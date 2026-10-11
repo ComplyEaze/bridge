@@ -298,7 +298,7 @@ fn parse_voucher_rows(
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 if scope.voucher_scalar() || (scope.collection() && tag != "VOUCHER") {
                     return Err("agent_read_protocol_invalid".into());
                 }
@@ -307,15 +307,12 @@ fn parse_voucher_rows(
                     for attribute in event.attributes() {
                         let attribute =
                             attribute.map_err(|_| "agent_read_protocol_invalid".to_string())?;
-                        if attribute.key.as_ref().eq_ignore_ascii_case(b"REMOTEID") {
+                        if attribute.key.as_ref().eq_ignore_ascii_case("REMOTEID") {
                             claim_agent_scalar(&mut row, "REMOTEID")?;
                             row.insert(
                                 "REMOTEID".into(),
                                 attribute
-                                    .decoded_and_normalized_value(
-                                        quick_xml::XmlVersion::Implicit1_0,
-                                        reader.decoder(),
-                                    )
+                                    .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                                     .map_err(|_| "agent_read_protocol_invalid".to_string())?
                                     .into_owned(),
                             );
@@ -359,10 +356,7 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::CData(text)) => {
-                let value = text
-                    .decode()
-                    .map_err(|_| "agent_read_protocol_invalid".to_string())?
-                    .into_owned();
+                let value = text.to_string();
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -387,7 +381,7 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
                         // Tally emits an amount-only container for a ledger entry with no
@@ -564,8 +558,12 @@ fn parse_voucher_rows(
                             "voucher_master_id_invalid",
                         )?;
                         identities.admit(row.get("GUID").map(String::as_str), master_id)?;
+                        // Emitted as the parsed number's text, never Tally's
+                        // padded form (" 1"), so it equals the same id read
+                        // elsewhere, as import verification already emits it (#989).
+                        let master_id = master_id.map(|id| id.to_string());
                         let amounts = std::mem::take(&mut entries);
-                        let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": row.get("MASTERID"), "amounts": amounts});
+                        let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": master_id, "amounts": amounts});
                         // Present only when the read asked Tally to resolve the
                         // row's voucher type (bridge#625).
                         if let Some(resolved) = resolve_row_voucher_type(&row, company_guid)? {
@@ -595,12 +593,14 @@ fn parse_voucher_rows(
                             Value::Bool(required_tally_bool(row.get("ISCANCELLED"))?);
                         parsed["optional"] =
                             Value::Bool(required_tally_bool(row.get("ISOPTIONAL"))?);
-                        // Unlike ISCANCELLED/ISOPTIONAL, a real capture has shown Tally
-                        // omitting ISPOSTDATED entirely rather than asserting "No" on every
-                        // voucher. required_tally_bool would refuse the whole read on that
-                        // shape; that is right for a tag known to always be present, but
-                        // wrong here; it would turn "Tally did not say" into a hard failure
-                        // instead of a legible unknown. So this field is optional like
+                        // Unlike ISCANCELLED/ISOPTIONAL, ISPOSTDATED is left out by a source
+                        // that does not report it: one old committed capture did, because it
+                        // was taken before the tag was in the fetch list and never asked for
+                        // it (protocol reference 8.2c records Tally asserting it on every
+                        // voucher once the fetch list asks). required_tally_bool would refuse
+                        // the whole read on that shape; that is right for a tag known to always
+                        // be present, but wrong here; it would turn "Tally did not say" into a
+                        // hard failure instead of a legible unknown. So this field is optional like
                         // EFFECTIVEDATE above: an absent or empty element is not observed and
                         // the key is omitted, never invented as `false`. A present value must
                         // be Yes/No: an unrecognised value refuses the read rather than
@@ -628,6 +628,22 @@ fn parse_voucher_rows(
                             .filter(|value| !value.is_empty())
                         {
                             parsed["reference"] = json!(reference);
+                        }
+                        // REFERENCEDATE (#1257) is the date of the supplier's invoice a voucher's
+                        // REFERENCE names. Like EFFECTIVEDATE above, an empty or absent element is
+                        // not observed and the key is omitted, never invented as ""; a present value
+                        // must be a date, as DATE must, or the read is refused. Tally sent the
+                        // element on every voucher with `TYPE="Date"`, empty or `YYYYMMDD`, in the
+                        // one live read of one synthetic book (protocol reference §8.2f); other
+                        // forms are accepted if they hold a date but have not been observed.
+                        if let Some(reference_date) = row
+                            .get("REFERENCEDATE")
+                            .map(|value| value.trim())
+                            .filter(|value| !value.is_empty())
+                        {
+                            bridge_tally_core::TallyDate::parse(reference_date.to_string())
+                                .map_err(|_| "voucher_reference_date_invalid".to_string())?;
+                            parsed["reference_date"] = json!(reference_date);
                         }
                         // ISINVOICE follows ISPOSTDATED's optional-boolean idiom exactly:
                         // absent or empty is "Tally did not say" and the key is omitted,
@@ -670,7 +686,7 @@ fn parse_voucher_rows(
                 current_tag.clear();
             }
             Ok(quick_xml::events::Event::Empty(event)) => {
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if scope.voucher_scalar() {
                     return Err("agent_read_protocol_invalid".into());
                 }
@@ -771,10 +787,7 @@ pub(super) fn mark_agent_xml(xml: &str) -> std::borrow::Cow<'_, str> {
 }
 
 pub(super) fn decoded_agent_text(text: quick_xml::events::BytesText<'_>) -> Result<String, String> {
-    let decoded = text
-        .decode()
-        .map_err(|_| "agent_read_protocol_invalid".to_string())?;
-    quick_xml::escape::unescape(&decoded)
+    quick_xml::escape::unescape(&text)
         .map(|value| value.into_owned())
         .map_err(|_| "agent_read_protocol_invalid".to_string())
 }
@@ -782,10 +795,7 @@ pub(super) fn decoded_agent_text(text: quick_xml::events::BytesText<'_>) -> Resu
 pub(super) fn decoded_agent_reference(
     reference: quick_xml::events::BytesRef<'_>,
 ) -> Result<String, String> {
-    let reference = reference
-        .decode()
-        .map_err(|_| "agent_read_protocol_invalid".to_string())?;
-    quick_xml::escape::unescape(&format!("&{reference};"))
+    quick_xml::escape::unescape(&format!("&{};", &*reference))
         .map(|value| value.into_owned())
         .map_err(|_| "agent_read_protocol_invalid".to_string())
 }

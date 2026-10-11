@@ -17,13 +17,11 @@ impl Server {
         .map_err(|code| ToolFailure::from(code.to_string()))?;
         let (company, identity, mut result_evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
-            let as_of = optional_string(args, "as_of")?
-                .as_deref()
-                .map(normalized_date)
-                .transpose()?
-                .unwrap_or_else(tally_host_today);
-            let to =
-                bridge_tally_core::TallyDate::parse(as_of).map_err(|_| "invalid_as_of".to_string())?;
+            let to = match optional_string(args, "as_of")?.as_deref().map(normalized_date) {
+                Some(as_of) => as_of?,
+                None => bridge_tally_core::TallyDate::parse(tally_host_today())
+                    .map_err(|_| "invalid_as_of".to_string())?,
+            };
             let ageing_basis =
                 optional_string(args, "ageing_basis")?.unwrap_or_else(|| "due_date".to_string());
             let ageing_anchor = match ageing_basis.as_str() {
@@ -41,7 +39,7 @@ impl Server {
                 .map_err(|error| ToolFailure::from_runtime("company_currency_probe_failed", error))?;
             result_evidence = combine_evidence(result_evidence.clone(), evidence_from_runtime_read(currency.evidence()));
             let assertion = currency.admit_inr_classified().map_err(str::to_string)?;
-            let as_of_date = to.as_str().to_string();
+            let as_of_date = to.clone();
             let (load, outstandings_evidence) = self
                 .runtime
                 .fetch_agent_outstandings_with_evidence(
@@ -80,6 +78,10 @@ impl Server {
                     .collect::<Vec<_>>();
                 let totals = outstanding_totals_from_open_bills(&all_bills)?;
                 let ageing_buckets = ageing_buckets_from_open_bills(&all_bills)?;
+                // Every open bill in the requested direction, which the totals
+                // and the ageing cover; the page below may show fewer. The page
+                // count is restated if the response size cuts it further.
+                let open_bills_total = all_bills.len();
                 let (bills, bills_truncated, next_bill_offset) =
                     paginate_open_bills(all_bills, bill_offset, bill_limit);
                 let bills = bills
@@ -97,11 +99,11 @@ impl Server {
                     })
                     .collect::<Vec<_>>();
                 Ok((
-                    json!({"totals":totals, "ageing_basis": if matches!(ageing_anchor, OutstandingsAgeingAnchor::BillDate) {"bill_date"} else {"due_date"}, "ageing_buckets": ageing_buckets, "top_parties": parties, "top_parties_ranked_by":"gross_exposure", "open_bills": bills, "offset": bill_offset, "limit": bill_limit, "next_offset": next_bill_offset, "unallocated":{"count": unallocated_count, "totals": unallocated_totals, "parties": unallocated, "truncated": unallocated_truncated, "next_offset": next_unallocated_offset}}),
+                    json!({"totals":totals, "ageing_basis": if matches!(ageing_anchor, OutstandingsAgeingAnchor::BillDate) {"bill_date"} else {"due_date"}, "ageing_buckets": ageing_buckets, "top_parties": parties, "top_parties_ranked_by":"gross_exposure", "open_bills_total": open_bills_total, "open_bills_shown": bills.len(), "open_bills": bills, "offset": bill_offset, "limit": bill_limit, "next_offset": next_bill_offset, "unallocated":{"count": unallocated_count, "totals": unallocated_totals, "parties": unallocated, "truncated": unallocated_truncated, "next_offset": next_unallocated_offset}}),
                     bills_truncated || unallocated_truncated,
                 ))
             };
-            let (result, bills_truncated) = match load {
+            let (mut result, bills_truncated) = match load {
                 OutstandingsLoadResult::Complete {
                     report: _,
                     statement_open_bills,
@@ -198,6 +200,10 @@ impl Server {
                     )
                 }
             };
+            // The date read as of is echoed whether the caller named it or it
+            // defaulted to the host's today, in every state, so a stated
+            // figure can be tied to the date it was read at.
+            result["as_of"] = json!(as_of_date);
             Ok(ToolOutcome {
                 payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
                 evidence: result_evidence.clone(),

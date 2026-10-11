@@ -1,0 +1,64 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "ab3d3f4e061679c1",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
+  "figures": [
+    {
+      "id": "related_parties_cl23.amount_total_5bf0b872",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9fbcd3abf5533e67",
+      "definition_text": "Sum of amount_<nature>_5bf0b872 across every nature configured for person (tag 5bf0b872).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.related_person_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "8feb927f1116a35a",
+      "definition_text": "Related persons confirmed by the client for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_5bf0b872",
+      "value": "",
+      "unit": "text",
+      "definition_sha256_16": "a17966c90f64deb5",
+      "definition_text": "Relationship confirmed by the client for related person (tag 5bf0b872) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

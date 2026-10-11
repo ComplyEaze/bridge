@@ -23,7 +23,7 @@ pub(super) async fn pick_file(
     tokio::task::spawn_blocking(move || {
         let Some(path) = rfd::FileDialog::new()
             .set_title(title)
-            .add_filter("Bridge source draft", extensions)
+            .add_filter("ComplyEaze Bridge source draft", extensions)
             .pick_file()
         else {
             return Ok(None);
@@ -43,8 +43,8 @@ pub(super) async fn pick_file(
 pub(super) async fn save_path() -> CommandResult<Option<PathBuf>> {
     tokio::task::spawn_blocking(|| {
         let Some(path) = rfd::FileDialog::new()
-            .set_title("Save Bridge source draft")
-            .add_filter("Bridge source draft", &["json"])
+            .set_title("Save ComplyEaze Bridge source draft")
+            .add_filter("ComplyEaze Bridge source draft", &["json"])
             .set_file_name("source.bridge-draft.json")
             .save_file()
         else {

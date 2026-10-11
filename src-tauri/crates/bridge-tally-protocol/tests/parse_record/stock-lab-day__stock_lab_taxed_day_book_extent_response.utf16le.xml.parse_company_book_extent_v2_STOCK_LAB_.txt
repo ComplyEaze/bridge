@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/stock-lab-day/stock_lab_taxed_day_book_extent_response.utf16le.xml
+# parser: parse_company_book_extent_v2(STOCK LAB)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE STOCK LAB",
+    company_guid: "1edb9b05-8d35-4c0c-9959-dce655730463",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20250421",
+    ),
+    voucher_alter_id_high_water: Some(
+        3,
+    ),
+    master_alter_id_high_water: Some(
+        241,
+    ),
+})

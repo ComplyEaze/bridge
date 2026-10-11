@@ -45,6 +45,253 @@ async fn session(server: Server, requests: &[Value]) -> Vec<Value> {
         .collect()
 }
 
+/// The server tells the client, once, how to start: which tool first, when to
+/// ask which company, and that the figures go to the AI provider. A host may
+/// drop it, so each statement is pinned here by its phrase and nothing else
+/// depends on it.
+#[tokio::test]
+async fn initialize_carries_the_server_instructions() {
+    for (import_enabled, writes_enabled) in [(false, false), (true, false), (true, true)] {
+        let instructions = served_instructions(import_enabled, writes_enabled).await;
+        for needle in [
+        "Start with list_companies",
+        "every tool that reads a company's books needs a company_guid from it",
+        "If exactly one company is open and the user named no client, use it and say which company in your first line.",
+        "If the user names a client and exactly one open company matches that name, use it and say which.",
+        "ask which, offering the list; never guess a company.",
+        "State the company, the exact dates and any ledger you used in the first line of your answer",
+        "Everything you read through these tools, amounts included, goes to the AI provider.",
+        "Otherwise, whether several are open or the name matches none or more than one, ask which",
+        "Put anything partial, withheld, not established or not checked in that first line, before the figures.",
+        "Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user.",
+        "Never get around a refusal by another route.",
+        "Ask before a read that scans vouchers over more than one month (for example vouchers, a register, ledger_movement or voucher_presence), saying the window you would read, unless the user already gave the dates or the financial year;",
+    ] {
+            assert!(instructions.contains(needle), "missing: {needle}");
+        }
+        assert!(
+            instructions.len() < 1_800,
+            "kept short: {}",
+            instructions.len()
+        );
+    }
+}
+
+/// An outstandings party detail reads the company's vouchers from the start of
+/// the books to `as_of`, whatever period the user named, so the exemption for a
+/// period the user gave must not reach it. The first wording of the scan rule
+/// listed it beside reads whose window the user's dates do set.
+#[tokio::test]
+async fn the_scan_rule_always_asks_before_an_outstandings_party_detail() {
+    for (import_enabled, writes_enabled) in [(false, false), (true, false), (true, true)] {
+        let instructions = served_instructions(import_enabled, writes_enabled).await;
+        assert!(
+            instructions.contains("unless the user already gave the dates or the financial year; an outstandings party detail reads from the start of the books whatever period was given, so always ask before it."),
+            "{instructions}"
+        );
+        let exemption = instructions
+            .find("unless the user already gave the dates")
+            .unwrap();
+        let detail = instructions.find("an outstandings party detail").unwrap();
+        assert!(
+            exemption < detail,
+            "the detail is named after the exemption, not inside it: {instructions}"
+        );
+        assert_eq!(
+            instructions.matches("outstandings party detail").count(),
+            1,
+            "{instructions}"
+        );
+        // After the first-line rules, so "that first line" still points at the answer's first line.
+        assert!(
+            instructions
+                .find("in that first line, before the figures.")
+                .unwrap()
+                < instructions.find("Ask before a read that scans").unwrap(),
+            "{instructions}"
+        );
+    }
+}
+
+async fn served_instructions(import_enabled: bool, writes_enabled: bool) -> String {
+    let directory = tempfile::tempdir().unwrap();
+    let mut served = server(directory.path());
+    served.settings.import_enabled = import_enabled;
+    served.settings.writes_enabled = writes_enabled;
+    let responses = session(served, &[initialize("2025-06-18")]).await;
+    responses[0]["result"]["instructions"]
+        .as_str()
+        .expect("initialize carries instructions")
+        .to_string()
+}
+
+/// Asking the user before posting told an assistant with no posting tool that
+/// posting was possible: in a plan-only eval, told to post, most plans called a
+/// post_import that was not served or promised to post after a yes. Each mode
+/// now says what it cannot do, and only the posting mode asks before posting.
+#[tokio::test]
+async fn the_instructions_say_what_this_connection_can_do_with_vouchers() {
+    let never_claimed = "never say that anything was or will be posted from this chat.";
+    let asks_before_posting = "Ask the user before you prepare or post anything, and never choose a ledger for a voucher on their behalf.";
+
+    let read_only = served_instructions(false, false).await;
+    assert!(
+        read_only.ends_with("This connection cannot prepare or post vouchers: if the user asks to enter or post anything in Tally, say so plainly, and never say that anything was or will be posted from this chat. Never choose a ledger for a voucher on their behalf."),
+        "{read_only}"
+    );
+    assert!(!read_only.contains(asks_before_posting), "{read_only}");
+    assert!(!read_only.contains("can only prepare"), "{read_only}");
+
+    let prepare = served_instructions(true, false).await;
+    for needle in [
+        "This connection cannot post to Tally: it can only prepare a local import file that the user imports in Tally themselves, so if they ask to post, say so plainly",
+        never_claimed,
+        "Ask the user before you prepare anything, and never choose a ledger for a voucher on their behalf.",
+    ] {
+        assert!(prepare.contains(needle), "missing: {needle}\n{prepare}");
+    }
+    assert!(
+        prepare.ends_with("Ask the user before you prepare anything, and never choose a ledger for a voucher on their behalf."),
+        "{prepare}"
+    );
+    assert!(!prepare.contains(asks_before_posting), "{prepare}");
+    assert!(
+        !prepare.contains("cannot prepare or post vouchers"),
+        "{prepare}"
+    );
+
+    let post = served_instructions(true, true).await;
+    assert!(post.ends_with(asks_before_posting), "{post}");
+    assert!(
+        !post.contains("cannot post") && !post.contains(never_claimed),
+        "{post}"
+    );
+
+    // Writes alone mean posting: the setting turns import on with it.
+    assert_eq!(served_instructions(false, true).await, post);
+}
+
+/// Every `description` string under `value`, with the JSON path that holds it.
+fn descriptions<'a>(value: &'a Value, path: &str, out: &mut Vec<(String, &'a str)>) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                let child_path = format!("{path}.{key}");
+                match (key.as_str(), child) {
+                    ("description", Value::String(text)) => out.push((child_path, text)),
+                    _ => descriptions(child, &child_path, out),
+                }
+            }
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                let name = item["name"]
+                    .as_str()
+                    .map_or(index.to_string(), str::to_string);
+                descriptions(item, &format!("{path}[{name}]"), out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The server instructions and every tool and parameter description pair their
+/// backticks, checked as `initialize` and `tools/list` serve them, with posting
+/// off and on. One lost backtick turns every later code span in that text inside
+/// out, and a test that looks for a phrase still finds it: a merge into #1049
+/// left "whatever the statetop` ranks" in the outstandings description (#1109).
+///
+/// Parity only: an even number of lost or added backticks in one text passes.
+/// Not covered: the texts in tool results (headlines, `limitations`,
+/// `next_step` and refusal lines), which an assistant also reads but which
+/// `tools/list` does not serve.
+#[tokio::test]
+async fn every_served_description_and_instruction_pairs_its_backticks() {
+    let mut tool_counts = Vec::new();
+    for (import_enabled, writes_enabled) in
+        [(false, false), (true, false), (false, true), (true, true)]
+    {
+        let directory = tempfile::tempdir().unwrap();
+        let mut served = server(directory.path());
+        served.settings.max_bytes = 4_000_000;
+        served.settings.import_enabled = import_enabled;
+        served.settings.writes_enabled = writes_enabled;
+        let responses = session(
+            served,
+            &[
+                initialize("2025-06-18"),
+                json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            ],
+        )
+        .await;
+        let mut texts = Vec::new();
+        let instructions = responses[0]["result"]["instructions"]
+            .as_str()
+            .expect("initialize carries instructions");
+        texts.push(("instructions".to_string(), instructions));
+        let tools = &responses[1]["result"]["tools"];
+        let count = tools.as_array().expect("tools/list result").len();
+        for tool in tools.as_array().unwrap() {
+            assert!(tool["description"].is_string(), "{}", tool["name"]);
+        }
+        descriptions(tools, "tools", &mut texts);
+        let unpaired: Vec<&str> = texts
+            .iter()
+            .filter(|(_, text)| text.matches('`').count() % 2 == 1)
+            .map(|(path, _)| path.as_str())
+            .collect();
+        assert!(
+            unpaired.is_empty(),
+            "import_enabled={import_enabled} writes_enabled={writes_enabled}: unpaired backtick in {unpaired:?}"
+        );
+        tool_counts.push(count);
+    }
+    // The flags must change what is served, or the posting-on cases checked nothing new.
+    assert!(tool_counts[3] > tool_counts[0], "{tool_counts:?}");
+}
+
+/// A client that asked for tiny responses still gets its handshake: below the
+/// floor that carries guidance, `initialize` omits the instructions and keeps
+/// everything else.
+#[tokio::test]
+async fn initialize_omits_the_instructions_below_the_guidance_floor() {
+    for (max_bytes, carries) in [(256, false), (4_095, false), (4_096, true)] {
+        let directory = tempfile::tempdir().unwrap();
+        let mut small = server(directory.path());
+        small.settings.max_bytes = max_bytes;
+        let responses = session(small, &[initialize("2025-06-18")]).await;
+        let result = &responses[0]["result"];
+        assert_eq!(result["protocolVersion"], "2025-06-18", "{max_bytes}");
+        assert_eq!(result["instructions"].is_string(), carries, "{max_bytes}");
+    }
+    // A request id near the cap leaves no room for them either: the handshake
+    // still succeeds, without, and a retry is not met with `already_initialized`.
+    let directory = tempfile::tempdir().unwrap();
+    let mut long_id = initialize("2025-06-18");
+    long_id["id"] = json!("i".repeat(3_000));
+    let mut small = server(directory.path());
+    small.settings.max_bytes = 4_096;
+    let responses = session(small, &[long_id]).await;
+    assert_eq!(responses[0]["result"]["protocolVersion"], "2025-06-18");
+    assert!(responses[0]["result"].get("instructions").is_none());
+    // The id bound is on its serialized length: 256 bytes, quotes included,
+    // still carries the instructions and 257 does not.
+    for (characters, carries) in [(254, true), (255, false)] {
+        let directory = tempfile::tempdir().unwrap();
+        let mut request = initialize("2025-06-18");
+        request["id"] = json!("i".repeat(characters));
+        let mut small = server(directory.path());
+        small.settings.max_bytes = 4_096;
+        let responses = session(small, &[request]).await;
+        assert_eq!(responses[0]["result"]["protocolVersion"], "2025-06-18");
+        assert_eq!(
+            responses[0]["result"]["instructions"].is_string(),
+            carries,
+            "{characters}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn negotiates_fallback_and_returns_complete_text_to_legacy_clients() {
     for (requested, expected) in [

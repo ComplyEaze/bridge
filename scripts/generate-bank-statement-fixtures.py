@@ -8,6 +8,8 @@ calibrated on (column bounds, anchors, the stacked SBI date), which is already
 public in that module. The Union Bank statement carries only the row *shapes*
 recorded in the `Bank::Ubi` profile; its x positions are invented, because
 that profile reads each row as one line of text and has no column bounds.
+The Bank of Baroda statement carries the measured geometry of two real statements
+(column positions and shapes only, no values) in its own section below.
 
 Standard library only, and deterministic: the same script writes the same
 bytes, so `--check` can prove the committed fixtures are this script's output
@@ -129,6 +131,43 @@ def ending_at(edge, x, text):
     return (x, text)
 
 
+class Drawn:
+    """A page that is not plain text lines: its own content operators, and
+    whether it places the one small image (`/Im1`). A statement re-scanned by a
+    phone app, or printed to PDF, reaches the parser as pages like these."""
+
+    def __init__(self, ops, image=False):
+        self.ops = ops
+        self.image = image
+
+
+# An 8x8 8-bit grey image, uncompressed: a mid-grey field with one dark pixel
+# per row, so it is not a blank page.
+IMAGE_SIZE = 8
+IMAGE_DATA = bytes(
+    (40 if column == row else 200)
+    for row in range(IMAGE_SIZE) for column in range(IMAGE_SIZE))
+
+
+def full_page_image(width, height):
+    return f"q {width:g} 0 0 {height:g} 0 0 cm /Im1 Do Q"
+
+
+def path_glyphs(height, lines):
+    """Text drawn as filled rectangles, one per non-space character, at the
+    positions `content` would put the characters: what a printer driver writes
+    when it converts glyphs to outlines. No text object, so no extractable text."""
+    ops = []
+    for top, cells in lines:
+        for x, text in cells:
+            for index, character in enumerate(text):
+                if character != " ":
+                    left = x + index * GLYPH
+                    bottom = height - top - 0.629 * FONT_SIZE
+                    ops.append(f"{left:.3f} {bottom:.3f} {GLYPH * 0.8:.3f} {FONT_SIZE * 0.7:.3f} re f")
+    return "\n".join(ops)
+
+
 def write_pdf(pages, width, height, user, owner, seed, rotate=0):
     file_id = hashlib.md5(seed.encode("ascii")).digest()
     owner_value = owner_entry(owner, user)
@@ -138,17 +177,32 @@ def write_pdf(pages, width, height, user, owner, seed, rotate=0):
     objects = {}
     page_numbers = []
     next_number = 5
+    drawn = [page for page in pages if isinstance(page, Drawn) and page.image]
+    image_number = None
+    if drawn:
+        # numbered after every page and stream, so a fixture without an image
+        # is byte-identical to what this script wrote before images existed
+        image_number = 5 + 2 * len(pages)
+        image = rc4(object_key(key, image_number), IMAGE_DATA)
+        objects[image_number] = (
+            f"<< /Type /XObject /Subtype /Image /Width {IMAGE_SIZE} /Height {IMAGE_SIZE} "
+            f"/ColorSpace /DeviceGray /BitsPerComponent 8 /Length {len(image)} >>\nstream\n"
+        ).encode("ascii") + image + b"\nendstream"
     for page_lines in pages:
         page_number, stream_number = next_number, next_number + 1
         next_number += 2
         page_numbers.append(page_number)
-        stream = rc4(object_key(key, stream_number), content(height, page_lines))
+        uses_image = isinstance(page_lines, Drawn) and page_lines.image
+        body = page_lines.ops.encode("latin-1") if isinstance(page_lines, Drawn) \
+            else content(height, page_lines)
+        stream = rc4(object_key(key, stream_number), body)
         objects[stream_number] = (
             f"<< /Length {len(stream)} >>\nstream\n".encode("ascii")
             + stream + b"\nendstream")
+        xobject = f" /XObject << /Im1 {image_number} 0 R >>" if uses_image else ""
         objects[page_number] = (
             f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width:g} {height:g}] /Rotate {rotate} "
-            f"/Resources << /Font << /F1 3 0 R >> >> /Contents {stream_number} 0 R >>"
+            f"/Resources << /Font << /F1 3 0 R >>{xobject} >> /Contents {stream_number} 0 R >>"
         ).encode("ascii")
     objects[1] = b"<< /Type /Catalog /Pages 2 0 R >>"
     kids = " ".join(f"{n} 0 R" for n in page_numbers)
@@ -350,6 +404,129 @@ UBI_PAGE_2 = (
 )
 
 
+# --------------------------------------------------------------------------- #
+# Bank of Baroda-like statement                                                       #
+# --------------------------------------------------------------------------- #
+# The geometry is measured (two real statements read through PDFium): the
+# transaction date spans x 15-65 and the value date 87-137 on every row, the
+# narration starts at 148 and wraps at 360, withdrawals end at 543, deposits at
+# 662 and the balance at 787, a row's amount sits on its own line up to 12pt
+# below the date line, the newest row comes first, the column header is printed
+# on page 1 only, and every page ends with a `<date> <time> <word> Page N of M`
+# footer and a disclaimer line. Every word, number and amount below is invented;
+# the bank cuts a narration at about 50 characters, and the
+# fixture's two wrapped ones are longer, because Courier is wider than the
+# bank's font.
+
+BOB_DATE_X, BOB_VALUE_X, BOB_NARRATION_X = 15.0, 87.0, 149.5
+BOB_WRAP = 359.5   # a 50-character fragment ends here
+
+
+def indian(amount_paise):
+    """12345678 paise -> '1,23,456.78'."""
+    rupees, paise = divmod(amount_paise, 100)
+    digits = str(rupees)
+    head, tail = digits[:-3], digits[-3:]
+    groups = []
+    while head:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    return ",".join(groups + [tail]) + f".{paise:02d}"
+
+
+def bob_row(top, date, narration, side, amount, balance, amount_dy=0, cheque=None):
+    """`narration` is a list of printed fragments; `balance` is signed paise."""
+    cells = [(BOB_DATE_X, date), (BOB_VALUE_X, date),
+             (BOB_NARRATION_X, narration[0]),
+             right_aligned(787.14, indian(abs(balance)) + ("Cr" if balance >= 0 else "Dr"))]
+    if cheque:
+        cells.append((415.5, cheque))
+    lines = [(top, cells)]
+    edge = 543.0 if side == "dr" else 662.0
+    if amount_dy:
+        lines.append((top + amount_dy, [right_aligned(edge, indian(amount))]))
+    else:
+        cells.append(right_aligned(edge, indian(amount)))
+    for index, fragment in enumerate(narration[1:], start=1):
+        lines.append((top + 11 * index, [(BOB_NARRATION_X, fragment)]))
+    return lines
+
+
+def bob_footer(number, count):
+    return [(1165, [(10, f"09/10/2026 10:30 SYNTH-ID/00000 Page {number} of {count}")]),
+            (1185, [(10, "*This is computer-generated statement.No signature is required.")])]
+
+
+# oldest first: (date, narration fragments, side, amount in paise, amount_dy, cheque)
+BOB_ROWS = [
+    ("03/08/2026", ["BY CASH"], "cr", 75050, 0, None),
+    ("03/08/2026", ["UPI/600000000001/10:15:30/UPI/nw@okzz/ZZZZ BANK"], "cr", 150000, 0, None),
+    ("03/08/2026", ["UPI/600000000002/11:20:45/UPI/northwind.traders.sy",
+                    "nthetic@okzzzzzz/SYNTH"], "cr", 987654, 6, None),
+    ("04/08/2026", ["NEFT-ZZZZZ00000000001-ACME INDUSTRIES-EAST"], "dr", 225050, 0, None),
+    ("04/08/2026", ["RTGS-ZZZZZ00000000000000002-GREEN FIELD",
+                    "LTD"], "dr", 1200000, 6, None),
+    ("05/08/2026", ["IMPS/P2A/600000000003/ZZZZZZZZZZ1 234/NOTE"], "dr", 50000, 0, None),
+    ("05/08/2026", ["CHARGES FOR :IMPS/P2A/600000000003/XXXXXXXX",
+                    "0000", "0001"], "dr", 590, 11, None),
+    ("06/08/2026", ["Loan Recovery For00000000000001"], "dr", 300000, 0, None),
+    ("06/08/2026", ["SMS Charges for AUG 26"], "dr", 1180, 0, None),
+    ("07/08/2026", ["MBK/600000000004/12:00:00/SOME NAME"], "cr", 40000, 0, None),
+    ("07/08/2026", ["UPI/600000000005/09:09:09/UPI/cutoff@ok"], "cr", 10000, 0, None),
+    ("08/08/2026", ["SYNTHETIC SUPPLIES-MICR INWARD CLG (CTS)"], "dr", 8000000, 0, "000417"),
+    ("08/08/2026", ["EBANK:WIB/0000000001/order payment"], "dr", 100000, 0, None),
+    ("10/08/2026", ["NEFT-ZZZZZ00000000003-BLUE RIVER CO"], "cr", 6000000, 0, None),
+]
+BOB_OPENING = 1000000   # paise: 10,000.00 Cr
+
+
+def bob_statement():
+    """Printed lines, newest first, and the balance after each row."""
+    balance, built = BOB_OPENING, []
+    for date, narration, side, amount, dy, cheque in BOB_ROWS:
+        balance += amount if side == "cr" else -amount
+        built.append((date, narration, side, amount, balance, dy, cheque))
+    return list(reversed(built)), balance
+
+
+BOB_PRINTED, BOB_CLOSING = bob_statement()
+BOB_PAGE_BREAK = 9   # rows on page 1; the rest start page 2 with no header
+
+
+def bob_pages():
+    header = [
+        (71, [(10, "Your Account Statement as on 09/10/2026"), (640, "123XXXXXXXX456")]),
+        (90, [(10, "SYNTHETIC STATEMENT - NOT A REAL ACCOUNT")]),
+        (102, [(10, "SYNTHETIC CUSTOMER NAME"), (640, "BRANCH ZZ01")]),
+        (125, [(640, "123XXXXXXXX456")]),
+        # The identity line of the measured statements: the label, an invented code with the
+        # bank's prefix, and a right-hand label pair on the same visual line.
+        (211, [(10, "IFSC Code:"), (110, "BARB0SYNTH1"), (485, "Product"), (534, "Cur:"), (600, "IN")]),
+        (268, [(10, "Statement of transactions in Current Account 123XXXXXXXX456 "
+                    "in INR for the period 01/08/2026 - 31/08/2026")]),
+        (324, [(10, "TRAN"), (41, "DATE"), (82, "VALUE"), (119, "DATE"),
+               (160, "NARRATION"), (365, "CHQ.NO."), (457, "WITHDRAWAL(DR)"),
+               (602, "DEPOSIT(CR)"), (719, "BALANCE(INR)")]),
+    ]
+    pages = []
+    for number, (chunk, top, lead) in enumerate(
+            [(BOB_PRINTED[:BOB_PAGE_BREAK], 342, header),
+             (BOB_PRINTED[BOB_PAGE_BREAK:], 68, [])], start=1):
+        lines = list(lead)
+        for date, narration, side, amount, balance, dy, cheque in chunk:
+            lines += bob_row(top, date, narration, side, amount, balance, dy, cheque)
+            top += 18 + 11 * (len(narration) - 1)
+        lines += bob_footer(number, 2)
+        pages.append(tuple(lines))
+    return pages
+
+
+# What a phone scanner app prints over a page: words, and no digit.
+SCAN_STAMP = (
+    (820, [(28, "SCANNED WITH A PHONE APP")]),
+)
+
+
 FIXTURES = {
     # opened with the user password
     "hdfc-synthetic.pdf": dict(
@@ -369,6 +546,35 @@ FIXTURES = {
     "ubi-synthetic.pdf": dict(
         pages=[UBI_PAGE_1, UBI_PAGE_2], width=595, height=842,
         user="synthetic-user-7788", owner="synthetic-owner-unused-c", seed="ubi"),
+    # owner-password encryption only (the user password is empty, as on a downloaded
+    # Bank of Baroda statement); one visual line per amount, newest row first, no printed totals
+    "bob-synthetic.pdf": dict(
+        pages=bob_pages(), width=842, height=1200,
+        user="", owner="synthetic-owner-unused-h", seed="bob"),
+    # No text at all: a statement re-scanned by a phone app is one image per page
+    "scan-image-only.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842), image=True)] * 2, width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-d", seed="scan"),
+    # No text object either: the HDFC page 1 lines, every character drawn as a
+    # filled path, as a printer driver writes them
+    "print-to-pdf-vector-glyphs.pdf": dict(
+        pages=[Drawn(path_glyphs(842, HDFC_PAGE_1))], width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-e", seed="vector"),
+    # A scan with a visible stamp from the scanner app: real text, but no figures
+    "scan-with-visible-stamp.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842) + "\n"
+                     + content(842, SCAN_STAMP).decode("latin-1"),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-f", seed="stamp"),
+    # Real text, with a logo image and a light path watermark: must still read
+    "hdfc-logo-and-watermark.pdf": dict(
+        pages=[Drawn("q 40 0 0 40 20 770 cm /Im1 Do Q\n"
+                     "q 0.9 g 0.7 0.7 -0.7 0.7 120 300 cm 0 0 360 60 re f Q\n"
+                     + content(842, HDFC_PAGE_1).decode("latin-1"),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-g", seed="logo"),
 }
 
 

@@ -1,0 +1,141 @@
+{
+ "comment": "bank_reconciliation on a statement whose only fault is its last row's balance (Rs 2.50 under the declared closing): the rows sum to that closing, the chain holds, and the first row carries no balance, so no first row tie is reported. Every unmatched row is not computed.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_last_off-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_last_off-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_last_off-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_last_off-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_last_off-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 500000,
+   "debit": 3000,
+   "credit": 4000,
+   "closing": 499000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "l01",
+   "date": "2025-06-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     3000
+    ],
+    [
+     "Customer A",
+     -3000
+    ]
+   ]
+  },
+  {
+   "guid": "l02",
+   "date": "2025-06-25",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -4000
+    ],
+    [
+     "Supplier B",
+     4000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_statement": {
+  "doc_id": "bank:edge:last_off",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2025-06-01",
+   "end": "2025-06-30"
+  },
+  "opening_balance_paise": 500000,
+  "closing_balance_paise": 504000,
+  "rows": [
+   {
+    "doc": "bank:edge:last_off",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-02",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 3000,
+    "balance_paise": null
+   },
+   {
+    "doc": "bank:edge:last_off",
+    "row": 1,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-09",
+    "narration": "CHQ 301",
+    "debit_paise": 1000,
+    "credit_paise": 0,
+    "balance_paise": 501750
+   },
+   {
+    "doc": "bank:edge:last_off",
+    "row": 2,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-16",
+    "narration": "NEFT UNKNOWN",
+    "debit_paise": 0,
+    "credit_paise": 2000,
+    "balance_paise": 503750
+   }
+  ]
+ }
+}

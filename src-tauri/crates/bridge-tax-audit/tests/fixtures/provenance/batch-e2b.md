@@ -61,5 +61,5 @@ lists. A control run at `140bc7d3` reproduced the three goldens it replaces byte
 | `hvr_bare.json` | 1,611 | `7767924cf40a464b3fc25fdcbe870921db918f637536049537b707a4e72e2523` | `edge-books/hvr_bare.json` |
 | `hvr_paths.json` | 10,843 | `f36437bb51a2fc8c18fa8151be175d5a03fcd7d6e1fd8f5ab088636fb1582b93` | `edge-books/hvr_paths.json` |
 | `edge.hvr_bare.high_value_register.json` | 22,750 | `ffe3d4ad46240ce769ed6d7a747fc04bc42129e57ab08f1fd5be291859eb9764` | `golden/edge.hvr_bare.high_value_register.json` |
-| `edge.hvr_paths.high_value_register.json` | 72,530 | `9d9a0f59ab69a461a48ddf310e6c6428796c5b1c563a00bd4daa99ebec3fc8f1` | `golden/edge.hvr_paths.high_value_register.json` |
-| `synthetic.high_value_register.json` | 55,298 | `954fa976447f3e2c78aff4f093955119f355aa2a41a569455cba8b8bfe1967cf` | `golden/synthetic.high_value_register.json` |
+| `edge.hvr_paths.high_value_register.json` | 72,939 | `d185141e57bc83f3188d0527b2b0885deda03afdb50fb779155835c886ab14d0` | `golden/edge.hvr_paths.high_value_register.json` |
+| `synthetic.high_value_register.json` | 55,707 | `9575d71ef949bd3426defd90b03c027aa72ee3e4d109215dd439ebb0a0a3441a` | `golden/synthetic.high_value_register.json` |

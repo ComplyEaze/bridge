@@ -130,7 +130,7 @@ test("local-only and failed report reads have distinct no-evidence drawer entrie
   assert.match(panel, /This drawer was opened for local evidence review, not from an Outstandings report\./);
   assert.match(panel, /entry\.kind === "report-read-failed"/);
   assert.match(panel, /Outstandings read failed/);
-  assert.match(panel, /Bridge could not complete the report-bound read: \{entry\.message\}/);
+  assert.match(panel, /ComplyEaze Bridge could not complete the report-bound read: \{entry\.message\}/);
   assert.doesNotMatch(panel.slice(panel.indexOf('entry.kind === "report-read-failed"'), panel.indexOf("const { evidence } = entry")), /local evidence review/);
 });
 

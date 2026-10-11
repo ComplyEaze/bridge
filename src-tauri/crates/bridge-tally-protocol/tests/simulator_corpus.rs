@@ -705,13 +705,11 @@ fn captured_year_end_split_companies_keep_their_distinguishing_tuple() {
             .read_event()
             .expect("captured Company XML is well formed")
         {
-            Event::Start(element) if element.name().as_ref() == b"MASTERID" => {
+            Event::Start(element) if element.name().as_ref() == "MASTERID" => {
                 master_ids.push(
                     reader
                         .read_text(element.name())
                         .expect("MASTERID has text")
-                        .decode()
-                        .expect("MASTERID text is valid")
                         .trim()
                         .to_owned(),
                 );

@@ -1,0 +1,134 @@
+{
+ "comment": "bank_reconciliation on a statement whose rows carry no balance and whose declared closing is not its opening plus its rows (Rs 55 apart): no first or last row tie is reported, the chain counts no break, and every unmatched row is not computed.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_sum_off-000"
+  },
+  {
+   "name": "Customer A",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bankrec_sum_off-001"
+  },
+  {
+   "name": "Supplier B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bankrec_sum_off-002"
+  },
+  {
+   "name": "Bank Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bankrec_sum_off-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bankrec_sum_off-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Edge Bank",
+   "opening": 500000,
+   "debit": 20000,
+   "credit": 8000,
+   "closing": 512000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "s01",
+   "date": "2025-06-03",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Edge Bank",
+     20000
+    ],
+    [
+     "Customer A",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-06-18",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Edge Bank",
+     -8000
+    ],
+    [
+     "Supplier B",
+     8000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "bank_reconciliation"
+ ],
+ "bank_reconciliation_ledger": "Edge Bank",
+ "bank_charge_terms": [
+  "sms alert"
+ ],
+ "bank_statement": {
+  "doc_id": "bank:edge:sum_off",
+  "source_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "account_ref": "XXXXXX0009",
+  "bank": "Invented Bank",
+  "period": {
+   "start": "2025-06-01",
+   "end": "2025-06-30"
+  },
+  "opening_balance_paise": 500000,
+  "closing_balance_paise": 525000,
+  "rows": [
+   {
+    "doc": "bank:edge:sum_off",
+    "row": 0,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-03",
+    "narration": "NEFT CUSTOMER A",
+    "debit_paise": 0,
+    "credit_paise": 20000,
+    "balance_paise": null
+   },
+   {
+    "doc": "bank:edge:sum_off",
+    "row": 1,
+    "account_ref": "XXXXXX0009",
+    "txn_date": "2025-06-10",
+    "narration": "SMS ALERT CHARGES",
+    "debit_paise": 500,
+    "credit_paise": 0,
+    "balance_paise": null
+   }
+  ]
+ }
+}

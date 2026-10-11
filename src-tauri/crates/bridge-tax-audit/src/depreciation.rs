@@ -7,13 +7,15 @@
 //!     "vehicles" block code) -- `block_by_ledger` therefore maps a Fixed Assets ledger straight
 //!     to a rate-based block key (e.g. "plant_machinery_15"), never a books display category.
 //!   * Additions are debit lines on a mapped asset ledger in population vouchers, dated the
-//!     voucher date UNLESS `put_to_use_by_voucher` overrides it for that voucher's guid.
+//!     voucher date UNLESS `put_to_use_by_voucher` overrides it for that voucher's guid (every
+//!     voucher holding that guid, as the client's list names it).
 //!     ASSUMPTION, stated as a limit on every addition: put to use = purchase date (no separate
 //!     commissioning/technical certificate is visible in Tally).
 //!   * Deletions are credit lines on a mapped asset ledger, EXCLUDING the ledger's own credit
 //!     lines inside a depreciation journal (a voucher is a depreciation journal iff it also
 //!     carries a line on a ledger in `dep_expense_ledgers` -- identified by the sibling ledger,
-//!     never by date/number heuristics).
+//!     never by date/number heuristics, and by its own lines, never by another voucher that
+//!     holds its GUID).
 //!   * GST input tax and TCS lines never enter an addition's cost: an addition is read off the
 //!     asset ledger's OWN line only, and GST/TCS sit on separate ledger lines in the same voucher
 //!     by construction; `gst_tcs_addition_lines_seen_count` confirms this is exercised on data,
@@ -49,13 +51,27 @@
 //! (population vouchers + `dep_expense_ledgers`, the latter read back from a figure's evidence,
 //! never recomputed) and compares it to the Trial Balance's OWN closing balance, read directly --
 //! the tautology guard: the right-hand side can never be the same computation as the left.
+//!
+//! Where a voucher is meant it is never told by its GUID, which can be blank or repeated (#1243).
+//! A depreciation journal is decided by the voucher's own lines. The same-day search for a cash
+//! payment to an addition's supplier skips only the voucher itself, by its [`VoucherKey`]. A
+//! cash-flagged addition's row id is a hash of its voucher's GUID and its ledger's tag; one that
+//! would repeat (two such additions with one GUID, or two cash-paid lines of one voucher on one
+//! ledger) takes its place among the rows sharing it as a suffix, in the rows' order: block ledger
+//! by name, then the books' order, then line order. Every other id is as before, and a suffix can
+//! renumber when a row sharing the id is added earlier in the books. A citation still names a
+//! voucher by its GUID and label. A population whose keys would not be unique (a GUID holding a
+//! NUL, which no read produces) is refused with [`AuditError::VoucherKeysNotUnique`], as the
+//! reference raises. DEP-1 still tells a depreciation journal by GUID, as the reference's does: it
+//! subtracts deletions and depreciation credited alike, and DEP-2 asks only whether a ledger moved,
+//! so that split changes neither result for any amounts short of the 64-bit range.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 use sha2::Sha256;
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -206,12 +222,14 @@ pub struct DepreciationData<'a> {
 /// cash ledger -- the supplier was in substance paid in cash that day. Route (b)'s total can
 /// double-count if one same-day cash payment to that counterparty covers several invoices --
 /// named as a limit on the Finding, never hidden, same convention as `cash_payments_40a3`'s
-/// lump-entry caveat.
-fn cash_exposure<'a>(
-    v: &'a Voucher,
+/// lump-entry caveat. Another voucher is any but `v` itself, told by `key`: one that holds `v`'s
+/// GUID is still another voucher.
+fn cash_exposure(
+    key: &VoucherKey,
+    v: &Voucher,
     asset_ledger: &str,
     cash: &BTreeSet<String>,
-    pop_by_date: &BTreeMap<TallyDate, Vec<&'a Voucher>>,
+    pop_by_date: &BTreeMap<TallyDate, Vec<(&VoucherKey, &Voucher)>>,
 ) -> Result<(i64, Option<&'static str>)> {
     let mut same_voucher_cash: i64 = 0;
     for l in &v.lines {
@@ -238,8 +256,11 @@ fn cash_exposure<'a>(
     }
     let mut total: i64 = 0;
     if let Some(others) = pop_by_date.get(&v.date) {
-        for &other in others {
-            if other.guid == v.guid {
+        for &(other_key, other) in others {
+            // Kept line for line with the reference, where it changes nothing either: this
+            // branch is reached only when the voucher itself pays no cash, and such a voucher is
+            // passed over just below.
+            if other_key == key {
                 continue;
             }
             let mut other_cash: i64 = 0;
@@ -284,25 +305,18 @@ pub fn compute_depreciation<'a>(
     dep_expense_ledgers: &BTreeSet<String>,
     put_to_use_by_voucher: &BTreeMap<String, TallyDate>,
 ) -> Result<DepreciationData<'a>> {
-    let pop = book.population()?;
+    let keyed = voucher_keys(&book.population()?)?;
     let half_rate_days = rules.depreciation_half_rate_days_threshold;
     let cash_limit = rules.depreciation_cash_addition_limit_paise;
     let cash = book.ledgers_under_any(&[CASH_GROUP.to_string()]);
     let fa_ledgers = book.ledgers_under_any(&[FIXED_ASSETS_GROUP.to_string()]);
 
-    let dep_journal_guids: BTreeSet<&str> = pop
-        .iter()
-        .filter(|v| {
-            v.lines
-                .iter()
-                .any(|l| dep_expense_ledgers.contains(&l.ledger))
-        })
-        .map(|v| v.guid.as_str())
-        .collect();
-
-    let mut pop_by_date: BTreeMap<TallyDate, Vec<&Voucher>> = BTreeMap::new();
-    for &v in &pop {
-        pop_by_date.entry(v.date.clone()).or_default().push(v);
+    let mut pop_by_date: BTreeMap<TallyDate, Vec<(&VoucherKey, &Voucher)>> = BTreeMap::new();
+    for (key, v) in &keyed {
+        pop_by_date
+            .entry(v.date.clone())
+            .or_default()
+            .push((key, *v));
     }
 
     let mut additions: BTreeMap<String, Vec<Addition>> = BTreeMap::new();
@@ -310,8 +324,11 @@ pub fn compute_depreciation<'a>(
     let mut dep_credited: BTreeMap<String, i64> = BTreeMap::new();
     let mut gst_tcs_lines_seen: i64 = 0;
 
-    for &v in &pop {
-        let is_dep_journal = dep_journal_guids.contains(v.guid.as_str());
+    for (key, v) in keyed.iter().map(|(k, v)| (k, *v)) {
+        let is_dep_journal = v
+            .lines
+            .iter()
+            .any(|l| dep_expense_ledgers.contains(&l.ledger));
         for l in &v.lines {
             if !block_by_ledger.contains_key(&l.ledger) {
                 continue;
@@ -321,7 +338,8 @@ pub fn compute_depreciation<'a>(
                     .get(&v.guid)
                     .cloned()
                     .unwrap_or_else(|| v.date.clone());
-                let (cash_paise, cash_reason) = cash_exposure(v, &l.ledger, &cash, &pop_by_date)?;
+                let (cash_paise, cash_reason) =
+                    cash_exposure(key, v, &l.ledger, &cash, &pop_by_date)?;
                 additions
                     .entry(l.ledger.clone())
                     .or_default()
@@ -527,7 +545,7 @@ pub fn run(
 same voucher, confirmed to be separate ledger lines never summed into the asset ledger's own \
 debit amount -- verified on data, not merely asserted.",
         Vec::new(),
-    );
+    )?;
 
     for name in &fa_ledgers {
         let h = stable_ledger_tag(book, name)?;
@@ -543,7 +561,7 @@ debit amount -- verified on data, not merely asserted.",
                 "Depreciation block this Fixed Assets ledger (tag {h}) is mapped to, or 'unmapped'."
             ),
             vec![EvidenceRef::new("ledger", name)],
-        );
+        )?;
     }
 
     r.fig(
@@ -556,7 +574,7 @@ voucher that credits each asset ledger for its year's book depreciation).",
             .iter()
             .map(|n| EvidenceRef::new("ledger", n))
             .collect(),
-    );
+    )?;
 
     if !data.unmapped.is_empty() {
         let ev: Vec<EvidenceRef> = data
@@ -571,7 +589,7 @@ voucher that credits each asset ledger for its year's book depreciation).",
             "Fixed Assets ledgers with a non-zero Trial Balance closing balance, TB movement, or \
 FY voucher activity that the client's setup does not map to a depreciation block.",
             ev.clone(),
-        );
+        )?;
         r.findings.push(Finding {
             id: format!("{TEST_ID}/unmapped"),
             clauses: vec!["s.32".to_string(), "3CD-18".to_string()],
@@ -619,7 +637,7 @@ classified into a block in the client's setup."
             Unit::Paise,
             &format!("Opening (1-4) Income-tax Act WDV for block '{block_key}'."),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("additions_ge180_{block_key}"),
             Value::Int(b.additions_ge180_paise),
@@ -630,7 +648,7 @@ classified into a block in the client's setup."
                 rules.depreciation_half_rate_days_threshold
             ),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("additions_lt180_{block_key}"),
             Value::Int(b.additions_lt180_paise),
@@ -641,7 +659,7 @@ classified into a block in the client's setup."
                 rules.depreciation_half_rate_days_threshold
             ),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("deletions_{block_key}"),
             Value::Int(b.deletions_paise),
@@ -651,7 +669,7 @@ classified into a block in the client's setup."
 depreciation journal)."
             ),
             ev.clone(),
-        );
+        )?;
         let f_act = r.fig(
             &format!("dep_total_act_{block_key}"),
             Value::Int(b.dep_total_paise),
@@ -664,14 +682,14 @@ additions put to use fewer than {days} days before period end, net of any deleti
                 days = rules.depreciation_half_rate_days_threshold
             ),
             ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("closing_wdv_{block_key}"),
             Value::Int(b.closing_paise),
             Unit::Paise,
             &format!("Closing Income-tax Act WDV for block '{block_key}'."),
             ev.clone(),
-        );
+        )?;
         let f_book_dep = r.fig(
             &format!("book_dep_{block_key}"),
             Value::Int(b.book_dep_paise),
@@ -682,7 +700,7 @@ depreciation-journal vouchers (voucher-level; cross-checked against the Trial Ba
 this test's depreciation tie check)."
             ),
             ev.clone(),
-        );
+        )?;
         let diff_val = b
             .book_dep_paise
             .checked_sub(b.dep_total_paise)
@@ -695,7 +713,7 @@ this test's depreciation tie check)."
                 "Book depreciation minus Income-tax Act depreciation for block '{block_key}'."
             ),
             Vec::new(),
-        );
+        )?;
 
         book_dep_from_vouchers = book_dep_from_vouchers
             .checked_add(b.book_dep_paise)
@@ -723,7 +741,7 @@ cost; the proviso is mandatory and has no Rule 6DD-style exception). This is the
 unless the payment mode is shown not to be cash."
                     ),
                     ev.clone(),
-                );
+                )?;
             }
             None => {
                 act_dep_total_excl_cash = act_dep_total_excl_cash
@@ -732,10 +750,27 @@ unless the payment mode is shown not to be cash."
             }
         }
 
+        // A row id that would repeat takes its place among the rows sharing it, in the rows' order,
+        // as a suffix; every other id is as before (#1243, see the module doc).
+        let mut tagged = Vec::with_capacity(b.cash_rows.len());
         for row in &b.cash_rows {
-            let v = row.voucher;
             let h = stable_ledger_tag(book, &row.ledger)?;
-            let rid = format!("{}_{h}", hash12_sha256(&v.guid));
+            tagged.push((format!("{}_{h}", hash12_sha256(&row.voucher.guid)), h));
+        }
+        let mut sharing: BTreeMap<&str, usize> = BTreeMap::new();
+        for (base, _) in &tagged {
+            *sharing.entry(base.as_str()).or_insert(0) += 1;
+        }
+        let mut place: BTreeMap<&str, usize> = BTreeMap::new();
+        for (row, (base, h)) in b.cash_rows.iter().zip(&tagged) {
+            let v = row.voucher;
+            let rid = if sharing[base.as_str()] > 1 {
+                let k = place.entry(base.as_str()).or_insert(0);
+                *k += 1;
+                format!("{base}_{k}")
+            } else {
+                base.clone()
+            };
             let f_amt = r.fig(
                 &format!("cash_flagged_addition_{rid}"),
                 Value::Int(row.amount_paise),
@@ -752,7 +787,7 @@ shows cash of {} ({}), over the rules' s.43(1) cash limit for an addition.",
                     &v.guid,
                     &voucher_label(v),
                 )],
-            );
+            )?;
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/s43_1/{rid}"),
                 clauses: vec!["s.43(1) second proviso".to_string(), "3CD-18".to_string()],
@@ -797,7 +832,7 @@ set for this client (never summed from vouchers).",
             .iter()
             .map(|n| EvidenceRef::new("ledger", n))
             .collect(),
-    );
+    )?;
     let f_act_total = r.fig(
         "act_dep_total",
         Value::Int(act_dep_total),
@@ -805,7 +840,7 @@ set for this client (never summed from vouchers).",
         "Total Income-tax Act depreciation across every mapped block, INCLUDING additions the \
 books show as paid in cash; the Act figure only if that payment mode is shown not to be cash.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "act_dep_total_applying_s43_1_proviso",
         Value::Int(act_dep_total_excl_cash),
@@ -814,7 +849,7 @@ books show as paid in cash; the Act figure only if that payment mode is shown no
 the books show as paid in cash: the Act figure on the books as recorded. Equal to the total across \
 every mapped block including cash-paid additions when none is flagged.",
         Vec::new(),
-    );
+    )?;
     let diff_total = book_dep_from_tb
         .checked_sub(act_dep_total)
         .ok_or_else(overflow)?;
@@ -825,7 +860,7 @@ every mapped block including cash-paid additions when none is flagged.",
         "Book depreciation for the year less the total Income-tax Act depreciation across every \
 mapped block (cash-paid additions included).",
         Vec::new(),
-    );
+    )?;
     let tie_diff = book_dep_from_vouchers
         .checked_sub(book_dep_from_tb)
         .ok_or_else(overflow)?;
@@ -838,7 +873,7 @@ vouchers, minus the Trial Balance movement of the depreciation expense ledgers s
 Non-zero means the \
 depreciation journals do not fully explain the expense ledger's TB movement.",
         Vec::new(),
-    );
+    )?;
 
     // Nothing to compute: no block is mapped, no opening WDV is configured, and no Fixed Assets
     // ledger carries a balance or movement. Act depreciation is then zero by construction, not a
@@ -1090,6 +1125,7 @@ mod tests {
             turnover_threshold_paise: 0,
             turnover_threshold_low_cash_paise: 0,
             cash_share_limit_bp: 0,
+            profession_gross_receipts_paise: None,
             s40a3_limit_per_person_per_day_paise: 0,
             s40a3_goods_carriage_limit_paise: 0,
             s40a3_excluded_group_roles: Vec::new(),
@@ -1132,6 +1168,8 @@ mod tests {
             chain: vec!["Fixed Assets".to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("guid-{name}"),
             masterid: None,
         }
@@ -1144,6 +1182,8 @@ mod tests {
             chain: vec![group.to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: format!("guid-{name}"),
             masterid: None,
         }
@@ -1683,5 +1723,38 @@ mod tests {
                 .any(|v| v.contains("DEP-1") && v.contains("Asset Mut")),
             "{violations:?}"
         );
+    }
+
+    /// The walk keys the population (`book::voucher_keys`), so a GUID holding a NUL that makes two
+    /// keys equal is refused, as the reference raises; the same GUID beside no such pair is read.
+    #[test]
+    fn a_population_whose_voucher_keys_would_repeat_is_refused() {
+        let read = |guids: [&str; 3]| {
+            let lines = [("Asset K", 1_000), ("Suspense", -1_000)];
+            let vouchers = guids
+                .iter()
+                .map(|g| voucher(g, "20250601", &lines))
+                .collect();
+            let b = book(
+                vec![asset("Asset K"), misc("Suspense", "Suspense")],
+                vouchers,
+                vec![("Asset K", 0, 3_000, 0, 3_000)],
+            );
+            run(
+                &b,
+                &rules_dep(1500),
+                &period(),
+                &BTreeMap::from([("Asset K".to_string(), "block_a".to_string())]),
+                &BTreeMap::from([("block_a".to_string(), 0)]),
+                &BTreeSet::new(),
+                &BTreeMap::new(),
+            )
+            .map(|_| ())
+        };
+        assert!(matches!(
+            read(["a\u{0}00000001", "a", "a"]),
+            Err(AuditError::VoucherKeysNotUnique)
+        ));
+        assert!(matches!(read(["a\u{0}00000001", "a", "b"]), Ok(())));
     }
 }

@@ -1,0 +1,82 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "e3b0c44298fc1c14",
+  "population_note_text": "",
+  "figures": [
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "related_parties_cl23/not_confirmed",
+      "clauses": [
+        "3CD-23",
+        "s.40A(2)(b)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [],
+      "evidence": [],
+      "title_sha256_16": "a95651f669f72e91",
+      "title_text": "No related person has been confirmed for this engagement",
+      "limits_sha256_16": "0552fb8aad9176ed",
+      "limits_text": [
+        "Who is a related person under s.40A(2)(b) is a fact the books do not record; payments to such persons cannot be listed until the client names them."
+      ],
+      "ask_client_sha256_16": "12c4a091a9f0aa10",
+      "ask_client_text": [
+        "List the relatives of the proprietor or partners, and any concern in which any of them has a substantial interest, with every payment made to them in the year."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "MAP-1",
+      "subject": "Unmapped Holding",
+      "detail": "chain incomplete: Legacy Holding"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Electricity",
+      "detail": "vouchers 365050 vs TB movement 365550 paise"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-0000000c",
+      "detail": "Journal J/1 2025-09-28 lines sum 200"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 700 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

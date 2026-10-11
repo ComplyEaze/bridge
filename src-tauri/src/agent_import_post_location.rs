@@ -42,6 +42,20 @@ fn is_target(row: &LoadedCompanyMarks, guid: &str, name: &str) -> bool {
     row.guid.eq_ignore_ascii_case(guid) && same_name(&row.name, name)
 }
 
+/// The target's voucher mark in one snapshot, when exactly one loaded company
+/// is the target. `None` otherwise.
+pub(super) fn target_voucher_mark(
+    rows: &[LoadedCompanyMarks],
+    guid: &str,
+    name: &str,
+) -> Option<u64> {
+    let mut targets = rows.iter().filter(|row| is_target(row, guid, name));
+    match (targets.next(), targets.next()) {
+        (Some(row), None) => Some(row.vouchers),
+        _ => None,
+    }
+}
+
 /// The aim check, on the snapshot sent last before the POST: exactly one loaded
 /// company is the target (GUID and name), and no other loaded company shares
 /// its name. Anything else refuses before any import request.

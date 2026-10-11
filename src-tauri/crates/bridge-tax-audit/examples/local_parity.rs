@@ -37,8 +37,8 @@
 //! `dep_expense_ledgers`, all REQUIRED, and an optional `put_to_use_by_voucher`) is read the same
 //! way. `PYTHON_DUMP_JSON` is that script's output for the same config, read and test id.
 //! `ENGINE_RULES_TOML` is the reference engine's full rules file: the vendored excerpt must still
-//! be a byte-for-byte verbatim part of it (checked block by block; see `src/rules.rs`) and give
-//! the same values.
+//! be a verbatim part of it, a trailing `#` comment apart (checked block by block;
+//! `rules::vendored_blocks_in_source`, `src/rules.rs`), and give the same values.
 //!
 //! **Identity binding.** `CLIENT_TOML`'s `[ledger_ids]`/`[group_ids]` are resolved through
 //! `Engagement::bind` (`src/binding.rs`, `docs/tax-audit/config-identity-binding-v1.md`) exactly
@@ -48,7 +48,7 @@
 //! `tae/run.py`'s own `load()`, so a renamed ledger's identity entry (or a bare name that still
 //! matches) resolves on both sides of the comparison, not just this one. Those two tables are
 //! written for the reference implementation's FULL pack, though, and a real client TOML typically
-//! binds many labels this port never reads (`gst_outward`, `related_parties`, ...);
+//! binds many labels this port never reads (`gst_outward`, ...);
 //! `narrow_identity_tables` below strips `[ledger_ids]`/`[group_ids]` down to just the labels the
 //! locations this port's `Engagement` reads actually use (a legacy trade-creditor source's names
 //! included, read relative to `CLIENT_TOML`'s directory as the reference reads them), before `Engagement::from_toml` ever
@@ -67,7 +67,7 @@ use std::time::Instant;
 use bridge_tax_audit::canonical::hex;
 use bridge_tax_audit::compare::compare;
 use bridge_tax_audit::registry::{self, CallerData};
-use bridge_tax_audit::rules::{Rules, SOURCE_SHA256, VENDORED};
+use bridge_tax_audit::rules::{vendored_blocks_in_source, Rules, SOURCE_SHA256, VENDORED};
 use bridge_tax_audit::{load_book, Engagement};
 use sha2::{Digest, Sha256};
 
@@ -77,29 +77,27 @@ fn fail(message: impl std::fmt::Display) -> ExitCode {
 }
 
 /// Every vendored TOML block (separated by a blank line in `rules/ay2026-27.s44ab.toml`) must
-/// independently be a byte-for-byte verbatim substring of the live source. The blocks are not
-/// contiguous in the source file (two are truncated mid-table to skip a private research
-/// citation, and `[s44ab.turnover]`/`[s271da]` sit between them), so checking the whole
-/// post-header body as a single substring -- this example's earlier, `cash_44ab`-only check --
-/// no longer applies.
+/// independently be a run of the live source's lines, a trailing `#` comment on any line apart:
+/// a reworded comment moves no value, a changed key, header, value or string is found. The blocks
+/// are not contiguous in the source file (two are truncated mid-table to skip a private research
+/// citation, and `[s44ab.turnover]`/`[s271da]` sit between them), so the whole post-header body
+/// is not tested as one piece.
 fn vendored_blocks_are_verbatim(source: &str) -> bool {
-    let body = &VENDORED[VENDORED.find("\n[meta]\n").map_or(0, |i| i + 1)..];
-    body.split("\n\n")
-        .map(str::trim_end)
-        .filter(|block| !block.is_empty())
-        .all(|block| source.contains(block))
+    vendored_blocks_in_source(VENDORED, source)
 }
 
 /// Narrows `[ledger_ids]`/`[group_ids]` to the labels the locations this port's `Engagement`
 /// actually reads (`roles.cash_groups`, `roles.bank_groups`, `roles.creditor_groups`, a legacy
 /// `roles.trade_creditors_source`'s names, `roles.round_off_ledgers`,
 /// `roles.payment_channel_debtors`, `roles.gst_payment_ledgers`, `roles.writeoff_discount_ledgers`,
-/// every `roles.tax_ledgers` head,
+/// `roles.no_supplier_expense_ledgers`, every `roles.tax_ledgers` head,
+/// `roles.gst_registration_type_by_ledger`'s and `clause44.money_category_by_ledger`'s keys,
 /// `tds.nature_by_ledger`'s and `tds.payee_aliases`' keys, `tds_payees.s194j_category_by_ledger`'s
 /// keys, `loans.loan_ledgers`'s keys, each loan's `interest_ledger`, `loans.shared_interest_ledgers`,
 /// `depreciation.block_by_ledger`'s keys,
 /// `depreciation.dep_expense_ledgers`, every `partners.*` entry's `capital_ledgers`, `interest_ledger`
-/// and `remuneration_ledger`, `tds_tcs_26as`'s three ledger
+/// and `remuneration_ledger`, every `related_parties.*` entry's `ledgers_by_nature` lists,
+/// `tds_tcs_26as`'s three ledger
 /// lists and its `deductor_aliases` values) use, so
 /// `Engagement::bind`'s `BIND-ID-UNUSED` check never refuses over a label a real client TOML
 /// binds only for a role this port does not implement (see this file's doc comment and `docs/tax-audit/config-identity-binding-v1.md` section 4).
@@ -128,10 +126,17 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
             "payment_channel_debtors",
             "gst_payment_ledgers",
             "writeoff_discount_ledgers",
+            "no_supplier_expense_ledgers",
         ] {
             if let Some(v) = roles.get(key) {
                 ledger_labels.extend(strs(v));
             }
+        }
+        if let Some(t) = roles
+            .get("gst_registration_type_by_ledger")
+            .and_then(toml::Value::as_table)
+        {
+            ledger_labels.extend(t.keys().cloned());
         }
         if let Some(heads) = roles.get("tax_ledgers").and_then(toml::Value::as_table) {
             for v in heads.values() {
@@ -144,6 +149,14 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
         )
         .map_err(|e| e.to_string())?;
         ledger_labels.extend(legacy.unwrap_or_default());
+    }
+    if let Some(t) = cfg
+        .get("clause44")
+        .and_then(toml::Value::as_table)
+        .and_then(|t| t.get("money_category_by_ledger"))
+        .and_then(toml::Value::as_table)
+    {
+        ledger_labels.extend(t.keys().cloned());
     }
     if let Some(sd) = cfg.get("statutory_dues").and_then(toml::Value::as_table) {
         if let Some(t) = sd.get("nature_by_ledger").and_then(toml::Value::as_table) {
@@ -212,6 +225,19 @@ fn narrow_identity_tables(cfg: &mut toml::Table, base: &Path) -> Result<(), Stri
             for key in ["interest_ledger", "remuneration_ledger"] {
                 if let Some(label) = partner.get(key).and_then(toml::Value::as_str) {
                     ledger_labels.insert(label.to_string());
+                }
+            }
+        }
+    }
+    // Every [related_parties.*] entry's `ledgers_by_nature` lists, as `Engagement::bind` binds them.
+    if let Some(persons) = cfg.get("related_parties").and_then(toml::Value::as_table) {
+        for person in persons.values().filter_map(toml::Value::as_table) {
+            if let Some(natures) = person
+                .get("ledgers_by_nature")
+                .and_then(toml::Value::as_table)
+            {
+                for v in natures.values() {
+                    ledger_labels.extend(strs(v));
                 }
             }
         }
@@ -319,8 +345,9 @@ read (parity/python_golden.py --emit-bank-statement)",
             bridge_tax_audit::documents::traces_documents_from_json(&parsed)
                 .map(|t| caller.traces = t)
         } else if test_id == "bank_reconciliation" || test_id == "high_value_register" {
-            bridge_tax_audit::documents::bank_statement_from_json(&parsed)
-                .map(|t| caller.bank_statement = Some(t))
+            bridge_tax_audit::documents::bank_statement_from_json(&parsed).map(|t| {
+                caller.bank_statement = bridge_tax_audit::documents::BankStatementLoad::Read(t)
+            })
         } else {
             registry::turnover_inputs_from_json(&parsed).map(|t| caller.turnover_inputs = t)
         };

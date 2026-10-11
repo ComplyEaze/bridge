@@ -178,7 +178,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -234,7 +234,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -253,16 +253,40 @@
       ]
     },
     {
-      "id": "party_monthly.indirect_expenses_oct_25efbfe9",
+      "id": "party_monthly.indirect_expenses_not_attributed_money_vouchers",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "64887344a8e46d8b",
+      "definition_text": "Indirect Expenses: vouchers in the row 'Not attributed to a party' for this reason (see the finding citing them).",
+      "evidence": []
+    },
+    {
+      "id": "party_monthly.indirect_expenses_not_attributed_nil_vouchers",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "64887344a8e46d8b",
+      "definition_text": "Indirect Expenses: vouchers in the row 'Not attributed to a party' for this reason (see the finding citing them).",
+      "evidence": []
+    },
+    {
+      "id": "party_monthly.indirect_expenses_not_attributed_other_side_vouchers",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "64887344a8e46d8b",
+      "definition_text": "Indirect Expenses: vouchers in the row 'Not attributed to a party' for this reason (see the finding citing them).",
+      "evidence": []
+    },
+    {
+      "id": "party_monthly.indirect_expenses_oct_6c8f7958",
       "value": 500,
       "unit": "paise",
       "definition_sha256_16": "face57d5e19829c1",
       "definition_text": "Indirect Expenses: amount dated in October for this row (debits less credits).",
       "evidence": [
         {
-          "kind": "ledger",
-          "id": "Cust A",
-          "label": "Cust A"
+          "kind": "row",
+          "id": "indirect_expenses:not_attributed",
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -412,7 +436,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_vouchers_25efbfe9",
-      "value": 3,
+      "value": 2,
       "unit": "count",
       "definition_sha256_16": "2012e77139b808d6",
       "definition_text": "Indirect Expenses: vouchers in this row, including any dated outside the period.",
@@ -426,7 +450,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_vouchers_6c8f7958",
-      "value": 3,
+      "value": 4,
       "unit": "count",
       "definition_sha256_16": "2012e77139b808d6",
       "definition_text": "Indirect Expenses: vouchers in this row, including any dated outside the period.",
@@ -434,7 +458,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -481,35 +505,11 @@
       ]
     },
     {
-      "id": "party_monthly.indirect_expenses_vouchers_left_out_excluded",
-      "value": 25030,
-      "unit": "paise",
-      "definition_sha256_16": "c53a468b78c20022",
-      "definition_text": "Indirect Expenses: amount on these ledgers (debits less credits) of all the post-dated, optional and cancelled vouchers together cited, which the books leave out: one of several sets that each match the difference.",
-      "evidence": [
-        {
-          "kind": "excluded_voucher",
-          "id": "c3",
-          "label": "Payment c3 on 2026-03-16"
-        },
-        {
-          "kind": "excluded_voucher",
-          "id": "o2",
-          "label": "Payment o2 on 2026-03-15"
-        },
-        {
-          "kind": "excluded_voucher",
-          "id": "p4",
-          "label": "Journal p4 on 2026-03-17"
-        }
-      ]
-    },
-    {
-      "id": "party_monthly.indirect_expenses_vouchers_left_out_optional",
+      "id": "party_monthly.indirect_expenses_vouchers_left_out",
       "value": 25000,
       "unit": "paise",
-      "definition_sha256_16": "8e57e1be456e919f",
-      "definition_text": "Indirect Expenses: amount on these ledgers (debits less credits) of the optional vouchers cited, which the books leave out: one of several sets that each match the difference.",
+      "definition_sha256_16": "676b8ece793ba22c",
+      "definition_text": "Indirect Expenses: amount on these ledgers (debits less credits) of the optional vouchers cited, which the books leave out.",
       "evidence": [
         {
           "kind": "excluded_voucher",
@@ -520,7 +520,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_year_25efbfe9",
-      "value": 530,
+      "value": 30,
       "unit": "paise",
       "definition_sha256_16": "7b0935da16718ef0",
       "definition_text": "Indirect Expenses: amount dated inside the period for this row (debits less credits).",
@@ -534,7 +534,7 @@
     },
     {
       "id": "party_monthly.indirect_expenses_year_6c8f7958",
-      "value": 41000,
+      "value": 41500,
       "unit": "paise",
       "definition_sha256_16": "7b0935da16718ef0",
       "definition_text": "Indirect Expenses: amount dated inside the period for this row (debits less credits).",
@@ -542,7 +542,7 @@
         {
           "kind": "row",
           "id": "indirect_expenses:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -774,7 +774,7 @@
         {
           "kind": "row",
           "id": "sales:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -791,6 +791,14 @@
           "label": "Total"
         }
       ]
+    },
+    {
+      "id": "party_monthly.sales_not_attributed_other_side_vouchers",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "6cdaf07bfb0e1cab",
+      "definition_text": "Sales Accounts: vouchers in the row 'Not attributed to a party' for this reason (see the finding citing them).",
+      "evidence": []
     },
     {
       "id": "party_monthly.sales_nov_25efbfe9",
@@ -922,7 +930,7 @@
         {
           "kind": "row",
           "id": "sales:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -978,7 +986,7 @@
         {
           "kind": "row",
           "id": "sales:not_attributed",
-          "label": "Not attributed: no party on the other side"
+          "label": "Not attributed to a party"
         }
       ]
     },
@@ -1005,7 +1013,7 @@
       "facts": [
         {
           "name": "vouchers",
-          "figure_id": "party_monthly.indirect_expenses_vouchers_6c8f7958"
+          "figure_id": "party_monthly.indirect_expenses_not_attributed_other_side_vouchers"
         }
       ],
       "evidence": [
@@ -1018,18 +1026,13 @@
           "kind": "voucher",
           "id": "a04",
           "label": "Payment a04 on 2025-08-10"
-        },
-        {
-          "kind": "voucher",
-          "id": "a08",
-          "label": "Journal a08 on 2025-12-10"
         }
       ],
       "title_sha256_16": "1febfc0e0d1d54c2",
       "title_text": "'Indirect Expenses' amounts on vouchers whose party ledger is not on the other side are not attributed to a party",
-      "limits_sha256_16": "98d0078e0520da7e",
+      "limits_sha256_16": "a7ebb5d750b24a11",
       "limits_text": [
-        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Indirect Expenses' lines, so those lines are not that party's: for example bank charges or rent in the same payment as a supplier. They are shown in the row 'Not attributed: no party on the other side', not under any party, and are in the block's total."
+        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Indirect Expenses' lines, so those lines are not that party's: for example rent paid in the same payment as a supplier. They are shown in the row 'Not attributed to a party', not under any party, and are in the block's Total row."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1041,7 +1044,7 @@
       "facts": [
         {
           "name": "vouchers",
-          "figure_id": "party_monthly.sales_vouchers_81af7f00"
+          "figure_id": "party_monthly.sales_not_attributed_other_side_vouchers"
         }
       ],
       "evidence": [
@@ -1053,9 +1056,61 @@
       ],
       "title_sha256_16": "c5fc0a1457b7b7a5",
       "title_text": "'Sales Accounts' amounts on vouchers whose party ledger is not on the other side are not attributed to a party",
-      "limits_sha256_16": "38234a80ad0e4e9d",
+      "limits_sha256_16": "9587efaac67e20d3",
       "limits_text": [
-        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Sales Accounts' lines, so those lines are not that party's: for example bank charges or rent in the same payment as a supplier. They are shown in the row 'Not attributed: no party on the other side', not under any party, and are in the block's total."
+        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but none is on the other side from the 'Sales Accounts' lines, so those lines are not that party's. They are shown in the row 'Not attributed to a party', not under any party, and are in the block's Total row."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "party_monthly/not_attributed_money/indirect_expenses",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "vouchers",
+          "figure_id": "party_monthly.indirect_expenses_not_attributed_money_vouchers"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "a06",
+          "label": "Receipt a06 on 2025-10-10"
+        }
+      ],
+      "title_sha256_16": "29b19a28a65f4c15",
+      "title_text": "'Indirect Expenses' amounts on vouchers with a cash or bank line on their side are not attributed to the party (or parties) on the other side",
+      "limits_sha256_16": "5a8e736bfcbb57dd",
+      "limits_text": [
+        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger, or more than one, is on the other side from the 'Indirect Expenses' lines, and a cash or bank line is on the same side as them. These lines may be a deduction from what was paid or received, for example bank charges deducted from a customer's receipt, or a discount allowed on it, or something else on the same voucher; the books do not say which, so they are shown in the row 'Not attributed to a party', not under any party, and are in the block's Total row. A round-off on a receipt is listed here too. This applies to the expense blocks only."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "party_monthly/not_attributed_nil/indirect_expenses",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "vouchers",
+          "figure_id": "party_monthly.indirect_expenses_not_attributed_nil_vouchers"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "a08",
+          "label": "Journal a08 on 2025-12-10"
+        }
+      ],
+      "title_sha256_16": "08fc182f078a0c27",
+      "title_text": "'Indirect Expenses' lines netting to nil on vouchers with a party ledger: nothing to attribute",
+      "limits_sha256_16": "0bbe43dac67333a8",
+      "limits_text": [
+        "On each voucher cited (none of them a sales, purchase, credit or debit note voucher) a party ledger is present, but the 'Indirect Expenses' lines net to nil, so they move no net amount on these ledgers and are on neither side. The vouchers are counted in the row 'Not attributed to a party' and add nothing to its amounts."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1077,9 +1132,9 @@
       "evidence": [],
       "title_sha256_16": "dc5d85cdc12de8b3",
       "title_text": "'Direct Expenses' by party differs from the Trial Balance",
-      "limits_sha256_16": "96336a2c63e8adc0",
+      "limits_sha256_16": "0bd3cde2c053c18c",
       "limits_text": [
-        "The cancelled vouchers on these ledgers, taken as a whole, do not match it; smaller groups of them were not tried. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
+        "The cancelled vouchers on these ledgers, taken as a whole, do not account for it exactly; smaller groups of them were not tried. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1098,36 +1153,22 @@
           "figure_id": "party_monthly.indirect_expenses_tb_movement"
         },
         {
-          "name": "vouchers_left_out_excluded",
-          "figure_id": "party_monthly.indirect_expenses_vouchers_left_out_excluded"
-        },
-        {
-          "name": "vouchers_left_out_optional",
-          "figure_id": "party_monthly.indirect_expenses_vouchers_left_out_optional"
+          "name": "vouchers_left_out",
+          "figure_id": "party_monthly.indirect_expenses_vouchers_left_out"
         }
       ],
       "evidence": [
         {
           "kind": "excluded_voucher",
-          "id": "c3",
-          "label": "Payment c3 on 2026-03-16"
-        },
-        {
-          "kind": "excluded_voucher",
           "id": "o2",
           "label": "Payment o2 on 2026-03-15"
-        },
-        {
-          "kind": "excluded_voucher",
-          "id": "p4",
-          "label": "Journal p4 on 2026-03-17"
         }
       ],
-      "title_sha256_16": "5390311265134b0c",
-      "title_text": "'Indirect Expenses' by party differs from the Trial Balance by an amount that more than one set of excluded vouchers matches (each listed under Technical definitions)",
-      "limits_sha256_16": "3481ffb5c3629dd1",
+      "title_sha256_16": "f335607a003147b3",
+      "title_text": "'Indirect Expenses' by party differs from the Trial Balance by an amount matching optional vouchers (listed under Technical definitions)",
+      "limits_sha256_16": "23b3d3a0905edc22",
       "limits_text": [
-        "Each of these sets, taken as a whole, matches the difference to within a rupee: the optional vouchers (₹250); all the post-dated, optional and cancelled vouchers together (₹250.30). The Trial Balance may include one of them; the books do not say which, so none is chosen. Smaller groups were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
+        "These figures, like every books figure, leave out optional vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers accounts for the difference exactly, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. No other of the sets tried (each status taken as a whole, and all of them together) accounts for it; smaller groups of them were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1149,9 +1190,9 @@
       "evidence": [],
       "title_sha256_16": "19dbfc2fb3eff6f9",
       "title_text": "'Purchase Accounts' by party differs from the Trial Balance",
-      "limits_sha256_16": "38006f233efd30e2",
+      "limits_sha256_16": "8774c0b1b8701423",
       "limits_text": [
-        "Neither the post-dated, nor the optional vouchers on these ledgers, each status taken as a whole, nor all of them together, match it; smaller groups of them were not tried. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
+        "None of the sets tried accounts for it exactly: the post-dated and the optional vouchers on these ledgers, each status taken as a whole, and all of them together; smaller groups of them were not tried. Possible causes: a voucher the Trial Balance and the voucher export disagree on, a voucher outside the books that the Trial Balance counts, or a ledger with vouchers but no Trial Balance row. It is not balanced away."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []
@@ -1183,9 +1224,9 @@
       ],
       "title_sha256_16": "5bcb9094e6985722",
       "title_text": "'Sales Accounts' by party differs from the Trial Balance by an amount matching optional vouchers (listed under Technical definitions)",
-      "limits_sha256_16": "736600de7ea876da",
+      "limits_sha256_16": "23b3d3a0905edc22",
       "limits_text": [
-        "These figures, like every books figure, leave out optional vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers matches the difference to within a rupee, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. No other of the sets tried (each status taken as a whole, and all of them together) matches it; smaller groups of them were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
+        "These figures, like every books figure, leave out optional vouchers. The amount of the voucher(s) listed under Technical definitions on these ledgers accounts for the difference exactly, so the Trial Balance may include them; that is inferred from the amounts, not read from the Trial Balance. No other of the sets tried (each status taken as a whole, and all of them together) accounts for it; smaller groups of them were not tried. Whether they belong to this year is for the CA to confirm from the vouchers themselves."
       ],
       "ask_client_sha256_16": "e3b0c44298fc1c14",
       "ask_client_text": []

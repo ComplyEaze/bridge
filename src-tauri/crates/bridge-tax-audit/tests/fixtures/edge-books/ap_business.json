@@ -1,0 +1,22 @@
+{
+ "comment": "applicability_44ab, a client recorded as carrying on a business only, a profession-looking entity type, turnover not supplied: s.44AB(a) is undetermined, the s.44ADA flag is yes, and no s.44AB(b) question is asked.",
+ "entity_type": "Profession (HUF)",
+ "groups": {},
+ "ledgers": [],
+ "tb": [],
+ "vouchers": [],
+ "cash": [],
+ "bank": [],
+ "a44_turnover": {
+  "books_turnover_paise": null
+ },
+ "a44_cash_share": {
+  "receipts_bp": null,
+  "payments_bp": null,
+  "limits": []
+ },
+ "tests": [
+  "applicability_44ab"
+ ],
+ "deductor_activity": "business"
+}

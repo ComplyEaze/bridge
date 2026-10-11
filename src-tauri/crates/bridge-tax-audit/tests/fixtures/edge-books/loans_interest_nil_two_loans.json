@@ -1,0 +1,178 @@
+{
+ "comment": "loans_interest, bridge#1259, a firm: a voucher with a nil line on each of two configured loans and the TDS beside another ledger is a posting to neither loan, so its TDS counts on neither (Loan One, Loan Two); a TDS journal on Loan Three beside a nil line on Loan One counts on Loan Three only. The reference used to count the first voucher's TDS on both loans.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_two_loans-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_two_loans-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_nil_two_loans-002"
+  },
+  {
+   "name": "Loan One",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_two_loans-003"
+  },
+  {
+   "name": "Loan Two",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_two_loans-004"
+  },
+  {
+   "name": "Loan Three",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_two_loans-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 120000,
+   "credit": 0,
+   "closing": 120000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Loan One",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Loan Three",
+   "opening": -5000000,
+   "debit": 120000,
+   "credit": 0,
+   "closing": -4880000
+  },
+  {
+   "ledger": "Loan Two",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -5000000
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 240000,
+   "closing": -240000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "n01",
+   "date": "2025-09-01",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Bank A",
+     120000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ],
+    [
+     "Loan One",
+     0
+    ],
+    [
+     "Loan Two",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-09-02",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Loan Three",
+     120000
+    ],
+    [
+     "TDS Payable",
+     -120000
+    ],
+    [
+     "Loan One",
+     0
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan One": {
+   "lender": "Invented Loan One Lender",
+   "lender_type": "person"
+  },
+  "Loan Two": {
+   "lender": "Invented Loan Two Lender",
+   "lender_type": "person"
+  },
+  "Loan Three": {
+   "lender": "Invented Loan Three Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

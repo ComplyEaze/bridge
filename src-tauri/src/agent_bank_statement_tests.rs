@@ -168,7 +168,7 @@ async fn inputs_are_refused_before_the_statement_is_opened() {
             json!("statement.password"),
             "argument_invalid:password_file",
         ),
-        ("bank", json!("icici"), "argument_invalid:bank"),
+        ("bank", json!("axis"), "argument_invalid:bank"),
         (
             "total_debits",
             json!("-8,800.00"),
@@ -260,6 +260,39 @@ async fn a_password_file_others_can_read_is_refused() {
     assert_eq!(
         error_code(&response),
         Some("statement_password_file_permissions")
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["remediation"],
+        super::super::refusal_remediation("statement_password_file_permissions").unwrap()
+    );
+    assert!(!response.to_string().contains(PASSWORD));
+}
+
+/// ProgramData lets Users create folders, and a file in one inherits Users'
+/// read: the password file there is refused without the test changing any
+/// access list.
+#[cfg(windows)]
+#[tokio::test]
+async fn a_password_file_other_users_can_read_is_refused_on_windows() {
+    let directory = tempfile::tempdir().unwrap();
+    let shared = tempfile::Builder::new()
+        .prefix("complyeaze-bridge-password-test-")
+        .tempdir_in(env::var_os("ProgramData").expect("ProgramData is set"))
+        .unwrap();
+    let (statement, password_file) = statement_files(shared.path(), "hdfc-synthetic.pdf", PASSWORD);
+    let response = server(directory.path(), true, Redaction::None)
+        .call_tool(
+            "parse_bank_statement",
+            arguments(&statement, &password_file),
+        )
+        .await;
+    assert_eq!(
+        error_code(&response),
+        Some("statement_password_file_permissions")
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["remediation"],
+        super::super::refusal_remediation("statement_password_file_permissions").unwrap()
     );
     assert!(!response.to_string().contains(PASSWORD));
 }
@@ -496,6 +529,14 @@ async fn refusals_name_a_category_and_a_row_never_the_statement() {
     assert!(!wrong.to_string().contains("not-the-password"));
 
     fs::write(&password_file, PASSWORD).unwrap();
+    // a scan reaches the person under its own name, not as a layout change
+    let scan_directory = tempfile::tempdir().unwrap();
+    let (scan, scan_password) =
+        statement_files(scan_directory.path(), "scan-image-only.pdf", PASSWORD);
+    let scanned = server
+        .call_tool("parse_bank_statement", arguments(&scan, &scan_password))
+        .await;
+    assert_eq!(error_code(&scanned), Some("statement_no_readable_text"));
     for (key, value, expected) in [
         (
             "account_label",
@@ -1595,4 +1636,173 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
         assert!(group.get("total").is_none(), "{group}");
         assert!(group["rows"].as_u64().unwrap() >= 1, "{group}");
     }
+}
+
+#[tokio::test]
+async fn a_path_that_is_not_on_a_local_disk_is_refused_before_any_open() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path(), true, Redaction::None);
+    // Every other argument is valid and neither file exists. A path that got
+    // as far as an open would therefore answer statement_file_unreadable; the
+    // refusal asserted here is the one made on the text, before any open.
+    let missing = directory.path().join("absent.pdf");
+    let base = arguments(&missing, &directory.path().join("absent.password"));
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", base.clone()).await),
+        Some("statement_file_unreadable"),
+        "the control: a local path that does not exist is opened and fails there"
+    );
+    for text in [
+        r"\\host\share\statement.pdf",
+        r"\\host@80\share\statement.pdf",
+        r"\\?\UNC\host\share\statement.pdf",
+        r"\\?\C:\statement.pdf",
+        r"\\.\C:\statement.pdf",
+        "//host/share/statement.pdf",
+        r"/\host/share/statement.pdf",
+    ] {
+        for key in ["statement_path", "password_file"] {
+            let mut args = base.clone();
+            args[key] = json!(text);
+            let response = server.call_tool("parse_bank_statement", args).await;
+            let expected = format!("argument_invalid:{key}");
+            assert_eq!(
+                error_code(&response),
+                Some(expected.as_str()),
+                "{key} {text}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    let directory = tempfile::tempdir().unwrap();
+    let narration = "UPI-ALPHA-9@x-ABCD0001-111111111111-P";
+    let rows = [Row::from_pairs([
+        ("date", "05/08/26"),
+        ("narr", narration),
+        ("ref", "1"),
+        ("dr", "10.00"),
+        ("cr", ""),
+        ("bal", "990.00"),
+    ])];
+    let args = json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "hdfc",
+        "account_label": "Synthetic CA xx4321",
+        "opening_balance": "1,000.00",
+        "closing_balance": "990.00",
+        "total_debits": "10.00",
+        "total_credits": "0.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let request = OwnedRequest::from_args(&args).unwrap();
+    let build = build(
+        &rows,
+        Bank::Hdfc,
+        &Mapping::default(),
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic CA xx4321",
+            account_number: "00000000004321",
+            date_from: None,
+            date_to: None,
+            cash_answers: &request.cash_answers,
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: "00000000004321".into(),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("990.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        build,
+    };
+    let (proposals_id, digest) =
+        persist(directory.path(), &request, &parsed, &"0".repeat(64)).unwrap();
+    let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
+    let resolved =
+        resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
+    let ledgers = resolved.statement_ledgers.expect("a file names both");
+    assert_eq!(ledgers.bank_ledger, "Synthetic Bank Ledger");
+    assert_eq!(ledgers.suspense_ledger, "Suspense");
+
+    // Inline vouchers name no statement.
+    let inline = resolve_import_arguments(
+        directory.path(),
+        &json!({"company_guid": "g", "vouchers": []}),
+    )
+    .unwrap();
+    assert!(inline.statement_ledgers.is_none());
+}
+
+/// The party segment ends the narration text and a file imported by hand adds
+/// the tag after it (`render_voucher_xml` writes `{text} [BRIDGE:{id}]`), so
+/// the description says "ends" of the text, not of the narration (#1458).
+#[test]
+fn the_description_places_the_party_before_the_tag_a_hand_import_adds() {
+    assert!(DESCRIPTION.contains(
+        "at the end of its narration text (a file imported by hand adds the `[BRIDGE:...]` tag after it;"
+    ));
+    assert!(!DESCRIPTION.contains("ends its narration with"));
+}
+
+#[tokio::test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+async fn a_bob_statement_parses_from_the_callers_balances_with_an_empty_password_file() {
+    assert!(env::var_os("BRIDGE_PDFIUM_LIBRARY").is_some());
+    let directory = tempfile::tempdir().unwrap();
+    // a downloaded statement opens without a password: the password file is empty
+    let (statement, password_file) = statement_files(directory.path(), "bob-synthetic.pdf", "");
+    let server = server(directory.path(), true, Redaction::None);
+    let args = json!({
+        "statement_path": statement.to_str().unwrap(),
+        "password_file": password_file.to_str().unwrap(),
+        "bank": "bob",
+        "account_label": "BOB CA 12399999999456",
+        "opening_balance": "10,000.00",
+        "closing_balance": "-16,141.16",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    });
+    let open = server.call_tool("parse_bank_statement", args.clone()).await;
+    let result = &open["structuredContent"]["result"];
+    assert_eq!(result["statement_rows"], 14, "{open}");
+    let questions = result["cash_questions"].as_array().unwrap();
+    assert_eq!(questions.len(), 1, "{open}");
+    assert_eq!(questions[0]["movement"], "deposit");
+    assert_eq!(questions[0]["amount"], "750.50");
+    let mut args = args;
+    args["cash_answers"] =
+        json!([{"bridge_txn_id": questions[0]["bridge_txn_id"], "answer": "dont_know"}]);
+    let response = server.call_tool("parse_bank_statement", args.clone()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["vouchers"], 14, "{response}");
+    assert_eq!(result["cash_questions"], json!([]));
+    assert_eq!(result["reconciled"]["closing_balance"], "-16141.16");
+    assert_eq!(result["reconciled"]["total_debits"], Value::Null);
+    assert_eq!(result["reconciled"]["totals_match_statement"], false);
+
+    // the label must carry the whole number: a tail cannot bind a masked one
+    let mut tail = args.clone();
+    tail["account_label"] = json!("BOB CA xx0456");
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", tail).await),
+        Some("statement_unbindable_account")
+    );
+    // and a closing balance the rows do not reach is refused
+    let mut short = args;
+    short["closing_balance"] = json!("0.00");
+    assert_eq!(
+        error_code(&server.call_tool("parse_bank_statement", short).await),
+        Some("statement_extent_unproven")
+    );
 }

@@ -86,13 +86,35 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
     let end = start + original[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let mut reduced = original.to_string();
     reduced.replace_range(start..end, "");
-    for change in ["stable", "edit", "posting", "deletion", "incomplete"] {
-        let changed = change != "stable";
+    // The `stable` read's result, which the `zero` read must equal (#1251).
+    let mut stable_result = None;
+    for change in [
+        "stable",
+        "zero",
+        "edit",
+        "posting",
+        "deletion",
+        "incomplete",
+    ] {
+        let changed = !matches!(change, "stable" | "zero");
         let mut before = voucher.clone();
         let mut after = voucher.clone();
         // Inject concurrent changes into captured rows in memory. The source
         // captures stay byte-exact; no live concurrency experiment is claimed.
         match change {
+            "zero" => {
+                // One more entry on the selected ledger whose amount is `-0.00` and which Tally flags
+                // deemed-positive, in both paired reads. A zero adds nothing to either column and
+                // nothing to the voucher's balance, so the read must succeed with the same figures.
+                let zero_entry = "<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-0.00</AMOUNT></ALLLEDGERENTRIES.LIST>";
+                let at = original.find("</ALLLEDGERENTRIES.LIST>").unwrap()
+                    + "</ALLLEDGERENTRIES.LIST>".len();
+                let mut with_zero = original.to_string();
+                with_zero.insert_str(at, zero_entry);
+                assert_ne!(with_zero, original);
+                before.fixture = Fixture::SyntheticXml(with_zero.clone());
+                after.fixture = Fixture::SyntheticXml(with_zero);
+            }
             "edit" => {
                 let altered = original.replace("-101.01", "-201.01").replace(
                     "<AMOUNT TYPE=\"Amount\">101.01</AMOUNT>",
@@ -186,6 +208,16 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 3
             );
+            // #1076: the answer says which ledger it read and how.
+            let ledger_match = &response["structuredContent"]["result"]["ledger_match"];
+            assert_eq!(ledger_match["ledger"], "WR2 Sales", "{ledger_match}");
+            assert_eq!(ledger_match["matched"], "exact", "{ledger_match}");
+            let result = response["structuredContent"]["result"].clone();
+            match change {
+                "stable" => stable_result = Some(result),
+                // A zero entry on the selected ledger changes no figure.
+                _ => assert_eq!(Some(&result), stable_result.as_ref(), "{change}"),
+            }
         }
         let observations = simulator.finish().unwrap();
         assert_eq!(
@@ -351,6 +383,10 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 200
             );
+            // A quick call's result is unchanged: no block, nothing left out (#1239).
+            let result = &response["structuredContent"]["result"];
+            assert!(result.get("read_cost").is_none(), "{result}");
+            assert!(result.get("read_cost_left_out").is_none(), "{result}");
         } else {
             assert_eq!(response["isError"], true, "{response}");
             assert_eq!(
@@ -683,6 +719,115 @@ async fn a_movement_names_an_unknown_ledger_before_reading_any_voucher() {
         "no request after the catalogue"
     );
     simulator.cancel();
+}
+
+/// `ledger_movement` for a ledger spelt without its accents: the refusal keeps
+/// its code and lists the catalogue's own spelling for the user to confirm,
+/// from the catalogue already read (no request after it), and says what to do.
+async fn movement_for_ledger(
+    requested: &str,
+    redaction: Redaction,
+    max_bytes: usize,
+) -> (Value, String) {
+    let mut plans = first_ledger_read();
+    let total = plans.len();
+    plans.push(plans[1].clone());
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let (mut server, _directory) = movement_server(
+        &simulator,
+        bridge_tally_transport::TransportPolicy::default(),
+    );
+    server.settings.redaction = redaction;
+    server.settings.max_bytes = max_bytes;
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger": requested
+            }),
+        )
+        .await;
+    assert_eq!(
+        simulator.received(),
+        total,
+        "no request after the catalogue"
+    );
+    simulator.cancel();
+    let text = response.to_string();
+    (response, text)
+}
+
+#[tokio::test]
+async fn a_misspelt_ledger_lists_the_catalogues_spelling_and_asks_the_user() {
+    let (response, _) = movement_for_ledger("Cafe Naive Traders", Redaction::None, 200_000).await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "listed", "{error}");
+    assert_eq!(error["candidates_total"], 1, "{error}");
+    assert_eq!(error["candidates_total_is_lower_bound"], false, "{error}");
+    let names = error["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|candidate| candidate["name"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["Café Naïve Traders"], "{error}");
+    assert!(
+        error.get("requested").is_none(),
+        "the request is not echoed"
+    );
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("ask which one they meant"));
+}
+
+/// Under `mask_parties` neither the catalogue's spelling nor the request is in
+/// the response, in the structured result or its text copy.
+#[tokio::test]
+async fn masking_keeps_the_ledger_names_out_of_a_ledger_refusal() {
+    let (response, text) =
+        movement_for_ledger("Cafe Naive Traders", Redaction::MaskParties, 200_000).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{error}");
+    assert_eq!(error["candidates_listing"], "names_masked", "{error}");
+    // Not even a count: it would answer "does a ledger start with this?".
+    for key in ["candidates", "candidates_total", "candidates_reason"] {
+        assert!(error.get(key).is_none(), "{key} under masking: {error}");
+    }
+    for name in ["Café Naïve Traders", "Cafe Naive Traders", "Naïve", "Naive"] {
+        assert!(!text.contains(name), "{name} in {text}");
+    }
+}
+
+/// A masked spelling is refused as such, through the tool, and never looked up.
+#[tokio::test]
+async fn a_masked_ledger_spelling_is_refused_before_it_can_resolve_to_another_ledger() {
+    let (response, _) = movement_for_ledger("Ca…fe", Redaction::MaskParties, 200_000).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_name_masked", "{error}");
+    assert!(error["remediation"]
+        .as_str()
+        .unwrap()
+        .contains("type the full ledger name"));
+}
+
+/// Below the budget that carries guidance, the refusal is the bare code: no
+/// candidates and no listing word, so an absent listing is "no search was
+/// made", which the remediation says, and never a claim about the book.
+#[tokio::test]
+async fn under_the_guidance_budget_the_ledger_refusal_is_the_bare_code() {
+    let (response, _) = movement_for_ledger("Cafe Naive Traders", Redaction::None, 4_095).await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "ledger_not_found", "{response}");
+    for key in ["candidates", "candidates_listing", "remediation"] {
+        assert!(
+            error.get(key).is_none(),
+            "{key} at the small budget: {error}"
+        );
+    }
 }
 
 /// A catalogue export the transport refuses for its size names that too. A

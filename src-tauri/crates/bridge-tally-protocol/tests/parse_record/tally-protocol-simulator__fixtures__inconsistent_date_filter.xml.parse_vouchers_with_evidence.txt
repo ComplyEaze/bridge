@@ -1,0 +1,4 @@
+# fixture: ../tally-protocol-simulator/fixtures/inconsistent_date_filter.xml
+# parser: parse_vouchers_with_evidence
+# source: synthetic: not evidence of what Tally sends
+Err(Tally voucher row contained an unexpected field)

@@ -242,6 +242,30 @@
       "path": "src-tauri/crates/bridge-tally-protocol/src/lib.rs"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_cash_flow.rs",
+      "reason": "Cash Flow read: renders the report request and parses the answer closed over a window of whole months, placing each year-less month row in its year; a defect shows one month's figure as another's or reads an empty or refused answer as a cash flow."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_cash_flow_tests.rs",
+      "reason": "Tests pinning the Cash Flow request to its captured bytes and the parser's and window's refusals, on the live captures; a weakened test lets a month be misplaced or an empty answer pass unseen."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_company_features.rs",
+      "reason": "Company features read: renders the Company collection request and parses its answer closed, binding the one row to the verified company by GUID, name, number and books-from date; a defect shows another company's setting or reads a missing or empty one as No."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_company_features_tests.rs",
+      "reason": "Tests pinning the company features request to its captured bytes and the parser's refusals on the live captures; a weakened test lets a wrong company's setting, an empty setting or a repeated one pass unseen."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_funds_flow.rs",
+      "reason": "Funds Flow read: renders the report request and parses the answer with the Cash Flow's closed grammar over whole months, keeping Tally's three columns under neutral names; a defect swaps two columns, places a month in the wrong year or reads an empty or refused answer as a funds flow."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_funds_flow_tests.rs",
+      "reason": "Tests pinning the Funds Flow request to its captured bytes, the parse of the live capture and the mapping of each shared refusal to its own variant; a weakened test lets a swapped column or an empty answer pass unseen."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs"
     },
     {
@@ -251,6 +275,14 @@
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_masters_tests.rs",
       "reason": "Tests pinning the masters requests to their captured bytes and the parser's refusals, company binding and size arithmetic; a weakened test lets a masters defect ship unseen."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock.rs",
+      "reason": "Negative Stock read: renders the report request and parses the answer closed, item by item; a defect reads an empty or refused answer as 'no negative stock' or shows one item's quantity or value as another's."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-protocol/src/native_negative_stock_tests.rs",
+      "reason": "Tests pinning the Negative Stock request to its captured bytes, the parse of the live capture, and the parser's refusals on mutated copies of it; a weakened test lets an empty answer or a malformed row pass unseen."
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_outstandings/compute.rs"
@@ -387,6 +419,10 @@
       "path": "src-tauri/src/agent_bank_statement.rs"
     },
     {
+      "path": "src-tauri/src/agent_cash_flow.rs",
+      "reason": "The cash_flow tool: returns the months only when their net total tied to the trial balance's cash and bank ledgers, and withholds them otherwise. A defect shows a cash movement Tally's own ledgers contradict."
+    },
+    {
       "path": "src-tauri/src/agent_catalog.rs"
     },
     {
@@ -399,6 +435,10 @@
       "path": "src-tauri/src/agent_company.rs"
     },
     {
+      "path": "src-tauri/src/agent_company_features.rs",
+      "reason": "The company_features tool: returns three settings from Tally's company record and a currency symbol, each setting saying what it rests on. A defect presents a setting Tally did not send as off, or one not compared with the screen as checked."
+    },
+    {
       "path": "src-tauri/src/agent_delivery.rs"
     },
     {
@@ -406,6 +446,10 @@
     },
     {
       "path": "src-tauri/src/agent_egress.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_headline.rs",
+      "reason": "Decides the sentence a CA reads about whether a read is whole or partial, and states the company and the period."
     },
     {
       "path": "src-tauri/src/agent_import.rs"
@@ -418,6 +462,10 @@
     },
     {
       "path": "src-tauri/src/agent_import_approval.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_import_bill_wise.rs",
+      "reason": "Decides whether a batch that touches a ledger kept bill by bill may be built: reads each named ledger's flag and binds an approval to one party's rows."
     },
     {
       "path": "src-tauri/src/agent_import_cash_bank.rs"
@@ -436,6 +484,14 @@
     },
     {
       "path": "src-tauri/src/agent_import_post_location.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_import_post_on_account.rs",
+      "reason": "Decides which ledgers an approval dialog marks On Account, and holds the check every dialog text passes before a person is asked to approve a post."
+    },
+    {
+      "path": "src-tauri/src/agent_import_span_identity.rs",
+      "reason": "binds a native post's vouchers to the Tally vouchers its own POST created; a change there can attribute a posted voucher to the wrong Tally object, which is a false posted_verified"
     },
     {
       "path": "src-tauri/src/agent_import_verification.rs"
@@ -637,6 +693,14 @@
       "path": "src-tauri/src/reports/bulk_party_statement_tests.rs"
     },
     {
+      "path": "src-tauri/src/reports/cash_flow.rs",
+      "reason": "The check of Tally's Cash Flow net total against the cash and bank ledgers of the trial balance, and which groups it counts as money; a defect passes a cash movement that does not tie or counts a ledger Tally does not."
+    },
+    {
+      "path": "src-tauri/src/reports/cash_flow_tests.rs",
+      "reason": "Tests pinning the Cash Flow check: the tie measured on live captures, a one-paisa difference, the groups counted as money and the Bank OD refusal; a weakened test lets a cash movement that does not tie ship unseen."
+    },
+    {
       "path": "src-tauri/src/reports/mod.rs"
     },
     {
@@ -778,6 +842,14 @@
       "path": "src-tauri/src/tally/runtime.rs"
     },
     {
+      "path": "src-tauri/src/tally/runtime_company_features.rs",
+      "reason": "Runs the company features read inside the company, mode and book-extent bracket and binds the one row to the verified company. A defect returns settings of another company or of a book that moved."
+    },
+    {
+      "path": "src-tauri/src/tally/runtime_company_features_tests.rs",
+      "reason": "Tests for the company features runtime's bracket, row binding and refusals; a weakened test lets settings of the wrong company or a moved book ship unseen."
+    },
+    {
       "path": "src-tauri/src/tally/runtime_control.rs"
     },
     {
@@ -803,9 +875,6 @@
       "path": "src-tauri/src/tally/runtime_trial_balance_tests.rs"
     },
     {
-      "path": "src-tauri/src/tally/serial_queue.rs"
-    },
-    {
       "path": "src-tauri/src/tally/standard_ledger_catalog.rs"
     },
     {
@@ -828,9 +897,6 @@
     },
     {
       "path": "src/ErrorBoundary.tsx"
-    },
-    {
-      "path": "src/GstScreen.tsx"
     },
     {
       "path": "src/JournalPostingScreen.tsx"

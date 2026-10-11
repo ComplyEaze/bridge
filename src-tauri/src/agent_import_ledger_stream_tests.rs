@@ -8,7 +8,7 @@ fn batch(id: &str, narration: &str) -> ImportLedgerLine {
     serde_json::from_value(json!({
         "batch_id":id,"company_guid":"synthetic-guid","company":null,
         "txn_ids":["txn"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"a".repeat(64),"built_at":"2026-09-07T00:00:00Z","status":"built",
+        "sha256":"a".repeat(64),"built_at":"2026-09-07T00:00:00Z","status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":narration,"reference":null,"voucher_number":null,"entries":[
@@ -507,6 +507,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 7,
             unsettled: 4,
             unsettled_no_response: 2,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -517,6 +518,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -731,7 +733,7 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     );
     assert!(!already_posted(journal(&old), &extra));
     let mut later = same.clone();
-    later.vouchers[0].date = "20260902".into();
+    later.vouchers[0].date = bridge_tally_core::TallyDate::parse("20260902").unwrap();
     assert!(!already_posted(journal(&old), &later));
     // Another id with the same shape is another transaction.
     let renamed = plain("new", "t2", BANK_TO_B);

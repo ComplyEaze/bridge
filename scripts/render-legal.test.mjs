@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { LegalError, UNRESOLVED_MARKERS, applyTemplate, renderDocument } from "./render-legal.mjs";
+import { LegalError, SITE_ORIGIN, UNRESOLVED_MARKERS, applyTemplate, renderDocument } from "./render-legal.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const script = join(root, "scripts", "render-legal.mjs");
@@ -40,7 +40,7 @@ const noRawMarkdown = (html) => {
 };
 
 test("the published documents carry no unresolved marker and render as they stand", () => {
-  for (const name of ["privacy.md", "terms.md"]) {
+  for (const name of ["privacy.md", "terms.md", "terms-2026-10.md"]) {
     const source = realDoc(name);
     assert.notEqual(source, undefined, `${name} is missing`);
     for (const marker of UNRESOLVED_MARKERS) assert.ok(!source.includes(marker), `${name} still holds ${marker}`);
@@ -168,15 +168,29 @@ test("refused: a document needs exactly one # heading", () => {
 
 test("template markers must each appear exactly once", () => {
   const rendered = { title: "A & <B>", article: "<p>x</p>" };
-  const page = applyTemplate(template, rendered);
+  const page = applyTemplate(template, rendered, "privacy.html");
   assert.match(page, /<title>A &amp; &lt;B&gt;<\/title>/);
   assert.ok(page.includes("<p>x</p>") && !page.includes("<!-- legal"));
-  const bad = (t, pattern) => assert.throws(() => applyTemplate(t, rendered), (error) => error instanceof LegalError && pattern.test(error.reason));
+  const bad = (t, pattern) => assert.throws(() => applyTemplate(t, rendered, "privacy.html"), (error) => error instanceof LegalError && pattern.test(error.reason));
   bad(template.replace("<!-- legal -->", ""), /<!-- legal --> exactly once, found 0/);
   bad(`${template}<!-- legal -->`, /<!-- legal --> exactly once, found 2/);
   bad(template.replace("<!-- legal-title -->", ""), /<!-- legal-title --> exactly once, found 0/);
   bad(`${template}<!-- legal-title -->`, /<!-- legal-title --> exactly once, found 2/);
-  assert.equal(applyTemplate("<!-- legal-title --><!-- legal -->", { title: "t", article: "$&$1" }), "t$&$1");
+  bad(template.replace("<!-- legal-canonical -->", ""), /<!-- legal-canonical --> exactly once, found 0/);
+  bad(`${template}<!-- legal-canonical -->`, /<!-- legal-canonical --> exactly once, found 2/);
+  assert.equal(applyTemplate("<!-- legal-title --><!-- legal --><!-- legal-canonical -->", { title: "t", article: "$&$1" }, "terms.html"), `t$&$1${SITE_ORIGIN}terms.html`);
+});
+
+test("each page names its own address as its canonical one, from the output file name", () => {
+  const rendered = { title: "T", article: "<p>x</p>" };
+  for (const name of ["privacy.html", "terms.html", "terms-2026-10.html"]) {
+    const page = applyTemplate(template, rendered, name);
+    assert.equal(count(page, /<link rel="canonical" /g), 1, name);
+    assert.ok(page.includes(`<link rel="canonical" href="${SITE_ORIGIN}${name}" />`), name);
+  }
+  for (const name of ["", "privacy", "Privacy.html", "a/b.html", "-x.html", "x.htm", "a b.html"]) {
+    assert.throws(() => applyTemplate(template, rendered, name), (error) => error instanceof LegalError && /is not a page name/.test(error.reason), JSON.stringify(name));
+  }
 });
 
 function cli(files, args) {
@@ -196,6 +210,7 @@ test("cli: success writes the page and exits 0", () => {
   assert.equal(run.status, 0, run.stderr);
   assert.equal(run.stderr, "");
   assert.match(run.out, /<title>Privacy &amp; Terms<\/title>/);
+  assert.match(run.out, /<link rel="canonical" href="https:\/\/bridge\.complyeaze\.com\/out\.html" \/>/);
   assert.match(run.out, /<article class="legal">\n<h1>Privacy &amp; Terms<\/h1>\n<p>Hello\.<\/p>\n<\/article>/);
 });
 
@@ -214,6 +229,7 @@ test("cli: template errors and missing files write nothing", () => {
     [template.replace("<!-- legal -->", ""), /t\.html: template must contain <!-- legal --> exactly once/],
     [`${template}<!-- legal -->`, /t\.html: template must contain <!-- legal --> exactly once, found 2/],
     [template.replace("<!-- legal-title -->", ""), /t\.html: template must contain <!-- legal-title --> exactly once/],
+    [template.replace("<!-- legal-canonical -->", ""), /t\.html: template must contain <!-- legal-canonical --> exactly once/],
   ];
   for (const [t, needle] of cases) {
     const run = cli({ "in.md": "# T\n\nx\n", "t.html": t }, page);

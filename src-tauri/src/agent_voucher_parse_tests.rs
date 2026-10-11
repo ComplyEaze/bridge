@@ -426,7 +426,10 @@ fn numeric_voucher_ids_distinguish_absence_from_invalid_observations() {
     }
     let rows = parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
     assert_eq!(rows[0]["alter_id"], 1);
-    assert_eq!(rows[0]["master_id"], " 1");
+    // The capture carries Tally's padded `<MASTERID TYPE="Number"> 1</MASTERID>`;
+    // the row carries the plain number text (#989).
+    assert!(captured.contains("> 1</MASTERID>"));
+    assert_eq!(rows[0]["master_id"], "1");
     assert_eq!(parse_optional_tally_u64(None, "invalid"), Ok(None));
     assert_eq!(
         parse_optional_tally_u64(Some(" 0001 "), "invalid"),
@@ -768,15 +771,19 @@ fn repeated_captured_voucher_identities_are_refused_before_selection_or_movement
         first_start + captured[first_start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
     let first = &captured[first_start..first_end];
     let guid = original[0]["guid"].as_str().unwrap();
-    let master = original[0]["master_id"].as_str().unwrap();
+    // The first voucher's master ID as the capture spells it, padded. The row's
+    // `master_id` is the trimmed "1" (#989), which would match nothing here.
+    let master = "> 1</MASTERID>";
+    assert_eq!(original[0]["master_id"], "1");
+    assert!(first.contains(master), "{first}");
     for duplicate in [
         first.to_string(),
         first
             .replace(guid, &guid.to_ascii_uppercase())
-            .replace(&format!(">{master}</MASTERID>"), ">999</MASTERID>"),
+            .replace(master, ">999</MASTERID>"),
         first
             .replace(guid, &format!("{CAPTURED_VOUCHER_COMPANY_GUID}-distinct"))
-            .replace(&format!(">{master}</MASTERID>"), ">0001</MASTERID>"),
+            .replace(master, ">0001</MASTERID>"),
     ] {
         let repeated = captured.replacen("</COLLECTION>", &format!("{duplicate}</COLLECTION>"), 1);
         for require_identity in [false, true] {
@@ -1157,6 +1164,74 @@ fn captured_utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
+/// `reference_date` (#1257), checked on injected shapes: the captured three-voucher fixture was taken before
+/// the request named REFERENCEDATE, so these elements are derived. The shapes Tally sent under this request
+/// (`TYPE="Date"`, empty or `YYYYMMDD`) are tested on captured rows in
+/// `the_captured_rows_give_a_reference_date_only_where_tally_sent_one`; the forms injected here that no capture
+/// shows (no `TYPE` attribute, a self-closing element, a padded value) are accepted by the parse but not
+/// observed. The test also pins the refusal of a value that is not a date.
+#[test]
+fn reference_date_is_optional_a_date_when_present_and_refused_otherwise() {
+    let captured = captured_native_vouchers();
+    for rows in [
+        parse_agent_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap(),
+        parse_agent_changed_rows(&captured, CAPTURED_VOUCHER_COMPANY_GUID).unwrap(),
+    ] {
+        assert!(
+            rows.iter().all(|row| row.get("reference_date").is_none()),
+            "reference_date must not be invented when Tally did not report it"
+        );
+    }
+    // Populated on voucher 1 only, with and without the `TYPE="Date"` attribute.
+    for element in [
+        "<REFERENCEDATE>20260415</REFERENCEDATE>",
+        "<REFERENCEDATE TYPE=\"Date\">20260415</REFERENCEDATE>",
+    ] {
+        let populated = with_injected_voucher_element(element);
+        let rows = parse_agent_rows(&populated, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+        assert_eq!(rows[0]["reference_date"], "20260415", "{element}");
+        assert!(rows[1].get("reference_date").is_none(), "{element}");
+        assert!(rows[2].get("reference_date").is_none(), "{element}");
+    }
+    // An empty element, closed or self-closing, is not observed, exactly like an absent one.
+    for element in [
+        "<REFERENCEDATE TYPE=\"Date\"></REFERENCEDATE>",
+        "<REFERENCEDATE/>",
+    ] {
+        let empty = with_injected_voucher_element(element);
+        let rows = parse_agent_rows(&empty, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+        assert!(rows[0].get("reference_date").is_none(), "{element}");
+    }
+    // A padded value is read as the date it holds, and returned trimmed.
+    let padded = with_injected_voucher_element("<REFERENCEDATE>  20260415 </REFERENCEDATE>");
+    let rows = parse_agent_rows(&padded, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert_eq!(rows[0]["reference_date"], "20260415");
+    // A value that is not a date refuses the read rather than passing as unobserved.
+    for bad in ["15-Apr-2026", "20261340", "20260230", "2026"] {
+        let malformed =
+            with_injected_voucher_element(&format!("<REFERENCEDATE>{bad}</REFERENCEDATE>"));
+        assert_eq!(
+            parse_agent_rows(&malformed, CAPTURED_VOUCHER_COMPANY_GUID),
+            Err("voucher_reference_date_invalid".to_string()),
+            "{bad}"
+        );
+    }
+    // The change feed reads the same rows: a value that is not a date refuses it, as it refuses the window read.
+    let malformed = with_injected_voucher_element("<REFERENCEDATE>15-Apr-2026</REFERENCEDATE>");
+    assert_eq!(
+        parse_agent_changed_rows(&malformed, CAPTURED_VOUCHER_COMPANY_GUID),
+        Err("voucher_reference_date_invalid".to_string())
+    );
+    // A repeated element is the scalar rule's refusal, as for every other scalar.
+    let twice = with_injected_voucher_element(
+        "<REFERENCEDATE>20260415</REFERENCEDATE><REFERENCEDATE>20260416</REFERENCEDATE>",
+    );
+    assert_eq!(
+        parse_agent_rows(&twice, CAPTURED_VOUCHER_COMPANY_GUID),
+        Err("agent_read_protocol_invalid".to_string())
+    );
+}
+
 /// `TALLY_PROTOCOL_REFERENCE.md` §1.1(d): the agent parsers read `&#4;` as
 /// the marker the protocol crate's native parsers produce, not as U+0004.
 const MARKED_ROOT: &str = "\u{fffd}#4; Primary";
@@ -1269,7 +1344,9 @@ fn a_captured_forbidden_reference_in_voucher_text_reads_as_the_marker() {
 fn a_literal_replacement_character_that_looks_like_a_marker_reads_back_escaped() {
     // The rule keeps its rewrite reversible by escaping a literal U+FFFD that
     // is followed by `#`, digits and `;`. A voucher Bridge posted with such
-    // text would read back as other text; `validate_payload` refuses it.
+    // text would read back as other text: `validate_payload` refuses it in a
+    // voucher number or ledger name, and the build and a native post refuse it
+    // in a narration.
     let captured = captured_entry_wildcard_vouchers();
     // The capture's first non-empty narration, whatever it says.
     let open = "<NARRATION TYPE=\"String\">";
@@ -1527,13 +1604,70 @@ fn the_captured_empty_rate_composite_withholds_too() {
 
 #[test]
 fn the_captured_request_is_what_vouchers_renders_today() {
+    // The forex capture was taken before the read named REFERENCEDATE; the one word the read has
+    // added since is captured in `vouchers-reference-date-20260420.request.xml` (tested below).
     let request = include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-composite-20260915.request.xml"
-    );
+    )
+    .replacen("PARTYGSTIN</FETCH>", "PARTYGSTIN,REFERENCEDATE</FETCH>", 1);
     assert_eq!(
-        render_agent_vouchers("BRIDGE CORPUS FOREX", "20260915", "20260915", None).unwrap(),
+        render_agent_vouchers(
+            "BRIDGE CORPUS FOREX",
+            &tally_date("20260915"),
+            &tally_date("20260915"),
+            None
+        )
+        .unwrap(),
         request
     );
+}
+
+const SHAPE_LAB_COMPANY_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+
+/// The request the read sends with `REFERENCEDATE` named, as a live read sent it (#1257): captured, not
+/// rendered by hand. Fail-first: the read without the word renders another request.
+#[test]
+fn the_captured_reference_date_request_is_what_vouchers_renders_today() {
+    let request = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-reference-date-20260420.request.xml"
+    );
+    assert_eq!(
+        render_agent_vouchers(
+            "BRIDGE SHAPE LAB",
+            &tally_date("20260420"),
+            &tally_date("20260420"),
+            None
+        )
+        .unwrap(),
+        request
+    );
+    assert!(request.contains("PARTYGSTIN,REFERENCEDATE</FETCH>"));
+}
+
+/// Two voucher rows of a live read of a synthetic book with `REFERENCEDATE` named (#1257): the first has the
+/// element empty (`TYPE="Date"`), the second has it populated with the voucher's own date. Fail-first: before
+/// the element was allow-listed and parsed, neither row carried `reference_date`.
+#[test]
+fn the_captured_rows_give_a_reference_date_only_where_tally_sent_one() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-reference-date-year-rows.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    assert!(xml.contains("<REFERENCEDATE TYPE=\"Date\"></REFERENCEDATE>"));
+    assert!(xml.contains("<REFERENCEDATE TYPE=\"Date\">20250401</REFERENCEDATE>"));
+    let rows = parse_agent_rows(&xml, SHAPE_LAB_COMPANY_GUID).unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!(rows[0].get("reference_date").is_none());
+    assert!(rows[0].get("reference").is_none());
+    assert_eq!(rows[1]["reference_date"], "20250401");
+    assert_eq!(rows[1]["reference"], "SHAPELAB-MANUAL-1");
+    assert_eq!(rows[1]["date"], "20250401");
 }
 
 /// Synthetic mutation: the captured forex voucher with the party entry's own

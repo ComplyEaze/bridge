@@ -12,7 +12,7 @@ use tally_protocol_simulator::{
 const GUID: &str = "00000000-0000-4000-8000-000000000001";
 const CAPTURED_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 
-fn captured_catalogue_payload() -> ImportPayload {
+fn captured_catalogue_payload() -> ImportPayload<String> {
     let mut input = payload();
     input.company_guid = CAPTURED_GUID.into();
     for voucher in &mut input.vouchers {
@@ -37,11 +37,31 @@ fn captured_catalogue_payload() -> ImportPayload {
 /// The shared valid batch. Its Payment and Receipt carry no `reference`,
 /// which these types refuse: the qualified bank shape has no such element.
 /// `agent_import_post_tests` covers reference rendering on a Journal.
-fn payload() -> ImportPayload {
+fn payload() -> ImportPayload<String> {
     serde_json::from_value(json!({"company_guid":GUID,"vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Payment","narration":"Paid & settled","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Bank","amount":"12.50","side":"Cr"}]},
         {"bridge_txn_id":"txn-002","date":"2026-09-02","voucher_type":"Receipt","entries":[{"ledger":"Bank","amount":"7.50","side":"Dr"},{"ledger":"Income","amount":"7.50","side":"Cr"}]}
     ]})).expect("sample payload")
+}
+
+/// [`captured_catalogue_payload`] as `validate_payload` returns it.
+fn admitted_captured_payload() -> ImportPayload {
+    validate_payload(captured_catalogue_payload()).expect("captured payload")
+}
+
+/// [`payload`] as `validate_payload` returns it, with its dates parsed.
+fn admitted_payload() -> ImportPayload {
+    validate_payload(payload()).expect("sample payload")
+}
+
+/// `validate_payload`'s verdict on a batch, without the batch it returns.
+fn payload_verdict<D: PayloadDate + Clone>(payload: &ImportPayload<D>) -> Result<(), String> {
+    validate_payload(payload.clone()).map(drop)
+}
+
+/// A stored date, written as the journal holds it.
+fn stored_date(text: &str) -> TallyDate {
+    TallyDate::parse(text).expect("a YYYYMMDD date")
 }
 
 #[tokio::test]
@@ -68,7 +88,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
     {
         entry.amount = format!("{}.99", "9".repeat(253));
     }
-    validate_payload(&input).expect("each voucher individually fits exact decimal bounds");
+    payload_verdict(&input).expect("each voucher individually fits exact decimal bounds");
     let result = server
         .build_import_xml(&serde_json::to_value(input).unwrap())
         .await;
@@ -79,20 +99,281 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
+/// A narration the agent readers would rewrite is refused by the build itself,
+/// before any Tally request or file: a native post of it could never be bound.
+#[tokio::test]
+async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let mut input = payload();
+    input.vouchers[0].narration = Some("Paid \u{fffd}#5; settled".into());
+    payload_verdict(&input).expect("a saved batch holding it is still admitted");
+    let result = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await;
+    let failure = result.err().unwrap();
+    assert_eq!(failure.code, "voucher_text_invalid");
+    assert!(failure.evidence.is_none());
+    assert!(!directory.path().join("imports").exists());
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+/// In a batch with several defects, `build_import_xml` reports the first one
+/// `validate_payload` finds, before the narration refusal that runs after it
+/// (#1055). Both are refused before any read or write.
+#[tokio::test]
+async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_narration() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let build = |input: &ImportPayload<String>| {
+        let args = serde_json::to_value(input).unwrap();
+        let server = &server;
+        async move { server.build_import_xml(&args).await.err().expect("refused") }
+    };
+    // Control: the rewritten narration alone is refused as such.
+    let mut narration_only = payload();
+    narration_only.vouchers[0].narration = Some("Synthetic \u{fffd}#4; test only".into());
+    let failure = build(&narration_only).await;
+    assert_eq!(failure.code, "voucher_text_invalid");
+    assert!(failure.evidence.is_none());
+    // With a second voucher's ledger name empty as well, that defect wins.
+    let mut both = narration_only.clone();
+    both.vouchers[1].entries[0].ledger = String::new();
+    assert_eq!(
+        payload_verdict(&both),
+        Err("voucher_entry_invalid".to_string())
+    );
+    let failure = build(&both).await;
+    assert_eq!(failure.code, "voucher_entry_invalid");
+    assert!(failure.evidence.is_none());
+    assert!(!directory.path().join("imports").exists());
+}
+
+/// `wire` as a saved batch holds it: the same vouchers with each date parsed,
+/// and none of `validate_payload`'s other checks applied.
+fn saved(wire: &ImportPayload<String>) -> ImportPayload {
+    ImportPayload {
+        company_guid: wire.company_guid.clone(),
+        vouchers: wire
+            .vouchers
+            .iter()
+            .cloned()
+            .map(|voucher| {
+                let date = normalized_date(&voucher.date).expect("a valid sample date");
+                voucher.dated(date)
+            })
+            .collect(),
+        amends_batch_id: wire.amends_batch_id.clone(),
+    }
+}
+
+/// A tool's date is parsed where `validate_payload` checks it: in each form
+/// `normalized_date` accepts, to the date the journal stores, and refused by
+/// the same code, at the same point among the other refusals (#1307).
+#[test]
+fn a_tool_date_is_parsed_where_validate_payload_checks_it() {
+    for text in ["2026-09-01", "20260901", "2026-0901"] {
+        let mut input = payload();
+        input.vouchers[0].date = text.into();
+        let admitted = validate_payload(input).expect(text);
+        assert_eq!(admitted.vouchers[0].date, stored_date("20260901"), "{text}");
+        assert_eq!(admitted.vouchers[1].date, stored_date("20260902"), "{text}");
+    }
+    for text in ["20260431", "2026-02-29", "", "2026/09/01", "26-09-01"] {
+        let mut input = payload();
+        input.vouchers[0].date = text.into();
+        assert_eq!(
+            payload_verdict(&input),
+            Err("invalid_date".to_string()),
+            "{text}"
+        );
+    }
+    // An earlier voucher's later check still wins over a later voucher's date.
+    let mut input = payload();
+    input.vouchers[0].entries.truncate(1);
+    input.vouchers[1].date = "20260431".into();
+    assert_eq!(
+        payload_verdict(&input),
+        Err("voucher_entries_too_few".to_string())
+    );
+    // Within one voucher, the transaction id is checked before the date...
+    let mut input = payload();
+    input.vouchers[0].bridge_txn_id = String::new();
+    input.vouchers[0].date = "20260431".into();
+    assert_eq!(
+        payload_verdict(&input),
+        Err("bridge_txn_id_invalid_or_duplicate".to_string())
+    );
+    // ...and the date before the entries.
+    let mut input = payload();
+    input.vouchers[0].date = "20260431".into();
+    input.vouchers[0].entries.truncate(1);
+    assert_eq!(payload_verdict(&input), Err("invalid_date".to_string()));
+}
+
+/// The saved-batch check (`admit_saved_voucher_integrity`) runs
+/// `validate_payload` on a stored batch, whose dates are already parsed. Every
+/// refusal it can give that is not about a date is the one the same batch gets
+/// from the tool (#1307).
+#[test]
+fn a_saved_batch_gets_every_non_date_refusal_a_tool_payload_gets() {
+    type Edit = fn(&mut ImportPayload<String>);
+    let cases: [(&str, Edit); 17] = [
+        ("voucher_type_shapes_mixed", |input| {
+            input.vouchers[1].voucher_type = VoucherType::Journal;
+        }),
+        ("voucher_count_invalid", |input| {
+            input.company_guid = " ".into()
+        }),
+        ("voucher_count_invalid", |input| input.vouchers.clear()),
+        ("voucher_count_invalid", |input| {
+            input.vouchers = vec![input.vouchers[0].clone(); MAX_VOUCHERS + 1];
+        }),
+        ("bridge_txn_id_invalid_or_duplicate", |input| {
+            input.vouchers[1].bridge_txn_id = input.vouchers[0].bridge_txn_id.clone();
+        }),
+        ("voucher_entries_too_few", |input| {
+            input.vouchers[0].entries.truncate(1);
+        }),
+        ("narration_reserved_marker", |input| {
+            input.vouchers[0].narration = Some("[BRIDGE:forged]".into());
+        }),
+        ("voucher_text_invalid", |input| {
+            input.vouchers[0].narration = Some(String::new());
+        }),
+        ("voucher_text_invalid", |input| {
+            input.vouchers[0].voucher_number = Some("PV\u{1}".into());
+        }),
+        ("voucher_number_invalid", |input| {
+            input.vouchers[0].voucher_number = Some("PV$1".into());
+        }),
+        ("voucher_entry_invalid", |input| {
+            input.vouchers[0].entries[0].ledger = String::new();
+        }),
+        ("voucher_unique_ledger_limit_exceeded", |input| {
+            let entry = input.vouchers[0].entries[0].clone();
+            input.vouchers[0].entries = (0..=MAX_MASTER_NAMES)
+                .map(|index| ImportEntry {
+                    ledger: format!("Ledger {index}"),
+                    ..entry.clone()
+                })
+                .collect();
+        }),
+        ("voucher_not_balanced", |input| {
+            input.vouchers[0].entries[0].amount = "13.50".into();
+        }),
+        ("voucher_amount_overflow", |input| {
+            let huge = format!("{}.99", "9".repeat(253));
+            let entry = input.vouchers[0].entries[0].clone();
+            input.vouchers[0].entries.push(ImportEntry {
+                ledger: "Other Expense".into(),
+                ..entry
+            });
+            for entry in &mut input.vouchers[0].entries {
+                entry.amount = huge.clone();
+            }
+        }),
+        ("voucher_entry_ledger_repeated", |input| {
+            input.vouchers[0].entries[1].ledger = input.vouchers[0].entries[0].ledger.clone();
+        }),
+        ("voucher_number_unqualified_for_type", |input| {
+            input.vouchers[0].voucher_number = Some("PV-1".into());
+        }),
+        ("voucher_reference_unqualified_for_type", |input| {
+            input.vouchers[0].reference = Some("REF-1".into());
+        }),
+    ];
+    for (code, edit) in cases {
+        let mut wire = payload();
+        edit(&mut wire);
+        assert_eq!(
+            payload_verdict(&wire),
+            Err(code.to_string()),
+            "tool: {code}"
+        );
+        assert_eq!(
+            payload_verdict(&saved(&wire)),
+            Err(code.to_string()),
+            "saved: {code}"
+        );
+    }
+    assert_eq!(payload_verdict(&saved(&payload())), Ok(()));
+}
+
+/// The hand-import file of the shared sample batch, pinned by the sha256 the
+/// same render had on master `9fd63a85`, before the voucher date was typed
+/// (#1307). Its vouchers are bank vouchers, so each carries `EFFECTIVEDATE`
+/// beside `DATE`; the batch sent with `YYYYMMDD` dates renders the same file.
+#[test]
+fn the_hand_import_file_of_the_sample_batch_is_pinned_byte_for_byte() {
+    let xml = render_import_xml(
+        "Synthetic Accounts",
+        &admitted_payload().vouchers,
+        "bridge-batch-pin",
+    );
+    assert_eq!(
+        sha256_hex(xml.as_bytes()),
+        "d4499fd24c7814de5ce922907670417390907b8ef9d19b32552afd32920b434c"
+    );
+    for date in ["20260901", "20260902"] {
+        assert_eq!(xml.matches(&format!("<DATE>{date}</DATE>")).count(), 1);
+        assert_eq!(
+            xml.matches(&format!("<EFFECTIVEDATE>{date}</EFFECTIVEDATE>"))
+                .count(),
+            1
+        );
+    }
+    assert_eq!(xml.matches("<DATE>").count(), 2);
+    assert_eq!(xml.matches("<EFFECTIVEDATE>").count(), 2);
+    let mut compact = payload();
+    for voucher in &mut compact.vouchers {
+        voucher.date = voucher.date.replace('-', "");
+    }
+    let compact = validate_payload(compact).unwrap();
+    assert_eq!(
+        render_import_xml("Synthetic Accounts", &compact.vouchers, "bridge-batch-pin"),
+        xml
+    );
+}
+
 #[test]
 fn narration_and_reference_reject_reserved_markers_after_entity_decoding() {
     for text in ["[bridge:forged]", "&#91;BrIdGe:forged]"] {
         let mut input = payload();
         input.vouchers[0].narration = Some(text.to_string());
         assert_eq!(
-            validate_payload(&input),
+            payload_verdict(&input),
             Err("narration_reserved_marker".to_string())
         );
 
         let mut input = payload();
         input.vouchers[0].reference = Some(text.to_string());
         assert_eq!(
-            validate_payload(&input),
+            payload_verdict(&input),
             Err("narration_reserved_marker".to_string())
         );
     }
@@ -174,7 +455,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
 }
 
 #[test]
-fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission() {
+fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
     let directory = tempfile::tempdir().expect("temporary agent directory");
     let settings = super::super::Settings {
         endpoint: TallyEndpointConfig {
@@ -192,6 +473,8 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -199,8 +482,8 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
         company_guid: GUID.into(),
         company: None,
         txn_ids: vec![],
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".into(),
         built_at: now(),
         status: "built".into(),
@@ -246,9 +529,17 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     let results: Vec<_> = (0..2)
         .map(|_| done_rx.recv_timeout(std::time::Duration::from_secs(2)))
         .collect();
-    let json_path = directory.path().join("imports/batch-proof.proof.json");
-    let md_path = directory.path().join("imports/batch-proof.proof.md");
-    assert!(!json_path.exists() && !md_path.exists());
+    // Neither busy writer saved a proof.
+    assert!(
+        !directory.path().join("imports").exists()
+            || fs::read_dir(directory.path().join("imports"))
+                .unwrap()
+                .all(|entry| !entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".proof."))
+    );
     drop(admission);
     for writer in writers {
         writer.join().expect("publication writer");
@@ -269,6 +560,7 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
             assert_eq!(result, Err("import_verification_conflict_retry".into()));
         }
     }
+    let [json_path, md_path] = server.current_proof_paths("batch-proof");
     let proof: Value =
         serde_json::from_slice(&fs::read(json_path).expect("JSON proof")).expect("parseable proof");
     let markdown = fs::read_to_string(md_path).expect("Markdown proof");
@@ -283,14 +575,86 @@ fn concurrent_verifications_replace_both_proofs_and_status_under_one_admission()
     assert!(markdown.contains(&format!("- Verification status: `{}`", latest.batch.status)));
 }
 
+/// A batch whose latest verification an older build recorded reads that
+/// build's single proof file; a later verification's proof is current beside
+/// it, and the older file is never touched (#911).
+#[test]
+fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
+    let directory = tempfile::tempdir().expect("temporary agent directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-legacy".into(),
+        company_guid: GUID.into(),
+        company: None,
+        txn_ids: vec![],
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
+        sha256: "hash".into(),
+        built_at: now(),
+        status: "posted_verified".into(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".into(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![],
+    };
+    server.append_import_ledger(&line).unwrap();
+    let older = |server: &Server| {
+        let _admission = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::from(&line))
+            .unwrap();
+    };
+    older(&server);
+    let imports = server.imports_dir().unwrap();
+    fs::create_dir_all(&imports).unwrap();
+    let legacy = imports.join("batch-legacy.proof.json");
+    fs::write(&legacy, b"older proof").unwrap();
+    assert_eq!(
+        server.read_persisted_proof("batch-legacy").unwrap(),
+        b"older proof"
+    );
+    server.save_current_proof("batch-legacy", b"newer proof");
+    assert_eq!(
+        server.read_persisted_proof("batch-legacy").unwrap(),
+        b"newer proof"
+    );
+    assert_eq!(fs::read(&legacy).unwrap(), b"older proof");
+    // An older build verifies again: its file is current once more.
+    older(&server);
+    assert_eq!(
+        server.read_persisted_proof("batch-legacy").unwrap(),
+        b"older proof"
+    );
+}
+
 #[test]
 fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
-    let input = payload();
-    validate_payload(&input).expect("valid payload");
+    let input = admitted_payload();
+    payload_verdict(&input).expect("valid payload");
     let mut unbalanced = input.clone();
     unbalanced.vouchers[0].entries[1].amount = "12.49".to_string();
     assert_eq!(
-        validate_payload(&unbalanced),
+        payload_verdict(&unbalanced),
         Err("voucher_not_balanced".to_string())
     );
     // The generic agent catalogue carries no scope-qualified fold authority.
@@ -367,6 +731,8 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -374,8 +740,8 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "2026-09-01".to_string(),
-        date_to: "2026-09-01".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -420,7 +786,7 @@ fn duplicate_detection_uses_stable_voucher_identity_independently_of_remote_id()
                 guid: use_guid.then(|| id.to_string()),
                 master_id: (!use_guid).then(|| id.to_string()),
                 alter_id: Some(11),
-                date: Some("20260901".into()),
+                date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
                 voucher_type: Some("Payment".into()),
                 narration: None,
                 voucher_number: None,
@@ -466,9 +832,11 @@ fn duplicate_detection_uses_stable_voucher_identity_independently_of_remote_id()
 
 #[test]
 fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -476,8 +844,8 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
         company_guid: GUID.into(),
         company: None,
         txn_ids: vec!["txn-001".into()],
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "synthetic-hash".into(),
         built_at: now(),
         status: "built".into(),
@@ -493,7 +861,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
         guid: Some("synthetic-guid-1".into()),
         master_id: None,
         alter_id: Some(11),
-        date: Some("20260901".into()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".into()),
         narration: Some("[BRIDGE:txn-001]".into()),
         voucher_number: None,
@@ -554,9 +922,11 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
 
 #[test]
 fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -568,8 +938,8 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
             .iter()
             .map(|voucher| voucher.bridge_txn_id.clone())
             .collect(),
-        date_from: "2026-09-01".to_string(),
-        date_to: "2026-09-02".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260902"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -585,7 +955,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
             remote_id: Some("txn-001".to_string()),
             guid: Some("g-1".to_string()),
             alter_id: Some(12),
-            date: Some("20260901".to_string()),
+            date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
             voucher_type: Some("Payment".to_string()),
             narration: Some("[BRIDGE:txn-001]".to_string()),
             voucher_number: None,
@@ -610,7 +980,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
             remote_id: Some("other-id".to_string()),
             guid: Some("g-2".to_string()),
             alter_id: Some(13),
-            date: Some("20260901".to_string()),
+            date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
             voucher_type: Some("Payment".to_string()),
             narration: None,
             voucher_number: None,
@@ -652,7 +1022,7 @@ fn verification_window_corroboration_rejects_each_unsafe_branch() {
         remote_id: None,
         guid: Some(guid.to_string()),
         alter_id: Some(alter_id),
-        date: Some(date.to_string()),
+        date: bridge_tally_core::TallyDate::parse(date).unwrap(),
         voucher_type: None,
         narration: None,
         voucher_number: None,
@@ -727,9 +1097,11 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         writes_enabled: false,
         batch_post_enabled: false,
     });
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -737,8 +1109,8 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -761,9 +1133,11 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
 
 #[test]
 fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -771,8 +1145,8 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -788,7 +1162,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -814,7 +1188,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         remote_id: Some("unrelated-duplicate".to_string()),
         guid: Some(guid.to_string()),
         alter_id: Some(3),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Journal".to_string()),
         narration: None,
         voucher_number: None,
@@ -982,9 +1356,11 @@ fn the_markdown_proof_fences_the_company_name() {
 /// left out, so it still blocks the batch as it did before.
 #[test]
 fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -992,8 +1368,8 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1008,7 +1384,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1074,9 +1450,11 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
 
 #[test]
 fn fingerprint_only_verification_requires_a_post_mark_voucher() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1084,8 +1462,8 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1100,7 +1478,7 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
         remote_id: None,
         guid: Some("fingerprint-observed-guid".to_string()),
         alter_id: Some(alter_id),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: None,
         voucher_number: None,
@@ -1141,11 +1519,13 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
 
 #[test]
 fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
-    let input = payload();
+    let input = admitted_payload();
     let mut duplicate = input.vouchers[0].clone();
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1153,8 +1533,8 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string(), "txn-duplicate".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1169,7 +1549,7 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
         remote_id: None,
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: None,
         voucher_number: None,
@@ -1204,11 +1584,13 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
 
 #[test]
 fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
-    let input = payload();
+    let input = admitted_payload();
     let mut duplicate = input.vouchers[0].clone();
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let mut line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1216,8 +1598,8 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string(), "txn-duplicate".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1232,7 +1614,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
         remote_id: None,
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1276,9 +1658,11 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
 
 #[test]
 fn narration_tag_verification_requires_a_post_mark_voucher() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1286,8 +1670,8 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1302,7 +1686,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(alter_id),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1338,13 +1722,15 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
 
 #[test]
 fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
-    let mut input = payload();
+    let mut input = admitted_payload();
     for entry in &mut input.vouchers[0].entries {
         entry.amount = "0012.50".to_string();
     }
-    validate_payload(&input).expect("leading zeros satisfy the input contract");
+    payload_verdict(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1352,8 +1738,8 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260901".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1368,7 +1754,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(alter_id),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1402,9 +1788,11 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
 
 #[test]
 fn verified_import_vouchers_require_observed_effective_accounting_flags() {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -1412,8 +1800,8 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         company_guid: GUID.to_string(),
         company: None,
         txn_ids: vec!["txn-001".to_string()],
-        date_from: "20260901".to_string(),
-        date_to: "20260902".to_string(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260902"),
         sha256: "hash".to_string(),
         built_at: now(),
         status: "built".to_string(),
@@ -1428,7 +1816,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         remote_id: Some("posted-1".to_string()),
         guid: Some("posted-guid".to_string()),
         alter_id: Some(11),
-        date: Some("20260901".to_string()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
         narration: Some("[BRIDGE:txn-001]".to_string()),
         voucher_number: None,
@@ -1488,11 +1876,11 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     cancelled.entries.clear();
     for (date, diffs) in [("20260901", json!([])), ("20260902", json!(["date"]))] {
         let mut redated = cancelled.clone();
-        redated.date = Some(date.to_string());
+        redated.date = bridge_tally_core::TallyDate::parse(date).unwrap();
         verification_window_identities(
             &ImportReadSource::admit(vec![redated.clone()]).unwrap(),
-            &line.date_from,
-            &line.date_to,
+            line.date_from.as_str(),
+            line.date_to.as_str(),
         )
         .expect("a date the windowed read can return");
         let result = verify_observed_batch(&line, &[redated]).expect("cancelled voucher");
@@ -1624,14 +2012,14 @@ fn verification_rejects_incomplete_ledger_entries() {
 
 #[test]
 fn optional_voucher_number_is_rendered_only_when_valid_and_supplied() {
-    let mut input = payload();
+    let mut input = admitted_payload();
     input.vouchers[0].voucher_number = Some("PV-0001".to_string());
     let rendered = render_import_xml("Book", &input.vouchers, "batch-render");
     assert!(rendered.contains("<VOUCHERNUMBER>PV-0001</VOUCHERNUMBER>"));
     assert_eq!(rendered.matches("<VOUCHERNUMBER>").count(), 1);
     input.vouchers[0].voucher_number = Some("bad$number".to_string());
     assert_eq!(
-        validate_payload(&input),
+        payload_verdict(&input),
         Err("voucher_number_invalid".to_string())
     );
 }
@@ -1649,7 +2037,7 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
     let mut input = captured_catalogue_payload();
     for number in [eleven, "क".repeat(32), "A".repeat(32)] {
         input.vouchers[0].voucher_number = Some(number);
-        assert_eq!(validate_payload(&input), Ok(()));
+        assert_eq!(payload_verdict(&input), Ok(()));
     }
     for (number, code) in [
         ("क".repeat(33), "voucher_number_invalid"),
@@ -1660,7 +2048,7 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
         (String::new(), "voucher_text_invalid"),
     ] {
         input.vouchers[0].voucher_number = Some(number);
-        assert_eq!(validate_payload(&input), Err(code.to_string()));
+        assert_eq!(payload_verdict(&input), Err(code.to_string()));
     }
 }
 
@@ -1670,49 +2058,134 @@ fn text_that_would_read_back_changed_is_refused_before_posting() {
     // `;` (`agent_voucher_parse_tests`'s
     // `a_literal_replacement_character_that_looks_like_a_marker_reads_back_escaped`
     // measures it on a capture), so such a value could never verify — but only
-    // on a field `voucher_diffs` (agent_import_verification.rs) actually
-    // compares: the voucher number and a ledger name. Narration and reference
-    // are never compared there (attribution only searches narration for the
-    // `[BRIDGE:...]` tag, which the reserved-marker check leaves untouched),
-    // so the same sequence there is invisible to verification and stays
-    // admitted.
-    let mut input = captured_catalogue_payload();
-    assert_eq!(validate_payload(&input), Ok(()));
+    // on a field something compares: the voucher number and a ledger name
+    // (`voucher_diffs`), and the narration (a native post's span binding,
+    // byte for byte). The reference is never compared, so the same sequence
+    // there is invisible to verification and stays admitted.
+    let mut input = admitted_captured_payload();
+    assert_eq!(payload_verdict(&input), Ok(()));
     for text in ["A\u{fffd}#5;", "\u{fffd}#65533;"] {
         let mut changed = input.clone();
         changed.vouchers[0].voucher_number = Some(text.to_string());
         assert_eq!(
-            validate_payload(&changed),
+            payload_verdict(&changed),
             Err("voucher_text_invalid".to_string()),
             "{text:?}"
         );
         let mut changed = input.clone();
         changed.vouchers[0].entries[0].ledger = text.to_string();
         assert_eq!(
-            validate_payload(&changed),
+            payload_verdict(&changed),
             Err("voucher_entry_invalid".to_string()),
             "{text:?}"
         );
-        // The regression this guards against: narrowing the refusal back onto
-        // narration (its pre-fix scope) instead of onto the fields
-        // verification compares. Both assertions below fail under that
-        // mutation — the first because narration would wrongly refuse, the
-        // second because voucher_number would wrongly admit.
+        // The narration is refused at build, or the post's binding would be
+        // refused for good; a saved batch holding it is still admitted for
+        // review and reconciliation. The reference, which nothing compares,
+        // stays admitted.
         let mut changed = input.clone();
         changed.vouchers[0].narration = Some(text.to_string());
-        assert_eq!(validate_payload(&changed), Ok(()), "{text:?}");
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&changed.vouchers),
+            Err("voucher_text_invalid".to_string()),
+            "{text:?}"
+        );
         let mut changed = input.clone();
         changed.vouchers[0].reference = Some(text.to_string());
-        assert_eq!(validate_payload(&changed), Ok(()), "{text:?}");
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
     }
     // A replacement character on its own, and reference-looking text the
     // writer escapes, read back unchanged and stay admissible everywhere.
     for text in ["A\u{fffd}B", "\u{fffd}#x5;", "&#4; Primary", "A\u{fffd}#"] {
         let mut changed = input.clone();
         changed.vouchers[0].voucher_number = Some(text.to_string());
-        assert_eq!(validate_payload(&changed), Ok(()), "{text:?}");
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
         input.vouchers[0].narration = Some(text.to_string());
-        assert_eq!(validate_payload(&input), Ok(()), "{text:?}");
+        assert_eq!(payload_verdict(&input), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&input.vouchers),
+            Ok(()),
+            "{text:?}"
+        );
+    }
+}
+
+/// A narration holding a character that draws nothing (`draws_nothing`) is
+/// refused when the batch is built and before a native POST, while a saved
+/// batch holding one is still admitted for review. The joiners Indic spellings
+/// need, and the reference, stay admitted.
+#[test]
+fn a_narration_holding_a_character_that_draws_nothing_is_refused_before_posting() {
+    let input = admitted_captured_payload();
+    for text in [
+        "Paid \u{202E}Primary",
+        "Paid \u{2066}Primary\u{2069}",
+        "Paid\u{200B}Primary",
+        "\u{FEFF}Paid Primary",
+        "Paid Primary\u{E0041}",
+    ] {
+        let mut changed = input.clone();
+        changed.vouchers[0].narration = Some(text.to_string());
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&changed.vouchers),
+            Err("voucher_text_invalid".to_string()),
+            "{text:?}"
+        );
+        let mut changed = input.clone();
+        changed.vouchers[0].reference = Some(text.to_string());
+        assert_eq!(payload_verdict(&changed), Ok(()), "{text:?}");
+        assert_eq!(
+            refuse_rewritten_narration(&changed.vouchers),
+            Ok(()),
+            "{text:?}"
+        );
+    }
+    let mut changed = input.clone();
+    changed.vouchers[0].narration =
+        Some("\u{0915}\u{094D}\u{200D}\u{0937} \u{0930}\u{200C}".to_string());
+    assert_eq!(refuse_rewritten_narration(&changed.vouchers), Ok(()));
+}
+
+/// `reads_back_as_other_text` escapes the value with `quick_xml::escape::escape`
+/// before it marks references. quick-xml 0.42 also writes a carriage return as
+/// `&#13;` there, which 0.41 left raw (bridge#1198), so these answers were
+/// measured on 0.41 and pinned before the library moves.
+#[test]
+fn text_with_a_carriage_return_or_replacement_character_reads_back_as_measured() {
+    // A carriage return, alone or beside a replacement character, and
+    // reference-looking text the escape turns into `&amp;`, read back as
+    // written.
+    for text in [
+        "\r",
+        "\r\n",
+        "\r\r",
+        "Ledger\r",
+        "Ledger\r\n",
+        "A\rB",
+        "Paid & <vendor>\r\n",
+        "\u{fffd}",
+        "\u{fffd}\r",
+        "\u{fffd}\r\n",
+        "\r\u{fffd}",
+        "\u{fffd}\r#13;",
+        "&#13;",
+        "&#13;\r",
+        "\r&#4;",
+        "\u{fffd}&#13;",
+    ] {
+        assert!(!reads_back_as_other_text(text), "{text:?}");
+    }
+    // A replacement character directly followed by `#`, digits and `;` is
+    // rewritten by the readers, whether or not a carriage return is beside it.
+    for text in [
+        "\u{fffd}#13;",
+        "\u{fffd}#13;\r",
+        "\r\u{fffd}#13;",
+        "\r\u{fffd}#5;",
+    ] {
+        assert!(reads_back_as_other_text(text), "{text:?}");
     }
 }
 
@@ -1789,20 +2262,79 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             proof.payload["result"]["counts"]["matching_content_observed"],
             2
         );
-        assert!(directory
-            .path()
-            .join("imports")
-            .join(format!(
-                "{}.proof.md",
-                proof.payload["result"]["batch_id"]
-                    .as_str()
-                    .expect("batch id")
-            ))
-            .exists());
+        assert!(server.current_proof_paths(
+            proof.payload["result"]["batch_id"]
+                .as_str()
+                .expect("batch id")
+        )[1]
+        .exists());
         // 50 before the pre-flight volume bound, plus the six legs of the one
         // high-water read verify_import now makes (protocol reference §11c).
         assert_eq!(simulator.finish().expect("requests").len(), 56);
     }
+}
+
+/// A V2 catalogue answer with every ledger's flag set here: the names in
+/// `bill_wise` Yes, every other No.
+///
+/// A REGRESSION DOUBLE over a live capture (AGENTS.md P1): only the flag column
+/// is rewritten; names, GUIDs, parents and layout are the capture's. It
+/// exercises the build's and the post's own rules. What Tally answers to the
+/// V2 request is pinned on the captures themselves
+/// (`agent_import_bill_wise_tests.rs`, `tests/standard_ledger_catalogue_rows.rs`).
+pub(super) fn with_bill_wise_flags(catalogue: &str, bill_wise: &[&str]) -> String {
+    const OPEN: &str = "<LEDGER NAME=\"";
+    const FLAG: &str = "<ISBILLWISEON TYPE=\"Logical\">";
+    let mut out = String::with_capacity(catalogue.len());
+    let mut rest = catalogue;
+    while let Some(start) = rest.find(OPEN) {
+        let after = &rest[start + OPEN.len()..];
+        let name = &after[..after.find('"').expect("a ledger name closes")];
+        let name = name
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#13;", "\r")
+            .replace("&#10;", "\n");
+        let row_end = after.find("</LEDGER>").expect("a ledger closes");
+        let flag_at = after[..row_end]
+            .find(FLAG)
+            .expect("a V2 row carries its flag")
+            + FLAG.len();
+        let flag_end = flag_at + after[flag_at..].find('<').expect("the flag closes");
+        out.push_str(&rest[..start + OPEN.len() + flag_at]);
+        out.push_str(if bill_wise.contains(&name.as_str()) {
+            "Yes"
+        } else {
+            "No"
+        });
+        out.push_str(&after[flag_end..row_end]);
+        rest = &after[row_end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The import cycle with its two ledger catalogue answers (offsets 5 and 7) the
+/// V2 answer the import family reads (#1234): the same book, each
+/// ledger's `ISBILLWISEON` in the row, none of them bill-wise. Every other
+/// reader of the cycle keeps the V1 answers.
+fn import_family_cycle_plans() -> Vec<ScenarioPlan> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue-v2.utf16le.xml"
+    );
+    let words = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    let catalogue = with_bill_wise_flags(
+        &String::from_utf16(&words).expect("captured native V2 catalogue"),
+        &[],
+    );
+    let mut plans = import_cycle_plans();
+    for index in [5, 7] {
+        plans[index].fixture = Fixture::SyntheticXml(catalogue.clone());
+    }
+    plans
 }
 
 fn import_cycle_plans() -> Vec<ScenarioPlan> {
@@ -2143,7 +2675,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
             voucher
         })
         .collect();
-    assert_eq!(validate_payload(&repeated), Ok(()));
+    assert_eq!(payload_verdict(&repeated), Ok(()));
     let mut unique = repeated.clone();
     unique.vouchers.truncate(100);
     for (index, voucher) in unique.vouchers.iter_mut().enumerate() {
@@ -2151,9 +2683,9 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
     }
     let mut at_limit = unique.clone();
     at_limit.vouchers.pop();
-    assert_eq!(validate_payload(&at_limit), Ok(()));
+    assert_eq!(payload_verdict(&at_limit), Ok(()));
     assert_eq!(
-        validate_payload(&unique),
+        payload_verdict(&unique),
         Err("voucher_unique_ledger_limit_exceeded".into())
     );
     let directory = tempfile::tempdir().unwrap();
@@ -2196,8 +2728,241 @@ mod boundary_tests;
 #[path = "agent_import_multiplicity_tests.rs"]
 mod multiplicity_tests;
 
+/// The L1 capture's batch and verification rows (#806): L1A-050 was
+/// cancelled (voucher 352) and its content entered again by hand (353).
+fn l1_reentry_line_and_rows() -> (ImportLedgerLine, Vec<ReadVoucher>) {
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-journal.jsonl"
+    );
+    let line = serde_json::from_str(journal.lines().next().expect("the built batch")).unwrap();
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/l1-reentry-import-verification.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let rows = parse_import_vouchers(&xml, "17a10910-773c-42c6-bd66-7bba9a392536")
+        .unwrap()
+        .rows;
+    (line, rows)
+}
+
+/// Only effective, unmarked rows that no batch voucher took are copies of a
+/// cancelled voucher (#806), and at most five are listed while the count stays
+/// exact. Each variant is the captured re-entry, 353, under another identity.
+#[test]
+fn only_effective_unmarked_rows_count_as_copies_of_a_cancelled_voucher() {
+    let (line, rows) = l1_reentry_line_and_rows();
+    let re_entry = rows
+        .iter()
+        .find(|row| row.alter_id == Some(1790))
+        .expect("the captured re-entry")
+        .clone();
+    let variant = |at: u64, change: fn(&mut ReadVoucher)| {
+        let mut row = re_entry.clone();
+        row.alter_id = Some(at);
+        row.master_id = Some(at.to_string());
+        row.guid = Some(format!("17a10910-773c-42c6-bd66-7bba9a392536-{at:08x}"));
+        row.remote_id = row.guid.clone();
+        change(&mut row);
+        row
+    };
+    let cancelled_item = |rows: &[ReadVoucher]| {
+        let verified = verify_observed_batch(&line, rows).unwrap();
+        let item = verified["vouchers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["bridge_txn_id"] == "L1A-050")
+            .unwrap()
+            .clone();
+        assert_eq!(item["status"], "posted_not_effective");
+        (
+            item,
+            verified["counts"]["cancelled_with_effective_copy"].clone(),
+        )
+    };
+    let (item, count) = cancelled_item(&rows);
+    assert_eq!(item["effective_copies_observed"]["count"], 1);
+    assert_eq!(count, 1);
+    for change in [
+        (|row: &mut ReadVoucher| {
+            row.narration =
+                Some("manual re-entry [BRIDGE:00000000-0000-4000-8000-000000000806]".into());
+        }) as fn(&mut ReadVoucher),
+        |row| row.cancelled = Some(true),
+        |row| row.optional = Some(true),
+    ] {
+        let mut more = rows.clone();
+        more.push(variant(3000, change));
+        let (item, count) = cancelled_item(&more);
+        assert_eq!(item["effective_copies_observed"]["count"], 1, "{item}");
+        assert_eq!(count, 1);
+    }
+    let mut many = rows.clone();
+    // Appended out of AlterID order, so the listed five are sorted, not as found.
+    many.extend((3001..=3006).rev().map(|at| variant(at, |_| {})));
+    let (item, count) = cancelled_item(&many);
+    let copies = &item["effective_copies_observed"];
+    assert_eq!(copies["count"], 7, "{item}");
+    assert_eq!(count, 1);
+    let alter_ids = copies["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["alter_id"].as_u64().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(alter_ids, [1790, 3001, 3002, 3003, 3004], "{item}");
+}
+
+/// A copy must carry the cancelled voucher's own content and be left over by
+/// the rest of the batch (#806, from #1221's review): a re-entry with another
+/// amount, sign, ledger or date is not one, a copy another batch voucher of
+/// the same content took is not one, and one below the pre-import mark is
+/// listed and flagged.
+#[test]
+fn a_copy_must_carry_the_cancelled_vouchers_own_content_left_unconsumed() {
+    let (line, rows) = l1_reentry_line_and_rows();
+    let re_entry = rows
+        .iter()
+        .find(|row| row.alter_id == Some(1790))
+        .expect("the captured re-entry")
+        .clone();
+    let variant = |at: u64, change: &dyn Fn(&mut ReadVoucher)| {
+        let mut row = re_entry.clone();
+        row.alter_id = Some(at);
+        // An identity no captured row holds, even where AlterID is below
+        // the captured range.
+        let id = 900_000 + at;
+        row.master_id = Some(id.to_string());
+        row.guid = Some(format!("17a10910-773c-42c6-bd66-7bba9a392536-{id:08x}"));
+        row.remote_id = row.guid.clone();
+        change(&mut row);
+        row
+    };
+    let item_of = |line: &ImportLedgerLine, rows: &[ReadVoucher], txn: &str| {
+        let verified = verify_observed_batch(line, rows).expect("verified");
+        let item = verified["vouchers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["bridge_txn_id"] == txn)
+            .unwrap()
+            .clone();
+        (item, verified["counts"].clone())
+    };
+    // Another amount, sign, ledger or date: the same voucher in every other
+    // respect, so only the fingerprint keeps it out.
+    let changes: [&dyn Fn(&mut ReadVoucher); 4] = [
+        &|row| {
+            for entry in &mut row.entries {
+                entry.amount = entry.amount.replace("50.00", "60.00");
+            }
+        },
+        &|row| {
+            for entry in &mut row.entries {
+                entry.amount = if entry.amount.starts_with('-') {
+                    entry.amount.trim_start_matches('-').to_string()
+                } else {
+                    format!("-{}", entry.amount)
+                };
+                entry.is_deemed_positive = if entry.is_deemed_positive == "Yes" {
+                    "No".into()
+                } else {
+                    "Yes".into()
+                };
+            }
+        },
+        &|row| {
+            for entry in &mut row.entries {
+                if entry.ledger == "Cash" {
+                    entry.ledger = "Petty Cash".into();
+                }
+            }
+        },
+        &|row| row.date = bridge_tally_core::TallyDate::parse("20260618").unwrap(),
+    ];
+    for change in changes {
+        let mut rows = rows.clone();
+        rows.retain(|row| row.alter_id != Some(1790));
+        rows.push(variant(3000, change));
+        let (item, counts) = item_of(&line, &rows, "L1A-050");
+        assert_eq!(item["effective_copies_observed"]["count"], 0, "{item}");
+        assert_eq!(counts["cancelled_with_effective_copy"], 0);
+    }
+    // Another batch voucher of the same content takes the copy first.
+    let mut twinned = line.clone();
+    let mut twin = twinned
+        .vouchers
+        .iter()
+        .find(|voucher| voucher.bridge_txn_id == "L1A-050")
+        .unwrap()
+        .clone();
+    twin.bridge_txn_id = "L1A-051".into();
+    twinned.vouchers.push(twin);
+    let (item, counts) = item_of(&twinned, &rows, "L1A-050");
+    assert_eq!(
+        item["effective_copies_observed"],
+        json!({"count":0,"entries":[],"attribution":"not_established","ambiguous_within_batch":true}),
+        "{item}"
+    );
+    assert_eq!(counts["cancelled_with_effective_copy"], 0);
+    let (took, _) = item_of(&twinned, &rows, "L1A-051");
+    assert_eq!(took["status"], "matching_content_observed", "{took}");
+    assert_eq!(
+        took["guid"],
+        "17a10910-773c-42c6-bd66-7bba9a392536-000006b8"
+    );
+    // A copy below the pre-import mark (1738) is listed and flagged.
+    let mut below = rows.clone();
+    below.push(variant(1700, &|_| {}));
+    let (item, _) = item_of(&line, &below, "L1A-050");
+    let entries = &item["effective_copies_observed"]["entries"];
+    assert_eq!(item["effective_copies_observed"]["count"], 2, "{item}");
+    assert_eq!(entries[0]["alter_id"], 1700, "{item}");
+    assert_eq!(entries[0]["before_pre_import_mark"], true, "{item}");
+    assert_eq!(entries[1]["before_pre_import_mark"], false, "{item}");
+    // A copy read with no AlterID cannot be placed against the mark. (With
+    // no mark at all nothing is attributed, so no item is cancelled.)
+    let mut no_alter_id = rows.clone();
+    no_alter_id.retain(|row| row.alter_id != Some(1790));
+    no_alter_id.push(variant(3000, &|row| row.alter_id = None));
+    let (item, _) = item_of(&line, &no_alter_id, "L1A-050");
+    assert_eq!(item["effective_copies_observed"]["count"], 1, "{item}");
+    assert_eq!(
+        item["effective_copies_observed"]["entries"][0]["before_pre_import_mark"],
+        Value::Null,
+        "{item}"
+    );
+    // An optional voucher is not cancelled: it keeps its entries and carries
+    // no copy field at all.
+    let mut optional = rows.clone();
+    let cancelled = optional
+        .iter_mut()
+        .find(|row| row.alter_id == Some(1789))
+        .unwrap();
+    cancelled.cancelled = Some(false);
+    cancelled.optional = Some(true);
+    cancelled.entries = re_entry.entries.clone();
+    let (item, _) = item_of(&line, &optional, "L1A-050");
+    assert_eq!(
+        item,
+        json!({"bridge_txn_id":"L1A-050","status":"posted_not_effective","marker":"narration_tag",
+            "reason":"voucher_optional","voucher_number":"352",
+            "guid":"17a10910-773c-42c6-bd66-7bba9a392536-000006b7","master_id":"1719","alter_id":1789})
+    );
+}
+
 fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Result<Value, String> {
-    verify_batch(line, &ImportReadSource::admit(rows.to_vec())?)
+    verify_batch(
+        line,
+        &ImportReadSource::admit(rows.to_vec())?,
+        Attribution::Tag,
+    )
 }
 
 #[tokio::test]
@@ -2307,7 +3072,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
 #[tokio::test]
 async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
     // (batch posting, vouchers, edit, refusal the build must name)
-    type Edit = fn(&mut ImportPayload);
+    type Edit = fn(&mut ImportPayload<String>);
     let cases: [(bool, usize, Edit, Option<&str>); 4] = [
         (false, 2, |_| {}, Some("import_post_requires_one_voucher")),
         (true, 2, |_| {}, None),
@@ -2423,6 +3188,11 @@ fn refusal_reason_states_the_current_voucher_limit() {
     );
     let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
     assert!(too_large.contains("(50)"), "{too_large}");
+    let unmarked = native_post_refusal_reason("import_review_on_account_unmarked", 1);
+    assert!(
+        unmarked.contains("without its On Account mark"),
+        "{unmarked}"
+    );
     // An unlisted code keeps its own name in the warning and a neutral reason.
     let (warnings, _) =
         build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
@@ -2470,8 +3240,11 @@ mod qualification_tests;
 #[path = "agent_import_bank_tests.rs"]
 mod bank_tests;
 
+#[path = "agent_import_bill_wise_build_tests.rs"]
+mod bill_wise_build_tests;
+
 fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
-    let cycle = import_cycle_plans();
+    let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
         probe.clone(),
@@ -2521,9 +3294,13 @@ fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_per
     // Guard both production renderers against restoring that dependency; this
     // request test does not simulate or qualify Tally's date behavior.
     let (from, to) = ("20260815", "20260822");
+    let typed = (
+        &crate::agent::tally_date(from),
+        &crate::agent::tally_date(to),
+    );
     let requests = [
-        render_import_verification_read("Synthetic Book", from, to),
-        super::super::render_agent_vouchers("Synthetic Book", from, to, None).unwrap(),
+        render_import_verification_read("Synthetic Book", typed.0, typed.1),
+        super::super::render_agent_vouchers("Synthetic Book", typed.0, typed.1, None).unwrap(),
     ];
     for request in requests {
         let mut reader = quick_xml::Reader::from_str(&request);
@@ -2533,18 +3310,14 @@ fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_per
             match reader.read_event().unwrap() {
                 quick_xml::events::Event::Start(tag) => {
                     let name = tag.name();
-                    if name.as_ref() == b"SYSTEM" {
+                    if name.as_ref() == "SYSTEM" {
                         let text = reader.read_text(name).unwrap();
-                        let decoded = text.decode().unwrap();
-                        formulae.push(quick_xml::escape::unescape(&decoded).unwrap().into_owned());
-                    } else if matches!(name.as_ref(), b"SVFROMDATE" | b"SVTODATE") {
-                        let value = reader
-                            .read_text(name)
-                            .unwrap()
-                            .decode()
-                            .unwrap()
-                            .into_owned();
-                        assert!(bounds.insert(name.as_ref().to_vec(), value).is_none());
+                        formulae.push(quick_xml::escape::unescape(&text).unwrap().into_owned());
+                    } else if matches!(name.as_ref(), "SVFROMDATE" | "SVTODATE") {
+                        let value = reader.read_text(name).unwrap().to_string();
+                        assert!(bounds
+                            .insert(name.as_ref().as_bytes().to_vec(), value)
+                            .is_none());
                     }
                 }
                 quick_xml::events::Event::Eof => break,
@@ -2603,6 +3376,8 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         batch_id: "batch-dispatched-endpoint".into(),
         identity_scheme: Some(ImportIdentityScheme::BatchV1),
         amends_batch_id: None,
@@ -2610,8 +3385,8 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         endpoint_origin: Some("http://127.0.0.1:9002".into()),
         company: None,
         txn_ids: vec![],
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "hash".into(),
         built_at: now(),
         status: "built".into(),
@@ -2756,6 +3531,51 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
     assert_eq!(capped, bare);
 }
 
+/// A batch with no dispatch intent (a file a person imported by hand) has no
+/// mark from before a POST, so its proof measures `alter_id_delta` from the
+/// mark recorded when it was built, and says so (#1087).
+#[tokio::test]
+async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark() {
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    server
+        .call_tool_response(
+            "verify_import",
+            json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
+        )
+        .await;
+    let proof: Value =
+        serde_json::from_slice(&fs::read(&server.current_proof_paths(&batch_id)[0]).unwrap())
+            .unwrap();
+    assert_eq!(proof["alter_id_delta"]["from"], "build_mark", "{proof}");
+    assert_eq!(
+        proof["alter_id_delta"]["before"], proof["pre_import_mark"]["value"],
+        "{proof}"
+    );
+    assert!(proof["pre_import_mark"]["value"].is_u64(), "{proof}");
+}
+
 #[tokio::test]
 async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_again() {
     // bridge#627: a whole-batch response outgrew the agent byte cap.
@@ -2792,10 +3612,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
         .value;
     let page = &first["structuredContent"]["result"];
     assert_ne!(first["isError"], true, "{first}");
-    let proof_path = server
-        .imports_dir()
-        .unwrap()
-        .join(format!("{batch_id}.proof.json"));
+    let [proof_path, _] = server.current_proof_paths(&batch_id);
     let persisted = fs::read(&proof_path).unwrap();
     assert_eq!(
         page["proof"]["sha256"],
@@ -2874,11 +3691,30 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
         refused["structuredContent"]["result"]["error"]["code"],
         "verification_page_requires_proof"
     );
-    fs::write(&proof_path, [persisted.as_slice(), b" "].concat()).unwrap();
-    let refused = server.call_tool_response("verify_import", next).await.value;
+    // A newer verification became the batch's current proof: the page's own
+    // proof is refused, and still on disk as it was (#911).
+    let newer = [persisted.as_slice(), b" "].concat();
+    server.save_current_proof(&batch_id, &newer);
+    let refused = server
+        .call_tool_response("verify_import", next.clone())
+        .await
+        .value;
     assert_eq!(
         refused["structuredContent"]["result"]["error"]["code"],
         "verification_proof_changed"
+    );
+    assert_eq!(fs::read(&proof_path).unwrap(), persisted);
+    // The current proof's bytes no longer match the digest the journal records.
+    fs::write(&server.current_proof_paths(&batch_id)[0], b"{}").unwrap();
+    let mut altered = next;
+    altered["proof_sha256"] = json!(crate::agent::sha256_hex(&newer));
+    let refused = server
+        .call_tool_response("verify_import", altered)
+        .await
+        .value;
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"],
+        "verification_proof_altered"
     );
 }
 
@@ -2943,13 +3779,7 @@ async fn verify_saved_batch_after_dispatch(
         simulator.finish().expect("captured plan requests").len(),
         56
     );
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{batch_id}.proof.md")),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(&batch_id)[1]).unwrap();
     (response, snapshot, markdown)
 }
 
@@ -3015,17 +3845,12 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         .verify_import_after_current_dispatch(
             &json!({"company_guid":CAPTURED_GUID,"batch_id":batch_id}),
             json!({"state":"not_checked","reason":"masters_unmoved"}),
+            None,
         )
         .await
         .expect("current dispatch verification");
     let persisted: Value = serde_json::from_slice(
-        &std::fs::read(
-            server
-                .imports_dir()
-                .expect("imports directory")
-                .join(format!("{batch_id}.proof.json")),
-        )
-        .expect("persisted proof"),
+        &std::fs::read(&server.current_proof_paths(&batch_id)[0]).expect("persisted proof"),
     )
     .expect("proof JSON");
     let latest = server
@@ -3170,6 +3995,118 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
     }
 }
 
+/// #1241: the same cycle on a book large enough to be counted (a mark of 1,000):
+/// verify_import's window is counted by a census of its own, read whole, refused
+/// by Tally as too large, and read again as its two days, each admitted against
+/// that census; the marks read after the last day equal the ones it opened on.
+/// Such a read is not replayed: nothing follows the closing marks.
+fn verify_counted_split_plans() -> Vec<ScenarioPlan> {
+    let cycle = qualified_import_cycle_plans();
+    let (company, status) = (cycle[44].clone(), cycle[46].clone());
+    let counted = |plan: &ScenarioPlan| {
+        let mut plan = plan.clone();
+        let body = plan.fixture.body().into_owned();
+        assert!(body.contains("<ALTVCHID>10</ALTVCHID>"), "a marks answer");
+        plan.fixture = Fixture::SyntheticXml(
+            body.replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>1000</ALTVCHID>"),
+        );
+        plan
+    };
+    let premark = counted(&cycle[39]);
+    let readback = cycle[45].fixture.body().into_owned();
+    let first = readback.find("<VOUCHER ").unwrap();
+    let second = readback.rfind("<VOUCHER ").unwrap();
+    let end = readback.rfind("</COLLECTION>").unwrap();
+    let day = |voucher: &str| {
+        let mut plan = cycle[45].clone();
+        plan.fixture = Fixture::SyntheticXml(format!(
+            "{}{voucher}{}",
+            &readback[..first],
+            &readback[end..]
+        ));
+        plan
+    };
+    let (day_one, day_two) = (day(&readback[first..second]), day(&readback[second..end]));
+    let paired = |body: &ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body.clone(),
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let mut plans = cycle[..44].to_vec();
+    // verify_import's own marks read: the book is counted from here.
+    plans[39] = counted(&cycle[39]);
+    plans[41] = counted(&cycle[41]);
+    // The census of the window, then the whole window, refused as over the cap.
+    plans.extend(paired(&cycle[45]));
+    plans.push(company.clone());
+    plans.push(
+        cycle[45]
+            .clone()
+            .with_framing(ResponseFraming::DeclaredContentLength {
+                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+            }),
+    );
+    for body in [&day_one, &day_two, &premark] {
+        plans.extend(paired(body));
+    }
+    plans
+}
+
+#[tokio::test]
+async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says_so() {
+    // 44 legs to open verify_import through its marks, the census (6), the
+    // whole window Tally refuses (2), the two days and the closing marks (18).
+    // A replay would add 18 more, which this plan does not script. (A read
+    // that had a part refused is never admitted for a post, as the test above
+    // pins, so this runs the verification alone.)
+    let simulator = SequenceSimulator::spawn(verify_counted_split_plans()).expect("simulator");
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(super::super::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: super::super::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .expect("batch id")
+        .to_string();
+    let args = json!({"company_guid":CAPTURED_GUID, "batch_id": batch_id});
+    let proof = server.verify_import(&args).await.expect("verify");
+    assert_eq!(
+        proof.payload["result"]["counts"]["matching_content_observed"],
+        2
+    );
+    // The proof the journal names as current (bridge#911), not a fixed name.
+    let persisted: Value = serde_json::from_slice(
+        &server
+            .read_persisted_proof(&batch_id)
+            .expect("persisted proof"),
+    )
+    .expect("proof JSON");
+    assert_eq!(
+        persisted["evidence"]["voucher_read_corroboration"],
+        json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
+    );
+    assert_eq!(simulator.finish().expect("requests").len(), 44 + 6 + 2 + 18);
+}
+
 // bridge#626: a ledger whose stored name ends in CR LF. The catalogue carries
 // it verbatim; these pin that the build can now name it, by its exact bytes
 // only, and write it so an XML reader recovers those bytes.
@@ -3191,7 +4128,7 @@ fn a_ledger_name_may_end_in_one_crlf_and_nothing_else() {
     ] {
         let mut changed = input.clone();
         changed.vouchers[0].entries[0].ledger = ledger.to_string();
-        assert_eq!(validate_payload(&changed).is_ok(), admitted, "{ledger:?}");
+        assert_eq!(payload_verdict(&changed).is_ok(), admitted, "{ledger:?}");
     }
 }
 
@@ -3266,7 +4203,7 @@ fn only_one_trailing_crlf_makes_a_live_spelling_importable() {
 
 #[test]
 fn a_ledger_line_break_is_written_as_character_references() {
-    let mut input = captured_catalogue_payload();
+    let mut input = admitted_captured_payload();
     input.vouchers[0].entries[0].ledger = "Bridge Nested Debtor WR4\r\n".to_string();
     let xml = render_import_xml("Company", &input.vouchers, "bridge-batch");
     assert!(
@@ -3401,12 +4338,11 @@ fn decoded_element_text(xml: &str, tag: &str) -> String {
             .read_event()
             .expect("request must be well-formed XML")
         {
-            quick_xml::events::Event::Start(event) if event.name().as_ref() == tag.as_bytes() => {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == tag => {
                 let raw = reader
                     .read_text(event.name())
                     .unwrap_or_else(|_| panic!("<{tag}> must have a matching close tag"));
-                let decoded = raw.decode().expect("text must decode as UTF-8");
-                return quick_xml::escape::unescape(&decoded)
+                return quick_xml::escape::unescape(&raw)
                     .expect("text must unescape")
                     .into_owned();
             }
@@ -3427,7 +4363,7 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     let narration = "Paid & <vendor> \"X\" 'Y'";
     let reference = "REF & <NO> \"1\" 'A'";
     let ledger = "Bridge & <Ledger> \"Q\" 'A'\r\n";
-    let input: ImportPayload = serde_json::from_value(json!({
+    let input: ImportPayload<String> = serde_json::from_value(json!({
         "company_guid": GUID,
         "vouchers": [{
             "bridge_txn_id": "txn-escape",
@@ -3442,10 +4378,10 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
         }]
     }))
     .expect("synthetic escaping payload");
-    validate_payload(&input).expect("reserved characters and a trailing ledger CR LF are valid");
+    payload_verdict(&input).expect("reserved characters and a trailing ledger CR LF are valid");
 
     let company = "BRIDGE & <SYNTHETIC> \"BOOK\" 'X'";
-    let xml = render_import_xml(company, &input.vouchers, "batch-escape");
+    let xml = render_import_xml(company, &saved(&input).vouchers, "batch-escape");
 
     // The whole rendered request must be well-formed XML: an escaping bug can
     // make it exactly not that.
@@ -3465,8 +4401,8 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
     assert_eq!(decoded_element_text(&xml, "LEDGERNAME"), ledger);
     // A conforming XML parser folds a literal CR LF (and a lone CR) to LF
     // before the application sees the text (XML 1.0, end-of-line handling);
-    // character references are not folded. quick_xml's decode() skips that
-    // step, so apply it here: only an escaped CR LF survives it (bridge#626).
+    // character references are not folded. The text quick_xml hands over skips
+    // that step, so apply it here: only an escaped CR LF survives it (bridge#626).
     let folded = xml.replace("\r\n", "\n").replace('\r', "\n");
     assert_eq!(decoded_element_text(&folded, "LEDGERNAME"), ledger);
     assert!(!xml.contains('\r'), "no literal CR may reach the request");
@@ -3479,7 +4415,7 @@ fn shipped_write_path_round_trips_reserved_characters_and_a_ledger_crlf() {
 #[test]
 fn shipped_write_path_round_trips_a_party_ledger_crlf() {
     let party = "Vendor & <Party> \"Q\" 'A'\r\n";
-    let input: ImportPayload = serde_json::from_value(json!({
+    let input: ImportPayload<String> = serde_json::from_value(json!({
         "company_guid": GUID,
         "vouchers": [{
             "bridge_txn_id": "txn-party-escape",
@@ -3493,11 +4429,11 @@ fn shipped_write_path_round_trips_a_party_ledger_crlf() {
         }]
     }))
     .expect("synthetic party escaping payload");
-    validate_payload(&input).expect("a party ledger with reserved characters and CR LF is valid");
+    payload_verdict(&input).expect("a party ledger with reserved characters and CR LF is valid");
 
     let xml = render_import_xml(
         "BRIDGE SYNTHETIC BOOK",
-        &input.vouchers,
+        &saved(&input).vouchers,
         "batch-party-escape",
     );
     assert_eq!(decoded_element_text(&xml, "PARTYLEDGERNAME"), party);
@@ -3509,9 +4445,11 @@ fn shipped_write_path_round_trips_a_party_ledger_crlf() {
 /// A verification result with a divergent row, from the verifier itself: its
 /// entries name "Private Synthetic Party", "Expense" and "Bank".
 fn divergent_verification() -> Value {
-    let input = payload();
+    let input = admitted_payload();
     let line = ImportLedgerLine {
         ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,
@@ -3519,8 +4457,8 @@ fn divergent_verification() -> Value {
         company_guid: GUID.into(),
         company: None,
         txn_ids: vec!["txn-001".into()],
-        date_from: "20260901".into(),
-        date_to: "20260901".into(),
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
         sha256: "synthetic-hash".into(),
         built_at: now(),
         status: "built".into(),
@@ -3536,7 +4474,7 @@ fn divergent_verification() -> Value {
         guid: Some("synthetic-guid-1".into()),
         master_id: None,
         alter_id: Some(11),
-        date: Some("20260901".into()),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".into()),
         narration: Some("[BRIDGE:txn-001]".into()),
         voucher_number: None,
@@ -3644,11 +4582,9 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
     // the older plain format (plain names, and a message listing the ledgers)
     // and in the current, marked one.
     let divergent = divergent_verification();
-    let proof_path = masked
-        .imports_dir()
-        .unwrap()
-        .join(format!("{batch_id}.proof.json"));
-    let original: Value = serde_json::from_slice(&fs::read(&proof_path).unwrap()).unwrap();
+    let original: Value =
+        serde_json::from_slice(&fs::read(&masked.current_proof_paths(&batch_id)[0]).unwrap())
+            .unwrap();
     let names = ["Private Synthetic Party", "Private Changed Ledger"];
     for old_format in [true, false] {
         let mut proof = original.clone();
@@ -3659,7 +4595,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             proof = super::super::redact_value(proof, super::super::Redaction::None);
         }
         let bytes = serde_json::to_vec_pretty(&proof).unwrap();
-        fs::write(&proof_path, &bytes).unwrap();
+        masked.save_current_proof(&batch_id, &bytes);
         let mut saved = args.clone();
         saved["proof_sha256"] = json!(crate::agent::sha256_hex(&bytes));
         saved["offset"] = json!(0);
@@ -3738,4 +4674,142 @@ fn the_first_verification_page_masks_ledger_names_under_mask_parties() {
             "{name} under mask_parties: {masked}"
         );
     }
+}
+
+/// The first line names Tally's rejection only when Tally's own answer
+/// reported every voucher of the post as not created; a partly created batch,
+/// or a post whose vouchers were found or are not attributed, keeps the
+/// `refused` line unchanged (#1108).
+#[test]
+fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_not_created() {
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    let rejected =
+        "Tally reported that this post created none of its vouchers: follow each voucher's next step.";
+    let summary = |statuses: &[&str]| {
+        let vouchers = statuses
+            .iter()
+            .map(|status| json!({ "status": status }))
+            .collect::<Vec<_>>();
+        with_post_span_summary(json!({ "state": "refused" }), &json!(vouchers))["summary"].clone()
+    };
+    assert_eq!(summary(&["tally_reported_not_created"]), rejected);
+    assert_eq!(
+        summary(&["tally_reported_not_created", "tally_reported_not_created"]),
+        rejected
+    );
+    assert_eq!(
+        summary(&["tally_reported_not_created", "posted_verified"]),
+        refused
+    );
+    assert_eq!(summary(&["sent_not_attributed"]), refused);
+    assert_eq!(summary(&["posted_verified"]), refused);
+    assert_eq!(summary(&[]), refused);
+}
+
+/// A refused binding whose vouchers the book matches by content says what the
+/// book holds, and never that the vouchers are this post's (#1039). Only a
+/// refused binding reads so.
+#[test]
+fn a_refused_binding_says_the_book_holds_vouchers_of_the_same_content() {
+    let every = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
+    let some = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.";
+    let refused = "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.";
+    // A row is its status, or a content match with whether it counts in the
+    // accounts.
+    let summary = |state: &str, rows: &[Value]| {
+        with_post_span_summary(json!({ "state": state }), &json!(rows))["summary"].clone()
+    };
+    let status = |status: &str| json!({ "status": status });
+    let matched = |effective: bool| json!({ "status": "matching_content_observed", "accounting_effective": effective });
+    assert_eq!(summary("refused", &[matched(true)]), every);
+    assert_eq!(summary("refused", &[matched(true), matched(true)]), every);
+    assert_eq!(
+        summary("refused", &[matched(true), status("sent_not_attributed")]),
+        some
+    );
+    assert_eq!(
+        summary("refused", &[matched(true), status("duplicate_fingerprint")]),
+        some
+    );
+    // A cancelled or optional match is not held in the accounts.
+    assert_eq!(summary("refused", &[matched(true), matched(false)]), some);
+    assert_eq!(summary("refused", &[matched(false)]), refused);
+    for other in [
+        "duplicate_fingerprint",
+        "not_attributable",
+        "sent_not_attributed",
+    ] {
+        assert_eq!(summary("refused", &[status(other)]), refused, "{other}");
+    }
+    for state in ["bound", "unsettled", "not_bound", "book_rolled_back"] {
+        let own = summary(state, &[]);
+        assert_eq!(summary(state, &[matched(true)]), own, "{state}");
+    }
+}
+
+#[test]
+fn each_post_span_binding_state_carries_its_own_plain_summary() {
+    let states = [
+        "bound",
+        "refused",
+        "unsettled",
+        "not_bound",
+        "book_rolled_back",
+    ];
+    let summaries: BTreeSet<String> = states
+        .iter()
+        .map(|state| {
+            let report = with_post_span_summary(json!({ "state": state }), &json!([]));
+            let summary = report["summary"].as_str().unwrap_or_default();
+            assert!(!summary.is_empty(), "{state}: {report}");
+            summary.to_owned()
+        })
+        .collect();
+    assert_eq!(summaries.len(), states.len(), "{summaries:?}");
+    let unobserved = with_post_span_summary(
+        json!({ "state": "unsettled", "code": span_identity::BindUnsettled::EffectiveDateNotObserved.code() }),
+        &json!([]),
+    );
+    let unobserved = unobserved["summary"].as_str().unwrap_or_default();
+    assert!(
+        unobserved.contains("check the vouchers in Tally before posting"),
+        "{unobserved}"
+    );
+    assert!(!summaries.contains(unobserved), "{unobserved}");
+    let not_applicable = with_post_span_summary(json!({ "state": "not_applicable" }), &json!([]));
+    assert_eq!(not_applicable, json!({ "state": "not_applicable" }));
+}
+
+/// `record`'s bytes padded with trailing spaces to `size`, still valid JSON: a
+/// record past the bound would parse whole if it were read uncapped (#837).
+fn padded_record(record: &[u8], size: usize) -> Vec<u8> {
+    let mut bytes = record.to_vec();
+    bytes.resize(size, b' ');
+    bytes
+}
+
+/// A masters record larger than `MAX_RECORD_BYTES` reads as a pending check,
+/// the doubt an unreadable record is, never as its content; one at the bound
+/// reads whole (#837).
+#[test]
+fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("masters.json");
+    let record = json!({"state": "verified"});
+    let text = record.to_string();
+    std::fs::write(
+        &path,
+        padded_record(text.as_bytes(), ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(read_masters_record(&path), Some(record));
+    std::fs::write(
+        &path,
+        padded_record(text.as_bytes(), ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
+    assert_eq!(
+        read_masters_record(&path),
+        Some(json!({"state": MASTERS_CHECK_PENDING}))
+    );
 }

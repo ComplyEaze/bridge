@@ -1,0 +1,344 @@
+{
+ "comment": "entity_269st_gap with no [party_identity] table: PANs on the masters alone bind; a PAN that could be derived from a GSTIN is not; the ledgers named in the other book's table are ordinary.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null,
+  "Other Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-000"
+  },
+  {
+   "name": "Edge Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-001"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-002",
+   "pan": "PAN-ABCDE",
+   "gstin": "27ABCDE1234F1X5"
+  },
+  {
+   "name": "Alpha Trading Co",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-003",
+   "pan": "PAN-ABCDE"
+  },
+  {
+   "name": "Zed Stores",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-004",
+   "pan": "PAN-ZZZZZ"
+  },
+  {
+   "name": "Quick Mart",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-005",
+   "pan": "PAN-ZZZZZ"
+  },
+  {
+   "name": "Big Buyer",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-006",
+   "pan": "PAN-BIGBY"
+  },
+  {
+   "name": "Big Buyer Branch",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-007",
+   "pan": "PAN-BIGBY"
+  },
+  {
+   "name": "Small One",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-008",
+   "pan": "PAN-SMALL"
+  },
+  {
+   "name": "Small Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-009",
+   "pan": "PAN-SMALL"
+  },
+  {
+   "name": "Derived Co",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-010",
+   "gstin": "29DDDDD3333D1X7"
+  },
+  {
+   "name": "Derived Co North",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-011",
+   "pan": "DDDDD3333D"
+  },
+  {
+   "name": "Tan Registrant",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-012",
+   "gstin": "27ABCD12345F1X5"
+  },
+  {
+   "name": "Override Fill",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-013"
+  },
+  {
+   "name": "Override Fill Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-014",
+   "pan": "PAN-OVRDE"
+  },
+  {
+   "name": "Masters Win",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-015",
+   "pan": "PAN-MASTR"
+  },
+  {
+   "name": "Masters Win Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-016",
+   "pan": "PAN-MASTR"
+  },
+  {
+   "name": "No Pan Customer",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-017"
+  },
+  {
+   "name": "Sole Ledger",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-018",
+   "pan": "PAN-SOLEL"
+  },
+  {
+   "name": "Excluded Bank",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-019",
+   "pan": "PAN-ABCDE"
+  },
+  {
+   "name": "Other Asset Party",
+   "chain": [
+    "Other Assets"
+   ],
+   "guid": "edge-ep_gap-020",
+   "pan": "PAN-EXTRA"
+  },
+  {
+   "name": "Other Asset Party Two",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ep_gap-021",
+   "pan": "PAN-EXTRA"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-ep_gap-022"
+  },
+  {
+   "name": "Output CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ep_gap-023",
+   "pan": "PAN-ABCDE"
+  },
+  {
+   "name": "Round Off",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ep_gap-024",
+   "pan": "PAN-ABCDE"
+  }
+ ],
+ "tb": [],
+ "vouchers": [
+  {
+   "guid": "e01",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Traders",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e02",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Alpha Trading Co",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e09",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Derived Co",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e10",
+   "date": "2025-06-05",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     12000000
+    ],
+    [
+     "Derived Co North",
+     -12000000
+    ]
+   ]
+  },
+  {
+   "guid": "e15",
+   "date": "2025-06-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     30000000
+    ],
+    [
+     "No Pan Customer",
+     -30000000
+    ]
+   ]
+  },
+  {
+   "guid": "e16",
+   "date": "2025-06-08",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     25000000
+    ],
+    [
+     "Tan Registrant",
+     -25000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Edge Bank"
+ ],
+ "entity_type": "individual",
+ "tests": [
+  "entity_269st_gap"
+ ],
+ "round_off_ledgers": [
+  "Round Off"
+ ],
+ "party_identity": {}
+}

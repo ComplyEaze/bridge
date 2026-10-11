@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { ACK_DIR, MAX_REASON, SURFACE_PATH, checkAck, parseAck, parseNameStatus, parsePins, historicPaths, withdrawnPins } from "./check-surface-ack.mjs";
 
@@ -266,7 +267,7 @@ test("name-status -z parsing keeps both names of renames and refuses truncated r
 
 // ---- the CLI against a real temporary git repository ----
 
-const script = new URL("./check-surface-ack.mjs", import.meta.url).pathname;
+const script = fileURLToPath(new URL("./check-surface-ack.mjs", import.meta.url));
 const tmpDirs = [];
 test.after(() => tmpDirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
@@ -711,11 +712,30 @@ test("history check: a removed-pin line for a pin that was never withdrawn is st
   assert.match(out.stdout, /"removed-pin:" names path\(s\) that were not removed: zzz\.txt/);
 });
 
-test("history check: a shallow clone fails closed", () => {
-  const { r, tip } = ownPinLost({ unionList: true });
+function shallowClone(r, env = {}) {
   const clone = mkdtempSync(join(tmpdir(), "surface-ack-shallow-"));
   tmpDirs.push(clone);
-  execFileSync("git", ["clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8" });
+  execFileSync("git", ["-c", "core.hooksPath=/dev/null", "clone", "-q", "--depth", "2", `file://${r.dir}`, clone, "--branch", "merge-own"], { encoding: "utf8", env: { ...process.env, ...env } });
+  return clone;
+}
+
+test("history check: a shallow clone fails closed", () => {
+  const { r, tip } = ownPinLost({ unionList: true });
+  const out = cli(shallowClone(r), ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.stdout, /shallow clone/);
+});
+
+// A host's Git template is copied into the clone, and either of these hooks failing fails a clone
+// that runs them, before the history check is reached (#1468).
+test("history check: a shallow clone fails closed even when the host's Git template has failing hooks", () => {
+  const { r, tip } = ownPinLost({ unionList: true });
+  const template = mkdtempSync(join(tmpdir(), "surface-ack-template-"));
+  tmpDirs.push(template);
+  mkdirSync(join(template, "hooks"));
+  for (const hook of ["reference-transaction", "post-checkout"]) writeFileSync(join(template, "hooks", hook), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+  const clone = shallowClone(r, { GIT_TEMPLATE_DIR: template });
+  assert.ok(existsSync(join(clone, ".git", "hooks", "post-checkout")), "the template reached the clone, so its hooks were there to run");
   const out = cli(clone, ["--mode", "pull_request"], { PR_NUMBER: "7", PR_HEAD_SHA: tip });
   assert.equal(out.status, 1, out.stdout);
   assert.match(out.stdout, /shallow clone/);
@@ -819,4 +839,52 @@ test("historicPaths reads paths only: unsorted, duplicated and extra-key rows ar
   for (const bad of ["{ not json", "[]", "{}", JSON.stringify({ files: "x" }), rows({ path: 3 }), rows({}), rows(null), rows({ path: "" })]) {
     assert.throws(() => historicPaths(bad), /pin list/, bad);
   }
+});
+
+test("pull_request mode: a local --base that is ahead of the branch is read as its merge-base", () => {
+  const r = prRepo();
+  branch(r, "stale", () => (r.write("a.txt", "changed\n"), r.ackFile(7, ["a.txt"])));
+  // a second commit on the branch, so that HEAD^ is not the merge-base
+  r.sh("switch", "-q", "stale");
+  r.write("other.txt", "second commit\n");
+  const good = r.commit("second commit");
+  r.sh("switch", "-q", "main");
+  // main moves on: another pull request changes a different pinned file and adds its own acknowledgement.
+  r.write("b.txt", "changed on main\n");
+  r.ackFile(3, ["b.txt"]);
+  r.commit("another pull request lands");
+  r.sh("switch", "-q", "--detach", good);
+  const local = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(local.status, 0, local.stdout + local.stderr);
+  assert.match(local.stdout, /touched pinned files \(1: a\.txt\)/, "only this branch's change is counted, not main's");
+  const wrongNumber = cli(r.dir, ["--mode", "pull_request", "--pr", "8", "--base", "main"]);
+  assert.equal(wrongNumber.status, 1, "the branch's own rules still apply against the merge-base");
+  assert.equal(cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "no-such-revision"]).status, 1, "an unknown base fails closed");
+});
+
+test("pull_request mode: a pin master added after the cut still needs an ack for a local --base run", () => {
+  const r = prRepo();
+  const noAck = branch(r, "touches-later-pin", () => r.write("other.txt", "changed by the branch\n"));
+  const withAck = branch(r, "acknowledges-it", () => (r.write("other.txt", "changed by the branch\n"), r.ackFile(7, ["other.txt"])));
+  // main moves on and pins other.txt, which the branches (cut earlier) do not have pinned.
+  r.surface([{ path: "a.txt" }, { path: "b.txt" }, { path: "other.txt" }]);
+  r.commit("master pins other.txt");
+  r.sh("switch", "-q", "--detach", noAck);
+  const missing = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(missing.status, 1, "CI would fail this merge, so the local run must too");
+  assert.match(missing.stdout, /touched pinned files \(1: other\.txt\)/);
+  r.sh("switch", "-q", "--detach", withAck);
+  const ok = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+});
+
+test("pull_request mode: a named base whose pin list cannot be read fails closed", () => {
+  const r = prRepo();
+  const tip = branch(r, "branch", () => (r.write("a.txt", "changed\n"), r.ackFile(7, ["a.txt"])));
+  r.write(SURFACE_PATH, "{ this is not a pin list");
+  r.commit("master breaks its pin list");
+  r.sh("switch", "-q", "--detach", tip);
+  const local = cli(r.dir, ["--mode", "pull_request", "--pr", "7", "--base", "main"]);
+  assert.equal(local.status, 1, "an unreadable pin list at the named base is a failure, never an empty pinned set");
+  assert.match(local.stdout, /surface ack check FAILED/);
 });

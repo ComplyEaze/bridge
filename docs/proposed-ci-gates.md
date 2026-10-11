@@ -158,6 +158,11 @@ after `Enforce fixture byte integrity`:
         run: node scripts/check-fixture-provenance.mjs
 ```
 
+Since #838, every fixture needs its own hash row (or a sidecar declaring its
+hash), keyed by its path from the note that holds it. Prose alone no longer
+documents a fixture: where a capture is not established, the row carries the
+digest of the committed bytes, labelled an integrity digest.
+
 ## 4. Unbounded reads — BLOCKING (wired)
 
 `scripts/check-unbounded-reads.mjs` requires every `Read::read_to_end`/
@@ -167,6 +172,21 @@ pattern already used in `src-tauri/src/dsc.rs`, `agent_desktop_journal.rs`,
 passed clean: 11 call sites scanned, 11 bounded, 0 unbounded, 3 reviewed
 exceptions (zip entries read from a bundled XLSX/PDF template, not untrusted
 input — named in the script's `ALLOWED_UNBOUNDED`).
+
+Since #837 it also reads the fully qualified form,
+`std::io::Read::read_to_end(&mut reader, &mut buf)` (and `AsyncReadExt::`), in
+the whole source with comments and strings blanked rather than line by line. A
+call is bounded only when its own reader is a `take(N)`; a `take` elsewhere in
+the statement, or in a neighbouring one, does not count. On the master it was
+built from, that scanned 17 call sites and reported 3 unbounded record reads,
+which #837 capped: 15 call sites scanned, 15 bounded.
+
+The three exceptions were stale by then: none of those files held a read call any
+more, so a new unbounded read in one of them would have passed unreported. Since
+#837's slice 1b, exceptions live in the scanned tree's
+`scripts/unbounded-reads-allowed.json`, as `path: reason`. The repository ships
+no such file, so it has none. The gate fails an entry with no reason, and fails
+an entry whose file no longer holds an unbounded read for it to excuse.
 
 ```yaml
       - name: Enforce read bound coverage
@@ -231,7 +251,7 @@ dependencies beyond Node and `git ls-files`.
 | clippy default groups | existing `-D warnings` steps, `-A clippy::pedantic` appended | BLOCKING (already is, unchanged) | 0 warnings (unchanged by this PR) |
 | clippy pedantic | `lint-pedantic-advisory` job (new) | REPORTING | 1,199 warnings (1,150 + 49) |
 | Fixture provenance | `check-fixture-provenance.mjs` | BLOCKING (wired in `tally-portable`) | 0 undocumented (51/125 backfilled) |
-| Unbounded reads | `check-unbounded-reads.mjs` | BLOCKING (wired in `workflow-consistency`) | 0 unbounded (3 reviewed exceptions) |
+| Unbounded reads | `check-unbounded-reads.mjs` | BLOCKING (wired in `workflow-consistency`) | 0 unbounded (0 reviewed exceptions) |
 | `gh api` pagination | `check-gh-api-pagination.mjs` | BLOCKING (wired in `workflow-consistency`) | clean (one listing call, paginated) |
 | File size report | `report-file-sizes.mjs` | REPORTING (never fails) | 559 files, 213,322 lines |
 

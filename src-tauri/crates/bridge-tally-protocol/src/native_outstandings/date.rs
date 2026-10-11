@@ -1,6 +1,6 @@
 //! Parsing for Tally's display-formatted native dates: `1-Apr-24`,
 //! `31-May-26` — day (1-2 digits), a 3-letter month abbreviation, and a
-//! TWO-DIGIT year (TALLY_PROTOCOL_REFERENCE ground truth captured
+//! TWO-DIGIT year (a due date past 2099 was seen with a FOUR-digit year, below) (TALLY_PROTOCOL_REFERENCE ground truth captured
 //! 2026-08-07, `bills_receivable_billwise_lab.xml` /
 //! `bills_receivable_ageing_lab.xml`).
 //!
@@ -31,10 +31,24 @@ pub const OPENING_BILL_LOOKBACK_YEARS: u32 = 50;
 /// century lie after the bill date and cover the longest credit period
 /// measured to persist, `1000 Months`, about 83 years
 /// (TALLY_PROTOCOL_REFERENCE §12a.3). What Tally prints as the due date for
-/// such a period was not observed. A due date more than ninety years after its
-/// bill is read a century early; only the overdue crosscheck in `compute`
-/// can catch that, by leaving the read partial.
+/// such a period was observed once (bridge#1091, a synthetic book, 2026-10-02):
+/// a bill dated 1-Aug-25 with a credit period of about 83 years printed its due
+/// date as `1-Dec-2108`, the year in full, while due dates printed in 2026,
+/// 2033, 2035 and 2052 kept two digits. A due date's four-digit year is read
+/// exactly as written ([`FULL_YEAR_FROM`] and after, inside the same window). A
+/// two-digit year is placed in the one century the window holds, which can be
+/// the wrong one (a due date more than ninety years after its bill read a
+/// century early, or a two-digit year the window places after 2099, a form not
+/// seen printed): the overdue crosscheck in `compute` catches that only when
+/// Tally's own overdue figure is present and not zero, by leaving the read
+/// partial.
 pub const DUE_DATE_LOOKBACK_YEARS: u32 = 10;
+
+/// The first year Tally was seen to print in full (`1-Dec-2108`), once, on a
+/// due date. A four-digit year below this refuses, as before: a year that a
+/// two-digit year could have carried is a shape nobody has observed, and a
+/// bill date's four-digit year was not observed at all.
+pub const FULL_YEAR_FROM: u32 = 2100;
 
 const CENTURY_YEARS: u32 = 100;
 
@@ -44,7 +58,8 @@ const CENTURY_YEARS: u32 = 100;
 /// calendar date must fall in the window; none fails closed.
 ///
 /// The window ends at `as_of`: an as-of Bills report is taken to list only
-/// bills dated on or before it (inferred, not measured). It begins
+/// bills dated on or before it (one book listed none later, bridge#1091;
+/// otherwise inferred). It begins
 /// [`OPENING_BILL_LOOKBACK_YEARS`] before `books_from`, because `BooksFrom` is
 /// not a lower bound on a bill's date (TALLY_PROTOCOL_REFERENCE §12a.10), or a
 /// hundred years
@@ -60,7 +75,7 @@ pub fn parse_native_bill_date(
     books_from: &TallyDate,
     as_of: &TallyDate,
 ) -> Result<TallyDate, NativeOutstandingsError> {
-    let lexeme = DisplayDate::parse(raw)?;
+    let lexeme = DisplayDate::parse(raw, false)?;
     if books_from > as_of {
         return Err(NativeOutstandingsError::InvalidDate(
             "native_date_book_window_invalid",
@@ -92,7 +107,7 @@ pub fn parse_native_due_date(
     raw: &str,
     bill_date: &TallyDate,
 ) -> Result<TallyDate, NativeOutstandingsError> {
-    let lexeme = DisplayDate::parse(raw)?;
+    let lexeme = DisplayDate::parse(raw, true)?;
     let bill = year_month_day(bill_date)?;
     let after = (
         bill.0.saturating_sub(DUE_DATE_LOOKBACK_YEARS),
@@ -110,11 +125,21 @@ pub fn parse_native_due_date(
 struct DisplayDate {
     day: u32,
     month: u32,
-    two_digit_year: u32,
+    year: DisplayYear,
+}
+
+/// How a display date wrote its year.
+#[derive(Clone, Copy)]
+enum DisplayYear {
+    /// Two digits: the century is resolved against a window.
+    TwoDigit(u32),
+    /// Four digits, from [`FULL_YEAR_FROM`]: the year exactly as written.
+    Full(u32),
 }
 
 impl DisplayDate {
-    fn parse(raw: &str) -> Result<Self, NativeOutstandingsError> {
+    /// `allow_full_year` admits the one measured four-digit form, for a due date only.
+    fn parse(raw: &str, allow_full_year: bool) -> Result<Self, NativeOutstandingsError> {
         let trimmed = raw.trim();
         let mut parts = trimmed.split('-');
         let (Some(day_part), Some(month_part), Some(year_part), None) =
@@ -144,18 +169,25 @@ impl DisplayDate {
                 "native_date_month_invalid",
             ))?;
 
-        if year_part.len() != 2 || !year_part.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(NativeOutstandingsError::InvalidDate(
-                "native_date_year_invalid",
-            ));
+        let invalid_year = || NativeOutstandingsError::InvalidDate("native_date_year_invalid");
+        if !year_part.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(invalid_year());
         }
-        let two_digit_year: u32 = year_part
-            .parse()
-            .map_err(|_| NativeOutstandingsError::InvalidDate("native_date_year_invalid"))?;
+        let year = match year_part.len() {
+            2 => DisplayYear::TwoDigit(year_part.parse().map_err(|_| invalid_year())?),
+            4 if allow_full_year => {
+                let year: u32 = year_part.parse().map_err(|_| invalid_year())?;
+                if year < FULL_YEAR_FROM {
+                    return Err(invalid_year());
+                }
+                DisplayYear::Full(year)
+            }
+            _ => return Err(invalid_year()),
+        };
         Ok(Self {
             day,
             month: month_index as u32 + 1,
-            two_digit_year,
+            year,
         })
     }
 
@@ -172,8 +204,16 @@ impl DisplayDate {
         let (day, month) = (self.day, self.month);
         let mut candidates = Vec::new();
         let mut has_calendar_candidate = false;
-        for century in ((after.0 / 100) * 100..=(through.0 / 100) * 100).step_by(100) {
-            let year = century + self.two_digit_year;
+        // A year written in full has one candidate; a two-digit one has one per
+        // century the window touches.
+        let years = match self.year {
+            DisplayYear::Full(year) => vec![year],
+            DisplayYear::TwoDigit(two) => ((after.0 / 100) * 100..=(through.0 / 100) * 100)
+                .step_by(100)
+                .map(|century| century + two)
+                .collect(),
+        };
+        for year in years {
             let Ok(candidate) = TallyDate::parse(format!("{year:04}{month:02}{day:02}")) else {
                 continue;
             };

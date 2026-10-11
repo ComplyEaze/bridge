@@ -1104,7 +1104,7 @@ fn the_resolved_digest_equals_an_independent_reference_value() {
         .unwrap();
     assert_eq!(
         digest,
-        "41b71caf29c8b7ead77e186dbdb4da348270d2abb51167b322447510b27e0a0b"
+        "49270ddc57b412c284ddca33e56c8575fc18ec1c08ccf7a123add853fd542a2a"
     );
 }
 
@@ -1210,6 +1210,43 @@ fn a_pin_list_must_be_sorted_unique_relative_bounded_and_reasons_short() {
     }
     pins.files[0].reason = Some("x".repeat(MAX_PIN_REASON_CHARS));
     pins.validate().unwrap();
+}
+
+/// Two spellings of one file must not both pass as pins (#840): a path is refused unless it is
+/// written in its normal form, and two paths are refused if they differ only in letter case.
+#[test]
+fn a_surface_path_is_refused_unless_normal_and_unique_ignoring_case() {
+    let manifest_for = |pins: &SurfacePins| CompatibilitySurfaceManifest {
+        schema_version: SURFACE_SCHEMA_VERSION,
+        files: pins
+            .files
+            .iter()
+            .map(|pin| SurfaceFile {
+                path: pin.path.clone(),
+                sha256: "0".repeat(64),
+            })
+            .collect(),
+    };
+    for (paths, code) in [
+        (&["docs//a.txt"][..], "surface_path_not_normalised"),
+        (&["docs/a.txt/"][..], "surface_path_not_normalised"),
+        (&["docs/./a.txt"][..], "surface_path_not_normalised"),
+        (
+            &["docs/A.txt", "docs/a.txt"][..],
+            "surface_path_case_collision",
+        ),
+    ] {
+        let pins = pins_for(paths);
+        assert_eq!(pins.validate().unwrap_err(), invalid(code), "{paths:?}");
+        assert_eq!(
+            manifest_for(&pins).validate().unwrap_err(),
+            invalid(code),
+            "{paths:?}"
+        );
+    }
+    let normal = pins_for(&["docs/a.txt", "docs/b.txt"]);
+    normal.validate().unwrap();
+    manifest_for(&normal).validate().unwrap();
 }
 
 #[test]

@@ -38,8 +38,8 @@
       "id": "loans_interest.clause31_not_computed_row_count",
       "value": 1,
       "unit": "count",
-      "definition_sha256_16": "205bd6d2d7ead77a",
-      "definition_text": "Taken/repaid entries listed as not computed -- because the two walks of the principal balance disagree on their reportability, or because a voucher listed as both crediting and debiting their loan comes on or before their date and their own amount is less than the limit: in no reportable total and not in the flag count.",
+      "definition_sha256_16": "91f4c28a48e8d293",
+      "definition_text": "Taken/repaid entries listed as not computed -- because the two walks of the principal balance disagree on their reportability, or a loan taken may be reportable if earlier repayments paid interest first (bridge#802), or because a voucher listed as both crediting and debiting their loan comes on or before their date and their own amount is less than the limit: in no reportable total and not in the flag count.",
       "evidence": []
     },
     {

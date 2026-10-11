@@ -308,7 +308,7 @@ test("the publish and deploy workflows keep the notes wiring in order", () => {
     assert.equal(optional.if, undefined);
   }
 
-  const deploy = workflow(".github/workflows/deploy-install-page.yml").jobs.deploy;
+  const deploy = workflow(".github/workflows/deploy-install-page.yml").jobs.build;
   const render = step(deploy, "Render the changelog page");
   const upload = deploy.steps.find((candidate) => candidate.uses?.startsWith("actions/upload-pages-artifact@"));
   assert.ok(deploy.steps.indexOf(render) < deploy.steps.indexOf(upload), "the changelog page is rendered before the site is uploaded");

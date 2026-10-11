@@ -13,7 +13,9 @@
 //! yields the same labels — which is what an amendment of the earlier batch has
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
-use crate::bank::{Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION};
+use crate::bank::{
+    Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES, PARSER_SENTINELS,
+};
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
 use crate::mapping::{Mapping, Treatment};
@@ -34,6 +36,45 @@ pub const MAX_NARRATION_CHARS: usize = 2000;
 /// The narration tag of a line posted to suspense because no mapping names
 /// its party, or the parser could not identify one.
 pub const UNIDENTIFIED: &str = "UNIDENTIFIED - reallocate from";
+
+/// The label of the segment that names the statement's party on a voucher
+/// posted to a mapped ledger: ` | Statement party: <name>`, after the date. It
+/// says where the name came from, so it is not read as a Tally party ledger.
+pub const STATEMENT_PARTY_LABEL: &str = "Statement party:";
+
+/// The counterparty a statement printed, fit to be written into a narration of
+/// a voucher posted to a mapped ledger. It cannot be built from a parser
+/// sentinel, a cash movement or a parser category such as bank charges (none
+/// is a counterparty the statement printed), nor from a name holding the segment delimiter `|` (it would end the segment early).
+struct StatementPayee<'a>(&'a str);
+
+impl<'a> StatementPayee<'a> {
+    /// `None` when the party is not a counterparty; a refusal when it is one
+    /// that cannot be written.
+    fn new(party: &'a str, row: usize) -> Result<Option<Self>, Refusal> {
+        if party.is_empty()
+            || PARSER_SENTINELS.contains(&party)
+            || PARSER_CATEGORIES.contains(&party)
+            || CashMovement::of_party(party).is_some()
+        {
+            return Ok(None);
+        }
+        if party.contains('|') {
+            return Err(Refusal::at_row(
+                "party_not_admissible",
+                row,
+                format!(
+                    "row {row}'s party contains the character | and cannot be written into the narration"
+                ),
+            ));
+        }
+        Ok(Some(Self(party)))
+    }
+
+    fn segment(&self) -> String {
+        format!(" | {STATEMENT_PARTY_LABEL} {}", self.0)
+    }
+}
 
 /// Every tag a line Bridge posts to suspense carries, one of each kind, so
 /// one read can find them all.
@@ -480,6 +521,12 @@ pub fn build(
         let unidentified = !dont_know && ledger_key(&ledger) == ledger_key(options.suspense_ledger);
         let suspense = dont_know || unidentified;
         let shown = if suspense { &party } else { &ledger };
+        // A suspense line already names its party where the ledger would be.
+        let payee = if suspense {
+            None
+        } else {
+            StatementPayee::new(&party, number)?
+        };
         let mut narration = squash(&format!(
             "{mode} {reference} {} {shown} | {} | {}",
             if outward { "to" } else { "from" },
@@ -499,6 +546,18 @@ pub fn build(
                     "row {number}'s narration carries control characters, the reserved [BRIDGE: marker, or more than {MAX_NARRATION_CHARS} characters"
                 ),
             ));
+        }
+        if let Some(payee) = &payee {
+            narration.push_str(&payee.segment());
+            if !admissible_text(&narration, MAX_NARRATION_CHARS) {
+                return Err(Refusal::at_row(
+                    "party_not_admissible",
+                    number,
+                    format!(
+                        "row {number}'s party makes the narration longer than {MAX_NARRATION_CHARS} characters or adds a character a narration cannot carry"
+                    ),
+                ));
+            }
         }
         require_unique(&mut seen, &txn_id, number)?;
         let (debit_ledger, credit_ledger) = if outward {
@@ -748,4 +807,28 @@ pub fn group_counterparties(
             }
         })
         .collect())
+}
+
+#[cfg(test)]
+mod statement_payee_tests {
+    use super::*;
+    use crate::bank::{UNNAMED, UNRESOLVED};
+    use crate::cash::{CASH_DEPOSIT, CASH_WITHDRAWAL};
+
+    #[test]
+    fn only_a_printed_counterparty_becomes_a_payee() {
+        for not_a_counterparty in ["", UNRESOLVED, UNNAMED, CASH_WITHDRAWAL, CASH_DEPOSIT]
+            .into_iter()
+            .chain(PARSER_CATEGORIES)
+        {
+            assert!(
+                matches!(StatementPayee::new(not_a_counterparty, 2), Ok(None)),
+                "{not_a_counterparty:?}"
+            );
+        }
+        let payee = StatementPayee::new("RAVI KUMAR", 2).unwrap().unwrap();
+        assert_eq!(payee.segment(), " | Statement party: RAVI KUMAR");
+        let refusal = StatementPayee::new("A|B", 2).err().unwrap();
+        assert_eq!(refusal.category, "party_not_admissible");
+    }
 }

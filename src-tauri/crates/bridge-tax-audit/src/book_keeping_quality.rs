@@ -22,16 +22,18 @@
 //! `int()` reads as its value; more than 4,300 digits is unparseable, as `int()` raises there; a
 //! value beyond i64 is refused rather than read differently; see `masterid_int`); the purchase
 //! rate and the cost are floats accumulated in population order, compared exactly with the integer
-//! sale, and rounded half to even; the invoice, receipt and re-issue maps keep the last voucher per
-//! GUID, as a dict does; a write-off is one row per voucher (by its position, not its GUID) and
-//! debtor, that debtor's credit lines summed.
+//! sale, and rounded half to even. Every per-voucher row (the entry-order lag, the vouchers created
+//! after the last sale, the invoices, the receipts, the re-issue and Contra rows) is keyed by the
+//! voucher's own key ([`voucher_keys`]), never by its GUID alone, which can be blank or repeated
+//! (#1243); a write-off is one row per voucher (by its position) and debtor, that debtor's credit
+//! lines summed.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 use sha2::{Digest, Sha256};
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{pct_bp, Confidence, EvidenceRef, Figure, Finding, TestResult, Unit, Value};
@@ -109,14 +111,15 @@ fn slug(base_type: &str) -> String {
     }
 }
 
-/// Voucher evidence from a map already ordered by GUID, as the reference sorts `items()`.
-fn evidence<'a, V: Copy + 'a>(
-    vouchers: impl IntoIterator<Item = (&'a &'a str, &'a V)>,
-    voucher: impl Fn(V) -> &'a Voucher,
-) -> Vec<EvidenceRef> {
+/// The distinct refs (GUID and label) of a row's vouchers, in (GUID, label) order: vouchers that
+/// share a GUID are each cited, unless their refs are identical too (#1195, #1243).
+fn evidence<'a>(vouchers: impl IntoIterator<Item = &'a Voucher>) -> Vec<EvidenceRef> {
     vouchers
         .into_iter()
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &support::voucher_label(voucher(*v))))
+        .map(|v| (v.guid.as_str(), support::voucher_label(v)))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(g, label)| EvidenceRef::with_label("voucher", g, &label))
         .collect()
 }
 
@@ -197,17 +200,20 @@ fn round_half_even(x: f64) -> Result<i64> {
     Ok(r as i64)
 }
 
-struct EntryOrder<'a> {
-    /// GUID -> (lag days, voucher): the last in creation order per GUID, as the dict keeps it.
-    lag: BTreeMap<&'a str, (i64, &'a Voucher)>,
-    after_last_sale: BTreeMap<&'a str, &'a Voucher>,
+/// One population's vouchers, each with its key ([`voucher_keys`]).
+type Keyed<'a> = [(VoucherKey, &'a Voucher)];
+
+struct EntryOrder<'k, 'a> {
+    /// Voucher key -> (lag days, voucher), for every non-sales voucher created once a sale has been.
+    lag: BTreeMap<&'k VoucherKey, (i64, &'a Voucher)>,
+    after_last_sale: BTreeMap<&'k VoucherKey, &'a Voucher>,
     unparseable: usize,
 }
 
-fn entry_order<'a>(pop: &[&'a Voucher]) -> Result<EntryOrder<'a>> {
-    let mut ordered: Vec<(i64, &Voucher)> = Vec::new();
+fn entry_order<'k, 'a>(keyed: &'k Keyed<'a>) -> Result<EntryOrder<'k, 'a>> {
+    let mut ordered: Vec<(i64, &VoucherKey, &Voucher)> = Vec::new();
     let mut unparseable = 0;
-    for v in pop {
+    for (k, v) in keyed {
         match v
             .masterid
             .as_deref()
@@ -215,19 +221,19 @@ fn entry_order<'a>(pop: &[&'a Voucher]) -> Result<EntryOrder<'a>> {
             .transpose()?
             .flatten()
         {
-            Some(mid) => ordered.push((mid, v)),
+            Some(mid) => ordered.push((mid, k, v)),
             None => unparseable += 1,
         }
     }
-    ordered.sort_by_key(|(mid, _)| *mid); // stable, as Python's sort
+    ordered.sort_by_key(|(mid, _, _)| *mid); // stable, as Python's sort
     let last_sale = ordered
         .iter()
-        .filter(|(_, v)| v.base_type == SALES_BASE_TYPE)
-        .map(|(mid, _)| *mid)
+        .filter(|(_, _, v)| v.base_type == SALES_BASE_TYPE)
+        .map(|(mid, _, _)| *mid)
         .max();
     let mut lag = BTreeMap::new();
     let mut clock: Option<&TallyDate> = None;
-    for (_, v) in &ordered {
+    for (_, k, v) in &ordered {
         if v.base_type == SALES_BASE_TYPE {
             clock = Some(match clock {
                 Some(c) if *c >= v.date => c,
@@ -239,13 +245,13 @@ fn entry_order<'a>(pop: &[&'a Voucher]) -> Result<EntryOrder<'a>> {
             continue; // no sale created yet at this point in the order
         };
         let days = civil_day_number(c) - civil_day_number(&v.date);
-        lag.insert(v.guid.as_str(), (days, *v));
+        lag.insert(*k, (days, *v));
     }
     let after_last_sale = match last_sale {
         Some(last) => ordered
             .iter()
-            .filter(|(mid, _)| *mid > last)
-            .map(|(_, v)| (v.guid.as_str(), *v))
+            .filter(|(mid, _, _)| *mid > last)
+            .map(|(_, k, v)| (*k, *v))
             .collect(),
         None => BTreeMap::new(),
     };
@@ -256,13 +262,13 @@ fn entry_order<'a>(pop: &[&'a Voucher]) -> Result<EntryOrder<'a>> {
     })
 }
 
-/// Sales vouchers with a debit line on a payment-channel debtor: GUID -> (voucher, amount).
-fn payment_channel_invoices<'a>(
-    pop: &[&'a Voucher],
+/// Sales vouchers with a debit line on a payment-channel debtor: key -> (voucher, amount).
+fn payment_channel_invoices<'k, 'a>(
+    keyed: &'k Keyed<'a>,
     debtors: &BTreeSet<String>,
-) -> Result<BTreeMap<&'a str, (&'a Voucher, i64)>> {
+) -> Result<BTreeMap<&'k VoucherKey, (&'a Voucher, i64)>> {
     let mut out = BTreeMap::new();
-    for v in pop {
+    for (k, v) in keyed {
         if v.base_type != SALES_BASE_TYPE {
             continue;
         }
@@ -273,19 +279,19 @@ fn payment_channel_invoices<'a>(
                 .map(|l| l.amount_paise),
         )?;
         if amt != 0 {
-            out.insert(v.guid.as_str(), (*v, amt));
+            out.insert(k, (*v, amt));
         }
     }
     Ok(out)
 }
 
-/// Non-Sales vouchers crediting a payment-channel debtor: GUID -> (voucher, positive amount).
-fn payment_channel_receipts<'a>(
-    pop: &[&'a Voucher],
+/// Non-Sales vouchers crediting a payment-channel debtor: key -> (voucher, positive amount).
+fn payment_channel_receipts<'k, 'a>(
+    keyed: &'k Keyed<'a>,
     debtors: &BTreeSet<String>,
-) -> Result<BTreeMap<&'a str, (&'a Voucher, i64)>> {
+) -> Result<BTreeMap<&'k VoucherKey, (&'a Voucher, i64)>> {
     let mut out = BTreeMap::new();
-    for v in pop {
+    for (k, v) in keyed {
         if v.base_type == SALES_BASE_TYPE {
             continue;
         }
@@ -297,43 +303,43 @@ fn payment_channel_receipts<'a>(
         )?;
         let amt = credit.checked_neg().ok_or_else(overflow)?;
         if amt != 0 {
-            out.insert(v.guid.as_str(), (*v, amt));
+            out.insert(k, (*v, amt));
         }
     }
     Ok(out)
 }
 
-/// Greedy match, invoices oldest first (date, then GUID): each takes the first unused receipt of
-/// the same amount dated 0-3 days after it, receipts tried in (date, GUID) order. Invoice GUID ->
+/// Greedy match, invoices oldest first (date, then key): each takes the first unused receipt of
+/// the same amount dated 0-3 days after it, receipts tried in (date, key) order. Invoice key ->
 /// lag days, matched invoices only.
-fn match_invoices_to_receipts<'a>(
-    invoices: &BTreeMap<&'a str, (&'a Voucher, i64)>,
-    receipts: &BTreeMap<&'a str, (&'a Voucher, i64)>,
-) -> BTreeMap<&'a str, i64> {
-    let mut by_amount: BTreeMap<i64, Vec<(&TallyDate, &str)>> = BTreeMap::new();
-    for (guid, (v, amt)) in receipts {
-        by_amount.entry(*amt).or_default().push((&v.date, guid));
+fn match_invoices_to_receipts<'k>(
+    invoices: &BTreeMap<&'k VoucherKey, (&Voucher, i64)>,
+    receipts: &BTreeMap<&'k VoucherKey, (&Voucher, i64)>,
+) -> BTreeMap<&'k VoucherKey, i64> {
+    let mut by_amount: BTreeMap<i64, Vec<(&TallyDate, &VoucherKey)>> = BTreeMap::new();
+    for (key, (v, amt)) in receipts {
+        by_amount.entry(*amt).or_default().push((&v.date, key));
     }
     for list in by_amount.values_mut() {
         list.sort_unstable();
     }
-    let mut ordered: Vec<(&str, &Voucher, i64)> =
-        invoices.iter().map(|(g, (v, a))| (*g, *v, *a)).collect();
+    let mut ordered: Vec<(&VoucherKey, &Voucher, i64)> =
+        invoices.iter().map(|(k, (v, a))| (*k, *v, *a)).collect();
     ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));
-    let mut used: BTreeSet<&str> = BTreeSet::new();
+    let mut used: BTreeSet<&VoucherKey> = BTreeSet::new();
     let mut matches = BTreeMap::new();
-    for (guid, v, amt) in ordered {
+    for (key, v, amt) in ordered {
         let Some(candidates) = by_amount.get(&amt) else {
             continue;
         };
-        for (rdate, rguid) in candidates {
-            if used.contains(rguid) {
+        for (rdate, rkey) in candidates {
+            if used.contains(rkey) {
                 continue;
             }
             let lag = civil_day_number(rdate) - civil_day_number(&v.date);
             if (RECEIPT_MATCH_MIN_DAYS..=RECEIPT_MATCH_MAX_DAYS).contains(&lag) {
-                used.insert(rguid);
-                matches.insert(guid, lag);
+                used.insert(rkey);
+                matches.insert(key, lag);
                 break;
             }
         }
@@ -452,8 +458,10 @@ pub fn run(
     r.population_note =
         "Books population (optional, cancelled and post-dated vouchers excluded).".to_string();
 
+    let keyed = voucher_keys(&pop)?;
+
     // ------------------------------------------------------------------ 1. entry order
-    let eo = entry_order(&pop)?;
+    let eo = entry_order(&keyed)?;
     if eo.unparseable > 0 {
         r.fig(
             "entry_order_unparseable_masterid_count",
@@ -462,20 +470,20 @@ pub fn run(
             "Population vouchers with no usable creation-order number; excluded from every \
 entry-order figure.",
             Vec::new(),
-        );
+        )?;
     }
-    let mut lag_by_type: BTreeMap<&str, BTreeMap<&str, (i64, &Voucher)>> = BTreeMap::new();
-    for (guid, (lag, v)) in &eo.lag {
+    let mut lag_by_type: BTreeMap<&str, Vec<(i64, &Voucher)>> = BTreeMap::new();
+    for (lag, v) in eo.lag.values() {
         lag_by_type
             .entry(v.base_type.as_str())
             .or_default()
-            .insert(guid, (*lag, v));
+            .push((*lag, v));
     }
     for (base_type, rows) in &lag_by_type {
-        let over: BTreeMap<&str, &Voucher> = rows
+        let over: Vec<&Voucher> = rows
             .iter()
-            .filter(|(_, (lag, _))| *lag > LAG_OVER_DAYS)
-            .map(|(g, (_, v))| (*g, *v))
+            .filter(|(lag, _)| *lag > LAG_OVER_DAYS)
+            .map(|(_, v)| *v)
             .collect();
         let s = slug(base_type);
         r.fig(
@@ -487,7 +495,7 @@ entry-order figure.",
 order) after at least one sales voucher, with a lag against the latest sale date already created."
             ),
             Vec::new(),
-        );
+        )?;
         let f_over = r.fig(
             &format!("entry_order_lag_over_30_count_{s}"),
             count(over.len())?,
@@ -497,8 +505,8 @@ order) after at least one sales voucher, with a lag against the latest sale date
 order) after a sales voucher, whose own date is more than {LAG_OVER_DAYS} days before the latest \
 sale date already created at that point (that sale date less the voucher's own date)."
             ),
-            evidence(&over, |v| v),
-        );
+            evidence(over.iter().copied()),
+        )?;
         if !over.is_empty() {
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/entry_order/lag_over_30/{s}"),
@@ -509,7 +517,7 @@ more than {LAG_OVER_DAYS} days before it",
                     over.len()
                 ),
                 facts: vec![("over_30_count".to_string(), f_over)],
-                evidence: evidence(&over, |v| v),
+                evidence: evidence(over.iter().copied()),
                 confidence: Confidence::Indicative,
                 limits: vec![
                     "Tally's creation sequence approximates the order vouchers were created in \
@@ -538,15 +546,15 @@ document reached the office late, or for some other reason."
         "Population vouchers (any base type) created after the sales voucher with the latest in \
 Tally's creation order.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "entry_order_after_last_sale_value_paise",
         Value::Int(sum_gross(after.values().copied())?),
         Unit::Paise,
         "Sum of the debit-side (gross) amount of every population voucher (any base type) created \
 after the sales voucher with the latest in Tally's creation order.",
-        evidence(after, |v| v),
-    );
+        evidence(after.values().copied()),
+    )?;
     let mut after_by_type: BTreeMap<&str, usize> = BTreeMap::new();
     for v in after.values() {
         *after_by_type.entry(v.base_type.as_str()).or_default() += 1;
@@ -563,7 +571,7 @@ after the sales voucher with the latest in Tally's creation order.",
 '{base_type}'."
             ),
             Vec::new(),
-        );
+        )?;
         after_facts.push((format!("after_last_sale_count_{s}"), fid));
     }
     if !after.is_empty() {
@@ -576,7 +584,7 @@ company for the year",
                 after.len()
             ),
             facts: after_facts,
-            evidence: evidence(after, |v| v),
+            evidence: evidence(after.values().copied()),
             confidence: Confidence::Indicative,
             limits: vec![
                 "A closing/adjustment journal created after the last sale is ordinary; the same \
@@ -604,29 +612,30 @@ period the underlying transaction relates to."
         "Debtor ledgers configured as a consolidated payment-channel debtor; a books test with \
 none configured does not apply and reports zero throughout this section.",
         Vec::new(),
-    );
+    )?;
     if !debtors.is_empty() {
-        let invoices = payment_channel_invoices(&pop, debtors)?;
-        let receipts = payment_channel_receipts(&pop, debtors)?;
+        let invoices = payment_channel_invoices(&keyed, debtors)?;
+        let receipts = payment_channel_receipts(&keyed, debtors)?;
         let matches = match_invoices_to_receipts(&invoices, &receipts);
-        let within3: BTreeMap<&str, (&Voucher, i64)> = invoices
+        let within3: Vec<&Voucher> = invoices
             .iter()
-            .filter(|(g, _)| matches.contains_key(*g))
-            .map(|(g, d)| (*g, *d))
+            .filter(|(k, _)| matches.contains_key(*k))
+            .map(|(_, (v, _))| *v)
             .collect();
         let next_day = matches.values().filter(|lag| **lag == 1).count();
         let unmatched = invoices
             .keys()
-            .filter(|g| !matches.contains_key(*g))
+            .filter(|k| !matches.contains_key(*k))
             .count();
+        let invoice_refs = || evidence(invoices.values().map(|(v, _)| *v));
 
         let f_inv_count = r.fig(
             "pc_invoice_count",
             count(invoices.len())?,
             Unit::Count,
             "Sales vouchers with a debit line on a configured payment-channel debtor ledger.",
-            evidence(&invoices, |d| d.0),
-        );
+            invoice_refs(),
+        )?;
         r.fig(
             "pc_invoice_value_total_paise",
             Value::Int(checked_sum(invoices.values().map(|(_, a)| *a))?),
@@ -634,7 +643,7 @@ none configured does not apply and reports zero throughout this section.",
             "Sum of the payment-channel debtor line(s) across the sales vouchers with a debit \
 line on a configured payment-channel debtor ledger.",
             Vec::new(),
-        );
+        )?;
         let f_within3 = r.fig(
             "pc_matched_within_3_days_count",
             count(within3.len())?,
@@ -644,8 +653,8 @@ line on a configured payment-channel debtor ledger.",
 payment-channel debtor ledger) paired with a receipt of the same amount on the same ledger, dated \
 {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days later (greedy match, oldest invoice first)."
             ),
-            evidence(&within3, |d| d.0),
-        );
+            evidence(within3.iter().copied()),
+        )?;
         r.fig(
             "pc_matched_next_day_count",
             count(next_day)?,
@@ -656,7 +665,7 @@ ledger (dated {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days later, gree
 invoice first) whose receipt is dated exactly one day later."
             ),
             Vec::new(),
-        );
+        )?;
         r.fig(
             "pc_unmatched_count",
             count(unmatched)?,
@@ -666,7 +675,7 @@ invoice first) whose receipt is dated exactly one day later."
 within {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days."
             ),
             Vec::new(),
-        );
+        )?;
         let mut per_month: BTreeMap<&str, usize> = BTreeMap::new();
         for (v, _) in invoices.values() {
             *per_month.entry(&v.date.as_str()[..6]).or_default() += 1;
@@ -678,14 +687,14 @@ within {RECEIPT_MATCH_MIN_DAYS}-{RECEIPT_MATCH_MAX_DAYS} days."
                 Unit::Count,
                 "Fewest payment-channel invoices in any calendar month touched by the population.",
                 Vec::new(),
-            );
+            )?;
             r.fig(
                 "pc_invoices_per_month_max",
                 count(*max)?,
                 Unit::Count,
                 "Most payment-channel invoices in any calendar month touched by the population.",
                 Vec::new(),
-            );
+            )?;
         }
 
         if !invoices.is_empty() {
@@ -703,7 +712,7 @@ days later",
                     ("invoice_count".to_string(), f_inv_count),
                     ("matched_within_3_days_count".to_string(), f_within3),
                 ],
-                evidence: evidence(&invoices, |d| d.0),
+                evidence: invoice_refs(),
                 confidence: Confidence::Indicative,
                 limits: vec![
                     "A same-amount, near-date match is not proof that the receipt discharges \
@@ -728,7 +737,7 @@ or a single invoice built to match each day's bank credit."
                 "Sales-voucher inventory lines on payment-channel debtor invoices priced against \
 the item's own year-average purchase rate.",
                 Vec::new(),
-            );
+            )?;
             let f_below = r.fig(
                 "pc_margin_below_cost_share_bp",
                 pct_bp(
@@ -740,7 +749,7 @@ the item's own year-average purchase rate.",
                 "Share of the sales-voucher inventory lines on payment-channel debtor invoices \
 where the sale value is less than the item's year-average purchase rate x quantity.",
                 Vec::new(),
-            );
+            )?;
             let f_margin_pc = r.fig(
                 "pc_margin_bp",
                 margin_bp(pc)?,
@@ -748,7 +757,7 @@ where the sale value is less than the item's year-average purchase rate x quanti
                 "Overall (sales - cost) / sales across payment-channel debtor lines, cost from \
 the item's year-average purchase rate.",
                 Vec::new(),
-            );
+            )?;
             let mut facts = vec![
                 ("lines".to_string(), f_lines),
                 ("below_cost_share_bp".to_string(), f_below),
@@ -763,7 +772,7 @@ the item's year-average purchase rate.",
                     "Same overall margin definition, computed on 'named customer' Sales lines \
 (debtor line not a payment-channel debtor or a cash line), for comparison.",
                     Vec::new(),
-                );
+                )?;
                 facts.push(("named_customer_margin_bp".to_string(), f_named));
             }
             let mut limits = vec![
@@ -790,7 +799,7 @@ book; no comparison margin is available."
 year-average purchase rate show a share below cost, compared with named-customer lines"
                     .to_string(),
                 facts,
-                evidence: evidence(&invoices, |d| d.0),
+                evidence: invoice_refs(),
                 confidence: Confidence::JudgementRequired,
                 limits,
                 ask_client: vec![
@@ -838,7 +847,7 @@ cost."
         Unit::Count,
         "Ledgers under Tally's 'Stock-in-Hand' group.",
         Vec::new(),
-    );
+    )?;
     let f_untouched = r.fig(
         "stock_ledger_untouched_count",
         count(untouched.len())?,
@@ -846,7 +855,7 @@ cost."
         "Ledgers under Tally's 'Stock-in-Hand' group with zero population vouchers touching them \
 all year.",
         untouched_refs(),
-    );
+    )?;
     for (name, n) in &touches {
         let tag = stable_ledger_tag(book, name)?;
         r.fig(
@@ -855,7 +864,7 @@ all year.",
             Unit::Count,
             &format!("Population vouchers touching one Stock-in-Hand ledger (tag {tag}) all year."),
             Vec::new(),
-        );
+        )?;
     }
     if !untouched.is_empty() {
         r.findings.push(Finding {
@@ -891,7 +900,7 @@ at."
         "GST payment ledgers set for this client; a books test with none configured does not \
 apply and reports only the tax ledgers' own balances, if any.",
         Vec::new(),
-    );
+    )?;
     let mut by_head: BTreeMap<&str, Vec<&String>> = BTreeMap::new();
     for (ledger, head) in &inputs.tax_ledgers_by_head {
         by_head.entry(head.as_str()).or_default().push(ledger);
@@ -912,7 +921,7 @@ apply and reports only the tax ledgers' own balances, if any.",
 '{head}' (Dr+/Cr-)."
             ),
             Vec::new(),
-        );
+        )?;
         head_facts.push((format!("{head}_closing"), fid));
     }
     let mut payment_facts = Vec::new();
@@ -925,7 +934,7 @@ apply and reports only the tax ledgers' own balances, if any.",
             Unit::Paise,
             &format!("TB closing balance of one configured GST payment ledger (tag {h})."),
             Vec::new(),
-        );
+        )?;
         payment_facts.push((format!("payment_closing_{h}"), fid));
         let fid2 = r.fig(
             &format!("gst_setoff_payment_ledger_debit_movement_paise_{h}"),
@@ -936,7 +945,7 @@ apply and reports only the tax ledgers' own balances, if any.",
 payments posted to it during the year."
             ),
             Vec::new(),
-        );
+        )?;
         payment_facts.push((format!("payment_debit_movement_{h}"), fid2));
     }
     if !head_facts.is_empty() && !payment_facts.is_empty() {
@@ -970,11 +979,11 @@ journal entry, and if so, ask for those entries."
         .iter()
         .map(|t| support::py_upper(t))
         .collect();
-    let mut reissue: BTreeMap<&str, &Voucher> = BTreeMap::new();
-    for v in &pop {
+    let mut reissue: BTreeMap<&VoucherKey, &Voucher> = BTreeMap::new();
+    for (k, v) in &keyed {
         let narration = support::py_upper(&v.narration);
         if terms_upper.iter().any(|t| narration.contains(t.as_str())) {
-            reissue.insert(v.guid.as_str(), v);
+            reissue.insert(k, v);
         }
     }
     let f_reissue = r.fig(
@@ -983,8 +992,8 @@ journal entry, and if so, ask for those entries."
         Unit::Count,
         "Population vouchers whose narration matches a configured re-issue/amendment/transfer \
 term.",
-        evidence(&reissue, |v| v),
-    );
+        evidence(reissue.values().copied()),
+    )?;
     r.fig(
         "reissue_narration_match_value_paise",
         Value::Int(sum_gross(reissue.values().copied())?),
@@ -992,7 +1001,7 @@ term.",
         "Sum of the debit-side (gross) amount of every population voucher whose narration \
 matches a configured re-issue/amendment/transfer term.",
         Vec::new(),
-    );
+    )?;
     if !reissue.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/reissue_narration"),
@@ -1003,7 +1012,7 @@ term",
                 reissue.len()
             ),
             facts: vec![("match_count".to_string(), f_reissue)],
-            evidence: evidence(&reissue, |v| v),
+            evidence: evidence(reissue.values().copied()),
             confidence: Confidence::JudgementRequired,
             limits: vec![
                 "A narration match is not proof that a sale was actually re-issued, amended or \
@@ -1072,7 +1081,7 @@ November following the financial year)."
         "Journal vouchers debiting a configured discount/write-off ledger and crediting a Sundry \
 Debtors ledger.",
         writeoff_evidence(),
-    );
+    )?;
     r.fig(
         "debtor_writeoff_total_paise",
         Value::Int(checked_sum(writeoffs.values().map(|(_, a)| *a))?),
@@ -1080,7 +1089,7 @@ Debtors ledger.",
         "Sum of the debtor-ledger credit line(s) across the journal vouchers debiting a \
 configured discount/write-off ledger and crediting a Sundry Debtors ledger.",
         Vec::new(),
-    );
+    )?;
     if !writeoffs.is_empty() {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/debtor_writeoff"),
@@ -1108,8 +1117,8 @@ originally."
     }
 
     // ------------------------------------------------------------------ 6. contra narration vs direction
-    let mut mismatches: BTreeMap<&str, (&Voucher, i64)> = BTreeMap::new();
-    for v in &pop {
+    let mut mismatches: BTreeMap<&VoucherKey, (&Voucher, i64)> = BTreeMap::new();
+    for (k, v) in &keyed {
         if v.base_type != CONTRA_BASE_TYPE {
             continue;
         }
@@ -1125,7 +1134,7 @@ originally."
         let narration = support::py_upper(&v.narration);
         for (keyword, expected_sign) in CONTRA_DIRECTION_KEYWORDS {
             if narration.contains(keyword) && (cash_net > 0) != (expected_sign > 0) {
-                mismatches.insert(v.guid.as_str(), (v, cash_net));
+                mismatches.insert(k, (v, cash_net));
                 break;
             }
         }
@@ -1136,8 +1145,8 @@ originally."
         Unit::Count,
         "Contra vouchers whose narration claims a direction that their own Cash line's sign \
 contradicts.",
-        evidence(&mismatches, |d| d.0),
-    );
+        evidence(mismatches.values().map(|(v, _)| *v)),
+    )?;
     let abs_total = mismatches
         .values()
         .map(|(_, a)| a.checked_abs().ok_or_else(overflow))
@@ -1149,19 +1158,33 @@ contradicts.",
         "Sum of the Cash line amounts, each taken without its sign, across the Contra vouchers \
 whose narration claims a direction that their own Cash line's sign contradicts.",
         Vec::new(),
-    );
-    let mut ordered: Vec<(&str, &Voucher, i64)> =
-        mismatches.iter().map(|(g, (v, a))| (*g, *v, *a)).collect();
+    )?;
+    let mut ordered: Vec<(&VoucherKey, &Voucher, i64)> =
+        mismatches.iter().map(|(k, (v, a))| (*k, *v, *a)).collect();
     ordered.sort_by(|a, b| (&a.1.date, a.0).cmp(&(&b.1.date, b.0)));
+    // A row's id is a hash of its voucher's GUID: rows whose hash repeats take their place among
+    // those sharing it, in this order, as a suffix, so no id repeats and every other id is as before.
+    let mut sharing: BTreeMap<String, usize> = BTreeMap::new();
+    for (_, v, _) in &ordered {
+        *sharing.entry(guid_hash12(&v.guid)).or_default() += 1;
+    }
+    let mut place: BTreeMap<String, usize> = BTreeMap::new();
     for (_, v, cash_amount) in ordered {
-        let h = guid_hash12(&v.guid);
+        let base = guid_hash12(&v.guid);
+        let h = if sharing[&base] > 1 {
+            let n = place.entry(base.clone()).or_default();
+            *n += 1;
+            format!("{base}_{n}")
+        } else {
+            base
+        };
         let f_amt = r.fig(
             &format!("contra_direction_cash_amount_paise_{h}"),
             Value::Int(cash_amount),
             Unit::Paise,
             "Net Cash-line amount (Dr+/Cr-) on this Contra voucher.",
             one_voucher(v),
-        );
+        )?;
         r.findings.push(Finding {
             id: format!("{TEST_ID}/contra_direction/{h}"),
             clauses: Vec::new(),

@@ -396,12 +396,18 @@ async fn outstandings_requires_closing_mode_and_retains_sources_on_refusal() {
             if fault != "amount" {
                 assert_profile_refusal(&error, fault);
             } else {
-                assert!(matches!(
+                // The amount is the first bill's: the refusal names its row,
+                // and the runtime names the report (bridge#1096).
+                assert_eq!(
                     error
                         .chain()
                         .find_map(|cause| cause.downcast_ref::<NativeOutstandingsError>()),
-                    Some(NativeOutstandingsError::InvalidAmount)
-                ));
+                    Some(&NativeOutstandingsError::BillRow {
+                        report: Some("receivable"),
+                        row: 1,
+                        cause: Box::new(NativeOutstandingsError::InvalidAmount),
+                    })
+                );
             }
             error
                 .downcast_ref::<RuntimeReadFailure>()

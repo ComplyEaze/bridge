@@ -1,0 +1,223 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "related_parties_cl23",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "ab3d3f4e061679c1",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). One entry = one voucher's net Dr+/Cr- line-sum on a person's nature ledger set.",
+  "figures": [
+    {
+      "id": "related_parties_cl23.amount_interest_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8988997478933c71",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag fb1d8b58)'s 'interest' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Interest",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_rent_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "354a55c00da0b5f3",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag fb1d8b58)'s 'rent' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Rent",
+          "label": ""
+        },
+        {
+          "kind": "ledger",
+          "id": "Quiet Rent Deposit",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_salary_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "417df6dff6795573",
+      "definition_text": "Net Dr+/Cr- population-line movement on related person (tag fb1d8b58)'s 'salary' ledger(s), confirmed by the client.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.amount_total_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "72ac3d46d9385867",
+      "definition_text": "Sum of amount_<nature>_fb1d8b58 across every nature configured for person (tag fb1d8b58).",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.applicable",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "9b27b7c2da441e41",
+      "definition_text": "Whether any related person has been confirmed by the client for this engagement. 'no' means none were confirmed -- never inferred from a ledger or party name.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_interest_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2fd00b554aac551f",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag fb1d8b58)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Interest",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_accrued_salary_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "215fed857545a346",
+      "definition_text": "TB period CREDIT movement (accrual, P&L side) on person (tag fb1d8b58)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_interest_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "23ba2cf7d4e68adb",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag fb1d8b58)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Interest",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_closing_salary_fb1d8b58",
+      "value": 200000,
+      "unit": "paise",
+      "definition_sha256_16": "2b7daad667fb67a2",
+      "definition_text": "Closing payable (-TB closing_paise) on person (tag fb1d8b58)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_interest_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d9606d8f2ba0d2f4",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag fb1d8b58)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Interest",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_opening_salary_fb1d8b58",
+      "value": 200000,
+      "unit": "paise",
+      "definition_sha256_16": "537bba1e1b416b5c",
+      "definition_text": "Opening payable (-TB opening_paise) on person (tag fb1d8b58)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_interest_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "16ee9d3be33c94ea",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag fb1d8b58)'s 'interest' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Interest",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.payable_paid_salary_fb1d8b58",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2dea77a80a982e65",
+      "definition_text": "TB period DEBIT movement (amount actually paid) on person (tag fb1d8b58)'s 'salary' ledger(s).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Quiet Salary Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "related_parties_cl23.related_person_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "8feb927f1116a35a",
+      "definition_text": "Related persons confirmed by the client for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "related_parties_cl23.relationship_fb1d8b58",
+      "value": "father of the proprietor",
+      "unit": "text",
+      "definition_sha256_16": "7f3c33865c2d23e2",
+      "definition_text": "Relationship confirmed by the client for related person (tag fb1d8b58) -- client confirmation only, never inferred from a ledger or party name.",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "related_parties_cl23.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

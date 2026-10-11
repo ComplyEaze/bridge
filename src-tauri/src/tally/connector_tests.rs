@@ -444,7 +444,7 @@ async fn spawn_method_routed_server_with_extra_request_check(
         }
         if refuse_extra_requests {
             assert!(
-                tokio::time::timeout(std::time::Duration::from_millis(200), listener.accept())
+                tokio::time::timeout(std::time::Duration::from_millis(1000), listener.accept())
                     .await
                     .is_err(),
                 "snapshot start sent a ledger export after its Education profile rejected BOOKSFROM"

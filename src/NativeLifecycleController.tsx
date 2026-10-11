@@ -25,7 +25,7 @@ function sameRequest(left: NativeLifecycleRequest, right: NativeLifecycleRequest
 }
 
 function errorMessage(cause: unknown) {
-  return formatCommandErrorMessage(cause, "Bridge could not complete the native close request.");
+  return formatCommandErrorMessage(cause, "ComplyEaze Bridge could not complete the native close request.");
 }
 
 type Props = {
@@ -186,7 +186,7 @@ export function NativeLifecycleController({
       } catch (cause) {
         if (active && currentEpoch === epoch.current) {
           setCurrentRequest(next);
-          setRequestError(`Bridge could not inspect this native close request: ${errorMessage(cause)}`);
+          setRequestError(`ComplyEaze Bridge could not inspect this native close request: ${errorMessage(cause)}`);
         }
         return;
       }
@@ -229,7 +229,7 @@ export function NativeLifecycleController({
         const pending = await invoke<NativeLifecycleRequest | null>("desktop_pending_source_draft_lifecycle_request");
         if (active && pending) await handleRequest(pending);
       } catch (cause) {
-        if (active) onProtectionChange(false, `Bridge could not install native close protection: ${errorMessage(cause)}`);
+        if (active) onProtectionChange(false, `ComplyEaze Bridge could not install native close protection: ${errorMessage(cause)}`);
       }
     })();
 
@@ -248,12 +248,12 @@ export function NativeLifecycleController({
   const sourceBusy = sourceDraftActionBusyRef.current;
   const canDiscard = !busy && !completionBlocked() && requestError === null;
   const heading = sourceDraftDirtyRef.current
-    ? isExit ? "Discard unsaved proposals and quit Bridge?" : "Discard unsaved proposals and close this window?"
-    : isExit ? "Quit Bridge?" : "Close this window?";
+    ? isExit ? "Discard unsaved proposals and quit ComplyEaze Bridge?" : "Discard unsaved proposals and close this window?"
+    : isExit ? "Quit ComplyEaze Bridge?" : "Close this window?";
   const description = journalBusy
-    ? "A Journal action is in progress. Wait for the result before closing Bridge."
+    ? "A Journal action is in progress. Wait for the result before closing ComplyEaze Bridge."
     : sourceBusy
-    ? "A local source-draft action is in progress. Wait for its result before closing Bridge."
+    ? "A local source-draft action is in progress. Wait for its result before closing ComplyEaze Bridge."
     : sourceDraftDirtyRef.current
     ? "Unsaved proposal edits are local only and will be lost."
     : "No unsaved proposals remain.";

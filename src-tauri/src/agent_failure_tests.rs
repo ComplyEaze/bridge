@@ -9,7 +9,7 @@ fn response_bytes(plan: &ScenarioPlan) -> Vec<u8> {
 #[tokio::test]
 async fn import_post_read_failures_retain_source_evidence_and_admission_errors_stay_empty() {
     for malformed_catalogue in [false, true] {
-        let mut plans = import_cycle_plans()[..10].to_vec();
+        let mut plans = import_family_cycle_plans()[..10].to_vec();
         if malformed_catalogue {
             // Remove one required attribute from the captured native catalogue.
             // This is fault injection, not a claimed additional Tally fixture.

@@ -43,7 +43,13 @@ writes that JSON. With neither, no comparison source is supplied. `creditor_agei
 `[creditor_ageing_43bh]` table, and passes no next-year payment data, as the reference's pack runs
 it. `statutory_dues_43b` reads the optional `[statutory_dues]` table (`nature_by_ledger`,
 `salary_expense_ledgers`). `partners_40b_194t` reads the optional `[partners]` table, with its `deed`
-popped out, as the reference's `partners_config` returns it. With --read DIR, the [snapshot] table is replaced in memory by that read with
+popped out, as the reference's `partners_config` returns it. `books_examined` reads nothing beyond the
+book; the names of the documents the reference's pack loaded with the read are caller data:
+`--documents-read FILE` reads them from a JSON list of text, in the pack's order (none without it).
+`clause21a_candidates` reads the optional `[clause21a].extra_terms` through the reference's own reader and the
+`[partners]` interest and remuneration ledgers, as the reference's pack passes them, and runs on the crate's
+vendored keyword table (`rules/clause21a_keywords.toml`), refused unless it is the reference's own file byte for
+byte (`require_vendored_clause21a_keywords`). With --read DIR, the [snapshot] table is replaced in memory by that read with
 allow_unbracketed_read = true -- the same switch the engine's own read-format parity gate applies
 -- so a legacy client config can be run against its wrapped read without editing it.
 
@@ -81,9 +87,93 @@ def _cash_payments_40a3(c):
         round_off_ledgers=frozenset(round_off_ledgers))
 
 
+def _entity_269st_gap(c):
+    """As tae/pack.py calls it: the party index is built from the engagement's [party_identity] table, and the
+    round-off ledgers are the [roles] ones."""
+    from tae.audit_tests import entity_269st_gap
+    from tae.config import role_ledger_set
+    from tae.party_identity import build_party_index
+    round_off_ledgers = (role_ledger_set(c.cfg, "round_off_ledgers")
+                         if "round_off_ledgers" in c.cfg.get("roles", {}) else set())
+    return entity_269st_gap, entity_269st_gap.run(
+        c.eng, c.rules, c.cash, c.bank, build_party_index(c.eng.book, c.cfg),
+        round_off_ledgers=frozenset(round_off_ledgers))
+
+
+def _books_examined(c):
+    """As tae/pack.py calls it: the names of the documents the pack loaded, in its order, as a tuple."""
+    from tae.audit_tests import books_examined
+    docs = []
+    if c.args.documents_read:
+        docs = json.loads(Path(c.args.documents_read).read_text(encoding="utf-8"))
+        if not (isinstance(docs, list) and all(isinstance(d, str) for d in docs)):
+            c.ap.error("--documents-read: the file must hold a JSON list of text")
+    return books_examined, books_examined.run(c.eng, c.rules, tuple(docs))
+
+
+def _read_scope(c):
+    from tae.audit_tests import read_scope
+    return read_scope, read_scope.run(c.eng, c.rules)
+
+
+def _related_parties_cl23(c):
+    from tae.audit_tests import related_parties_cl23
+    from tae.config import related_parties_config
+    return related_parties_cl23, related_parties_cl23.run(c.eng, c.rules, related_parties_config(c.cfg))
+
+
+def _clause44(c):
+    from tae.audit_tests import clause44
+    from tae.config import (clause44_money_category_by_ledger, depreciation_config, gst_registration_type_by_ledger,
+                            role_ledger_set, tax_ledgers_by_head)
+    # As tae/pack.py reads them: tax_ledgers, round_off_ledgers and the depreciation table before any test, then the
+    # three clause44 keys.
+    tax_ledgers = tax_ledgers_by_head(c.cfg)
+    round_off_ledgers = role_ledger_set(c.cfg, "round_off_ledgers")
+    dep_expense_ledgers = depreciation_config(c.cfg)[2]
+    return clause44, clause44.run(
+        c.eng, c.rules, dep_expense_ledgers, gst_registration_type_by_ledger(c.cfg), tax_ledgers,
+        role_ledger_set(c.cfg, "no_supplier_expense_ledgers"), round_off_ledgers,
+        clause44_money_category_by_ledger(c.cfg))
+
+def _specified_persons_40a2b(c):
+    from types import SimpleNamespace
+    from tae.audit_tests import related_parties_cl23, specified_persons_40a2b
+    from tae.config import related_parties_config
+    rp = related_parties_config(c.cfg)
+    cl23 = related_parties_cl23.run(c.eng, c.rules, rp)
+    mod = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
+                          specified_persons_40a2b.check_invariants(e, c.rules, rp, cl23, res))
+    return mod, specified_persons_40a2b.run(c.eng, c.rules, rp, cl23)
+
+
 def _trial_balance(c):
     from tae.audit_tests import trial_balance
     return trial_balance, trial_balance.run(c.eng, c.rules)
+
+
+CLAUSE21A_KEYWORDS = Path(__file__).resolve().parent.parent / "rules" / "clause21a_keywords.toml"
+
+
+def require_vendored_clause21a_keywords(module):
+    """The crate's keyword table (rules/clause21a_keywords.toml) is the reference's own file, byte for byte:
+    refuse to run against a reference whose table has moved on, so a golden is never made from different words."""
+    if module.KEYWORDS.read_bytes() != CLAUSE21A_KEYWORDS.read_bytes():
+        raise SystemExit("rules/clause21a_keywords.toml is not the reference's tae/rules/clause21a_keywords.toml")
+
+
+def _clause21a_candidates(c):
+    """As tae/pack.py calls it: the client's [clause21a].extra_terms through the reference's own reader, and the
+    partners' interest and remuneration ledgers from the [partners] table (the deed popped out), each kept when
+    truthy; the keyword table is the crate's copy of the reference's."""
+    from tae.audit_tests import clause21a_candidates
+    from tae.config import clause21a_extra_terms, partners_config
+    require_vendored_clause21a_keywords(clause21a_candidates)
+    partners, _deed = partners_config(c.cfg)
+    return clause21a_candidates, clause21a_candidates.run(
+        c.eng, c.rules, clause21a_extra_terms(c.cfg),
+        frozenset(led for q in partners.values() for led in (q.get("interest_ledger"), q.get("remuneration_ledger"))
+                  if led))
 
 
 def _cash_book_integrity(c):
@@ -128,7 +218,7 @@ def _financial_statements(c):
 
 def _applicability_44ab(c):
     from tae.audit_tests import applicability_44ab, cash_44ab, financial_statements
-    from tae.config import partner_interest_ledgers, presumptive_history_config
+    from tae.config import deductor_activity, partner_interest_ledgers, presumptive_history_config
     a = c.args
     if a.turnover_inputs and a.emit_turnover_inputs:
         c.ap.error("--turnover-inputs and --emit-turnover-inputs are exclusive")
@@ -161,7 +251,8 @@ def _applicability_44ab(c):
                   "payments_bp": c44.figures[f"{cash_44ab.TEST_ID}.cash_share_payments"].value,
                   "limits": c44.findings[0].limits}
     return applicability_44ab, applicability_44ab.run(
-        c.eng, c.rules, turnover_inputs, cash_share, presumptive_history_config(c.cfg))
+        c.eng, c.rules, turnover_inputs, cash_share, presumptive_history_config(c.cfg),
+        deductor_activity=deductor_activity(c.cfg))
 
 
 def _depreciation(c):
@@ -174,6 +265,13 @@ def _depreciation(c):
                  **{k: v for k, v in c.rules["depreciation"].items() if k not in ("authority", "status")}}
     return depreciation, depreciation.run(c.eng, rules_dep, block_by_ledger, opening_wdv_paise,
                                           dep_expense_ledgers)
+
+
+def _counter_cheques_40a3(c):
+    from tae.audit_tests import counter_cheques_40a3
+    from tae.config import counter_cheque_narration_terms
+    return counter_cheques_40a3, counter_cheques_40a3.run(
+        c.eng, c.rules, cash=c.cash, bank=c.bank, narration_terms=counter_cheque_narration_terms(c.cfg))
 
 
 def _creditor_ageing_43bh(c):
@@ -228,6 +326,16 @@ def _loans_interest(c):
         turnover_is_placeholder=turnover_is_placeholder(c.cfg))
 
 
+def _narration_payees(c):
+    from tae.audit_tests import narration_payees
+    from tae.config import tds_config
+    configured = frozenset(c.cfg.get("roles", {}).get("narration_payee_ledgers", []))
+    added = narration_payees.unnamed_194c_ledgers(c.eng.book, _tds_payees(c)[1], tds_config(c.cfg)[0])
+    module = SimpleNamespace(TEST_ID=narration_payees.TEST_ID, check_invariants=lambda eng, result:
+                             narration_payees.check_invariants(eng, result, c.bank, configured | added))
+    return module, narration_payees.run(c.eng, c.rules, c.bank, configured, added_ledgers=added)
+
+
 def _partners_40b_194t(c):
     from tae.audit_tests import partners_40b_194t
     from tae.config import partners_config, tds_payable_ledgers
@@ -260,9 +368,10 @@ def _traces_documents(c):
     if a.traces_documents:
         doc = json.loads(Path(a.traces_documents).read_text(encoding="utf-8"))
         day = lambda s: None if s is None else date.fromisoformat(s)
-        form26as = [Form26ASRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("form26as", [])]
-        ais = [AisRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("ais", [])]
-        tis = [TisRow(**r) for r in doc.get("tis", [])]
+        # An absent or null document was not loaded; the tests take it as no rows, as the pack does.
+        form26as = [Form26ASRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("form26as") or []]
+        ais = [AisRow(**{**r, "txn_date": day(r["txn_date"])}) for r in doc.get("ais") or []]
+        tis = [TisRow(**r) for r in doc.get("tis") or []]
     elif a.emit_traces_documents:
         year = c.eng.assessment_year
         p26 = document_path(c.cfg, c.path.parent, "form26as")
@@ -271,8 +380,10 @@ def _traces_documents(c):
         ais = load_ais_json(p_ais, f"ais:{year}") if p_ais is not None else []
         p_tis = optional_document_path(c.cfg, c.path.parent, "tis")
         tis = load_tis_json(p_tis, f"tis:{year}") if p_tis is not None else []
-        out = {k: [{f: (v.isoformat() if isinstance(v, date) else v) for f, v in vars(r).items()} for r in rows]
-               for k, rows in (("form26as", form26as), ("ais", ais), ("tis", tis))}
+        # null for an optional file not given, so the crate tells "not loaded" from "no rows" (#1281).
+        out = {k: (None if path is None else
+                   [{f: (v.isoformat() if isinstance(v, date) else v) for f, v in vars(r).items()} for r in rows])
+               for k, path, rows in (("form26as", p26, form26as), ("ais", p_ais, ais), ("tis", p_tis, tis))}
         Path(a.emit_traces_documents).write_text(json.dumps(out, indent=1, ensure_ascii=False) + "\n",
                                                  encoding="utf-8")
     c.eng.form26as = form26as
@@ -346,6 +457,11 @@ def _bank_reconciliation(c):
         bank_charge_narration_terms=bank_charge_narration_terms(c.cfg))
 
 
+def _knock_off_candidates(c):
+    from tae.audit_tests import knock_off_candidates
+    return knock_off_candidates, knock_off_candidates.run(
+        c.eng, c.rules, tuple(c.cfg.get("party_identity", {}).get("party_groups", ())))
+
 def _high_value_register(c):
     """As tae/pack.py calls it, on every engagement: the bank statement and the AIS rows are both
     optional here, as there (none and no rows without their flags). The counterparty types are the
@@ -387,27 +503,46 @@ def _stock(c):
     return module, stock.run(c.eng, {"version": c.rules.version}, items, opening, closing,
                              read_format.company_isintegrated(c.cfg, c.path.parent))
 
+def _questionnaire_cl13(c):
+    from tae.audit_tests import questionnaire_cl13
+    return questionnaire_cl13, questionnaire_cl13.run(c.eng, c.rules, _stock(c)[1])
+
 def _party_monthly(c):
     from tae.audit_tests import party_monthly
     # As tae/pack.py calls it: the cash and bank ledgers, and the module's own top-parties cut.
-    return party_monthly, party_monthly.run(c.eng, c.rules, c.cash, c.bank)
+    # PWM-2 takes the same cash and bank ledgers, as pack.py passes them (it calls this check outside
+    # its generic loop); the canonical dump calls check_invariants(eng, result), so they are bound here.
+    module = SimpleNamespace(TEST_ID=party_monthly.TEST_ID, check_invariants=lambda eng, result:
+                             party_monthly.check_invariants(eng, result, c.cash, c.bank))
+    return module, party_monthly.run(c.eng, c.rules, c.cash, c.bank)
 
 
 RUNNERS = {
     "applicability_44ab": _applicability_44ab,
     "bank_reconciliation": _bank_reconciliation,
     "book_keeping_quality": _book_keeping_quality,
+    "books_examined": _books_examined,
     "cash_44ab": _cash_44ab,
     "cash_book_integrity": _cash_book_integrity,
     "cash_payments_40a3": _cash_payments_40a3,
+    "clause21a_candidates": _clause21a_candidates,
+    "clause44": _clause44,
+    "counter_cheques_40a3": _counter_cheques_40a3,
     "creditor_ageing_43bh": _creditor_ageing_43bh,
     "depreciation": _depreciation,
+    "entity_269st_gap": _entity_269st_gap,
     "financial_statements": _financial_statements,
     "high_value_register": _high_value_register,
+    "knock_off_candidates": _knock_off_candidates,
     "ledger_scrutiny": _ledger_scrutiny,
     "loans_interest": _loans_interest,
+    "narration_payees": _narration_payees,
     "partners_40b_194t": _partners_40b_194t,
     "party_monthly": _party_monthly,
+    "questionnaire_cl13": _questionnaire_cl13,
+    "read_scope": _read_scope,
+    "related_parties_cl23": _related_parties_cl23,
+    "specified_persons_40a2b": _specified_persons_40a2b,
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,
@@ -429,6 +564,8 @@ def main() -> int:
     ap.add_argument("--emit-turnover-inputs",
                     help="applicability_44ab: take GSTR-1 turnover from the reference's own pack and write it here")
     ap.add_argument("--report-totals", help="financial_statements: report totals JSON to use")
+    ap.add_argument("--documents-read",
+                    help="books_examined: a JSON list of the names of the documents loaded with the read")
     ap.add_argument("--traces-documents", help="tds_tcs_26as/twentysixas_receipts/high_value_register: Form 26AS/AIS/TIS rows JSON to use")
     ap.add_argument("--emit-traces-documents",
                     help="tds_tcs_26as/twentysixas_receipts: read the rows with the reference's adapters and write them "

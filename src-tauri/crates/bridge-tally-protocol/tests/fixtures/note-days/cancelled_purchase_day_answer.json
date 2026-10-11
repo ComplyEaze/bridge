@@ -1,0 +1,67 @@
+{
+ "company": {
+  "books_from": "20250401",
+  "company_number": "100021",
+  "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+  "identity_state": "verified_tuple",
+  "missing_field": null,
+  "name": "BRIDGE SHAPE LAB"
+ },
+ "evidence": {
+  "bytes": 946192,
+  "duration_ms": 7375,
+  "read_at": "2026-10-01T18:06:10.917Z",
+  "request_sha256": "68501148e9043ba43c49e0ac6f4bdb59f6094e70251246ec808daf6030aa177f",
+  "response_sha256": "264a71c74e8295e1c1cf2eb178beb932a1467552ac143da4ee96c13760c425fb",
+  "state": "complete"
+ },
+ "read_at": "2026-10-01T18:06:03.541Z",
+ "result": {
+  "coverage": "items are the Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes; tax is taken only from the GST duty head recorded on a ledger master, never from a name or an amount; every other voucher type that touches those ledgers is listed apart (whether it belongs in a return is the CA's call); Purchase and Debit Note vouchers with no entry on a Duties & Taxes ledger are counted in purchase_vouchers_without_duties_taxes_entry, not returned as items",
+  "items": [],
+  "ledger_masters_observed": 44,
+  "next_offset": null,
+  "offset": 0,
+  "other_voucher_types_touching_duties_taxes": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "profile": "agent_purchase_register_v1",
+  "purchase_vouchers_without_duties_taxes_entry": {
+   "listed": [
+    {
+     "cancelled": true,
+     "date": "20250703",
+     "guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000029",
+     "optional": false,
+     "post_dated": false,
+     "voucher_class": "Purchase",
+     "voucher_number": "9",
+     "voucher_type": "Purchase"
+    }
+   ],
+   "listed_truncated": false,
+   "total": 1
+  },
+  "reason": null,
+  "register_classes": [
+   "Purchase",
+   "Debit Note"
+  ],
+  "state": "complete",
+  "total": 0,
+  "unclassified_voucher_type": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  },
+  "vouchers_observed": 1,
+  "vouchers_with_unplaced_ledgers": {
+   "listed": [],
+   "listed_truncated": false,
+   "total": 0
+  }
+ },
+ "truncated": false
+}

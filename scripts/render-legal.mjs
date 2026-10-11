@@ -4,10 +4,16 @@
 // writes nothing. Unlike the changelog renderer there is no fallback page: a legal page must not
 // silently degrade.
 import { readFileSync, writeFileSync } from "node:fs";
+import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const ARTICLE_MARKER = "<!-- legal -->";
 export const TITLE_MARKER = "<!-- legal-title -->";
+export const CANONICAL_MARKER = "<!-- legal-canonical -->";
+// The site's own address; each rendered page names itself as its canonical one (privacy.html and
+// terms.html are also reachable without ".html", and the same bytes must not count as two pages).
+export const SITE_ORIGIN = "https://bridge.complyeaze.com/";
+const PAGE_NAME = /^[a-z0-9][a-z0-9-]*\.html$/;
 export const UNRESOLVED_MARKERS = ["[VERIFY", "[PUBLISH DATE]"];
 
 export class LegalError extends Error {
@@ -199,12 +205,16 @@ export function renderDocument(source) {
   return { title: ctx.titles[0].raw, article: `<article class="legal">\n${body.join("\n")}\n</article>` };
 }
 
-export function applyTemplate(template, { title, article }) {
-  for (const marker of [ARTICLE_MARKER, TITLE_MARKER]) {
+export function applyTemplate(template, { title, article }, page) {
+  for (const marker of [ARTICLE_MARKER, TITLE_MARKER, CANONICAL_MARKER]) {
     const count = template.split(marker).length - 1;
     if (count !== 1) fail(undefined, `template must contain ${marker} exactly once, found ${count}`);
   }
-  return template.replace(TITLE_MARKER, () => escapeHtml(title)).replace(ARTICLE_MARKER, () => article);
+  if (!PAGE_NAME.test(page)) fail(undefined, `output file name ${JSON.stringify(page)} is not a page name (lowercase letters, digits, hyphens, then .html)`);
+  return template
+    .replace(TITLE_MARKER, () => escapeHtml(title))
+    .replace(CANONICAL_MARKER, () => SITE_ORIGIN + page)
+    .replace(ARTICLE_MARKER, () => article);
 }
 
 const USAGE = "usage: render-legal.mjs page --in F --template F --out F";
@@ -229,7 +239,7 @@ export function main(argv) {
     const source = readFileSync(options["--in"], "utf8");
     const rendered = renderDocument(source);
     where = options["--template"];
-    const html = applyTemplate(readFileSync(options["--template"], "utf8"), rendered);
+    const html = applyTemplate(readFileSync(options["--template"], "utf8"), rendered, basename(options["--out"]));
     where = options["--out"];
     writeFileSync(options["--out"], html);
     return 0;

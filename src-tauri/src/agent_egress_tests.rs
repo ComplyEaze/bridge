@@ -305,7 +305,7 @@ fn receipt_append_waits_until_all_shared_readers_release_the_file() {
     });
     ready.recv_timeout(Duration::from_secs(2)).unwrap();
     reader.unlock().unwrap();
-    std::thread::sleep(Duration::from_millis(20));
+    std::thread::sleep(Duration::from_millis(1000));
     assert!(
         !writer.is_finished(),
         "remaining reader must exclude the append"

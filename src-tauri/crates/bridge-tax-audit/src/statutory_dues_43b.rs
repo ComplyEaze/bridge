@@ -16,12 +16,20 @@
 //!   dated after the year end (clause 26(i)(B)); the opening liability is walked FIFO against this
 //!   year's payments for clause 26(i)(A), and its unpaid remainder is kept out of 26(i)(B).
 //!
+//! A nature's vouchers are kept by [`VoucherKey`], never by GUID (#1243): a figure or finding of
+//! the walk cites each voucher with a line that has an amount on the nature's ledgers, by its GUID and
+//! label, so two vouchers sharing a GUID are each cited unless their refs are identical too. The
+//! payments cited for clause 26(i)(A) are those of them with a debit line on the nature's ledgers.
+//! Keys are made once per mapped nature, as the reference makes them: a population in which a
+//! GUID holding a NUL makes two keys equal is refused there (`AuditError::VoucherKeysNotUnique`,
+//! where the reference raises), and with no nature mapped no key is made and nothing is refused.
+//!
 //! `check_invariants` is S43B-1: per nature, opening + charged - paid ties the closing liability,
 //! re-derived from the Trial Balance alone.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
@@ -219,7 +227,7 @@ struct NatureLines<'a> {
     charged: i64,
     paid: i64,
     lines: Vec<(i64, i64)>,
-    vouchers: BTreeMap<&'a str, &'a Voucher>,
+    vouchers: BTreeMap<VoucherKey, &'a Voucher>,
 }
 
 fn compute_nature_lines<'a>(
@@ -233,14 +241,14 @@ fn compute_nature_lines<'a>(
         lines: Vec::new(),
         vouchers: BTreeMap::new(),
     };
-    for v in pop {
+    for (vk, v) in voucher_keys(pop)? {
         let day = civil_day_number(&v.date);
         for l in &v.lines {
             if l.amount_paise == 0 || !ledgers.contains(l.ledger.as_str()) {
                 continue;
             }
             out.lines.push((day, l.amount_paise));
-            out.vouchers.insert(v.guid.as_str(), *v);
+            out.vouchers.insert(vk.clone(), v);
             if l.amount_paise < 0 {
                 out.charged = out
                     .charged
@@ -252,13 +260,6 @@ fn compute_nature_lines<'a>(
         }
     }
     Ok(out)
-}
-
-fn voucher_refs(vouchers: &BTreeMap<&str, &Voucher>) -> Vec<EvidenceRef> {
-    vouchers
-        .iter()
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &support::voucher_label(v)))
-        .collect()
 }
 
 fn ledger_refs<'a>(names: impl Iterator<Item = &'a str>) -> Vec<EvidenceRef> {
@@ -325,7 +326,7 @@ filtered sub-table)."
 summed across every ledger the client's setup maps to nature '{nature}'."
             ),
             ledger_ev.clone(),
-        );
+        )?;
         let f_close = r.fig(
             &format!("closing_liability_{nature}"),
             Value::Int(closing),
@@ -335,7 +336,7 @@ summed across every ledger the client's setup maps to nature '{nature}'."
 summed across every ledger the client's setup maps to nature '{nature}'."
             ),
             ledger_ev.clone(),
-        );
+        )?;
         if !no_tb_row.is_empty() {
             r.fig(
                 &format!("ledgers_without_tb_row_count_{nature}"),
@@ -346,11 +347,11 @@ summed across every ledger the client's setup maps to nature '{nature}'."
 (opening/closing treated as nil)."
                 ),
                 ledger_refs(no_tb_row.iter().copied()),
-            );
+            )?;
         }
 
         let nl = compute_nature_lines(&pop, ledgers)?;
-        let voucher_ev = voucher_refs(&nl.vouchers);
+        let voucher_ev = support::voucher_refs(nl.vouchers.values().copied());
         let f_charged = r.fig(
             &format!("charged_{nature}"),
             Value::Int(nl.charged),
@@ -360,7 +361,7 @@ summed across every ledger the client's setup maps to nature '{nature}'."
 mapped to nature '{nature}'."
             ),
             voucher_ev.clone(),
-        );
+        )?;
         r.fig(
             &format!("paid_{nature}"),
             Value::Int(nl.paid),
@@ -370,7 +371,7 @@ mapped to nature '{nature}'."
 ledgers mapped to nature '{nature}'."
             ),
             voucher_ev,
-        );
+        )?;
 
         if NOT_S43B_NATURES.contains(&nature) {
             continue;
@@ -451,7 +452,7 @@ liability reported separately under clause 26(i)(A)(b), so the same rupee is nev
 both clauses (GN 46.4-46.7)."
             ),
             ledger_ev.to_vec(),
-        );
+        )?;
         let mut limits = vec![
             format!(
                 "Allowability under s.43B turns on payment on or before {due_text}; a challan or \
@@ -505,16 +506,11 @@ the s.139(1) return due date."
     let Some(opening_lot) = opening_lot else {
         return Ok(());
     };
-    let payment_ev: Vec<EvidenceRef> = nl
-        .vouchers
-        .iter()
-        .filter(|(_, v)| {
-            v.lines
-                .iter()
-                .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)
-        })
-        .map(|(g, v)| EvidenceRef::with_label("voucher", g, &support::voucher_label(v)))
-        .collect();
+    let payment_ev = support::voucher_refs(nl.vouchers.values().copied().filter(|v| {
+        v.lines
+            .iter()
+            .any(|l| ledgers.contains(l.ledger.as_str()) && l.amount_paise > 0)
+    }));
     let f_paid = r.fig(
         &format!("opening_s43b_paid_this_year_{nature}"),
         Value::Int(opening_lot.paid_paise),
@@ -528,7 +524,7 @@ return/Form 3CD (not available to this module) -- treating the whole TB opening 
 26(i)(A) risks double-deducting an amount already allowed last year."
         ),
         payment_ev.clone(),
-    );
+    )?;
     let f_unpaid = r.fig(
         &format!("opening_s43b_still_unpaid_{nature}"),
         Value::Int(opening_lot.remaining_paise),
@@ -542,7 +538,7 @@ already allowable in an earlier year, not a settled figure; it carries forward a
 opening balance either way, and is EXCLUDED from clause 26(i)(B) so it is never counted twice."
         ),
         ledger_ev.to_vec(),
-    );
+    )?;
     if opening_lot.paid_paise > 0 {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/opening_paid/{nature}"),
@@ -634,7 +630,7 @@ fn employee_contribution(
         }
     }
     let opening_lot = lots.iter().find(|l| l.month.is_none());
-    let lot_ev = voucher_refs(&nl.vouchers);
+    let lot_ev = support::voucher_refs(nl.vouchers.values().copied());
 
     let f_on_time = r.fig(
         &format!("deposited_on_time_{nature}"),
@@ -646,7 +642,7 @@ date (FIFO, oldest lot first; s.36(1)(va)). Excludes any opening (prior-year) li
 payments are reported separately."
         ),
         lot_ev.clone(),
-    );
+    )?;
     let f_late = r.fig(
         &format!("deposited_late_{nature}"),
         Value::Int(late),
@@ -656,7 +652,7 @@ payments are reported separately."
 (FIFO, oldest lot first). Excludes any opening (prior-year) liability lot."
         ),
         lot_ev.clone(),
-    );
+    )?;
     let f_not_visible = r.fig(
         &format!("not_visible_after_year_end_{nature}"),
         Value::Int(not_visible),
@@ -667,7 +663,7 @@ voucher population has no postings after this date, so on-time/late cannot be de
 this book at all)."
         ),
         lot_ev.clone(),
-    );
+    )?;
     let f_visible_unpaid = r.fig(
         &format!("unpaid_due_date_passed_{nature}"),
         Value::Int(visible_unpaid),
@@ -677,7 +673,7 @@ this book at all)."
 had no matching payment recorded in the books by then."
         ),
         lot_ev.clone(),
-    );
+    )?;
     if unmatched_advance != 0 {
         r.fig(
             &format!("unmatched_advance_{nature}"),
@@ -689,7 +685,7 @@ had no matching payment recorded in the books by then."
 a specific month's deduction)."
             ),
             lot_ev.clone(),
-        );
+        )?;
     }
 
     if let Some(opening_lot) = opening_lot {
@@ -708,7 +704,7 @@ s.36(1)(va) due date into the portion paid on time and the portion paid late, no
 as a whole."
             ),
             lot_ev.clone(),
-        );
+        )?;
         let f_open_paid_on_time = r.fig(
             &format!("opening_liability_paid_on_time_{nature}"),
             Value::Int(opening_paid_on_time),
@@ -719,7 +715,7 @@ as a whole."
 (s.36(1)(va)) -- allowable in the earlier year it was deducted, not disallowed."
             ),
             lot_ev.clone(),
-        );
+        )?;
         let f_open_paid_late = r.fig(
             &format!("opening_liability_paid_late_{nature}"),
             Value::Int(opening_paid_late),
@@ -731,7 +727,7 @@ as a whole."
 Ltd v CIT (2022) SC), not reassessed this year."
             ),
             lot_ev.clone(),
-        );
+        )?;
         let f_open_unpaid = r.fig(
             &format!("opening_liability_unpaid_{nature}"),
             Value::Int(opening_lot.remaining_paise),
@@ -743,7 +739,7 @@ pre-dates this PY), so it is permanently disallowed for the earlier year it was 
 (s.36(1)(va), Checkmate), and still an unresolved PF/ESI Act deposit besides."
             ),
             lot_ev.clone(),
-        );
+        )?;
         if opening_paid_late > 0 {
             r.findings.push(Finding {
                 id: format!("{TEST_ID}/opening_paid_late/{nature}"),
@@ -1077,6 +1073,8 @@ mod tests {
                     chain: vec!["Duties & Taxes".to_string()],
                     chain_complete: true,
                     master_opening_paise: 0,
+                    pan: String::new(),
+                    gstin: String::new(),
                     guid: "gx".to_string(),
                     masterid: None,
                 },
@@ -1095,21 +1093,24 @@ mod tests {
         };
         let mut r = TestResult::new(TEST_ID, VERSION, "v");
         let x = || vec![EvidenceRef::new("ledger", "X")];
-        r.fig("opening_liability_a", Value::Int(1), Unit::Paise, "d", x());
+        r.fig("opening_liability_a", Value::Int(1), Unit::Paise, "d", x())
+            .unwrap();
         r.fig(
             "closing_liability_a",
             Value::Int(999),
             Unit::Paise,
             "d",
             x(),
-        );
+        )
+        .unwrap();
         r.fig(
             "closing_liability_b",
             Value::Int(0),
             Unit::Paise,
             "d",
             Vec::new(),
-        );
+        )
+        .unwrap();
         assert_eq!(
             check_invariants(&book, &r).unwrap(),
             vec![

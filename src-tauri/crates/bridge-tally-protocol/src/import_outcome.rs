@@ -180,6 +180,13 @@ pub struct TallyImportOutcome {
     /// How many `LINEERROR`s kept no text, so a short list is explicit.
     #[serde(skip_serializing_if = "is_zero")]
     tally_line_errors_omitted: u64,
+    /// `LASTVCHID` as Tally reported it, when it did. On a clean create of 10
+    /// vouchers it equalled the last created voucher's MASTERID on one
+    /// licensed Silver 7.1 run (`tests/fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`);
+    /// it is a cross-check for binding a posted voucher, never an identity alone.
+    /// Absent in records saved before it was kept, which read as not observed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_vch_id: Option<u64>,
 }
 
 /// A saved outcome as read back. Its text is bounded again on the way in, so
@@ -192,6 +199,8 @@ struct StoredTallyImportOutcome {
     exceptions_were_reported: bool,
     #[serde(default, deserialize_with = "stored_line_errors")]
     tally_line_errors: Vec<StoredTallyLineError>,
+    #[serde(default)]
+    last_vch_id: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -232,6 +241,7 @@ impl From<StoredTallyImportOutcome> for TallyImportOutcome {
             exceptions_were_reported: stored.exceptions_were_reported,
             tally_line_errors,
             tally_line_errors_omitted,
+            last_vch_id: stored.last_vch_id,
         }
     }
 }
@@ -259,6 +269,11 @@ impl TallyImportOutcome {
     /// How many `LINEERROR`s kept no text.
     pub fn tally_line_errors_omitted(&self) -> u64 {
         self.tally_line_errors_omitted
+    }
+
+    /// `LASTVCHID`, when the response carried it.
+    pub fn last_vch_id(&self) -> Option<u64> {
+        self.last_vch_id
     }
 
     pub fn into_counters(self) -> TallyImportResult {
@@ -344,22 +359,24 @@ impl TallyImportResult {
 /// response on a bare `&` inside a CDATA section. An XML comment inside the
 /// element is dropped; any other markup still refuses the response.
 fn read_line_error_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> anyhow::Result<String> {
-    let expected = name.as_ref().to_ascii_uppercase();
+    let expected = name.as_ref().as_bytes().to_ascii_uppercase();
     crate::native_ledger_collection::with_untrimmed_text(reader, |reader| {
         let mut text = String::new();
         loop {
             match reader.read_event()? {
                 Event::Text(part) => {
-                    text.push_str(&quick_xml::escape::unescape(&part.decode()?)?);
+                    text.push_str(&quick_xml::escape::unescape(&part)?);
                 }
                 Event::GeneralRef(reference) => text.push_str(
                     &crate::native_ledger_collection::resolve_party_ledger_master_reference(
                         reference,
                     )?,
                 ),
-                Event::CData(part) => text.push_str(&part.decode()?),
+                Event::CData(part) => text.push_str(&part),
                 Event::Comment(_) => {}
-                Event::End(end) if end.name().as_ref().to_ascii_uppercase() == expected => {
+                Event::End(end)
+                    if end.name().as_ref().as_bytes().to_ascii_uppercase() == expected =>
+                {
                     break;
                 }
                 Event::Eof => anyhow::bail!("Tally import LINEERROR ended before it closed"),
@@ -390,11 +407,12 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
     let mut line_error_count = 0_u64;
     let mut tally_line_errors = Vec::new();
     let mut documented_extra_fields = HashSet::new();
+    let mut last_vch_id = None;
 
     loop {
         match reader.read_event()? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 validate_only_attributes(&element, &[]).map_err(|_| {
                     anyhow::anyhow!("Tally import response attributes were invalid")
                 })?;
@@ -515,10 +533,11 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
                             anyhow::bail!("Tally import response duplicated a documented field");
                         }
                         if name.as_slice() == b"LASTVCHID" {
-                            // Tally documents LASTVCHID as a numeric import-result field. We do
-                            // not retain it yet, but accepting arbitrary text here would make the
-                            // parser evidence unusable for a future identifier cross-check.
-                            read_counter(&mut reader, element.name(), "LASTVCHID")?;
+                            // Tally documents LASTVCHID as a numeric import-result field; it
+                            // is kept as a cross-check for binding a posted voucher, so
+                            // arbitrary text is refused rather than read as absent.
+                            last_vch_id =
+                                Some(read_counter(&mut reader, element.name(), "LASTVCHID")?);
                         } else {
                             read_optional_text(&mut reader, element.name())?;
                         }
@@ -550,7 +569,12 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
                 let Some(expected) = path.pop() else {
                     anyhow::bail!("Tally import response contained an unexpected closing element");
                 };
-                if !element.name().as_ref().eq_ignore_ascii_case(&expected) {
+                if !element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&expected)
+                {
                     anyhow::bail!("Tally import response closed an unexpected element");
                 }
                 if path.is_empty() {
@@ -559,10 +583,7 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
             }
             Event::Empty(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"])
-                    && element
-                        .name()
-                        .as_ref()
-                        .eq_ignore_ascii_case(b"IMPORTRESULT") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("IMPORTRESULT") =>
             {
                 validate_only_attributes(&element, &[]).map_err(|_| {
                     anyhow::anyhow!("Tally import response attributes were invalid")
@@ -578,18 +599,18 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
                 );
             }
             Event::Empty(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"HEADER")
-                    || element.name().as_ref().eq_ignore_ascii_case(b"BODY") =>
+                if element.name().as_ref().eq_ignore_ascii_case("HEADER")
+                    || element.name().as_ref().eq_ignore_ascii_case("BODY") =>
             {
                 anyhow::bail!("Tally import response contained an empty critical container");
             }
             Event::Empty(_) => {
                 anyhow::bail!("Tally import response contained an unexpected empty element");
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally import response contained unexpected mixed text");
             }
-            Event::CData(text) if !text.decode()?.trim().is_empty() => {
+            Event::CData(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally import response contained unexpected mixed CDATA");
             }
             Event::DocType(_) | Event::PI(_) => {
@@ -646,6 +667,7 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
         exceptions_were_reported,
         tally_line_errors,
         tally_line_errors_omitted,
+        last_vch_id,
     })
 }
 
@@ -695,7 +717,7 @@ fn parse_import_evidence_inner(xml: &str) -> anyhow::Result<ParsedImportEvidence
     let mut line_error_sha256 = Vec::new();
     loop {
         match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"LINEERROR") => {
+            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("LINEERROR") => {
                 let value = read_line_error_text(&mut reader, element.name())?;
                 if line_error_sha256.len() == MAX_LINE_ERRORS {
                     anyhow::bail!("Tally import response exceeded the line-error limit");

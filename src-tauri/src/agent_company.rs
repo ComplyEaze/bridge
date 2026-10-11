@@ -55,6 +55,8 @@ impl Server {
                 "endpoint": endpoint,
                 "loaded_companies": probe.companies,
                 "refusal_reason": refusal_reason,
+                // The host date every omitted date defaults to (YYYYMMDD).
+                "today": tally_host_today(),
             }),
             evidence,
         ))

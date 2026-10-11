@@ -14,9 +14,9 @@
 //!
 //! Tally does not echo a client REMOTEID on readback (TALLY_PROTOCOL_REFERENCE
 //! §9.3), so the voucher is located by its narration marker, which carries the
-//! same batch-derived UUID. A natively posted batch carried that marker beside a
-//! random private REMOTEID, so an amendment of it would create a duplicate; any
-//! dispatch in the lineage refuses the amendment.
+//! same batch-derived UUID. A natively posted batch carries a random private
+//! REMOTEID and, since #864, no marker at all, so an amendment of it would create
+//! a duplicate; any dispatch in the lineage refuses the amendment.
 //!
 //! The comparison covers the date, a bank voucher's effective date when read,
 //! the voucher type, the voucher number when the batch set one, each entry's
@@ -63,8 +63,9 @@ pub(super) fn admit_lineage(
         if batch.endpoint_origin.as_deref() != Some(endpoint_origin) {
             return Err("import_amend_endpoint_mismatch".into());
         }
-        // A native post carried the marker beside a random private REMOTEID.
-        // Re-importing under the batch identity would create, not alter.
+        // A native post was sent under a fresh private REMOTEID, not the batch
+        // identity, and since #864 without the narration marker. Re-importing
+        // under the batch identity would create, not alter.
         if build.dispatched {
             return Err("import_amend_natively_posted".into());
         }
@@ -120,20 +121,14 @@ impl Lineage {
 
     /// The read window that holds both where each voucher is now and where the
     /// amendment will put it: an amendment may move a voucher's date.
-    pub(super) fn window(&self, vouchers: &[ImportVoucher]) -> (String, String) {
-        let dates = vouchers
-            .iter()
-            .flat_map(|voucher| {
-                std::iter::once(voucher.date.clone()).chain(
-                    self.versions(&voucher.bridge_txn_id)
-                        .map(|(_, recorded)| recorded.date.clone()),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        (
-            dates.first().cloned().unwrap_or_default(),
-            dates.last().cloned().unwrap_or_default(),
-        )
+    /// `None` only for no vouchers.
+    pub(super) fn window(&self, vouchers: &[ImportVoucher]) -> Option<(TallyDate, TallyDate)> {
+        super::date_window(vouchers.iter().flat_map(|voucher| {
+            std::iter::once(&voucher.date).chain(
+                self.versions(&voucher.bridge_txn_id)
+                    .map(|(_, recorded)| &recorded.date),
+            )
+        }))
     }
 
     /// The compare-and-swap. Returns per-voucher evidence when every amended
@@ -267,7 +262,7 @@ impl Lineage {
 fn expected_narration(voucher: &ImportVoucher, tag: &str) -> String {
     format!(
         "{} [BRIDGE:{tag}]",
-        voucher.narration.as_deref().unwrap_or("").trim()
+        super::posted_narration(voucher).unwrap_or("")
     )
     .trim()
     .to_string()

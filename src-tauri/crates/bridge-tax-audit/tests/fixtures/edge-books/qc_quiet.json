@@ -1,0 +1,350 @@
+{
+ "comment": "Twelve near misses and no match, and no stock result, so the count is 0 and the golden is byte-identical to qc_empty's. m01 is dated the day before the period's last day and m02 the day after it; m03 is a Payment; m04 is a Payment whose voucher type is named Journal; m05 has the base type 'journal' in lower case; m06 posts only to non-expense ledgers (Purchases and Expenses Payable); m07's ledger is under a group named 'indirect expenses' in lower case; m08's ledger is named 'Indirect Expenses' but sits under Provisions; m09, m10 and m11 are optional, cancelled and post-dated; m12 has the base type 'Stock Journal' and a line on a Direct Expenses ledger.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "indirect expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_quiet-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-qc_quiet-001"
+  },
+  {
+   "name": "Expenses Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-qc_quiet-002"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_quiet-003"
+  },
+  {
+   "name": "Indirect Expenses",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-qc_quiet-004"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-qc_quiet-005"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-qc_quiet-006"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-qc_quiet-007"
+  },
+  {
+   "name": "Sundry Charges",
+   "chain": [
+    "indirect expenses"
+   ],
+   "guid": "edge-qc_quiet-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 100000,
+   "closing": 49900000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Expenses Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -300000
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 30000,
+   "credit": 0,
+   "closing": 30000
+  },
+  {
+   "ledger": "Indirect Expenses",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 50000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 250000,
+   "credit": 0,
+   "closing": 250000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 30000,
+   "closing": 20000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sundry Charges",
+   "opening": 0,
+   "debit": 50000,
+   "credit": 0,
+   "closing": 50000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "qc-quiet-m01",
+   "date": "2026-03-30",
+   "base_type": "Journal",
+   "number": "JV-1",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m02",
+   "date": "2026-04-01",
+   "base_type": "Journal",
+   "number": "JV-2",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m03",
+   "date": "2026-03-31",
+   "base_type": "Payment",
+   "number": "PV-1",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m04",
+   "date": "2026-03-31",
+   "base_type": "Payment",
+   "vtype": "Journal",
+   "number": "PV-2",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m05",
+   "date": "2026-03-31",
+   "base_type": "journal",
+   "number": "JV-3",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m06",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-4",
+   "lines": [
+    [
+     "Purchases",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m07",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-5",
+   "lines": [
+    [
+     "Sundry Charges",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m08",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-6",
+   "lines": [
+    [
+     "Indirect Expenses",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m09",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-7",
+   "status": "optional",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m10",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-8",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m11",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-9",
+   "status": "postdated",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-quiet-m12",
+   "date": "2026-03-31",
+   "base_type": "Stock Journal",
+   "number": "SJ-1",
+   "lines": [
+    [
+     "Freight Inward",
+     30000
+    ],
+    [
+     "Purchases",
+     -30000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "questionnaire_cl13"
+ ]
+}

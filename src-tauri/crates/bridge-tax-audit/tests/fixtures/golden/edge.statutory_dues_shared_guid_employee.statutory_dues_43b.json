@@ -1,0 +1,1282 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "statutory_dues_43b",
+  "test_version": "2",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "60f4750c0ff10ed0",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). Each nature's opening/closing liability is the Trial Balance sum across every ledger the client's setup maps to it; charged/paid are population voucher-line sums on the same ledgers (never a filtered sub-table).",
+  "figures": [
+    {
+      "id": "statutory_dues_43b.charged_esi_employee",
+      "value": 490,
+      "unit": "paise",
+      "definition_sha256_16": "dfcbbebccd6de9c0",
+      "definition_text": "Sum of population voucher CREDIT lines (amount added to the liability) on ledgers mapped to nature 'esi_employee'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.charged_pf_employee",
+      "value": 750,
+      "unit": "paise",
+      "definition_sha256_16": "7f028c4f8563a6b5",
+      "definition_text": "Sum of population voucher CREDIT lines (amount added to the liability) on ledgers mapped to nature 'pf_employee'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.closing_liability_esi_employee",
+      "value": 990,
+      "unit": "paise",
+      "definition_sha256_16": "fb700550a0a4694c",
+      "definition_text": "Trial Balance closing balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'esi_employee'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "ESI Employee Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.closing_liability_pf_employee",
+      "value": -75,
+      "unit": "paise",
+      "definition_sha256_16": "a9a7c15fd2212a5b",
+      "definition_text": "Trial Balance closing balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'pf_employee'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "PF Employee Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.deposited_late_esi_employee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "873a0e7cb1a7d6ec",
+      "definition_text": "Sum of 'esi_employee' deduction lots' payments dated after that month's own due date (FIFO, oldest lot first). Excludes any opening (prior-year) liability lot.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.deposited_late_pf_employee",
+      "value": 500,
+      "unit": "paise",
+      "definition_sha256_16": "bb7820aeb77d1e4f",
+      "definition_text": "Sum of 'pf_employee' deduction lots' payments dated after that month's own due date (FIFO, oldest lot first). Excludes any opening (prior-year) liability lot.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.deposited_on_time_esi_employee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2143263b776f8963",
+      "definition_text": "Sum of 'esi_employee' deduction lots' payments dated on or before that month's own due date (FIFO, oldest lot first; s.36(1)(va)). Excludes any opening (prior-year) liability lot, whose payments are reported separately.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.deposited_on_time_pf_employee",
+      "value": 250,
+      "unit": "paise",
+      "definition_sha256_16": "c964f923c2ea9d0c",
+      "definition_text": "Sum of 'pf_employee' deduction lots' payments dated on or before that month's own due date (FIFO, oldest lot first; s.36(1)(va)). Excludes any opening (prior-year) liability lot, whose payments are reported separately.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.not_visible_after_year_end_esi_employee",
+      "value": 200,
+      "unit": "paise",
+      "definition_sha256_16": "dd03436ca6ded480",
+      "definition_text": "Sum of 'esi_employee' deduction lots whose due date falls after 2026-03-31 (the FY's voucher population has no postings after this date, so on-time/late cannot be determined from this book at all).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.not_visible_after_year_end_pf_employee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "91ab094f5b3d9b8f",
+      "definition_text": "Sum of 'pf_employee' deduction lots whose due date falls after 2026-03-31 (the FY's voucher population has no postings after this date, so on-time/late cannot be determined from this book at all).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_esi_employee",
+      "value": 800,
+      "unit": "paise",
+      "definition_sha256_16": "1236c87813b67cc0",
+      "definition_text": "Trial Balance opening balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'esi_employee'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "ESI Employee Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_paid_late_esi_employee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "fe920655a9326f94",
+      "definition_text": "Of this year's payments on 'esi_employee'-mapped ledgers FIFO-matched to the OPENING (prior-year) liability lot, the portion paid AFTER that deduction month's own due date (s.36(1)(va)) -- permanently disallowed for the earlier year it was deducted (Checkmate Services P Ltd v CIT (2022) SC), not reassessed this year.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_paid_late_pf_employee",
+      "value": 400,
+      "unit": "paise",
+      "definition_sha256_16": "c926afaebbd09a17",
+      "definition_text": "Of this year's payments on 'pf_employee'-mapped ledgers FIFO-matched to the OPENING (prior-year) liability lot, the portion paid AFTER that deduction month's own due date (s.36(1)(va)) -- permanently disallowed for the earlier year it was deducted (Checkmate Services P Ltd v CIT (2022) SC), not reassessed this year.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_paid_on_time_esi_employee",
+      "value": 300,
+      "unit": "paise",
+      "definition_sha256_16": "504aaa041f231a64",
+      "definition_text": "Of this year's payments on 'esi_employee'-mapped ledgers FIFO-matched to the OPENING (prior-year) liability lot, the portion paid on or before that deduction month's OWN due date (s.36(1)(va)) -- allowable in the earlier year it was deducted, not disallowed.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_paid_on_time_pf_employee",
+      "value": 600,
+      "unit": "paise",
+      "definition_sha256_16": "e8aed9fda7cce256",
+      "definition_text": "Of this year's payments on 'pf_employee'-mapped ledgers FIFO-matched to the OPENING (prior-year) liability lot, the portion paid on or before that deduction month's OWN due date (s.36(1)(va)) -- allowable in the earlier year it was deducted, not disallowed.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_paid_this_year_esi_employee",
+      "value": 300,
+      "unit": "paise",
+      "definition_sha256_16": "a71bb2a9d65bb5ac",
+      "definition_text": "Sum of this year's payments on 'esi_employee'-mapped ledgers FIFO-matched to the OPENING (prior-year) liability lot, seeded so a payment early in the year settles last year's carried-over deduction first rather than being misattributed to this year's own lots. Split by s.36(1)(va) due date into the portion paid on time and the portion paid late, not assumed disallowed as a whole.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_paid_this_year_pf_employee",
+      "value": 1000,
+      "unit": "paise",
+      "definition_sha256_16": "fe59377ca7d68957",
+      "definition_text": "Sum of this year's payments on 'pf_employee'-mapped ledgers FIFO-matched to the OPENING (prior-year) liability lot, seeded so a payment early in the year settles last year's carried-over deduction first rather than being misattributed to this year's own lots. Split by s.36(1)(va) due date into the portion paid on time and the portion paid late, not assumed disallowed as a whole.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_pf_employee",
+      "value": 1000,
+      "unit": "paise",
+      "definition_sha256_16": "5765a056beb3aeae",
+      "definition_text": "Trial Balance opening balance (Dr+/Cr- flipped to a liability-positive figure), summed across every ledger the client's setup maps to nature 'pf_employee'.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "PF Employee Payable",
+          "label": ""
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_unpaid_esi_employee",
+      "value": 500,
+      "unit": "paise",
+      "definition_sha256_16": "db5e5611cc2656d3",
+      "definition_text": "Remaining balance of the opening (prior-year) 'esi_employee' liability lot with no payment matched to it in this year's population -- its own due date has already passed (it pre-dates this PY), so it is permanently disallowed for the earlier year it was deducted (s.36(1)(va), Checkmate), and still an unresolved PF/ESI Act deposit besides.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.opening_liability_unpaid_pf_employee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "24417874ed716164",
+      "definition_text": "Remaining balance of the opening (prior-year) 'pf_employee' liability lot with no payment matched to it in this year's population -- its own due date has already passed (it pre-dates this PY), so it is permanently disallowed for the earlier year it was deducted (s.36(1)(va), Checkmate), and still an unresolved PF/ESI Act deposit besides.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.paid_esi_employee",
+      "value": 300,
+      "unit": "paise",
+      "definition_sha256_16": "7be8eeb915adaf86",
+      "definition_text": "Sum of population voucher DEBIT lines (amount paid against the liability) on ledgers mapped to nature 'esi_employee'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.paid_pf_employee",
+      "value": 1825,
+      "unit": "paise",
+      "definition_sha256_16": "2f23386d4c5f390b",
+      "definition_text": "Sum of population voucher DEBIT lines (amount paid against the liability) on ledgers mapped to nature 'pf_employee'.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.unmatched_advance_pf_employee",
+      "value": 75,
+      "unit": "paise",
+      "definition_sha256_16": "34b03418b68a493a",
+      "definition_text": "Payments on 'pf_employee'-mapped ledgers left over after every open deduction lot (incl. any opening lot) was exhausted (an advance deposit, or a payment the books cannot match to a specific month's deduction).",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.unpaid_due_date_passed_esi_employee",
+      "value": 290,
+      "unit": "paise",
+      "definition_sha256_16": "5527c8191e7afc96",
+      "definition_text": "Sum of 'esi_employee' deduction lots whose due date fell on or before 2026-03-31 and still had no matching payment recorded in the books by then.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ]
+    },
+    {
+      "id": "statutory_dues_43b.unpaid_due_date_passed_pf_employee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "6aa614b277dd5c3a",
+      "definition_text": "Sum of 'pf_employee' deduction lots whose due date fell on or before 2026-03-31 and still had no matching payment recorded in the books by then.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "statutory_dues_43b/late/pf_employee",
+      "clauses": [
+        "s.36(1)(va)",
+        "3CD-20(b)"
+      ],
+      "confidence": "indicative",
+      "facts": [
+        {
+          "name": "charged",
+          "figure_id": "statutory_dues_43b.charged_pf_employee"
+        },
+        {
+          "name": "deposited_late",
+          "figure_id": "statutory_dues_43b.deposited_late_pf_employee"
+        },
+        {
+          "name": "deposited_on_time",
+          "figure_id": "statutory_dues_43b.deposited_on_time_pf_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ],
+      "title_sha256_16": "3ede46f6735fb94e",
+      "title_text": "Employees' contribution ('pf_employee') deposited after its own due date",
+      "limits_sha256_16": "43618e334881387c",
+      "limits_text": [
+        "The deposit date used here is the payment voucher's own date in the books, not the PF/ESI challan's acknowledgement date -- confirm against the actual challans. Checkmate Services P Ltd v CIT (2022) (SC): the s.43B return-date proviso does not extend to employees' contributions, so a late deposit is not allowable however small the delay; a CA judgement applies only to a specific fact affecting the due date itself (e.g. the 15th falling on a bank holiday), never to the rule."
+      ],
+      "ask_client_sha256_16": "edf2664b4ccc8214",
+      "ask_client_text": [
+        "PF/ESI challans for the late-deposited amount, to confirm the actual deposit date against the voucher date used here."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/not_visible/esi_employee",
+      "clauses": [
+        "s.36(1)(va)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "charged",
+          "figure_id": "statutory_dues_43b.charged_esi_employee"
+        },
+        {
+          "name": "not_visible",
+          "figure_id": "statutory_dues_43b.not_visible_after_year_end_esi_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ],
+      "title_sha256_16": "6cb95d6aa178444e",
+      "title_text": "Employees' contribution ('esi_employee') for the year's last deduction month(s): due date falls after year end, not visible in this book",
+      "limits_sha256_16": "9b75821576661306",
+      "limits_text": [
+        "This FY's voucher export ends 31 March; a due date of 15 April or later falls outside it, so whether this amount was deposited on time cannot be determined from the books at all, on either side."
+      ],
+      "ask_client_sha256_16": "6922b25c82d0e8b1",
+      "ask_client_text": [
+        "PF/ESI challans dated after 31 March for this month's deduction."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/opening_paid_late/pf_employee",
+      "clauses": [
+        "s.36(1)(va)"
+      ],
+      "confidence": "indicative",
+      "facts": [
+        {
+          "name": "opening_paid_late",
+          "figure_id": "statutory_dues_43b.opening_liability_paid_late_pf_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ],
+      "title_sha256_16": "aadc227e28ed1ee3",
+      "title_text": "Employees' contribution ('pf_employee') carried over from a prior year, paid this year AFTER its own due date",
+      "limits_sha256_16": "b1fd8690e906f4c2",
+      "limits_text": [
+        "Permanently disallowed for the earlier year in which it was deducted (s.36(1)(va), Checkmate Services P Ltd v CIT (2022) SC) -- not an income-tax question for THIS year, but flagged because the deposit is only now showing up in this year's payment vouchers."
+      ],
+      "ask_client_sha256_16": "1cd1a560d663f20a",
+      "ask_client_text": [
+        "PF/ESI challans for this amount, to confirm the actual deposit date against the voucher date used here."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/opening_paid_on_time/esi_employee",
+      "clauses": [
+        "s.36(1)(va)"
+      ],
+      "confidence": "indicative",
+      "facts": [
+        {
+          "name": "opening_paid_on_time",
+          "figure_id": "statutory_dues_43b.opening_liability_paid_on_time_esi_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ],
+      "title_sha256_16": "e27e98ff941c4af8",
+      "title_text": "Employees' contribution ('esi_employee') carried over from a prior year, paid this year by its own due date",
+      "limits_sha256_16": "cc9d8738fe27863f",
+      "limits_text": [
+        "Deposited by its own s.36(1)(va) due date, so allowable in the earlier year it was deducted -- not disallowed; shown here only because the matching payment voucher falls inside this year's population."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "statutory_dues_43b/opening_paid_on_time/pf_employee",
+      "clauses": [
+        "s.36(1)(va)"
+      ],
+      "confidence": "indicative",
+      "facts": [
+        {
+          "name": "opening_paid_on_time",
+          "figure_id": "statutory_dues_43b.opening_liability_paid_on_time_pf_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment  on 2025-09-05"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P1 on 2025-04-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Payment PF-P2 on 2025-04-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-jul",
+          "label": "Payment P-JUL on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Payment P-MAY on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-twin",
+          "label": "Journal J-JUL on 2025-07-31"
+        }
+      ],
+      "title_sha256_16": "d8594c3d8603075a",
+      "title_text": "Employees' contribution ('pf_employee') carried over from a prior year, paid this year by its own due date",
+      "limits_sha256_16": "cc9d8738fe27863f",
+      "limits_text": [
+        "Deposited by its own s.36(1)(va) due date, so allowable in the earlier year it was deducted -- not disallowed; shown here only because the matching payment voucher falls inside this year's population."
+      ],
+      "ask_client_sha256_16": "e3b0c44298fc1c14",
+      "ask_client_text": []
+    },
+    {
+      "id": "statutory_dues_43b/opening_still_unpaid/esi_employee",
+      "clauses": [
+        "s.36(1)(va)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "opening_unpaid",
+          "figure_id": "statutory_dues_43b.opening_liability_unpaid_esi_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ],
+      "title_sha256_16": "2b92799ec44b7578",
+      "title_text": "Employees' contribution ('esi_employee') carried over from a prior year is still unpaid",
+      "limits_sha256_16": "1aba395ec329f651",
+      "limits_text": [
+        "Already permanently disallowed for income tax in the year the deduction was made, since its own due date has passed unpaid (s.36(1)(va), Checkmate Services P Ltd v CIT (2022) SC); flagged here only because it remains an open PF/ESI Act deposit question, not an income-tax question for this year."
+      ],
+      "ask_client_sha256_16": "9ed8f399cc0a034e",
+      "ask_client_text": [
+        "Confirm whether and when this carried-over amount was eventually deposited."
+      ]
+    },
+    {
+      "id": "statutory_dues_43b/unpaid/esi_employee",
+      "clauses": [
+        "s.36(1)(va)",
+        "3CD-20(b)"
+      ],
+      "confidence": "computed",
+      "facts": [
+        {
+          "name": "charged",
+          "figure_id": "statutory_dues_43b.charged_esi_employee"
+        },
+        {
+          "name": "closing_liability",
+          "figure_id": "statutory_dues_43b.closing_liability_esi_employee"
+        },
+        {
+          "name": "unpaid_due_date_passed",
+          "figure_id": "statutory_dues_43b.unpaid_due_date_passed_esi_employee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "",
+          "label": "Journal ESI-J2 on 2026-03-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Journal ESI-J1 on 2025-10-31"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-esi",
+          "label": "Payment ESI-P1 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-sge-may",
+          "label": "Journal J-MAY on 2025-05-31"
+        }
+      ],
+      "title_sha256_16": "702e77204fd32e82",
+      "title_text": "Employees' contribution ('esi_employee') charged but no deposit recorded by its due date, which has already passed",
+      "limits_sha256_16": "25743d91d4949d99",
+      "limits_text": [
+        "Checkmate Services P Ltd v CIT (2022) (SC): not allowable for this year regardless of whether it is eventually deposited later."
+      ],
+      "ask_client_sha256_16": "f58de4765a1717c6",
+      "ask_client_text": [
+        "Confirm whether and when this amount was eventually deposited, for interest exposure under the PF/ESI Act (a separate question from income-tax allowability)."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-1",
+      "subject": "Bank",
+      "detail": "vouchers -2125 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Wages",
+      "detail": "vouchers 1240 vs TB movement 0 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to -915 paise"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "opening_paise",
+      "detail": "TB opening_paise sums to -1800 paise"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "(blank)",
+      "detail": "5 in-books voucher(s) have no GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "edge-sge-esi",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "edge-sge-may",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "edge-sge-twin",
+      "detail": "2 in-books vouchers share this GUID"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "statutory_dues_43b.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

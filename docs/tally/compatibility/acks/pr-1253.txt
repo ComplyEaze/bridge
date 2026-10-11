@@ -1,0 +1,16 @@
+docs/adr/0004-tally-write-safety.md
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
+reviewer: lamemustafa
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_bill_wise.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/tally/approved_import.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/standard_ledger_catalog.rs

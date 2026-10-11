@@ -1,0 +1,392 @@
+# fixture: tests/fixtures/agent/native-outstandings-lab-ledgers.utf16le.xml
+# parser: parse_native_ledger_snapshot_for_company(OUTSTANDINGS LAB)
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL Bank",
+        parent: Some(
+            "Bank Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-18000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL Misc Income",
+        parent: Some(
+            "Indirect Incomes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "5000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P01 Named Bills Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-12000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P02 On Account Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-7000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P03 Not Billwise Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-7500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P04 Advance Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "6000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P05 Credit Note Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-7500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P06 Debit Note Creditor",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "6200.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P07 Referenced Opening Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-33333.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-33333.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-33333.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P08 Unreferenced Opening Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-20000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-20000.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-20000.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P09 Reuse Debtor A",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-4200.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P10 Reuse Debtor B",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-6500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL P11 Journal Debtor",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-5000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL Purchases",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-6200.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "OL Sales",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "56700.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "55500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "I₹",
+        ),
+    },
+])

@@ -2004,11 +2004,10 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
             needed_at_least: 5,
             allowed: 2,
         });
-        failure.window_timings = Some(Box::new(WindowReadTimings {
-            from: "20260401".into(),
-            to: "20260802".into(),
-            ..WindowReadTimings::default()
-        }));
+        failure.window_timings = Some(Box::new(WindowReadTimings::new(
+            tally_date("20260401"),
+            tally_date("20260802"),
+        )));
         failure
     };
     let response = server.finish_tool_response(

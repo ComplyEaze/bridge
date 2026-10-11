@@ -40,12 +40,11 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
             .read_event()
             .expect("request must be well-formed XML")
         {
-            Event::Start(event) if event.name().as_ref() == b"SVCURRENTCOMPANY" => {
+            Event::Start(event) if event.name().as_ref() == "SVCURRENTCOMPANY" => {
                 let raw = reader
                     .read_text(event.name())
                     .expect("SVCURRENTCOMPANY must have a matching close tag");
-                let decoded = raw.decode().expect("text must decode as UTF-8");
-                return quick_xml::escape::unescape(&decoded)
+                return quick_xml::escape::unescape(&raw)
                     .expect("text must unescape")
                     .into_owned();
             }
@@ -68,6 +67,10 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
             // already escaped). Kept here so that claim stays checked.
             "xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV1",
             ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render(),
+        ),
+        (
+            "xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV2",
+            ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render(),
         ),
         (
             "xml_read_profiles::compatibility::ledgers_request",

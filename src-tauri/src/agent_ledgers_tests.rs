@@ -1898,11 +1898,17 @@ mod through_the_tool {
         reads: Vec<String>,
         closing: Option<String>,
     ) -> Vec<ScenarioPlan> {
-        // Tally's own count of the ledgers agrees with the census's.
-        let counted: usize = slices
+        // Tally's own count of the ledgers agrees with the census's: the distinct
+        // GUIDs the census's own parser reads from the slices, so text that merely
+        // looks like a ledger row cannot skew it.
+        let counted = slices
             .iter()
-            .map(|body| body.matches("<LEDGER NAME=\"").count())
-            .sum();
+            .flat_map(|body| {
+                bridge_tally_protocol::parse_ledger_census_slice(body, GUID, u64::MAX)
+                    .expect("a census slice given to the helper parses")
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
         census_plans_counted(
             mark,
             slices,
@@ -2208,9 +2214,10 @@ mod through_the_tool {
         assert_eq!(bytes[1] - bytes[0], sizes[1] - sizes[0]);
     }
 
-    /// A transport failure on the company-count read (here an answer past the
-    /// response cap) is not a damaged answer: it keeps its own cause and nothing
-    /// is sent after it.
+    /// A company-count answer past the response cap is not a damaged answer: it
+    /// is refused under the read's own code with its own `cause` and remediation
+    /// (#1033), never as `ledger_count_company_invalid` or
+    /// `ledger_count_company_differs`, and nothing is sent after it.
     #[tokio::test]
     async fn a_transport_failure_on_the_company_count_read_is_not_an_invalid_answer() {
         let mark = 102_161_u64;
@@ -2230,11 +2237,61 @@ mod through_the_tool {
             call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
         assert_eq!(requests, total, "a request was sent after the count read");
         assert_eq!(response["isError"], true, "{response}");
-        for other in [
-            "ledger_count_company_invalid",
-            "ledger_count_company_differs",
+        let error = refusal(&response);
+        assert_eq!(
+            error["code"], "party_ledger_master_read_failed",
+            "{response}"
+        );
+        assert_eq!(
+            error["cause"], "ledger_count_company_response_too_large",
+            "{response}"
+        );
+        assert_eq!(
+            error["remediation"],
+            crate::agent::refusal_remediation("ledger_count_company_response_too_large").unwrap()
+        );
+    }
+
+    /// Any other failure of the company-count read keeps what it had (#1144
+    /// review): a reset connection still carries no `cause`, and an HTTP error
+    /// keeps the transport's own. Only an answer past the cap is renamed, so
+    /// neither reads as `ledger_count_company_response_too_large`, and nothing
+    /// is sent after either.
+    #[tokio::test]
+    async fn a_count_read_failure_short_of_the_cap_keeps_its_own_cause() {
+        for (failed, cause) in [
+            (
+                xml(company_count_body(Some("9")))
+                    .with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+                None,
+            ),
+            (
+                xml(company_count_body(Some("9"))).with_http_status(500),
+                Some("http_status_failure"),
+            ),
         ] {
-            assert_ne!(refusal(&response)["cause"], other);
+            let mark = 102_161_u64;
+            let mut plans = marked_plans_over(extent_with_master_mark(mark), Vec::new(), None);
+            plans.extend(
+                census_bodies(mark, GUID, &[(24, 0..9)])
+                    .into_iter()
+                    .map(xml),
+            );
+            plans.push(failed);
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "a request was sent after the count read");
+            let error = refusal(&response);
+            assert_eq!(
+                error["code"], "party_ledger_master_read_failed",
+                "{response}"
+            );
+            assert_eq!(
+                error.get("cause").and_then(Value::as_str),
+                cause,
+                "{response}"
+            );
         }
     }
 
@@ -2694,6 +2751,153 @@ mod through_the_tool {
         let error = refusal(&response);
         assert_eq!(error["code"], "ledger_export_invalid");
         assert_eq!(error["cause"], "company_base_currency_not_inr");
+    }
+
+    /// A ledger export refused as a whole names why (#718): Tally's failure
+    /// answer, no answer, a response cut off before its root closed, and one
+    /// whose ledgers belong to another company each carry their own cause
+    /// beside `ledger_export_invalid`. Each is the captured basic export with
+    /// one change made here; before #718 all four carried no cause.
+    #[tokio::test]
+    async fn a_ledger_export_refused_as_a_whole_names_its_cause() {
+        let captured = period_opening();
+        let company_prefix = format!("{GUID}-");
+        assert!(captured.contains(&company_prefix));
+        for (body, cause) in [
+            (
+                captured.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1),
+                "native_collection_not_success",
+            ),
+            (
+                captured.replacen("<STATUS>1</STATUS>", "<STATUS></STATUS>", 1),
+                "native_collection_status_absent",
+            ),
+            (
+                captured.replacen("</ENVELOPE>", "", 1),
+                "native_collection_malformed_response",
+            ),
+            (
+                captured.replace(&company_prefix, "00000000-0000-4000-8000-0000000000aa-"),
+                "native_collection_identity_mismatch",
+            ),
+        ] {
+            assert_ne!(body, captured, "{cause}");
+            let (response, _) = call(
+                basic_plans_reading(body, None),
+                json!({"company_guid":GUID}),
+            )
+            .await;
+            let error = refusal(&response);
+            assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+            assert_eq!(error["cause"], cause, "{response}");
+        }
+    }
+
+    /// A ledger export refused for one row names whose fault it was (#718,
+    /// slice 2): a row repeating a field is `native_collection_row_unusable`, and
+    /// a response that ends inside a row is `native_collection_malformed_response`.
+    /// Each is the captured basic export with one change made here; before
+    /// slice 2 both carried no cause.
+    #[tokio::test]
+    async fn a_ledger_export_refused_for_one_row_names_its_cause() {
+        let captured = period_opening();
+        let parent = r#"<PARENT TYPE="String">Bridge Nested Debtors WR4</PARENT>"#;
+        assert_eq!(captured.matches(parent).count(), 1);
+        let opening = captured.find("<OPENINGBALANCE").expect("a row's opening");
+        for (body, cause) in [
+            (
+                captured.replacen(parent, &format!("{parent}{parent}"), 1),
+                "native_collection_row_unusable",
+            ),
+            (
+                captured[..opening].to_owned(),
+                "native_collection_malformed_response",
+            ),
+        ] {
+            assert_ne!(body, captured, "{cause}");
+            let (response, _) = call(
+                basic_plans_reading(body, None),
+                json!({"company_guid":GUID}),
+            )
+            .await;
+            let error = refusal(&response);
+            assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+            assert_eq!(error["cause"], cause, "{response}");
+        }
+    }
+
+    /// A `ledger_masters` catalogue export that outlives its deadline is sent
+    /// once, as the movement catalogue is (#937): a 2 s deadline, a 5 s stall,
+    /// and a wait past both. A whole second read is held behind the stalled
+    /// export, so a retry would find plans to answer it and `received` would
+    /// count them. Returns the response and how many requests were received.
+    async fn ledger_masters_with_a_stalled_export(
+        args: Value,
+        groups: Option<String>,
+    ) -> (Value, usize) {
+        const EXPORT: usize = 15;
+        let busy = std::time::Duration::from_millis(5_000);
+        let captured = period_opening();
+        let mut plans = basic_plans_reading(captured.clone(), groups.clone());
+        plans[EXPORT] = plans[EXPORT]
+            .clone()
+            .with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(busy));
+        let stalled = EXPORT + 1;
+        plans.truncate(stalled);
+        // Everything after the identity read: what a retried read sends next.
+        plans.extend(basic_plans_reading(captured, groups).into_iter().skip(4));
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = Server::new(Settings {
+            endpoint: TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().into(),
+            max_rows: 500,
+            max_bytes: 200_000,
+            redaction: Redaction::None,
+            import_enabled: false,
+            writes_enabled: false,
+            batch_post_enabled: false,
+        });
+        server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+            bridge_tally_transport::TransportPolicy {
+                request_timeout: std::time::Duration::from_millis(2_000),
+                ..Default::default()
+            },
+        );
+        let response = server.call_tool("ledger_masters", args).await;
+        // Past the stalled response and any retry that would have queued behind it.
+        tokio::time::sleep(busy + std::time::Duration::from_millis(3_000)).await;
+        let received = simulator.received();
+        simulator.cancel();
+        assert_eq!(
+            received, stalled,
+            "nothing was sent after the export that timed out: {response}"
+        );
+        (response, received)
+    }
+
+    #[tokio::test]
+    async fn a_basic_ledger_masters_catalogue_that_times_out_is_sent_once() {
+        let (response, _) =
+            ledger_masters_with_a_stalled_export(json!({"company_guid":GUID}), None).await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    }
+
+    #[tokio::test]
+    async fn a_group_filtered_ledger_masters_catalogue_that_times_out_is_sent_once() {
+        let (response, _) = ledger_masters_with_a_stalled_export(
+            json!({"company_guid":GUID, "group":"Sundry Debtors"}),
+            Some(groups()),
+        )
+        .await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "ledger_export_invalid", "{response}");
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
     }
 
     /// As `basic_plans`, with the ledger export given and, when `groups` is

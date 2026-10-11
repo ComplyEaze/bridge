@@ -19,7 +19,7 @@
 //! **Parity evidence.** `tests/parity.rs`, `tests/parity_40a3.rs` and `tests/parity_depreciation.rs`
 //! each compare this crate's dump over a committed synthetic read with the reference engine's dump
 //! over the same bytes, and prove the comparison can fail. That is parity on invented data only.
-//! The evidence that the slice reads real Tally books is `examples/local_parity.rs`, run on the
+//! The evidence that the slice reads real Tally books is the local parity example (`examples/local_parity`), run on the
 //! machine that holds client reads and never committed; each change to this crate should record
 //! that run's result.
 //!
@@ -32,27 +32,39 @@ pub mod bank_reconciliation;
 pub mod binding;
 pub mod book;
 pub mod book_keeping_quality;
+pub mod books_examined;
 pub mod canonical;
 pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
+pub mod clause21a_candidates;
+pub mod clause44;
 pub mod compare;
+pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
 pub mod depreciation;
 pub mod documents;
+pub mod entity_269st_gap;
 pub mod error;
 pub mod financial_statements;
 pub mod findings;
 pub mod high_value_register;
 pub mod invariants;
+pub mod knock_off_candidates;
 pub mod ledger_ids;
 pub mod ledger_scrutiny;
 pub mod loans_interest;
+pub mod narration_payees;
 pub mod partners_40b_194t;
+pub mod party_identity;
 pub mod party_monthly;
+pub mod questionnaire_cl13;
 pub mod read;
+pub mod read_scope;
 pub mod registry;
+pub mod related_parties_cl23;
 pub mod rules;
+pub mod specified_persons_40a2b;
 pub mod stale_balances_41_1;
 pub mod statutory_dues_43b;
 pub mod stock;
@@ -64,6 +76,7 @@ pub mod tds_tranches;
 mod text_tables;
 pub mod trial_balance;
 pub mod twentysixas_receipts;
+mod unicode_tables;
 pub mod xml;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -88,6 +101,9 @@ pub struct Engagement {
     pub label: String,
     pub assessment_year: String,
     pub period: Window,
+    /// The directory of the read. Empty for an engagement built for a book the caller holds
+    /// ([`Engagement::from_toml_for_read`]); never give that to `Read::open`. [`load_book`] refuses
+    /// such an engagement, and the field stays `pub` until the engagement is split into two types.
     pub read_dir: PathBuf,
     pub allow_unbracketed_read: bool,
     /// `[client.tally]` `company_guid` + `books_from`: the company every read must come from
@@ -96,6 +112,10 @@ pub struct Engagement {
     pub cash_groups: Vec<String>,
     pub bank_groups: Vec<String>,
     pub round_off_ledgers: Vec<String>,
+    /// `narration_payees`-only: `[roles].narration_payee_ledgers` as bound, empty when absent.
+    /// [`binding::bind`] fills it, and refuses a value that is not a list of names
+    /// (`BIND-ID-MALFORMED`) or a name that matches no ledger.
+    pub narration_payee_ledgers: Vec<String>,
     pub loan_ledgers_configured: Vec<String>,
     /// `cash_book_integrity`-only: the optional `[roles].own_account_narration_terms`, the forms
     /// in which the bank prints the assessee's own other account on transfer lines (client data).
@@ -104,6 +124,11 @@ pub struct Engagement {
     /// not every test on the engagement -- the reference, too, reads the key only when it runs
     /// `cash_book_integrity`. `None` when the key is absent.
     pub own_account_narration_terms: Option<toml::Value>,
+    /// `counter_cheques_40a3`-only: the optional `[roles].counter_cheque_narration_terms`, the bank
+    /// narration terms that mark a payment as encashed across the counter or not account payee
+    /// (client data). Kept as written and validated only when that test runs
+    /// ([`counter_cheques_40a3::narration_terms`]), as `own_account_narration_terms` is.
+    pub counter_cheque_narration_terms: Option<toml::Value>,
     /// `bank_reconciliation`-only: `[roles].bank_reconciliation_ledger`, the bank ledger a supplied
     /// statement is reconciled against. Set when the engagement is bound (by identity, like every
     /// other configured name); `None` before binding or when the key is absent, and the test then
@@ -120,6 +145,16 @@ pub struct Engagement {
     /// `high_value_register`-only: the optional `[roles].s194n_withdrawal_narration_terms`, kept as
     /// written and validated when that test runs ([`high_value_register::s194n_terms`]).
     pub s194n_withdrawal_narration_terms: Option<toml::Value>,
+    /// `entity_269st_gap`-only: the optional `[party_identity]` table. [`binding::bind`] binds its
+    /// ledger and group names to the Book; its values are typed when that test runs
+    /// ([`party_identity::PartyConfig::from_toml`]).
+    pub party_identity: Option<toml::Value>,
+    /// `knock_off_candidates`-only: `[party_identity].party_groups` as bound, empty when absent.
+    /// [`binding::bind`] refuses a value that is not a list of names (`BIND-ID-MALFORMED`).
+    pub party_groups: Vec<String>,
+    /// `[party_identity]` is present but is not a table: `knock_off_candidates` refuses when it
+    /// runs, as the reference's read of `party_groups` raises there.
+    pub party_identity_not_a_table: bool,
     /// `depreciation`-only: `None` when the client config carries no `[depreciation]` table at
     /// all (an engagement that never runs that test); `Some` once the table is present, at which
     /// point `block_by_ledger`, `opening_wdv_paise` and `dep_expense_ledgers` are REQUIRED within
@@ -160,6 +195,13 @@ pub struct Engagement {
     pub loans: LoansConfig,
     /// `[partners]`, bound by [`Engagement::bind`]; empty before binding. See [`PartnersConfig`].
     pub partners: PartnersConfig,
+    /// `related_parties_cl23`-only: `[related_parties]`, bound by [`Engagement::bind`]; empty
+    /// before binding. See [`RelatedPartiesConfig`].
+    pub related_parties: RelatedPartiesConfig,
+    /// `clause21a_candidates`-only: the optional `[clause21a]` table as written, `None` when absent.
+    /// Typed when that test runs ([`clause21a_candidates::extra_terms`]), so a malformed one fails
+    /// that test alone.
+    pub clause21a: Option<toml::Value>,
     /// `creditor_ageing_43bh`-only: the optional `[creditor_ageing_43bh]` table. Filled by
     /// [`Engagement::bind`]; see [`CreditorAgeingConfig`] for what is typed when.
     pub creditor_ageing: CreditorAgeingConfig,
@@ -186,6 +228,9 @@ pub struct Engagement {
     /// `book_keeping_quality`-only: its `[roles]` name locations, bound. Filled by
     /// [`Engagement::bind`]; see [`BookKeepingQualityConfig`] for what is typed when.
     pub book_keeping_quality: BookKeepingQualityConfig,
+    /// `clause44`-only: its three name locations, bound. Filled by [`Engagement::bind`]; see
+    /// [`Clause44Config`].
+    pub clause44: Clause44Config,
     /// The parsed config, kept only so [`Engagement::bind`] can read `[ledger_ids]`/
     /// `[group_ids]` (`binding::bind`) without re-parsing the source text. Not part of this
     /// struct's public contract: a field a caller should read directly (`cash_groups` and the
@@ -193,6 +238,10 @@ pub struct Engagement {
     raw_cfg: toml::Table,
     /// The directory `[snapshot].path` and a legacy trade-creditor source are relative to.
     base_dir: PathBuf,
+    /// Built by [`Engagement::from_toml_for_read`]: no `[snapshot]`, no directory. [`load_book`]
+    /// refuses such an engagement, so it cannot reach a directory by any path; its book comes from
+    /// the caller, and the tests run on it through [`registry`].
+    in_memory: bool,
 }
 
 /// `[loans]` from the client config, bound. Empty when the config has no `[loans]` table: the
@@ -228,6 +277,19 @@ pub struct PartnersConfig {
     pub partners: BTreeMap<String, toml::Value>,
     /// `[partners].deed` as written; `None` when absent.
     pub deed: Option<toml::Value>,
+}
+
+/// `[related_parties]` from the client config: the related persons the client confirmed, keyed
+/// as the client wrote them.
+///
+/// **Typed lazily**, as [`PartnersConfig`] is: [`Engagement::bind`] binds each
+/// `ledgers_by_nature` list; everything else is kept as written and typed when
+/// `related_parties_cl23` runs ([`related_parties_cl23::related_persons`]).
+#[derive(Debug, Clone, Default)]
+pub struct RelatedPartiesConfig {
+    /// `[related_parties.<key>]` for every person key, as written with its ledger lists bound.
+    /// Empty when the config has no `[related_parties]` table.
+    pub persons: BTreeMap<String, toml::Value>,
 }
 
 /// `[creditor_ageing_43bh]` from the client config, every key optional: the reference's
@@ -404,6 +466,19 @@ impl BookKeepingQualityConfig {
     }
 }
 
+/// `clause44`'s own name locations, bound by [`Engagement::bind`]; empty before binding. The two
+/// maps' values are kept as written and typed when the test runs ([`clause44::Inputs::new`]).
+#[derive(Debug, Clone, Default)]
+pub struct Clause44Config {
+    /// `[roles].no_supplier_expense_ledgers`; `None` when absent, and the test then refuses, as the
+    /// reference's `role_ledger_set` requires the key.
+    pub no_supplier_expense_ledgers: Option<Vec<String>>,
+    /// `[roles.gst_registration_type_by_ledger]`, keyed by each ledger's bound name.
+    pub registration_type_by_ledger: BTreeMap<String, toml::Value>,
+    /// `[clause44].money_category_by_ledger`, keyed by each ledger's bound name.
+    pub money_category_by_ledger: BTreeMap<String, toml::Value>,
+}
+
 /// `[depreciation]` from the client config: see [`Engagement::depreciation`].
 #[derive(Debug, Clone, Default)]
 pub struct DepreciationConfig {
@@ -486,6 +561,18 @@ const LEGACY_SNAPSHOT_KEYS: [&str; 10] = [
 impl Engagement {
     /// Parse a client config; `[snapshot].path` is relative to `base_dir`.
     pub fn from_toml(text: &str, base_dir: &Path) -> Result<Self> {
+        Self::parse(text, Some(base_dir))
+    }
+
+    /// Parse a client config for a book the caller already holds (a read Bridge made itself): no
+    /// `[snapshot]` table is allowed, there is no directory, and the result can never be given to
+    /// [`load_book`]. Everything else is read and refused exactly as [`Engagement::from_toml`] does,
+    /// except a `legacy_json` trade-creditor source, which names a file and so is refused here.
+    pub fn from_toml_for_read(text: &str) -> Result<Self> {
+        Self::parse(text, None)
+    }
+
+    fn parse(text: &str, base_dir: Option<&Path>) -> Result<Self> {
         let cfg: toml::Table = toml::from_str(text)
             .map_err(|e| AuditError::Config(format!("engagement TOML: {e}")))?;
         let table = |name: &str| {
@@ -520,13 +607,36 @@ impl Engagement {
                     AuditError::Config(format!("[period].{key} {s:?} is not YYYY-MM-DD"))
                 })
         };
-        let (client, period, snapshot, roles) = (
-            table("client")?,
-            table("period")?,
-            table("snapshot")?,
-            table("roles")?,
-        );
-        if snapshot.get("format").and_then(toml::Value::as_str) != Some("tally-read-v1") {
+        let (client, period, roles) = (table("client")?, table("period")?, table("roles")?);
+        let in_memory = base_dir.is_none();
+        if in_memory && cfg.contains_key("snapshot") {
+            return Err(AuditError::refused(
+                "CFG-snapshot-for-read",
+                "[snapshot] names a directory, and this engagement has none",
+            ));
+        }
+        if in_memory
+            && roles
+                .get("trade_creditors_source")
+                .and_then(toml::Value::as_table)
+                .and_then(|t| t.get("kind"))
+                .and_then(toml::Value::as_str)
+                == Some("legacy_json")
+        {
+            return Err(AuditError::refused(
+                "CFG-legacy-for-read",
+                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
+            ));
+        }
+        let empty = toml::Table::new();
+        let snapshot = if in_memory {
+            &empty
+        } else {
+            table("snapshot")?
+        };
+        if !in_memory
+            && snapshot.get("format").and_then(toml::Value::as_str) != Some("tally-read-v1")
+        {
             return Err(AuditError::refused(
                 "C1-format",
                 "[snapshot].format is not \"tally-read-v1\"",
@@ -542,11 +652,15 @@ impl Engagement {
                 format!("[snapshot] names a read and also legacy keys {mixed:?}"),
             ));
         }
-        let path = snapshot
-            .get("path")
-            .and_then(toml::Value::as_str)
-            .filter(|p| !p.is_empty())
-            .ok_or_else(|| AuditError::refused("CFG-path", "[snapshot].path is required"))?;
+        let path = if in_memory {
+            ""
+        } else {
+            snapshot
+                .get("path")
+                .and_then(toml::Value::as_str)
+                .filter(|p| !p.is_empty())
+                .ok_or_else(|| AuditError::refused("CFG-path", "[snapshot].path is required"))?
+        };
         let company_pin = client
             .get("tally")
             .map(|t| -> Result<CompanyPin> {
@@ -837,7 +951,7 @@ not YYYY-MM-DD"
                 from: date(period, "start")?,
                 to: date(period, "end")?,
             },
-            read_dir: base_dir.join(path),
+            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),
             allow_unbracketed_read: snapshot
                 .get("allow_unbracketed_read")
                 .and_then(toml::Value::as_bool)
@@ -849,13 +963,18 @@ not YYYY-MM-DD"
                 Some(_) => strings(roles, "round_off_ledgers")?,
                 None => Vec::new(),
             },
+            narration_payee_ledgers: Vec::new(),
             own_account_narration_terms: roles.get("own_account_narration_terms").cloned(),
+            counter_cheque_narration_terms: roles.get("counter_cheque_narration_terms").cloned(),
             bank_reconciliation_ledger: None,
             bank_charge_narration_terms: roles.get("bank_charge_narration_terms").cloned(),
             counterparty_type_by_ledger: BTreeMap::new(),
             s194n_withdrawal_narration_terms: roles
                 .get("s194n_withdrawal_narration_terms")
                 .cloned(),
+            party_identity: cfg.get("party_identity").cloned(),
+            party_groups: Vec::new(),
+            party_identity_not_a_table: false,
             loan_ledgers_configured: cfg
                 .get("loans")
                 .and_then(toml::Value::as_table)
@@ -869,6 +988,7 @@ not YYYY-MM-DD"
             tds_tcs_26as_missing,
             tds,
             book_keeping_quality: BookKeepingQualityConfig::default(),
+            clause44: Clause44Config::default(),
             client_state: tds_payees::read_client_state(client)?,
             deductor_activity: tds_payees::read_deductor_activity(&cfg)?,
             entity_type: client
@@ -891,9 +1011,12 @@ not YYYY-MM-DD"
             trade_creditors_source: roles.get("trade_creditors_source").cloned(),
             loans: LoansConfig::default(),
             partners: PartnersConfig::default(),
+            related_parties: RelatedPartiesConfig::default(),
+            clause21a: cfg.get("clause21a").cloned(),
             creditor_ageing: CreditorAgeingConfig::default(),
             statutory_dues: StatutoryDuesConfig::default(),
-            base_dir: base_dir.to_path_buf(),
+            base_dir: base_dir.map_or_else(PathBuf::new, Path::to_path_buf),
+            in_memory,
             raw_cfg: cfg,
         })
     }
@@ -904,6 +1027,28 @@ not YYYY-MM-DD"
     /// the reference implementation's `run.load()` calling `bind_config()` once.
     pub fn bind(&self, book: &book::Book) -> Result<(Self, binding::BindingReport)> {
         binding::bind(self, book)
+    }
+
+    /// The ledger names a `legacy_json` trade-creditor source reads, or `None` for any other
+    /// source. This is the one place an engagement reads such a file, and a held-book engagement
+    /// refuses to: its source can be set after parsing (the field is public), and the parse-time
+    /// refusal (`CFG-legacy-for-read`) cannot see that.
+    pub(crate) fn legacy_creditor_names(
+        &self,
+        source: Option<&toml::Value>,
+    ) -> Result<Option<Vec<String>>> {
+        let legacy = source
+            .and_then(toml::Value::as_table)
+            .and_then(|t| t.get("kind"))
+            .and_then(toml::Value::as_str)
+            == Some("legacy_json");
+        if self.in_memory && legacy {
+            return Err(AuditError::refused(
+                "CFG-no-directory",
+                "a legacy_json trade-creditor source names a file, and this engagement has no directory",
+            ));
+        }
+        legacy_trade_creditor_names(source, &self.base_dir)
     }
 }
 
@@ -977,12 +1122,11 @@ pub fn trade_creditors(engagement: &Engagement, book: &book::Book) -> Result<BTr
                 })
             })
             .collect(),
-        "legacy_json" => Ok(
-            legacy_trade_creditor_names(Some(src), &engagement.base_dir)?
-                .unwrap_or_default()
-                .into_iter()
-                .collect(),
-        ),
+        "legacy_json" => Ok(engagement
+            .legacy_creditor_names(Some(src))?
+            .unwrap_or_default()
+            .into_iter()
+            .collect()),
         other => Err(AuditError::Config(format!(
             "roles.trade_creditors_source: unknown kind {other:?}"
         ))),
@@ -1002,6 +1146,12 @@ pub fn rules_for(engagement: &Engagement) -> Result<Rules> {
 
 /// Read and verify the engagement's read, and build its book (C1-C10).
 pub fn load_book(engagement: &Engagement) -> Result<book::Book> {
+    if engagement.in_memory {
+        return Err(AuditError::refused(
+            "CFG-no-directory",
+            "this engagement was built for a book the caller holds and names no read directory",
+        ));
+    }
     let read = Read::open(&engagement.read_dir)?;
     read.check(
         &engagement.period,
@@ -1051,6 +1201,33 @@ pub fn cash_payments_40a3_on(
         &round_off_ledgers,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `counter_cheques_40a3` on a book and return its canonical parity dump. The cash and bank
+/// groups and the optional `[roles].counter_cheque_narration_terms` are as the reference's pack
+/// passes them; the module's own invariants run on the result alone (CCQ-3 needs the
+/// `cash_payments_40a3` result and the reference's dump does not pass it either).
+pub fn counter_cheques_40a3_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (engagement, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&engagement.cash_groups);
+    let bank = book.ledgers_under_any(&engagement.bank_groups);
+    let terms =
+        counter_cheques_40a3::narration_terms(engagement.counter_cheque_narration_terms.as_ref())?;
+    let result = counter_cheques_40a3::run(book, rules, &cash, &bank, &terms)?;
+    let module_check = counter_cheques_40a3::check_invariants(&result, None);
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Read, verify, build the book, run `counter_cheques_40a3` and return its canonical parity dump.
+pub fn counter_cheques_40a3_canonical(
+    engagement: &Engagement,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    counter_cheques_40a3_on(engagement, &load_book(engagement)?, rules)
 }
 
 /// Read, verify, build the book, run `cash_payments_40a3` and return its canonical parity dump.
@@ -1243,7 +1420,8 @@ pub fn trial_balance_on(
 
 /// Run `party_monthly` on a book and return its canonical parity dump, with the module's own
 /// PWM-1/PWM-2 check. Cash and bank are the engagement's cash and bank groups, as the reference's
-/// pack passes them; the period is the engagement's, and the top-parties cut is the module's own.
+/// pack passes them, to `run` and to the check alike; the period is the engagement's, and the
+/// top-parties cut is the module's own.
 pub fn party_monthly_on(
     engagement: &Engagement,
     book: &book::Book,
@@ -1260,7 +1438,7 @@ pub fn party_monthly_on(
         &bank,
         party_monthly::PARTY_TOP_N,
     )?;
-    let module_check = party_monthly::check_invariants(book, &bound.period, &result)?;
+    let module_check = party_monthly::check_invariants(book, &bound.period, &result, &cash, &bank)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
@@ -1278,6 +1456,41 @@ pub fn stock_on(
     let result = stock::run(book, rules, &inputs)?;
     let module_check = stock::check_invariants(book, &result, &inputs)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `questionnaire_cl13` on a book and return its canonical parity dump, with the module's own
+/// QCL-1 check. As the reference's pack runs it, the `stock` port runs first on the same book and
+/// its result is passed in, so the closing-stock finding carries its pointer; a missing or
+/// malformed stock part refuses here, as [`stock_on`] does, and never becomes "no stock result".
+pub fn questionnaire_cl13_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let inputs = stock_read::stock_inputs(engagement.raw_cfg.get("stock"), book.stock.as_ref())?;
+    let stock_result = stock::run(book, rules, &inputs)?;
+    let result = questionnaire_cl13::run(book, rules, &bound.period, Some(&stock_result))?;
+    let module_check = questionnaire_cl13::check_invariants(book, &bound.period, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `knock_off_candidates` on a book and return its canonical parity dump. The test has no
+/// module check. Its only setting is the bound `[party_identity].party_groups`; the table's other
+/// keys are never read, as the reference's pack never reads them for this test.
+pub fn knock_off_candidates_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    if bound.party_identity_not_a_table {
+        return Err(AuditError::Config(
+            "[party_identity] is not a table".to_string(),
+        ));
+    }
+    let result = knock_off_candidates::run(book, rules, &bound.party_groups)?;
+    canonical::canonical_test_result(book, &result, None)
 }
 
 /// Run `cash_book_integrity` on a book and return its canonical parity dump, with the module's
@@ -1303,20 +1516,31 @@ pub fn cash_book_integrity_on(
 /// parity dump. Refuses with `AuditError::Config` without a statement (the reference runs this
 /// test only when the engagement has one) or without `[roles].bank_reconciliation_ledger` (the
 /// reference's `require` raises). The statement's own rows feed BANK-1, as the reference sets
-/// `eng.bank` to them.
+/// `eng.bank` to them. A statement the engagement supplied but the reader refused
+/// ([`documents::BankStatementLoad::Refused`], with the reader's reason) gives
+/// [`bank_reconciliation::refused`], as the reference's pack gives it, and BANK-1 has no rows.
 pub fn bank_reconciliation_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
-    statement: Option<&documents::BankStatementDoc>,
+    statement: &documents::BankStatementLoad,
 ) -> Result<serde_json::Value> {
-    let statement = statement.ok_or_else(|| {
-        AuditError::Config(format!(
-            "{}: no bank statement was supplied (the reference runs this test only when the \
-             engagement has one)",
-            bank_reconciliation::TEST_ID
-        ))
-    })?;
+    let statement = match statement {
+        documents::BankStatementLoad::Read(statement) => statement,
+        documents::BankStatementLoad::Refused(reason) => {
+            engagement.bind(book)?;
+            let result = bank_reconciliation::refused(rules, reason)?;
+            let module_check = bank_reconciliation::check_invariants(&[], &result)?;
+            return canonical::canonical_test_result(book, &result, Some(module_check));
+        }
+        documents::BankStatementLoad::NotSupplied => {
+            return Err(AuditError::Config(format!(
+                "{}: no bank statement was supplied (the reference runs this test only when the \
+                 engagement has one)",
+                bank_reconciliation::TEST_ID
+            )))
+        }
+    };
     let (bound, _report) = engagement.bind(book)?;
     let ledger = bound.bank_reconciliation_ledger.as_deref().ok_or_else(|| {
         AuditError::Config(
@@ -1342,13 +1566,15 @@ pub fn bank_reconciliation_on(
 /// caller documents (`None` and empty when not supplied). The counterparty types are the
 /// configured loan ledgers' `lender_type`, overridden by `[roles].counterparty_type_by_ledger`; the
 /// s.194N recipient type follows `[client].entity_type`. Refuses when `[loans]` is not a table, as
-/// the reference's `loan_ledgers_config` raises there. The reference module has no
+/// the reference's `loan_ledgers_config` raises there. A statement the engagement supplied but the
+/// reader refused is [`documents::BankStatementLoad::Refused`], with the reader's reason. The
+/// reference module has no
 /// `check_invariants`, so the dump's module invariants are empty on both sides.
 pub fn high_value_register_on(
     engagement: &Engagement,
     book: &book::Book,
     rules: &Rules,
-    statement: Option<&documents::BankStatementDoc>,
+    statement: &documents::BankStatementLoad,
     ais_rows: &[documents::AisRow],
 ) -> Result<serde_json::Value> {
     let (bound, _report) = engagement.bind(book)?;
@@ -1373,6 +1599,63 @@ pub fn high_value_register_on(
         counterparty_type_by_ledger: &counterparty_types,
     };
     let result = high_value_register::run(book, rules, &inputs)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `entity_269st_gap` on a book and return its canonical parity dump. The party index is built
+/// from the engagement's optional `[party_identity]` table, its names bound to the Book. A ledger
+/// whose group chain is incomplete and does not already settle whether it is a party refuses this
+/// test (`PARTY-chain-incomplete`).
+///
+/// Divergence, deliberate, and not parity: the reference builds its party index inline in its pack,
+/// so its `IncompleteLedgerChain` ends the whole pack. Here only this test refuses, and every other
+/// test still gives its result.
+pub fn entity_269st_gap_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let config = party_identity::PartyConfig::from_toml(bound.party_identity.as_ref())?;
+    let index = party_identity::build_party_index(book, &config)?;
+    let cash = book.ledgers_under_any(&bound.cash_groups);
+    let bank = book.ledgers_under_any(&bound.bank_groups);
+    let round_off_ledgers: BTreeSet<String> = bound.round_off_ledgers.iter().cloned().collect();
+    let result = entity_269st_gap::run(book, rules, &cash, &bank, &index, &round_off_ledgers)?;
+    let module_check = entity_269st_gap::check_invariants(&result);
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `books_examined` on a book, with the documents the caller loaded, and return its canonical
+/// parity dump. The reference module has no `check_invariants`.
+pub fn books_examined_on(
+    book: &book::Book,
+    rules: &Rules,
+    documents_read: &BTreeSet<books_examined::DocumentRead>,
+) -> Result<serde_json::Value> {
+    let result = books_examined::run(book, rules, documents_read)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `clause21a_candidates` on a book and return its canonical parity dump: the client's
+/// `[clause21a].extra_terms` and the bound `[partners]` interest and remuneration ledgers, as the
+/// reference's pack passes them. The reference module has no `check_invariants`.
+pub fn clause21a_candidates_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let extra_terms = clause21a_candidates::extra_terms(engagement.clause21a.as_ref())?;
+    let (bound, _report) = engagement.bind(book)?;
+    let partner_ledgers = clause21a_candidates::partner_ledgers(&bound.partners)?;
+    let result = clause21a_candidates::run(book, rules, &extra_terms, &partner_ledgers)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `read_scope` on a book and return its canonical parity dump. The reference module has no
+/// `check_invariants`, so the dump's module invariants are empty on both sides.
+pub fn read_scope_on(book: &book::Book, rules: &Rules) -> Result<serde_json::Value> {
+    let result = read_scope::run(book, rules)?;
     canonical::canonical_test_result(book, &result, None)
 }
 
@@ -1534,6 +1817,7 @@ pub fn applicability_44ab_on(
         &inputs,
         &cash_share,
         bound.presumptive_history.as_ref(),
+        bound.deductor_activity,
     )?;
     canonical::canonical_test_result(book, &result, None)
 }
@@ -1563,9 +1847,14 @@ pub fn twentysixas_receipts_on(
 ) -> Result<serde_json::Value> {
     let (bound, _report) = engagement.bind(book)?;
     let cfg = tds_26as_config(&bound, twentysixas_receipts::TEST_ID)?;
-    let result =
-        twentysixas_receipts::run(book, rules, &documents.form26as, &cfg.deductor_aliases)?;
-    let module_check = twentysixas_receipts::check_invariants(book, &documents.form26as, &result)?;
+    let result = twentysixas_receipts::run(
+        book,
+        rules,
+        documents.form26as_rows(),
+        &cfg.deductor_aliases,
+    )?;
+    let module_check =
+        twentysixas_receipts::check_invariants(book, documents.form26as_rows(), &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
@@ -1583,12 +1872,12 @@ pub fn tds_tcs_26as_on(
         book,
         rules,
         &bound.period,
-        &documents.form26as,
-        &documents.ais,
-        &documents.tis,
+        documents.form26as_rows(),
+        documents.ais_rows(),
+        documents.tis_rows(),
         cfg,
     )?;
-    let module_check = tds_tcs_26as::check_invariants(book, &documents.form26as, &result)?;
+    let module_check = tds_tcs_26as::check_invariants(book, documents.form26as_rows(), &result)?;
     canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
@@ -1615,6 +1904,35 @@ pub fn tds_payees_on(
     canonical::canonical_test_result(book, &result, None)
 }
 
+/// Run `narration_payees` on a book and return its canonical parity dump, with the module's own
+/// NP-1 to NP-7 check. The bank ledgers are those under the bound `bank_groups`; the listed ledgers
+/// are the bound `[roles].narration_payee_ledgers`. The TDS payee test runs first, as
+/// [`tds_payees_on`] runs it (so `[client].entity_type` and a `[tds]` table are required), and the
+/// 194C ledgers whose payees it could not name are read too.
+pub fn narration_payees_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.clone().ok_or_else(|| {
+        AuditError::Config("narration_payees needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let tds = bound
+        .tds
+        .as_ref()
+        .ok_or_else(|| AuditError::Config("narration_payees needs a [tds] table".to_string()))?;
+    let inputs = tds_payees_inputs(&bound)?;
+    let tds_result = tds_payees::run(book, rules, &entity_type, tds, &inputs)?;
+    let added = narration_payees::unnamed_194c_ledgers(book, &tds_result, &tds.nature_by_ledger)?;
+    let bank = book.ledgers_under_any(&bound.bank_groups);
+    let listed: BTreeSet<String> = bound.narration_payee_ledgers.iter().cloned().collect();
+    let result = narration_payees::run(book, rules, &bank, &listed, &added)?;
+    let read: BTreeSet<String> = listed.union(&added).cloned().collect();
+    let module_check = narration_payees::check_invariants(book, &result, &bank, &read)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
 /// The ledgers a bound engagement's `[statutory_dues].nature_by_ledger` classifies as
 /// `tds_payable`, as the reference's `tds_payable_ledgers` reads them for `tds_payees` and
 /// `partners_40b_194t` and `loans_interest`. Refuses a `[statutory_dues]` that is not a table.
@@ -1633,6 +1951,22 @@ pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>
         .collect())
 }
 
+/// Every `[roles].tax_ledgers` ledger, whatever its GST head; `None` when the table is absent.
+fn all_tax_ledgers(bound: &Engagement) -> Result<Option<BTreeSet<String>>> {
+    match &bound.book_keeping_quality.tax_ledgers {
+        None => Ok(None),
+        Some(TaxLedgers::NotATable) => Err(AuditError::Config(
+            "[roles].tax_ledgers is not a table".to_string(),
+        )),
+        Some(TaxLedgers::Heads(heads)) => Ok(Some(
+            heads
+                .iter()
+                .flat_map(|(_, ledgers)| ledgers.iter().cloned())
+                .collect(),
+        )),
+    }
+}
+
 /// What the reference's `pack._tds_payees` passes `tds_payees.run()` from tables other than
 /// `[tds]`/`[tds_payees]`, from a bound engagement: the ledgers `[statutory_dues]` classifies as
 /// `tds_payable`, every `[roles].tax_ledgers` ledger (none when the table is absent, the module's
@@ -1640,18 +1974,7 @@ pub(crate) fn tds_payable_ledgers(bound: &Engagement) -> Result<BTreeSet<String>
 /// keys, `[client].state` and `[deductor].activity`.
 pub(crate) fn tds_payees_inputs(bound: &Engagement) -> Result<tds_payees::Inputs> {
     let tds_ledgers = tds_payable_ledgers(bound)?;
-    let gst_ledgers = match &bound.book_keeping_quality.tax_ledgers {
-        None => BTreeSet::new(),
-        Some(TaxLedgers::NotATable) => {
-            return Err(AuditError::Config(
-                "[roles].tax_ledgers is not a table".to_string(),
-            ))
-        }
-        Some(TaxLedgers::Heads(heads)) => heads
-            .iter()
-            .flat_map(|(_, ledgers)| ledgers.iter().cloned())
-            .collect(),
-    };
+    let gst_ledgers = all_tax_ledgers(bound)?.unwrap_or_default();
     Ok(tds_payees::Inputs {
         tds_ledgers,
         gst_ledgers,
@@ -1681,6 +2004,90 @@ pub fn partners_40b_194t_on(
         &tds_payable_ledgers(&bound)?,
     )?;
     canonical::canonical_test_result(book, &result, None)
+}
+
+/// `clause44`'s inputs from a bound engagement. Of the keys this test takes, `[roles].tax_ledgers`
+/// (every head's ledgers), `[roles].round_off_ledgers`, `[depreciation]` and
+/// `[roles].no_supplier_expense_ledgers` are required, refused in the order the reference's pack
+/// reads them; the two ledger maps are optional. Keys the pack reads for other tests are not
+/// required here, as for every other test in this crate.
+fn clause44_inputs(bound: &Engagement) -> Result<clause44::Inputs> {
+    let missing =
+        |key: &str| AuditError::Config(format!("client config missing required key '{key}'"));
+    let tax_ledgers = all_tax_ledgers(bound)?.ok_or_else(|| missing("roles.tax_ledgers"))?;
+    let round_off_present = bound
+        .raw_cfg
+        .get("roles")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|roles| roles.contains_key("round_off_ledgers"));
+    if !round_off_present {
+        return Err(missing("roles.round_off_ledgers"));
+    }
+    let dep = bound
+        .depreciation
+        .as_ref()
+        .ok_or_else(|| missing("depreciation"))?;
+    let no_supplier = bound
+        .clause44
+        .no_supplier_expense_ledgers
+        .as_ref()
+        .ok_or_else(|| missing("roles.no_supplier_expense_ledgers"))?;
+    Ok(clause44::Inputs {
+        dep_expense_ledgers: dep.dep_expense_ledgers.clone(),
+        tax_ledgers,
+        no_supplier_expense_ledgers: no_supplier.iter().cloned().collect(),
+        round_off_ledgers: bound.round_off_ledgers.iter().cloned().collect(),
+        ..clause44::Inputs::new(
+            &bound.clause44.registration_type_by_ledger,
+            &bound.clause44.money_category_by_ledger,
+        )?
+    })
+}
+
+/// Run `clause44` on an already-built book: its canonical parity dump, with its module check
+/// (CL44-1 to CL44-3).
+pub fn clause44_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let result = clause44::run(book, rules, &clause44_inputs(&bound)?)?;
+    let module_check = clause44::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `related_parties_cl23` on an already-built book: its canonical parity dump, with its
+/// module check (SUM-1, XCL-1).
+pub fn related_parties_cl23_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let result = related_parties_cl23::run(book, rules, &bound.related_parties)?;
+    let module_check = related_parties_cl23::check_invariants(book, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
+}
+
+/// Run `specified_persons_40a2b` on an already-built book: `related_parties_cl23` first, on the
+/// same bound table, then this test on its result, with its module check (SPD-1). Refuses without
+/// `[client].entity_type`.
+pub fn specified_persons_40a2b_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let entity_type = engagement.entity_type.as_deref().ok_or_else(|| {
+        AuditError::Config("specified_persons_40a2b needs [client].entity_type".to_string())
+    })?;
+    let (bound, _report) = engagement.bind(book)?;
+    let table = &bound.related_parties;
+    let related = related_parties_cl23::run(book, rules, table)?;
+    let result = specified_persons_40a2b::run(rules, entity_type, table, &related)?;
+    let module_check =
+        specified_persons_40a2b::check_invariants(rules, entity_type, table, &related, &result)?;
+    canonical::canonical_test_result(book, &result, Some(module_check))
 }
 
 /// Read, verify, build the book, run `tds_payees` and return its canonical parity dump.
@@ -1814,6 +2221,173 @@ mod py_int_tests {
         assert_eq!(
             py_int_value(&Value::Float(f64::INFINITY)),
             Err(PyIntError::Invalid)
+        );
+    }
+}
+
+#[cfg(test)]
+mod clause44_inputs_tests {
+    use super::*;
+
+    fn bound(roles: &str, tables: &str) -> Engagement {
+        let text = format!(
+            "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+             start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+             bank_groups = []\n{roles}\n{tables}"
+        );
+        let e = Engagement::from_toml_for_read(&text).unwrap();
+        e.bind(&book::Book::default()).unwrap().0
+    }
+
+    fn missing(err: AuditError) -> String {
+        match err {
+            AuditError::Config(m) => m,
+            other => panic!("not a config refusal: {other}"),
+        }
+    }
+
+    /// Each required key is refused in the order the reference's pack reads it, and the two maps
+    /// are optional.
+    #[test]
+    fn clause44_refuses_each_missing_required_key_in_the_packs_order() {
+        let dep = "[depreciation]\nblock_by_ledger = {}\nopening_wdv_paise = {}\n\
+                   dep_expense_ledgers = []\n";
+        let cases = [
+            ("", "", "roles.tax_ledgers"),
+            ("tax_ledgers = {}", "", "roles.round_off_ledgers"),
+            (
+                "tax_ledgers = {}\nround_off_ledgers = []",
+                "",
+                "depreciation",
+            ),
+            (
+                "tax_ledgers = {}\nround_off_ledgers = []",
+                dep,
+                "roles.no_supplier_expense_ledgers",
+            ),
+        ];
+        for (roles, tables, key) in cases {
+            let err = clause44_inputs(&bound(roles, tables)).unwrap_err();
+            assert_eq!(
+                missing(err),
+                format!("client config missing required key '{key}'"),
+                "{roles:?}"
+            );
+        }
+        let all = bound(
+            "tax_ledgers = {}\nround_off_ledgers = []\nno_supplier_expense_ledgers = []",
+            dep,
+        );
+        assert!(clause44_inputs(&all).is_ok());
+        let not_a_table = bound(
+            "tax_ledgers = []\nround_off_ledgers = []\nno_supplier_expense_ledgers = []",
+            dep,
+        );
+        assert_eq!(
+            missing(clause44_inputs(&not_a_table).unwrap_err()),
+            "[roles].tax_ledgers is not a table"
+        );
+    }
+
+    /// Every required key reaches its own input, bound, and the tax ledgers are every head's.
+    #[test]
+    fn clause44_inputs_carry_each_configured_ledger_to_its_own_input() {
+        let names = [
+            "Igst", "Cgst", "Round", "Dep", "Salary", "Comp", "Bank Int", "Other",
+        ];
+        let book = book::Book {
+            ledgers: names
+                .iter()
+                .map(|n| {
+                    let ledger = book::Ledger {
+                        name: (*n).to_string(),
+                        parent: "Indirect Expenses".to_string(),
+                        chain: vec!["Indirect Expenses".to_string()],
+                        chain_complete: true,
+                        master_opening_paise: 0,
+                        pan: String::new(),
+                        gstin: String::new(),
+                        guid: String::new(),
+                        masterid: None,
+                    };
+                    ((*n).to_string(), ledger)
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let text = "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+                    start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+                    bank_groups = []\ntax_ledgers = { igst = [\"Igst\"], cgst = [\"Cgst\"] }\n\
+                    round_off_ledgers = [\"Round\"]\nno_supplier_expense_ledgers = [\"Salary\"]\n\
+                    gst_registration_type_by_ledger = { \"Comp\" = \"Composition\", \"Other\" = \"Regular\" }\n\
+                    \n[depreciation]\nblock_by_ledger = {}\nopening_wdv_paise = {}\n\
+                    dep_expense_ledgers = [\"Dep\"]\n\n[clause44]\n\
+                    money_category_by_ledger = { \"Bank Int\" = \"interest_bank_nbfc\" }\n";
+        let e = Engagement::from_toml_for_read(text).unwrap();
+        let inputs = clause44_inputs(&e.bind(&book).unwrap().0).unwrap();
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|n| (*n).to_string()).collect()
+        };
+        assert_eq!(inputs.tax_ledgers, set(&["Igst", "Cgst"]));
+        assert_eq!(inputs.round_off_ledgers, set(&["Round"]));
+        assert_eq!(inputs.no_supplier_expense_ledgers, set(&["Salary"]));
+        assert_eq!(inputs.dep_expense_ledgers, set(&["Dep"]));
+        assert_eq!(inputs.composition_ledgers, set(&["Comp"]));
+        assert_eq!(
+            inputs.money_category_by_ledger,
+            BTreeMap::from([(
+                "Bank Int".to_string(),
+                clause44::MoneyCategory::InterestBankNbfc
+            )])
+        );
+    }
+
+    /// A mistyped value in either client table reaches the test's inputs as the typed refusal,
+    /// naming the table and the ledger as bound.
+    #[test]
+    fn clause44_inputs_refuse_a_mistyped_registration_type_or_money_category() {
+        let ledger = |name: &str| {
+            let ledger = book::Ledger {
+                name: name.to_string(),
+                parent: "Indirect Expenses".to_string(),
+                chain: vec!["Indirect Expenses".to_string()],
+                chain_complete: true,
+                master_opening_paise: 0,
+                pan: String::new(),
+                gstin: String::new(),
+                guid: String::new(),
+                masterid: None,
+            };
+            (name.to_string(), ledger)
+        };
+        let book = book::Book {
+            ledgers: [ledger("Comp"), ledger("Bank Int")].into_iter().collect(),
+            ..Default::default()
+        };
+        let refused = |registration: &str, money: &str| {
+            let text = format!(
+                "[client]\nlabel = \"T\"\nassessment_year = \"2026-27\"\n\n[period]\n\
+                 start = \"2025-04-01\"\nend = \"2026-03-31\"\n\n[roles]\ncash_groups = []\n\
+                 bank_groups = []\ntax_ledgers = {{}}\nround_off_ledgers = []\n\
+                 no_supplier_expense_ledgers = []\n\
+                 gst_registration_type_by_ledger = {{ \"Comp\" = \"{registration}\" }}\n\
+                 \n[depreciation]\nblock_by_ledger = {{}}\nopening_wdv_paise = {{}}\n\
+                 dep_expense_ledgers = []\n\n[clause44]\n\
+                 money_category_by_ledger = {{ \"Bank Int\" = \"{money}\" }}\n"
+            );
+            let e = Engagement::from_toml_for_read(&text).unwrap();
+            match clause44_inputs(&e.bind(&book).unwrap().0).unwrap_err() {
+                AuditError::ConfigValueRefused { table, name } => (table, name),
+                other => panic!("not a refused config value: {other}"),
+            }
+        };
+        assert_eq!(
+            refused("Composit", "bank_charges"),
+            ("roles.gst_registration_type_by_ledger", "Comp".to_string())
+        );
+        assert_eq!(
+            refused("Composition", "Bank_Charges"),
+            ("clause44.money_category_by_ledger", "Bank Int".to_string())
         );
     }
 }

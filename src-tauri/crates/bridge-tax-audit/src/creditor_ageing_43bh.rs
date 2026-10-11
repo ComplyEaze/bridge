@@ -16,12 +16,18 @@
 //! client configuration and never inferred: an unclassified creditor is reported as needing the
 //! certificate and is kept out of every disallowance-candidate total. `check_invariants` is AGE-1,
 //! which re-derives what is owed from the Trial Balance alone.
+//!
+//! A creditor's vouchers are kept by [`VoucherKey`], never by GUID (#1243): its figures and
+//! findings cite each voucher with a line that has an amount on the ledger, by its GUID and label, so
+//! two vouchers sharing a GUID are each cited unless their refs are identical too. A population in
+//! which a GUID holding a NUL makes two keys equal is refused
+//! (`AuditError::VoucherKeysNotUnique`, where the reference raises), with or without a creditor.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
@@ -235,7 +241,7 @@ pub fn apply_post_year_payments(lots: &[Lot], post_year_lines: &[(i64, i64)]) ->
 /// One creditor's population lines and the vouchers carrying them.
 struct Rows<'a> {
     walk: Walk,
-    vouchers: BTreeMap<&'a str, &'a Voucher>,
+    vouchers: BTreeMap<VoucherKey, &'a Voucher>,
     has_tb_row: bool,
     bills_in_year_paise: i64,
 }
@@ -249,11 +255,11 @@ fn compute_ageing<'a>(
     let overflow = || support::overflow(TEST_ID);
     let mut lines: BTreeMap<&str, Vec<(i64, i64)>> =
         creditors.iter().map(|n| (n.as_str(), Vec::new())).collect();
-    let mut vouchers: BTreeMap<&str, BTreeMap<&'a str, &'a Voucher>> = creditors
+    let mut vouchers: BTreeMap<&str, BTreeMap<VoucherKey, &'a Voucher>> = creditors
         .iter()
         .map(|n| (n.as_str(), BTreeMap::new()))
         .collect();
-    for v in pop {
+    for (vk, v) in voucher_keys(pop)? {
         let day = civil_day_number(&v.date);
         for l in &v.lines {
             if l.amount_paise == 0 {
@@ -262,7 +268,7 @@ fn compute_ageing<'a>(
             if let Some(ls) = lines.get_mut(l.ledger.as_str()) {
                 ls.push((day, l.amount_paise));
                 if let Some(vs) = vouchers.get_mut(l.ledger.as_str()) {
-                    vs.insert(v.guid.as_str(), *v);
+                    vs.insert(vk.clone(), v);
                 }
             }
         }
@@ -365,11 +371,7 @@ records.",
         let h = stable_ledger_tag(book, name)?;
         let classification = classify(name, &params.supplier_classification)?;
         let mut creditor_ev = vec![EvidenceRef::new("ledger", name)];
-        creditor_ev.extend(
-            d.vouchers
-                .iter()
-                .map(|(g, v)| EvidenceRef::with_label("voucher", g, &support::voucher_label(v))),
-        );
+        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));
         let creditor_recon = d
             .walk
             .lots
@@ -383,7 +385,7 @@ records.",
             Unit::Paise,
             &format!("Sum of open FIFO lots for one creditor ledger (tag {h}) at {as_of_iso}."),
             creditor_ev.clone(),
-        );
+        )?;
         let f_adv = r.fig(
             &format!("creditor_advance_{h}"),
             Value::Int(d.walk.advance),
@@ -393,7 +395,7 @@ records.",
 {h}) at {as_of_iso}."
             ),
             creditor_ev.clone(),
-        );
+        )?;
 
         if applicable(classification) {
             clause22_ii_total = add(clause22_ii_total, d.bills_in_year_paise)?;
@@ -455,7 +457,7 @@ records.",
 lot is reported as the clause 26(i)(A)(b) candidate instead). {lag_note}"
                     ),
                     creditor_ev.clone(),
-                );
+                )?;
                 let f_o15 = r.fig(
                     &format!("creditor_over15_{h}"),
                     Value::Int(creditor_over_15_clause22),
@@ -466,7 +468,7 @@ lot is reported as the clause 26(i)(A)(b) candidate instead). {lag_note}"
 balance's own lot (GN 42.25). {lag_note}"
                     ),
                     creditor_ev.clone(),
-                );
+                )?;
                 clause22_iii_b_45day_total =
                     add(clause22_iii_b_45day_total, creditor_over_45_clause22)?;
                 clause22_iii_b_15day_total =
@@ -533,7 +535,7 @@ bill, to replace the assumed acceptance lag."
 days as of {as_of_iso}. {lag_note}"
                 ),
                 creditor_ev.clone(),
-            );
+            )?;
             let f_o15 = r.fig(
                 &format!("creditor_over15_{h}"),
                 Value::Int(creditor_over_15),
@@ -543,7 +545,7 @@ days as of {as_of_iso}. {lag_note}"
 days as of {as_of_iso} (no-written-agreement view). {lag_note}"
                 ),
                 creditor_ev.clone(),
-            );
+            )?;
             unknown_classification_creditor_count += 1;
             unknown_classification_total = add(unknown_classification_total, creditor_over_15)?;
             r.findings.push(Finding {
@@ -617,7 +619,7 @@ exists."
                 "Sum of FIFO lots aged in this bucket as of {as_of_iso}. {lag_note} {pop_note}"
             ),
             Vec::new(),
-        );
+        )?;
     }
     r.fig(
         "reconstructed_total",
@@ -625,14 +627,14 @@ exists."
         Unit::Paise,
         &format!("Sum of every creditor's open FIFO lots. {pop_note}"),
         Vec::new(),
-    );
+    )?;
     r.fig(
         "advances_total",
         Value::Int(advances_total),
         Unit::Paise,
         &format!("Sum of every creditor's residual advance. {pop_note}"),
         Vec::new(),
-    );
+    )?;
     r.fig(
         "over_45_total",
         Value::Int(over_45_total),
@@ -644,7 +646,7 @@ raw ageing fact, not a s.43B(h) applicability conclusion (the clause 22(iii)(b) 
 the classification-scoped candidate). {lag_note}"
         ),
         Vec::new(),
-    );
+    )?;
     r.fig(
         "over_15_total",
         Value::Int(over_15_total),
@@ -655,7 +657,7 @@ without a written agreement), same scope as the {over_45_days}-day books-fact su
 never instead of it. {lag_note}"
         ),
         Vec::new(),
-    );
+    )?;
     r.fig(
         "over_45_creditor_count",
         support::count(TEST_ID, over_45_creditor_count)?,
@@ -663,7 +665,7 @@ never instead of it. {lag_note}"
         "Creditor ledgers with at least one FIFO lot older than the MSME limit (books fact, \
 unconditional on classification).",
         Vec::new(),
-    );
+    )?;
     if !no_tb_row.is_empty() {
         r.fig(
             "creditors_without_tb_row_count",
@@ -674,7 +676,7 @@ unconditional on classification).",
                 .iter()
                 .map(|n| EvidenceRef::new("ledger", n))
                 .collect(),
-        );
+        )?;
     }
 
     r.fig(
@@ -689,7 +691,7 @@ are excluded (each is reported in its own finding asking for the supplier's cate
 a floor, not the \
 true total, until every supplier is classified.",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "clause22_iii_b_45day_total",
         Value::Int(clause22_iii_b_45day_total),
@@ -703,7 +705,7 @@ instead). Shown beside the \
 15-day figure, never in its place: with no written agreement on file the default amount for this \
 clause is the 15-day figure (GN 42.14(b)).",
         Vec::new(),
-    );
+    )?;
     r.fig(
         "clause22_iii_b_15day_total",
         Value::Int(clause22_iii_b_15day_total),
@@ -714,7 +716,7 @@ population as the clause 22(iii)(b) 45-day view (including the same opening-lot 
 beside it \
 because whether a written agreement exists is not in these books.",
         Vec::new(),
-    );
+    )?;
     if opening_dues_26a_candidate_creditor_count > 0 {
         let f_amt = r.fig(
             "opening_dues_26a_candidate_total",
@@ -726,7 +728,7 @@ period earlier than this PY, not to this year's own claimed dues. Reported here 
 for clause 26(i)(A)(b) instead (GN 46.5: only a sum NOT allowable in an earlier year belongs in \
 26(i)(A); that needs last year's own return/3CD, which this module does not have).",
             Vec::new(),
-        );
+        )?;
         let f_count = r.fig(
             "opening_dues_26a_candidate_creditor_count",
             support::count(TEST_ID, opening_dues_26a_candidate_creditor_count)?,
@@ -734,7 +736,7 @@ for clause 26(i)(A)(b) instead (GN 46.5: only a sum NOT allowable in an earlier 
             "Micro/small creditor ledgers with a still-unpaid remainder of their OPENING (pre-year) \
 balance.",
             Vec::new(),
-        );
+        )?;
         // `dict.fromkeys`: first occurrence of each whole ref, in order.
         let mut evidence: Vec<EvidenceRef> = Vec::new();
         for e in opening_dues_26a_evidence {
@@ -782,7 +784,7 @@ if so, in what amount."
 no MSME classification in the client's setup -- pending Udyam evidence, excluded from every clause \
 22(ii)/22(iii)(b) s.43B(h) total until classified.",
             Vec::new(),
-        );
+        )?;
         let f_unknown = r.fig(
             "unknown_classification_creditor_count",
             support::count(TEST_ID, unknown_classification_creditor_count)?,
@@ -790,7 +792,7 @@ no MSME classification in the client's setup -- pending Udyam evidence, excluded
             "Creditor ledgers with an aged open lot and no MSME classification in the client's \
 setup.",
             Vec::new(),
-        );
+        )?;
         r.findings.push(Finding {
             id: format!("{TEST_ID}/clause22_undetermined"),
             clauses: vec!["s.43B(h)".to_string(), "3CD-22(iii)(b)".to_string()],
@@ -825,7 +827,7 @@ year (or never settled) -- a disallowance for the claim year under audit, confir
 payment data, not assumed. Not folded into the books-fact aged sums or the clause 22(iii)(b) totals \
 (those are the at-31-March view only); add this figure to them for the full-year picture.",
         Vec::new(),
-    );
+    )?;
     let f_pending = r.fig(
         "post_year_pending_confirmation_total",
         Value::Int(post_year_pending_confirmation_total),
@@ -834,7 +836,7 @@ payment data, not assumed. Not folded into the books-fact aged sums or the claus
 with no next-year payment data supplied at all -- whether the window was eventually met cannot be \
 determined from these books; a document is needed, never assumed met or missed.",
         Vec::new(),
-    );
+    )?;
     if post_year_pending_confirmation_total != 0 {
         r.findings.push(Finding {
             id: format!("{TEST_ID}/post_year_pending"),
@@ -878,7 +880,7 @@ auditee neither provided nor paid any such interest, per GN 42.21 -- not itself 
 none is due; see the mercantile-system observation in GN 42.22 (a CA judgement, not computed \
 here).",
         Vec::new(),
-    );
+    )?;
     Ok(r)
 }
 

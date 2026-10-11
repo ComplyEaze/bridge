@@ -236,7 +236,7 @@ impl CashBankState {
                 reserved_group,
                 gap,
             } => format!(
-                "The ledger's group ancestry reaches the reserved {reserved_group} identity, which holds money — but {gap}. Bridge admits it on neither side of a voucher."
+                "The ledger's group ancestry reaches the reserved {reserved_group} identity, which holds money — but {gap}. ComplyEaze Bridge admits it on neither side of a voucher."
             ),
             Self::OtherReservedGroup { reserved_group } => format!(
                 "The ledger's group ancestry reaches the reserved {reserved_group} identity, which holds no cash or bank balance."

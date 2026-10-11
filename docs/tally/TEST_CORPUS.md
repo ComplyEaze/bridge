@@ -452,7 +452,7 @@ names**.
 | `Alpha Pilot Account 5550001001` | `identifier` | **the rule this module exists for**: a name sharing no word with the master bound on its embedded number |
 | `Zeta Holdings 5550001009` | `near_miss`, 2 candidates, `shared_identifier` | one identifier on two masters refuses and shows both |
 | `MB TRADING COMPANY LTD` | `near_miss`, 2 candidates | a truncation surfaces both neighbours and chooses neither |
-| `MB EXPENSES FY2025` | `near_miss`, 2 candidates, `shared_token` | a shared period label did **not** become an identifier |
+| `MB EXPENSES FY2025` | `near_miss`, 2 candidates, `shared_token` (as run, before #1076) | a shared period label did **not** become an identifier |
 | `MB ITEM PH-01-AB-00` | `identifier` | a code matched across punctuation |
 | `Zeta Nowhere Traders` | `missing`, `listing: "none"` | an absence stated as an absence, not as an empty list |
 | `MB PARTY BETA` | `near_miss`, 4 candidates | a prefix family surfaced whole |
@@ -500,6 +500,9 @@ ledgers — `MB-PROBE-LEDGER-A` and `MB CAFÉ PROBE` — and they remain in this
 runs above, so `catalogue_evidence_sha256` for `BRIDGE CORPUS OPENING` no longer equals
 `0767077c…`. Anyone re-running this slice should expect a different digest and check the ledger
 list before treating it as the book changing underneath them.
+
+**2026-10-02:** `MB CAFÉ PROBE` is stored as mojibake (`Ã` + U+0089 where É was meant), so it is not
+an NFC master; see the dated note under the reference's §9.4d fixtures.
 
 **What it found within minutes.** The `DELTA`/`EPSILON` pair exposed a defect no fabricated
 fixture had produced: a *byte-exact* request for `MB PARTY DELTA (5550001009)` was being

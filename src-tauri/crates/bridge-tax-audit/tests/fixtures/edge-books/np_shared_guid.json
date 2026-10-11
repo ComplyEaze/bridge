@@ -1,0 +1,422 @@
+{
+ "comment": "Vouchers sharing a GUID; every amount is a multiple of 10000 paise. Wages is listed; Cartage, Job Work and Hamali are mapped 194C. dup-a: ALPHA TRADERS (A1) and BETA STORES (A2), each with a handle of its own: two rows, each citing dup-a. dup-b: GAMMA MILLS (B1) and a payment whose narration is not read (B2). dup-c: DELTA WORKS twice; C1 also debits Driver Advances 200000 and C2, a Contra, does too: one row of two payments, citing dup-c twice (two labels), and its payee_elsewhere figure counts C1 only. dup-d: EPSILON CARRIERS twice with one type, number and day: two payments, one citation. Two vouchers with no GUID pay ZETA: two payments, cited under an empty id. dup-e: a Job Work bill credited to a creditor (E1), a Cartage payment of 3500000 to ETA (E2) and a cancelled Hamali bill (E3). The TDS payee test's finding cites dup-e for E2; Cartage is added, and so is Job Work, debited on E1 under the same GUID (E1 is in not_through_bank_total); Hamali, on the cancelled voucher, is not. dup-f: THETA (F1) and a cancelled payment (F2). The book check POP-5 reports the five shared GUIDs and the blank one; the result check POP-4 reports the four citations of dup-e and the one of dup-f, GUIDs a cancelled voucher also carries. The module check reads the last regular voucher of a GUID and fires NP-2 for dup-a (ALPHA TRADERS' citation resolves to BETA STORES' payment) and for dup-b (to the unread one, tag none), NP-3 for dup-a, NP-4 (BETA STORES in two rows), NP-5 (the handle BETA.S in two rows) and NP-7 (the Contra C2 counts for nothing, against 200000).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_shared_guid-200"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_shared_guid-201"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_shared_guid-202"
+  },
+  {
+   "name": "Cartage",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_shared_guid-203"
+  },
+  {
+   "name": "Job Work",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_shared_guid-204"
+  },
+  {
+   "name": "Hamali",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_shared_guid-205"
+  },
+  {
+   "name": "Driver Advances",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-np_shared_guid-206"
+  },
+  {
+   "name": "Neem Supplies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-np_shared_guid-207"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5570000,
+   "closing": -5570000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 1670000,
+   "credit": 0,
+   "closing": 1670000
+  },
+  {
+   "ledger": "Cartage",
+   "opening": 0,
+   "debit": 3500000,
+   "credit": 0,
+   "closing": 3500000
+  },
+  {
+   "ledger": "Job Work",
+   "opening": 0,
+   "debit": 250000,
+   "credit": 0,
+   "closing": 250000
+  },
+  {
+   "ledger": "Hamali",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Driver Advances",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Neem Supplies",
+   "opening": 0,
+   "debit": 0,
+   "credit": 250000,
+   "closing": -250000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dup-a",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "number": "A1",
+   "narration": "UPI-ALPHA TRADERS-ALPHA.T@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     50000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-a",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "number": "A2",
+   "narration": "UPI-BETA STORES-BETA.S@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     70000
+    ],
+    [
+     "Bank A",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-b",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "number": "B1",
+   "narration": "UPI-GAMMA MILLS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     90000
+    ],
+    [
+     "Bank A",
+     -90000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-b",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "number": "B2",
+   "narration": "WAGES BY TRANSFER",
+   "lines": [
+    [
+     "Wages",
+     110000
+    ],
+    [
+     "Bank A",
+     -110000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-c",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "number": "C1",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     130000
+    ],
+    [
+     "Driver Advances",
+     200000
+    ],
+    [
+     "Bank A",
+     -330000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-c",
+   "date": "2025-05-07",
+   "base_type": "Contra",
+   "number": "C2",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     150000
+    ],
+    [
+     "Driver Advances",
+     200000
+    ],
+    [
+     "Bank A",
+     -350000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-d",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "number": "D",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     170000
+    ],
+    [
+     "Bank A",
+     -170000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-d",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "number": "D",
+   "narration": "UPI-EPSILON CARRIERS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     190000
+    ],
+    [
+     "Bank A",
+     -190000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     210000
+    ],
+    [
+     "Bank A",
+     -210000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     230000
+    ],
+    [
+     "Bank A",
+     -230000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-e",
+   "date": "2025-05-11",
+   "base_type": "Journal",
+   "number": "E1",
+   "narration": "Job work bill",
+   "lines": [
+    [
+     "Job Work",
+     250000
+    ],
+    [
+     "Neem Supplies",
+     -250000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-e",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "number": "E2",
+   "narration": "UPI-ETA-CARTAGE",
+   "lines": [
+    [
+     "Cartage",
+     3500000
+    ],
+    [
+     "Bank A",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-e",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "number": "E3",
+   "status": "cancelled",
+   "narration": "Hamali bill",
+   "lines": [
+    [
+     "Hamali",
+     310000
+    ],
+    [
+     "Neem Supplies",
+     -310000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-f",
+   "date": "2025-05-13",
+   "base_type": "Payment",
+   "number": "F1",
+   "narration": "UPI-THETA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     270000
+    ],
+    [
+     "Bank A",
+     -270000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-f",
+   "date": "2025-05-14",
+   "base_type": "Payment",
+   "number": "F2",
+   "status": "cancelled",
+   "narration": "UPI-IOTA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     290000
+    ],
+    [
+     "Bank A",
+     -290000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "nature_by_ledger": {
+  "Cartage": "194C",
+  "Job Work": "194C",
+  "Hamali": "194C"
+ },
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

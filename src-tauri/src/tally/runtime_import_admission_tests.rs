@@ -713,6 +713,47 @@ async fn the_wire_lock_is_held_across_the_record_and_released_after_the_post() {
     assert_eq!(simulator.finish().unwrap().len(), 33);
 }
 
+/// #778: the reads before the intent stop for a withdrawn call, but the POST
+/// does not. A withdrawal that lands as the intent is recorded, here from the
+/// recording callback itself, still sends the POST, so an intent is never left
+/// without its send.
+#[tokio::test]
+async fn a_withdrawal_as_the_intent_is_recorded_still_sends_the_post() {
+    let companies = captured_companies();
+    let plans = queued_plans(
+        companies.clone(),
+        companies.clone(),
+        captured_catalogue(),
+        companies.clone(),
+        Some(companies.clone()),
+    );
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let runtime = TallyRuntime::default();
+    let withdrawal = CancellationToken::new();
+    let withdraw = withdrawal.clone();
+    TOOL_CANCELLATION
+        .scope(
+            withdrawal,
+            runtime.post_approved_import(
+                TallyConfig {
+                    host: "127.0.0.1".into(),
+                    port: simulator.address().port(),
+                },
+                &identity(&companies),
+                approved_import(&companies, "20260901"),
+                |_: QueuedAdmission<'_>| Ok(()),
+                move || {
+                    withdraw.cancel();
+                    Ok(())
+                },
+            ),
+        )
+        .await
+        .expect("a post whose intent was recorded is sent");
+    // Every queue read, then the POST.
+    assert_eq!(simulator.finish().unwrap().len(), 33);
+}
+
 /// A pre-intent read refused by the wire gate stays the refusal, with its retry
 /// time and "nothing sent"; any other failed read is the typed unconfirmed
 /// refusal (#697).
@@ -729,6 +770,16 @@ fn a_wire_refused_pre_intent_read_stays_the_wire_refusal() {
         Some(WireRefusal::Busy)
     );
     assert!(!kept.chain().any(|cause| cause.is::<Unconfirmed>()));
+    // A send the call withdrew before it started stays that withdrawal (#778).
+    let withdrawn = unconfirmed_unless_wire_refused(
+        anyhow::Error::new(TallyTransportError::SendWithdrawn),
+        Unconfirmed::CompanyScopeUnconfirmed,
+    );
+    assert_eq!(
+        withdrawn.downcast_ref::<TallyTransportError>(),
+        Some(&TallyTransportError::SendWithdrawn)
+    );
+    assert!(!withdrawn.chain().any(|cause| cause.is::<Unconfirmed>()));
     let failed = anyhow::Error::new(TallyTransportError::ConnectionFailed);
     let typed = unconfirmed_unless_wire_refused(failed, Unconfirmed::MastersUnconfirmed);
     assert!(typed.chain().any(|cause| cause.is::<Unconfirmed>()));

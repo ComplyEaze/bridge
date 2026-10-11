@@ -208,6 +208,15 @@ pub(crate) enum PartyLedgerMasterSourceValidationError {
         #[source]
         source: OutstandingsError,
     },
+    /// Tally's answer to the company ledger-count request (#938) ran past the
+    /// transport's response cap (#1033), far more than one company's count can
+    /// account for. The transport drops the connection with the rest of the
+    /// response unread. Nothing was sized from it, and nothing after it was sent.
+    #[error("Tally's answer to the company ledger-count request ran past ComplyEaze Bridge's response limit")]
+    LedgerCountCompanyResponseTooLarge {
+        #[source]
+        source: anyhow::Error,
+    },
     /// A slice of the ledger census (#679) failed validation: another company,
     /// a damaged response, a foreign field, or a ledger seen twice within the
     /// slice. Nothing was sized from it.
@@ -279,14 +288,22 @@ impl PartyLedgerMasterSourceValidationError {
             Self::LedgerSpan { source } => source.safe_code(),
             Self::LedgerCountCompanyDiffers { .. } => "ledger_count_company_differs",
             Self::LedgerCountCompanyInvalid { .. } => "ledger_count_company_invalid",
+            Self::LedgerCountCompanyResponseTooLarge { .. } => {
+                "ledger_count_company_response_too_large"
+            }
             Self::LedgerSpanSliceInvalid { source } => match source {
                 StandardLedgerCatalogError::DuplicateIdentity => "ledger_span_duplicate_identity",
                 StandardLedgerCatalogError::CompanyIdentityMismatch => {
                     "ledger_span_identity_mismatch"
                 }
                 StandardLedgerCatalogError::BoundsViolation => "ledger_span_slice_over_bound",
+                // The census slice has no bill-wise flag to be missing, so the
+                // flag errors cannot arrive here; they read as malformed.
                 StandardLedgerCatalogError::MalformedResponse
-                | StandardLedgerCatalogError::LedgerNameUnusable => "ledger_span_slice_malformed",
+                | StandardLedgerCatalogError::LedgerNameUnusable
+                | StandardLedgerCatalogError::BillWiseFlagMissing
+                | StandardLedgerCatalogError::BillWiseFlagInvalid
+                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
             },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",
@@ -622,6 +639,26 @@ fn admit_counted_catalogue(ledgers: u64) -> Result<(), PartyLedgerMasterSourceVa
 /// its width in ledgers, far under the cap. Any other failure is left as it
 /// came.
 fn ledger_span_response_error(error: anyhow::Error) -> anyhow::Error {
+    named_past_the_cap(error, |source| {
+        PartyLedgerMasterSourceValidationError::LedgerSpanSliceResponseTooLarge { source }
+    })
+}
+
+/// Names the company ledger-count read (#938) that ran past the response cap
+/// as such (#1033), so the refusal carries its own cause rather than none. Any
+/// other failure is left as it came.
+fn company_count_response_error(error: anyhow::Error) -> anyhow::Error {
+    named_past_the_cap(error, |source| {
+        PartyLedgerMasterSourceValidationError::LedgerCountCompanyResponseTooLarge { source }
+    })
+}
+
+/// `error` wrapped by `name` when the transport refused the response as past
+/// its cap; any other failure unchanged.
+fn named_past_the_cap(
+    error: anyhow::Error,
+    name: fn(anyhow::Error) -> PartyLedgerMasterSourceValidationError,
+) -> anyhow::Error {
     let over_the_cap = error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<TallyTransportError>(),
@@ -629,11 +666,7 @@ fn ledger_span_response_error(error: anyhow::Error) -> anyhow::Error {
         )
     });
     if over_the_cap {
-        anyhow::Error::new(
-            PartyLedgerMasterSourceValidationError::LedgerSpanSliceResponseTooLarge {
-                source: error,
-            },
-        )
+        anyhow::Error::new(name(error))
     } else {
         error
     }
@@ -668,6 +701,12 @@ pub(crate) enum PairedReadValidationError {
     CompanyCurrencyName,
     #[error("Tally's own statement changed between paired reads")]
     NativeStatement,
+    #[error("Tally's own Cash Flow changed between paired reads")]
+    NativeCashFlow,
+    #[error("Tally's Company collection changed between paired reads")]
+    CompanyFeatures,
+    #[error("Tally company book changed during the company features read")]
+    CompanyFeaturesExtent,
     #[error("Tally company book changed during currency detection")]
     CurrencyExtent,
     #[error("Tally company changed between the currency read and the master read")]
@@ -698,6 +737,9 @@ impl PairedReadValidationError {
             Self::CurrencyMaster => "currency_master_changed",
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
+            Self::NativeCashFlow => "native_cash_flow_changed",
+            Self::CompanyFeatures => "company_features_changed",
+            Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",
             Self::CurrencyToMasterExtent => "currency_to_master_extent_changed",
             Self::MastersCollection => "masters_collection_changed",
@@ -1019,6 +1061,22 @@ impl TallyClient {
         }
     }
 
+    /// A clone whose sends start only while `token` is not cancelled (#778):
+    /// a withdrawn call finishes the send in flight and starts no other. Each
+    /// send asks before it takes the wire lock and again once it holds it.
+    pub(crate) fn withdrawable(&self, token: tokio_util::sync::CancellationToken) -> Self {
+        struct NotWithdrawn(tokio_util::sync::CancellationToken);
+        impl bridge_tally_transport::SendAdmission for NotWithdrawn {
+            fn admits(&self) -> bool {
+                !self.0.is_cancelled()
+            }
+        }
+        Self {
+            http: self.http.with_send_admission(Arc::new(NotWithdrawn(token))),
+            ..self.clone()
+        }
+    }
+
     pub fn canonical_origin(&self) -> anyhow::Result<String> {
         canonical_loopback_origin(&self.config)
     }
@@ -1061,27 +1119,28 @@ impl TallyClient {
     }
 
     pub async fn check_connection(&self) -> anyhow::Result<ConnectionStatus> {
-        match self.check_connection_strict().await {
-            Ok(status) => Ok(status),
+        match self.check_connection_strict_with_wire_evidence().await {
+            Ok((status, _)) => Ok(status),
             Err(error) => Ok(ConnectionStatus {
                 reachable: false,
                 compatible: false,
                 server_text: String::new(),
                 product: TallyProduct::Unknown,
-                error: Some(safe_connection_failure_code(&error).to_string()),
+                error: Some(error.safe_code().to_string()),
             }),
         }
     }
 
     pub(crate) async fn check_connection_strict(&self) -> anyhow::Result<ConnectionStatus> {
-        self.check_connection_strict_with_wire_evidence()
-            .await
-            .map(|(status, _)| status)
+        let (status, _) = self.check_connection_strict_with_wire_evidence().await?;
+        Ok(status)
     }
 
+    /// The `/status` read. Its one failure is the transport's own, so a caller
+    /// reports it by the transport's safe code, never by matching its text.
     async fn check_connection_strict_with_wire_evidence(
         &self,
-    ) -> anyhow::Result<(ConnectionStatus, RuntimeReadEvidence)> {
+    ) -> Result<(ConnectionStatus, RuntimeReadEvidence), TallyTransportError> {
         let response = self.http.get_status_decoded().await?;
         let wire_evidence = RuntimeReadEvidence {
             // GET /status has an empty request body. This is a body commitment,
@@ -1136,7 +1195,7 @@ impl TallyClient {
                         compatible: false,
                         server_text: String::new(),
                         product: TallyProduct::Unknown,
-                        error: Some(safe_connection_failure_code(&error).to_string()),
+                        error: Some(error.safe_code().to_string()),
                     },
                     RuntimeReadEvidence::empty(),
                 ),
@@ -2044,7 +2103,11 @@ impl TallyClient {
         // ledgers is read and must not be higher than the census's: that is
         // meant to catch a company closed and reopened with equal marks, which
         // the extent cannot see (by reasoning: no live reproduction), and it
-        // also refuses a ledger added during the read (#938). Then the extent (company GUID and marks) is
+        // also refuses a ledger added during the read (#938), and, by reasoning
+        // only (#965), one altered during it before its slice was read: its new
+        // AlterID is past every slice, while Tally still counts it. A ledger
+        // altered after its slice was read was counted; the extent read below
+        // refuses that case instead. Then the extent (company GUID and marks) is
         // read again, and a change in either refuses the call.
         let cross_check = self
             .cross_check_census_count(identity, counted.get(), evidence, count_evidence)
@@ -2072,7 +2135,10 @@ impl TallyClient {
         count_evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<CountCrossCheck> {
         let request = render_company_ledger_count_request(identity.display_name());
-        let (body, bytes, sha256) = self.post_xml_with_encoded_bytes(request.clone()).await?;
+        let (body, bytes, sha256) = self
+            .post_xml_with_encoded_bytes(request.clone())
+            .await
+            .map_err(company_count_response_error)?;
         let read = RuntimeReadEvidence::single(&request, sha256, bytes);
         *evidence = evidence.clone().combine(read.clone());
         *count_evidence = count_evidence.clone().combine(read);
@@ -2949,26 +3015,6 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
-}
-
-fn safe_connection_failure_code(error: &anyhow::Error) -> &'static str {
-    if let Some(transport) = error.downcast_ref::<TallyTransportError>() {
-        return transport.safe_code();
-    }
-    let message = error.to_string().to_ascii_lowercase();
-    if message.contains("cancel") {
-        "request_cancelled"
-    } else if message.contains("queue deadline") {
-        "endpoint_queue_deadline_exceeded"
-    } else if message.contains("circuit") {
-        "endpoint_circuit_open"
-    } else if message.contains("response exceeded") {
-        "response_size_limit_exceeded"
-    } else if message.contains("decode") || message.contains("utf") {
-        "response_encoding_invalid"
-    } else {
-        "endpoint_unreachable"
-    }
 }
 
 pub(crate) fn canonical_loopback_origin(config: &TallyConfig) -> anyhow::Result<String> {

@@ -409,12 +409,12 @@ range (one rule for an empty or missing value across its renderers) are outside 
 | Fixture | Bytes | SHA-256 | Path |
 | --- | ---: | --- | --- |
 | `synthetic.cash_44ab.json` | 5,880 | `94d58bcf9a18413ef024eed4537c18e41aed5eeb7fb6ddc964d193ea6e1abe5a` | `golden/synthetic.cash_44ab.json` |
-| `synthetic.cash_payments_40a3.json` | 72,108 | `f9efbd693830005738b44cd1482ef7cd9e1cfd4b1805c6c01cb81f29dbb5cca2` | `golden/synthetic.cash_payments_40a3.json` |
+| `synthetic.cash_payments_40a3.json` | 74,066 | `accefe8587c297fbf3f0fa0af507f72bbecb7ec166e372c40eb2994e01c03244` | `golden/synthetic.cash_payments_40a3.json` |
 | `synthetic.depreciation.json` | 28,219 | `251b34d0491e392b640ffb3df997027704e747868cbd79b6bd6dd3d2ef4a245d` | `golden/synthetic.depreciation.json` |
 | `synthetic.financial_statements.json` | 16,955 | `90f3f13974b2699f8c19dc172d697cc9ed4c77adddf0d9d59f4305d8081fa5e4` | `golden/synthetic.financial_statements.json` |
 | `synthetic.financial_statements.noreport.json` | 15,888 | `2134a63248e05f06f7755fd7588dba8acaccebc471dfba383f4171806b637a69` | `golden/synthetic.financial_statements.noreport.json` |
 | `synthetic-report-totals.json` | 134 | `e772509bd6ebc52afc23ef9742b6b1f2a090737533abe3761a7448124411b7e3` | `synthetic-report-totals.json` |
-| `synthetic.applicability_44ab.json` | 10,768 | `fe59182afe17fc8b5ddb0d06cbc565bd851423b02af3bdbf3185b86dfc552b2e` | `golden/synthetic.applicability_44ab.json` |
+| `synthetic.applicability_44ab.json` | 11,960 | `2e67df43f09f8e2c1ba01ef8314773174882238743fd26f79014eb96bef06079` | `golden/synthetic.applicability_44ab.json` |
 | `synthetic.trial_balance.json` | 92,621 | `249306799598823277ac59bb68dcd83c4af9d693b68d648b0d2f79852e3fd69f` | `golden/synthetic.trial_balance.json` |
 | `synthetic.stale_balances_41_1.json` | 10,501 | `8962228b7ab6a9c8cf95f8dcd467bcba91acac09e5b37a622518843775d31e40` | `golden/synthetic.stale_balances_41_1.json` |
 | `synthetic.ledger_scrutiny.json` | 53,038 | `f3f1505aa17b7d4b4bae46b340c439a089a3cc2e91bedad55066a7bd9cd8a628` | `golden/synthetic.ledger_scrutiny.json` |
@@ -440,7 +440,7 @@ range (one rule for an empty or missing value across its renderers) are outside 
 | `edge.tb_rows.trial_balance.order.json` | 219 | `2ace3be45ee1cd6ae4757727e947e07fd2ca3600a83f480b279bdda181d5f43d` | `golden/edge.tb_rows.trial_balance.order.json` |
 | `text-probes.json` | 1,150,882 | `96ca23055262ee348a27ae2672664d9296c869d1ac95fb21f3a904b43631760c` | `text-probes.json` |
 | `synthetic-turnover-inputs.json` | 153 | `970500728d9d0447cb3fe1b6e870d5fea2c3a1bb919da05f1d601d4ba6f66929` | `synthetic-turnover-inputs.json` |
-| `synthetic-engagement.toml` | 6,636 | `e0fb9ae6fae3739419e600222bd6c605b3386063899264811905074a0a7a587a` | `synthetic-engagement.toml` |
+| `synthetic-engagement.toml` | 7,388 | `e03b530a29782feeb4dd915759611acdf16c1a6edfa36a9903b3f88dfc88f5fa` | `synthetic-engagement.toml` |
 | `manifest.json` | 11,395 | `de808c76c34dc23dae0d208b7162853170f8b00f682d3f516e3004ef7fee5cfa` | `synthetic-read/manifest.json` |
 | `company_object.xml` | 606 | `f1b6fe4e6b6cc406a4ae92ce0ef62a6c79a88a99ac83b1888989a98fbee967b4` | `synthetic-read/parts/company_object.xml` |
 | `groups.xml` | 8,102 | `12e4d994960ecd768cd33fb4565f19b140a765d3f9f4982dbcfe1a108d9e5214` | `synthetic-read/parts/groups.xml` |

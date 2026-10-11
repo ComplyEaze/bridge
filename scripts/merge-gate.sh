@@ -846,7 +846,7 @@ fi
 # A PR that touches a pinned path also needs one review or comment that names
 # the head, the acknowledgement path and every touched path, written by the
 # login the acknowledgement names as reviewer. The login proves nothing when
-# several lanes post under one account; the file list is what the reviewer must
+# several reviewers post under one account; the file list is what the reviewer must
 # have read. A review counts as naming the head when GitHub bound it to the
 # head commit or when its body names the head.
 if [ "$ack_required" -eq 1 ]; then

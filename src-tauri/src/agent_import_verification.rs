@@ -38,6 +38,7 @@ pub(super) fn parse_import_voucher_rows(
                 | "change_row_core_field_invalid"
                 | "voucher_date_invalid"
                 | "voucher_effective_date_invalid"
+                | "voucher_reference_date_invalid"
                 | "voucher_accounting_state_not_observed" => "import_verification_export_invalid",
                 "change_row_identity_invalid"
                 | "voucher_source_identity_invalid"
@@ -70,10 +71,8 @@ pub(super) fn verification_window_identities(
     to: &str,
 ) -> Result<BTreeSet<(String, u64)>, String> {
     if observed.rows.iter().any(|voucher| {
-        voucher
-            .date
-            .as_deref()
-            .is_none_or(|date| date < from || date > to)
+        let date = voucher.date.as_str();
+        date < from || date > to
     }) {
         return Err("window_not_honoured".to_string());
     }
@@ -140,18 +139,59 @@ impl VerificationCandidates {
     }
 }
 
+/// The fingerprint a batch voucher is matched by: its date, type and entries.
+/// `voucher` must carry canonical amounts, as `verify_batch`'s comparison copy
+/// does. One function, so the copy search for a cancelled voucher (#806) and
+/// the matching use the same key.
+pub(super) fn expected_fingerprint(voucher: &ImportVoucher) -> VerificationFingerprint {
+    (
+        Some(voucher.date.as_str().to_owned()),
+        Some(voucher.voucher_type.as_str().to_string()),
+        expected_entry_fingerprint(voucher),
+    )
+}
+
+/// At most this many effective copies of one cancelled voucher are listed;
+/// the count is exact (#806).
+const MAX_EFFECTIVE_COPIES_LISTED: usize = 5;
+
 pub(super) fn observed_fingerprint(voucher: &ReadVoucher) -> VerificationFingerprint {
     (
-        voucher.date.clone(),
+        Some(voucher.date.as_str().to_owned()),
         voucher.voucher_type.clone(),
         actual_entry_fingerprint(voucher),
     )
 }
 
+/// How a batch's vouchers can be attributed to rows of the book.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Attribution<'a> {
+    /// By the `[BRIDGE:...]` narration tag: the hand-import file, a native
+    /// post made before the pre-POST mark was recorded, and the check made
+    /// before a native POST.
+    Tag,
+    /// A native post that sent no tag, attributed only by the vouchers its own
+    /// POST was bound to by its AlterID span (`agent_import_span_identity.rs`),
+    /// if it was bound. A row carrying the batch's tag cannot be one of the
+    /// vouchers this POST created, so the tag attributes nothing: such a row
+    /// (a hand import of the batch's file) is matched by content only.
+    Span(Option<&'a [super::span_identity::PostedVoucherIdentity]>),
+}
+
+/// Verifies a batch against a window read. Bound vouchers rank first, so a
+/// bound voucher is found by its GUID, not by a narration tag or its content.
+/// A bound voucher the window does not hold is `bound_not_in_window`, never
+/// `not_found`: it was posted, so its absence here is not evidence that it is
+/// absent.
 pub(super) fn verify_batch(
     line: &ImportLedgerLine,
     observed: &ImportReadSource,
+    attribution: Attribution<'_>,
 ) -> Result<Value, String> {
+    let (bindings, tags_attribute) = match attribution {
+        Attribution::Tag => (None, true),
+        Attribution::Span(bindings) => (bindings, false),
+    };
     // Normalize only the comparison copies. Persisted batches and generated XML
     // retain their original amount lexemes and remain backward compatible.
     let mut comparison_line = line.clone();
@@ -177,13 +217,7 @@ pub(super) fn verify_batch(
     let expected_fingerprints = line
         .vouchers
         .iter()
-        .map(|voucher| {
-            (
-                normalized_date(&voucher.date).ok(),
-                Some(voucher.voucher_type.as_str().to_string()),
-                expected_entry_fingerprint(voucher),
-            )
-        })
+        .map(expected_fingerprint)
         .collect::<Vec<VerificationFingerprint>>();
     let observed_fingerprints = observed
         .iter()
@@ -214,14 +248,40 @@ pub(super) fn verify_batch(
                 .flatten()
         })
         .collect::<Vec<_>>();
+    // Each bound voucher's row, found by the GUID its POST created. A bound row
+    // takes part in no tag or fingerprint match: it is already attributed.
+    let bound_rows = line
+        .vouchers
+        .iter()
+        .map(|voucher| {
+            let identity = bindings?
+                .iter()
+                .find(|identity| identity.bridge_txn_id == voucher.bridge_txn_id)?;
+            Some((
+                identity,
+                observed
+                    .iter()
+                    .position(|row| row.guid.as_deref() == Some(identity.guid.as_str())),
+            ))
+        })
+        .collect::<Vec<_>>();
+    let bound_indexes = bound_rows
+        .iter()
+        .filter_map(|bound| bound.and_then(|(_, index)| index))
+        .collect::<BTreeSet<_>>();
     let mut tagged = BTreeMap::<&str, VerificationCandidates>::new();
     let mut fallback = BTreeMap::<&VerificationFingerprint, VerificationCandidates>::new();
     for (index, voucher) in observed.iter().enumerate() {
+        if bound_indexes.contains(&index) {
+            continue;
+        }
         let after_mark = line
             .pre_import_mark
             .value
             .is_some_and(|mark| voucher.alter_id.is_some_and(|id| id > mark));
-        if let Some(tag) = observed_tags[index].filter(|tag| expected_tags.contains(tag)) {
+        if let Some(tag) =
+            observed_tags[index].filter(|tag| tags_attribute && expected_tags.contains(tag))
+        {
             tagged.entry(tag).or_default().insert(index, after_mark);
         } else {
             fallback
@@ -232,6 +292,7 @@ pub(super) fn verify_batch(
     }
     let mut ambiguous_within_batch = Vec::new();
     let mut counts = BTreeMap::from([
+        ("bound_not_in_window", 0_u64),
         ("posted_verified", 0_u64),
         ("matching_content_observed", 0),
         ("posted_not_effective", 0),
@@ -239,13 +300,54 @@ pub(super) fn verify_batch(
         ("not_found", 0),
         ("not_attributable", 0),
         ("duplicate_fingerprint", 0),
+        ("cancelled_with_effective_copy", 0),
     ]);
-    for ((expected, expected_key), marker_identity) in line
+    for (((expected, expected_key), marker_identity), bound) in line
         .vouchers
         .iter()
         .zip(&expected_fingerprints)
         .zip(&expected_markers)
+        .zip(&bound_rows)
     {
+        if let Some((identity, index)) = bound {
+            let value = match index {
+                None => {
+                    counts
+                        .entry("bound_not_in_window")
+                        .and_modify(|count| *count += 1);
+                    json!({"bridge_txn_id":expected.bridge_txn_id,"status":"bound_not_in_window","marker":"post_span_binding","guid":identity.guid,"master_id":identity.master_id.to_string(),"next_step":plain_next_step("bound_not_in_window")})
+                }
+                Some(index) => {
+                    let matched = &observed[*index];
+                    if matched.master_id.as_deref() != Some(identity.master_id.to_string().as_str())
+                    {
+                        // Refuse-only: the GUID found the row, but its MasterID
+                        // is not the one bound. Nothing is attributed to it.
+                        counts
+                            .entry("not_attributable")
+                            .and_modify(|count| *count += 1);
+                        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"not_attributable","marker":"post_span_binding","reason":"bound_master_id_changed"})
+                    } else {
+                        let mut value = attributed_status(
+                            expected,
+                            matched,
+                            "post_span_binding",
+                            expected_key.2 == observed_fingerprints[*index].2,
+                            &mut counts,
+                        )?;
+                        if value["status"] == "posted_verified" {
+                            fully_verified_identities.insert(observed_identities[*index].clone());
+                        }
+                        if effective_date_not_observed(expected, matched) {
+                            value["not_observed"] = json!(["effective_date"]);
+                        }
+                        value
+                    }
+                }
+            };
+            rows.push(value);
+            continue;
+        }
         let fingerprint_ambiguous_within_batch = expected_fingerprint_counts[expected_key] > 1;
         let tagged_group = tagged.get(marker_identity.as_str());
         let fingerprint_fallback = tagged_group.is_none();
@@ -297,43 +399,23 @@ pub(super) fn verify_batch(
                 matched,
                 expected_key.2 == observed_fingerprints[matched_index].2,
             );
-            let mut matched_value = if fingerprint_fallback {
+            let mut matched_value = if !fingerprint_fallback {
+                let value = attributed_status(
+                    expected,
+                    matched,
+                    marker,
+                    expected_key.2 == observed_fingerprints[matched_index].2,
+                    &mut counts,
+                )?;
+                if value["status"] == "posted_verified" {
+                    fully_verified_identities.insert(observed_identities[matched_index].clone());
+                }
+                value
+            } else {
                 counts
                     .entry("matching_content_observed")
                     .and_modify(|count| *count += 1);
                 json!({"bridge_txn_id":expected.bridge_txn_id,"status":"matching_content_observed","marker":marker,"attribution":"not_established","accounting_effective":voucher_is_accounting_effective(matched)?,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else if matched.cancelled == Some(true) {
-                // Tally drops a cancelled voucher's entries from this read
-                // (measured for Journals only: protocol reference §9.14, PARTIAL,
-                // for a gateway cancel; a screen cancel is captured in
-                // fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md), so its entries
-                // need not match: it is cancelled, not changed.
-                // Only the header is compared, so a re-date before the cancel
-                // still shows, if it stays inside the read window: a voucher
-                // re-dated out of it is not read, so is not found unless another
-                // voucher in the window has its content. The fingerprint branch
-                // above cannot see a cancelled row whose entries were dropped:
-                // with no entries, no build's fingerprint matches.
-                counts
-                    .entry("posted_not_effective")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
-                fully_verified_identities.insert(observed_identities[matched_index].clone());
-                counts
-                    .entry("posted_verified")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else if diffs.is_empty() {
-                counts
-                    .entry("posted_not_effective")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
-            } else {
-                counts
-                    .entry("posted_divergent")
-                    .and_modify(|count| *count += 1);
-                json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_divergent","marker":marker,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
             };
             if effective_date_unobserved {
                 matched_value["not_observed"] = json!(["effective_date"]);
@@ -345,6 +427,57 @@ pub(super) fn verify_batch(
             ambiguous_within_batch.push(expected.bridge_txn_id.clone());
         }
         rows.push(value);
+    }
+    // A cancelled batch voucher whose content was entered again (#806): the
+    // effective rows carrying its fingerprint that no voucher of this batch
+    // took and that carry no marker, so a person entered them, not a build.
+    // Report-only: nothing is attributed through such a copy, since identical
+    // content can be a genuine second transaction, and no verdict changes.
+    // Each voucher pushed exactly one row above, in order.
+    for (row, expected_key) in rows.iter_mut().zip(&expected_fingerprints) {
+        if row["status"] != "posted_not_effective" || row["reason"] != "voucher_cancelled" {
+            continue;
+        }
+        let mut copies = fallback
+            .get(expected_key)
+            .map(|group| {
+                group
+                    .remaining
+                    .iter()
+                    .copied()
+                    .filter(|&index| {
+                        observed_tags[index].is_none()
+                            && observed[index].cancelled != Some(true)
+                            && observed[index].optional != Some(true)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        copies.sort_by_key(|&index| observed[index].alter_id);
+        if !copies.is_empty() {
+            counts
+                .entry("cancelled_with_effective_copy")
+                .and_modify(|count| *count += 1);
+        }
+        let entries = copies
+            .iter()
+            .take(MAX_EFFECTIVE_COPIES_LISTED)
+            .map(|&index| {
+                let copy = &observed[index];
+                let before_pre_import_mark = line
+                    .pre_import_mark
+                    .value
+                    .zip(copy.alter_id)
+                    .map(|(mark, alter_id)| alter_id <= mark);
+                json!({"guid":copy.guid,"master_id":copy.master_id,"alter_id":copy.alter_id,"voucher_number":copy.voucher_number,"before_pre_import_mark":before_pre_import_mark})
+            })
+            .collect::<Vec<_>>();
+        let mut observed_copies =
+            json!({"count":copies.len(),"entries":entries,"attribution":"not_established"});
+        if expected_fingerprint_counts[expected_key] > 1 {
+            observed_copies["ambiguous_within_batch"] = Value::Bool(true);
+        }
+        row["effective_copies_observed"] = observed_copies;
     }
     let (batch_duplicates, unrelated_duplicates_in_window) = batch_duplicate_sets(
         observed,
@@ -358,6 +491,171 @@ pub(super) fn verify_batch(
     Ok(
         json!({"counts":counts,"vouchers":rows,"duplicates":batch_duplicates,"unrelated_duplicates_in_window":unrelated_duplicates_in_window,"ambiguous_within_batch":ambiguous_within_batch}),
     )
+}
+
+/// The status of a voucher attributed to `matched` by an identity (its
+/// narration tag, or the GUID its own POST was bound to), counted in `counts`.
+fn attributed_status(
+    expected: &ImportVoucher,
+    matched: &ReadVoucher,
+    marker: &str,
+    entries_match: bool,
+    counts: &mut BTreeMap<&'static str, u64>,
+) -> Result<Value, String> {
+    let diffs = voucher_diffs(expected, matched, entries_match);
+    let mut count = |key: &'static str| {
+        counts.entry(key).and_modify(|count| *count += 1);
+    };
+    Ok(if matched.cancelled == Some(true) {
+        // Tally drops a cancelled voucher's entries from this read
+        // (measured for Journals only: protocol reference §9.14, PARTIAL,
+        // for a gateway cancel; a screen cancel is captured in
+        // fixtures/D3_CANCELLED_CAPTURE_PROVENANCE.md), so its entries
+        // need not match: it is cancelled, not changed.
+        // Only the header is compared, so a re-date before the cancel
+        // still shows, if it stays inside the read window: a voucher
+        // re-dated out of it is not read, so is not found unless another
+        // voucher in the window has its content. The fingerprint branch
+        // cannot see a cancelled row whose entries were dropped:
+        // with no entries, no build's fingerprint matches.
+        count("posted_not_effective");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
+        count("posted_verified");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    } else if diffs.is_empty() {
+        count("posted_not_effective");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_optional","voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    } else {
+        count("posted_divergent");
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_divergent","marker":marker,"diffs":diffs,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+    })
+}
+
+/// Rewrites a verification of a post into a book that was rolled back after
+/// it: a voucher the window does not hold is `book_rolled_back`, never
+/// `not_found`, because it was posted and the book was then restored or
+/// replaced. A rolled-back post is not evidence that its rows are absent.
+pub(super) fn mark_book_rolled_back(result: &mut Value) {
+    mark_not_found_as(result, "book_rolled_back");
+    result["book_rolled_back"] = json!(true);
+}
+
+/// Rewrites a verification of a native post that carries no tag and was not
+/// bound to its span: a voucher not found by its content is `sent_not_attributed`,
+/// never `not_found`. It was sent, so an edit in Tally (which a tag used to
+/// survive) is as likely as absence, and absence is never reported for it.
+pub(super) fn mark_sent_not_attributed(result: &mut Value) {
+    mark_not_found_as(result, "sent_not_attributed");
+}
+
+/// Why an untagged native post's vouchers that its content cannot find are not
+/// found, as far as the post's own answer from Tally can say (bridge#1108).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum UnmatchedCause {
+    /// Tally's answer reported every counter, with `CREATED 0`, `EXCEPTIONS`
+    /// equal to the vouchers sent and every other counter zero, and none of
+    /// them is found. For a batch of two or more, the company's voucher mark
+    /// was also read on both sides of the post and did not move. Only these
+    /// captured shapes are read so (protocol reference §9.2; bridge#1108). A
+    /// partly created batch is never read so: a count does not say which
+    /// voucher Tally rejected, and twins in one batch defeat matching by
+    /// content.
+    ReportedNotCreated,
+    /// Anything else, including no recorded answer: an edit in Tally is as
+    /// likely as absence, so the voucher is `sent_not_attributed`.
+    NotEstablished,
+}
+
+/// The cause for `unmatched` vouchers of a post of `sent`, from the post's own
+/// answer. Every counter must have been present in the answer: an omitted
+/// counter is not an observed zero (§9.2). `voucher_step` is how far the
+/// company's voucher mark moved across the post, `None` unless it was read on
+/// both sides; a batch of two or more needs it measured at 0, which catches a
+/// Tally that created something while answering `CREATED 0`.
+pub(super) fn unmatched_cause(
+    counters: Option<&bridge_tally_protocol::TallyImportResult>,
+    sent: usize,
+    unmatched: u64,
+    voucher_step: Option<u64>,
+) -> UnmatchedCause {
+    let Some(counters) = counters else {
+        return UnmatchedCause::NotEstablished;
+    };
+    let Ok(sent) = u64::try_from(sent) else {
+        return UnmatchedCause::NotEstablished;
+    };
+    let step_confirms = sent == 1 || voucher_step == Some(0);
+    if sent >= 1
+        && step_confirms
+        && counters.counter_presence.all_reported()
+        && counters.created == 0
+        && counters.altered == 0
+        && counters.deleted == 0
+        && counters.ignored == 0
+        && counters.errors == 0
+        && counters.cancelled == 0
+        && counters.exceptions == sent
+        && unmatched == sent
+    {
+        UnmatchedCause::ReportedNotCreated
+    } else {
+        UnmatchedCause::NotEstablished
+    }
+}
+
+/// How far the company's voucher mark moved across the post, from the mark
+/// journaled before it and the one read after it: `None` unless both were
+/// read, and `None` when the later one reads lower (the book moved backwards).
+pub(super) fn measured_voucher_step(before: Option<u64>, after: Option<u64>) -> Option<u64> {
+    before
+        .zip(after)
+        .and_then(|(before, after)| after.checked_sub(before))
+}
+
+/// How many of a verification's vouchers its content found nowhere. Read only
+/// where nothing is bound, so no voucher is `bound_not_in_window`.
+pub(super) fn unmatched_count(result: &Value) -> u64 {
+    result["counts"]["not_found"].as_u64().unwrap_or(0)
+}
+
+/// Rewrites the post's own readback when Tally's answer to that post
+/// reported its voucher as not created (`UnmatchedCause::ReportedNotCreated`).
+pub(super) fn mark_reported_not_created(result: &mut Value) {
+    mark_not_found_as(result, "tally_reported_not_created");
+}
+
+#[cfg(test)]
+#[path = "agent_import_unmatched_cause_tests.rs"]
+mod unmatched_cause_tests;
+
+/// The one plain line a person reads for each status that is never absence.
+pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
+    match status {
+        "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
+        "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
+        "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
+        "tally_reported_not_created" => Some("Tally reported this voucher as not created. Check that it is not in Tally, then enter this one voucher in Tally's voucher entry screen; do not import it again through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again."),
+        _ => None,
+    }
+}
+
+fn mark_not_found_as(result: &mut Value, status: &str) {
+    let mut moved = 0_u64;
+    if let Some(vouchers) = result["vouchers"].as_array_mut() {
+        for voucher in vouchers {
+            if voucher["status"] == "not_found" || voucher["status"] == "bound_not_in_window" {
+                voucher["status"] = json!(status);
+                voucher["next_step"] = json!(plain_next_step(status));
+                moved += 1;
+            }
+        }
+    }
+    let counts = &mut result["counts"];
+    let already = counts[status].as_u64().unwrap_or(0);
+    counts["not_found"] = json!(0);
+    counts["bound_not_in_window"] = json!(0);
+    counts[status] = json!(already + moved);
 }
 
 pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<bool, String> {
@@ -572,8 +870,8 @@ pub(super) fn voucher_diffs(
     entries_match: bool,
 ) -> Vec<Value> {
     let mut diffs = Vec::new();
-    let expected_date = normalized_date(&expected.date).ok();
-    if actual.date.as_deref() != expected_date.as_deref() {
+    let expected_date = expected.date.as_str();
+    if actual.date.as_str() != expected_date {
         diffs.push(json!("date"));
     }
     // A bank voucher is written with EFFECTIVEDATE equal to DATE (§9.13), and
@@ -583,8 +881,8 @@ pub(super) fn voucher_diffs(
     if expected.voucher_type != VoucherType::Journal
         && actual
             .effective_date
-            .as_deref()
-            .is_some_and(|observed| Some(observed) != expected_date.as_deref())
+            .as_ref()
+            .is_some_and(|observed| observed.as_str() != expected_date)
     {
         diffs.push(json!("effective_date"));
     }
@@ -725,13 +1023,27 @@ pub(super) fn company_high_water_mark(high_water: &Value) -> Result<PreImportMar
     })
 }
 
-pub(super) fn alter_id_delta(mark: &PreImportMark, observed: &[ReadVoucher]) -> Value {
+/// The mark `alter_id_delta` measures from (#1087): the target's voucher mark
+/// the dispatch intent recorded just before the POST, for a native post, or
+/// the mark recorded when the batch was built, for one with no such intent (a
+/// file a person imported by hand). The build mark alone counts anything
+/// posted between the build and the POST as this post's.
+pub(super) enum DeltaBasis<'a> {
+    PrePost(u64),
+    Build(&'a PreImportMark),
+}
+
+pub(super) fn alter_id_delta(basis: DeltaBasis<'_>, observed: &[ReadVoucher]) -> Value {
+    let (before, from) = match basis {
+        DeltaBasis::PrePost(mark) => (Some(mark), "pre_post_mark"),
+        DeltaBasis::Build(mark) => (mark.value, "build_mark"),
+    };
     let latest = observed.iter().filter_map(|voucher| voucher.alter_id).max();
-    match (mark.value, latest) {
+    match (before, latest) {
         (Some(before), Some(after)) if after >= before => {
-            json!({"before":before,"after_seen":after,"delta":after-before})
+            json!({"before":before,"after_seen":after,"delta":after-before,"from":from})
         }
-        _ => json!({"before":mark.value,"after_seen":latest,"delta":"not_observed"}),
+        _ => json!({"before":before,"after_seen":latest,"delta":"not_observed","from":from}),
     }
 }
 
@@ -818,7 +1130,7 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));
     }
-    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len)));
+    output.push_str(&format!("\n- Company: {}\n- Batch SHA-256: `{}`\n- Readback checked: `{}`\n- Readback counts: matching {}, divergent {}, not effective {}, not found {}\n- AlterID delta: `{}`\n- Duplicates in this batch: {}\n- Unrelated duplicates in window: {}\n- Cancelled vouchers with an effective copy (report only, not attributed): {}\n\n| Transaction | Readback status |\n| --- | --- |\n", markdown_code(proof["company"]["name"].as_str().unwrap_or("unknown")), proof["batch_sha256"].as_str().unwrap_or("unknown"), proof["verified_at"].as_str().unwrap_or("unknown"), proof["counts"]["posted_verified"], proof["counts"]["posted_divergent"], proof["counts"]["posted_not_effective"], proof["counts"]["not_found"], proof["alter_id_delta"], proof["duplicates"].as_array().map_or(0, Vec::len), proof["unrelated_duplicates_in_window"].as_array().map_or(0, Vec::len), proof["counts"]["cancelled_with_effective_copy"]));
     for row in proof["vouchers"].as_array().into_iter().flatten() {
         output.push_str(&format!(
             "| {} | {} |\n",

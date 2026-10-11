@@ -1,0 +1,17 @@
+src-tauri/src/agent.rs
+src-tauri/src/agent_bank_statement.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_span_identity.rs
+src-tauri/src/agent_import_verification.rs
+src-tauri/src/agent_ledgers.rs
+src-tauri/src/agent_movement.rs
+src-tauri/src/agent_outstandings.rs
+src-tauri/src/agent_presence.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_statements.rs
+src-tauri/src/agent_stock_summary.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/agent_trial_balance.rs
+src-tauri/src/agent_voucher_window.rs
+src-tauri/src/agent_vouchers.rs
+reviewer: lamemustafa

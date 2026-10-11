@@ -1,0 +1,38 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "read_scope",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "7516f60b94596323",
+  "population_note_text": "The read of the books itself: no voucher is examined.",
+  "figures": [
+    {
+      "id": "read_scope.currency_read",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "c43f20a93cd50fa2",
+      "definition_text": "Whether this read of the books includes their currency settings.",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

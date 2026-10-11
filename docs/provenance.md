@@ -70,9 +70,11 @@ to this record or `NOTICE`.
 the committed blob and verifies that every registered fixture location opts out
 of Git text normalization. In CI, a normal checkout materialises the worktree
 from that same blob, so the byte comparison cannot independently prove capture
-fidelity there; the Git attribute check is the meaningful CI protection. This
-does not establish SHA-256 or byte-length assertions for provenance-listed
-fixtures.
+fidelity there. The CI protection is the Git attribute check, and the byte count
+and SHA-256 that every fixture's provenance row declares, which
+`scripts/check-fixture-provenance.mjs` checks (#838). The registered locations,
+and how an unregistered fixture directory is found by its name or by the
+provenance it holds, are in `scripts/fixture-roots.mjs`.
 
 ## Third-party material
 

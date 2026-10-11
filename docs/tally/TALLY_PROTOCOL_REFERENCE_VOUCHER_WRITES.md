@@ -143,6 +143,28 @@ returned `CREATED=1`.
 Note also that `EXCEPTIONS=1` arrived with **no `LINEERROR`** — a parser must treat a
 non-zero `EXCEPTIONS` as failure on its own, without waiting for an error string.
 
+**The method is kept per number series, not on the voucher type — verified 2026-10-09 on one
+book (PARTIAL).** On a synthetic book on Silver 7.1 on Windows 10, three voucher types were set on
+Tally's own screens (Journal Automatic; Payment Manual with duplicates prevented; Receipt Manual
+without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PREVENTDUPLICATES` and
+`VOUCHERNUMBERSERIES.*` (request 1,106 bytes, response 81,966 bytes; both committed as
+`voucher_type_numbering_series_*` with their provenance, bridge#724).
+
+- **VERIFIED:** each type holds exactly one `VOUCHERNUMBERSERIES.LIST`, named `Default`. The series'
+  `NUMBERINGMETHOD` and `PREVENTDUPLICATES` match the screen for all three types (`Automatic`/`No`,
+  `Manual`/`Yes`, `Manual`/`No`); the 21 types left alone read `Automatic`/`No`.
+- **VERIFIED:** the type-level `NUMBERINGMETHOD` reads `None` for the three types set by hand and
+  `Default` for the rest, and the type-level `PREVENTDUPLICATES` reads `No` on all 24, including
+  Payment, whose screen says Yes. The type level is not the method and is never read for it.
+- **Observed, meaning not established:** `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series,
+  Manual ones included; `DUPLICATECONTROL` is present and empty on all 24 series.
+- **Not established:** more than one series on a type; a single series not named `Default`; `Automatic (Manual Override)` on a captured
+  response (seen on a real book on 2026-09-28, not committed); Multi-user Auto; a type created new
+  rather than altered; other releases; macOS. A type with no series or several is a typed
+  observation, not a method, and a method outside `Automatic`, `Manual` and
+  `Automatic (Manual Override)` is kept raw and never read as `Manual`
+  (`native_voucher_type_numbering.rs`).
+
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
 **VERIFIED 2026-09-10 (licensed TallyPrime 7.1 Gold; five files imported by hand through
@@ -153,7 +175,7 @@ Journals in a fifth. `CREATED` equalled the voucher count on every file with zer
 exceptions, and each affected bank ledger reproduced, on readback, the debit total, credit total
 and closing balance its own statement printed.
 
-*(The session record headlined 148. That figure does not reconcile with its own per-file table
+*(An earlier summary headlined 148. That figure does not reconcile with its own per-file table
 or with the artifacts, both of which give 157; the count above is taken from the files.)*
 
 **A bank statement cannot be expressed as Journals.** Booking bank lines as Journals reconciles
@@ -216,7 +238,9 @@ Four properties of it are not guessable, and each was measured:
    and the marker came back intact while the attribute did not. The rule is field-specific and
    more useful stated that way: **Tally overwrites the attribute it owns, and preserves a marker
    placed in a field it does not.** That is why Bridge attributes readback by the narration tag —
-   a deliberate choice of a durable carrier, not a workaround for a missing one.
+   a deliberate choice of a durable carrier, not a workaround for a missing one. (Since
+   2026-10-02 a native post carries no tag and is attributed by its own AlterID span instead;
+   see §9.15. The hand-import file keeps the tag.)
 
    A verifier that compares the observed attribute against the value it sent therefore refuses
    every legitimate readback. The client value is still *stored*, still matches for a
@@ -343,10 +367,14 @@ for more than it proves:
 
 **What it still does not do.** Two gaps, both stated here rather than left to be discovered.
 
-Nothing detects a party ledger configured for bill-wise accounting: the catalogue Bridge reads
-carries no such flag, and adding one would mean authoring a request shape with no live capture
-behind it. Every party amount therefore lands On Account, exactly as the measured import did,
-and every build naming a counterparty says so in its warnings.
+A party ledger configured for bill-wise accounting is now detected (6 Oct 2026, #1234): the ledger
+catalogue request carries one more native method and returns each ledger's `ISBILLWISEON`
+(§12a.15, live-captured), so the build refuses a batch naming such a ledger until each party is
+approved, and the post and the queue read the flag again. Every party amount on a bill-wise
+ledger still lands On Account, exactly as the measured import did; the approval only records that
+a person was asked, and a hand import of the file is not checked. *(Written before that change: "Nothing
+detects a party ledger configured for bill-wise accounting; every build naming a counterparty says so in its
+warnings.")*
 
 **Two written elements are not verified: `EFFECTIVEDATE` and `PARTYLEDGERNAME`.** *(Written before
 #467 and #469. `EFFECTIVEDATE` is now verified and `PARTYLEDGERNAME` is still not; see the two
@@ -540,6 +568,123 @@ the official sample shapes verbatim** — the §9.5/§9.6 failures may be a requ
 on our side rather than an Edit Log restriction. This is the cheapest next step on the write
 path and it should be taken before the Phase 4 licensed-Tally gate.
 
+### 9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it
+
+**PARTIAL, and narrow: one synthetic company, licensed TallyPrime 7.1 Silver (the earlier rounds on that
+lab record the release and licence; these answers do not show them), CGST plus state tax within the
+company's own state, 5% services lines (one 18% goods line on a bill whose figures are exact), the invoice
+view, one book, one run per voucher. A "line" is a sales-ledger line in an Accounting Invoice
+(`VCHENTRYMODE`), with no stock items; the buyer is Unregistered/Consumer and the state Rajasthan on every
+voucher. The "Tax entered" column comes from the sitting's own record of how each voucher was made, not
+from these answers: the export cannot show who filled a figure.** Sixteen Sales vouchers were read back in one full voucher export;
+Tally's own GSTR-1 flag is in that export (`VCHGSTSTATUSISINCLUDED`, `VCHGSTSTATUSISUNCERTAIN`,
+`VCHGSTSTATUSISEXCLUDED`) and was checked against the uncertain list on Tally's screen, which named the
+same six vouchers with the reason "Mismatch between Expected Tax Amount and Modified Tax Amount in
+transaction". "Per line" is `half-up(line x rate / 2)` to two decimals for each sales line, summed per rate,
+for each of the two heads.
+
+| Voucher | Sales lines | CGST / SGST | Per line | Per bill | Tally flag | Tax entered |
+|---|---|---|---|---|---|---|
+| 0001 | 1000.00 | 25.00 / 25.00 | 25.00 | 25.00 | included | typed |
+| 0002 | 1001.00 | 25.03 / 25.02 | 25.03 | 25.03 | **uncertain** | typed |
+| 0003 | 1001.00 | 25.02 / 25.03 | 25.03 | 25.03 | **uncertain** | typed |
+| 0004 | 1001.00 | 25.03 / 25.03, round off -0.01 | 25.03 | 25.03 | included | typed |
+| 0005 | 1001.00 | 25.02 / 25.02, round off +0.01 | 25.03 | 25.03 | **uncertain** | typed |
+| 0006 | 1000.00 | 25.01 / 25.01 | 25.00 | 25.00 | **uncertain** | typed |
+| 0007 | 600.00 + 400.00 | 25.00 / 25.00 | 25.00 | 25.00 | included | typed |
+| 0008 | 601.00 + 400.00 | 25.03 / 25.02 | 25.03 | 25.03 | **uncertain** | typed |
+| 0009 | 600.00 at 5% + 700.00 at 18% | 15.00, 63.00 / 15.00, 63.00 | same | same | included | typed |
+| 0010 | 600.40 + 400.40 | 25.02 / 25.02, round off +0.16 | 25.02 | 25.02 | included | imported |
+| 0011 | 1001.00 | 25.03 / 25.03 | 25.03 | 25.03 | included | Tally filled |
+| 0012 | 100.10 + 100.10 | 5.00 / 5.00 | 5.00 | **5.01** | included | Tally filled |
+| 0013 | 100.20 + 100.20 | 5.02 / 5.02 | 5.02 | **5.01** | included | Tally filled |
+| 0014 | 100.60 + 100.60 | 5.04 / 5.04 | 5.04 | **5.03** | included | Tally filled |
+| 0015 | 100.20 + 100.20, the same ledger on two lines | 5.02 / 5.02 | 5.02 | **5.01** | included | Tally filled |
+| 0016 | 100.20 + 100.20 | 5.01 / 5.01 | **5.02** | 5.01 | **uncertain** | typed, the per-bill figure |
+
+- **VERIFIED (this book): for all sixteen vouchers, Tally's flag is "included" exactly when both heads equal
+  the per-line figure, and "uncertain" otherwise.** Every flagged voucher was 0.01 off the per-line figure
+  on at least one head; nothing larger was seen. The per-bill figure disagrees with Tally on four
+  included vouchers (0012 to 0015) and agrees with the one it flagged (0016).
+- **VERIFIED (this book, positive amounts, 2.5% heads): the rounding is half-up per line.** `0013`'s lines
+  are 2.505 each and Tally's figure is 5.02 (half-even would give 5.00); `0011`'s 25.025 gave 25.03
+  (half-even 25.02). `0014`'s 2.515 does not discriminate: half-even gives the same.
+- **VERIFIED (this book): per line, not per ledger or per bill.** `0015` carries one ledger on two lines
+  and Tally's figure is 5.02 (a ledger total would give 5.01).
+- **VERIFIED (this book): a difference of one paisa is flagged.** `0016` differs from the per-line figure by one
+  paisa; `0002`, `0003` and `0008` carry heads that differ from each other by one paisa and are flagged.
+  No tolerance showed: the four on-screen tax ledgers read `ROUNDINGMETHOD` Not Applicable and
+  `ROUNDINGLIMIT` 0 (the one tax ledger created by import reads an empty `ROUNDINGMETHOD` and 0, and is on none of
+  these vouchers), and the two company screens read, which show no setting that ignores a difference.
+- **A round off line does not decide the flag** (`0004`, `0010` are included with one).
+- **VERIFIED (this book): Accept As Is on `0016` alters the voucher and overrides the flag; it does not
+  change an amount.** Before: uncertain, `ISGSTOVERRIDDEN` No. After: included, `ISGSTOVERRIDDEN` Yes,
+  `ISGSTOVRDNCRC` 0 to a number, `ALTERID` 27 to 28, `ALTVCHID` 27 to 28; every leg and amount unchanged.
+- **What follows for a check on an invoice's tax (a reading of this table, not a further measurement).** A
+  check that admits the per-bill figure, or two heads that differ by a paisa, or a figure one paisa from
+  either head, admits vouchers this table shows Tally flags (the `0002` and `0016` kinds). Whether and how to
+  change a given check is a separate decision.
+- **Not measured:** inter-state tax, cess, inventory or discount lines, a registered buyer, a rate other than
+  5% with a tie, more than one rate with a tie, a sales ledger whose GST rate disagrees with the tax posted
+  (the rate sits on the sales ledger; the vouchers carry no rate element), Gold. Do not read the rule beyond what the table covers.
+
+Evidence: the answers (`workorder/vouchers-w1.xml`, `vouchers-w2-before.xml`, `vouchers-w2-after.xml`,
+`aw2-marks-*.xml`, `ledgers-w1.xml`) are held on the repository's `lab/1342-capture-answers` branch at
+`d78906775`, listed by SHA-256 in its `SHA256.txt`.
+
+### 9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions
+
+**PARTIAL: the same book, one run each, over the XML gateway with hand-built files and one file rendered by
+Bridge's code.** The voucher type setting is "Allow zero-valued transactions".
+
+- **VERIFIED (this book): all three zero-value Sales imports into `BRIDGE Sales` were refused.** The
+  accounting view, the invoice view and the one Bridge's code renders (three ids, each a single voucher
+  with a customer leg and one sales leg at 0.00) each answered `EXCEPTIONS=1`, `CREATED=0`, **with no
+  `LINEERROR`**, and the voucher mark did not move (28, 28, 28). A refusal with no `LINEERROR` and
+  `ERRORS=0` is the §9.2 trap in a new form.
+- **VERIFIED (this book): the setting decides.** A voucher type created with the setting at its default (No)
+  refused the same zero voucher the same way. A type created with it Yes answered `CREATED=1`
+  (`LASTVCHID` 21) and the voucher was found by the next read (accounting view, both legs 0.00).
+- **VERIFIED (screen, one try, accounting view): Tally's own data entry refused a zero line in `BRIDGE Sales`**
+  ("No Entries in Voucher!"); the invoice view was not tried.
+- **VERIFIED (screen): the GSTR-1 document summary lists a voucher type's zero voucher as an issued
+  document** (a line for the zero-value type, count 1). The counts for `BRIDGE Sales` fit "included
+  documents of a type": 11 before (16 numbered, five uncertain) and 12 after the normal invoice that
+  followed. That reading is an inference: the zero voucher's own GSTR-1 flag was not read.
+- **Not measured:** the GSTR-1 flag of the zero voucher (the voucher type was not in the export); a zero
+  invoice in the invoice view under the setting Yes; a zero line beside a non-zero one; Gold.
+
+Evidence: the requests (`w3-zero-accounting.xml`, `w3-zero-invoice.xml`, `w3-zero-code.xml`,
+`w3-zero-type-default.xml`, `w3-zero-type-yes.xml`, `w3-valid-after-refused.xml`) are on
+`lab/1342-capture-requests` at `5cc927e5` under `workorder/`; the answers `workorder/aw3-*.xml`,
+`vouchers-w3.xml`, `aw3-window-0802-extra.xml` and the screens
+`w3-0018-zero-keyed-error`, `w3-voucher-type-z0`, `w3-voucher-type-z1`, `w3-document-summary-before` and
+`w3-document-summary-after` on the same branch and commit.
+
+### 9.19 A keyed Purchase invoice, as the voucher export reads it
+
+**PARTIAL: the same book, two Purchase invoices keyed by hand in invoice mode, one run.** This is the shape
+Tally stored, not a measurement of Bridge posting a Purchase.
+
+- **VERIFIED from the export:** type `Purchase`, numbered by Tally (1 and 2), the supplier's invoice number
+  `SUP/0001` dated 3-Aug-2026 on both (`REFERENCE`, `REFERENCEDATE`), the voucher dated 4-Aug-2026,
+  `ISINVOICE` Yes, entry mode Accounting Invoice, view Invoice Voucher View. The supplier leg reads
+  1050.00, `ISDEEMEDPOSITIVE` No (a credit); the purchase leg -1000.00 and the CGST and SGST legs -25.00
+  each, `ISDEEMEDPOSITIVE` Yes. The header carries the supplier's GSTIN, `STATENAME` and `PLACEOFSUPPLY`
+  Rajasthan, `GSTREGISTRATIONTYPE` Regular, the company as the buyer name and its GSTIN as the consignee's.
+- **VERIFIED: Tally saved the second invoice with the same supplier invoice number and date.** The screen read
+  was taken after the save, so whether a warning appeared before it is not recorded.
+- **VERIFIED (screen): the bill reference is `SUP/0001`, and the two invoices share it.** The supplier's
+  pending bills show one row, opening 1,050.00 Cr and pending 2,100.00 Cr. **NOT established through
+  a read:** the export's bill allocation carries only an amount, and why is not established.
+- **Both vouchers read uncertain in GSTR (`VCHGSTSTATUSISUNCERTAIN` Yes). The cause is UNVERIFIED:** a
+  duplicate supplier invoice number is unlikely to explain the first one (its `ALTERID` is 31 and the
+  second's 32, so it was not re-saved, but no read was taken between the two saves and the flag is
+  stored), and the supplier's GSTIN is of the synthetic family, which Tally may not accept as valid.
+- **Not measured:** a purchase imported over the gateway, any GSTR-2 view, a Purchase in the accounting-voucher view, Gold.
+
+Evidence: `workorder/purchases-w4.xml` and the screens `w4-*` on the same branch and commit.
+
 ### 9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate
 
 **Scope of every item below.** TallyPrime 7.1 Silver, licensed, not Education, on a synthetic
@@ -605,3 +750,43 @@ TallyPrime 7.1 Gold, one client book, 2026-09-28).**
 - **Why VERIFIED.** §9.14 marks a single observation PARTIAL. This one differs because about 300
   vouchers were read back in full. It is still one session on one client book, not repeated on a
   second, so treat it as **Confidence: PARTIAL** beyond that book.
+
+### 9.15 An import fills its own AlterID span in request order
+
+**VERIFIED 2026-10-02, one run (licensed TallyPrime 7.1 Silver, synthetic `BRIDGE AMEND LAB`, raw gateway).**
+One `Import Data` request carried 10 Payment, Receipt and Contra vouchers in Bridge's native shape, with print-ready narrations and no `[BRIDGE:…]` tag. Two of the vouchers were identical in every element but the REMOTEID. The capture and its provenance are `tests/fixtures/POST_SPAN_CAPTURE_PROVENANCE.md`.
+
+| Fact | Observed |
+| --- | --- |
+| Counters | `CREATED=10`, every other counter 0, no `LINEERROR`, all seven present, `LASTVCHID=1733` |
+| Company `ALTVCHID`, read just before and just after the POST | 1795 → 1805, a step of exactly 10; `ALTMSTID` unchanged; the other loaded companies unchanged |
+| Read of `$AlterID > 1795 AND $AlterID <= 1805` within the day | exactly the 10 vouchers, ALTERIDs 1796–1805 **in request order** for every voucher that can be told apart, the identical pair at 1797 and 1798 (the two are identical in content and no sent REMOTEID comes back, so their own order cannot be observed); the whole-day read was byte-identical, so the day held only these 10 and this capture cannot show the span excluding anything (a single-writer lab) |
+| MasterIDs | 1724–1733 in request order for every voucher that can be told apart (the identical pair as above); the last equals `LASTVCHID` |
+| Content | type, date, `EFFECTIVEDATE`, signed entries and the untagged narration as sent |
+| GUID | the company GUID, `-`, then the MasterID in 8 hex digits (`…-000006bc` = 1724); the `REMOTEID` attribute equals it (§9.3) |
+| `$GUID = "<guid>"` added to the day's formula | one row for a present GUID (a GUID of the identical pair returned that voucher alone, not both); an empty collection for an absent one |
+
+The span and order for Journals were already in a capture of Bridge's own post path, tagged: 50 Journals at ALTERIDs 1,420–1,469 in batch order, mark 1,419 → 1,469 (`D3_BATCH_CAPTURE_PROVENANCE.md`). One import of 50, 200 and 500 Journals each stepped the mark by exactly its count over the raw gateway, and 50 and 200 did so through Bridge's own post path with contiguous AlterIDs ([§11c.5](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21), one run each).
+
+**Untagged Journals (VERIFIED, one run, 2026-10-02, raw gateway).** One import of 5 untagged Journals in Bridge's own Journal render (no `EFFECTIVEDATE`, no party, the caller's entry order), including an identical pair and a three-leg Journal, gave `CREATED=5` and a mark step of exactly 5 (1805 → 1810). The span held exactly those 5 at ALTERIDs 1806–1810 in request order (the identical pair cannot be told apart in this read, so its order is assigned by position), MasterIDs 1734–1738 ending on `LASTVCHID`, with narration and entries as sent; Tally filled `EFFECTIVEDATE` with the date (`POST_SPAN_CAPTURE_PROVENANCE.md`, `post-span-journal-*`).
+
+**What Bridge builds on it.** A native post no longer writes the narration tag. It is attributed by its position inside its own POST's span (`agent_import_span_identity.rs`). The dispatch intent records the target's voucher mark from the last read before the POST. Binding requires all of these:
+- a clean response with `CREATED=N` and `LASTVCHID`;
+- a step equal to `CREATED` when the mark after the POST was read;
+- exactly N rows in the span, row k at mark + k, with the content sent as voucher k;
+- MasterIDs that end on `LASTVCHID`, and a GUID that is the company GUID plus the MasterID.
+
+The bound GUIDs are journaled and verified first. Content and `LASTVCHID` only refuse. The hand-import file keeps its tag, because Bridge never sees that import.
+
+**A rolled-back book (PARTIAL: derived, not captured).** Every voucher change measured gives the voucher an AlterID above the company's mark (§11c.5), so after a create of N the mark should never again read below the pre-POST mark plus N unless the book was rolled back (a backup restored, or another copy put in its place). No rollback has been captured. Bridge reports such a book as `book_rolled_back`, never as `not_found`, and binds nothing in it; a company holding no voucher omits its mark, which reads as 0 for this check. The check sees a rollback only while the mark reads below that floor: a book keyed past it again after a restore is not seen as rolled back, and if a restore lets new vouchers take the MasterIDs the post's vouchers had (not established), a bound GUID would then name another voucher: `posted_divergent`, or `posted_verified` (a false verified) if the fields verification compares are the same and it is effective.
+
+**Known limit (by design, 2026-10-02).** A binding refusal is final for the batch: one voucher edited in Tally before a deferred bind refuses the binding of all of them, whose vouchers are then matched by content only and stay `reconciliation_required`. The person checks them in Tally; a review inside Bridge is bridge#1039.
+
+**Not established:**
+- another Gold client process writing during the post;
+- whether a voucher keeps its GUID and MasterID through a screen edit or an upsert;
+- a concurrent save tripping the step;
+- Payment, Receipt and Contra batches other than 10;
+- a `$GUID` filter without a date clause;
+- any other release or licence tier;
+- whether a restore or a data rewrite reuses AlterIDs or MasterIDs.

@@ -1,0 +1,7 @@
+scripts/outstandings-copy.test.mjs
+scripts/tally-company-selection.test.mjs
+scripts/tally-error-copy.test.mjs
+src/outstandings-copy.ts
+src/tally-company-selection.ts
+src/tally-error-copy.ts
+reviewer: lamemustafa

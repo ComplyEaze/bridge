@@ -1,0 +1,76 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "books_examined",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "0c201f4c86bc3a1c",
+  "population_note_text": "The read of the books itself, and the documents loaded with it.",
+  "figures": [
+    {
+      "id": "books_examined.books_examined",
+      "value": "Books kept in Tally, as read: day book (Sales 2, Purchase 1, Receipt 3, Payment 3, Contra 1, Journal 2, Credit Note 1, Debit Note 1, Delivery Note 1, Physical Stock 1, Stock Journal 1); cash book (2 cash ledgers); bank books (3 bank ledgers); ledger (10 ledger accounts); trial balance. Documents examined: GSTR-2B, GSTR-1, Form 26AS, Tally Profit & Loss report export, AIS, TIS, GSTR-3B, GSTR-3B vs 2B workbook, Bank statement, Draft Form 3CD.",
+      "unit": "text",
+      "definition_sha256_16": "322e391cbd45cb0f",
+      "definition_text": "Clause 11(c): the books of account read, and the documents loaded for this engagement.",
+      "evidence": []
+    },
+    {
+      "id": "books_examined.books_maintained",
+      "value": "Books kept in Tally, as read: day book (Sales 2, Purchase 1, Receipt 3, Payment 3, Contra 1, Journal 2, Credit Note 1, Debit Note 1, Delivery Note 1, Physical Stock 1, Stock Journal 1); cash book (2 cash ledgers); bank books (3 bank ledgers); ledger (10 ledger accounts); trial balance. The address at which the books are kept: to be confirmed by the CA.",
+      "unit": "text",
+      "definition_sha256_16": "79f4d6264d91b9f0",
+      "definition_text": "Clause 11(b): the books of account this read of Tally holds; the address is not in the books.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "books_examined/clause11",
+      "clauses": [
+        "3CD-11(b)",
+        "3CD-11(c)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "books_examined",
+          "figure_id": "books_examined.books_examined"
+        },
+        {
+          "name": "books_maintained",
+          "figure_id": "books_examined.books_maintained"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "025c3b1edbda9556",
+      "title_text": "Books of account kept and examined: listed from what was read; the CA confirms and completes the list",
+      "limits_sha256_16": "df364463781fddf9",
+      "limits_text": [
+        "The list is what this read of Tally holds and the documents loaded with it. Books kept outside Tally (registers, stock records, a second set of books) and the address at which the books are kept are not in the read."
+      ],
+      "ask_client_sha256_16": "04bf9abab0dc2f27",
+      "ask_client_text": [
+        "Any books of account kept outside Tally, and the address at which the books are kept."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

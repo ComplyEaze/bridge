@@ -2,7 +2,7 @@
   "source": "Live licensed TallyPrime 7.1 Silver response to render_party_ledger_master_request (ledger_masters fields=compliance, period 20250401..20250804) from the disposable BRIDGE GST RECON LAB book, recorded by a read-only relay between bridge_mcp and the gateway: the response body exactly as Tally sent it (HTTP head removed)",
   "observed_date": "2026-09-30",
   "observed_at": "2026-09-30T23:30+05:30",
-  "executor": "Claude Sonnet 5.5 (Lane M2) under the lab owner's seeding ruling relayed by the orchestrator",
+  "executor": "an AI coding session (Claude Sonnet 5.5), on the lab owner's instruction",
   "binary": "bridge_mcp debug build of bef4ecfd338238a0c27df839423aea592fe057d4 (source-equivalent to e648bfb5), sha256 758e39805f00dc7e282f4fd16db81669bbd1895f2b381ed1d7bfd7213561f8fd; writes disabled at run time",
   "relay": "serial read-only allowlist relay v3.5, sha256 3436269e04a9847642b0eeb597fdd140fb82d52eafb574e5e6346dbf51d224ab, forwarding to 127.0.0.1:9001 only",
   "request_sha256_utf8": "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",

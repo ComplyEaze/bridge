@@ -422,3 +422,29 @@ fn a_voucher_party_field_is_read_and_stripped() {
     assert_eq!(party("CS/1"), "Pinecrest Builders");
     assert_eq!(party("R/1"), "");
 }
+
+/// A voucher's PARTYGSTIN reaches the book Python-stripped and otherwise as written, as the
+/// reference's adapter reads it (`_t(v, "PARTYGSTIN")`); a voucher without one reads empty.
+#[test]
+fn a_voucher_party_gstin_is_read_and_stripped() {
+    let scratch = common::ScratchRead::new("party-gstin");
+    scratch.edit_part(
+        "vouchers-2025-04-01",
+        "<NARRATION TYPE=\"String\">Synthetic voucher CS/1</NARRATION>",
+        "<NARRATION TYPE=\"String\">Synthetic voucher CS/1</NARRATION>\
+         <PARTYGSTIN TYPE=\"String\"> \t 27invent0000a1y1 \n</PARTYGSTIN>",
+        true,
+    );
+    let e = common::engagement(&scratch.dir, false);
+    let book = bridge_tax_audit::load_book(&e).unwrap();
+    let gstin = |number: &str| {
+        book.vouchers
+            .iter()
+            .find(|v| v.number == number)
+            .unwrap_or_else(|| panic!("{number}"))
+            .party_gstin
+            .clone()
+    };
+    assert_eq!(gstin("CS/1"), "27invent0000a1y1");
+    assert_eq!(gstin("R/1"), "");
+}

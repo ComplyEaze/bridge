@@ -392,7 +392,15 @@ const REQUIRED_SURFACE_DIRECTORIES: [&str; 2] =
 /// entry and acknowledging the change. A required path cannot be dropped silently, and
 /// `gate_rejects_each_omitted_required_lifecycle_path` iterates this list, so adding it
 /// here is what covers its omission.
-const REQUIRED_SURFACE_FILES: [&str; 14] = [
+///
+/// The voucher-presence contract's files follow (#840; until then a test in
+/// `book_presence_tests.rs` checked them by hand): `book_presence.rs` and
+/// `agent_presence.rs` are its production files; `agent_presence_tests.rs` holds the only
+/// independent statement of the admission contract, since the adapter reads its bounds from
+/// the published schema; and `agent_import_identity.rs` derives the narration marker both the
+/// presence reader and the import writer use, so an edit confined to it silently changes what
+/// is reported present.
+const REQUIRED_SURFACE_FILES: [&str; 18] = [
     "src-tauri/src/agent_catalog.rs",
     "src-tauri/src/agent_desktop_journal.rs",
     "src-tauri/src/agent_ledgers.rs",
@@ -407,6 +415,10 @@ const REQUIRED_SURFACE_FILES: [&str; 14] = [
     "docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md",
     "docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md",
     "docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md",
+    "src-tauri/crates/bridge-tally-core/src/book_presence.rs",
+    "src-tauri/src/agent_presence.rs",
+    "src-tauri/src/agent_presence_tests.rs",
+    "src-tauri/src/agent_import_identity.rs",
 ];
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -995,7 +1007,7 @@ impl SurfacePins {
             }
             previous = Some(&pin.path);
         }
-        Ok(())
+        refuse_case_collisions(self.files.iter().map(|pin| pin.path.as_str()))
     }
 
     /// Reads every pinned file and returns the resolved manifest: each pinned path with the
@@ -1129,7 +1141,7 @@ impl CompatibilitySurfaceManifest {
             }
             previous = Some(&file.path);
         }
-        Ok(())
+        refuse_case_collisions(self.files.iter().map(|file| file.path.as_str()))
     }
 
     pub fn validate_files(&self, repository_root: &Path) -> Result<(), CompatibilityError> {
@@ -1880,6 +1892,30 @@ fn validate_relative_path(value: &str) -> Result<(), CompatibilityError> {
             .any(|part| !matches!(part, Component::Normal(_)))
     {
         return Err(invalid("surface_path_invalid"));
+    }
+    // A path that only reads as normal (`a//b`, `a/b/`, `a/./b`) names the same file as its normal
+    // form but is not equal to it as text, so two spellings of one pin could both be listed (#840).
+    let normal = path
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/");
+    if normal != value {
+        return Err(invalid("surface_path_not_normalised"));
+    }
+    Ok(())
+}
+
+/// Two pins that differ only in ASCII letter case name one file on a case-insensitive file
+/// system, so one of them pins nothing a reader could tell apart (#840).
+fn refuse_case_collisions<'a>(
+    paths: impl IntoIterator<Item = &'a str>,
+) -> Result<(), CompatibilityError> {
+    let mut folded = BTreeSet::new();
+    for path in paths {
+        if !folded.insert(path.to_ascii_lowercase()) {
+            return Err(invalid("surface_path_case_collision"));
+        }
     }
     Ok(())
 }

@@ -17,7 +17,7 @@ The ORCHESTRATOR (§7) drives phase selection, the cycle, and phase-gate advance
 ```text
 GLOBAL RULES — Bridge × Tally (2026-07 plan revision)
 
-Repository: lamemustafa/bridge. Base branch: master.
+Repository: ComplyEaze/bridge. Base branch: master.
 
 Read before editing: AGENTS.md, CONTRIBUTING.md, SECURITY.md,
 review-checklist.md, docs/tally/README.md, docs/tally/privacy-model.md,

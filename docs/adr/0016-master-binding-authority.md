@@ -282,7 +282,7 @@ stemming, and no similarity threshold anywhere in the implementation.
 
 Every non-binding entity carries its candidates, each labelled with the **rule
 that produced it** — `SharedIdentifier`, `NormalizedEqual`, `SourcePrefix`,
-`CatalogPrefix`, or `SharedToken`. Candidates are ordered by rule and then by
+`CatalogPrefix`, `SharedEveryDistinctiveToken`, or `SharedToken`. Candidates are ordered by rule and then by
 name; **no candidate is marked best, first-choice, or `exact_live_spelling`,
 and no numeric score is emitted at all.**
 
@@ -297,6 +297,23 @@ it records what was observed).
 (20) entries, so a catalog-wide word cannot pull in every master. The
 suppression is measured from the catalog rather than from a built-in word list,
 which keeps it free of language and domain assumptions.
+
+`SharedEveryDistinctiveToken` (#1076) is `SharedToken` for a master that holds
+**every** word of the source name. The words `SharedToken` searches on are the
+distinctive tokens; the others are only checked and can only veto, never create a
+candidate: a token this catalog makes common (`input` against `output`, which
+tells two GST heads apart), a word too short to be a token (a GST rate such as
+`5` against `18`, `OD`), and a decimal (`2.5` is one word, of any length, so `5`
+does not match inside it). It is set inclusion, not a degree of similarity, and
+there is no threshold in it. It lists such a master ahead of one holding some of
+the words, and it does so before the cap. It marks no candidate best; a name of a
+single word makes every candidate sharing it a `SharedEveryDistinctiveToken`.
+Neither rule removes a candidate from what is found or counted, so a near-miss
+never becomes "missing", which would get a ledger created. Under the 25-name cap
+the same masters are listed in a new order; over it, the cut now falls on the
+partial matches first. Known and rare: a decimal is kept whole only for the
+short-word check (`Rate 100%` still matches `Rate 100.5%`), and only ASCII digits
+join into one.
 
 Candidates are capped at `MAX_CANDIDATES_PER_ENTITY` (25). The core retains
 `candidate_count`, listing state and `Candidates::count_is_lower_bound()`.
@@ -350,7 +367,7 @@ reads the empty vector as "nothing exists" is wrong in two cases out of three.
 
 This is stated here, in the producer's contract, rather than left to each
 consumer to rediscover, because **it has already been got wrong twice by
-different lanes**: the preparation screen rendered "0 possible ledgers are
+different consumers**: the preparation screen rendered "0 possible ledgers are
 listed first" over a family of 120, and the voucher-presence contract had to
 add a paired test to stop its own rule collapsing into "no candidates means
 unknown" — a reading that is right for the truncated case and wrong for

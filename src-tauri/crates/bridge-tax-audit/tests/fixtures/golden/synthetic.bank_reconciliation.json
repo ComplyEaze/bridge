@@ -79,6 +79,22 @@
       "evidence": []
     },
     {
+      "id": "bank_reconciliation.books_only_reason_not_computed_statement_does_not_add_up_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "e3e966be3c576825",
+      "definition_text": "Unmatched books rows classified 'not_computed_statement_does_not_add_up'.",
+      "evidence": []
+    },
+    {
+      "id": "bank_reconciliation.books_only_reason_not_computed_statement_does_not_add_up_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0e7958f78e1e0ab6",
+      "definition_text": "Sum of books amount, reason 'not_computed_statement_does_not_add_up'.",
+      "evidence": []
+    },
+    {
       "id": "bank_reconciliation.books_only_reason_not_found_count",
       "value": 0,
       "unit": "count",
@@ -224,11 +240,43 @@
       "evidence": []
     },
     {
+      "id": "bank_reconciliation.statement_arithmetic_diff_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5dc27ad94f8066a9",
+      "definition_text": "The statement's declared opening balance plus its rows' credits less debits, less its declared closing balance; reported even when zero.",
+      "evidence": []
+    },
+    {
+      "id": "bank_reconciliation.statement_balance_chain_break_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "481b16ceda11e3a1",
+      "definition_text": "Statement transactions whose own balance is not the balance after the statement's preceding transaction plus this one's credit less its debit (counted where both carry a balance).",
+      "evidence": []
+    },
+    {
       "id": "bank_reconciliation.statement_closing_paise",
       "value": 24295777,
       "unit": "paise",
       "definition_sha256_16": "e2f70d04f1d4f970",
       "definition_text": "The statement's own declared closing balance.",
+      "evidence": []
+    },
+    {
+      "id": "bank_reconciliation.statement_first_row_tie_diff_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2c718b835efa4a75",
+      "definition_text": "The statement's first row balance, less its declared opening balance plus that row's credit less its debit; reported even when zero.",
+      "evidence": []
+    },
+    {
+      "id": "bank_reconciliation.statement_net_movement_paise",
+      "value": 9295777,
+      "unit": "paise",
+      "definition_sha256_16": "7ff1c49737d0922b",
+      "definition_text": "The statement's own rows in this window: credits less debits.",
       "evidence": []
     },
     {
@@ -283,6 +331,22 @@
       "unit": "paise",
       "definition_sha256_16": "d766e7c2a5bb8916",
       "definition_text": "Sum of statement amount, reason 'deposit_not_credited'.",
+      "evidence": []
+    },
+    {
+      "id": "bank_reconciliation.statement_only_reason_not_computed_statement_does_not_add_up_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "417e6a858dd5300e",
+      "definition_text": "Unmatched statement rows classified 'not_computed_statement_does_not_add_up'.",
+      "evidence": []
+    },
+    {
+      "id": "bank_reconciliation.statement_only_reason_not_computed_statement_does_not_add_up_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3755ea89b5eb94a8",
+      "definition_text": "Sum of statement amount, reason 'not_computed_statement_does_not_add_up'.",
       "evidence": []
     },
     {

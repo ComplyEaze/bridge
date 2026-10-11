@@ -75,6 +75,12 @@ pub struct Ledger {
     pub guid: String,
     /// The Tally MASTERID, when the digits parse as a positive integer.
     pub masterid: Option<i64>,
+    /// The master's own `INCOMETAXNUMBER`, empty when the read carried none. Never derived from
+    /// the GSTIN here (`party_identity` decides whether a PAN may be).
+    pub pan: String,
+    /// The master's flat `PARTYGSTIN`, else the registration in force on the period's last day
+    /// from its dated `LEDGSTREGDETAILS.LIST`; empty when neither gives one.
+    pub gstin: String,
 }
 
 impl Ledger {
@@ -150,6 +156,9 @@ pub struct Voucher {
     /// the stated exception, as in the reference: it attributes a TDS/TCS claim and a
     /// capitalisation fact to this party.
     pub party_field: String,
+    /// PARTYGSTIN, Python-stripped as the reference's adapter reads it; empty when absent. The
+    /// GSTIN recorded on the transaction itself, which `clause44` takes before the party ledger's.
+    pub party_gstin: String,
     /// MASTERID as text, Python-stripped, `None` when absent or empty -- the reference model's
     /// `str | None`. Never parsed here: a test that needs a number parses it by its own rule.
     pub masterid: Option<String>,
@@ -174,6 +183,7 @@ impl Default for Voucher {
             lines: Vec::new(),
             narration: String::new(),
             party_field: String::new(),
+            party_gstin: String::new(),
             masterid: None,
             inventory: Vec::new(),
         }
@@ -210,6 +220,81 @@ pub struct Book {
     /// ([`crate::stock_read::stock_inputs`]), so a bad one refuses that test alone. `None` on a
     /// book not built from a read.
     pub stock: Option<StockReadParts>,
+    /// Whether the read carries the books' currency settings. No read does yet, so this is
+    /// `false` for a book built from one (`read_scope` says so).
+    pub currency_read: bool,
+    /// The opening stock a ledger-wise trial balance leaves out (POP-3), read once here.
+    pub opening_stock: OpeningStock,
+}
+
+/// Opening stock as of the trial balance's first day. Tally holds it on the stock items, never
+/// on a ledger, so a ledger-wise trial balance of a book with integrated inventory sums to minus
+/// this amount plus any difference in opening balances.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum OpeningStock {
+    /// Not a read, or the company does not keep inventory integrated with its accounts.
+    #[default]
+    NotApplicable,
+    /// The stock items' opening values in paise, debit positive. Taken only when the trial
+    /// balance starts on the books' first day. On one real read whose ledger masters followed a
+    /// later current period, the items' opening values still equalled Tally's own opening stock
+    /// for the audited year [partial: one book; that read's year began on the books' first day,
+    /// so whether the values follow the request's window or the books' first day is not
+    /// separated]. An item with no opening value counts as zero.
+    Valued(i64),
+    /// Integrated inventory, but the amount is not known; see [`OpeningStockUnknown`].
+    Unknown(OpeningStockUnknown),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpeningStockUnknown {
+    /// The read has no stock-items part.
+    NotRead,
+    /// The trial balance does not start on the books' first day, or the read records no
+    /// trial-balance window or no first day. A dated opening Stock Summary is not taken in its
+    /// place (#1486).
+    NotAtBooksStart,
+    /// The stock-items part did not parse; `stock` refuses on it with the typed error.
+    Unreadable,
+}
+
+impl OpeningStockUnknown {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotRead => "not read",
+            Self::NotAtBooksStart => {
+                "not taken: the read does not show the trial balance starting on the books' first day"
+            }
+            Self::Unreadable => "unreadable",
+        }
+    }
+}
+
+/// [`OpeningStock`] from a read's integration flag, stock-items part and trial-balance window.
+fn opening_stock(
+    is_integrated: Option<bool>,
+    items: Option<&Part>,
+    tb_from: Option<&TallyDate>,
+    books_from: Option<&TallyDate>,
+) -> OpeningStock {
+    if is_integrated != Some(true) {
+        return OpeningStock::NotApplicable;
+    }
+    let Some(items) = items else {
+        return OpeningStock::Unknown(OpeningStockUnknown::NotRead);
+    };
+    if tb_from.is_none() || tb_from != books_from {
+        return OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart);
+    }
+    match crate::stock_read::stock_item_masters(items) {
+        Ok(masters) => OpeningStock::Valued(
+            masters
+                .values()
+                .map(|m| m.opening_value_paise.unwrap_or(0))
+                .sum(),
+        ),
+        Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),
+    }
 }
 
 impl Book {
@@ -244,6 +329,66 @@ impl Book {
             .map(|l| l.name.clone())
             .collect()
     }
+}
+
+/// A voucher's key in one population, which no other voucher of it shares (the reference's
+/// `model.voucher_keys`, #1243). A row that keeps a per-voucher amount, date or count keys it by
+/// this, never by [`Voucher::guid`]: a GUID can be blank or repeated, and two vouchers under one
+/// key are one voucher in the figure. A citation names a voucher by its GUID and label, never by
+/// this, so the key's text has no accessor, nor has its index: nothing reads either, and what
+/// nothing can read cannot be sorted by wrongly. Only [`voucher_keys`] makes one.
+///
+/// Keys made from two different populations must never be compared or mixed: equality here needs
+/// both fields (text and index), where the reference's needs the text only.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct VoucherKey {
+    /// The reference's key: the GUID where no other voucher of the population holds it, else the
+    /// GUID, a NUL and the voucher's place (from 1) among those holding it, zero-padded to eight
+    /// digits so the keys of one GUID sort in population order. Compared first, and unique, so keys
+    /// sort as the reference sorts its `str` keys (code points, as UTF-8 bytes do).
+    text: String,
+    /// The voucher's index in the population. Equality compares it too, and [`Debug`] shows it
+    /// alone, so a key can be told from another in a failure message without printing its text.
+    /// Keys of different GUIDs sort by text, not by this.
+    ///
+    /// [`Debug`]: std::fmt::Debug
+    index: usize,
+}
+
+impl std::fmt::Debug for VoucherKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VoucherKey(#{})", self.index)
+    }
+}
+
+/// Each voucher of `pop` with its key, in `pop`'s order: its GUID where no other voucher of `pop`
+/// holds that GUID, so nothing that reads it moves; else the GUID, a NUL and its place among those
+/// sharing it, zero-padded to eight digits (the reference's `{place:08d}`). Refuses, as the
+/// reference raises, if two keys are still equal, which only a GUID holding a NUL can make (no
+/// read produces one).
+pub fn voucher_keys<'a>(pop: &[&'a Voucher]) -> Result<Vec<(VoucherKey, &'a Voucher)>> {
+    let mut count: BTreeMap<&str, usize> = BTreeMap::new();
+    for v in pop {
+        *count.entry(v.guid.as_str()).or_default() += 1;
+    }
+    let mut place: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut out = Vec::with_capacity(pop.len());
+    for (index, &v) in pop.iter().enumerate() {
+        let guid = v.guid.as_str();
+        let text = if count[guid] == 1 {
+            guid.to_string()
+        } else {
+            let n = place.entry(guid).or_default();
+            *n += 1;
+            format!("{guid}\0{n:08}")
+        };
+        out.push((VoucherKey { text, index }, v));
+    }
+    let distinct: BTreeSet<&str> = out.iter().map(|(k, _)| k.text.as_str()).collect();
+    if distinct.len() != out.len() {
+        return Err(AuditError::VoucherKeysNotUnique);
+    }
+    Ok(out)
 }
 
 /// Tally amount text to integer paise, as the reference engine's `model.paise` reads it:
@@ -594,6 +739,7 @@ fn load_ledgers(
     root: &Element,
     groups: &BTreeMap<String, Option<String>>,
     part: &str,
+    as_of: &TallyDate,
 ) -> Result<BTreeMap<String, Ledger>> {
     refuse_foreign(
         part,
@@ -620,10 +766,34 @@ fn load_ledgers(
                 master_opening_paise,
                 guid: l.child_text("GUID").to_string(),
                 masterid: parse_masterid(l.child_text("MASTERID")),
+                pan: l.child_text("INCOMETAXNUMBER").to_string(),
+                gstin: match l.child_text("PARTYGSTIN") {
+                    "" => gstin_as_of(l, as_of),
+                    flat => flat.to_string(),
+                },
             },
         );
     }
     Ok(out)
+}
+
+/// The GST registration in force on `as_of`: of the dated entries (`APPLICABLEFROM`, YYYYMMDD; an
+/// undated one is the oldest) that carry a GSTIN and apply on or before the day, the latest, a later
+/// entry of the same date winning. Never the first or the last in document order.
+fn gstin_as_of(ledger: &Element, as_of: &TallyDate) -> String {
+    ledger
+        .children_named("LEDGSTREGDETAILS.LIST")
+        .enumerate()
+        .map(|(i, d)| {
+            let from = match d.child_text("APPLICABLEFROM") {
+                "" => "00000000",
+                from => from,
+            };
+            (from, i, d.child_text("GSTIN"))
+        })
+        .filter(|(from, _, gstin)| !gstin.is_empty() && *from <= as_of.as_str())
+        .max()
+        .map_or_else(String::new, |(_, _, gstin)| gstin.to_string())
 }
 
 fn load_tb(root: &Element, part: &str) -> Result<BTreeMap<String, TbRow>> {
@@ -849,6 +1019,7 @@ fn load_vouchers(
             lines,
             narration: v.child_text("NARRATION").to_string(),
             party_field: v.child_text("PARTYLEDGERNAME").to_string(),
+            party_gstin: v.child_text("PARTYGSTIN").to_string(),
             masterid: (!masterid.is_empty()).then(|| masterid.to_string()),
             inventory,
         });
@@ -872,7 +1043,12 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
     let groups = load_groups(&gp_root);
     let group_masters = load_group_masters(&gp_root);
     let lp = required(read, "ledgers")?;
-    let ledgers = load_ledgers(&xml::read(&lp.content, &lp.id)?, &groups, &lp.id)?;
+    let ledgers = load_ledgers(
+        &xml::read(&lp.content, &lp.id)?,
+        &groups,
+        &lp.id,
+        &read.period.to,
+    )?;
     crate::ledger_ids::check_no_duplicate_ledger_guids(&ledgers)?;
     let tp = required(read, "trial_balance")?;
     let tb = load_tb(&xml::read(&tp.content, &tp.id)?, &tp.id)?;
@@ -986,6 +1162,14 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
             ));
         }
     }
+    let is_integrated = company_is_integrated(&company);
+    let items = read.one("stock_items");
+    let opening_stock = opening_stock(
+        is_integrated,
+        items,
+        tp.window.as_ref().map(|w| &w.from),
+        read.books_from.as_ref(),
+    );
     Ok(Book {
         company_name: company_name.to_string(),
         company_guid: guid.to_string(),
@@ -995,11 +1179,13 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         ledgers,
         vouchers,
         tb,
+        currency_read: false,
         stock: Some(StockReadParts {
-            items: read.one("stock_items").cloned(),
+            items: items.cloned(),
             summaries: read.of_kind("stock_summary").cloned().collect(),
-            is_integrated: company_is_integrated(&company),
+            is_integrated,
         }),
+        opening_stock,
     })
 }
 
@@ -1339,7 +1525,124 @@ mod tests {
     }
 
     fn fx_ledgers(text: &str) -> Result<BTreeMap<String, Ledger>> {
-        load_ledgers(&xml::parse(text, "probe")?, &BTreeMap::new(), "probe")
+        load_ledgers(
+            &xml::parse(text, "probe")?,
+            &BTreeMap::new(),
+            "probe",
+            &TallyDate::parse("20260331").unwrap(),
+        )
+    }
+
+    /// A ledger master's PAN, and its GSTIN: the flat `PARTYGSTIN`, else the registration in force
+    /// on the period's last day from the dated list. The expected values are what the reference's
+    /// `_gstin_as_of` and `INCOMETAXNUMBER` read give for the same XML.
+    #[test]
+    fn a_ledger_carries_its_pan_and_the_gstin_in_force_on_the_last_day() {
+        let reg = |from: Option<&str>, gstin: &str| {
+            let from = from.map_or(String::new(), |f| {
+                format!("<APPLICABLEFROM>{f}</APPLICABLEFROM>")
+            });
+            format!("<LEDGSTREGDETAILS.LIST>{from}<GSTIN>{gstin}</GSTIN></LEDGSTREGDETAILS.LIST>")
+        };
+        let gstin_of = |body: &str, as_of: &str| -> String {
+            let text = format!(
+                "<ENVELOPE><LEDGER NAME=\"x\"><PARENT>Sundry Debtors</PARENT>{body}</LEDGER></ENVELOPE>"
+            );
+            let l = load_ledgers(
+                &xml::parse(&text, "probe").unwrap(),
+                &BTreeMap::new(),
+                "probe",
+                &TallyDate::parse(as_of).unwrap(),
+            )
+            .unwrap();
+            l["x"].gstin.clone()
+        };
+        let at = "20260331";
+        let dated = |entries: &[(Option<&str>, &str)]| {
+            entries.iter().map(|(f, g)| reg(*f, g)).collect::<String>()
+        };
+        for (what, entries, want) in [
+            (
+                "one after the day is not in force",
+                vec![
+                    (Some("20240401"), "G1"),
+                    (Some("20250401"), "G2"),
+                    (Some("20260401"), "G3"),
+                ],
+                "G2",
+            ),
+            (
+                "document order is not date order",
+                vec![(Some("20250401"), "G2"), (Some("20240401"), "G1")],
+                "G2",
+            ),
+            (
+                "the later entry of one date wins",
+                vec![(Some("20250401"), "Gz"), (Some("20250401"), "Ga")],
+                "Ga",
+            ),
+            (
+                "an undated entry is the oldest",
+                vec![(None, "Gz"), (Some("20250401"), "G2")],
+                "G2",
+            ),
+            (
+                "an undated entry alone is in force",
+                vec![(None, "Gz")],
+                "Gz",
+            ),
+            (
+                "an entry with no GSTIN is dropped",
+                vec![(Some("20250401"), ""), (Some("20240401"), "G1")],
+                "G1",
+            ),
+            (
+                "every entry after the day gives none",
+                vec![(Some("20260401"), "G3")],
+                "",
+            ),
+            (
+                "an entry on the day itself is in force",
+                vec![(Some("20260331"), "Gd")],
+                "Gd",
+            ),
+            (
+                "the GSTIN is stripped",
+                vec![(Some("20250401"), "  Gp  ")],
+                "Gp",
+            ),
+        ] {
+            assert_eq!(gstin_of(&dated(&entries), at), want, "{what}");
+        }
+        // The flat GSTIN wins over any dated entry; the as-of day moves with the period.
+        let flat = format!(
+            "<PARTYGSTIN> Gf </PARTYGSTIN>{}",
+            dated(&[(Some("20250401"), "G2")])
+        );
+        assert_eq!(gstin_of(&flat, at), "Gf");
+        assert_eq!(
+            gstin_of(&dated(&[(Some("20250401"), "G2")]), "20250331"),
+            ""
+        );
+        // The PAN is the master's own, stripped, and empty when absent.
+        let pan_of = |body: &str| -> String {
+            let text = format!(
+                "<ENVELOPE><LEDGER NAME=\"x\"><PARENT>Sundry Debtors</PARENT>{body}</LEDGER></ENVELOPE>"
+            );
+            let l = load_ledgers(
+                &xml::parse(&text, "probe").unwrap(),
+                &BTreeMap::new(),
+                "probe",
+                &TallyDate::parse(at).unwrap(),
+            )
+            .unwrap();
+            l["x"].pan.clone()
+        };
+        assert_eq!(
+            pan_of("<INCOMETAXNUMBER> PAN-READ-1 </INCOMETAXNUMBER>"),
+            "PAN-READ-1"
+        );
+        assert_eq!(pan_of(""), "");
     }
 
     fn fx_tb(text: &str) -> Result<BTreeMap<String, TbRow>> {
@@ -1554,5 +1857,138 @@ mod tests {
         let e = fx_tb(&text).expect_err("unreadable");
         assert!(matches!(e, AuditError::Parse { .. }), "{e}");
         assert!(e.to_string().contains("not a plain decimal amount"), "{e}");
+    }
+
+    /// The reference's `voucher_keys`, case by case: a unique GUID is its own key; a blank or
+    /// repeated one takes its place among those sharing it, zero-padded to eight digits, so a
+    /// tenth sharer sorts after its second as the reference's keys do; keys sort by their text and
+    /// keep the population index; a GUID that would make two keys equal is
+    /// refused, and without it the same GUIDs are keyed.
+    #[test]
+    fn voucher_keys_are_the_guid_where_unique_else_its_place_among_those_sharing_it() {
+        let vouchers = |guids: &[&str]| -> Vec<Voucher> {
+            guids
+                .iter()
+                .map(|g| Voucher {
+                    guid: (*g).to_string(),
+                    ..Default::default()
+                })
+                .collect()
+        };
+        let mut guids = vec!["u", "", "d", "", "d"];
+        guids.extend(std::iter::repeat_n("t", 10));
+        let vs = vouchers(&guids);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        let keys = voucher_keys(&pop).unwrap();
+        let text: Vec<&str> = keys.iter().map(|(k, _)| k.text.as_str()).collect();
+        assert_eq!(
+            text[..5],
+            [
+                "u",
+                "\u{0}00000001",
+                "d\u{0}00000001",
+                "\u{0}00000002",
+                "d\u{0}00000002"
+            ]
+        );
+        assert_eq!(text[14], "t\u{0}00000010");
+        assert!(keys
+            .iter()
+            .enumerate()
+            .all(|(i, (k, v))| k.index == i && std::ptr::eq(*v, pop[i])));
+        // Eleven or more sharers: the tenth "t" sorts after the second, by text, as the reference's
+        // zero-padded str keys do, so one GUID's keys sort in population order.
+        assert!(keys[6].0 < keys[14].0 && keys[6].0.index < keys[14].0.index);
+        // The text is compared before the index: a key read later but smaller as text sorts first.
+        let vs = vouchers(&["b", "a", "b"]);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        let keys = voucher_keys(&pop).unwrap();
+        assert!(keys[1].0 < keys[0].0 && keys[1].0.index > keys[0].0.index);
+        assert!(keys[0].0 < keys[2].0 && keys[1].0 < keys[2].0);
+        // A key's Debug shows its index and never its text.
+        assert_eq!(format!("{:?}", keys[2].0), "VoucherKey(#2)");
+        let sharers: Vec<&str> = std::iter::repeat_n("s", 12).collect();
+        let vs = vouchers(&sharers);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        let keys = voucher_keys(&pop).unwrap();
+        assert!(keys.windows(2).all(|w| w[0].0 < w[1].0));
+        assert_eq!(keys[11].0.text, "s\u{0}00000012");
+        let vs = vouchers(&["a\u{0}00000001", "a", "a"]);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        assert!(matches!(
+            voucher_keys(&pop),
+            Err(AuditError::VoucherKeysNotUnique)
+        ));
+        let vs = vouchers(&["a\u{0}00000001", "a"]);
+        let pop: Vec<&Voucher> = vs.iter().collect();
+        assert_eq!(voucher_keys(&pop).unwrap().len(), 2);
+    }
+
+    fn stock_items_part(body: &str) -> Part {
+        Part {
+            id: "stock-items".to_string(),
+            kind: "stock_items".to_string(),
+            name: "stock-items.xml".to_string(),
+            window: None,
+            as_of: None,
+            rows: None,
+            alter_id_max: None,
+            scope: None,
+            stored_name: "stock-items.xml".to_string(),
+            response_sha256: String::new(),
+            content: format!(
+                "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
+            )
+            .into_bytes(),
+        }
+    }
+
+    /// #1486: the opening stock POP-3 adds is the stock items' opening values, debit positive,
+    /// only for integrated inventory whose trial balance starts on the books' first day; every
+    /// other case says why it is not known, or that it does not apply.
+    #[test]
+    fn opening_stock_is_taken_only_for_a_trial_balance_from_the_books_first_day() {
+        let from = TallyDate::parse("20250401").unwrap();
+        let later = TallyDate::parse("20250501").unwrap();
+        let items = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>-900.00</OPENINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Latch\"><OPENINGVALUE>-100.50</OPENINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), Some(&from), Some(&from)),
+            OpeningStock::Valued(100_050)
+        );
+        assert_eq!(
+            opening_stock(Some(false), Some(&items), Some(&from), Some(&from)),
+            OpeningStock::NotApplicable
+        );
+        assert_eq!(
+            opening_stock(None, Some(&items), Some(&from), Some(&from)),
+            OpeningStock::NotApplicable
+        );
+        assert_eq!(
+            opening_stock(Some(true), None, Some(&from), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead)
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), Some(&later), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), Some(&from), None),
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&items), None, None),
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+        );
+        let broken = stock_items_part(
+            "<STOCKITEM NAME=\"Hinge\"><OPENINGVALUE>nine</OPENINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            opening_stock(Some(true), Some(&broken), Some(&from), Some(&from)),
+            OpeningStock::Unknown(OpeningStockUnknown::Unreadable)
+        );
     }
 }

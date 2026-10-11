@@ -3,13 +3,14 @@ use super::*;
 fn profiles<'a>(
     company: &'a ValidatedCompanyName,
     range: &'a ValidatedDateRange,
-) -> [ReadOnlyProfile<'a>; 7] {
+) -> [ReadOnlyProfile<'a>; 8] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
         ReadOnlyProfile::CompanyBookExtentV2 { company },
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
+        ReadOnlyProfile::StandardLedgerCatalogV2 { company },
         ReadOnlyProfile::LedgersV1 { company },
         ReadOnlyProfile::VouchersV2 { company, range },
     ]
@@ -198,6 +199,10 @@ fn profile_ids_and_template_hashes_are_stable() {
             "3f38d58a88c8bb99180290b2fb17a3057d6149f78d81e08ba3d9bfc2d595dd95",
         ),
         (
+            ReadOnlyProfileId::StandardLedgerCatalogV2,
+            "e93bbf843455db2a4c9f77991c52b16f10b16bbb792af5ecae4909a48216a62e",
+        ),
+        (
             ReadOnlyProfileId::LedgersV1,
             "259b8159eb7c5a503c96f2760996db992127298781d5a332699a090cea90301b",
         ),
@@ -293,15 +298,11 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
     loop {
         match reader.read_event().unwrap() {
             Event::Start(event) => {
-                path.push(String::from_utf8(event.name().as_ref().to_vec()).unwrap());
+                path.push(event.name().as_ref().to_owned());
                 for attribute in event.attributes() {
                     let attribute = attribute.unwrap();
                     out.push((
-                        format!(
-                            "{}/@{}",
-                            path.join("/"),
-                            String::from_utf8(attribute.key.as_ref().to_vec()).unwrap()
-                        ),
+                        format!("{}/@{}", path.join("/"), attribute.key.as_ref()),
                         attribute
                             .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                             .unwrap()
@@ -311,14 +312,12 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
                 out.push((path.join("/"), String::new()));
             }
             Event::Text(text) => {
-                let text = text.decode().unwrap();
                 if let Some(last) = out.last_mut() {
                     last.1.push_str(&text);
                 }
             }
             Event::GeneralRef(reference) => {
-                let name = reference.decode().unwrap();
-                let decoded = quick_xml::escape::resolve_predefined_entity(&name).unwrap();
+                let decoded = quick_xml::escape::resolve_predefined_entity(&reference).unwrap();
                 out.last_mut().unwrap().1.push_str(decoded);
             }
             Event::End(_) => {
@@ -498,7 +497,7 @@ fn audit_fetch_lists_carry_what_a_silent_default_would_hide() {
         assert!(vouchers.iter().any(|field| field == required), "{required}");
     }
     // An absent quantity, rate or amount on a goods line is read as none,
-    // and the stock movement is silently dropped (Lane B, 2026-09-21).
+    // and the stock movement is silently dropped.
     for prefix in [
         "ALLLEDGERENTRIES.INVENTORYALLOCATIONS",
         "ALLINVENTORYENTRIES",
@@ -646,6 +645,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::CompanyBookExtentV2
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
+            | ReadOnlyProfileId::StandardLedgerCatalogV2
             | ReadOnlyProfileId::LedgersV1
             | ReadOnlyProfileId::VouchersV2
             | ReadOnlyProfileId::AuditCompanyObjectV1
@@ -666,6 +666,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::CompanyBookExtentV2,
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,
+        ReadOnlyProfileId::StandardLedgerCatalogV2,
         ReadOnlyProfileId::LedgersV1,
         ReadOnlyProfileId::VouchersV2,
         ReadOnlyProfileId::AuditCompanyObjectV1,
@@ -738,4 +739,37 @@ fn a_spaced_function_argument_is_read_as_the_hazard_script_reads_it() {
     ] {
         assert_eq!(first_spaced_function_argument(&tdl), hit, "{tdl}");
     }
+}
+
+/// V2 is V1 and one more native method, so the same ledger rows come back with
+/// one more field, and V1's own bytes are not touched.
+#[test]
+fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let v1 = ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render();
+    let v2 = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+    let method = "<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>";
+    assert_eq!(v2.matches(method).count(), 1);
+    assert!(!v1.contains(method));
+    assert_eq!(
+        v2.lines()
+            .filter(|line| !line.contains(method))
+            .collect::<Vec<_>>(),
+        v1.lines().collect::<Vec<_>>()
+    );
+    // The method sits with the other native methods, not elsewhere in the request.
+    let lines = v2.lines().collect::<Vec<_>>();
+    let parent = lines
+        .iter()
+        .position(|line| line.trim() == "<NATIVEMETHOD>Parent</NATIVEMETHOD>")
+        .unwrap();
+    assert_eq!(lines[parent + 1].trim(), method);
+    assert_eq!(
+        ReadOnlyProfileId::StandardLedgerCatalogV2.as_str(),
+        "standard_ledger_catalog_v2"
+    );
+    assert_ne!(
+        ReadOnlyProfileId::StandardLedgerCatalogV1.template_sha256(),
+        ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256()
+    );
 }

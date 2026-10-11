@@ -117,7 +117,7 @@ reviewer: some-github-login
   request that only deletes old acknowledgements (a cleanup) passes.
 - An acknowledgement is append-only for its own pull request: an existing one is
   never modified. After merge it means nothing, and old files may be cleaned up.
-- The branch name is not the file name, so a lane branch is fine.
+- The branch name is not the file name, so any branch name is fine.
 - The number is known only once the pull request is open, so the first run of a
   pull request that touches a pinned path fails with `found 0` until
   `pr-<N>.txt` is pushed to its branch. That is expected, not a breakage: open
@@ -566,7 +566,9 @@ payload-free smoke result, and source-provenance record is present. Preview tags
 must be `mcp-vX.Y.Z` (or the older `mcp-preview-X.Y.Z`, used by 0.2.0 and
 0.3.0); they cannot reuse a production `v*` tag. A
 build without publisher signing must never be described as signed, notarized,
-or ready for production use.
+or ready for production use. The workflow titles the release
+`ComplyEaze Bridge MCP <version>` itself, with the version taken from the tag
+(`mcp-v0.5.0` gives `0.5.0`), so the title needs no edit after publication.
 
 This workflow intentionally has no production-signed channel. A raw MCPB
 archive is not a notarization-and-stapling carrier for the enclosed macOS
@@ -616,10 +618,11 @@ every note for them first, and for maintainers second.
 
 **Rhythm**
 
-- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) at most every two
-  weeks, and only when both of
+- Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) only when both of
   these hold: at least one user-visible change has landed, and CI is green on
-  both hosts.
+  both hosts. A master push may show the native, bundle and seam jobs skipped
+  when the merge queue ran them on that same commit; its job summary names the
+  queue run, and the daily scheduled run runs everything.
 - The workflow publishes each preview as a prerelease. Once its checks are
   read, the maintainer marks the newest preview as the repository's latest
   release (`gh release edit <tag> --prerelease=false --latest`), so the
@@ -680,7 +683,17 @@ It checks every file first and writes none if one fails. Then:
    Also update the sentences that say a tool is "in source but not in the
    0.3.0 release" in `docs/agent/README.md` (name the build that now has it),
    and the `README.md` lines that describe the published package, so no line
-   describes the previous build as the newest.
+   describes the previous build as the newest. Add the new tag to the
+   "so far" list under `## [Unreleased]` in `CHANGELOG.md`, and the new version
+   to the version line of `docs/security-and-privacy.md` (change its tag line
+   only when the page is read again at the new tag).
+   The publish workflow creates the release as a pre-release and deploys the
+   site as soon as it ends, before `gh release edit` marks the release latest, so
+   the release snapshot deployed with the site still records it as a
+   pre-release. The site workflow has no push trigger: text merged under `site/`
+   and in `CHANGELOG.md` goes live only when a maintainer dispatches it or at
+   the next publication, so dispatch it once after the post-release pull request
+   merges.
 
 `scripts/check-license-metadata.mjs` fails CI when the five version files
 disagree.
@@ -702,7 +715,11 @@ disagree.
 **`CHANGELOG.md`**
 
 - Each release gets an "In plain words" section above the detailed entries,
-  written from the merged pull requests since the last build.
+  written from the merged pull requests since the last build. It opens with a
+  short "Should I upgrade?" block: who should, in one line why (name a published
+  advisory if the build fixes one), how to upgrade, and what to check afterwards
+  (the version the extension shows, and the posting setting).
+  It adds no claim the detailed entries or the published advisory do not support.
 - While the changes are unreleased, head the first part "What the next build
   adds", so nothing unpublished reads as available. Rename it "What you can do
   now" when the section becomes the release.
@@ -733,6 +750,11 @@ disagree.
   is empty too, only the standard text and GitHub's list. Headings must read
   `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
   closed, or another level-two heading, is reported as a warning in the run.
+  In the same pull request, reread every answer on the Questions page (`site/faq.html`)
+  against the new release and move its check stamp (the release and the day, in the
+  hero and in the structured data). `scripts/site-pages.test.mjs` fails until the stamp
+  names the version in `packaging/mcpb/manifest.json`, so a version bump cannot merge
+  with answers nobody has reread.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer
@@ -764,17 +786,79 @@ disagree.
 - If the MCP registry or another directory lists the build, update that
   listing's version and SHA-256 in the same release. A listing that points at
   an older package is a stale claim.
+- The official MCP registry listing is `io.github.ComplyEaze/bridge-tally`, published
+  from `registry/server.json` by the **Publish to the MCP registry** workflow
+  (`.github/workflows/publish-mcp-registry.yml`), dispatched by hand and never by a tag.
+  Create its `mcp-registry-publish` environment first. As set up on 2 October 2026 it
+  allows the default branch only and names one required reviewer, the owner, with
+  prevention of self-review off and administrator bypass off: a run waits for the
+  owner's own confirmation click, and there is no second person. For each release, after
+  it is published, update `registry/server.json` in the post-release pull request: the
+  version, the two asset addresses (they carry the version) and both `fileSha256`
+  values, copied from the release's `.sha256` files. Merge that pull request, and
+  dispatch the workflow from the default branch with the release tag, before any later
+  version pull request changes the manifest. The first job refuses to let the publishing
+  job run unless the file's version equals `packaging/mcpb/manifest.json`'s, the tag is
+  `mcp-v<version>`, the release is final, and each hash equals both the digest GitHub
+  records for the asset and its `.sha256` file. The registry accepts a token from any
+  job of any ComplyEaze repository that holds `id-token: write` and checks nothing else,
+  so the namespace is not protected by this workflow alone.
+
+  A published registry version's configuration cannot be edited or moved. A wrong
+  version can be withdrawn: the publish permission also lets a token mark a version
+  deprecated or deleted through the registry's status endpoint (`mcp-publisher status`),
+  which hides it without removing its metadata, and the next release's publication
+  supersedes it. Withdrawal needs its own `id-token` run, so it is an owner-only step
+  and is deliberately not part of the workflow. The test `scripts/check-registry-server-
+  json.test.mjs` (run by `pnpm test` in every pull request) checks the file's form and
+  that its version never runs ahead of the manifest; it cannot require equality in a
+  pull request, because the version pull request bumps the manifest before the release
+  (and so the hashes) exists.
 
 ## Rollback
 
 1. Mark the affected GitHub release as withdrawn and remove unsafe downloadable
-   artifacts without moving or reusing its tag.
-2. Publish a security advisory when coordinated disclosure is required.
-3. Revert or rectify the source change through a pull request with migration
-   compatibility notes.
-4. Cut a new patch version; never replace an already published artifact under
-   the same version or checksum.
-5. Preserve release notes explaining impact, upgrade/rollback steps, and the
-   last known-good version without including customer data.
+   artifacts without moving or reusing its tag. Remove every unsafe artifact: a
+   bundle left on the release stays downloadable from GitHub. Removing one
+   platform's bundle and its `.sha256` is enough for the live list to stop
+   offering the release on the install page (step 2 covers the snapshot),
+   because the page offers a release only while both platforms have a bundle
+   and a checksum. Delete the release or make it a draft only when the entry
+   itself must leave the list. Renaming it or changing its pre-release flag does
+   not change whether the page offers it: the page tells builds apart by tag
+   and assets.
+2. Redeploy the install page and read it back. The page is static and joins
+   two lists (`site/release-catalog.mjs`): the live GitHub list, and the
+   snapshot written by the last deploy (`site/releases.json`), with the live
+   entry winning for each tag. Until the redeploy, two things follow.
+   - A tag that is only in the snapshot stays. A deleted or drafted release
+     leaves the live list, so the Download button can still offer it, and
+     Releases shows it as Latest, with links to artifacts that no longer exist,
+     when it is the newest installable tag.
+   - A visitor whose browser gets no answer from GitHub (for example after its
+     unauthenticated rate limit) sees the snapshot only, with the page's notice,
+     so even a kept release whose artifacts were removed is still offered from
+     the old snapshot.
 
-<!-- Merge-queue canary, 30 Sep 2026: this comment tests the queue and can be removed. -->
+   A new deploy writes a snapshot without the release, or without a complete
+   asset set. Dispatch "Deploy Bridge install page" from master (a run on another
+   ref skips both jobs without saying so) with the owner's yes. A
+   deploy also publishes any `site/` change already merged and renders the
+   changelog and legal pages again, so that text goes live too; read the run's
+   "Site text changed since the last deploy" summary afterwards, as under "MCPB
+   previews and the install page" (it does not compare the generated pages).
+   Then fetch `releases.json` from the deployed site, with a query string so a
+   cache does not answer, and check that the withdrawn tag is absent or present
+   with no complete asset set; open Download and Releases once to see the
+   merged list. If the withdrawn release was the only installable one, the
+   deploy stops at its check for at least one installable release and the old
+   page stays: cut the replacement first (step 5). Its publication redeploys the
+   page when its run succeeds; if it fails, dispatch the deploy by hand. Or say
+   plainly that the page cannot be updated.
+3. Publish a security advisory when coordinated disclosure is required.
+4. Revert or rectify the source change through a pull request with migration
+   compatibility notes.
+5. Cut a new patch version; never replace an already published artifact under
+   the same version or checksum.
+6. Preserve release notes explaining impact, upgrade/rollback steps, and the
+   last known-good version without including customer data.

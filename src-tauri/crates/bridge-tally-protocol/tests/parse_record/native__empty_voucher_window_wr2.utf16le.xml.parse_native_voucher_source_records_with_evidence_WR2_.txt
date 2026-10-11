@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/native/empty_voucher_window_wr2.utf16le.xml
+# parser: parse_native_voucher_source_records_with_evidence(WR2)
+# source: captured
+Ok(ParsedExport {
+    records: [],
+    evidence: ExportEvidence {
+        company_context: None,
+        schema: None,
+        object_type: None,
+        observed_record_count: Some(
+            0,
+        ),
+        source_record_count: None,
+        identified_record_count: 0,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 0,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

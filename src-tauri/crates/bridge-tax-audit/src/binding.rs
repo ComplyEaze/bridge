@@ -1,15 +1,20 @@
 //! Bind an [`Engagement`]'s ledger and group names to the Book by Tally identity, or refuse.
 //!
 //! An engagement config names ledgers and groups by display text: `[roles].cash_groups`,
-//! `[roles].round_off_ledgers`, `[tds].nature_by_ledger`'s and `[tds].payee_aliases`' keys,
+//! `[roles].round_off_ledgers`, `[roles].narration_payee_ledgers`, `[tds].nature_by_ledger`'s and `[tds].payee_aliases`' keys,
 //! `[tds_payees].s194j_category_by_ledger`'s keys, `[loans.loan_ledgers]`'s keys, each loan's
 //! `interest_ledger` and `[loans].shared_interest_ledgers`,
 //! `[depreciation].block_by_ledger`'s keys, `[depreciation].dep_expense_ledgers`,
-//! `[partners.*].interest_ledger`, `[tds_tcs_26as]`'s three ledger lists and its
+//! `[partners.*].interest_ledger`, every list under `[related_parties.*].ledgers_by_nature`,
+//! `[roles].no_supplier_expense_ledgers`, `[roles.gst_registration_type_by_ledger]`'s and
+//! `[clause44].money_category_by_ledger`'s keys,
+//! `[tds_tcs_26as]`'s three ledger lists and its
 //! `deductor_aliases` values (the keys are TANs),
 //! `[statutory_dues]`'s `salary_expense_ledgers` and `nature_by_ledger` keys,
-//! `[creditor_ageing_43bh]`'s `supplier_classification` keys and `mse_interest_ledgers`, the ledger
-//! names a legacy trade-creditor JSON source lists, and `[roles].creditor_groups` -- every location
+//! `[creditor_ageing_43bh]`'s `supplier_classification` keys and `mse_interest_ledgers`,
+//! `[party_identity]`'s `additional_party_ledgers`, `excluded_ledgers`, `round_off_ledgers` and
+//! `overrides` keys, the ledger names a legacy trade-creditor JSON source lists,
+//! `[roles].creditor_groups` and `[party_identity].party_groups` -- every location
 //! this crate's [`Engagement`] reads. Staff rename ledgers between reads, and a name that stops matching used to drop out of
 //! a role silently: the figures moved and nothing said why. [`bind`] is the one place a
 //! configured name meets the Book; every one of the locations above is bound once, before any
@@ -31,7 +36,7 @@
 //!   drift can judge.
 //!
 //! **Scope.** This port's registry above is a strict subset of the reference implementation's
-//! (which also binds names inside `gst_outward`, `related_parties`, and more): only the locations the ported tests actually read. A real client config's `[ledger_ids]`/
+//! (which also binds names inside `gst_outward` and more): only the locations the ported tests actually read. A real client config's `[ledger_ids]`/
 //! `[group_ids]` tables are written for the reference implementation's full pack and will
 //! typically carry many labels this port never looks at; [`BIND_ID_UNUSED`] is checked only
 //! against the locations this module reads, so this crate never refuses over a label some other,
@@ -643,6 +648,26 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             *slot = Some(lbinder.bind_list(&names_at(value, &location)?, &location)?);
         }
     }
+    // `[roles].no_supplier_expense_ledgers` (`clause44`), after `writeoff_discount_ledgers`, as
+    // in the reference's `LEDGER_PATHS`. `None` when absent: the test then refuses.
+    let no_supplier_expense_ledgers = match roles.and_then(|r| r.get("no_supplier_expense_ledgers"))
+    {
+        None => None,
+        Some(value) => {
+            let location = "roles.no_supplier_expense_ledgers";
+            Some(lbinder.bind_list(&names_at(value, location)?, location)?)
+        }
+    };
+    // `[roles].narration_payee_ledgers` (`narration_payees`), after `no_supplier_expense_ledgers`
+    // and before `bank_reconciliation_ledger`, as in the reference's `LEDGER_PATHS`. That list also
+    // has `roles.rcm_tax_ledgers` between `no_supplier_expense_ledgers` and this location, which
+    // the crate does not bind; if it is ever ported, this location must come after it. Read from
+    // the raw config so that a value that is not a list of names refuses here, as the reference's
+    // binding refuses it.
+    let narration_payee_ledgers = lbinder.bind_list(
+        &list_at(&engagement.raw_cfg, &["roles", "narration_payee_ledgers"])?,
+        "roles.narration_payee_ledgers",
+    )?;
     // `[roles].bank_reconciliation_ledger`, a single name, binds before `tax_ledgers`, as in the
     // reference's `LEDGER_PATHS`.
     let bank_reconciliation_ledger = match roles.and_then(|r| r.get("bank_reconciliation_ledger")) {
@@ -673,6 +698,17 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             ),
         });
     }
+    // `clause44`'s two maps bind their keys around `[roles].counterparty_type_by_ledger`'s, as in
+    // the reference's `LEDGER_PATHS`: the registration types after `tax_ledgers`, the money
+    // categories after the counterparty types. Each value is left as written.
+    let registration_type_by_ledger = bind_table_keys(
+        &mut lbinder,
+        table_at(
+            &engagement.raw_cfg,
+            &["roles", "gst_registration_type_by_ledger"],
+        )?,
+        "roles.gst_registration_type_by_ledger",
+    )?;
     // `[roles].counterparty_type_by_ledger`'s keys bind after `tax_ledgers`, as in the reference's
     // `LEDGER_PATHS`; each value is a counterparty type, not a ledger, and is left as written.
     let counterparty_type_by_ledger = bind_table_keys(
@@ -682,6 +718,14 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             &["roles", "counterparty_type_by_ledger"],
         )?,
         "roles.counterparty_type_by_ledger",
+    )?;
+    let money_category_by_ledger = bind_table_keys(
+        &mut lbinder,
+        table_at(
+            &engagement.raw_cfg,
+            &["clause44", "money_category_by_ledger"],
+        )?,
+        "clause44.money_category_by_ledger",
     )?;
 
     // `[tds]` and `[tds_payees]` bind before `[loans]` and `[depreciation]`, as they come before
@@ -875,6 +919,51 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         partners: partner_entries,
     };
 
+    // `[related_parties.*]`'s one name location (spec pack related_parties_cl23 §2.5): every list
+    // under each person's `ledgers_by_nature`, whatever the nature (a name the test ignores is
+    // still a ledger the client named). Persons and natures are visited in key order where the
+    // reference visits them in the file's, so only which refusal is reported first (and, for a
+    // label used in several places, the order of its locations in the rename report) can differ.
+    // A person or `ledgers_by_nature` that is not a table is left as written for the test
+    // to refuse (`RELATED-table-shape`); a list that is not a list of names refuses here, as every
+    // malformed name location does. In the reference's LEDGER_PATHS this is location 25 of 42:
+    // after the three `[partners.*]` locations and before the two `[statutory_dues]` ones.
+    let mut related_persons: BTreeMap<String, toml::Value> =
+        table_at(&engagement.raw_cfg, &["related_parties"])?
+            .map(|t| t.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default();
+    for (person, entry) in &mut related_persons {
+        let Some(natures) = entry
+            .as_table_mut()
+            .and_then(|t| t.get_mut("ledgers_by_nature"))
+            .and_then(toml::Value::as_table_mut)
+        else {
+            continue;
+        };
+        for (nature, v) in natures.iter_mut() {
+            let location = format!("related_parties.{person}.ledgers_by_nature.{nature}");
+            let names: Vec<String> = v
+                .as_array()
+                .and_then(|a| a.iter().map(|x| x.as_str().map(str::to_string)).collect())
+                .ok_or_else(|| {
+                    AuditError::refused(
+                        BIND_ID_MALFORMED,
+                        format!("{location}: expected a list of names, got {v}"),
+                    )
+                })?;
+            *v = toml::Value::Array(
+                lbinder
+                    .bind_list(&names, &location)?
+                    .into_iter()
+                    .map(toml::Value::from)
+                    .collect(),
+            );
+        }
+    }
+    let related_parties = crate::RelatedPartiesConfig {
+        persons: related_persons,
+    };
+
     // The two tables `statutory_dues_43b` and `creditor_ageing_43bh` read, in the reference's
     // LEDGER_PATHS order. Only the name locations' shapes are checked here; every value is kept as
     // written and typed when its own test runs (see `CreditorAgeingConfig`).
@@ -911,13 +1000,40 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         mse_interest_ledgers,
     };
 
+    // `[party_identity]`'s four ledger locations, in the reference's LEDGER_PATHS order (after the
+    // creditor-ageing names, before the legacy trade-creditor source): the three lists, then the
+    // `overrides` keys. Each bound location is written back into a copy of the table, which
+    // `party_identity::PartyConfig::from_toml` types when `entity_269st_gap` runs. A location that
+    // is absent, or a `[party_identity]` that is not a table, is skipped, as the reference's
+    // `_expand` skips it; `from_toml` refuses the latter.
+    let mut party_identity = engagement.party_identity.clone();
+    for key in [
+        "additional_party_ledgers",
+        "excluded_ledgers",
+        "round_off_ledgers",
+    ] {
+        let path = ["party_identity", key];
+        let location = path.join(".");
+        let bound = lbinder.bind_list(&list_at(raw, &path)?, &location)?;
+        if raw_at(raw, &path).is_some() {
+            set_party_identity_key(&mut party_identity, key, toml::Value::from(bound));
+        }
+    }
+    if let Some(overrides) = table_at(raw, &["party_identity", "overrides"])? {
+        let bound = bind_table_keys(&mut lbinder, Some(overrides), "party_identity.overrides")?;
+        set_party_identity_key(
+            &mut party_identity,
+            "overrides",
+            toml::Value::Table(bound.into_iter().collect()),
+        );
+    }
+
     // As the reference does, after every other ledger location: a legacy trade-creditor source's
     // names are configuration too, read once here and replaced by the bound list.
     let mut trade_creditors_source = engagement.trade_creditors_source.clone();
-    if let Some(names) = crate::legacy_trade_creditor_names(
-        engagement.trade_creditors_source.as_ref(),
-        &engagement.base_dir,
-    )? {
+    if let Some(names) =
+        engagement.legacy_creditor_names(engagement.trade_creditors_source.as_ref())?
+    {
         let bound = lbinder.bind_list(&names, LEGACY_PATH_LABEL)?;
         let mut t = toml::Table::new();
         t.insert("kind".to_string(), toml::Value::from("ledgers"));
@@ -952,6 +1068,22 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         None => None,
     };
 
+    // `[party_identity].party_groups`, after `creditor_groups`, as in the reference's GROUP_PATHS.
+    let mut party_groups = Vec::new();
+    if raw_at(raw, &["party_identity", "party_groups"]).is_some() {
+        let bound = gbinder.bind_list(
+            &list_at(raw, &["party_identity", "party_groups"])?,
+            "party_identity.party_groups",
+        )?;
+        set_party_identity_key(
+            &mut party_identity,
+            "party_groups",
+            toml::Value::from(bound.clone()),
+        );
+        party_groups = bound;
+    }
+    let party_identity_not_a_table = raw.get("party_identity").is_some_and(|v| !v.is_table());
+
     gbinder.check_unused()?;
 
     let mut drifts = drift_rows(
@@ -978,6 +1110,7 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         cash_groups,
         bank_groups,
         round_off_ledgers,
+        narration_payee_ledgers,
         bank_reconciliation_ledger,
         counterparty_type_by_ledger,
         loan_ledgers_configured,
@@ -985,6 +1118,7 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         depreciation,
         partner_interest_ledgers,
         partners,
+        related_parties,
         creditor_groups,
         trade_creditors_source,
         creditor_ageing,
@@ -992,9 +1126,25 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
         tds,
         tds_tcs_26as,
         book_keeping_quality,
+        clause44: crate::Clause44Config {
+            no_supplier_expense_ledgers,
+            registration_type_by_ledger,
+            money_category_by_ledger,
+        },
+        party_identity,
+        party_groups,
+        party_identity_not_a_table,
         ..engagement.clone()
     };
     Ok((bound, report))
+}
+
+/// Write a bound location back into the engagement's `[party_identity]` table. Only called for a
+/// location [`raw_at`] found, so the table exists and is a table.
+fn set_party_identity_key(table: &mut Option<toml::Value>, key: &str, value: toml::Value) {
+    if let Some(t) = table.as_mut().and_then(toml::Value::as_table_mut) {
+        t.insert(key.to_string(), value);
+    }
 }
 
 /// Review Register rows (filing aid) for each renamed master, plain-worded for a CA reader.
@@ -1073,6 +1223,8 @@ mod tests {
             chain: vec![group.to_string()],
             chain_complete: true,
             master_opening_paise: 0,
+            pan: String::new(),
+            gstin: String::new(),
             guid: guid.to_string(),
             masterid,
         }
@@ -1396,6 +1548,158 @@ mod tests {
         let b = book("Cash-in-Hand", "", None);
         let err = e.bind(&b).unwrap_err();
         assert_eq!(err.code(), Some(BIND_ID_MALFORMED));
+    }
+
+    /// `narration_payees`' list is bound as a list of ledger names: an unknown name and a value
+    /// that is not a list refuse naming the location, and a label in `[ledger_ids]` is rewritten
+    /// with the list's order and repeats kept, and counts as used.
+    #[test]
+    fn narration_payee_ledgers_are_bound_as_a_list_of_ledger_names() {
+        let mut b = book("Cash-in-Hand", "", None);
+        let e = engagement("narration_payee_ledgers = [\"Wages\"]\n");
+        let err = e.bind(&b).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN));
+        assert!(format!("{err}").contains("roles.narration_payee_ledgers"));
+        let e = engagement("narration_payee_ledgers = \"Wages\"\n");
+        let err = e.bind(&b).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_ID_MALFORMED));
+        assert!(format!("{err}").contains("roles.narration_payee_ledgers"));
+
+        b.ledgers.insert(
+            "Wages Paid".to_string(),
+            ledger("Wages Paid", "Direct Expenses", G_OTHER, None),
+        );
+        let e = engagement(&format!(
+            "narration_payee_ledgers = [\"Wages\", \"Sales\", \"Wages\"]\n\
+             [ledger_ids]\n\"Wages\" = {G_OTHER:?}\n"
+        ));
+        let (bound, report) = e.bind(&b).unwrap();
+        assert_eq!(
+            bound.narration_payee_ledgers,
+            ["Wages Paid", "Sales", "Wages Paid"].map(String::from)
+        );
+        assert_eq!(report.drifts.len(), 1);
+        assert!(engagement("")
+            .bind(&book("Cash-in-Hand", "", None))
+            .unwrap()
+            .0
+            .narration_payee_ledgers
+            .is_empty());
+    }
+
+    /// `roles.narration_payee_ledgers` binds where the reference's `LEDGER_PATHS` puts it, after
+    /// `book_keeping_quality`'s lists and `roles.no_supplier_expense_ledgers`: with an unknown name
+    /// there and at one of those, the refusal names that other location first.
+    #[test]
+    fn narration_payee_ledgers_bind_after_no_supplier_expense_ledgers() {
+        let b = book("Cash-in-Hand", "", None);
+        for other in [
+            "roles.payment_channel_debtors",
+            "roles.no_supplier_expense_ledgers",
+        ] {
+            let key = other.trim_start_matches("roles.");
+            let e = engagement(&format!(
+                "narration_payee_ledgers = [\"Nowhere B\"]\n{key} = [\"Nowhere A\"]\n"
+            ));
+            let err = e.bind(&b).unwrap_err();
+            assert!(
+                matches!(&err, AuditError::Refused { code: BIND_NAME_UNKNOWN, detail }
+                    if detail.split_once(':').map(|(location, _)| location) == Some(other)),
+                "{err:?}"
+            );
+        }
+    }
+
+    /// `narration_payees_on` runs the TDS payee test first, refusing without its two inputs as
+    /// `tds_payees_on` does, reads the bound list, and reads the 194C ledger whose payee that
+    /// test could not name too.
+    #[test]
+    fn narration_payees_on_reads_the_bound_list_and_the_added_ledgers() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let mut b = book("Cash-in-Hand", "", None);
+        for (name, group, guid) in [
+            ("Bank A", "Bank Accounts", ""),
+            ("Wages Paid", "Direct Expenses", G_OTHER),
+            ("Cartage", "Direct Expenses", ""),
+        ] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, group, guid, None));
+        }
+        b.group_masters
+            .insert("Bank Accounts".to_string(), group_master("", None));
+        let paid = |guid: &str, ledger: &str, amount: i64, narration: &str| Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse("20250510").unwrap(),
+            vtype: "Payment".to_string(),
+            base_type: "Payment".to_string(),
+            number: guid.to_string(),
+            status: VoucherStatus::Regular,
+            narration: narration.to_string(),
+            lines: vec![
+                LedgerLine {
+                    ledger: ledger.to_string(),
+                    amount_paise: amount,
+                },
+                LedgerLine {
+                    ledger: "Bank A".to_string(),
+                    amount_paise: -amount,
+                },
+            ],
+            ..Default::default()
+        };
+        b.vouchers
+            .push(paid("w1", "Wages Paid", 4_000, "UPI-ALPHA-WAGES"));
+        b.vouchers
+            .push(paid("c1", "Cartage", 3_500_000, "UPI-BETA-CARTAGE"));
+        let toml = |client: &str, tds: &str| {
+            format!(
+                "[client]\nlabel = \"Test\"\nassessment_year = \"2026-27\"\n{client}\
+                 [period]\nstart = \"2025-04-01\"\nend = \"2026-03-31\"\n\
+                 [snapshot]\nformat = \"tally-read-v1\"\npath = \"unused\"\n\
+                 [roles]\ncash_groups = [\"Cash-in-Hand\"]\nbank_groups = [\"Bank Accounts\"]\n\
+                 narration_payee_ledgers = [\"Wages\"]\n\
+                 [ledger_ids]\n\"Wages\" = {G_OTHER:?}\n{tds}"
+            )
+        };
+        let on = |text: String| {
+            let e = Engagement::from_toml(&text, Path::new(".")).unwrap();
+            crate::narration_payees_on(&e, &b, &rules)
+        };
+        let firm = "entity_type = \"firm\"\n";
+        let tds = "[tds]\nnature_by_ledger = { \"Cartage\" = \"194C\" }\npayee_aliases = {}\n";
+        let dump = on(toml(firm, tds)).unwrap();
+        let value = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("narration_payees.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(
+            (
+                value("configured_ledgers_count"),
+                value("added_ledgers_count"),
+                value("payees_count"),
+                value("resolved_total"),
+            ),
+            (
+                Some(1.into()),
+                Some(1.into()),
+                Some(2.into()),
+                Some(3_504_000.into())
+            )
+        );
+        for (text, want) in [
+            (toml("", tds), "narration_payees needs [client].entity_type"),
+            (toml(firm, ""), "narration_payees needs a [tds] table"),
+        ] {
+            let err = on(text).unwrap_err();
+            assert!(
+                matches!(&err, AuditError::Config(m) if m == want),
+                "{err:?}"
+            );
+        }
     }
 
     // ---- BIND-ID-UNUSED ----
@@ -2163,6 +2467,151 @@ deductor_aliases = 5\n"
         assert!(format!("{err}").contains("[partners].a.interest_ledger"));
     }
 
+    #[test]
+    fn related_party_ledgers_are_bound_and_follow_a_rename_by_identity() {
+        // An unknown name refuses; a label renamed since the table was written binds to the
+        // ledger's current name; a label used only here is not unused; and every nature's list is
+        // a location, one the test ignores included.
+        let unknown = engagement(
+            "\n[related_parties.\"Person A\"]\nledgers_by_nature = { salary = [\"A Salary\"] }\n",
+        );
+        let b = book_with_interest_ledger("A salary", "", None); // case differs
+        assert_eq!(
+            unknown.bind(&b).unwrap_err().code(),
+            Some(BIND_NAME_UNKNOWN)
+        );
+        let renamed = engagement(&format!(
+            "\n[ledger_ids]\n\"Old Salary\" = {G_ROUNDOFF:?}\n\
+             \n[related_parties.\"Person A\"]\nledgers_by_nature = {{ commission = [\"Old Salary\"] }}\n"
+        ));
+        let b = book_with_interest_ledger("Person A Salary", G_ROUNDOFF, None);
+        let (bound, _) = renamed.bind(&b).unwrap();
+        assert_eq!(
+            bound.related_parties.persons["Person A"]["ledgers_by_nature"]["commission"],
+            toml::Value::Array(vec!["Person A Salary".into()])
+        );
+    }
+
+    #[test]
+    fn clause44_ledgers_are_bound_and_follow_a_rename_by_identity() {
+        // Each location refuses an unknown name, naming itself; a label renamed since the config
+        // was written binds to the ledger's current name, each map value kept as written; a list
+        // location that is not a list of names refuses.
+        let b = book_with_interest_ledger("Rent Paid", G_ROUNDOFF, None);
+        for (extra, location) in [
+            (
+                "no_supplier_expense_ledgers = [\"Rent\"]\n",
+                "roles.no_supplier_expense_ledgers",
+            ),
+            (
+                "gst_registration_type_by_ledger = { \"Rent\" = \"Composition\" }\n",
+                "roles.gst_registration_type_by_ledger",
+            ),
+            (
+                "\n[clause44]\nmoney_category_by_ledger = { \"Rent\" = \"bank_charges\" }\n",
+                "clause44.money_category_by_ledger",
+            ),
+        ] {
+            let err = engagement(extra).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN), "{extra}");
+            assert!(format!("{err}").contains(location), "{err}");
+        }
+        let renamed = engagement(&format!(
+            "no_supplier_expense_ledgers = [\"Old Rent\"]\n\
+             gst_registration_type_by_ledger = {{ \"Old Rent\" = \"Composition\" }}\n\
+             \n[ledger_ids]\n\"Old Rent\" = {G_ROUNDOFF:?}\n\
+             \n[clause44]\nmoney_category_by_ledger = {{ \"Old Rent\" = \"bank_charges\" }}\n"
+        ));
+        let (bound, _) = renamed.bind(&b).unwrap();
+        assert_eq!(
+            bound.clause44.no_supplier_expense_ledgers,
+            Some(vec!["Rent Paid".to_string()])
+        );
+        assert_eq!(
+            bound.clause44.registration_type_by_ledger,
+            BTreeMap::from([("Rent Paid".to_string(), toml::Value::from("Composition"))])
+        );
+        assert_eq!(
+            bound.clause44.money_category_by_ledger,
+            BTreeMap::from([("Rent Paid".to_string(), toml::Value::from("bank_charges"))])
+        );
+        let malformed = engagement("no_supplier_expense_ledgers = \"Rent Paid\"\n");
+        assert_eq!(
+            malformed.bind(&b).unwrap_err().code(),
+            Some(BIND_ID_MALFORMED)
+        );
+    }
+
+    /// With an unknown name at every `[roles]` location from `writeoff_discount_ledgers` on, each
+    /// refusal names the location the reference's `LEDGER_PATHS` reaches first.
+    #[test]
+    fn clause44_locations_refuse_in_the_references_order() {
+        let b = book_with_interest_ledger("Rent Paid", G_ROUNDOFF, None);
+        let mut locations = vec![
+            (
+                "writeoff_discount_ledgers = [\"X\"]",
+                "roles.writeoff_discount_ledgers",
+            ),
+            (
+                "no_supplier_expense_ledgers = [\"X\"]",
+                "roles.no_supplier_expense_ledgers",
+            ),
+            (
+                "bank_reconciliation_ledger = \"X\"",
+                "roles.bank_reconciliation_ledger",
+            ),
+            ("tax_ledgers = { igst = [\"X\"] }", "roles.tax_ledgers.igst"),
+            (
+                "gst_registration_type_by_ledger = { \"X\" = \"Regular\" }",
+                "roles.gst_registration_type_by_ledger",
+            ),
+            (
+                "counterparty_type_by_ledger = { \"X\" = \"bank\" }",
+                "roles.counterparty_type_by_ledger",
+            ),
+        ];
+        let money = "\n[clause44]\nmoney_category_by_ledger = { \"X\" = \"bank_charges\" }\n";
+        while !locations.is_empty() {
+            let roles: Vec<&str> = locations.iter().map(|(line, _)| *line).collect();
+            let err = engagement(&format!("{}\n{money}", roles.join("\n")))
+                .bind(&b)
+                .unwrap_err();
+            assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN));
+            let want = locations[0].1;
+            assert!(
+                format!("{err}").contains(&format!("{want}:")),
+                "{want}: {err}"
+            );
+            locations.remove(0);
+        }
+        let err = engagement(money).bind(&b).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_NAME_UNKNOWN));
+        assert!(
+            format!("{err}").contains("clause44.money_category_by_ledger"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_related_party_ledger_list_that_is_not_names_refuses_and_other_shapes_wait_for_the_test() {
+        let b = book_with_interest_ledger("A Salary", "", None);
+        let malformed = engagement(
+            "\n[related_parties.\"Person A\"]\nledgers_by_nature = { salary = \"A Salary\" }\n",
+        );
+        assert_eq!(
+            malformed.bind(&b).unwrap_err().code(),
+            Some(BIND_ID_MALFORMED)
+        );
+        // A person that is not a table names no location: binding passes it on as written, and
+        // related_parties_cl23 refuses it (RELATED-table-shape).
+        let not_a_table = engagement("\n[related_parties]\n\"Person A\" = \"brother\"\n");
+        let (bound, _) = not_a_table.bind(&b).unwrap();
+        assert_eq!(
+            bound.related_parties.persons["Person A"],
+            toml::Value::from("brother")
+        );
+    }
+
     // The reference binds all three [partners.*] ledger locations (LEDGER_PATHS), not only the
     // interest ledger financial_statements reads: partners_40b_194t reads the other two.
     #[test]
@@ -2670,5 +3119,322 @@ deductor_aliases = 5\n"
             "{ CGST = [\"Sales\", \"Sales\"] }",
         );
         assert!(bkq(&same).is_ok());
+    }
+
+    // ---- [party_identity]: four ledger locations and one group location, as the reference's
+    // LEDGER_PATHS (after the creditor-ageing names, before the legacy trade-creditor source) and
+    // GROUP_PATHS (after `creditor_groups`) bind them ----
+
+    /// The book of [`book`] plus two debtor ledgers, one of them with a Tally GUID.
+    fn party_book() -> book::Book {
+        let mut b = book("Cash-in-Hand", G_CASH, None);
+        for (name, guid) in [("Cust A", ""), ("Cust B", G_OTHER)] {
+            b.ledgers
+                .insert(name.to_string(), ledger(name, "Sundry Debtors", guid, None));
+        }
+        b
+    }
+
+    #[test]
+    fn a_party_identity_name_that_matches_nothing_refuses() {
+        let b = party_book();
+        for (extra, code) in [
+            (
+                "[party_identity]\nadditional_party_ledgers = [\"No Such\"]\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity]\nexcluded_ledgers = [\"No Such\"]\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity]\nround_off_ledgers = [\"No Such\"]\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity.overrides]\n\"No Such\" = { name = \"X\" }\n",
+                BIND_NAME_UNKNOWN,
+            ),
+            (
+                "[party_identity]\nparty_groups = [\"No Such\"]\n",
+                BIND_GROUP_UNKNOWN,
+            ),
+        ] {
+            let err = engagement(extra).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(code), "{extra}");
+        }
+    }
+
+    #[test]
+    fn a_malformed_party_identity_location_refuses() {
+        let b = party_book();
+        for extra in [
+            "[party_identity]\nexcluded_ledgers = \"Cust A\"\n",
+            "[party_identity]\nadditional_party_ledgers = [1]\n",
+            "[party_identity]\noverrides = 5\n",
+            "[party_identity]\nparty_groups = \"Sundry Debtors\"\n",
+        ] {
+            let err = engagement(extra).bind(&b).unwrap_err();
+            assert_eq!(err.code(), Some(BIND_ID_MALFORMED), "{extra}");
+        }
+        // Not a table: the reference's `_expand` skips every location under it, and
+        // `PartyConfig::from_toml` refuses it when `entity_269st_gap` runs.
+        let not_a_table = format!("party_identity = 5\n{}", base_toml(""));
+        let e = Engagement::from_toml(&not_a_table, Path::new(".")).unwrap();
+        let (bound, _) = e.bind(&b).unwrap();
+        assert_eq!(bound.party_identity, Some(toml::Value::Integer(5)));
+    }
+
+    /// `knock_off_candidates` reads `party_groups` as bound, and refuses only a `[party_identity]`
+    /// that is not a table; an unknown key in the table does not stop it.
+    #[test]
+    fn party_groups_are_kept_bound_and_a_non_table_is_flagged_for_knock_off_candidates() {
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let mut b = party_book();
+        b.group_masters
+            .insert("Sundry Debtors".to_string(), group_master(G_OTHER, None));
+        let e = engagement(&format!(
+            "[group_ids]\n\"Debtors Old\" = {G_OTHER:?}\n\
+             [party_identity]\nparty_groups = [\"Debtors Old\"]\nno_such_key = 1\n"
+        ));
+        let (bound, _) = e.bind(&b).unwrap();
+        assert_eq!(
+            (bound.party_groups, bound.party_identity_not_a_table),
+            (vec!["Sundry Debtors".to_string()], false)
+        );
+        assert!(crate::knock_off_candidates_on(&e, &b, &rules).is_ok());
+
+        let not_a_table = format!("party_identity = 5\n{}", base_toml(""));
+        let e = Engagement::from_toml(&not_a_table, Path::new(".")).unwrap();
+        let (bound, _) = e.bind(&b).unwrap();
+        assert_eq!(
+            (bound.party_groups, bound.party_identity_not_a_table),
+            (Vec::<String>::new(), true)
+        );
+        let refused = crate::knock_off_candidates_on(&e, &b, &rules).unwrap_err();
+        assert!(
+            matches!(&refused, AuditError::Config(d) if d == "[party_identity] is not a table"),
+            "{refused:?}"
+        );
+    }
+
+    #[test]
+    fn a_label_used_only_under_party_identity_is_bound_and_rewritten() {
+        let e = engagement(&format!(
+            "[ledger_ids]\n\"Cust Old\" = {G_OTHER:?}\n\
+             [group_ids]\n\"Debtors Old\" = {G_OTHER:?}\n\
+             [party_identity]\n\
+             derive_pan_from_gstin = true\n\
+             party_groups = [\"Debtors Old\"]\n\
+             additional_party_ledgers = [\"Cust Old\"]\n\
+             excluded_ledgers = [\"Cust Old\", \"Cust A\"]\n\
+             round_off_ledgers = [\"Cust Old\"]\n\
+             [party_identity.overrides]\n\
+             \"Cust Old\" = {{ name = \"Customer B\" }}\n"
+        ));
+        let mut b = party_book();
+        b.group_masters
+            .insert("Sundry Debtors".to_string(), group_master(G_OTHER, None));
+        let (bound, report) = e.bind(&b).unwrap();
+        let expected: toml::Value = toml::from_str(
+            "derive_pan_from_gstin = true\n\
+             party_groups = [\"Sundry Debtors\"]\n\
+             additional_party_ledgers = [\"Cust B\"]\n\
+             excluded_ledgers = [\"Cust B\", \"Cust A\"]\n\
+             round_off_ledgers = [\"Cust B\"]\n\
+             [overrides]\n\
+             \"Cust B\" = { name = \"Customer B\" }\n",
+        )
+        .unwrap();
+        assert_eq!(bound.party_identity, Some(expected));
+        assert_eq!(report.drifts.len(), 2);
+    }
+
+    #[test]
+    fn two_override_keys_that_bind_to_one_ledger_refuse() {
+        let e = engagement(&format!(
+            "[ledger_ids]\n\"Cust Old\" = {G_OTHER:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust Old\" = {{ name = \"X\" }}\n\
+             \"Cust B\" = {{ name = \"Y\" }}\n"
+        ));
+        let err = e.bind(&party_book()).unwrap_err();
+        assert_eq!(err.code(), Some(BIND_COLLISION));
+    }
+
+    /// The production path: an override keyed by a label that `[ledger_ids]` binds to a renamed
+    /// ledger gives that ledger its PAN, so two ledgers carrying one PAN and receiving cash on one
+    /// day, each under the s.269ST(a) limit and together at or over it, make one gap row.
+    #[test]
+    fn entity_269st_gap_reads_the_bound_party_identity_table() {
+        let e = engagement(&format!(
+            "[ledger_ids]\n\"Cust Old\" = {G_OTHER:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust A\" = {{ pan = \"PAN-SAME-1\" }}\n\
+             \"Cust Old\" = {{ pan = \"PAN-SAME-1\" }}\n"
+        ));
+        let mut b = party_book();
+        b.vouchers.clear(); // only the two receipts below
+        let day = TallyDate::parse("20250612").unwrap();
+        for (guid, party, paise) in [("r1", "Cust A", 12_000_000), ("r2", "Cust B", 10_000_000)] {
+            b.vouchers.push(Voucher {
+                guid: guid.to_string(),
+                date: day.clone(),
+                vtype: "Receipt".to_string(),
+                base_type: "Receipt".to_string(),
+                status: VoucherStatus::Regular,
+                lines: vec![
+                    LedgerLine {
+                        ledger: "Cash".to_string(),
+                        amount_paise: paise,
+                    },
+                    LedgerLine {
+                        ledger: party.to_string(),
+                        amount_paise: -paise,
+                    },
+                ],
+                ..Default::default()
+            });
+        }
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let dump = crate::entity_269st_gap_on(&e, &b, &rules).unwrap();
+        let figure = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("entity_269st_gap.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(figure("gap_rows_count"), Some(serde_json::json!(1)));
+        assert_eq!(figure("unbound_ledger_count"), Some(serde_json::json!(0)));
+        assert_eq!(
+            dump["module_invariants_evaluated"],
+            serde_json::json!(["entity_269st_gap.check_invariants"])
+        );
+    }
+    /// The production path's other two sources, each as bound (a label bound by identity to the
+    /// book's cash group, and one to its round-off ledger): a receipt's round-off line belongs to
+    /// its party, so the day reaches the s.269ST(a) limit exactly.
+    #[test]
+    fn entity_269st_gap_reads_the_bound_cash_groups_and_round_off_ledgers() {
+        let toml = base_toml(&format!(
+            "round_off_ledgers = [\"Round Old\"]\n\
+             [ledger_ids]\n\"Round Old\" = {G_ROUNDOFF:?}\n\
+             [group_ids]\n\"Cash Old\" = {G_CASH:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust A\" = {{ pan = \"PAN-SAME-2\" }}\n\
+             \"Cust B\" = {{ pan = \"PAN-SAME-2\" }}\n"
+        ))
+        .replace(
+            "cash_groups = [\"Cash-in-Hand\"]",
+            "cash_groups = [\"Cash Old\"]",
+        );
+        let e = Engagement::from_toml(&toml, Path::new(".")).unwrap();
+        let mut b = party_book();
+        b.ledgers.insert(
+            "Round Off".to_string(),
+            ledger("Round Off", "Indirect Expenses", G_ROUNDOFF, None),
+        );
+        b.vouchers.clear();
+        let day = TallyDate::parse("20250612").unwrap();
+        // Cust A pays 99,999.50 rounded up to 1,00,000 in cash; Cust B pays 1,00,000.
+        for (guid, credits) in [
+            ("r1", vec![("Cust A", 9_999_950), ("Round Off", 50)]),
+            ("r2", vec![("Cust B", 10_000_000)]),
+        ] {
+            let mut lines = vec![LedgerLine {
+                ledger: "Cash".to_string(),
+                amount_paise: 10_000_000,
+            }];
+            lines.extend(credits.into_iter().map(|(ledger, paise)| LedgerLine {
+                ledger: ledger.to_string(),
+                amount_paise: -paise,
+            }));
+            b.vouchers.push(Voucher {
+                guid: guid.to_string(),
+                date: day.clone(),
+                vtype: "Receipt".to_string(),
+                base_type: "Receipt".to_string(),
+                status: VoucherStatus::Regular,
+                lines,
+                ..Default::default()
+            });
+        }
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let dump = crate::entity_269st_gap_on(&e, &b, &rules).unwrap();
+        let figure = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("entity_269st_gap.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(figure("gap_rows_count"), Some(serde_json::json!(1)));
+        assert_eq!(
+            figure("gap_amount_total"),
+            Some(serde_json::json!(20_000_000))
+        );
+    }
+    /// The production path's bank set, as bound: a bank line on a cash receipt is not a party (nor
+    /// part of the party's amount), so it is not counted as an unbound ledger.
+    #[test]
+    fn entity_269st_gap_reads_the_bound_bank_groups() {
+        const G_BANK: &str = "11111111-1111-1111-1111-000000000009";
+        let toml = base_toml(&format!(
+            "[group_ids]\n\"Bank Old\" = {G_BANK:?}\n\
+             [party_identity.overrides]\n\
+             \"Cust A\" = {{ pan = \"PAN-SAME-3\" }}\n\
+             \"Cust B\" = {{ pan = \"PAN-SAME-3\" }}\n"
+        ))
+        .replace("bank_groups = []", "bank_groups = [\"Bank Old\"]");
+        let e = Engagement::from_toml(&toml, Path::new(".")).unwrap();
+        let mut b = party_book();
+        b.ledgers.insert(
+            "Bank One".to_string(),
+            ledger("Bank One", "Bank Accounts", "", None),
+        );
+        b.group_masters
+            .insert("Bank Accounts".to_string(), group_master(G_BANK, None));
+        b.vouchers.clear();
+        let day = TallyDate::parse("20250612").unwrap();
+        // Cust A's voucher takes 1,10,000 in cash: 1,00,000 to its ledger and 10,000 to a bank
+        // ledger; Cust B pays 1,00,000.
+        for (guid, credits) in [
+            ("r1", vec![("Cust A", 10_000_000), ("Bank One", 1_000_000)]),
+            ("r2", vec![("Cust B", 10_000_000)]),
+        ] {
+            let cash_in: i64 = credits.iter().map(|(_, paise)| paise).sum();
+            let mut lines = vec![LedgerLine {
+                ledger: "Cash".to_string(),
+                amount_paise: cash_in,
+            }];
+            lines.extend(credits.into_iter().map(|(ledger, paise)| LedgerLine {
+                ledger: ledger.to_string(),
+                amount_paise: -paise,
+            }));
+            b.vouchers.push(Voucher {
+                guid: guid.to_string(),
+                date: day.clone(),
+                vtype: "Receipt".to_string(),
+                base_type: "Receipt".to_string(),
+                status: VoucherStatus::Regular,
+                lines,
+                ..Default::default()
+            });
+        }
+        let rules = crate::rules::Rules::vendored().unwrap();
+        let dump = crate::entity_269st_gap_on(&e, &b, &rules).unwrap();
+        let figure = |name: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("entity_269st_gap.{name}"))
+                .map(|f| f["value"].clone())
+        };
+        assert_eq!(figure("gap_rows_count"), Some(serde_json::json!(1)));
+        assert_eq!(figure("unbound_ledger_count"), Some(serde_json::json!(0)));
     }
 }

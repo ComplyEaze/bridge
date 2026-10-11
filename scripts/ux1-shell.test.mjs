@@ -20,7 +20,7 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
   assert.match(app, /Overview/);
   assert.match(app, /Companies/);
   assert.match(app, /Settings/);
-  const nav = app.slice(app.indexOf('<nav aria-label="Bridge navigation">'), app.indexOf("</nav>"));
+  const nav = app.slice(app.indexOf('<nav aria-label="ComplyEaze Bridge navigation">'), app.indexOf("</nav>"));
   assert.doesNotMatch(nav, /GST Returns|DSC Token|Documents|AXAL Backend|Evidence dashboard/);
   // The document-upload and AXAL screens are gone from the source, not only
   // from the navigation, and no view or state in the app names them.
@@ -97,7 +97,7 @@ test("UI keeps client selection searchable and exposes only source-backed shell 
 
 test("simplified nav has explicit Overview, Companies, and Settings destinations", async () => {
   const app = await readFile(new URL("../src/main.tsx", import.meta.url), "utf8");
-  const nav = app.slice(app.indexOf('<nav aria-label="Bridge navigation">'), app.indexOf("</nav>"));
+  const nav = app.slice(app.indexOf('<nav aria-label="ComplyEaze Bridge navigation">'), app.indexOf("</nav>"));
 
   assert.match(nav, /Overview/);
   assert.match(nav, /Companies/);
@@ -115,7 +115,7 @@ test("UX2 keeps report evidence distinct from Core Accounting history and hides 
     readFile(new URL("../src/OutstandingsEvidencePanel.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/evidence-drawer-focus.ts", import.meta.url), "utf8"),
   ]);
-  const nav = app.slice(app.indexOf('<nav aria-label="Bridge navigation">'), app.indexOf("</nav>"));
+  const nav = app.slice(app.indexOf('<nav aria-label="ComplyEaze Bridge navigation">'), app.indexOf("</nav>"));
   const advanced = mirrorProof.slice(
     mirrorProof.indexOf('<details className="evidence-advanced">'),
     mirrorProof.lastIndexOf("</details>"),

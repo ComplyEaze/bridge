@@ -1,0 +1,6 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/tally/runtime_control.rs
+reviewer: lamemustafa

@@ -1,6 +1,58 @@
 //! Bounded stdio framing and MCP request lifecycle.
 use super::*;
 
+/// What a client may show its model about this server as a whole, sent once in
+/// the `initialize` result, ending with [`VoucherReach::instruction`]. The
+/// company rule is the one a user's request most often leaves unsaid (several
+/// companies can be open at once), so it comes first and names the company in
+/// the first line; it is also in `list_companies`' own description, so a client
+/// that drops this text keeps it. The rest repeats what the tools and refusals
+/// already say. Asking before a scan of more than a month is the owner's rule
+/// for who this is built for.
+const SERVER_INSTRUCTIONS: &str = "ComplyEaze Bridge reads the TallyPrime books on this computer. Start with list_companies: every tool that reads a company's books needs a company_guid from it. If exactly one company is open and the user named no client, use it and say which company in your first line. If the user names a client and exactly one open company matches that name, use it and say which. Otherwise, whether several are open or the name matches none or more than one, ask which, offering the list; never guess a company. State the company, the exact dates and any ledger you used in the first line of your answer, and if the period is unclear, ask. Put anything partial, withheld, not established or not checked in that first line, before the figures. Ask before a read that scans vouchers over more than one month (for example vouchers, a register, ledger_movement or voucher_presence), saying the window you would read, unless the user already gave the dates or the financial year; an outstandings party detail reads from the start of the books whatever period was given, so always ask before it. Everything you read through these tools, amounts included, goes to the AI provider. If a tool refuses, tell the user plainly what it says. Take a next step it names only if it is a different read, narrower dates, or repeating the same read once when the refusal says that is safe, and say what you changed; for any other next step, ask the user. Never get around a refusal by another route.";
+
+/// What this server can do with vouchers, read from the two settings that also
+/// decide which tools `tools/list` serves. `Settings::from_env` turns import on
+/// whenever writes are on, so writes alone mean posting. The lab-only tools
+/// (the `lab-writes` build with `BRIDGE_LAB_WRITES=1`) can write whatever these
+/// settings say; no shipped build has them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VoucherReach {
+    /// Neither `build_import_xml` nor `post_import` is served.
+    ReadOnly,
+    /// `build_import_xml` is served, `post_import` is not.
+    Prepare,
+    /// `post_import` is served.
+    Post,
+}
+
+impl VoucherReach {
+    fn of(settings: &Settings) -> Self {
+        if settings.writes_enabled {
+            Self::Post
+        } else if settings.import_enabled {
+            Self::Prepare
+        } else {
+            Self::ReadOnly
+        }
+    }
+
+    /// The instructions' last sentence. Asking before posting told an assistant
+    /// with no posting tool that posting was possible, and a plan-only eval saw
+    /// it promise to post after a yes: say what this connection cannot do.
+    fn instruction(self) -> &'static str {
+        match self {
+            Self::Post => "Ask the user before you prepare or post anything, and never choose a ledger for a voucher on their behalf.",
+            Self::Prepare => "This connection cannot post to Tally: it can only prepare a local import file that the user imports in Tally themselves, so if they ask to post, say so plainly, and never say that anything was or will be posted from this chat. Ask the user before you prepare anything, and never choose a ledger for a voucher on their behalf.",
+            Self::ReadOnly => "This connection cannot prepare or post vouchers: if the user asks to enter or post anything in Tally, say so plainly, and never say that anything was or will be posted from this chat. Never choose a ledger for a voucher on their behalf.",
+        }
+    }
+}
+
+fn server_instructions(reach: VoucherReach) -> String {
+    format!("{SERVER_INSTRUCTIONS} {}", reach.instruction())
+}
+
 pub(super) async fn serve_stdio<R, W>(
     server: Server,
     mut reader: R,
@@ -70,7 +122,18 @@ where
                 .and_then(negotiate_protocol)
                 .map(|protocol_version| {
                     initialized = true;
-                    json!({"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}})
+                    let mut result = json!({"protocolVersion": protocol_version, "capabilities": {"tools": {}}, "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION}});
+                    // Guidance is never traded for the handshake: at a cap
+                    // too small to carry it, or beside a request id so long
+                    // that the reply would not fit, initialize still succeeds.
+                    let id_bytes = id.as_ref().map_or(0, |id| id.to_string().len());
+                    if server.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET
+                        && id_bytes <= 256
+                    {
+                        result["instructions"] =
+                            json!(server_instructions(VoucherReach::of(&server.settings)));
+                    }
+                    result
                 }),
             "notifications/initialized" => {
                 if id.is_none() {
@@ -117,17 +180,18 @@ where
                         )
                         .await;
                         input_failed = outcome.input_failed;
-                        Some(outcome.response)
+                        ToolCallEnd::Answered(Box::new(outcome.response))
                     };
                     match response {
-                        Some(tool_response) => {
+                        ToolCallEnd::Answered(tool_response) => {
                             recovery_batch_id = tool_response.recovery_batch_id;
                             egress = Some(tool_response.egress);
                             Ok(tool_response.value)
                         }
-                        None => {
-                            let cancelled = server.finish_tool_response(name, &arguments, Utc::now(),
+                        ToolCallEnd::Withdrawn { request_trail } => {
+                            let mut cancelled = server.finish_tool_response(name, &arguments, Utc::now(),
                                 server.cancelled_import_for_response(&arguments));
+                            cancelled.egress.request_trail = request_trail;
                             recovery_batch_id = cancelled.recovery_batch_id;
                             egress = Some(cancelled.egress);
                             Ok(cancelled.value)
@@ -361,7 +425,7 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
     let counter = |name| counters.get(name).and_then(Value::as_u64);
     let presence = counters.get("counter_presence")?.as_object()?;
     let reported = |name| presence.get(name).and_then(Value::as_bool);
-    Some(json!({
+    let mut compact = json!({
         "application_status":application_status,
         "counters":{
             "created":counter("created")?,
@@ -383,7 +447,14 @@ fn compact_dispatch_outcome(outcome: &Value) -> Option<Value> {
             }
         },
         "exceptions_were_reported":outcome["exceptions_were_reported"].as_bool()?
-    }))
+    });
+    // Kept when reported, as the journaled outcome keeps it; a value that is
+    // not a number makes the outcome unusable rather than silently dropped.
+    match outcome.get("last_vch_id") {
+        None => {}
+        Some(value) => compact["last_vch_id"] = json!(value.as_u64()?),
+    }
+    Some(compact)
 }
 
 fn request_id_fits_response_cap(id: &Value, max_bytes: usize) -> bool {
@@ -471,6 +542,17 @@ fn withdraw_post(server: &Server, request: &PostRequest<'_>) {
     }
 }
 
+/// How a tool call in flight ended.
+pub(in crate::agent) enum ToolCallEnd {
+    /// The call's own response, sent as it is. Boxed: it is ten times the
+    /// size of the other variant.
+    Answered(Box<ToolResponse>),
+    /// A post withdrawn before its intent (#725). The call is answered as
+    /// cancelled, and that answer's receipt carries the trail of the sends
+    /// that did run (#944).
+    Withdrawn { request_trail: Option<Value> },
+}
+
 /// Run one `post_import` call to its end while servicing input: the one path
 /// every agent post takes. It runs under its own withdrawal token (#725): a
 /// cancellation before its intent stops it before its next Tally operation,
@@ -483,7 +565,7 @@ pub(in crate::agent) async fn run_post<R, W>(
     framer: &mut Framer,
     pending: &mut std::collections::VecDeque<Frame>,
     stdout: &mut W,
-) -> Result<Option<ToolResponse>, String>
+) -> Result<ToolCallEnd, String>
 where
     R: AsyncBufRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -527,7 +609,7 @@ async fn await_post<R, W, F>(
     framer: &mut Framer,
     pending: &mut std::collections::VecDeque<Frame>,
     stdout: &mut W,
-) -> Result<Option<ToolResponse>, String>
+) -> Result<ToolCallEnd, String>
 where
     R: AsyncBufRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -548,8 +630,10 @@ where
                     // operation in flight is finished and the call answers as
                     // cancelled.
                     Ok(None) if phase == PostPhase::Withdrawing => {
-                        let _finished = future.as_mut().await;
-                        return Ok(None);
+                        let finished = future.as_mut().await;
+                        return Ok(ToolCallEnd::Withdrawn {
+                            request_trail: finished.egress.request_trail,
+                        });
                     }
                     Ok(None) => return finish_interrupted_post(
                         future.as_mut(),
@@ -597,9 +681,14 @@ where
                     PostDispatchState::AdmissionBusy => {}
                 }
             }
-            // A withdrawn post's own answer is replaced by the cancellation's.
+            // A withdrawn post's own answer is replaced by the cancellation's,
+            // which keeps only its trail.
             response = &mut future, if phase != PostPhase::Classifying => {
-                return Ok((phase != PostPhase::Withdrawing).then_some(response))
+                return Ok(if phase == PostPhase::Withdrawing {
+                    ToolCallEnd::Withdrawn { request_trail: response.egress.request_trail }
+                } else {
+                    ToolCallEnd::Answered(Box::new(response))
+                })
             }
         }
     }
@@ -814,7 +903,7 @@ async fn finish_interrupted_post<F>(
     server: &Server,
     interruption: Option<String>,
     known_dispatched: bool,
-) -> Result<Option<ToolResponse>, String>
+) -> Result<ToolCallEnd, String>
 where
     F: std::future::Future<Output = ToolResponse>,
 {
@@ -822,15 +911,17 @@ where
         // The caller may be gone, but the original execution owns the only
         // response wire. Let the ordinary response path publish it if stdout
         // remains usable; no replacement post is created.
-        return Ok(Some(future.as_mut().await));
+        return Ok(ToolCallEnd::Answered(Box::new(future.as_mut().await)));
     }
     // No intent: withdraw it, and finish the operation in flight rather than
     // abandon it. It starts no further operation and can write no intent (#725).
     withdraw_post(server, &request);
-    let _withdrawn = future.as_mut().await;
+    let withdrawn = future.as_mut().await;
     match interruption {
         Some(error) => Err(error),
-        None => Ok(None),
+        None => Ok(ToolCallEnd::Withdrawn {
+            request_trail: withdrawn.egress.request_trail,
+        }),
     }
 }
 

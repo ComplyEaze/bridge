@@ -1,0 +1,82 @@
+# fixture: ../tally-protocol-simulator/fixtures/voucher_export.xml
+# parser: parse_voucher_source_records_with_evidence
+# source: synthetic: not evidence of what Tally sends
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: TallyVoucher {
+                id: Some(
+                    "00000000-0000-4000-8000-000000000201",
+                ),
+                date: Some(
+                    "20260701",
+                ),
+                voucher_type: Some(
+                    "Receipt",
+                ),
+                voucher_number: Some(
+                    "BRIDGE-001",
+                ),
+                party_ledger_name: Some(
+                    "BRIDGE SYNTHETIC LEDGER",
+                ),
+                cancelled: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                ledger_entry_count: Some(
+                    0,
+                ),
+                ledger_entries: [],
+            },
+            source_id: Some(
+                "00000000-0000-4000-8000-000000000201",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "00000000-0000-4000-8000-000000000201",
+                ),
+                remote_id: Some(
+                    "bridge-synthetic-voucher-001",
+                ),
+                master_id: None,
+            },
+            alter_id: None,
+            raw_source_sha256: "be4dc5cd7f7433cf2f686e2a3f279be6794508f6c7133cb1d509c1cc5f92eba1",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: Some(
+            CompanyContextEvidence {
+                name: Some(
+                    "BRIDGE SYNTHETIC BOOK",
+                ),
+                guid: Some(
+                    "00000000-0000-4000-8000-000000000001",
+                ),
+                query_identity_set_sha256: None,
+                requested_from_yyyymmdd: None,
+                requested_to_yyyymmdd: None,
+            },
+        ),
+        schema: Some(
+            "bridge.tally.vouchers/2",
+        ),
+        object_type: Some(
+            "VOUCHER",
+        ),
+        observed_record_count: None,
+        source_record_count: Some(
+            1,
+        ),
+        identified_record_count: 1,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 0,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

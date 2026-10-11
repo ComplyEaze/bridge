@@ -1,0 +1,1049 @@
+{
+ "what": "the ordered record of every HTTP request one purchase_register call sent, not a wire capture itself",
+ "tool": "purchase_register",
+ "arguments": {
+  "company_guid": "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+  "from": "20250703",
+  "to": "20250703"
+ },
+ "requests_sent": 118,
+ "posts": 66,
+ "status_reads": 52,
+ "posts_by_request_id": {
+  "BridgeCompanyExtent": 20,
+  "BridgeCompanyBookExtentV2": 16,
+  "BridgeCompanyCurrencies": 8,
+  "BridgeCompanyBaseCurrency": 4,
+  "List of Ledgers": 8,
+  "List of Groups": 4,
+  "Bridge Agent Voucher Census": 2,
+  "Bridge Agent Vouchers": 2,
+  "Bridge Agent Company High Water": 2
+ },
+ "requests": [
+  {
+   "seq": 1,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 2,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 3,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 4,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 5,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 6,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 7,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 8,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 9,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 10,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "e7807e21d1a179b44848879a9431e3547beb70f9d2ebae67e75cf80d3d40b659",
+   "response_body_bytes": 3816,
+   "response_body_sha256": "d793abca6e9d2cefe882ea656b514d5d0e963e30ce5af114430b7199edd273c8",
+   "fixture": "shape_lab_currencies_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 11,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 12,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "e7807e21d1a179b44848879a9431e3547beb70f9d2ebae67e75cf80d3d40b659",
+   "response_body_bytes": 3816,
+   "response_body_sha256": "d793abca6e9d2cefe882ea656b514d5d0e963e30ce5af114430b7199edd273c8",
+   "fixture": "shape_lab_currencies_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 13,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 14,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "806e65cb2aa25220448a351900b062bd6066eb741020ddd8bc7d938180f0a879",
+   "response_body_bytes": 4024,
+   "response_body_sha256": "2e72259c8a144799b04487f1346b0a6253c8b2506c6bc133a38f8e542df50fec",
+   "fixture": "shape_lab_currencies_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 15,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 16,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "806e65cb2aa25220448a351900b062bd6066eb741020ddd8bc7d938180f0a879",
+   "response_body_bytes": 4024,
+   "response_body_sha256": "2e72259c8a144799b04487f1346b0a6253c8b2506c6bc133a38f8e542df50fec",
+   "fixture": "shape_lab_currencies_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 17,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 18,
+   "method": "POST",
+   "request_id": "BridgeCompanyBaseCurrency",
+   "request_sha256": "fcaafea1508d3295ab61563ce43e586abe267551187b231432fabbfc5d5b979c",
+   "response_body_bytes": 4382,
+   "response_body_sha256": "f48ba7e7fdd383a2d10035286647e6b2746e5993ca1687cd7c1057fb59debc68",
+   "fixture": "shape_lab_base_currency_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 19,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 20,
+   "method": "POST",
+   "request_id": "BridgeCompanyBaseCurrency",
+   "request_sha256": "fcaafea1508d3295ab61563ce43e586abe267551187b231432fabbfc5d5b979c",
+   "response_body_bytes": 4382,
+   "response_body_sha256": "f48ba7e7fdd383a2d10035286647e6b2746e5993ca1687cd7c1057fb59debc68",
+   "fixture": "shape_lab_base_currency_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 21,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 22,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 23,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 24,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 25,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 26,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 27,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 28,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 29,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 30,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 31,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 32,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 33,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 34,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "61c9b17f265e3f1e9dc9d6997488dc41e65ae49a2850233e16df523abd041373",
+   "response_body_bytes": 85746,
+   "response_body_sha256": "dd085b77a3fd05694ccd130bf65eff6558e89e5cc784f5b4ce607e09f0457c03",
+   "fixture": "shape_lab_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 35,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 36,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "61c9b17f265e3f1e9dc9d6997488dc41e65ae49a2850233e16df523abd041373",
+   "response_body_bytes": 85746,
+   "response_body_sha256": "dd085b77a3fd05694ccd130bf65eff6558e89e5cc784f5b4ce607e09f0457c03",
+   "fixture": "shape_lab_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 37,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 38,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "72ea0f6d407252333dad3bfb6cc2d569147833d4df690306de558253c3e72c2c",
+   "response_body_bytes": 57668,
+   "response_body_sha256": "f9b437b881baafd592f61b263b747c0f661e5ddcffdc0dbeb07b1f5323af75e0",
+   "fixture": "shape_lab_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 39,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 40,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "72ea0f6d407252333dad3bfb6cc2d569147833d4df690306de558253c3e72c2c",
+   "response_body_bytes": 57668,
+   "response_body_sha256": "f9b437b881baafd592f61b263b747c0f661e5ddcffdc0dbeb07b1f5323af75e0",
+   "fixture": "shape_lab_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 41,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 42,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "1a635c8b200ede795af39ad1abfa9ce3041c1341c561975bc623470d9db2dd0a",
+   "response_body_bytes": 62904,
+   "response_body_sha256": "c635ac45139e6321c3f00a645e9913d177f68176ee385f86f4b82b03dfc670e7",
+   "fixture": "shape_lab_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 43,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 44,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "1a635c8b200ede795af39ad1abfa9ce3041c1341c561975bc623470d9db2dd0a",
+   "response_body_bytes": 62904,
+   "response_body_sha256": "c635ac45139e6321c3f00a645e9913d177f68176ee385f86f4b82b03dfc670e7",
+   "fixture": "shape_lab_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 45,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 46,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 47,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 48,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 49,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 50,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 51,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 52,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 53,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 54,
+   "method": "POST",
+   "request_id": "Bridge Agent Voucher Census",
+   "request_sha256": "27a22111f294ee36efc81c0f7c69683408c596cf94938d47d311792511b7ae54",
+   "response_body_bytes": 5434,
+   "response_body_sha256": "71c527b65edcb2aaee81561d581528ce3f620a10deaca764f6bd050fd2842973",
+   "fixture": "cancelled_purchase_day_voucher_census_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 55,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 56,
+   "method": "POST",
+   "request_id": "Bridge Agent Voucher Census",
+   "request_sha256": "27a22111f294ee36efc81c0f7c69683408c596cf94938d47d311792511b7ae54",
+   "response_body_bytes": 5434,
+   "response_body_sha256": "71c527b65edcb2aaee81561d581528ce3f620a10deaca764f6bd050fd2842973",
+   "fixture": "cancelled_purchase_day_voucher_census_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 57,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 58,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 59,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 60,
+   "method": "POST",
+   "request_id": "Bridge Agent Vouchers",
+   "request_sha256": "a216c2be79685a0e935f62257ca550cae3d5081280c90347bf4d41076baae000",
+   "response_body_bytes": 7734,
+   "response_body_sha256": "5a275b35313efec202141229c43e867e51647cfb740b70c9d7edbf9a3d679bed",
+   "fixture": "cancelled_purchase_day_voucher_window_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 61,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 62,
+   "method": "POST",
+   "request_id": "Bridge Agent Vouchers",
+   "request_sha256": "a216c2be79685a0e935f62257ca550cae3d5081280c90347bf4d41076baae000",
+   "response_body_bytes": 7734,
+   "response_body_sha256": "5a275b35313efec202141229c43e867e51647cfb740b70c9d7edbf9a3d679bed",
+   "fixture": "cancelled_purchase_day_voucher_window_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 63,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 64,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 65,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 66,
+   "method": "POST",
+   "request_id": "Bridge Agent Company High Water",
+   "request_sha256": "f556551d09682fd94d41b40bcf539d5d34bf06260d6da4bb44ad7023c598fcb1",
+   "response_body_bytes": 4326,
+   "response_body_sha256": "3298da50c42daeef5950a299c9921db808518b973aa6985906e16aa960a382da",
+   "fixture": "shape_lab_company_marks_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 67,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 68,
+   "method": "POST",
+   "request_id": "Bridge Agent Company High Water",
+   "request_sha256": "f556551d09682fd94d41b40bcf539d5d34bf06260d6da4bb44ad7023c598fcb1",
+   "response_body_bytes": 4326,
+   "response_body_sha256": "3298da50c42daeef5950a299c9921db808518b973aa6985906e16aa960a382da",
+   "fixture": "shape_lab_company_marks_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 69,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 70,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 71,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 72,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 73,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 74,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 75,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 76,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "e7807e21d1a179b44848879a9431e3547beb70f9d2ebae67e75cf80d3d40b659",
+   "response_body_bytes": 3816,
+   "response_body_sha256": "d793abca6e9d2cefe882ea656b514d5d0e963e30ce5af114430b7199edd273c8",
+   "fixture": "shape_lab_currencies_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 77,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 78,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "e7807e21d1a179b44848879a9431e3547beb70f9d2ebae67e75cf80d3d40b659",
+   "response_body_bytes": 3816,
+   "response_body_sha256": "d793abca6e9d2cefe882ea656b514d5d0e963e30ce5af114430b7199edd273c8",
+   "fixture": "shape_lab_currencies_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 79,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 80,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "806e65cb2aa25220448a351900b062bd6066eb741020ddd8bc7d938180f0a879",
+   "response_body_bytes": 4024,
+   "response_body_sha256": "2e72259c8a144799b04487f1346b0a6253c8b2506c6bc133a38f8e542df50fec",
+   "fixture": "shape_lab_currencies_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 81,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 82,
+   "method": "POST",
+   "request_id": "BridgeCompanyCurrencies",
+   "request_sha256": "806e65cb2aa25220448a351900b062bd6066eb741020ddd8bc7d938180f0a879",
+   "response_body_bytes": 4024,
+   "response_body_sha256": "2e72259c8a144799b04487f1346b0a6253c8b2506c6bc133a38f8e542df50fec",
+   "fixture": "shape_lab_currencies_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 83,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 84,
+   "method": "POST",
+   "request_id": "BridgeCompanyBaseCurrency",
+   "request_sha256": "fcaafea1508d3295ab61563ce43e586abe267551187b231432fabbfc5d5b979c",
+   "response_body_bytes": 4382,
+   "response_body_sha256": "f48ba7e7fdd383a2d10035286647e6b2746e5993ca1687cd7c1057fb59debc68",
+   "fixture": "shape_lab_base_currency_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 85,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 86,
+   "method": "POST",
+   "request_id": "BridgeCompanyBaseCurrency",
+   "request_sha256": "fcaafea1508d3295ab61563ce43e586abe267551187b231432fabbfc5d5b979c",
+   "response_body_bytes": 4382,
+   "response_body_sha256": "f48ba7e7fdd383a2d10035286647e6b2746e5993ca1687cd7c1057fb59debc68",
+   "fixture": "shape_lab_base_currency_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 87,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 88,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 89,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 90,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 91,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 92,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 93,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 94,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 95,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 96,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 97,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 98,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 99,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 100,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "61c9b17f265e3f1e9dc9d6997488dc41e65ae49a2850233e16df523abd041373",
+   "response_body_bytes": 85746,
+   "response_body_sha256": "dd085b77a3fd05694ccd130bf65eff6558e89e5cc784f5b4ce607e09f0457c03",
+   "fixture": "shape_lab_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 101,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 102,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "61c9b17f265e3f1e9dc9d6997488dc41e65ae49a2850233e16df523abd041373",
+   "response_body_bytes": 85746,
+   "response_body_sha256": "dd085b77a3fd05694ccd130bf65eff6558e89e5cc784f5b4ce607e09f0457c03",
+   "fixture": "shape_lab_ledgers_1_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 103,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 104,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "72ea0f6d407252333dad3bfb6cc2d569147833d4df690306de558253c3e72c2c",
+   "response_body_bytes": 57668,
+   "response_body_sha256": "f9b437b881baafd592f61b263b747c0f661e5ddcffdc0dbeb07b1f5323af75e0",
+   "fixture": "shape_lab_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 105,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 106,
+   "method": "POST",
+   "request_id": "List of Ledgers",
+   "request_sha256": "72ea0f6d407252333dad3bfb6cc2d569147833d4df690306de558253c3e72c2c",
+   "response_body_bytes": 57668,
+   "response_body_sha256": "f9b437b881baafd592f61b263b747c0f661e5ddcffdc0dbeb07b1f5323af75e0",
+   "fixture": "shape_lab_ledgers_2_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 107,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 108,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "1a635c8b200ede795af39ad1abfa9ce3041c1341c561975bc623470d9db2dd0a",
+   "response_body_bytes": 62904,
+   "response_body_sha256": "c635ac45139e6321c3f00a645e9913d177f68176ee385f86f4b82b03dfc670e7",
+   "fixture": "shape_lab_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 109,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 110,
+   "method": "POST",
+   "request_id": "List of Groups",
+   "request_sha256": "1a635c8b200ede795af39ad1abfa9ce3041c1341c561975bc623470d9db2dd0a",
+   "response_body_bytes": 62904,
+   "response_body_sha256": "c635ac45139e6321c3f00a645e9913d177f68176ee385f86f4b82b03dfc670e7",
+   "fixture": "shape_lab_groups_response.utf16le.xml",
+   "fixture_is_trimmed": false
+  },
+  {
+   "seq": 111,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 112,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 113,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 114,
+   "method": "POST",
+   "request_id": "BridgeCompanyBookExtentV2",
+   "request_sha256": "63aa3324c7b7fa133fa4d6df3bd25f0c46ac5bad97a0922181e64fed7f836866",
+   "response_body_bytes": 5652,
+   "response_body_sha256": "29a1dd8493e6026ff2cd7d85584a139f422ad2fc0ff1602ecacf456b00539695",
+   "fixture": "shape_lab_book_extent_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 115,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 116,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  },
+  {
+   "seq": 117,
+   "method": "GET",
+   "target": "/status",
+   "response_body_bytes": 51,
+   "response_body_sha256": "655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800"
+  },
+  {
+   "seq": 118,
+   "method": "POST",
+   "request_id": "BridgeCompanyExtent",
+   "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+   "response_body_bytes": 6140,
+   "response_body_sha256": "f0873d4fb61ac9465a234c1e38ae42e875ea846685cd0cba65e963b81b09846a",
+   "fixture": "shape_lab_company_list_response.utf16le.xml",
+   "fixture_is_trimmed": true
+  }
+ ]
+}

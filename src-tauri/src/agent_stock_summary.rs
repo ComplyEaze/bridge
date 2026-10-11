@@ -32,15 +32,17 @@ const ONE_PERIOD_MEASURED: &str = "Only the period ending 31 March 2026 has been
 const ITEM_COUNT_DIFFERS: &str = "stock_summary_item_count_differs";
 
 /// What is and is not checked, per field, in one closed vocabulary: `checked`,
-/// `not_checked`, `withheld`. Only the value total is compared with a second
-/// source; a quantity is read but never returned. Tally's item count is a
-/// cross-check that refuses a short list; it is not proof of a complete one.
+/// `checked_per_item`, `not_checked`. Only the value total is compared with a
+/// second source as a whole; a quantity is returned only for an item whose own
+/// line in that source agrees with it, and each item says whether it did.
+/// Tally's item count is a cross-check that refuses a short list; it is not
+/// proof of a complete one.
 fn checks() -> Value {
     json!({
         "closing_value_total": "checked",
         "item_list_complete": "not_checked",
         "closing_value_each": "not_checked",
-        "closing_quantity": "withheld",
+        "closing_quantity": "checked_per_item",
         "name_parent_unit": "not_checked",
         "as_of_honoured": "not_checked",
     })
@@ -66,9 +68,9 @@ impl Withheld {
     /// What a caller does next.
     fn remediation(self) -> &'static str {
         match self {
-            Self::Differs => "The closing values of the stock items Bridge read and Tally's own Stock Summary for the same period disagree (`unchecked_comparison` shows what each side added up to; a side with no figure is null), so no item is returned. Do not retry: each was read twice and the book did not change. Give the user both sides and ask them to open the Stock Summary in Tally for `period`; present neither figure as the stock value.",
-            Self::ReportShowsNoValue => "Stock items exist and carry closing values, but Tally's Stock Summary for the same period came back with no amount, so nothing was confirmed and no item is returned. Bridge cannot tell whether Tally left the report blank or it truly shows no stock. Ask the user to open the Stock Summary in Tally for `period`: if it shows stock, Bridge cannot read it on this Tally and stock_summary should not be retried.",
-            Self::NotComparable => "Nothing could be compared. Either no stock item Bridge read carries a closing value and Tally's Stock Summary for the period shows no amount or a total of zero, or the items' values add up to zero and the Stock Summary shows no amount. Bridge returns no stock rows it could not check. Do not retry: each was read twice and the book did not change. Tell the user stock for this period has to be read in Tally.",
+            Self::Differs => "The closing values of the stock items ComplyEaze Bridge read and Tally's own Stock Summary for the same period disagree (`unchecked_comparison` shows what each side added up to; a side with no figure is null), so no item is returned. Do not retry: each was read twice and the book did not change. Give the user both sides and ask them to open the Stock Summary in Tally for `period`; present neither figure as the stock value.",
+            Self::ReportShowsNoValue => "Stock items exist and carry closing values, but Tally's Stock Summary for the same period came back with no amount, so nothing was confirmed and no item is returned. ComplyEaze Bridge cannot tell whether Tally left the report blank or it truly shows no stock. Ask the user to open the Stock Summary in Tally for `period`: if it shows stock, ComplyEaze Bridge cannot read it on this Tally and stock_summary should not be retried.",
+            Self::NotComparable => "Nothing could be compared. Either no stock item ComplyEaze Bridge read carries a closing value and Tally's Stock Summary for the period shows no amount or a total of zero, or the items' values add up to zero and the Stock Summary shows no amount. ComplyEaze Bridge returns no stock rows it could not check. Do not retry: each was read twice and the book did not change. Tell the user stock for this period has to be read in Tally.",
         }
     }
 }
@@ -78,8 +80,7 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         // Before any read: an unsupported date or a filter that cannot be
         // honoured costs no Tally request.
-        let as_of = TallyDate::parse(normalized_date(required_string(args, "as_of")?)?)
-            .map_err(|_| "invalid_date".to_string())?;
+        let as_of = normalized_date(required_string(args, "as_of")?)?;
         let as_of = StockSummaryAsOf::new(as_of).map_err(|error| error.code().to_string())?;
         let wanted = item_filter(args)?;
         let (company, identity, mut prior) = self.verified_company(guid).await?;
@@ -362,7 +363,7 @@ fn inventory_basis(integrated: NativeFlag) -> String {
         NativeFlag::Unknown => "Tally did not send ISINTEGRATED",
     };
     format!(
-        "{reported}. These are the stock items' closing values with the sign Tally sends (a negative value is a debit: stock held); how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them."
+        "{reported}. These are the stock items' closing values with the sign Tally sends (a negative value is a debit: stock held); how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and a quantity is returned only where Tally's own Stock Summary shows the same one (`closing.quantity`)."
     )
 }
 
@@ -371,8 +372,10 @@ fn inventory_basis(integrated: NativeFlag) -> String {
 /// go out under the party-name marker, as `masters` does for stock groups;
 /// Tally's reserved root as a parent is a fixed string and stays plain, and an
 /// absent parent stays null. `guid` is the identity and stays plain. The item's
-/// `opening` and every quantity are read and validated but not serialized
-/// ([`NativeStockItem::opening`], [`NativeStockPosition::quantity`]).
+/// `opening` is read and validated but not serialized
+/// ([`NativeStockItem::opening`]); its closing quantity leaves only as
+/// `closing.quantity`, and only where the report agrees
+/// ([`NativeStockPosition::agreement`]).
 fn stock_row(item: &NativeStockItem) -> Value {
     let mut row = json!(item);
     mark_party_field(&mut row, "name");
@@ -407,7 +410,8 @@ fn stock_frame(
         "limitations": [
             NOT_ATOMIC,
             "Only the closing-value TOTAL is compared with Tally's own Stock Summary (`checks`): no item's value is checked on its own, so `value_total_matched` can stand beside `partial: true` when some items have no closing value",
-            "Quantities are withheld: nothing checks them, so none is returned. A quantity Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
+            "A closing quantity is returned only where Tally's own plain Stock Summary shows the same item by name with the same quantity, unit and amount: `closing.quantity.state` is `agreed`, with `amount` and `unit`. Every other item says why not: `none_sent` (Tally sent none, which is not zero), `unread` (a compound unit, or a unit with a space in it; also counted in `totals.closing_quantity_unread_count`, and the read is not refused), `inside_stock_group` (the item's own parent is not the root, that is a stock group; in the captures the report listed only what sits directly under the root, so it is taken to have no line of its own), `report_has_no_line` (the item sits under the root and no line of the report carries its name: it has nothing to show, or the report names it differently; also given when Tally sent no parent, whatever a line shows), `report_name_not_unique` or `report_differs`",
+            "The Stock Summary does not say whether a line is a stock group or an item: a line is tied to an item by its name, quantity, unit and amount and by the item sitting directly under the root",
             "An empty closing value is not zero: it is returned as null and counted (`empty_closing_value_count`), and `value_sum` is null with `partial` true whenever any item's closing value is empty. A value Tally sent as 0.00 is a value",
             "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; a read whose rows differ from that count either way is refused. The count followed the one delete measured (one synthetic company, one sample), which is not proof of a complete list (`checks.item_list_complete`)",
             "Opening quantity and value are read but not returned, because their as-at date is unmeasured",

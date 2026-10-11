@@ -22,7 +22,7 @@ fn build(batch_id: &str, amends: Option<&str>, amount: &str, date: &str) -> Impo
         "endpoint_origin":origin(),
         "company":{"name":"Synthetic Accounts","guid":GUID,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["txn-001"],"date_from":date,"date_to":date,
-        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn-001","date":date,"voucher_type":"Payment",
             "entries":[{"ledger":"Expense","amount":amount,"side":"Dr"},
@@ -74,7 +74,7 @@ fn book_row(line: &ImportLedgerLine) -> ReadVoucher {
         guid: Some(format!("{GUID}-00000005")),
         master_id: Some("5".into()),
         alter_id: Some(40),
-        date: Some(voucher.date.clone()),
+        date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
         voucher_type: Some(voucher.voucher_type.as_str().into()),
         narration: Some(format!("[BRIDGE:{}]", line.attribution_tag(voucher))),
         voucher_number: Some("7".into()),
@@ -277,12 +277,12 @@ fn the_window_holds_where_a_voucher_is_and_where_the_amendment_moves_it() {
     let earlier = build(AMENDMENT, None, "12.50", "20260902").vouchers;
     assert_eq!(
         lineage.window(&earlier),
-        ("20260902".into(), "20260910".into())
+        Some((stored_date("20260902"), stored_date("20260910")))
     );
     let later = build(AMENDMENT, None, "12.50", "20260920").vouchers;
     assert_eq!(
         lineage.window(&later),
-        ("20260910".into(), "20260920".into())
+        Some((stored_date("20260910"), stored_date("20260920")))
     );
 }
 
@@ -304,6 +304,40 @@ fn a_voucher_still_as_any_build_wrote_it_is_admitted() {
             .expect("book holds a version Bridge built");
         assert_eq!(admitted[0]["book_matches_batch_id"], expected);
     }
+}
+
+/// The amendment check expects the narration the import wrote, which has no
+/// outer whitespace (#1055): a book row carrying the trimmed text and the tag
+/// is still the version this build wrote, and is admitted.
+#[test]
+fn a_padded_saved_narration_is_compared_as_the_text_the_import_wrote() {
+    let mut original = build(ORIGINAL, None, "12.50", "20260901");
+    original.vouchers[0].narration = Some("  Paid rent\u{a0}".into());
+    original.sha256 = sha256_hex(
+        render_import_xml(
+            "Synthetic Accounts",
+            &original.vouchers,
+            original.identity_batch_id(),
+        )
+        .as_bytes(),
+    );
+    let lineage = lineage_of(&journal(&[&original]), ORIGINAL).unwrap();
+    let proposal = build(AMENDMENT, None, "18.00", "20260901").vouchers;
+    let mut row = book_row(&original);
+    row.narration = Some(format!(
+        "Paid rent [BRIDGE:{}]",
+        original.attribution_tag(&original.vouchers[0])
+    ));
+    let admitted = lineage
+        .compare_and_swap(&proposal, &book(vec![row]), &verified_as_booked(&lineage))
+        .unwrap()
+        .expect("book holds the version this build wrote");
+    assert_eq!(
+        json!(admitted),
+        json!([{"bridge_txn_id":"txn-001","book_matches_batch_id":ORIGINAL,
+            "guid":format!("{GUID}-00000005"),"master_id":"5","alter_id":40,
+            "not_observed":["effective_date"]}])
+    );
 }
 
 #[test]
@@ -333,11 +367,12 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     ));
     assert_eq!(reason(vec![renarrated]), "book_voucher_diverged");
     let mut redated = book_row(&original);
-    redated.date = Some("20260905".into());
+    redated.date = bridge_tally_core::TallyDate::parse("20260905").unwrap();
     assert_eq!(reason(vec![redated]), "book_voucher_diverged");
     // an edited effective date is a change the amendment would overwrite
     let mut effective_redated = book_row(&original);
-    effective_redated.effective_date = Some("20260905".into());
+    effective_redated.effective_date =
+        Some(bridge_tally_core::TallyDate::parse("20260905").unwrap());
     let refused = lineage
         .compare_and_swap(
             &proposal,
@@ -354,7 +389,7 @@ fn an_edited_missing_or_cancelled_voucher_refuses_the_amendment() {
     // one that came back unchanged is admitted without a caveat; one that did
     // not come back is admitted with it
     let mut effective_kept = book_row(&original);
-    effective_kept.effective_date = effective_kept.date.clone();
+    effective_kept.effective_date = Some(effective_kept.date.clone());
     let admitted = lineage
         .compare_and_swap(
             &proposal,
@@ -432,7 +467,7 @@ fn an_amendment_is_never_eligible_for_native_posting() {
         "company_guid":GUID, "endpoint_origin":origin(),
         "company":{"name":"Synthetic Accounts","guid":GUID,"company_number":"100001","books_from":"20260401"},
         "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901",
-        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built",
+        "sha256":"", "built_at":"2026-09-16T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal",
             "entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},
@@ -564,7 +599,7 @@ fn seed_original(server: &Server) {
 fn seed_original_as(server: &Server, status: &str, txn_ids: [&str; 2]) -> ImportLedgerLine {
     let mut vouchers = captured_catalogue_payload().vouchers;
     for (voucher, txn_id) in vouchers.iter_mut().zip(txn_ids) {
-        voucher.date = normalized_date(&voucher.date).unwrap();
+        voucher.date = normalized_date(&voucher.date).unwrap().as_str().to_string();
         voucher.bridge_txn_id = txn_id.into();
     }
     let line: ImportLedgerLine = serde_json::from_value(json!({
@@ -709,9 +744,10 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
 
 #[test]
 fn the_amendment_admission_module_stays_pinned() {
-    // A pin the branch itself added and then lost in a merge resolution is seen by nothing; one
-    // that existed at the base is a removed pin, which merge-gate.sh blocks without a
-    // `removed-pin:` line.
+    // A pin the branch itself added and then lost in a merge resolution is a withdrawn pin:
+    // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
+    // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
+    // without a `removed-pin:` line.
     // This module decides what an import file may overwrite; its reason sits
     // beside MAX_SURFACE_FILES.
     let surface: Value = serde_json::from_str(include_str!(
@@ -836,29 +872,112 @@ async fn an_amendment_of_a_voucher_altered_or_never_verified_writes_nothing() {
 #[test]
 fn a_verified_baseline_file_is_written_once_per_voucher() {
     let directory = tempfile::tempdir().unwrap();
-    let proof = |alter_id: u64| json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":alter_id}]});
-    record_verified_baseline(directory.path(), ORIGINAL, &proof(40)).unwrap();
-    let first = std::fs::read(directory.path().join(format!("{ORIGINAL}.baseline.json"))).unwrap();
+    let addition =
+        |index: usize| verified_baseline_addition_path(directory.path(), ORIGINAL, index);
+    let proof = |vouchers: &[(&str, u64)]| {
+        json!({"vouchers": vouchers
+            .iter()
+            .map(|(txn_id, alter_id)| json!({"bridge_txn_id":txn_id,"status":"posted_verified","alter_id":alter_id}))
+            .collect::<Vec<_>>()})
+    };
+    record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-001", 40)])).unwrap();
+    let first = std::fs::read(addition(1)).unwrap();
     // A later verification after an edit reports the voucher posted at a
-    // higher ALTERID; the file keeps the first.
-    record_verified_baseline(directory.path(), ORIGINAL, &proof(41)).unwrap();
-    assert_eq!(
-        std::fs::read(directory.path().join(format!("{ORIGINAL}.baseline.json"))).unwrap(),
-        first
-    );
-    assert_eq!(
-        read_verified_baseline(directory.path(), ORIGINAL)
-            .unwrap()
-            .vouchers["txn-001"],
-        40
-    );
-    // An unreadable file is never rewritten.
-    std::fs::write(
-        directory.path().join(format!("{ORIGINAL}.baseline.json")),
-        b"{",
+    // higher ALTERID; nothing is written and the first value stays.
+    record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-001", 41)])).unwrap();
+    assert!(!addition(2).exists());
+    // A voucher verified for the first time goes to a file of its own; the
+    // earlier file is not touched (#911).
+    record_verified_baseline(
+        directory.path(),
+        ORIGINAL,
+        &proof(&[("txn-001", 41), ("txn-002", 52)]),
     )
     .unwrap();
-    assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof(42)).is_err());
+    assert_eq!(std::fs::read(addition(1)).unwrap(), first);
+    let second: amend::VerifiedBaseline =
+        serde_json::from_slice(&std::fs::read(addition(2)).unwrap()).unwrap();
+    assert_eq!(
+        second.vouchers,
+        BTreeMap::from([("txn-002".to_string(), 52)])
+    );
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([
+            ("txn-001".to_string(), 40),
+            ("txn-002".to_string(), 52)
+        ]))
+    );
+    // An unreadable file is never added to, and the baseline reads as none.
+    std::fs::write(addition(1), b"{").unwrap();
+    assert!(
+        record_verified_baseline(directory.path(), ORIGINAL, &proof(&[("txn-003", 60)])).is_err()
+    );
+    assert!(!addition(3).exists());
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+#[test]
+fn an_older_builds_baseline_is_read_first_and_never_touched() {
+    let directory = tempfile::tempdir().unwrap();
+    let legacy = verified_baseline_path(directory.path(), ORIGINAL);
+    std::fs::write(&legacy, br#"{"vouchers":{"txn-001":40}}"#).unwrap();
+    // An older build's stage, left by a stop before its rename.
+    let stage = directory
+        .path()
+        .join(format!("{ORIGINAL}.baseline.json.next"));
+    std::fs::write(&stage, b"older stage").unwrap();
+    let proof = json!({"vouchers":[
+        {"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":41},
+        {"bridge_txn_id":"txn-002","status":"posted_verified","alter_id":52}
+    ]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    assert_eq!(
+        std::fs::read(&legacy).unwrap(),
+        br#"{"vouchers":{"txn-001":40}}"#
+    );
+    assert_eq!(std::fs::read(&stage).unwrap(), b"older stage");
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([
+            ("txn-001".to_string(), 40),
+            ("txn-002".to_string(), 52)
+        ]))
+    );
+    // An addition that repeats a recorded voucher proves nothing about which
+    // value came first: no baseline.
+    std::fs::write(
+        verified_baseline_addition_path(directory.path(), ORIGINAL, 2),
+        br#"{"vouchers":{"txn-001":41}}"#,
+    )
+    .unwrap();
+    assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
+}
+
+/// A baseline larger than `MAX_RECORD_BYTES` is no baseline, as an unreadable
+/// one is; one at the bound reads whole (#837).
+#[test]
+fn a_verified_baseline_past_the_record_bound_is_no_baseline() {
+    let directory = tempfile::tempdir().unwrap();
+    let proof =
+        json!({"vouchers":[{"bridge_txn_id":"txn-001","status":"posted_verified","alter_id":40}]});
+    record_verified_baseline(directory.path(), ORIGINAL, &proof).unwrap();
+    let path = verified_baseline_addition_path(directory.path(), ORIGINAL, 1);
+    let record = std::fs::read(&path).unwrap();
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES),
+    )
+    .unwrap();
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
+    std::fs::write(
+        &path,
+        super::padded_record(&record, ledger::MAX_RECORD_BYTES + 1),
+    )
+    .unwrap();
     assert_eq!(read_verified_baseline(directory.path(), ORIGINAL), None);
 }
 
@@ -977,22 +1096,32 @@ fn the_build_whose_record_equals_the_book_admits_even_when_not_first() {
     assert_eq!(refused[0]["reason"], "voucher_never_verified");
 }
 
+// Unix only: the stage takes a fresh name on each write, so the only failure a
+// test can cause before the rename is a folder that refuses new files. On
+// Windows that needs an access-control change, and this crate builds
+// windows-sys without its security API. On every platform,
+// a_record_written_once_is_whole_alone_and_never_replaced shows that the write
+// never replaces a record already there.
+#[cfg(unix)]
 #[test]
 fn a_failed_baseline_write_leaves_the_previous_file_whole() {
+    use std::os::unix::fs::PermissionsExt;
     let directory = tempfile::tempdir().unwrap();
     let proof = |txn_id: &str, alter_id: u64| json!({"vouchers":[{"bridge_txn_id":txn_id,"status":"posted_verified","alter_id":alter_id}]});
     record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-001", 40)).unwrap();
-    let path = directory.path().join(format!("{ORIGINAL}.baseline.json"));
+    let path = verified_baseline_addition_path(directory.path(), ORIGINAL, 1);
     let before = std::fs::read(&path).unwrap();
-    // The staged file cannot be written: the write fails before the rename.
-    std::fs::create_dir(
-        directory
-            .path()
-            .join(format!("{ORIGINAL}.baseline.json.next")),
-    )
-    .unwrap();
-    assert!(record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52)).is_err());
+    // Nothing can be staged in the folder: the write fails before the link.
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o500)).unwrap();
+    let result = record_verified_baseline(directory.path(), ORIGINAL, &proof("txn-002", 52));
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(result.is_err());
     assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+    assert_eq!(
+        read_verified_baseline(directory.path(), ORIGINAL).map(|baseline| baseline.vouchers),
+        Some(BTreeMap::from([("txn-001".to_string(), 40)]))
+    );
 }
 
 /// A rebuild of the captured batch with the first voucher's debtor leg moved to

@@ -19,7 +19,9 @@
 //! a withdrawal of the batch or a restart.
 use super::post::NativePostRequest;
 use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
-use crate::tally::approved_import::{Answered, ApprovedImport, PendingPostApproval};
+use crate::tally::approved_import::{
+    Answered, ApprovedImport, PendingPostApproval, UnderLockRefusal,
+};
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{json, Value};
@@ -664,7 +666,7 @@ impl PostApprovals {
     /// Spend the approval, once. Called under the import admission lock just
     /// before the dispatch intent is written; a second call, or one after a
     /// revocation, is refused and writes no intent.
-    pub(super) fn spend(&self, batch_id: &str, approval: Uuid) -> Result<(), String> {
+    pub(super) fn spend(&self, batch_id: &str, approval: Uuid) -> Result<(), UnderLockRefusal> {
         let mut slot = self.slot();
         match slot.as_ref() {
             Some((held_batch, Held::Redeeming { id, .. }))
@@ -673,7 +675,7 @@ impl PostApprovals {
                 *slot = None;
                 Ok(())
             }
-            _ => Err("import_approval_revoked".into()),
+            _ => Err(UnderLockRefusal::ApprovalRevoked),
         }
     }
 
@@ -705,13 +707,22 @@ impl PostApprovals {
         }
     }
 
-    /// Withdraw `batch_id`'s approval if it is held and not taken: a call that
-    /// was to redeem it was refused before taking it.
+    /// Withdraw `batch_id`'s approval if it was given and not taken: a call
+    /// that was to redeem it was refused before taking it. That is an
+    /// approval a call has collected (`Approved`), and one clicked while no call
+    /// waited, whose dialog still sits in the slot with its answer. An open or
+    /// declined dialog, one a call is waiting on, a taken approval and another
+    /// batch's hold are left as they are.
     pub(super) fn revoke_unredeemed(&self, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
         if matches!(
             slot.as_ref(),
             Some((held_batch, Held::Approved { .. })) if held_batch == batch_id
+        ) || matches!(
+            slot.as_ref(),
+            Some((held_batch, Held::Pending { dialog: Some(dialog), .. }))
+                if held_batch == batch_id
+                    && dialog.answered().is_some_and(|answered| answered.approved)
         ) {
             if let Some((_, held)) = slot.take() {
                 self.lapse(batch_id, held, reason);

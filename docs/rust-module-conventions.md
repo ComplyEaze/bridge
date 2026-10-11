@@ -169,7 +169,7 @@ The earlier draft's open questions now have measured answers:
 
 Proposed order: text encoding, then import outcome (492 lines, depending only on XML reader
 primitives), then the base layers as `pub(crate)` modules, then the ledger families one per PR.
-This work is owned by a separate lane and waits for #456's test extraction.
+This work is being done separately and waits for #456's test extraction.
 
 ### `src/commands.rs` (~3,350 item lines, pinned)
 
@@ -244,14 +244,14 @@ A method-aware root set is needed before measuring closures.
 
 - **`bills_reconciliation.rs::assess_party_outstanding`** is 416 of the file's 688 item lines, 26
   times the median: the crate's clearest one-huge-function case. Its body reads as six phases, from
-  scope admission to on-account handling. Extracting those steps in place is claimed tonight by a
-  separate lane.
+  scope admission to on-account handling. Extracting those steps in place is being done
+  separately.
 - **`master_binding.rs`** is one pipeline under `bind`, not a module of many things. Its one clean
   seam is identifier extraction: 18 items and 442 lines behind `extract_identifiers` and the
   `Identifier` types. That would be a deep module. It is also the most scrutinised code here
   (ADR 0016), so splitting it needs the master-binding owner's agreement.
 - **`book_presence.rs::decide`** is 393 lines, 12 times the file's median. Step extraction in place
-  is claimed by a separate lane.
+  is being done separately.
 
 ### Not yet measured
 

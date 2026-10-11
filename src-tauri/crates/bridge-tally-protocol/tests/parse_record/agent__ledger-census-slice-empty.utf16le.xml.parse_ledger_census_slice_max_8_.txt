@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/agent/ledger-census-slice-empty.utf16le.xml
+# parser: parse_ledger_census_slice(max 8)
+# source: captured
+Ok([])

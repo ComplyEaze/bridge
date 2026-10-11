@@ -247,8 +247,9 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
         assert_ne!(xml, captured);
         let date = parse_agent_changed_rows(&xml, identity.company_guid()).unwrap()[0]["date"]
             .as_str()
+            .map(bridge_tally_core::TallyDate::parse)
             .unwrap()
-            .to_string();
+            .unwrap();
         let plan = |xml: String| {
             ScenarioPlan::new(Fixture::SyntheticXml(xml))
                 .with_encoding(WireEncoding::Utf16Le)
@@ -329,4 +330,39 @@ fn movement_direction_comes_from_the_amount_sign_not_the_polarity_flag() {
         assert!(movement_entry_is_debit(&amount(zero), true));
         assert!(!movement_entry_is_debit(&amount(zero), false));
     }
+}
+
+/// A zero entry adds nothing to either column, whatever its sign or flag, and never becomes `--0.00`
+/// (#1251). With the magnitude taken from `abs()`, `-0.00` stayed `-0.00` and the debit text was
+/// `--0.00`. The whole read is covered by the `zero` read of
+/// `movement_refuses_voucher_changes_even_when_period_openings_match`, which failed with
+/// `voucher_amount_invalid` before the fix.
+#[test]
+fn a_zero_entry_adds_a_plain_zero_to_the_column_its_flag_names() {
+    let amount = |text: &str| bridge_tally_core::ExactDecimal::parse(text.to_string()).unwrap();
+    for zero in ["0", "0.00", "-0", "-0.00", "-0.000"] {
+        assert_eq!(
+            movement_entry_effect(&amount(zero), true),
+            (true, "0".to_string()),
+            "{zero}"
+        );
+        assert_eq!(
+            movement_entry_effect(&amount(zero), false),
+            (false, "0".to_string()),
+            "{zero}"
+        );
+    }
+    // A non-zero entry keeps its magnitude as Tally wrote it and the column its sign gives.
+    assert_eq!(
+        movement_entry_effect(&amount("-10.50"), true),
+        (true, "10.50".to_string())
+    );
+    assert_eq!(
+        movement_entry_effect(&amount("10.50"), false),
+        (false, "10.50".to_string())
+    );
+    // The debit text a movement builds from it is a number.
+    let (is_debit, magnitude) = movement_entry_effect(&amount("-0.00"), true);
+    assert!(is_debit);
+    assert!(bridge_tally_core::ExactDecimal::parse(format!("-{magnitude}")).is_ok());
 }

@@ -255,7 +255,8 @@ request is predicted over a budget well below the cap.
      `GOLD = No`, so Education still reports Silver and the mode is read from `EDUMODE` alone.
 6. **Every part is admitted, and so is their union.** Each row of a part must lie in the part's dates
    and AlterID span. When the window was counted, a part's vouchers must be **exactly** the ones the
-   census counted for it, by AlterID and GUID — a matching count is not enough, because a substituted
+   census counted for it, by AlterID and GUID; a window counted and then read whole, in one part, is
+   admitted against its census the same way, not only a divided one (#985) — a matching count is not enough, because a substituted
    voucher preserves it. And GUIDs and master IDs must be unique across the union of parts, not only
    within each response: a voucher re-dated between two parts is returned by both, each valid alone.
    Either failure refuses as `voucher_window_part_not_admitted` or
@@ -278,7 +279,12 @@ request is predicted over a budget well below the cap.
    AlterID-limited parts reads only up to the first read's ceilings: a voucher posted in the window
    between the two reads takes an AlterID above them, both reads miss it, and their responses match
    byte for byte. A replay of a divided read without a witness is refused as
-   `voucher_window_replay_unwitnessed`.
+   `voucher_window_replay_unwitnessed`. The import-verification read is not replayed at all when it
+   was divided, every part was admitted against a census naming each voucher's GUID, and the marks
+   read after its last part equal the marks it opened on (#1241): each part is already a paired
+   read that matched the census voucher for voucher, and each create, alter, cancel, re-date and
+   delete moved a mark every time it was measured (§11c.5; §11c.4 lists what was not tested), so the
+   replay could only observe a later state. A window read whole, or divided with no census, is still replayed.
 9. **A caller that must send the undivided request itself decides on what was measured.** The
    pre-post check inside the import dispatch lease sends the whole verification window as one
    request. Before approval it is admitted on the `verify_import` read of the same window that runs
@@ -302,6 +308,19 @@ request is predicted over a budget well below the cap.
   inventory-heavy book with a mark of about 250,000 (31 census spans): a one-day `vouchers` call took
   34 s (7.5 s before the rectify) and a one-month `ledger_movement` 105 s (53 s before). The MCP
   host's own timeout is not measured.
+- **The import-verification read's second read is skipped for a divided, counted, bracketed read
+  (#1241).** That rests on the marks moving for every change that could alter what a window
+  returns, which §11c.5 measured for gateway writes and the screen actions listed there, once each;
+  changes made in the Edit Log SKU, in Education, by synchronisation, or by another connector on a
+  multi-user book were not tested. A change that altered a voucher's export without moving either
+  mark, made between two parts, would be caught by the census (a part holds the counted
+  AlterIDs and GUIDs) only if it also changed the voucher's AlterID or GUID. **Confidence: PARTIAL**:
+  the request counts are from scripted doubles through the tool call; no live Tally was read, and the
+  saving in seconds was not measured here (the issue (#1241) states 93.4 s to verify a 4,972-voucher
+  window against 48.8 s for its build read).
+  `ledger_movement` keeps its second read: it compares two ledger catalogues taken either side of
+  the voucher read, and skipping the replay would leave the second catalogue outside the marks
+  bracket.
 - **An abandoned call is not cancelled mid-read.** For every tool but `post_import`, the stdio server
   awaits a tool call to completion before reading its input again, so a host's cancellation or
   closed input is seen only afterwards, and the read dispatches its remaining (bounded) requests.
@@ -414,6 +433,85 @@ Further observations from the same runs:
 - **Currency rename.** A Company Alteration rename of the base currency (symbol and formal name)
   changed the currency master's `ORIGINALNAME` and the company's `CURRENCYNAME` with it, both ways.
   A non-INR company given a ₹ symbol was not measured.
+
+**A window read whole and admitted against its census (#985, #1020) — PARTIAL, 2026-10-02.**
+Run by the maintainers on a licensed TallyPrime 7.1 Silver lab, through Bridge's own tools, on
+synthetic lab books, one-day windows. The reads ran on builds of two #1020 heads, `5797c9ec` and
+`ff50b571` (before it merged master), with the same results on both; the post ran on `ff50b571`
+only. One run of each. The requests are described from each tool's own request trail (counts,
+hashes and sizes); no request or response was captured into this tree.
+
+When a census is read (rule 2 of §11c.3) is derived from the code, not measured: the planner reads
+one only when a book's voucher mark times the shape's default size per voucher exceeds the 16 MiB
+budget. That is
+a mark of 43 or more for the `vouchers` and `voucher_presence` shape (384 KiB a voucher) and 171 or
+more for the import-verification shape (96 KiB a voucher) that the read-back after a post uses.
+
+**Deviation, 6 Oct 2026 (#1029).** The two paragraphs above, and rule 2 of §11c.3 ("sent undivided,
+exactly as before"), describe the build the table below was measured on. Since #1029 `vouchers`,
+`voucher_presence` and the registers read a census on a small book as well, whatever its mark (a mark
+of zero is never counted), so the "no census" rows below describe the earlier build for those tools.
+`ledger_movement`, the read-back after a post, `outstandings` and the widened read that corroborates an
+empty window still read a small book undivided and uncounted. The 22 and 34 request counts for a small
+book came from scripted doubles and were then measured on one synthetic book of eight vouchers on 7 Oct 2026
+(a `vouchers` call 16 to 22 requests, `voucher_presence` 28 to 34, every request served; the six more are two
+census reads, two company-extent reads and two status reads). **Confidence: PARTIAL**: one book, one run of the
+day and week calls and three of the presence call, debug builds, windows of one voucher. This change does not alter a larger
+book's path (from the code); a larger book's census cost was not measured here.
+
+| Call | Book | Window label | Verdicts | Requests |
+| --- | --- | --- | --- | --- |
+| `vouchers`, a day with one voucher | census read | `complete`, total 1 | | 22 |
+| `vouchers`, the same | no census | `partial`, `nonempty_window_unqualified`, total 1 | | 16 |
+| `voucher_presence`, 2 proposals | census read | `complete` | the voucher in the book `present`; one nothing in the book resembles `absent` | 34 |
+| `voucher_presence`, 2 proposals | no census | `partial`, `nonempty_window_unqualified` | the voucher in the book `present`; one sharing its party `possibly_present`, `resembles_book_voucher` | 28 |
+| `voucher_presence`, 1 proposal whose party is bound and is not the book voucher's | no census | `partial`, `nonempty_window_unqualified` | `possibly_present`, `window_not_proven_complete`, no candidates | 28 |
+
+- No `absent` was issued on a `partial` window.
+- The `vouchers` call on the census book sent the same requests as a build without #1020, in the
+  same order, with the same request hashes and response sizes.
+- On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
+  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
+  code, not the run: that reason is returned when the read widened by a day on each side finds
+  rows, none inside the window, so it names the neighbouring days, not the window, which returned
+  no row; the wording is a separate matter.
+
+**The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
+`post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
+the read-back read a census. `post_import` returned `posted_verified`: created 1 and every other
+counter 0, one import sent and not resent, and the voucher mark moved by exactly 1. On a day empty
+before the post, the census answer grew in size from the empty answer's, as one holding a voucher
+would; that a census was read is taken from request and response sizes in the tool's own request
+trail, not from captured bytes. The read was admitted against it and returned complete.
+`verify_import` then returned `posted_verified`, 1 verified, none unverified and no duplicate,
+reading the window again with the same request and response hashes. No `voucher_window_part_not_admitted` was returned on a book
+nobody changed.
+
+**Where a one-month window read spends its time, and what a later page costs — PARTIAL, 2026-10-02.**
+One run of each, on a synthetic benchmark book (one month, 2,542 vouchers, about 82 a day), the `vouchers`
+tool of a master build through a recording read-only relay, licensed TallyPrime 7.1 Silver.
+
+- A whole-window read took 65.8 s in a release build (75.6 s in a debug build) and sent 232 requests. Tally
+  held 45.5 s of it, Bridge's request spacing about 19.1 s, Bridge's own CPU 2.4 s. Of the relay's Tally seconds, the
+  data parts took 36.7 s and the census 5.2 s: 55.7% and 7.9% of the 65.84 s the call took (computed from those three figures
+  of the same run). In 57 relay logs of paired reads on quiet synthetic books, the two sends of a pair never differed.
+- Before the page snapshot change (#1053), every later page of the same window read the whole window again:
+  232 requests each. With it, in one run, a later page that named the first page's `snapshot_id` took 1.2 s and
+  sent 10 requests (0.18 s of it Tally's), against 68.0 s and 232 requests for the first page, on a quiet book.
+- Not measured: a change made at Tally's screen between two live pages (the screen actions that move the marks
+  are in the entries above, one run each), a window larger than the 64 MiB the held windows share, another book,
+  another release, the desktop screen (it holds nothing), and the effect of any change to the request spacing.
+
+This does not establish:
+
+- a window of several days read in one request and admitted against its census, which is the case
+  `voucher_presence` is mostly asked about (ADR 0017's note of 2026-10-02);
+- the refusal itself: no run produced a disagreement between a census and its read, so what a
+  caller sees then, after a read or after a post, is shown only by #1020's own tests;
+- how often that refusal fires on a book several people are changing;
+- Education mode, or tiers and releases other than Silver 7.1;
+- the voucher types' own numbering: the caller declared them `manual`;
+- anything beyond one run of each, on synthetic lab books.
 
 ## 11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**
 
@@ -634,13 +732,15 @@ The Company collection fetched with `Name, GUID, NUMLEDGERS` (request `BridgeCom
 `COMPANY` row per loaded company, whatever `SVCURRENTCOMPANY` named, each row `NAME`, `GUID` and
 `NUMLEDGERS` (a number with a leading space, as `ALTMSTID` is): present on 31 of 31 rows, in 0.09 s for
 18.7 KB. The synthetic 4,339-ledger book's value, 4,339, equalled its catalogue and AlterID-census counts, and two
-real stock-heavy books, about 900 and about 2,600 ledgers, read by another lane, also equalled their censuses
+real stock-heavy books, about 900 and about 2,600 ledgers, read separately, also equalled their censuses
 (recorded in #938 only; the tree holds the synthetic book's capture, and the counts of the two other kept rows,
 6 and 123, are not compared with a census anywhere in this tree). That is three books, one of them captured here: what `NUMLEDGERS` counts for a book with deleted or hidden ledgers, and on another Tally
 version, is not measured. Bridge therefore uses it only to refuse: a census that counted fewer ledgers than the
 company reports is refused (`ledger_count_company_differs`), which is meant to catch a company closed and
 reopened with equal marks while the census ran (by reasoning: that case was not reproduced live) and also
-refuses a ledger added during the read; an equal or higher census count, or an answer with no `NUMLEDGERS`, admits and
+refuses a ledger added during the read, and (by reasoning, not reproduced: #965) one altered during it before its
+slice was read, whose new AlterID is past every slice while `NUMLEDGERS` still counts it (one altered after its slice
+was read was counted, and the closing extent read refuses that case instead); an equal or higher census count, or an answer with no `NUMLEDGERS`, admits and
 sizes nothing, and the result of a counted read says which it was (`ledger_count_cross_check.status`).
 
 **A company name of 150 characters is stored whole, and a request naming it is handled (bridge#917) — PARTIAL, one company, one release.**
@@ -675,6 +775,19 @@ read returns and refuses a difference), a mark above 400,000, a slice of names l
 characters, and how a busy or edited book answers a slice (the bracket, not the slice, is what
 detects an edit). Tally's behaviour on a slice that would exceed the 32 MiB response cap is not
 measured and is not to be: Bridge sizes a slice by its width before sending it.
+
+## 11f. How long Claude Desktop waits on one tool call — **PARTIAL**
+
+**PARTIAL: one run per case, one app build, no Tally involved. Not a Tally observation.** This section records how a host treats a long tool call, because the size of a read (§11c) is bounded by it as well as by Tally's own time. No request was sent to Tally.
+
+- **Build, system and date:** Claude Desktop (the chat app) on macOS, 2026-10-02. The build number, 2.19675.0, is the app bundle's version; the probe's own log records neither the build nor the system. A throw-away extension installed in the app, a stdio server with one tool that waits a given number of seconds and logs every message it receives with its time. It sent no progress notifications in the runs below.
+- **Silent calls of 20, 55, 75 and 130 seconds each were answered by the server without a cancel**, one run each (the server's own log; the log has no host-side receipt).
+- **A silent call of 250 seconds was cancelled 240 seconds after it arrived:** the server received a `notifications/cancelled` naming that call with the reason `SdkError: Request timed out`. So the limit seen in this Claude Desktop build is 240 seconds per call. The 60 seconds in #703 and #485 was seen through the Claude Code client, a host this run did not test.
+- **The host offered no `progressToken` on any of the six calls** (five in the first run, one in the second; each call's `_meta` was empty), so the server could not send a progress notification tied to a call. Six calls do not show that it never does; whether progress would extend the limit is **not answered**.
+- **The host started three copies of the probe within the same second,** each initialised by a different client (one named `claude-ai`, two with names derived from the extension's); in the first run all five calls reached the `claude-ai` one, and in the second the one call did.
+- **After the cancel, in the first run, no further message reached that server process,** and its log has no exit record; a later call in the same chat left no record in the server's log. A second run of the same 250-second silent call, with a probe that also logged signals, exit and a 10-second heartbeat, was cancelled the same way, 239.96 seconds after the call arrived, with the same reason. The server process that received it kept writing heartbeats for at least 74 seconds after the cancel, to the end of the log, with no signal, no exit and no closed input. So on this build the host cancelled the call and did not stop or disconnect the server within that time: one run, PARTIAL. Of the other two copies started at install, one logged an exit at once and one kept writing heartbeats with no call.
+- **What Bridge does on a cancel (from reading the code, not from this host; the probe server was not Bridge):** a `notifications/cancelled` naming a read in flight withdraws it before its next Tally operation, and a post not yet dispatched is withdrawn; a read already sent is not abandoned, and a `lab_import_*` write, or a post past its dispatch intent, runs to completion (`agent_protocol.rs`). A cancelled post that has written no intent still runs its operation in flight and any already admitted in full; the code's own comment puts that at about 11 to 13 minutes at worst at the default deadlines, far past a 240-second host limit. On a host timeout like the one seen, the server was not stopped within a minute, so Bridge's own cancel handling applies and a post past its dispatch intent completes while the chat shows an error: a person who sees one should check with `verify_import` before trying again. Whether a host ever stops the Bridge process after a timeout, which would abandon a request in flight, was not measured beyond that one run.
+- **Not measured:** other app builds, Windows, Claude Code (its limits are separate and configurable), the effect of progress, a call between 130 and 240 seconds, the host's behaviour more than a minute after a cancel.
 
 ## 11a. Scale measurements — 11,287-voucher corpus
 
@@ -939,6 +1052,39 @@ toggling the UI to *Ageing by Bill Date* left the exported `BILLOVERDUE` unchang
 due-date value. Recompute ageing from `BILLDATE`/`BILLDUE` against an explicit as-of on
 every path.
 
+**A due date past 2099 prints its year in full, and an as-of report listed no later-dated bill — PARTIAL, 2026-10-02 (bridge#1091).**
+One read each of the Bills Receivable and Bills Payable reports of a synthetic company (BRIDGE PROBE B SANDBOX, licensed
+TallyPrime 7.1 Silver) as of 20260331, from the book's start 20250401: 1,477 open receivable bills and 21 payable ones.
+
+- The bill dated 1-Aug-25 whose credit period was about 83 years (the printed date is exactly 1000 months after it: an inference from
+  the arithmetic, the report does not state the period) printed `BILLDUE` as `1-Dec-2108`, the year in full. Due dates in 2026, 2033, 2035
+  and 2052 in the same report printed two digits. Bridge's parser accepted two digits only, so the whole read refused with no cause. It now
+  reads a four-digit year of 2100 or later in a **due date** exactly as written, inside the same window; a four-digit year in a bill date,
+  or below 2100, still refuses. Observed once: whether every year from 2100 prints so, and on other releases, is not established.
+- Six rows, the ones with a due date after the as-of date, carried an empty `BILLOVERDUE` element.
+- The report's latest bill date was the as-of date. The issue records later probe vouchers dated after the financial year on this book
+  (not re-read here), so on this book the as-of Bills report did not list a later-dated bill. One book; it was inferred before.
+- Fixtures: `native-outstandings-probe-b-bills-receivable` and `native-outstandings-probe-b-bills-payable`, byte-exact, with provenance.
+- **The whole call then completed on this book — PARTIAL, one run, 2026-10-03.** A release build of `outstandings` from master 7b994e65 (later
+  master commits are not in it; it holds the four-digit due-date change), for this company, as of 20260331, direction `both`, default limits,
+  through a recording read-only relay on the same licensed 7.1 Silver gateway. No write was made: of the call's 48 requests, all 26 POSTs were Export requests and the other
+  22 were status GETs; with the status read before and the one after (each one export POST and one GET) that is 28 POSTs, all Export, and 24 GETs over all 52. State `complete`, evidence `complete`, 4.0 s wall. It sent 48 requests (8 company-extent, 8 book-extent, 22
+  status GETs, 2 currency, and 2 each of Bills Receivable, Bills Payable, List of Ledgers and List of Groups), plus 2 status reads before and 2
+  after: 52 in all, none refused. Sizes: Bills Receivable 674,070 bytes and Bills Payable 9,528 (each fetched twice, the same size both times),
+  List of Ledgers 33,850, List of Groups 54,280; about 1.7 MB relayed in all, the slowest request 0.6 s (Bills Receivable). The result carried
+  1,498 open bills (1,477 receivable and 21 payable, counted in this run's own Bills answers) and 15 unallocated parties, in a 181,044-byte MCP
+  result, under the 200,000-byte cap. The bills page is a truncated view of a complete read: `truncated` true with `state` `complete`, 500
+  bills shown (`open_bills_shown` 500, `next_offset` 500), in the order `all_open_bill_rows` gives (days past the due date, largest first; then party; then reference), so the oldest-due bills come first and bills not yet due, which have no age, come last. The gross billed total equalled receivable plus payable
+  and the sum of the five ageing buckets, and the `unaged` bucket equalled, to the paisa, the six receivable bills whose `BILLOVERDUE` was empty
+  (the not-yet-due ones, the 1-Dec-2108 bill among them): checked by script, amounts are not quoted here.
+- What that shows, and what it does not: the four-digit due date was parsed without a refusal and the bill is inside the totals (deduced from the
+  sums above, not seen as a row). The 2108 bill, like the 2033, 2035 and 2052 ones, was not on the returned page, because every due date on it was in
+  2025 (the first 500 by that order). The 2108 bill is not yet due, so it has no age and sits in the tail of bills not yet due, in party then
+  reference order, among the last rows: on the last page (offset 1000), not the second (inferred from the order above and the six
+  not-yet-due bills in the saved Bills answers; only the first page was read). How a 2108 due date shows in a
+  live response was not seen. The overdue crosscheck has no field in the result; the code gives a `partial` reason for every outcome except an
+  honoured one, so `complete` is the evidence it was honoured. No further page was read; one run, one book, `both` only.
+
 ### 12a.4 The import path rewrites what you send — extends §9
 
 §9.2 already records that `ERRORS=0` does not mean success. Eight further rewrites, each
@@ -1041,6 +1187,14 @@ returns `STATUS=0` with empty `DATA`; an `SVLOADCOMPANY` variable returns `STATU
 `<COMPANY>0</COMPANY>`. Those two attempts establish only that these shapes do not load a
 company. Until a working supported path is observed, a client must detect the condition and
 instruct the operator to open the company on the server by hand.
+
+**What a `Company` collection fetch returned for a company's own details (2026-10-01; licensed TallyPrime 7.1 Silver, two synthetic companies, four runs).** These were raw lab requests, not ones Bridge sends: the GUID-filtered `Company` collection of §12a.13 (one formula, `$GUID = "<the company's GUID>"`, which returns exactly that company's row) with only its `FETCH` list changed, to `Name, GUID, CompanyNumber, StartingFrom, BooksFrom, LastVoucherDate, CurrencyName, StateName, PinCode, IsGstOn, GstRegistrationType, GstRegistrationNumber` and, in a second request, the same plus `Address.List`. The requests and responses were kept and are not committed to this repository. Each answer was in band with one `COMPANY` row.
+
+- **Returned, with their text forms (VERIFIED on both companies).** `NAME`, `GUID` and `CURRENCYNAME` as `TYPE="String"`; `STARTINGFROM`, `BOOKSFROM` and `LASTVOUCHERDATE` as `TYPE="Date"`, written `yyyymmdd`; `ISGSTON` as `TYPE="Logical"` (`Yes`); `COMPANYNUMBER` as `TYPE="Number"` with a leading space. The row also carries `NAME` and an empty `RESERVEDNAME` as attributes. The elements do not arrive in the order of the `FETCH` list.
+- **An unset state or PIN code is an absent element, not an empty one (VERIFIED on one company, before and after).** On one company the first answer held no `STATENAME` and no `PINCODE` element. After a state and a PIN code were entered on Tally's own screen, the same request bytes returned both, each as `TYPE="String"`. This is the collection behaviour §8.1 records for ledgers: a collection `FETCH` emits only values that are set.
+- **No registration type or number on the row, even where a registration exists (VERIFIED for these two fetch names on one company, one run).** On a company whose GST registration screen shows an active regular registration with a GSTIN (seen on Tally's screen by the book's owner, not by the request), the answer held `ISGSTON` `Yes` and no `GSTREGISTRATIONTYPE` and no `GSTREGISTRATIONNUMBER` element, and no GSTIN-shaped text anywhere. So under these names the `Company` row does not carry the registration. Where a company's GSTIN can be read from was not measured.
+- **The address list returned nothing (PARTIAL: one sample).** Adding `Address.List` to the `FETCH` left the answer byte-identical on one company and returned no `ADDRESS.LIST` on either company. Whether an address line was set on either company at the time is not confirmed, so this does not yet tell an unset address from a name the collection does not return.
+- **Not measured:** a company with an address known to be set; any other name for the registration or the address; several registrations on one company; an Object export of the company with the same names; Education and Gold; a client book.
 
 ### 12a.8 Payload scales with voucher count; measure request time separately
 
@@ -1205,6 +1359,7 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
 - **Profit and Loss.** Top-level `DSPACCNAME` / `PLAMT` pairs. The amount is in `PLAMT/BSMAINAMT` (a heading such as `Cost of Sales :`) or `PLAMT/PLSUBAMT` (a group such as `Purchase Accounts`).
 - **Amounts are plain signed decimals.** There is no digit grouping, symbol or `Dr`/`Cr` suffix, and a debit is negative, as in the trial balance. Examples: `-4250.00`; `222962422.38` and `-222962422.38` on the larger book.
 - **An empty window gives empty amount elements**, not `0.00`: a month with no activity returned all five Balance Sheet amounts empty. An empty amount is not zero (§7).
+  - **A zero-valued line is empty in both columns, not `0.00` (PARTIAL: four synthetic lab books, one financial year each, 2 Oct 2026, read through the installed 0.4.1 Bridge).** Every zero line (a capital account, loans, current liabilities, a direct-expenses group with one ledger and two empty amounts) came back empty in both columns; no line was present as `0` in both. No client book was read, and the case of a present `0` in both columns has not been observed. Bridge treats that shape as a zero amount and compares it with the derived line (#1067); an empty pair is compared the same way.
 - **The figures tie to the native trial balance (§5.6)** for the small book's full year. Current liabilities equalled the sundry creditors' TB closing. The P&L line equalled the P&L ledger's TB closing (`0.00`) plus the year's result. `Purchase Accounts` equalled the purchase ledger's TB closing.
 - **A part-year window (PARTIAL: one book, one month).** On the 29,900-voucher book, for 2025-05-01 to 2025-05-31, the statements were read beside the native TB and group tree in the same two minutes. Every line tied.
   - The book's one P&L ledger (sales) had a TB covering the window only. Its `TBALOPENING` was `0.00`, and its `TBALCLOSING` equalled the month's movement, `113726661.73`. That is the P&L's `Sales Accounts` line.
@@ -1277,16 +1432,31 @@ Requests used §12a.1's shape with `<ID>Balance Sheet</ID>` and `<ID>Profit and 
   - The answer stayed in band and was **flat**: every line is a top-level sibling in document order, and nothing is nested. Each top-level line of the plain report was expanded by **one level**: a stock group was followed by its items, and a stock item that sits directly under the root was followed by one `SSBATCHNAME` (`SSBATCH`, `SSGODOWN`) and a `DSPSTKINFO` repeating its figures.
   - An item line carries `DSPCLQTY` (`<number> <unit>`), `DSPCLRATE` and `DSPCLAMTA`. **For each of the nine items that held stock, the quantity text and the amount equalled the item collection's `CLOSINGBALANCE` and `CLOSINGVALUE`**, across two units, a three-decimal quantity and a negative amount.
   - A group line carries an amount and no quantity (its items had two units). In the plain report, an item directly under the root is a top-level line with its quantity and rate.
-  - Limits, which is why no quantity is checked from this yet:
+  - Limits, which is why the exploded report is not used for a quantity (the plain report is, below):
     - the two items with an empty quantity and value had **no line**, so the report cannot vouch for an item it omits;
     - only one level is expanded. In a second run, after a stock group was created inside the first and one item holding stock was put in it, the nested group appeared as one line under its parent (an amount, no quantity) and **the item inside it had no line**;
     - the answer is flat, so a group line and an item line differ only by position and by the empty quantity (a nested group's line sits among its parent's items), and nothing but its name ties a line to an item;
     - the amount on an item line is already covered by the total; the quantity is the only new information.
   - Candidate ways to reach items below the first level, all **unmeasured** and none sent: the same request scoped to one stock group at a time, repeated for each nested group (which needs the report variable that scopes the Stock Summary to a group, not yet identified from Tally's own documentation); a report variable that expands every level, if Tally has one; and another built-in report that lists stock items directly. Until one is measured, quantities are not checked on a book with nested stock groups.
+- **A quantity is returned where the plain Stock Summary agrees (build note 2026-10-07 on two real captures; run through the tool on a live Tally 2026-10-09: VERIFIED on one new synthetic book of two items directly under the root, equal to Tally's own Stock Summary on every point; PARTIAL beyond that book).** `stock_summary` returns an item's closing quantity only where exactly one line of the plain report carries the item's name and shows the same quantity, the same unit and the same amount as the item row (two empty amounts agree). A line is tied to an item by those four things and by the item's own parent being the root, because the report does not say whether a line is a stock group or an item. An item whose own parent is not the root (a stock group) is taken to have no line of its own, because in the captures the report listed only what sits directly under the root (none holds a group and an item under the root side by side), so none is returned for it (a line of the same name is read as the group's); an item with no parent sent gets none either, and the exploded report is not used. Every other item says why no quantity is returned (`none_sent`, `unread`, `inside_stock_group`, `report_has_no_line`, `report_name_not_unique`, `report_differs`). The two captures are the item rows and the plain report after a sale of an item that held none: both showed `-5 Nos` with no value for it, and `18 Nos` with `-186.00` for the other item. The live run: an outside contributor, on the maintainers' Windows laptop (TallyPrime 7.1 Silver, licensed), a new synthetic company `BRIDGE STOCK QTY LAB` built to the list of the captured book (books from 2025-04-01, inventory on and integrated, batches off, no godowns, no GST, unit `Nos`, items `Lab Item NEG` and `Lab Item POS` directly under the root, the same vouchers; Tally warned on the sale of `NEG` and saved it), the only company loaded, one `stock_summary` for 2026-03-31 through `bridge_mcp` built at this pull request's earlier head `5ef86b972`, driven over stdio, nothing else on the port. Tally's own Stock Summary for 1-Apr-25 to 31-Mar-26: `NEG` (-)5 Nos with no rate or value, `POS` 18 Nos, rate 10.33, value 186.00, total 13 Nos, 186.00. The tool: `NEG` `agreed`, -5 `Nos`, value null; `POS` `agreed`, 18 `Nos`, value -186.00 (the wire sign); `checks.closing_quantity` `checked_per_item`; two items returned; `item_count_cross_check` 2 rows, Tally count 2, `matched`; `tie_out` `matched`, total -186.00. The answer was 12,194 bytes (sha256 `d85f8a0a1d38ac317c55e3a152a375f55a0abb7dd67d2d13bcc194977c3f7ae1`); the evidence: complete, 39,242 bytes. Not measured: a book whose stock sits in groups, a group that carries an item's name, a compound unit, other dates, other releases, macOS.
 - **A sales goods line on a batch-wise company needs a batch allocation (2026-10-01; VERIFIED on one pair, one synthetic company, licensed TallyPrime 7.1 Silver).** Two imports of one sales item invoice that differed only in whether the goods line carried a `BATCHALLOCATIONS.LIST`: the one without was refused in band, with no message; the one with it was created. The allocation named Tally's default godown and default batch, and that addressed stock which the exploded Stock Summary had shown with an empty batch name. Both import requests and Tally's two responses were kept; they are not committed to this repository, and the import shape with a batch allocation is not yet recorded in any part of this reference. Not measured: a purchase line or any other voucher type without an allocation, and a company that is not batch-wise.
 - **A taxed sales item invoice is stored as sent (2026-10-01; VERIFIED on one voucher, one synthetic company, licensed TallyPrime 7.1 Silver).** One sales item invoice imported with two credit entries on ledgers under Duties & Taxes (masters created by import with `TAXTYPE` `GST` and the duty heads `CGST` and `SGST/UTGST`, §8.3, with no change to the company) was created, and read back with both tax entries at the amounts imported: Tally did not recompute or drop them. The import request and Tally's response were kept and are not committed to this repository. The voucher carried no GSTIN, place of supply, HSN or rate. In a fetch of `ALLLEDGERENTRIES.*` it read back as four ledger entries (the party, the sales ledger with the goods line nested under it, and the two tax ledgers); in a fetch of `ALLINVENTORYENTRIES.*` the party and the two tax ledgers arrive as ledger entries beside the goods line, and the sales ledger only as the goods line's accounting allocation. The company's GST state was not controlled: a raw lab read of its Company row later the same day returned `ISGSTON` `Yes` and no registration type or number element, and what registration it holds was not established. Not measured: an inter-state line, a tax Tally computes itself, a company whose GST flag reads `No`, and a company whose registration is known.
 - **A stock value changed sign after an item's first outward line (2026-10-01; PARTIAL: one item, the same company; unexplained).** The item imported with a positive opening value in the sign measurement above (`50.00` for 5 units at 10.00, which Tally's screen shows as negative) read back, after one sale of 2 units, with a closing value of `-30.00`: the remaining quantity (3) times the opening rate, with the ordinary sign of stock held. Another item's value on the same book moved linearly under a purchase. So on a book whose openings were imported with a positive value, the sign of an item's value can change as it trades; nothing here says by what rule.
+- **A sale of an item that held none created a stock line of a negative quantity, with no value (2026-10-07; PARTIAL: one voucher, one item, one synthetic company, one sitting with each request answered twice by identical bytes, licensed TallyPrime 7.1 Silver).** One sales item invoice dated 8 July 2025 (5 Nos at 25.00 per Nos, no batch and no godown) was imported as the only voucher of its import, for an item whose closing balance read empty before it. The company was not batch-wise and not GST-enabled (`ISBATCHWISEON` and `ISGSTON` `No`, read just before the sale), and eight accounting vouchers with no stock lines were imported between the two reads. The item collection (the `AuditStockItemsV1` request, 20250401 to 20260331) and the Stock Summary by name (§12a.13, the plain report) were read before and after, from one Tally, in one sitting. The captured responses are not committed to this repository.
+  - Before the sale, the item's row carried an empty `CLOSINGBALANCE` and an empty `CLOSINGVALUE`, and the Stock Summary had no line for it.
+  - After the sale, the row carried `CLOSINGBALANCE` `-5 Nos` (no leading space, as above) and still an empty `CLOSINGVALUE`. The Stock Summary then had a line for the item: `DSPCLQTY` `-5 Nos` and an empty `DSPCLRATE` and `DSPCLAMTA`. The other item's row and line were unchanged (` 18 Nos` and `-186.00` in the row). So Tally kept the stock line of the sale, as a quantity below zero, and sent no value for it; an empty value is nothing sent, not zero (above).
+  - The row and the line agreed on the negative quantity. The exploded report's agreement with the rows (above) was recorded on a raw lab request, not on this plain report, and is not stated for a quantity below zero.
+  - `stock_summary` withholds every quantity, so its answer for this book shows the item with `closing.value` `null`, one `empty_closing_value_count` and no trace of the `-5 Nos`. The quantity is on the wire and is not returned. The voucher read returns amounts only, so it does not show the stock line either.
+  - Not measured: whether the value stays empty after a later voucher or an opening is set; how Tally's screen presents the line (no screen read was taken); an item in a godown or batch; and other releases.
 - **Cost, by role, on a stock-heavy client book (several thousand items; figures rounded).** The Stock Summary report took about 1.5 s (about 150 KB, a few hundred top-level lines). One span of 2,000 items took about 1 s (about 3 MB). Bridge does not read stock items on such a book: its master-alteration mark is far above the admitted size (§12a.12).
+- **`NUMSTOCKITEMS` against the item rows through a run of operations (2026-10-02; PARTIAL: one synthetic company of 12 to 55 items, once each; licensed TallyPrime 7.1 Silver).** After each of eight imports the Company collection's `NUMSTOCKITEMS` and the `AuditStockItemsV1` rows were read and compared by parsing: the count equalled the rows (and no name repeated) at the baseline and after every step. Each import's counters were as expected and every other counter was 0.
+  - Three new items (CREATED 3): both rose by 3. Two imports of 20 items (CREATED 20 each): both rose by 20 each.
+  - A Create on an existing item name: CREATED 0 / ALTERED 1, no new row, the count unchanged, and **none of the fields read for the item changed** (opening and closing quantity and value, parent, name entries): a different opening quantity and value in the request were not applied. For a stock item, one item, once. For a ledger, §9.4g records (one run, PARTIAL) that a `Create` on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other.
+  - A rename by an Alter that carries only the language-name list: accepted (ALTERED 1): the item's name in the rows changed from the old to the new, one name added and one removed, and the count was unchanged.
+  - One second language name (an alias) added to one item the same way: accepted, and the item's row then carried **two name entries** (`LANGUAGENAME.LIST/NAME.LIST/NAME` in the row, one before), while neither `NUMSTOCKITEMS` nor the row count changed: **this alias was not counted as an item.** The "each with one name" observation above is a property of that capture, not a rule.
+  - An Alter with only a `PARENT` (ALTERED 1): accepted, and only the parent changed; the item's quantities and values were unchanged.
+  - An inventory purchase of five units of an existing item (one voucher, CREATED 1): the item's closing quantity and value moved by the voucher, and the count and rows were unchanged. The voucher's batch name was accepted on an item whose batch tracking was not examined; whether it was kept is not checked.
+  - **Not measured:** an item created by hand on Tally's screen, a delete of an item that has vouchers, removing an alias, a merge, a reload of the company, a book of thousands of items, a count after a crash or an interrupted import, and other Tally releases than licensed 7.1 Silver. One synthetic company is not evidence about a client book.
 - **Not measured:**
   - a book whose inventory is not integrated with the accounts (what the report and the items then show);
   - an `SVTODATE` other than 31 March 2026 (another year's 31 March, a day 1 or 2, any other date);
@@ -1345,6 +1515,68 @@ balance for its reference beside it, rather than netting allocations on an unver
 
 ---
 
+### 12a.15 The ledger catalogue can carry each ledger's `ISBILLWISEON`
+
+**PARTIAL: VERIFIED on five synthetic licensed 7.1 Silver books (`BRIDGE OUTSTANDINGS LAB`, `BRIDGE GST RECON LAB`,
+`BRIDGE AMEND LAB`, `BRIDGE SHAPE LAB`, `WR2 Unicode Lab`), reads only, 6 Oct 2026; not measured on a large book.** The request is
+`StandardLedgerCatalogV2`: the `StandardLedgerCatalogV1` request (`List of Ledgers`, NATIVEMETHOD `Name`, `GUID`,
+`Parent`, the two company computes) plus one more line, `<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>`, rendered by
+Bridge's own profile code and sent over the gateway by a reads-only sitting. What was observed:
+
+- Every ledger row carried exactly one `<ISBILLWISEON TYPE="Logical">` element, `Yes` or `No`: 17 of 17 and 43 of 43
+  rows on the first two books, 19 of 19, 44 of 44 and 9 of 9 on the other three.
+- The rows (GUID, name, parent) were the V1 answer's rows, and the flags equalled, by name, the flags of the same book's
+  outstandings ledger snapshot (10 `Yes` of 17 and 10 of 43).
+- Ledgers under groups where bill-wise tracking is not offered (cash, bank, duties, income, expense, purchase, sales and
+  the root) answered `No`, never an empty element: 6 of 17 and 26 of 43 rows.
+- Four ledgers whose names end in a carriage return and line feed (three on the amend book, one on the shape book) came
+  back with the name as an escaped attribute and a flag: `No` for the three on the amend book, `Yes` for the one on
+  the shape book (pinned by a protocol test).
+- The same request sent twice answered with byte-identical bodies on the first two books. The answer was about 8 to 9
+  percent larger than V1's and took under 0.4 s.
+- A flag in a form other than `Yes` or `No` was not seen; Bridge's parser accepts only those two and refuses a row with
+  no flag, so a V1 answer is never read as "no ledger keeps bills".
+
+Not shown: a book above a few thousand ledgers (size and time), or a ledger whose flag reads `No` yet holds bills
+(company-wide bill-wise settings, §12a.5).
+
+### 12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1
+
+**PARTIAL: VERIFIED 2026-10-06, licensed TallyPrime 7.1 Silver** (`education_mode=false`), attended, one request at a time. Two synthetic companies, one run each (one repeated request answered byte for byte the same). Nothing here is evidence about a client book. This extends §12a.1 and §12a.11 to six more report names. Every request is §12a.1's envelope with `<ID>` set to the name; every answer was HTTP 200 with `/status` healthy after it, and no dialog appeared at the Tally screen. Fixtures: the `builtin_*` files and `BUILTIN_REPORTS_CAPTURE_PROVENANCE.md`.
+
+- **Cash Flow.** No `HEADER` or `STATUS`. One `DSPPERIOD` (a month name, **with no year**) then one `DSPACCINFO` per month, holding `DSPDRAMT/DSPDRAMTA`, `DSPCRAMT/DSPCRAMTA` and `DSPCLAMT/DSPCLAMTA`. A full year gave 12 rows, 2025-04-01 to 2025-06-30 gave 3 (Tally accepted a day-30 end and answered with those three months, unlike the day 1, 2 and 31 rule of Education mode; whether it computed the figures to the 30th was not separated from month rounding) and one month gave 1. **A month with no activity is a row with every amount empty, not a missing row**, and an empty amount is not zero (§7). A debit is negative, as in the trial balance. The closing figure is the month's own: May's equalled May's debit alone. The credit column was empty in every row of this book, so the sign and meaning of a credit, and a closing figure with both columns present, were unmeasured on this book (the 2026-10-07 captures below measure them).
+  - **The tie.** On the book (one cash ledger and one bank ledger, receipts only), the sum of the months' debits equalled the debit totals of the ledgers under Cash-in-Hand and Bank Accounts read by `trial_balance` for the same window, to the paisa (the trial balance responses were not kept, so that side is a recorded reading, not committed bytes), for the year (17,975,981.22), April to June (7,263,013.22) and June (5,472,348.20). **Not measured on that book:** an outflow, a contra, a Bank OD A/c ledger, a month with both (the 2026-10-07 books below measured a Bank OD ledger and months with both columns, and showed a credit column; a contra and the direction of a credit stayed unverified), a window that is not whole months, a several-currency book, optional or post-dated vouchers, a large book.
+  - **Three more books, 2026-10-07 (licensed 7.1 Silver, synthetic books, one request each; fixtures `builtin_cash_flow_*` and the provenance file).** VERIFIED on `BRIDGE AMEND LAB` and `BRIDGE SHAPE LAB`: with credits present, **a row's closing is its debit plus its credit** (a debit negative) on every row with an amount: a month of credit only (empty debit), a month with both, a positive closing. **The net total (the sum of the closings) ties to the trial balance's debit plus credit over the ledgers under Cash-in-Hand and Bank Accounts** on AMEND LAB (VERIFIED, one window); on SHAPE LAB it ties only with the ledger under Bank OD A/c added (VERIFIED, below). The trial balance figures are those `trial_balance` returned for the same window at the time (recorded readings; the responses are kept privately, not committed), and the tests type the rows from them. **Bank OD:** `HDFC CC` (group `Bank OD A/c`, a debit of 2,600.00 in the year and in April 2025, no credit) is **counted in Tally's Cash Flow**: without it the two sides differ by exactly its net. VERIFIED for that one ledger, one book, debit only, on whole windows that contain its movement; a Bank OD credit, a Bank OCC A/c ledger and a ledger inside a subgroup of Bank OD A/c were not measured. PARTIAL: the debit column and the credit column each differed from the debit and credit totals of the ledgers Tally counts as cash and bank (on SHAPE LAB including the Bank OD ledger) by one common amount in size (the ledgers' columns larger in both) (AMEND LAB 17,000.00, SHAPE LAB 37,600.00) while the net tied; without the Bank OD ledger the SHAPE LAB columns differ by 35,000.00 and 37,600.00; that a transfer between money ledgers (a contra) is counted in the ledgers' columns and left out of Tally's is the leading reading and is UNVERIFIED. PARTIAL: `BRIDGE CORPUS DENSE` (about 30,000 vouchers) answered the year as 12 rows with every amount empty in 0.1 s, as predicted for a book whose earlier trial balance showed no cash or bank movement; this answer alone cannot tell that from a report that did not compute, and the timing is a no-activity lower bound, not a cost for a large book. The tie rule that a net of two empties compares nothing, and two zero nets are not a tie, rests on these answers and is built in `reports::cash_flow`.
+- **Funds Flow** gave the same month-row shape. On the same book Dr is the working capital at the start of the month, Cr at its end, and `CL` = Cr - Dr is the month's change; June's three figures equalled the trial balance's opening, closing and movement of Sundry Debtors, Bank Accounts and Cash-in-Hand. Which groups Tally counts as working capital is not measured.
+- **Sales Register** gave the same month-row shape with Dr empty, Cr the month's sales and `CL` the running total. The year's total (the last month's `CL`) equalled the sales ledger's credit in the trial balance; the Sales Accounts group total was 21.00 higher, the ledger that three journals posted to, which the register leaves out.
+- **Ratio Analysis** gave 23 `RATIONAME` / `RATIOVALUE` pairs. Money values are **rendered text**: Indian digit grouping and a Dr or Cr suffix (`6,31,22,592.83 Dr`); ratios are text too (`0.00 : 1`, `99.88 %`, `260.75 days`); several values are present and empty. The exact-decimal parser refuses them. A current ratio of `0.00 : 1` was a division by zero (no current liabilities) rather than a zero ratio.
+- **Negative Stock** (a book with 11 stock items) listed 5 in the Stock Summary item shape (`DSPACCNAME`, `DSPSTKINFO/DSPSTKCL` with `DSPCLQTY`, `DSPCLRATE`, `DSPCLAMTA`): four items of positive quantity whose closing value was a credit (§12a.13's sign rule) and one of quantity `-50.000 Kgs`. The three items with a debit closing value and the three with no quantity or value were not listed. So the listed set was exactly the items whose closing quantity is below zero or whose closing value is a credit (one book; as at the window end, or at any point in it, is not measured).
+- **Negative Ledgers** answered an empty `<ENVELOPE>` on a book with no ledger whose balance is on the side opposite its group's usual side. **Inconclusive:** an empty envelope cannot be told from a report that was not rendered (§12a.11), and its row shape is unseen. It was recognised as a report (an unknown name is refused, below).
+- **An unknown report name** answered `STATUS` 0 in a `HEADER` and a `LINEERROR` "Could not find Report '<name>'!" in `BODY` / `DATA`, with no dialog and the gateway healthy afterwards. §12a.1 measured a bare `RESPONSE` "Unknown Request" on another build, so the text and the shape of the refusal differ by build; classify by structure (`STATUS` 0 with a `LINEERROR`, or a bare `RESPONSE`), not by text.
+
+### 12a.17 Cost centres and categories are returned whatever the company's setting reads; an imported allocation is stored although it reads No
+
+**PARTIAL: VERIFIED 2026-10-07, licensed TallyPrime 7.1 Silver** (`education_mode=false`), attended, one request at a time. Two synthetic books (`BRIDGE SHAPE LAB`, `BRIDGE CORPUS FOREX`), one run each; the owner read the Cost Centres setting on screen (F11): No on both. A third synthetic book with the setting at Yes was captured the same day in a separate sitting through the same requests (below; that sitting's own status read recorded TallyPrime 7.1, licence Silver, Education mode off, and the status answer is not committed). Nothing here is evidence about a client book. Committed captures: the `masters_cost_*` files and `MASTERS_CAPTURE_PROVENANCE.md`. Readings marked "recorded" below have no committed bytes.
+
+- **The setting is not "no centres".** `CostCentre` on `BRIDGE SHAPE LAB` (setting No) still returned two centres (`Assembly`, `Trading`; `PARENT` the reserved root, `CATEGORY` `Business Line`, `GUID`, `MASTERID`, `ALTERID`, and the computed `BRIDGECOMPANYGUID`) and `CostCategory` two categories (`Business Line`: `ALLOCATEREVENUE` Yes, `ALLOCATENONREVENUE` No, `AFFECTSSTOCK` No; `Primary Cost Category`: Yes, Yes, No). `BRIDGE CORPUS FOREX`, with none defined, answered `STATUS` 1 and one present, empty `COLLECTION` carrying `MSTDEPTYPE` 32. The Company collection (a `$GUID` filter) answered `ISCOSTCENTRESON` No, equal to the screen, on both books (recorded). So a No setting plus an empty list does not say whether the feature is off or no centre is defined, and a No setting alone must not refuse a cost-centre read. The `COLLECTION` element carried `MSTDEPTYPE` 32 on every cost-centre answer and 16 on every cost-category answer; Bridge requires it, so an empty answer that was not resolved to the type is not read as "none".
+- **The same shapes with the setting at Yes (a third synthetic book, captured in a separate sitting; its `ISCOSTCENTRESON` read Yes, equal to the owner's screen, as reported at capture).** PARTIAL (committed bytes, one book, captured in a separate sitting, whose own status read recorded TallyPrime 7.1, licence Silver, Education mode off; that status answer is not committed): `CostCentre` returned three centres: two at the top level (`PARENT` the reserved root) and one whose `PARENT` is the name of another centre (a child), every `CATEGORY` the default `Primary Cost Category`, each row with a `LANGUAGENAME.LIST` that holds only the centre's own name (no alias beyond it was seen); `CostCategory` returned the one predefined `Primary Cost Category` (`ALLOCATEREVENUE` Yes, `ALLOCATENONREVENUE` Yes, `AFFECTSSTOCK` No). On these two books the answers carry the same field set and markers as the No book's (apart from `LANGUAGEID` 1033 inside each cost centre's `LANGUAGENAME.LIST` on the Yes book), with one book each. The fixtures are scrubbed (company GUID prefix and the lab names replaced; structure untouched). Not measured: centres nested more than one level, a centre with an alias beyond its own name, a screen-keyed allocation. The predefined `Primary Cost Category` was present in the two books whose categories were captured (one at No, one at Yes); the categories of the book with no centre defined were not captured, so "it always exists" is UNVERIFIED and is only the reason an empty category list is refused.
+- **An imported allocation is stored although the setting is No (recorded).** The one-day `vouchers` read of the Journal `SHAPELAB-C9-costcentre` (2025-06-05, written by an import) returned, in Tally's raw voucher export and under one `ALLLEDGERENTRIES.LIST`, `CATEGORYALLOCATIONS.LIST` with `CATEGORY` `Business Line`, `ISDEEMEDPOSITIVE` Yes and two `COSTCENTREALLOCATIONS.LIST` (`NAME` `Trading`, `AMOUNT` -600.00; `NAME` `Assembly`, `AMOUNT` -400.00; empty `ACTUALQTY` and `BILLEDQTY`; `PAYHEADSORTORDER` and `EMPLOYEESORTORDER` 0), adding up to -1000.00, the amount of the ledger entry they sit under. Bridge's own `vouchers` output does not carry these allocations. How a screen-keyed allocation looks was not captured.
+- **The Company collection answers the F11 flags (recorded)** `ISACCOUNTINGON, ISINVENTORYON, ISINTEGRATED, ISBILLWISEON, ISALLBILLWISEON, ISCOSTCENTRESON, ISBATCHWISEON, ISPAYROLLON, ISTDSON, ISJOBCOSTINGON, ISTCSON, ISGSTON, ISGSTCLASSIFON, ISEDITLOGON, ISCOSTTRACKINGON, ISISOCURRENCYAPPLICABLE, ISTRACKVOUCHERSON` with `CompanyNumber`, `ALTVCHID`, `ALTMSTID`, `LASTVOUCHERDATE` and `CURRENCYNAME` written as the symbol. Only `ISCOSTCENTRESON` was compared with a screen on those books (the other two settings later, below). `ISISOCURRENCYAPPLICABLE` read No on both of the maintainers' books although `BRIDGE SHAPE LAB` has currency masters: it is not the multi-currency signal.
+- **Bank allocations stayed empty (recorded):** every `BANKALLOCATIONS.LIST` container of the books read (2 on `BRIDGE AMEND LAB`, 94 on `BRIDGE SHAPE LAB` in a June window) was empty, so a reconciled entry's wire form is still unseen.
+- **Not measured:** a screen-keyed allocation, a reconciled bank entry, a larger book, any release other than this one.
+
+### 12a.18 The Company collection's settings and currency symbol
+
+**PARTIAL: the shape VERIFIED 2026-10-07 on two committed captures; what each setting means is not, except three (compared with the screen 2026-10-09).** Licensed TallyPrime 7.1 Silver, synthetic lab books, attended, one request at a time. Committed captures: the `company_features_*` files and `COMPANY_FEATURES_CAPTURE_PROVENANCE.md`. Nothing here is evidence about a client book.
+
+- **The request and the answer (verified, two committed captures).** A `Company` collection filtered to one GUID (`$GUID = "<GUID>"`; a Company collection ignores `SVCURRENTCOMPANY` and returns every loaded company, §12a.7) fetching `Name, GUID, CompanyNumber, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID, CURRENCYNAME` and 17 flags answers one `COMPANY` row under `ENVELOPE/BODY/DATA/COLLECTION`. Each flag is `<IS...ON TYPE="Logical">Yes</...>` or `No`; `CURRENCYNAME` is the currency's symbol, not an ISO code. The `CMPINFO` block carries a bare `<COMPANY>0</COMPANY>` counter, which is not a row. The request ComplyEaze Bridge sends is byte-equal to the captured one.
+- **What differs across books (verified from the bytes of the two committed books; the third book's reading is recorded, not committed).** Only three of the 17 flags read differently on different books: `ISCOSTCENTRESON` (No, No, Yes), `ISGSTON` (Yes, Yes, No) and `ISBATCHWISEON` (Yes, No, No). Four read Yes on every book (accounting, inventory, integrated, bill-wise) and ten read No on every book. A flag that has only ever shown one value proves that its element exists, not that it follows its setting.
+- **Against the screen (VERIFIED 2026-10-09 for the three settings the tool returns).** `ISCOSTCENTRESON` equalled the F11 screen on the first three books (§12a.17). Then the built tool was run once on each of three new synthetic books (`BRIDGE FEATURES ONE`, `TWO`, `THREE`, books from 2026-04-01, no vouchers, each the only company loaded) by an outside contributor on the maintainers' Windows laptop, TallyPrime 7.1 Silver, with the F11 screen taken before each read and again after it with nothing changed between: cost centres No/Yes/No, GST Yes/No/Yes, batch-wise No/No/Yes on the screen, and the tool's `no/yes/no`, `yes/no/yes`, `no/no/yes` equal on all nine values; each setting read Yes on at least one book and No on another. Each answer's `company` equalled the loaded company in name, GUID, company number and books-from date. The 14 other flags were not compared (the tool does not return them). One book (ONE) had batches off though meant to have them on; its setting was left as the screen showed it.
+- **A setting read two ways in one sitting (recorded, PARTIAL).** On the third book `ISGSTON` read Yes and, about three and a half minutes later, No, and No in every later read of that sitting; that fits a setting changed on screen during the lab setup and does not show it.
+- **The currency symbol.** `CURRENCYNAME` carried the rupee sign on all three books. A user can set any symbol, so it is not mapped to a currency code. `ISISOCURRENCYAPPLICABLE` read No on every book, including one that has currency masters: it is not the multi-currency signal (§12a.17).
+- **What ComplyEaze Bridge does with it.** `company_features` returns the cost-centre, GST and batch-wise settings, each as yes, no or not_reported (an element Tally did not send is never read as no; an empty or odd one refuses the read), each saying what it rests on, and the symbol. The row is bound to the verified company by its GUID, name, company number and books-from date. Nothing it returns changes what another tool reads or refuses; `stock_summary` reads its own inventory, integrated and batch-wise flags from its own request. All three settings equalled the screen on three synthetic books, so each carries `compared_with_tally_screen_on_synthetic_books`.
+- **Not measured:** the 14 flags the tool does not return against the screen; a setting changed inside a sitting (the GST reading above is one such case, unexplained); books with vouchers; macOS; a setting changed one at a time; Education mode; any release other than 7.1; a book with companies that share a GUID; a client book.
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1400,3 +1632,8 @@ balance for its reference beside it, rather than netting allocations on an unver
 | 2026-10-01 | §12a.13: the Stock Summary with the explode flag, a raw lab request: a flat answer expanded by one level, whose item lines' quantity and amount equalled the item collection's for the nine items holding stock on one synthetic licensed 7.1 Silver company; items holding nothing, and an item under a stock group inside a stock group, had no line. PARTIAL, one book, two runs |
 | 2026-10-01 | §11e: a 150-character company name stored whole (limit not shown) and handled in a census slice request with no dialog, and a census row's name copies (two, three for a built-in ledger), on the licensed 7.1 Silver lab book set. PARTIAL, one company, one release (bridge#917, part) |
 | 2026-10-01 | §12a.14: what a party's bill trail and unadjusted detail were measured against on one seeded synthetic licensed 7.1 Silver book (same reference on two parties, a reused reference, a two-party journal, on-account netting); the whole-window read and the entry-ledger filter follow from it. |
+| 2026-10-01 | §12a.7: what a GUID-filtered `Company` collection fetch returned for a company's own details on two synthetic licensed 7.1 Silver companies: the dates, currency, GST flag and company number with their text forms; an unset state or PIN code as an absent element (one company, before and after it was set); no registration type or number on the row of a company that has a registration; nothing for the address list (one sample, the address not confirmed set). VERIFIED for the names returned; PARTIAL for the address |
+| 2026-10-02 | §11f: how long Claude Desktop (chat app, macOS, bundle version 2.19675.0) waited on one tool call: silent calls of 20, 55, 75 and 130 s were answered, a 250 s call was cancelled at 240 s with `Request timed out` in two runs and the server was not stopped within a minute of the cancel; no `progressToken` was offered on six calls, so the effect of progress is unanswered; no Tally request. PARTIAL, one run per case |
+| 2026-10-02 | §12a.13: `NUMSTOCKITEMS` against the item rows after create, create-on-existing, rename, alias, move to another group, an inventory purchase and two bulk imports of 20 items on one synthetic licensed 7.1 Silver company: equal at every point; this alias was not counted as an item and added a name entry to the row; a Create on an existing item changed no field of those read; a parent-only Alter changed, of the fields read, only the parent. For a ledger, §9.4g records (one run, PARTIAL) that a Create on an existing name with a changed parent, bill-wise flag and opening balance replaced all three, also answering `CREATED=0, ALTERED=1`: the two master types gave different results here, and neither result is generalised to the other. PARTIAL, one item each, once; not measured: screen-created items, delete with vouchers, merge, a reload. |
+| 2026-10-03 | §12a.3: a whole `outstandings` call (release build from master 7b994e65) on the book of the 1-Dec-2108 due date: state `complete`, 52 requests with none refused, 4.0 s, 1,498 open bills in a page of 500 and a 181,044-byte result. PARTIAL, one run, one book; not measured: the 2108 bill's row in a live response (not on the page: the page runs oldest-due first and the bill is not yet due), the later pages, other books or directions. |
+| 2026-10-06 | §12a.15: the ledger catalogue request with one more native method (`IsBillWiseOn`) returned exactly one `Yes` or `No` `ISBILLWISEON` on every ledger of five synthetic licensed 7.1 Silver books, equal, on the two books where it was compared, to the outstandings snapshot's flags, with the cash, bank and duty ledgers answering `No` and four CR LF ledger names answering a flag (three `No`, one `Yes`). VERIFIED for those books (the captures of four are committed; the GST RECON LAB answer is not); no large book |

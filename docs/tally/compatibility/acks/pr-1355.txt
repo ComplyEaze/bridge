@@ -1,0 +1,5 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+scripts/merge-gate.sh
+src-tauri/crates/bridge-tally-core/src/master_binding.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+reviewer: lamemustafa

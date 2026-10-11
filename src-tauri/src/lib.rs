@@ -6,7 +6,7 @@ pub mod commands;
 pub mod db;
 pub(crate) mod endpoint_coordination;
 pub(crate) mod endpoint_wire;
-pub mod gst;
+pub(crate) mod exported_files;
 pub(crate) mod local_files;
 // Crate-internal only: the previously separate `bridge-tally-observability` crate had exactly
 // one consumer inside this crate, so it does not need to be reachable from outside `bridge_lib`.
@@ -95,6 +95,7 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
 
     let builder = tauri::Builder::default()
         .manage(tally::TallyRuntime::default())
+        .manage(exported_files::ExportedFiles::default())
         .manage(source_draft::SourceDraftStore::default())
         .manage(source_draft::SourceDraftLifecycleGuard::default())
         .manage(reports::bulk_party_statement::PartyStatementDestinationApprovals::default())
@@ -154,7 +155,7 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::all_clients::load_client_group_labels,
             commands::all_clients::save_client_group_label,
             commands::all_clients::replace_client_group_labels,
-            commands::all_clients::prepare_client_group_label_migration,
+            commands::all_clients::migration::prepare_client_group_label_migration,
             commands::all_clients::load_client_sort_preference,
             commands::all_clients::save_client_sort_preference,
             commands::detect_tally_base_currency,
@@ -173,7 +174,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::fetch_tally_companies,
             commands::fetch_tally_outstandings,
             commands::fetch_selected_ledger_entries,
-            commands::prepare_gst_return_draft,
             source_draft::desktop_pick_source_draft,
             source_draft::desktop_open_source_draft,
             source_draft::desktop_save_source_draft,

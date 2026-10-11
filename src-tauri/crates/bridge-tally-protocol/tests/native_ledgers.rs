@@ -190,11 +190,10 @@ fn captured_self_closing_master_fields_are_returned_empty_and_mixed_duplicates_f
         "56359347-3976-4d01-b44e-56fa0f6a422c",
     )
     .expect_err("mixed populated and self-closing EMAIL must not collapse");
-    assert!(
-        error
-            .to_string()
-            .contains("repeated a party/ledger master field"),
-        "unexpected error: {error:#}"
+    assert_eq!(
+        error.downcast_ref::<bridge_tally_protocol::NativeCollectionError>(),
+        Some(&bridge_tally_protocol::NativeCollectionError::RowUnusable),
+        "{error:#}"
     );
 }
 
@@ -331,11 +330,10 @@ fn native_ledger_row_omitting_parent_entirely_is_rejected() {
         "61c6de69-1748-461c-ad3f-162cb949df9f",
     )
     .expect_err("a native ledger row that never sent PARENT must be rejected");
-    assert!(
-        error
-            .to_string()
-            .contains("native ledger row omitted PARENT"),
-        "unexpected error: {error:#}"
+    assert_eq!(
+        error.downcast_ref::<bridge_tally_protocol::NativeCollectionError>(),
+        Some(&bridge_tally_protocol::NativeCollectionError::RowUnusable),
+        "{error:#}"
     );
 }
 

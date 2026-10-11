@@ -136,7 +136,7 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
   education_report_family_unsupported: {
     title: "Ledger-balance cross-view needs a licensed Tally",
-    action: "Tally is in Education mode, which cannot run this read-only report, so Bridge did not send it. Run a new evidence read against a licensed Tally.",
+    action: "Tally is in Education mode, which cannot run this read-only report, so ComplyEaze Bridge did not send it. Run a new evidence read against a licensed Tally.",
     retry: "after_change",
   },
   report_tie_out_unavailable: {
@@ -156,12 +156,12 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
   minimum_window_response_too_large: {
     title: "One Tally day exceeds the bounded response limit",
-    action: "Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",
+    action: "ComplyEaze Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",
     retry: "after_change",
   },
   adaptive_window_limit_reached: {
     title: "Adaptive window safety limit reached",
-    action: "Start a new run for a shorter requested period. Bridge stopped before growing the durable split graph beyond its reviewed bound.",
+    action: "Start a new run for a shorter requested period. ComplyEaze Bridge stopped before growing the durable split graph beyond its reviewed bound.",
     retry: "after_change",
   },
 };
@@ -361,7 +361,7 @@ export function MirrorProofScreen({
           <h2>{latestProof ? `${formatIdentifier(latestProof.outcome)} · ${formatIdentifier(latestProof.verification_state)} ${formatIdentifier(latestProof.pack_id)} attempt` : "No durable Core Accounting run receipt yet"}</h2>
           <p>
             {latestProof
-              ? `Within this run's declared Core Accounting scope, Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows, ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap, and ${latestProof.rejected_records} rejected rows. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
+              ? `Within this run's declared Core Accounting scope, ComplyEaze Bridge persisted ${latestProof.accepted_records} provenance-backed accepted canonical rows, ${latestProof.provenance_unavailable_records} canonical rows with an explicit provenance-unavailable gap, and ${latestProof.rejected_records} rejected rows. These are not Tally source-total counts. ${latestProof.gap_codes.length} declared gap(s) and ${latestProof.warning_codes.length} warning(s).`
               : "Endpoint reachability and fetched preview rows do not establish a Verified accounting state."}
           </p>
         </div>
@@ -394,7 +394,7 @@ export function MirrorProofScreen({
           )}
         </div>
       </article>
-      <p className="section-note">Reads Bridge's declared Core Accounting v3 scope for this period. It is not a native Trial Balance, a complete-books guarantee, or an atomic Tally snapshot.</p>
+      <p className="section-note">Reads ComplyEaze Bridge's declared Core Accounting v3 scope for this period. It is not a native Trial Balance, a complete-books guarantee, or an atomic Tally snapshot.</p>
 
       {syncEvidenceError && <TallyErrorNotice message={syncEvidenceError} />}
       {snapshotError && <TallyErrorNotice message={snapshotError} />}
@@ -406,7 +406,7 @@ export function MirrorProofScreen({
       )}
       {snapshotStartOutcomeUnknown && (
         <section className="status-strip" role="alert">
-          <span>Bridge could not confirm whether the read started or resumed. Refresh saved runs before continuing.</span>
+          <span>ComplyEaze Bridge could not confirm whether the read started or resumed. Refresh saved runs before continuing.</span>
           <button className="secondary-action" type="button" disabled={acknowledgingSnapshotOutcome} onClick={() => void acknowledgeSnapshotOutcome()}>{acknowledgingSnapshotOutcome ? "Refreshing saved runs…" : "Refresh and confirm no active run"}</button>
         </section>
       )}
@@ -474,8 +474,8 @@ export function MirrorProofScreen({
         </article>
         <article className="truth-card">
           <span>Local verified checkpoint</span>
-          <strong>{syncEvidence?.core_accounting_freshness.checkpoint_present ? "Bridge receipt committed" : "None"}</strong>
-          <small>{syncEvidence?.core_accounting_freshness.proof_present ? "Bridge committed this local receipt atomically; it is not a Tally source watermark or source-isolation guarantee." : "Partial and failed runs never advance freshness."}</small>
+          <strong>{syncEvidence?.core_accounting_freshness.checkpoint_present ? "ComplyEaze Bridge receipt committed" : "None"}</strong>
+          <small>{syncEvidence?.core_accounting_freshness.proof_present ? "ComplyEaze Bridge committed this local receipt atomically; it is not a Tally source watermark or source-isolation guarantee." : "Partial and failed runs never advance freshness."}</small>
         </article>
         <article className="truth-card">
           <span>Incremental execution</span>
@@ -517,7 +517,7 @@ export function MirrorProofScreen({
           <div>
             <h2>Local mirror explorer</h2>
             <p className="panel-description">Paged, privacy-preserving metadata for the selected company and Core Accounting pack. Names, amounts, source IDs, and payloads are not returned to this view.</p>
-            <p className="section-note">Totals describe rows currently held in Bridge's local mirror for the selected pack/run state. They are not Tally source counts and may reflect a Partial attempt. Aliases are page-local and may shift after later runs.</p>
+            <p className="section-note">Totals describe rows currently held in ComplyEaze Bridge's local mirror for the selected pack/run state. They are not Tally source counts and may reflect a Partial attempt. Aliases are page-local and may shift after later runs.</p>
           </div>
           <button className="secondary-action" onClick={() => void loadMirrorExplorerPage(0)} disabled={!selectedCompanyRecord?.mirror_company_id || tallyAction !== null}>
             <Database size={16} /> {tallyAction === "explorer" ? "Loading..." : "Load mirror page"}
@@ -558,7 +558,7 @@ export function MirrorProofScreen({
         <div className="panel-heading">
           <div>
             <h2>Hash-linked local proof ledger</h2>
-            <p className="panel-description">Append-only under Bridge's local controls. Hash checks detect inconsistency; this is not a signature, a tamper-proof audit log, or proof that the responder was genuine Tally.</p>
+            <p className="panel-description">Append-only under ComplyEaze Bridge's local controls. Hash checks detect inconsistency; this is not a signature, a tamper-proof audit log, or proof that the responder was genuine Tally.</p>
           </div>
           <span>Latest {syncEvidence?.latest_proofs.length ?? 0} loaded · 20-row API limit</span>
         </div>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,11 +32,17 @@ const expected = new Set([
 // named otherwise is not caught, and a FIELD with no <SET> is not scanned.
 const amountMethod = /(?:Balance|Amount|Opening|Closing|Totals?|Debit|Credit|Value|Limit)$/i;
 
+// The attributes and head of a `mod` item.
+const ATTRIBUTES = String.raw`((?:#\[[^\]]*\]\s*)*)(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*`;
+
 const actual = new Set();
-for (const sourceRoot of ["src-tauri", "tools"]) {
-  for (const path of rustFiles(resolve(repositoryRoot, sourceRoot))) {
-    scanRequestBuilderStrings(repositoryRoot, path, actual);
-  }
+const sources = ["src-tauri", "tools"].flatMap((sourceRoot) => rustFiles(resolve(repositoryRoot, sourceRoot)));
+// A file reached only through a test-only module declaration is test code, by
+// its #[cfg(test)] attribute rather than by its name (#837).
+const quarantined = testOnlyFiles(sources);
+for (const path of sources) {
+  if (quarantined.has(path)) continue;
+  scanRequestBuilderStrings(repositoryRoot, path, actual);
 }
 
 const unexpected = [...actual].filter((violation) => !expected.has(violation)).sort();
@@ -50,7 +56,10 @@ if (unexpected.length || missing.length) {
   );
 }
 
-console.log(`Tally request-builder hazards match the pinned set (${actual.size} violations).`);
+console.log(
+  `Tally request-builder hazards match the pinned set (${actual.size} violations; ` +
+    `${quarantined.size} test-only file(s) skipped by their #[cfg(test)] mod declaration).`,
+);
 
 function rustFiles(directory) {
   const files = [];
@@ -81,8 +90,10 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
   //
   // Test-quarantine strategy: strings are skipped when they fall inside a
   // #[cfg(test)] *module* body (specifically `#[cfg(test)] mod name { ... }`,
-  // tracked via brace-depth) or inside a file under a tests/ directory
-  // (integration tests). This is deliberate, not incidental: unit tests such
+  // tracked via brace-depth), inside a file under a tests/ directory
+  // (integration tests), or in a file reached only through a test-only
+  // `mod name;` declaration (testOnlyFiles(), by its #[cfg] attribute and never
+  // by the file's name: #837). This is deliberate, not incidental: unit tests such
   // as `exact_report_collection_is_shared_by_count_and_rows`, which live
   // inside `#[cfg(test)] mod tests { ... }`, assert against string literals
   // containing `<REPORT NAME="...">` or `$$NumItems:... With Spaces` as
@@ -98,9 +109,11 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
   // #[cfg(test)] items would silently drop it from the pinned set.
   //
   // What this still cannot catch:
-  //  - A hazard assembled at runtime via string concatenation/format!
-  //    across multiple literals (no single literal contains the full
-  //    pattern).
+  //  - A hazard assembled at runtime via string concatenation across
+  //    multiple literals (no single literal contains the full pattern). A
+  //    format placeholder inside an unquoted `$$Fn:` argument or a
+  //    `<REPORT NAME="...">` is reported as `unresolved-argument` (#837),
+  //    since the literal cannot show what the request sends there.
   //  - A hazard placed in a bare #[cfg(test)] fn/const/impl (not a `mod`)
   //    that is purely a test fixture, not a request builder -- it will
   //    still be scanned and, if it happens to contain hazard-shaped text,
@@ -144,13 +157,25 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
       }
       const rest = literal.value.slice(afterColon);
       const unquoted = /^([^<\r\n]*)/.exec(rest)[1];
+      // A format placeholder in an unquoted argument is filled at run time, so
+      // the literal cannot show whether the argument the request sends holds
+      // a space (#837): it is reported until a reviewed exact-set entry pins it.
+      if (hasPlaceholder(unquoted)) {
+        violations.add(`unresolved-argument|${file}::${identifier}|${`${match[0]}${unquoted}`.trim()}`);
+      }
       if (/\s/.test(unquoted)) {
         const expression = `${match[0]}${unquoted}`.trim();
         violations.add(`function-argument-with-space|${file}::${identifier}|${expression}`);
       }
     }
     for (const match of literal.value.matchAll(/<REPORT\s+NAME="([^"]+)"/g)) {
-      violations.add(`custom-report|${file}::${identifier}|${match[1]}`);
+      // A report named by a placeholder is a custom report whose name the
+      // literal does not show (#837).
+      if (hasPlaceholder(match[1])) {
+        violations.add(`unresolved-argument|${file}::${identifier}|<REPORT NAME="${match[1]}">`);
+      } else {
+        violations.add(`custom-report|${file}::${identifier}|${match[1]}`);
+      }
     }
     // A report FIELD that SETs an amount-valued method without declaring
     // <TYPE>Amount</TYPE> returns Tally's display text, with the sign dropped
@@ -373,4 +398,187 @@ function enclosingFunction(source, position) {
   const prefix = source.slice(0, position);
   const functions = [...prefix.matchAll(/(?:pub(?:\([^)]*\))?\s+)?fn\s+([A-Za-z0-9_]+)/g)];
   return functions.at(-1)?.[1] ?? "<module>";
+}
+
+// Whether `attributes` hold a `#[cfg(...)]` whose predicate holds only under
+// test: `test`, an `all(...)` with any such argument, or an `any(...)` whose
+// every argument is one. `any(test, feature = "...")` is not test-only.
+function testOnlyCfg(attributes) {
+  const args = (inner) => {
+    const parts = [];
+    let depth = 0;
+    let start = 0;
+    for (let k = 0; k < inner.length; k += 1) {
+      if (inner[k] === "(") depth += 1;
+      else if (inner[k] === ")") depth -= 1;
+      else if (inner[k] === "," && depth === 0) {
+        parts.push(inner.slice(start, k));
+        start = k + 1;
+      }
+    }
+    parts.push(inner.slice(start));
+    return parts.map((part) => part.trim()).filter(Boolean);
+  };
+  const implies = (predicate) => {
+    if (predicate === "test") return true;
+    const call = /^(all|any)\s*\(([\s\S]*)\)$/.exec(predicate);
+    if (!call) return false;
+    const inner = args(call[2]);
+    return call[1] === "all" ? inner.some(implies) : inner.length > 0 && inner.every(implies);
+  };
+  for (const match of attributes.matchAll(/#\[\s*cfg\s*\(/g)) {
+    let depth = 1;
+    let k = match.index + match[0].length;
+    const start = k;
+    while (k < attributes.length && depth > 0) {
+      if (attributes[k] === "(") depth += 1;
+      else if (attributes[k] === ")") depth -= 1;
+      k += 1;
+    }
+    if (implies(attributes.slice(start, k - 1).trim())) return true;
+  }
+  return false;
+}
+
+// Whether `text` holds a Rust format placeholder (`{}`, `{name}`, `{0:?}`). An
+// escaped brace (`{{`, `}}`) is a literal brace, not a placeholder.
+function hasPlaceholder(text) {
+  return /\{[^{}]*\}/.test(text.replaceAll("{{", "").replaceAll("}}", ""));
+}
+
+// `source` with every comment and string or character literal blanked to
+// spaces (quotes and newlines kept), so offsets still match the source.
+function blankLiterals(source) {
+  const out = source.split("");
+  const blank = (from, to) => {
+    for (let k = from; k < to; k += 1) if (out[k] !== "\n") out[k] = " ";
+  };
+  const charLiteral = /^'(?:\\(?:['"\\nrt0]|x[0-9a-fA-F]{2}|u\{[0-9a-fA-F]{1,6}\})|[^'\\\n])'/;
+  let i = 0;
+  while (i < source.length) {
+    const two = source.slice(i, i + 2);
+    if (two === "//") {
+      const end = source.indexOf("\n", i);
+      const stop = end === -1 ? source.length : end;
+      blank(i, stop);
+      i = stop;
+    } else if (two === "/*") {
+      let depth = 0;
+      let j = i;
+      while (j < source.length) {
+        if (source.startsWith("/*", j)) {
+          depth += 1;
+          j += 2;
+        } else if (source.startsWith("*/", j)) {
+          depth -= 1;
+          j += 2;
+          if (depth === 0) break;
+        } else j += 1;
+      }
+      blank(i, j);
+      i = j;
+    } else if (source[i] === "r" && /^r#*"/.test(source.slice(i, i + 260)) && !/[A-Za-z0-9_]/.test(source[i - 1] ?? "")) {
+      const hashes = /^r(#*)"/.exec(source.slice(i, i + 260))[1];
+      const valueStart = i + hashes.length + 2;
+      const end = source.indexOf(`"${hashes}`, valueStart);
+      const stop = end === -1 ? source.length : end;
+      blank(valueStart, stop);
+      i = stop + 1 + hashes.length;
+    } else if (source[i] === '"') {
+      let j = i + 1;
+      while (j < source.length && source[j] !== '"') j += source[j] === "\\" ? 2 : 1;
+      blank(i + 1, j);
+      i = j + 1;
+    } else if (source[i] === "'") {
+      const literal = charLiteral.exec(source.slice(i, i + 12));
+      if (literal) blank(i, i + literal[0].length);
+      i += literal ? literal[0].length : 1;
+    } else i += 1;
+  }
+  return out.join("");
+}
+
+// The span of the brace-delimited body that opens at `open` in `masked`.
+function bodyEnd(masked, open) {
+  let depth = 0;
+  for (let k = open; k < masked.length; k += 1) {
+    if (masked[k] === "{") depth += 1;
+    else if (masked[k] === "}" && (depth -= 1) === 0) return k;
+  }
+  return masked.length;
+}
+
+// Every `mod name;` declaration of a file: its name, its `#[path]`, the inline
+// modules it sits in (outermost first), and whether it is test-only, by a
+// #[cfg(test)] attribute of its own or of an inline module around it.
+function moduleDeclarations(source) {
+  const masked = blankLiterals(source);
+  const inline = [...masked.matchAll(new RegExp(`${ATTRIBUTES}\\{`, "g"))].map((m) => {
+    const open = m.index + m[0].length - 1;
+    return { name: m[2], start: open, end: bodyEnd(masked, open), test: testOnlyCfg(m[1]) };
+  });
+  return [...masked.matchAll(new RegExp(`${ATTRIBUTES};`, "g"))].map((m) => {
+    const around = inline.filter((block) => block.start < m.index && m.index < block.end);
+    const path = /#\[\s*path\s*=\s*"([^"]*)"\s*\]/.exec(source.slice(m.index, m.index + m[1].length))?.[1];
+    return {
+      name: m[2],
+      path,
+      chain: around.map((block) => block.name),
+      test: testOnlyCfg(m[1]) || around.some((block) => block.test),
+    };
+  });
+}
+
+// The file a declaration in `file` names, by Rust's module path rules, or
+// undefined when none exists.
+function moduleFile(file, declaration) {
+  const modRs = ["mod.rs", "lib.rs", "main.rs"].includes(basename(file));
+  const own = modRs ? dirname(file) : join(dirname(file), basename(file, ".rs"));
+  if (declaration.path !== undefined) {
+    const base = declaration.chain.length ? join(own, ...declaration.chain) : dirname(file);
+    const target = resolve(base, declaration.path);
+    return existsSync(target) ? target : undefined;
+  }
+  const base = join(own, ...declaration.chain);
+  return [join(base, `${declaration.name}.rs`), join(base, declaration.name, "mod.rs")].find(existsSync);
+}
+
+// Every file reached only through a test-only module declaration, and every
+// file such a file declares in turn. A file that production code also reaches
+// through an ordinary `mod` is scanned, whatever else declares it (#837): a
+// gate that fails closed never lets a shared file go unscanned.
+function testOnlyFiles(files) {
+  const declared = new Map(files.map((file) => [file, moduleDeclarations(readFileSync(file, "utf8"))]));
+  const quarantined = new Set();
+  const pending = [];
+  for (const [file, declarations] of declared) {
+    for (const declaration of declarations.filter((d) => d.test)) {
+      const target = moduleFile(file, declaration);
+      if (target && !quarantined.has(target)) {
+        quarantined.add(target);
+        pending.push(target);
+      }
+    }
+  }
+  while (pending.length) {
+    const file = pending.pop();
+    const declarations = declared.get(file) ?? moduleDeclarations(readFileSync(file, "utf8"));
+    for (const declaration of declarations) {
+      const target = moduleFile(file, declaration);
+      if (target && !quarantined.has(target)) {
+        quarantined.add(target);
+        pending.push(target);
+      }
+    }
+  }
+  const production = files.filter((file) => !quarantined.has(file));
+  while (production.length) {
+    const file = production.pop();
+    const declarations = declared.get(file) ?? moduleDeclarations(readFileSync(file, "utf8"));
+    for (const declaration of declarations.filter((d) => !d.test)) {
+      const target = moduleFile(file, declaration);
+      if (target && quarantined.delete(target)) production.push(target);
+    }
+  }
+  return quarantined;
 }

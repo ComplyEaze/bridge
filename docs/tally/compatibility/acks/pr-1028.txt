@@ -1,0 +1,12 @@
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_desktop_journal.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_import_cash_bank.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_stock_summary.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/source_draft.rs
+src-tauri/src/source_draft/files.rs
+src/OutstandingsScreen.tsx
+reviewer: lamemustafa

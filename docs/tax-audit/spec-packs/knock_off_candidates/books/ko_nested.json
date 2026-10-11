@@ -1,0 +1,514 @@
+{
+ "comment": "Names inside, beside and across other names. n01 writes RHO TRANSPORT, a party that contains the separate party Rho, which is dropped as nested. n02 pays Rho Transport and writes its name, so nothing is listed. n03 writes TAU MU NU: the parties Tau Mu and Mu Nu overlap there (Mu, nested in both, is dropped), and each is read as part of a longer name. n04 writes TAU MU NU XI, a chain of Tau Mu, Mu Nu and Nu Xi: all three read as part of a longer name. n05 writes ALPHA TRADERS BETA STORES with nothing between: both plain. n06 pays Alpha Traders with the same narration: Beta Stores is plain. n07 puts ZED and Lambda Traders on either side of a slash: plain. n08 and n09 put ZED before and after LAMBDA TRADERS in the same part: inside. n10 to n14 put LTD, X, 42, B2 and XY next to it: only XY makes it inside. n15 has Lambda Traders once inside and once plain: plain only. n16 has Alpha Traders plain and Lambda Traders inside: listed in both lists. n17 has Lambda Traders inside in two parts of its narration. n18 writes ZED LAMBDA-TRADERS, the name spread over two parts. n19 pays Lambda Traders and writes it inside a longer name: nothing listed.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_nested-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_nested-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_nested-cap-1"
+  },
+  {
+   "name": "Lambda Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-004"
+  },
+  {
+   "name": "Mu",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_nested-005"
+  },
+  {
+   "name": "Mu Nu",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-006"
+  },
+  {
+   "name": "Nu Xi",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-007"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_nested-008"
+  },
+  {
+   "name": "Rho",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-009"
+  },
+  {
+   "name": "Rho Transport",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-010"
+  },
+  {
+   "name": "Tau Mu",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_nested-011"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 1900000,
+   "closing": 48100000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Lambda Traders",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Mu",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Mu Nu",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Nu Xi",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 1600000,
+   "credit": 0,
+   "closing": 1600000
+  },
+  {
+   "ledger": "Rho",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Rho Transport",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Tau Mu",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "n01",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "Paid RHO TRANSPORT",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "Paid RHO TRANSPORT",
+   "lines": [
+    [
+     "Rho Transport",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n03",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "Paid TAU MU NU",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n04",
+   "date": "2025-04-23",
+   "base_type": "Payment",
+   "narration": "Paid TAU MU NU XI",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n05",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "Paid ALPHA TRADERS BETA STORES",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n06",
+   "date": "2025-05-14",
+   "base_type": "Payment",
+   "narration": "Paid ALPHA TRADERS BETA STORES",
+   "lines": [
+    [
+     "Alpha Traders",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n07",
+   "date": "2025-05-21",
+   "base_type": "Payment",
+   "narration": "Paid to Zed / Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n08",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "NEFT-ZED LAMBDA TRADERS-REF",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n09",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "narration": "LAMBDA TRADERS ZED",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n10",
+   "date": "2025-06-18",
+   "base_type": "Payment",
+   "narration": "LAMBDA TRADERS LTD",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n11",
+   "date": "2025-06-25",
+   "base_type": "Payment",
+   "narration": "X LAMBDA TRADERS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n12",
+   "date": "2025-07-02",
+   "base_type": "Payment",
+   "narration": "LAMBDA TRADERS 42",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n13",
+   "date": "2025-07-09",
+   "base_type": "Payment",
+   "narration": "LAMBDA TRADERS B2",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n14",
+   "date": "2025-07-16",
+   "base_type": "Payment",
+   "narration": "XY LAMBDA TRADERS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n15",
+   "date": "2025-07-23",
+   "base_type": "Payment",
+   "narration": "ZED LAMBDA TRADERS, paid Lambda Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n16",
+   "date": "2025-08-06",
+   "base_type": "Payment",
+   "narration": "to Alpha Traders, ZED LAMBDA TRADERS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n17",
+   "date": "2025-08-13",
+   "base_type": "Payment",
+   "narration": "ZED LAMBDA TRADERS / LAMBDA TRADERS YOD",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n18",
+   "date": "2025-08-20",
+   "base_type": "Payment",
+   "narration": "ZED LAMBDA-TRADERS",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "n19",
+   "date": "2025-08-27",
+   "base_type": "Payment",
+   "narration": "ZED LAMBDA TRADERS",
+   "lines": [
+    [
+     "Lambda Traders",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

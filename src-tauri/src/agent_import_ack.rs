@@ -226,8 +226,7 @@ fn read_masters_record_raw(path: &Path) -> Result<Option<(Vec<u8>, Value)>, ()> 
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(_) => return Err(()),
     };
-    let mut bytes = Vec::new();
-    std::io::Read::read_to_end(&mut file, &mut bytes).map_err(|_| ())?;
+    let bytes = read_capped_record(&mut file).ok_or(())?;
     let value = serde_json::from_slice(&bytes).map_err(|_| ())?;
     Ok(Some((bytes, value)))
 }
@@ -255,7 +254,14 @@ fn read_masters_records(imports: &Path, batch_id: &str) -> MastersRecord {
         // A doubt file holds only that verdict, naming each of its ledgers;
         // anything else is not one this build can bind to.
         Some(_) => MastersRecord::Unreadable,
-        None => match read_masters_record_raw(&masters_check_path(imports, batch_id)) {
+        // A finished verdict outranks the pending mark the post left beside
+        // it, as it does for `read_masters_check` (#911).
+        None => match read_masters_record_raw(&masters_verdict_path(imports, batch_id)).and_then(
+            |verdict| match verdict {
+                Some(verdict) => Ok(Some(verdict)),
+                None => read_masters_record_raw(&masters_check_path(imports, batch_id)),
+            },
+        ) {
             Err(()) => MastersRecord::Unreadable,
             Ok(Some((_, check))) if check["state"] == MASTERS_CHECK_PENDING => {
                 MastersRecord::Pending
@@ -351,17 +357,46 @@ struct ReviewSnapshot {
     vouchers: Vec<ReviewedVoucher>,
 }
 
-/// The one row carrying `line`'s marker, if exactly one does.
-fn marked_row<'a>(line: &ImportLedgerLine, rows: &'a [ReadVoucher]) -> Option<&'a ReadVoucher> {
-    marked_row_for(line, line.vouchers.first()?, rows)
+/// The vouchers a native post was bound to by its own span, if the journal
+/// holds that binding (`agent_import_span_identity.rs`).
+pub(super) type Bindings<'a> = Option<&'a [super::span_identity::PostedVoucherIdentity]>;
+
+/// The one row that is `line`'s first voucher, if exactly one is.
+fn marked_row<'a>(
+    line: &ImportLedgerLine,
+    rows: &'a [ReadVoucher],
+    bindings: Bindings<'_>,
+) -> Option<&'a ReadVoucher> {
+    marked_row_for(line, line.vouchers.first()?, rows, bindings)
 }
 
-/// The one row carrying `voucher`'s marker, if exactly one does.
+/// The one row that is `voucher`: for a voucher bound by its post's span, the
+/// row with the bound GUID and MasterID (a native post carries no tag, and a
+/// tag never overrides a binding); otherwise the one row carrying its marker.
+/// An untagged native post that is not bound falls to the tag here, but it
+/// never reaches a recorded review: `admit_review` requires `posted_verified`,
+/// which `verify_batch` never gives such a post through a tag
+/// (`Attribution::Span`). `operator_review` may find a tagged copy here, and
+/// only reports it.
 fn marked_row_for<'a>(
     line: &ImportLedgerLine,
     voucher: &ImportVoucher,
     rows: &'a [ReadVoucher],
+    bindings: Bindings<'_>,
 ) -> Option<&'a ReadVoucher> {
+    if let Some(bound) = bindings
+        .into_iter()
+        .flatten()
+        .find(|bound| bound.bridge_txn_id == voucher.bridge_txn_id)
+    {
+        let master_id = bound.master_id.to_string();
+        let mut found = rows.iter().filter(|row| {
+            row.guid.as_deref() == Some(bound.guid.as_str())
+                && row.master_id.as_deref() == Some(master_id.as_str())
+        });
+        let row = found.next()?;
+        return found.next().is_none().then_some(row);
+    }
     let tag = line.attribution_tag(voucher);
     let mut marked = rows.iter().filter(|row| {
         row.narration
@@ -383,6 +418,7 @@ fn admit_review(
     payload: &Value,
     rows: &[ReadVoucher],
     kind: DoubtKind,
+    bindings: Bindings<'_>,
 ) -> Result<ReviewSnapshot, String> {
     let doubt_raw = match kind.read(imports, &line.batch_id) {
         MastersRecord::Doubt { raw } => raw,
@@ -411,7 +447,7 @@ fn admit_review(
         .vouchers
         .iter()
         .map(|voucher| {
-            let row = marked_row_for(line, voucher, rows)
+            let row = marked_row_for(line, voucher, rows, bindings)
                 .filter(|row| voucher_is_accounting_effective(row) == Ok(true))?;
             Some(ReviewedVoucher {
                 bridge_txn_id: voucher.bridge_txn_id.clone(),
@@ -502,7 +538,7 @@ fn render_review_text(
         .chain(row.narration.as_deref())
         .chain(row.voucher_number.as_deref())
         .chain(row.voucher_type.as_deref())
-        .chain(row.date.as_deref());
+        .chain(std::iter::once(row.date.as_str()));
     if text_read
         .clone()
         .any(post::has_unsafe_review_layout_character)
@@ -539,7 +575,7 @@ fn render_review_text(
         "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
         row.voucher_type.as_deref().unwrap_or("voucher"),
         quoted(company_name),
-        shown(&row.date),
+        quoted(row.date.as_str()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
         shown(&narration),
@@ -571,7 +607,7 @@ fn batch_review_preview(
             row.entries
                 .iter()
                 .flat_map(|entry| [entry.ledger.as_str(), entry.amount.as_str()])
-                .chain(row.date.as_deref())
+                .chain(std::iter::once(row.date.as_str()))
                 .chain(row.voucher_type.as_deref())
         }));
     if text_read
@@ -604,7 +640,7 @@ fn batch_review_preview(
         };
         summed.map_err(|_| "ack_readback_not_matched".to_string())?;
     }
-    let dates = rows.iter().filter_map(|row| row.date.as_deref());
+    let dates = rows.iter().map(|row| row.date.as_str());
     let alter_ids = rows.iter().filter_map(|row| row.alter_id);
     let mut text = vec![format!(
         "Record that you reviewed {} vouchers in {}",
@@ -756,33 +792,18 @@ impl RecordedReview {
     }
 }
 
-/// Place `bytes` at `path` only if nothing is there: staged, synced, then
-/// hard-linked, which fails when the name exists. Taking the approval by value
-/// means no record can be written without one.
+/// Place `bytes` at `path` only if nothing is there (see
+/// [`persistence::write_record_once`]). Taking the approval by value means no
+/// record can be written without one.
 fn write_record_once(
     path: &Path,
     bytes: &[u8],
     _approval: ReviewAcknowledged,
 ) -> Result<(), String> {
-    let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
-    write_private(&staged, bytes)?;
-    let linked = fs::hard_link(&staged, path);
-    let _ = fs::remove_file(&staged);
-    match linked {
-        Ok(()) => {
-            // Make the new name durable; a record lost to a power failure
-            // would read as absent, never as someone else's.
-            #[cfg(unix)]
-            if let Some(directory) = path.parent() {
-                let _ = fs::File::open(directory).and_then(|directory| directory.sync_all());
-            }
-            Ok(())
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            Err("ack_already_recorded".into())
-        }
-        Err(_) => Err("import_file_write_failed".into()),
-    }
+    persistence::write_record_once(path, bytes).map_err(|refused| match refused {
+        persistence::RecordOnce::Exists => "ack_already_recorded".into(),
+        persistence::RecordOnce::Failed => "import_file_write_failed".into(),
+    })
 }
 
 /// `operator_review` for a readback of a doubted batch: whether a recorded
@@ -792,9 +813,10 @@ pub(super) fn operator_review(
     imports: &Path,
     line: &ImportLedgerLine,
     rows: &[ReadVoucher],
+    bindings: Bindings<'_>,
 ) -> Option<Value> {
     if line.vouchers.len() > 1 {
-        return batch_operator_review(imports, line, rows);
+        return batch_operator_review(imports, line, rows, bindings);
     }
     let masters = read_masters_records(imports, &line.batch_id);
     let record = read_masters_record_raw(&masters_ack_path(imports, &line.batch_id));
@@ -824,7 +846,7 @@ pub(super) fn operator_review(
     let covers_doubt = record.batch_id == line.batch_id
         && batch_guid_matches(&line.company_guid, &record.company_guid)
         && record.doubt_sha256 == sha256_hex(&raw);
-    let row = marked_row(line, rows);
+    let row = marked_row(line, rows, bindings);
     let voucher_unchanged = record.voucher_fingerprint_fields == FINGERPRINT_FIELDS
         // The fingerprint also covers the GUID and MASTERID today; they are
         // compared on their own as well, and the ALTERID only here.
@@ -853,6 +875,7 @@ fn batch_operator_review(
     imports: &Path,
     line: &ImportLedgerLine,
     rows: &[ReadVoucher],
+    bindings: Bindings<'_>,
 ) -> Option<Value> {
     let mut reviews = serde_json::Map::new();
     let mut any = false;
@@ -860,7 +883,7 @@ fn batch_operator_review(
         let review = match kind.read(imports, &line.batch_id) {
             MastersRecord::Doubt { raw } => {
                 any = true;
-                batch_review_state(imports, line, rows, *kind, &raw)
+                batch_review_state(imports, line, rows, *kind, &raw, bindings)
             }
             MastersRecord::Unreadable => {
                 any = true;
@@ -898,6 +921,7 @@ fn batch_review_state(
     rows: &[ReadVoucher],
     kind: DoubtKind,
     doubt_raw: &[u8],
+    bindings: Bindings<'_>,
 ) -> Value {
     let record = match read_masters_record_raw(&kind.ack_path(imports, &line.batch_id)) {
         Ok(None) => return json!({"state":"absent"}),
@@ -927,7 +951,7 @@ fn batch_review_state(
                 .vouchers
                 .iter()
                 .find(|voucher| voucher.bridge_txn_id == reviewed.bridge_txn_id)
-                .and_then(|voucher| marked_row_for(line, voucher, rows));
+                .and_then(|voucher| marked_row_for(line, voucher, rows, bindings));
             !(record.voucher_fingerprint_fields == FINGERPRINT_FIELDS
                 && row.is_some_and(|row| {
                     row.guid.as_deref() == Some(reviewed.guid.as_str())
@@ -1030,11 +1054,23 @@ impl Server {
         let evidence = first.evidence.clone();
         let fail = |code: String| ToolFailure::from(code).with_prior_evidence(evidence.clone());
         let rows = rows.unwrap_or_default();
+        // The verification just made may have bound the post to its span: read
+        // the binding after it, never from the snapshot taken before.
+        let bound = match self
+            .latest_import_snapshot(batch_id)
+            .map_err(&fail)?
+            .and_then(|snapshot| snapshot.span_verdict)
+        {
+            Some(ledger::PostSpanVerdict::Bound(bound)) => Some(bound),
+            _ => None,
+        };
+        let bindings = bound.as_deref();
         if requested.is_none() {
             still_the_only_doubt(&doubt_states(&imports, &line))
                 .map_err(|code| with_doubt_cause(fail(code.to_string()), code))?;
         }
-        let shown = admit_review(&imports, &line, &first.payload, &rows, kind).map_err(fail)?;
+        let shown =
+            admit_review(&imports, &line, &first.payload, &rows, kind, bindings).map_err(fail)?;
         // Read again, not reused: a review recorded by another call during
         // the read answers here, before the dialog.
         if let Some(recorded) = recorded_review(&ack_path) {
@@ -1049,7 +1085,7 @@ impl Server {
         let reviewed_rows = line
             .vouchers
             .iter()
-            .filter_map(|voucher| marked_row_for(&line, voucher, &rows))
+            .filter_map(|voucher| marked_row_for(&line, voucher, &rows, bindings))
             .collect::<Vec<_>>();
         let preview = if batch {
             batch_review_preview(&line, kind, &company_name, &doubt, &reviewed_rows)
@@ -1100,7 +1136,14 @@ impl Server {
             still_the_only_doubt(&doubt_states(&imports, &line))
                 .map_err(|code| with_doubt_cause(fail(code), code))?;
         }
-        let again = admit_review(&imports, &line, &second.payload, &rows_after, kind);
+        let again = admit_review(
+            &imports,
+            &line,
+            &second.payload,
+            &rows_after,
+            kind,
+            bindings,
+        );
         if again.as_ref() != Ok(&shown) {
             return Err(fail("ack_changed_while_reviewing"));
         }
@@ -1148,7 +1191,7 @@ impl Server {
                     "batch_id": line.batch_id,
                     "dispatch": {"state": second.payload["result"]["dispatch"]["state"]},
                     // Read back as verify_import reports it, not asserted.
-                    "operator_review": operator_review(&imports, &line, &rows_after),
+                    "operator_review": operator_review(&imports, &line, &rows_after, bindings),
                 },
             }),
             evidence,

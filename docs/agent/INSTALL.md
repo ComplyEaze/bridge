@@ -2,7 +2,8 @@
 
 ComplyEaze Bridge lets Claude, on your computer, read your TallyPrime books when you ask it a question.
 These steps take you from nothing to your first answer. Do them in order. The steps themselves make no entry in your
-books.
+books. The [Download page](https://bridge.complyeaze.com/download.html) chooses the current GitHub Release file for your
+operating system and gives the same setup steps in short form; this guide is the fallback when that page is unavailable.
 
 ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its source code is public.
 
@@ -14,6 +15,14 @@ checked by looking, on TallyPrime 7.1 on Windows on 10 October 2026; saving with
 the Backup & Restore submenu were not part of that check. The Mac keys are written from general knowledge of those programs; we did not walk them
 ourselves. On a Mac, the question in Step 6 ("Which company is open in Tally?") has not been run by us. These are
 other companies' programs and they change, so a screen of yours may differ a little.
+
+## At a glance, release 0.5.1
+
+- **You can ask for** outstanding receivables and payables with ageing, the trial balance, the vouchers in a date range (found by number, reference, narration or amount, and added up by ledger, month, voucher type, group or primary group; checked on one synthetic book, not a large one), Tally's own Cash Flow for whole months (shown only when its net total ties to the trial balance; not a cash flow statement under AS 3; tried on two synthetic books), and one ledger's movement.
+- **Partly:** profit and loss and the balance sheet (a book with stock items is expected to be refused); closing stock value at 31 March, values only, on small books, and only the year to 31 March 2026 has been checked; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC or Union Bank of India PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
+- **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags, and Tally's Funds Flow, Ratio Analysis and negative-balance reports.
+
+"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.5.1 file against TallyPrime. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you start
 
@@ -139,11 +148,11 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
 
 A settings window opens with five lines. Go from top to bottom.
 
-![The five settings, drawn as a diagram: the Terms line switched on, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off.](./img/install-settings.svg)
+![The five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off.](./img/install-settings.svg)
 
 | Line | What to do | What it is |
 | --- | --- | --- |
-| **I accept the ComplyEaze Bridge Terms of Use (version 2026-10)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then switch this **on**. If you do not own the practice, the owner should read and agree first. | Your agreement. While it is off, ComplyEaze Bridge refuses every request and reads nothing from Tally. |
+| **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
 | **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to hide things from Claude. The other two values are `mask_parties` (shortens party names; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts are never hidden. |
@@ -153,18 +162,19 @@ Click **Save**.
 
 ## Step 5. Close Claude Desktop fully and open it again
 
-ComplyEaze Bridge reads your acceptance of the Terms when it starts. Until Claude Desktop has been fully closed and
-opened again, it can list its tools and still refuse every request. Closing the window is not enough; the program
-keeps running in the background.
+Quit Claude Desktop completely and open it again. Closing the window is not enough; the program keeps running in the
+background.
 
 - **Windows:** look near the clock at the bottom right. If you do not see the Claude icon, click the small **^** arrow
   there. Right-click the Claude icon and choose **Quit**. Then open Claude Desktop again.
 - **Mac:** click **Claude** in the menu bar at the top of the screen and choose **Quit Claude**. Then open Claude
   Desktop again.
 
-Do this on both. In our one test of each, a Mac needed it and Windows did not. That was a first install. When we
-installed a newer file over an installed one on a Mac, with the Terms switch already on, no quit was needed (one
-test; see "Remove or update it").
+Do this on both. In our one test of each, a Mac needed it and Windows did not. That was a first install.
+
+On the Mac in the 0.5.0 note under Step 4, Claude Desktop started ComplyEaze Bridge as soon as the settings were saved
+and a new chat got an answer from it, but the assistant first called a leftover second entry for the same extension,
+which failed with the same error; after Claude Desktop was quit and reopened there was one connector and no error.
 
 ## Step 6. Ask your first question
 
@@ -180,9 +190,9 @@ test; see "Remove or update it").
 
 | What you see | What to do |
 | --- | --- |
-| Claude says the Terms are not accepted | Go back to Step 4, switch the first line on, click Save, then do Step 5. |
+| Claude says the Terms of Use are not accepted | Go back to Step 4, tick the first line, click Save, then do Step 5. |
 | Claude says it cannot reach Tally | Check that TallyPrime is open with a company open. Do the browser check in Step 1 again (on a Mac, in Safari on the Mac itself). Check that the Tally port in Step 4 is the same number. |
-| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. |
+| Claude does not seem to know about Tally at all | Open Settings, then Extensions. Check that ComplyEaze Bridge is listed and switched on. Then do Step 5. In a new chat, **Connectors** also shows whether it is connected. If you updated to 0.5.0 from 0.4.2, see "Remove or update it". |
 | The settings window did not open in Step 4, or you want to change a setting | Open Settings, then Extensions. Click ComplyEaze Bridge, then **Configure**. |
 
 Still stuck? See [Help](#help).
@@ -222,12 +232,32 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   does not remove ComplyEaze Bridge's data folder: the receipt log and the saved copies of vouchers, which are not
   masked, stay on the computer. Section 7 of the [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how
   to archive or remove them.
-- **Update:** it does not update by itself. Install the newer file as in Step 3. Claude Desktop showed an **Update**
-  button: click it and follow the prompts. In our one test of this, on a Mac, going from 0.4.0 to the package CI
-  built for 0.4.1, the settings and the Terms switch carried over, ComplyEaze Bridge started again on its
-  own, and no quit was needed. That test covered Claude Desktop only: if another program also uses ComplyEaze
-  Bridge, stop it first, as the paragraph on upgrading under "The limits of posting" says. Then look at the settings in Step 4. If you had an earlier version, check
-  **Allow voucher posting**: an earlier default may still be saved as on.
+- **Update:** it does not update by itself. Stop ComplyEaze Bridge, and every other program that uses it, before you
+  update, as the paragraph on upgrading under "The limits of posting" says. Keep the data folder. Install the newer file
+  as in Step 3, then look at the settings in Step 4. What we saw, release by release:
+  - **0.4.0 to 0.4.1, early October 2026, one Mac.** Going from 0.4.0 to the package CI built for 0.4.1, Claude Desktop
+    showed an **Update** button; the settings and the Terms setting carried over, ComplyEaze Bridge started again on its
+    own, and no quit was needed. That test covered Claude Desktop only, and it is not what later releases did.
+  - **0.4.2.** It installed as a second extension beside an older release instead of replacing it (its author line
+    changed, and Claude Desktop includes the author in an extension's identity; seen on a Mac, not tried on Windows).
+  - **0.5.0.** The package our checks built for 0.5.0, installed on one Mac over 0.4.2, replaced it as an update: one
+    extension at version 0.5.0, the Tally port, Response redaction and the posting setting as they were (a posting
+    setting that was on stayed on), the old Terms setting gone and no value for the new one (version 2026-10.1). With
+    the published 0.5.0 file, on one Mac, the Tally port and Response redaction were kept and the Terms setting was
+    dropped the same way (bridge#1413). On one Windows computer, the published 0.5.0 file over 0.4.2 was not started
+    either: the chat showed no ComplyEaze Bridge tool and no error.
+  - **Terms and 0.5.1.** Before the box is ticked, Claude Desktop may not start 0.5.0 at all; from 0.5.1 it starts
+    ComplyEaze Bridge, and every tool answers that the Terms of Use are not accepted (the tools the assistant called
+    gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this
+    release; bridge#1413).
+- **What to do after updating.** Tick the Terms setting, check **Allow voucher posting** (an earlier default may still
+  be saved as on), then quit and reopen Claude Desktop.
+- **A release older than 0.4.2.** Installing over one was not tried: remove such a release first.
+- **Two ComplyEaze Bridge entries.** If Settings, then Extensions lists two entries (as happened when 0.4.2 was
+  installed beside an older release), remove the older entry before you use either, and do not delete the data folder,
+  which both versions use. Then enter your settings in the new one: the Tally port, the posting setting (posting starts
+  off), the Terms setting and Response redaction (it starts at none; set it again if you had shortened or masked
+  names), and quit and reopen Claude Desktop.
 
 ## Help
 
@@ -252,8 +282,8 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 ## The limits of posting
 
 Voucher file preparation and bank-statement parsing are available by default;
-they write nothing to Tally. **Voucher posting is off by default** while three
-known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. ComplyEaze Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. ComplyEaze Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. ComplyEaze Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And ComplyEaze Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582).
+they write nothing to Tally. **Voucher posting is off by default** while four
+known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. ComplyEaze Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. ComplyEaze Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. ComplyEaze Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And ComplyEaze Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 Turning on **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the
 extension settings adds posting; every new posting still requires your approval in a separate ComplyEaze Bridge
 dialog. Leave it off unless you accept those risks. If you installed an earlier
@@ -279,7 +309,7 @@ and leave Tally's product/licence mode unchanged. ComplyEaze Bridge's checks do 
 out changes made directly in Tally or by other software.
 
 Stop ComplyEaze Bridge and every client running its connector before upgrading, then restart
-them with the updated version. Dispatch coordination uses the operating system's
+them with the newer version (see "Remove or update it" for what we saw when upgrading). Dispatch coordination uses the operating system's
 local app-data folder on Windows and account home on macOS, independently of
 launcher environment variables. Older processes may use a different coordination path.
 Keep the recovery data when upgrading. New posting attempts add a native request
@@ -301,7 +331,8 @@ is sent to the AI provider used for that conversation, so the conversation is
 not wholly local. Choose the package's redaction setting when it suits the
 workflow.
 
-Private MCPB downloads do not update automatically. Install a newer release
-from Claude Desktop's Extensions settings to upgrade, then confirm its version
-and settings. Use the same screen to uninstall. Neither action changes Tally's
+Private MCPB downloads do not update automatically. To upgrade, keep the data
+folder, install the newer release from the Extensions screen in Claude Desktop's
+settings, then confirm its version and settings; "Remove or update it" says what
+we saw. Use the same screen to uninstall. Neither action changes Tally's
 HTTP gateway configuration.

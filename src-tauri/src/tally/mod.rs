@@ -9,7 +9,6 @@ pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.
 mod runtime_control;
-pub mod serial_queue;
 pub mod tdl_engine;
 pub mod validators;
 pub mod xml_parser;

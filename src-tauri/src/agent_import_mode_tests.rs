@@ -96,8 +96,8 @@ async fn import_build_requires_an_observed_mode_bracket_and_retains_probe_eviden
         let plans = if admitted {
             [
                 import_profile_probe(fault),
-                import_cycle_plans()[..16].to_vec(),
-                import_cycle_plans()[4..10].to_vec(),
+                import_family_cycle_plans()[..16].to_vec(),
+                import_family_cycle_plans()[4..10].to_vec(),
                 build_preflight_plans(),
                 import_profile_probe(fault),
             ]

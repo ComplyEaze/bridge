@@ -1,0 +1,2 @@
+src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs
+reviewer: lamemustafa

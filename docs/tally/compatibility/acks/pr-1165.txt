@@ -1,0 +1,6 @@
+src-tauri/src/commands.rs
+src-tauri/src/commands_trial_balance.rs
+src-tauri/src/reports/bulk_party_statement.rs
+src-tauri/src/source_draft/types.rs
+src-tauri/src/sync/coordinator.rs
+reviewer: lamemustafa

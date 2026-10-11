@@ -43,7 +43,7 @@ export function OutstandingsEvidencePanel({ entry }: Props) {
     return (
       <section className="panel wide report-evidence-panel" aria-labelledby="report-evidence-heading" role="alert">
         <h2 id="report-evidence-heading">Outstandings read failed</h2>
-        <p className="panel-description">Bridge could not complete the report-bound read: {entry.message}</p>
+        <p className="panel-description">ComplyEaze Bridge could not complete the report-bound read: {entry.message}</p>
       </section>
     );
   }

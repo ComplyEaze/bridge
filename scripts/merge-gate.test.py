@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -46,10 +47,14 @@ def load_privacy_module():
     spec.loader.exec_module(module)
     return module
 
+# The real mktemp is resolved here, before the stub's directory is put on
+# PATH, and written into the stub. A lookup inside the stub would need
+# `command -v -p`, which macOS's bash 3.2 ignores, so the stub found itself
+# and called itself forever (#1043).
 MKTEMP_WRAPPER = """#!/usr/bin/env bash
 # Only scan-input-write-failure pre-occupies the privacy-scan-input path (as
 # a directory) so the write inside merge-gate.sh's redirect group fails.
-real=$(command -v -p mktemp)
+real={real}
 if [ "${GATE_SCENARIO:-}" = "scan-input-write-failure" ] && [ "$1" = "-d" ]; then
   dir=$("$real" -d)
   mkdir "$dir/privacy-scan-input"
@@ -68,8 +73,11 @@ class MergeGateControls(unittest.TestCase):
         gh = cls.bin / "gh"
         shutil.copyfile(FAKE_GH, gh)
         gh.chmod(0o755)
+        real_mktemp = shutil.which("mktemp")
+        if not real_mktemp:
+            raise RuntimeError("mktemp is required for merge-gate controls")
         mktemp = cls.bin / "mktemp"
-        mktemp.write_text(MKTEMP_WRAPPER)
+        mktemp.write_text(MKTEMP_WRAPPER.replace("{real}", shlex.quote(real_mktemp)))
         mktemp.chmod(mktemp.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         if not shutil.which("jq"):
             raise RuntimeError("jq is required for merge-gate controls")

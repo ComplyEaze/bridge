@@ -735,7 +735,7 @@ impl PortableReadRuntime {
             // The circuit also yields a retry-after timestamp here. Nothing
             // consumes it -- every caller destructured it away -- so it is not
             // carried on the error. Surfacing "try again in N seconds" to the
-            // operator is a real gap, tracked in the hub; wire it back through
+            // operator is a real gap; wire it back through
             // when the UI can act on it rather than keeping an unread field.
             Err((reason, _retry_after_unix_ms)) => {
                 self.collector

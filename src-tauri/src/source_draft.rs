@@ -83,7 +83,7 @@ pub(crate) async fn desktop_open_source_draft(
     store: State<'_, SourceDraftStore>,
 ) -> CommandResult<Option<SourceDraftDto>> {
     let Some((filename, bytes)) = pick_file(
-        "Open Bridge source draft",
+        "Open ComplyEaze Bridge source draft",
         &["json"],
         types::MAX_DRAFT_BYTES,
     )

@@ -136,6 +136,33 @@ pub struct UnclassifiedLedger {
     pub credit: NativeTrialBalanceAmount,
 }
 
+/// Why a statement's result is not established. Typed, so that nothing words
+/// or reports a reason that this list does not hold; the codes are the same
+/// ones the result has always carried.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotEstablishedReason {
+    UnclassifiedLedgerCarriesAnAmount,
+    ClosingStockNotDerivableFromTrialBalance,
+    ProfitAndLossLedgerNotReturned,
+    TallyBalanceSheetDiffers,
+    TallyProfitAndLossDiffers,
+}
+
+impl NotEstablishedReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UnclassifiedLedgerCarriesAnAmount => "unclassified_ledger_carries_an_amount",
+            Self::ClosingStockNotDerivableFromTrialBalance => {
+                "closing_stock_not_derivable_from_trial_balance"
+            }
+            Self::ProfitAndLossLedgerNotReturned => "profit_and_loss_ledger_not_returned",
+            Self::TallyBalanceSheetDiffers => "tally_balance_sheet_differs",
+            Self::TallyProfitAndLossDiffers => "tally_profit_and_loss_differs",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum Established {
@@ -143,7 +170,7 @@ pub enum Established {
         value: ExactDecimal,
     },
     NotEstablished {
-        reason: &'static str,
+        reason: NotEstablishedReason,
         /// For `tally_balance_sheet_differs`, the lines that did not tie: a
         /// Tally line's name, or a derived line's display name.
         lines: Vec<String>,
@@ -151,7 +178,7 @@ pub enum Established {
 }
 
 impl Established {
-    fn blocked(reason: &'static str) -> Self {
+    fn blocked(reason: NotEstablishedReason) -> Self {
         Self::NotEstablished {
             reason,
             lines: Vec::new(),
@@ -348,12 +375,12 @@ pub fn derive_statements(
     });
     // Stock blocks the carried line too: Tally's carries the change in stock.
     let blocked = if omitted {
-        Some("unclassified_ledger_carries_an_amount")
+        Some(NotEstablishedReason::UnclassifiedLedgerCarriesAnAmount)
     } else if stock_ledger_count > 0 {
-        Some("closing_stock_not_derivable_from_trial_balance")
+        Some(NotEstablishedReason::ClosingStockNotDerivableFromTrialBalance)
     } else if profit_and_loss_ledger.is_none() {
         // Tally's carried line then has nothing to tie to; name the cause.
-        Some("profit_and_loss_ledger_not_returned")
+        Some(NotEstablishedReason::ProfitAndLossLedgerNotReturned)
     } else {
         None
     };
@@ -370,7 +397,7 @@ pub fn derive_statements(
     let gross = sum_of(&|name| TRADING_PRIMARY_GROUPS.contains(&name))?;
     let net = sum_of(&|_| true)?;
     let carried = match &profit_and_loss_ledger {
-        None => Established::blocked("profit_and_loss_ledger_not_returned"),
+        None => Established::blocked(NotEstablishedReason::ProfitAndLossLedgerNotReturned),
         Some(ledger) => {
             let mut total = profit_and_loss_closing;
             total.add(&ledger.closing)?;
@@ -390,7 +417,7 @@ pub fn derive_statements(
     let gated = |value: ExactDecimal| match blocked {
         Some(reason) => Established::blocked(reason),
         None if !failures.is_empty() => Established::NotEstablished {
-            reason: "tally_balance_sheet_differs",
+            reason: NotEstablishedReason::TallyBalanceSheetDiffers,
             lines: failures.clone(),
         },
         None => Established::Established { value },
@@ -406,7 +433,7 @@ pub fn derive_statements(
     let movement_gated = |value: ExactDecimal| match gated(value) {
         Established::Established { .. } if !profit_and_loss_failures.is_empty() => {
             Established::NotEstablished {
-                reason: "tally_profit_and_loss_differs",
+                reason: NotEstablishedReason::TallyProfitAndLossDiffers,
                 lines: profit_and_loss_failures.clone(),
             }
         }
@@ -463,9 +490,12 @@ const COST_OF_SALES_HEADING: &str = "Cost of Sales :";
 const COST_OF_SALES_GROUPS: [&str; 2] = ["Purchase Accounts", "Direct Expenses"];
 
 /// As [`gate_failures`], for Tally's own Profit and Loss, with the one
-/// heading allowed when its amount is the derived cost of sales. A stock line
-/// (Opening or Closing Stock) is uncompared and refuses, and stock also moves
-/// the heading off the derived cost of sales.
+/// heading allowed when its amount is the derived cost of sales. The heading
+/// is compared as [`compare`] compares a line, before the no-amount arm, so a
+/// heading that reads zero or empty refuses over a non-zero cost of sales and
+/// ties over a zero one (#1070). A stock line (Opening or Closing Stock) is
+/// uncompared and refuses, and stock also moves the heading off the derived
+/// cost of sales.
 fn profit_and_loss_gate_failures(tie: &TieOut, cost_of_sales: &ExactDecimal) -> Vec<String> {
     let mut failures: Vec<String> = tie
         .lines
@@ -473,10 +503,11 @@ fn profit_and_loss_gate_failures(tie: &TieOut, cost_of_sales: &ExactDecimal) -> 
         .filter(|line| match &line.status {
             TieStatus::Matched | TieStatus::MatchedEmptyAsZero => false,
             TieStatus::Differs { .. } => true,
+            TieStatus::NotCompared { .. } if line.name == COST_OF_SALES_HEADING => !matches!(
+                compare(&line.tally_sub, &line.tally_main, cost_of_sales),
+                TieStatus::Matched | TieStatus::MatchedEmptyAsZero
+            ),
             TieStatus::NotCompared { .. } if !carries_an_amount(line) => false,
-            TieStatus::NotCompared { .. } if line.name == COST_OF_SALES_HEADING => {
-                !single_amount(line).is_some_and(|amount| amount.numeric_eq(cost_of_sales))
-            }
             TieStatus::NotCompared { .. } => true,
         })
         .map(|line| line.name.clone())
@@ -489,15 +520,6 @@ fn carries_an_amount(line: &TieLine) -> bool {
     [&line.tally_sub, &line.tally_main]
         .iter()
         .any(|amount| matches!(amount, NativeStatementAmount::Present(value) if !value.is_zero()))
-}
-
-/// The line's amount when exactly one of its two columns is present.
-fn single_amount(line: &TieLine) -> Option<&ExactDecimal> {
-    match (&line.tally_sub, &line.tally_main) {
-        (NativeStatementAmount::Present(value), NativeStatementAmount::Empty)
-        | (NativeStatementAmount::Empty, NativeStatementAmount::Present(value)) => Some(value),
-        _ => None,
-    }
 }
 
 fn place(chain: &bridge_tally_protocol::group_ancestry::AncestryChain) -> Placement {
@@ -607,21 +629,22 @@ fn tie_lines(
         .lines
         .iter()
         .map(|line| {
-            let status = if let Some(group) =
-                lines.iter().find(|group| group.display_name == line.name)
-            {
-                named.push(group.display_name.as_str());
-                compare(&line.sub, &line.main, &group.amount.sum)
-            } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
-                match result {
-                    Established::Established { value } => compare(&line.sub, &line.main, value),
-                    Established::NotEstablished { reason, .. } => TieStatus::NotCompared { reason },
-                }
-            } else {
-                TieStatus::NotCompared {
-                    reason: "no_derived_line_of_that_name",
-                }
-            };
+            let status =
+                if let Some(group) = lines.iter().find(|group| group.display_name == line.name) {
+                    named.push(group.display_name.as_str());
+                    compare(&line.sub, &line.main, &group.amount.sum)
+                } else if let Some((_, result)) = carried.filter(|(name, _)| *name == line.name) {
+                    match result {
+                        Established::Established { value } => compare(&line.sub, &line.main, value),
+                        Established::NotEstablished { reason, .. } => TieStatus::NotCompared {
+                            reason: reason.as_str(),
+                        },
+                    }
+                } else {
+                    TieStatus::NotCompared {
+                        reason: "no_derived_line_of_that_name",
+                    }
+                };
             TieLine {
                 name: line.name.clone(),
                 tally_sub: line.sub.clone(),
@@ -659,6 +682,15 @@ fn compare(
                     derived: derived.clone(),
                 }
             };
+        }
+        // Both columns present and both zero is a zero amount, compared with
+        // the derived line like any other: it is neither "not compared" nor a
+        // pass (#1067). Both present with an amount stays uncompared, and the
+        // gate counts that as a failure.
+        (NativeStatementAmount::Present(sub), NativeStatementAmount::Present(main))
+            if sub.is_zero() && main.is_zero() =>
+        {
+            sub
         }
         (NativeStatementAmount::Present(_), NativeStatementAmount::Present(_)) => {
             return TieStatus::NotCompared {

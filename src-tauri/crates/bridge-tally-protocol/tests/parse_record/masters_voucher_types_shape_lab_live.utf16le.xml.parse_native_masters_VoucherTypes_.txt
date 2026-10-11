@@ -1,0 +1,527 @@
+# fixture: tests/fixtures/masters_voucher_types_shape_lab_live.utf16le.xml
+# parser: parse_native_masters(VoucherTypes)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Attendance",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000004e",
+            master_id: 78,
+            alter_id: 80,
+            parent: Some(
+                "Attendance",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Contra",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000020",
+            master_id: 32,
+            alter_id: 34,
+            parent: Some(
+                "Contra",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Credit Note",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000028",
+            master_id: 40,
+            alter_id: 42,
+            parent: Some(
+                "Credit Note",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Debit Note",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000002a",
+            master_id: 42,
+            alter_id: 44,
+            parent: Some(
+                "Debit Note",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Delivery Note",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000030",
+            master_id: 48,
+            alter_id: 50,
+            parent: Some(
+                "Delivery Note",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Job Work In Order",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000052",
+            master_id: 82,
+            alter_id: 84,
+            parent: Some(
+                "Job Work In Order",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Job Work Out Order",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000054",
+            master_id: 84,
+            alter_id: 86,
+            parent: Some(
+                "Job Work Out Order",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Journal",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000026",
+            master_id: 38,
+            alter_id: 40,
+            parent: Some(
+                "Journal",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Material In",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000058",
+            master_id: 88,
+            alter_id: 90,
+            parent: Some(
+                "Material In",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Material Out",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000056",
+            master_id: 86,
+            alter_id: 88,
+            parent: Some(
+                "Material Out",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Memorandum",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000003c",
+            master_id: 60,
+            alter_id: 62,
+            parent: Some(
+                "Memorandum",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Payment",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000022",
+            master_id: 34,
+            alter_id: 36,
+            parent: Some(
+                "Payment",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Payroll",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000050",
+            master_id: 80,
+            alter_id: 82,
+            parent: Some(
+                "Payroll",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Physical Stock",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000038",
+            master_id: 56,
+            alter_id: 58,
+            parent: Some(
+                "Physical Stock",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Purchase",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000002e",
+            master_id: 46,
+            alter_id: 48,
+            parent: Some(
+                "Purchase",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Purchase Order",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000042",
+            master_id: 66,
+            alter_id: 68,
+            parent: Some(
+                "Purchase Order",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Receipt",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000024",
+            master_id: 36,
+            alter_id: 38,
+            parent: Some(
+                "Receipt",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Receipt Note",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000032",
+            master_id: 50,
+            alter_id: 52,
+            parent: Some(
+                "Receipt Note",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Rejections In",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000036",
+            master_id: 54,
+            alter_id: 56,
+            parent: Some(
+                "Rejections In",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Rejections Out",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000034",
+            master_id: 52,
+            alter_id: 54,
+            parent: Some(
+                "Rejections Out",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Reversing Journal",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000003e",
+            master_id: 62,
+            alter_id: 64,
+            parent: Some(
+                "Reversing Journal",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Sales",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000002c",
+            master_id: 44,
+            alter_id: 46,
+            parent: Some(
+                "Sales",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Sales Order",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000040",
+            master_id: 64,
+            alter_id: 66,
+            parent: Some(
+                "Sales Order",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Shape Purchase",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010a",
+            master_id: 266,
+            alter_id: 269,
+            parent: Some(
+                "Purchase",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Automatic,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Shape Sales",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000da",
+            master_id: 218,
+            alter_id: 220,
+            parent: Some(
+                "Sales",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Manual,
+                ),
+            },
+        },
+        NativeMasterRow {
+            name: "Stock Journal",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000003a",
+            master_id: 58,
+            alter_id: 60,
+            parent: Some(
+                "Stock Journal",
+            ),
+            detail: VoucherType {
+                active: Some(
+                    true,
+                ),
+                optional: Some(
+                    false,
+                ),
+                numbering: Some(
+                    Default,
+                ),
+            },
+        },
+    ],
+})

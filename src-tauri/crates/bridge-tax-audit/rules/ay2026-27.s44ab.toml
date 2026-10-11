@@ -1,10 +1,10 @@
 # Vendored excerpt of the reference Python implementation's rules table for AY 2026-27, as
 # separate byte-for-byte verbatim blocks (each checked independently against the live source by
 # the local parity example, since the blocks are not contiguous in the source file):
-#   1. [meta] in full; then [s44ab] as two blocks: its header with its three thresholds, and
-#      `authority` and `status`. Excludes the comment lines and the s.44AB(b) profession limit
-#      between them (no ported test reads that limit yet) and the [s44ab.turnover] sub-table after
-#      it, which cites a private research note.
+#   1. [meta] in full; then [s44ab] as three blocks: its header with its three thresholds, the
+#      s.44AB(b) profession limit line, and `authority` and `status`. Excludes the comment lines
+#      between them and the [s44ab.turnover] sub-table after it, which cites a private research
+#      note.
 #   2. [s40a3] in full (five lines) -- cash_payments_40a3 reads every key in it.
 #   3. [s269st]'s first three lines only (limit_per_person_per_day_paise, authority, status) --
 #      excludes the table's Circular 22/2017 discussion further down, which cites a private
@@ -78,6 +78,8 @@ version = "2026-09-17.1"
 turnover_threshold_paise = 1_00_00_000_00        # s.44AB(a)
 turnover_threshold_low_cash_paise = 10_00_00_000_00  # proviso to s.44AB(a)
 cash_share_limit_bp = 500                         # 5% of receipts and of payments, each
+
+profession_gross_receipts_paise = 50_00_000_00    # s.44AB(b)
 
 authority = "s.44AB(a) and its proviso; s.44AB(b)"
 status = "verified"

@@ -1,0 +1,27 @@
+# fixture: tests/fixtures/masters_godowns_shape_lab_live.utf16le.xml
+# parser: parse_native_masters(Godowns)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Factory Floor",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d4",
+            master_id: 212,
+            alter_id: 213,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+        NativeMasterRow {
+            name: "Main Location",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000063",
+            master_id: 99,
+            alter_id: 100,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+    ],
+})

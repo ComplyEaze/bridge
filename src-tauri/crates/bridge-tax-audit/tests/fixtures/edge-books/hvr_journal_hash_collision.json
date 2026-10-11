@@ -1,0 +1,321 @@
+{
+ "comment": "high_value_register: journal-transfer row ids where two DIFFERENT voucher GUIDs have one hash (sha1 of 'jv-29286' and of 'jv-46864' both begin 62ff2b35), each GUID also shared by several vouchers. Rows whose id would repeat take a suffix in date order, the books' order within a day whatever the amounts (the later of two same-day journals is the smaller): lines of different GUIDs, of one GUID on two vouchers, and both lines of one voucher on one ledger (debit first and credit first) all meet under one base id. One line under the threshold shares the base and takes no place.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Capital Account": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "adv-dc42e5-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "adv-dc42e5-001"
+  },
+  {
+   "name": "Party Q",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "adv-dc42e5-002"
+  },
+  {
+   "name": "Party R",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "adv-dc42e5-003"
+  },
+  {
+   "name": "Party S",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "adv-dc42e5-004"
+  },
+  {
+   "name": "Party T",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "adv-dc42e5-005"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 90000000,
+   "credit": 0,
+   "closing": 90000000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Party Q",
+   "opening": 0,
+   "debit": 130000000,
+   "credit": 170000000,
+   "closing": -40000000
+  },
+  {
+   "ledger": "Party R",
+   "opening": 0,
+   "debit": 0,
+   "credit": 130000000,
+   "closing": -130000000
+  },
+  {
+   "ledger": "Party S",
+   "opening": 0,
+   "debit": 130000000,
+   "credit": 320000000,
+   "closing": -190000000
+  },
+  {
+   "ledger": "Party T",
+   "opening": 0,
+   "debit": 270000000,
+   "credit": 0,
+   "closing": 270000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "jv-29286",
+   "date": "2025-06-07",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party Q",
+     30000000
+    ],
+    [
+     "Party R",
+     -30000000
+    ]
+   ],
+   "number": "J1"
+  },
+  {
+   "guid": "jv-46864",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party Q",
+     40000000
+    ],
+    [
+     "Party R",
+     -40000000
+    ]
+   ],
+   "number": "J2"
+  },
+  {
+   "guid": "jv-46864",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party Q",
+     50000000
+    ],
+    [
+     "Party R",
+     -50000000
+    ]
+   ],
+   "number": "J3"
+  },
+  {
+   "guid": "jv-29286",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party S",
+     60000000
+    ],
+    [
+     "Party S",
+     -60000000
+    ]
+   ],
+   "number": "J4"
+  },
+  {
+   "guid": "jv-46864",
+   "date": "2025-06-04",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party S",
+     -70000000
+    ],
+    [
+     "Party S",
+     70000000
+    ]
+   ],
+   "number": "J5"
+  },
+  {
+   "guid": "solo",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party T",
+     80000000
+    ],
+    [
+     "Party Q",
+     -80000000
+    ]
+   ],
+   "number": "J6"
+  },
+  {
+   "guid": "jv-29286",
+   "date": "2025-06-03",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party Q",
+     10000000
+    ],
+    [
+     "Party R",
+     -10000000
+    ]
+   ],
+   "number": "J7"
+  },
+  {
+   "guid": "jv-46864",
+   "date": "2025-06-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party T",
+     100000000
+    ],
+    [
+     "Party S",
+     -100000000
+    ]
+   ],
+   "number": "J8"
+  },
+  {
+   "guid": "jv-29286",
+   "date": "2025-06-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Party S",
+     -90000000
+    ],
+    [
+     "Party T",
+     90000000
+    ]
+   ],
+   "number": "J9"
+  },
+  {
+   "guid": "jv-29286",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     30000000
+    ],
+    [
+     "Party Q",
+     -30000000
+    ]
+   ],
+   "number": "C1",
+   "reference": "INV-1"
+  },
+  {
+   "guid": "jv-46864",
+   "date": "2025-07-01",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     30000000
+    ],
+    [
+     "Party Q",
+     -30000000
+    ]
+   ],
+   "number": "C2"
+  },
+  {
+   "guid": "jv-46864",
+   "date": "2025-07-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Cash",
+     30000000
+    ],
+    [
+     "Party Q",
+     -30000000
+    ]
+   ],
+   "number": "C3",
+   "reference": "INV-1"
+  }
+ ],
+ "tests": [
+  "high_value_register"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "entity_type": "individual"
+}

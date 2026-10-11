@@ -6004,8 +6004,9 @@ async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue(
 }
 
 /// A number another voucher took while the approval waited is refused under
-/// the admission's own code, not as a master that moved. The rehearsal's
-/// captured answer for a number a Sales voucher carries stands for it.
+/// the admission's own code, not as a master that moved. SYNTHETIC answer: the
+/// rehearsal's captured answer for a number a Sales voucher carries (another
+/// company's) stands for it.
 #[tokio::test]
 async fn a_number_taken_after_the_approval_is_refused_in_the_queue_under_its_own_code() {
     let run = pilot_post_changed(&[Changed {
@@ -6025,7 +6026,8 @@ async fn a_number_taken_after_the_approval_is_refused_in_the_queue_under_its_own
 
 /// The company's registration read as composition while the approval waited
 /// (the registration type of the captured unit edited): refused under the
-/// admission's own code.
+/// admission's own code. SYNTHETIC answer: the captured tax unit with that one
+/// edit; it stands for a lapse, and is not Tally's answer to one.
 #[tokio::test]
 async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the_queue() {
     let from = "<REGISTRATIONTYPE>Regular</REGISTRATIONTYPE>";
@@ -6054,6 +6056,11 @@ fn pilot_queue_start() -> usize {
 /// judges them before the listing is read. A book over the voucher mark is
 /// refused with the queue's reads up to its currency made and none of the
 /// invoice's.
+///
+/// SYNTHETIC answer: the captured binding marks with the voucher mark edited
+/// to 25,001. It stands for a book that grew; it is not Tally's answer for one,
+/// and shows only that the queue judges the limit before it sends an invoice
+/// read.
 #[tokio::test]
 async fn a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read() {
     let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
@@ -6081,6 +6088,9 @@ async fn a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_i
 /// the build's limit. It does not show that Tally answers the count request for
 /// the pilot lab with 4,339, or at all: the unedited capture is judged under
 /// its own company's name in the precheck's unit test.
+///
+/// The binding marks are SYNTHETIC too: the captured marks with the master mark
+/// edited to 5,001, standing for a book whose masters grew past the gate's mark.
 #[tokio::test]
 async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal() {
     let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
@@ -6111,8 +6121,12 @@ async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_r
 }
 
 /// A currency master added while the approval waited is refused under its own
-/// code before any read of the invoice (the multi-currency capture stands for
-/// the queue's currency answer).
+/// code before any read of the invoice.
+///
+/// SYNTHETIC answer: the multi-currency capture is another company's, and stands
+/// for the pilot lab's currency answer after a master was added. It shows that
+/// the currency is judged before an invoice read is sent, not what Tally
+/// answers for the pilot lab with two currency masters.
 #[tokio::test]
 async fn a_currency_added_after_the_approval_is_refused_before_any_invoice_read() {
     let queue_currency = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap() + 8;
@@ -6131,7 +6145,8 @@ async fn a_currency_added_after_the_approval_is_refused_before_any_invoice_read(
 
 /// A master changed after the queue's last invoice read is not seen by the
 /// judge; the aim check sees the company's master mark move (the aim marks
-/// edited to read one higher), and refuses.
+/// edited to read one higher), and refuses. SYNTHETIC answer: the captured aim
+/// marks with that one edit.
 #[tokio::test]
 async fn a_master_mark_that_moves_after_the_invoice_reads_is_refused_by_the_aim_check() {
     let aim = PILOT_ORDER.find('Z').unwrap() - 1;

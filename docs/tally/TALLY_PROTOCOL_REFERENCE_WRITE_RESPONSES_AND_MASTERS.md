@@ -506,7 +506,7 @@ gone. The preservation above is of an omitted scalar field; a list that is sent 
 whole list. Not measured: a ledger's lists (GST rate and HSN details, the dated registration
 history, the mailing details), and other releases. Until they are, a writer treats every list it
 sends as replacing the stored one, and sends the whole list as read, with its addition. The run's
-request and responses are not in this repository: the book was not a synthetic lab company.
+request and responses are not in this repository.
 
 ### 9.4b Master-name matching: case- and separator-insensitive, otherwise exact
 

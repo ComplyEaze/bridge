@@ -345,6 +345,34 @@ async fn party_source_ends_its_balance_snapshot_at_the_hosts_today_when_a_vouche
     }
 }
 
+/// The balance request of the host-date path, taken from master before #903
+/// changed anything: with no date typed, the request must not change.
+const HOST_DATE_BALANCE_REQUEST_SHA256: &str = "pin from master";
+
+#[tokio::test]
+async fn party_source_host_date_balance_request_is_byte_for_byte_unchanged() {
+    let plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let identity = company_identity(&companies());
+    TallyRuntime::default()
+        .fetch_party_ledger_master_source_with_evidence(
+            TallyConfig {
+                host: simulator.address().ip().to_string(),
+                port: simulator.address().port(),
+            },
+            &identity,
+            assertion(&extents(), &identity),
+            TallyDate::parse("20260815").unwrap(),
+        )
+        .await
+        .unwrap();
+    let observed = simulator.finish().unwrap();
+    assert_eq!(
+        observed[11].request_body_sha256, HOST_DATE_BALANCE_REQUEST_SHA256,
+        "the balance request is the third pair's first request"
+    );
+}
+
 #[tokio::test]
 async fn outstandings_requires_closing_mode_and_retains_sources_on_refusal() {
     for fault in std::iter::once("amount").chain(ADMITTED_PROFILE_VARIANTS) {

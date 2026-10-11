@@ -411,3 +411,55 @@ fn no_later_dated_voucher_adds_nothing_to_the_workbook() {
         );
     }
 }
+
+/// A fingerprint of every part of the package except `docProps/core.xml`,
+/// which Excel's writer stamps with the creation time: each part's name,
+/// length and decompressed bytes, in name order.
+fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
+    use sha2::{Digest, Sha256};
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_party_ledger_master_xlsx(&workbook).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut parts = Vec::new();
+    for index in 0..archive.len() {
+        let mut part = archive.by_index(index).unwrap();
+        if part.name() == "docProps/core.xml" {
+            continue;
+        }
+        let mut contents = Vec::new();
+        std::io::Read::read_to_end(&mut part, &mut contents).unwrap();
+        parts.push((part.name().to_owned(), contents));
+    }
+    parts.sort();
+    let mut hasher = Sha256::new();
+    for (name, contents) in &parts {
+        hasher.update(name.as_bytes());
+        hasher.update((contents.len() as u64).to_le_bytes());
+        hasher.update(contents);
+    }
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The package of the host-date workbook, taken from master before #903
+/// changed anything: with no date typed, the bytes must not change.
+const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str = "pin from master";
+const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str = "pin from master";
+
+#[test]
+fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {
+    assert_eq!(
+        package_fingerprint(source_with_precision(2)),
+        HOST_DATE_PACKAGE_WITHOUT_NOTE
+    );
+    let mut later = source_with_precision(2);
+    later.to = TallyDate::parse("20261001").unwrap();
+    later.last_voucher_date = TallyDate::parse("50261231").unwrap();
+    assert_eq!(
+        package_fingerprint(later),
+        HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE
+    );
+}

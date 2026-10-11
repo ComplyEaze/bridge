@@ -1,11 +1,27 @@
 {
  "comment": "financial_statements (#1505): integrated inventory, no Stock Summary dated the trial balance's last day. No gross or net profit is shown, and the limit says why.",
  "groups": {
+  "Bank Accounts": null,
+  "Capital Account": null,
   "Indirect Expenses": null,
   "Purchase Accounts": null,
   "Sales Accounts": null
  },
  "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts"
+   ],
+   "guid": "edge-bank"
+  },
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
   {
    "name": "Sales",
    "chain": [
@@ -30,6 +46,20 @@
  ],
  "tb": [
   {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 1200000,
+   "closing": 800000
+  },
+  {
+   "ledger": "Owner Capital",
+   "opening": -800000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -800000
+  },
+  {
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
@@ -51,7 +81,42 @@
    "closing": 200000
   }
  ],
- "vouchers": [],
+ "vouchers": [
+  {
+   "guid": "fs-v1",
+   "date": "2025-06-02",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Bank",
+     2000000
+    ],
+    [
+     "Sales",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "fs-v2",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Purchases",
+     1000000
+    ],
+    [
+     "Rent",
+     200000
+    ],
+    [
+     "Bank",
+     -1200000
+    ]
+   ]
+  }
+ ],
  "cash": [],
  "bank": [],
  "opening_stock": 800000,

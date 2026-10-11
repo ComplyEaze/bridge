@@ -1,6 +1,8 @@
 {
  "comment": "financial_statements (#1505): integrated inventory with both stock terms known, and a Stock-in-Hand ledger that carries a value. The two are not added, and no profit is shown.",
  "groups": {
+  "Bank Accounts": null,
+  "Capital Account": null,
   "Current Assets": null,
   "Indirect Expenses": null,
   "Purchase Accounts": null,
@@ -8,6 +10,20 @@
   "Stock-in-Hand": "Current Assets"
  },
  "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts"
+   ],
+   "guid": "edge-bank"
+  },
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
   {
    "name": "Sales",
    "chain": [
@@ -40,6 +56,20 @@
  ],
  "tb": [
   {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 1200000,
+   "closing": 800000
+  },
+  {
+   "ledger": "Owner Capital",
+   "opening": -800000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -800000
+  },
+  {
    "ledger": "Sales",
    "opening": 0,
    "debit": 0,
@@ -68,7 +98,42 @@
    "closing": 500000
   }
  ],
- "vouchers": [],
+ "vouchers": [
+  {
+   "guid": "fs-v1",
+   "date": "2025-06-02",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Bank",
+     2000000
+    ],
+    [
+     "Sales",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "fs-v2",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Purchases",
+     1000000
+    ],
+    [
+     "Rent",
+     200000
+    ],
+    [
+     "Bank",
+     -1200000
+    ]
+   ]
+  }
+ ],
  "cash": [],
  "bank": [],
  "opening_stock": 800000,

@@ -1740,4 +1740,43 @@ profit is shown."
         assert_eq!(v.len(), 1, "{v:?}");
         assert!(v[0].contains("FS-2: net_profit is not published although the stock terms are known (fresh recompute 330000p)"));
     }
+
+    /// A Stock-in-Hand ledger counts as carrying a value by any one of its opening, its
+    /// recomputed closing (opening plus debit less credit) or the Trial Balance's own closing
+    /// field. Each alone keeps the stock items from being used beside it, and FS-2 agrees.
+    #[test]
+    fn each_value_a_stock_in_hand_ledger_can_carry_keeps_the_items_from_being_used() {
+        let cases = [
+            ("only the opening", 5_000, 0, 0, 0),
+            ("only a debit movement", 0, 5_000, 0, 0),
+            ("only a credit movement", 0, 0, 5_000, 0),
+            ("only the TB's own closing field", 0, 0, 0, 5_000),
+        ];
+        for (what, opening_paise, debit_paise, credit_paise, closing_paise) in cases {
+            let mut b = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+            b.ledgers.insert(
+                "Stock Ledger".to_string(),
+                ledger("Stock Ledger", &["Stock-in-Hand", "Current Assets"]),
+            );
+            b.tb.insert(
+                "Stock Ledger".to_string(),
+                TbRow {
+                    opening_paise,
+                    debit_paise,
+                    credit_paise,
+                    closing_paise,
+                },
+            );
+            let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+            for name in NO_PROFIT {
+                assert!(!has_figure(&r, name), "{what}: {name} must not be shown");
+            }
+            assert!(
+                r.findings[0].limits[2].starts_with("A ledger under Stock-in-Hand carries a value"),
+                "{what}: {:?}",
+                r.findings[0].limits
+            );
+            assert!(check_invariants(&b, &r).unwrap().is_empty(), "{what}");
+        }
+    }
 }

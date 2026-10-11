@@ -328,6 +328,9 @@ pub enum ClosingStockUnknown {
     NoSummaryAtPeriodEnd,
     /// The Stock Summary part dated that day did not parse.
     Unreadable,
+    /// The Stock Summary part dated that day parsed and lists no stock item. An empty list is not
+    /// a closing stock of zero: whether Tally lists items that hold no stock is not measured.
+    NoStockItems,
 }
 
 impl ClosingStockUnknown {
@@ -338,6 +341,9 @@ impl ClosingStockUnknown {
                 "not taken: the read has no Stock Summary dated the trial balance's last day"
             }
             Self::Unreadable => "unreadable",
+            Self::NoStockItems => {
+                "not taken: the Stock Summary dated the trial balance's last day lists no stock items"
+            }
         }
     }
 }
@@ -2093,6 +2099,18 @@ mod tests {
             closing_stock(Some(true), &[broken], Some(&to)),
             ClosingStock::Unknown(ClosingStockUnknown::Unreadable)
         );
+        // A part that lists no stock item is not a closing stock of zero. A part that lists items
+        // with no closing value is still counted as nothing, as `stock_summary` counts it.
+        let empty = stock_summary_part("20260331", "");
+        assert_eq!(
+            closing_stock(Some(true), &[empty], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::NoStockItems)
+        );
+        let nil = stock_summary_part("20260331", "<STOCKITEM NAME=\"Hook\"></STOCKITEM>");
+        assert_eq!(
+            closing_stock(Some(true), &[nil], Some(&to)),
+            ClosingStock::Valued(0)
+        );
         // Each reason's text is what the finding's limit prints.
         assert_eq!(ClosingStockUnknown::NotRead.as_str(), "not read");
         assert_eq!(
@@ -2100,6 +2118,10 @@ mod tests {
             "not taken: the read has no Stock Summary dated the trial balance's last day"
         );
         assert_eq!(ClosingStockUnknown::Unreadable.as_str(), "unreadable");
+        assert_eq!(
+            ClosingStockUnknown::NoStockItems.as_str(),
+            "not taken: the Stock Summary dated the trial balance's last day lists no stock items"
+        );
     }
 
     /// #1486: the opening stock POP-3 adds is the stock items' opening values, debit positive,

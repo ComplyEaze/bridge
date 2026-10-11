@@ -222,10 +222,15 @@ fn closing_stock(s: &Value) -> ClosingStock {
         "integer paise or a reason",
         |v| {
             v.as_i64().map(ClosingStock::Valued).or_else(|| {
-                [U::NotRead, U::NoSummaryAtPeriodEnd, U::Unreadable]
-                    .into_iter()
-                    .find(|u| v.as_str() == Some(u.as_str()))
-                    .map(ClosingStock::Unknown)
+                [
+                    U::NotRead,
+                    U::NoSummaryAtPeriodEnd,
+                    U::Unreadable,
+                    U::NoStockItems,
+                ]
+                .into_iter()
+                .find(|u| v.as_str() == Some(u.as_str()))
+                .map(ClosingStock::Unknown)
             })
         },
     )

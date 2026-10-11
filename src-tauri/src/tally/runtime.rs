@@ -5210,6 +5210,7 @@ fn classify_error(error: &anyhow::Error) -> HealthOutcome {
         ReadFailureClass::Connection
         | ReadFailureClass::RequestTimeout
         | ReadFailureClass::RequestFailed
+        | ReadFailureClass::ResponseBodyFailed
         | ReadFailureClass::HttpServer
         | ReadFailureClass::RateLimited => HealthOutcome::TransportFailure,
         ReadFailureClass::HttpClient
@@ -5237,11 +5238,11 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
     match transport_error {
         Some(TallyTransportError::ConnectionFailed) => ReadFailureClass::Connection,
         Some(TallyTransportError::RequestTimedOut) => ReadFailureClass::RequestTimeout,
+        Some(TallyTransportError::RequestFailed) => ReadFailureClass::RequestFailed,
+        // The response head had arrived, so Tally had begun answering (I7, section 5.2).
         Some(
-            TallyTransportError::RequestFailed
-            | TallyTransportError::ResponseTruncated
-            | TallyTransportError::ResponseReadFailed,
-        ) => ReadFailureClass::RequestFailed,
+            TallyTransportError::ResponseTruncated | TallyTransportError::ResponseReadFailed,
+        ) => ReadFailureClass::ResponseBodyFailed,
         Some(TallyTransportError::HttpStatus { status: 429 }) => ReadFailureClass::RateLimited,
         Some(TallyTransportError::HttpStatus { status }) if *status >= 500 => {
             ReadFailureClass::HttpServer

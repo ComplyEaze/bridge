@@ -1325,6 +1325,70 @@ fn local_rejections_and_client_http_statuses_do_not_poison_endpoint_health() {
 }
 
 #[test]
+fn a_failed_response_body_is_its_own_unretried_class_but_counts_as_a_transport_failure() {
+    for error in [
+        TallyTransportError::ResponseTruncated,
+        TallyTransportError::ResponseReadFailed,
+    ] {
+        let error = anyhow::Error::new(error);
+        let class = classify_failure(&error);
+        assert_eq!(class, ReadFailureClass::ResponseBodyFailed);
+        assert!(!class.retryable());
+        assert_eq!(classify_error(&error), HealthOutcome::TransportFailure);
+    }
+    // A request that failed before any response is still the retryable class.
+    let class = classify_failure(&anyhow::Error::new(TallyTransportError::RequestFailed));
+    assert_eq!(class, ReadFailureClass::RequestFailed);
+    assert!(class.retryable());
+}
+
+// The response head had already arrived, so Tally had begun answering; a client cannot cancel
+// that work and the gateway serialises, so a resend makes Tally produce the answer again
+// (IMPLEMENTATION_GUIDE rule I7, section 5.2).
+#[tokio::test]
+async fn a_read_whose_response_body_fails_is_sent_once() {
+    for (port, failure) in [
+        (9130, TallyTransportError::ResponseTruncated),
+        (9131, TallyTransportError::ResponseReadFailed),
+    ] {
+        let runtime = TallyRuntime::default();
+        let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = Arc::clone(&attempts);
+        let sent_failure = failure.clone();
+        let error = runtime
+            .execute(
+                TallyConfig {
+                    host: "localhost".to_string(),
+                    port,
+                },
+                ReadOperation::VoucherExport,
+                ReadRetryPolicy::new(3, std::time::Duration::ZERO, std::time::Duration::ZERO, 0)
+                    .unwrap(),
+                move |_client| {
+                    let observed = Arc::clone(&observed);
+                    let sent_failure = sent_failure.clone();
+                    async move {
+                        observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        Err::<(), _>(anyhow::Error::new(sent_failure))
+                    }
+                },
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            attempts.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "{failure:?}"
+        );
+        assert_eq!(
+            error.downcast_ref::<TallyTransportError>(),
+            Some(&failure),
+            "the typed transport error is returned"
+        );
+    }
+}
+
+#[test]
 fn endpoint_identity_aliases_only_localhost_to_ipv4_loopback() {
     let runtime = TallyRuntime::default();
     let localhost_identity = EndpointKey::from_config(&TallyConfig {

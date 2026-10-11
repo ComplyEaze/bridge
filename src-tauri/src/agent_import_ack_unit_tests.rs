@@ -1410,19 +1410,14 @@ fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
     assert!(stepped.contains(&r#"Dr 3  Cr 0  3 entries  Line break  "Ledger 0\r\n""#));
     assert!(stepped.contains(&post::LINE_BREAK_NOTE));
     assert!(!stepped.iter().any(|shown| shown.contains("Cash")));
-    // The text passes the check every dialog text passes: a date read back
-    // with the characters of a written-out break before a quote is not a
-    // marked name, and the text is refused.
-    let mut typed = batch_rows(&line);
-    typed[0].date = Some(r#"20260907\r\n""#.into());
-    let typed = typed.iter().collect::<Vec<_>>();
+    // A batch review shows no value of Tally's raw but the date, and a date
+    // is a validated TallyDate: no value it shows can carry the characters of
+    // a written-out break, so the check every dialog text passes is pinned on
+    // the one-voucher review above, which shows the voucher type raw.
     let plain_masters: Value = serde_json::from_slice(MASTERS_DOUBT).unwrap();
-    assert_eq!(
-        batch_review_preview(&line, DoubtKind::Masters, "Books", &plain_masters, &typed),
-        Err("ack_review_layout_text".to_string())
-    );
-    // Only a ledger name is taken so: the company name, an amount, a date
-    // or a voucher type with the same break is refused.
+    // Only a ledger name is taken so: the company name, an amount or a
+    // voucher type with the same break is refused. A date cannot hold one:
+    // it is a validated TallyDate.
     let masters = plain_masters;
     assert_eq!(
         batch_review_preview(
@@ -1440,9 +1435,6 @@ fn a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             (|row: &mut ReadVoucher| row.entries[0].amount.push_str("\r\n"))
                 as fn(&mut ReadVoucher),
         ),
-        ("date", |row: &mut ReadVoucher| {
-            row.date.as_mut().unwrap().push_str("\r\n")
-        }),
         ("voucher type", |row: &mut ReadVoucher| {
             row.voucher_type.as_mut().unwrap().push_str("\r\n")
         }),

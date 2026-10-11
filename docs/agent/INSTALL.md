@@ -8,8 +8,10 @@ ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its so
 
 What we checked ourselves, and what we did not. The Claude Desktop install screens and buttons in these steps are as
 seen in our tests on 1 and 2 October 2026. The Mac had Claude Desktop version 2.19675.0 (read from the app's files),
-and the owner reports that the Windows PC had the same version. The TallyPrime keys (F1, Settings, Connectivity,
-Ctrl+A, Alt+K, Alt+Y) and the Mac keys are written from general knowledge of those programs; we did not walk them
+and the owner reports that the Windows PC had the same version. The TallyPrime screens of Step 1 (F1, Settings,
+Connectivity, the Client/Server configuration box and its list), the browser check, and the Alt+K and Alt+Y menus were
+checked by looking, on TallyPrime 7.1 on Windows on 10 October 2026; saving with Ctrl+A, restarting TallyPrime and
+the Backup & Restore submenu were not part of that check. The Mac keys are written from general knowledge of those programs; we did not walk them
 ourselves. On a Mac, the question in Step 6 ("Which company is open in Tally?") has not been run by us. These are
 other companies' programs and they change, so a screen of yours may differ a little.
 
@@ -28,8 +30,8 @@ other companies' programs and they change, so a screen of yours may differ a lit
 - **Use a test company first.** Make a new company in TallyPrime with a few made-up entries (press **Alt+K**, choose
   **Create**, give it any name). It does not touch your other companies. Keep only the test company open in Tally while you
   try this. ComplyEaze Bridge is still being developed, so a release may contain errors:
-  try it on test data first and keep current backups. To take a backup in TallyPrime, press **Alt+Y** and choose
-  **Backup**.
+  try it on test data first and keep current backups. To take a backup in TallyPrime, press **Alt+Y**,
+  choose **Backup & Restore**, and back up the company from there.
 - **What Claude reads from Tally is sent to Anthropic**, the company that runs Claude. With real books, that includes
   party names and amounts. Decide about real books after it works on the test company; see
   [When you move to real books](#when-you-move-to-real-books).
@@ -84,7 +86,9 @@ port, and that you are on a network you trust.
 
 1. Open TallyPrime and open your test company.
 2. Press **F1**. A Help menu opens. Choose **Settings**, then **Connectivity**.
-3. Move to the line **Client/Server configuration** and press **Enter**.
+3. Move to the line **Client/Server configuration** and press **Enter**. On our check a box opened with three lines:
+   **TallyPrime acts as**, **Enable ODBC** and **Port**. Leave **Enable ODBC** as it is: it is another way for programs
+   to read Tally, and ComplyEaze Bridge does not use it.
 4. Look at the line **TallyPrime acts as**. Write down what it says now, so that you can set it back one day.
 5. On that line press **Enter**, choose **Both** from the list, and press **Enter**.
 6. Look at the line **Port**. It shows a number, usually **9000**. Write the number down. You need it in Step 4.
@@ -98,7 +102,7 @@ addresses appear, delete what is there, type exactly this, and press **Enter**. 
 
 | What you see | What it means |
 | --- | --- |
-| A short line of text that mentions Tally, such as "TallyPrime Server is Running" | It worked. Go to Step 2. |
+| A short line of text that mentions Tally, such as "TallyPrime Server is Running" | It worked. Go to Step 2. Some browsers add a line of their own above it, saying the XML file has no style information. That line comes from the browser and is not an error. |
 | A list of search results | You typed in a search box. Type it in the long bar at the very top instead. |
 | "This site can't be reached", or similar | Tally is closed, or the setting is not on yet, or the number is different. Check that TallyPrime is open, do Step 1 again, and make sure you closed and reopened TallyPrime. |
 | The page keeps loading and nothing appears | Tally is busy. Wait a minute and try again, two or three times. Do not change the setting. |
@@ -189,7 +193,7 @@ Still stuck? See [Help](#help).
   and uses it is set by your Claude account and Anthropic's own privacy policy. If the books belong to clients, the
   owner of the practice decides. How ComplyEaze Bridge itself handles information is in its
   [Privacy Policy](https://bridge.complyeaze.com/privacy).
-- **Take a backup first** (Alt+Y, Backup, in TallyPrime).
+- **Take a backup first** (Alt+Y, Backup & Restore, in TallyPrime).
 - **Leave Tally's port alone.** Do not open it to the internet, and do not try to reach a Tally on another computer.
   ComplyEaze Bridge accepts only this computer.
 - **Reading and posting are separate.** Asking questions reads. Preparing a voucher file and reading a bank statement

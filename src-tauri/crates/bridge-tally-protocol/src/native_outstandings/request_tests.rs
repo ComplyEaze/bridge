@@ -470,3 +470,34 @@ fn the_gst_details_request_differs_from_the_production_compliance_request_only_b
     assert!(production.contains("<FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST</FETCH>"));
     assert!(!production.contains("GSTDETAILS.LIST,"));
 }
+
+/// The parent-part variant of the GST details read adds the same `FETCH`
+/// suffix as the whole-book variant and changes nothing else: the parent
+/// filter, its formula and the collection are the production part request's.
+#[test]
+fn the_gst_details_parent_part_request_differs_from_the_production_part_request_only_by_the_suffix()
+{
+    let period = gst_details_period();
+    for part in [
+        one_part(&["Sundry Debtors"]),
+        one_part(&["Sundry Debtors", "Duties & Taxes"]),
+    ] {
+        let production = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        let with_details =
+            render_party_ledger_master_request_for_parents_with_gst_details("Co", &period, &part);
+        let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
+        let marker = "LEDGSTREGDETAILS.LIST</FETCH>";
+        assert_eq!(production.matches(marker).count(), 1);
+        assert_eq!(
+            production.replacen(marker, &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"), 1),
+            with_details
+        );
+        assert_ne!(production, with_details);
+        // The suffix is the whole-book variant's, byte for byte.
+        let whole = render_party_ledger_master_request_with_gst_details("Co", &period);
+        assert!(whole.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
+        assert!(with_details.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
+        assert_eq!(with_details.matches("<FILTERS>").count(), 1);
+        assert_eq!(with_details.matches("<SYSTEM ").count(), 1);
+    }
+}

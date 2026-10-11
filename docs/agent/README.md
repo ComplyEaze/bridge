@@ -221,6 +221,23 @@ estimated past `limit_bytes`; a response past the transport's cap is cut off mid
 company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
+`ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
+false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
+and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every
+request, the request commitment, the sizing and the result are what they were, and no row has a `gst_details`
+key. With it, the master read of each request (the whole book or each part by parent group) also names every
+ledger's `GSTDETAILS.LIST`, and each row's `compliance.gst_details` holds Tally's ledger-level GST details as
+sent: `observation` is `not_observed`, `entries` (each dated entry with its taxability, source, input-credit
+flag and state rows, whose rate rows carry a `rate` that is `absent`, `empty`, `zero` or `value` with `raw` and
+`decimal`, never merged) or `unreadable` (a `defect`, for that ledger only). HSN/SAC and type of supply are
+not returned because no capture shows them, the place of supply is in the registration history
+(`compliance.gst_registrations`), and slab rates are flagged, not read. The result's `limitations` say this
+and that the shape was measured on one 14-ledger lab book of TallyPrime 7.1 Silver and has not yet been run
+through this tool on a live Tally. The response is about twice as large per ledger, so the read is sized by
+its own UNVERIFIED estimate of 8,000 bytes per ledger instead of 3,750: a read, whole or one part, holds
+at most 2,000 ledgers (4,266 without the flag), so a book that fits one read today may come
+back in more parts, or be refused as the existing `parent_over_budget`, never truncated. A held listing
+is served only to a page that asks for the same mode.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only

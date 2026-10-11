@@ -5,7 +5,8 @@ use zip::ZipArchive;
 
 use super::*;
 use crate::reports::party_ledger_master::{
-    build_party_ledger_master_workbook, PartyLedgerMasterRow, PartyLedgerMasterSource,
+    build_party_ledger_master_workbook, BalanceDateBasis, PartyLedgerMasterRow,
+    PartyLedgerMasterSource,
 };
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, PartyLedgerMasterFields};
 
@@ -17,6 +18,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         currency_decimal_places: decimal_places,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Three decimal customer".to_string(),
@@ -81,6 +83,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer".to_string(),
@@ -149,6 +152,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer balance".to_string(),
@@ -228,6 +232,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows,
         request_sha256: "0".repeat(64),
@@ -283,6 +288,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Parent observation".to_string(),
@@ -462,4 +468,31 @@ fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_ty
         package_fingerprint(later),
         HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE
     );
+}
+
+#[test]
+fn a_moved_chosen_date_is_said_beside_the_balance_date_and_in_the_read_period() {
+    let mut source = source_with_precision(2);
+    source.to = TallyDate::parse("20260831").unwrap();
+    source.last_voucher_date = TallyDate::parse("20260831").unwrap();
+    source.balance_date_basis = BalanceDateBasis::Requested(TallyDate::parse("20260815").unwrap());
+    let moved = source.date_moved_note().expect("a moved date is noted");
+    let text = workbook_text(source);
+    // Once on the ledger sheet (beside the date), once in the Schedule III read period.
+    assert_eq!(text.matches(&moved).count(), 2, "{text}");
+    assert!(text.contains(&format!(
+        "Read period: 20260401 to 20260831. No prior-year values were requested or inferred. {moved}"
+    )));
+}
+
+#[test]
+fn a_chosen_date_that_is_a_boundary_adds_no_moved_note_to_the_workbook() {
+    let mut source = source_with_precision(2);
+    source.balance_date_basis = BalanceDateBasis::Requested(TallyDate::parse("20260731").unwrap());
+    assert_eq!(source.date_moved_note(), None);
+    let text = workbook_text(source);
+    assert!(!text.contains("is not a date Tally accepts"), "{text}");
+    assert!(text.contains(
+        "Read period: 20260401 to 20260731. No prior-year values were requested or inferred."
+    ));
 }

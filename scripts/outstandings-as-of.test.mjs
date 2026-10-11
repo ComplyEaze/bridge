@@ -12,6 +12,7 @@ import {
   bulkPartyStatementsInvokeArgument,
   bulkPartyStatementsPreviewInvokeArgument,
   operatorSelectedOutstandingsAsOf,
+  partyLedgerMasterInvokeArgument,
   partyStatementInvokeArgument,
   refreshAutomaticOutstandingsAsOf,
   settleAsOfBoundValue,
@@ -219,4 +220,29 @@ test("working-paper export sends only the opaque Rust-owned read binding", () =>
   );
   assert.equal(workingPaperInvokeArgument({}), null);
   assert.equal(workingPaperInvokeArgument({ working_paper_export_id: "" }), null);
+});
+
+test("the ledger-master request carries the screen's date only when the operator chose it (bridge#903)", () => {
+  const config = { host: "127.0.0.1", port: 9000 };
+  const company = {
+    name: "Synthetic Accounts",
+    guid: "00000000-0000-0000-0000-000000000000",
+    company_number: "100001",
+    books_from_yyyymmdd: "20260401",
+  };
+  const chosen = partyLedgerMasterInvokeArgument(config, company, "2027-03-31", true);
+  assert.equal(chosen.request.as_of_yyyymmdd, "20270331");
+  assert.deepEqual(chosen.request.selected_company, {
+    display_name: "Synthetic Accounts",
+    company_guid: "00000000-0000-0000-0000-000000000000",
+    company_number: "100001",
+    books_from_yyyymmdd: "20260401",
+  });
+  // An automatic date is the host's own: nothing is sent, so the backend's
+  // default is untouched.
+  const automatic = partyLedgerMasterInvokeArgument(config, company, "2027-03-31", false);
+  assert.equal("as_of_yyyymmdd" in automatic.request, false);
+  // A chosen date the contract cannot carry blocks the export.
+  assert.equal(partyLedgerMasterInvokeArgument(config, company, "", true), null);
+  assert.equal(partyLedgerMasterInvokeArgument(config, company, "2027-3-31", true), null);
 });

@@ -495,6 +495,55 @@ fn drifted_party_master_read_is_response_validation_not_endpoint_failure() {
 }
 
 #[test]
+fn a_chosen_date_before_the_books_is_named_in_band_through_retained_evidence() {
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    let refusal = anyhow::Error::new(
+        crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+    );
+    for error in [
+        refusal,
+        with_read_evidence(
+            anyhow::Error::new(
+                crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+            ),
+            RuntimeReadEvidence::empty(),
+        ),
+    ] {
+        let mapped = party_ledger_master_runtime_command_error(error);
+        assert_eq!(mapped.code, "as_of_precedes_books_from");
+        assert_eq!(mapped.retry, "after_change");
+        assert!(!mapped.local_state_changed);
+    }
+}
+
+#[test]
+fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_boundary() {
+    let request = |as_of: Option<&str>| {
+        let mut value = serde_json::json!({
+            "config": { "host": "127.0.0.1", "port": 9000 },
+            "selected_company": {
+                "display_name": "Synthetic Accounts",
+                "company_guid": "00000000-0000-0000-0000-000000000000",
+                "company_number": "100001",
+                "books_from_yyyymmdd": "20260401",
+            },
+        });
+        if let Some(as_of) = as_of {
+            value["as_of_yyyymmdd"] = serde_json::json!(as_of);
+        }
+        serde_json::from_value::<PartyLedgerMasterRequest>(value)
+    };
+    assert_eq!(request(None).unwrap().as_of_yyyymmdd, None);
+    assert_eq!(
+        request(Some("20260731")).unwrap().as_of_yyyymmdd,
+        Some(TallyDate::parse("20260731").unwrap())
+    );
+    for malformed in ["2026-07-31", "20260230", "", "2026073"] {
+        assert!(request(Some(malformed)).is_err(), "{malformed}");
+    }
+}
+
+#[test]
 fn party_master_export_keeps_runtime_control_error_code_and_hides_runtime_detail() {
     let error = party_ledger_master_runtime_command_error(anyhow::Error::new(
         crate::tally::runtime::TallyRuntimeControlError::QueueDeadline,

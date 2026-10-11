@@ -28,6 +28,7 @@ function defaultProps(): React.ComponentProps<typeof OutstandingsScreen> {
     liveReadNavigationLocked: false,
     liveReadSuppressed: false,
     asOf: "2026-09-08",
+    asOfOperatorSelected: false,
     onAsOfChange: () => {},
     onTallyReadActivityChange: () => {},
     onExportNoticeChange: () => {},
@@ -293,4 +294,65 @@ test("statement controls appear only with the source Bridge holds", async () => 
     host.remove();
     mocks.invoke.mockReset();
   }
+});
+
+// bridge#903: the ledger-master export carries the screen's As of date only
+// when the operator chose it, and hands the workbook's typed notes to the shell.
+async function clickLedgerMasterExport(props: Partial<React.ComponentProps<typeof OutstandingsScreen>>) {
+  mocks.invoke.mockImplementation((command: string) => {
+    if (command === "detect_tally_base_currency") {
+      return Promise.resolve({ is_inr: true, mailing_name: "Indian Rupee", currency_count: 1 });
+    }
+    if (command === "export_party_ledger_master") {
+      return Promise.resolve({
+        path: "/exports/party-ledger-master-synthetic-20260731.xlsx",
+        notes: [{ kind: "date_moved", text: "moved" }],
+      });
+    }
+    return Promise.resolve(null);
+  });
+  const notices: unknown[] = [];
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <OutstandingsScreen
+        {...defaultProps()}
+        {...props}
+        onExportNoticeChange={(notice) => notices.push(notice)}
+      />,
+    ),
+  );
+  await flush();
+  const button = [...host.querySelectorAll("button")].find((candidate) =>
+    candidate.textContent?.includes("Ledger master + group subtotal trace"),
+  );
+  await act(async () => button?.click());
+  await flush();
+  root.unmount();
+  const exports = mocks.invoke.mock.calls.filter(([command]) => command === "export_party_ledger_master");
+  return { exports, notices };
+}
+
+test("a ledger-master export sends the As of date the operator chose", async () => {
+  const { exports, notices } = await clickLedgerMasterExport({
+    asOf: "2026-07-31",
+    asOfOperatorSelected: true,
+  });
+  expect(exports).toHaveLength(1);
+  expect(exports[0][1].request.as_of_yyyymmdd).toBe("20260731");
+  expect(notices.at(-1)).toMatchObject({ path: expect.stringContaining(".xlsx"), notes: [{ kind: "date_moved" }] });
+});
+
+test("a ledger-master export leaves the host's date alone when the operator chose none", async () => {
+  const { exports } = await clickLedgerMasterExport({ asOf: "2026-07-31", asOfOperatorSelected: false });
+  expect(exports).toHaveLength(1);
+  expect("as_of_yyyymmdd" in exports[0][1].request).toBe(false);
+});
+
+test("a ledger-master export is blocked, not defaulted, when the chosen date cannot be sent", async () => {
+  const { exports, notices } = await clickLedgerMasterExport({ asOf: "", asOfOperatorSelected: true });
+  expect(exports).toHaveLength(0);
+  expect(notices.at(-1)).toMatchObject({ message: expect.stringContaining("valid As of date") });
 });

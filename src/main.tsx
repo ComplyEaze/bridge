@@ -1609,6 +1609,7 @@ function App() {
             liveReadSuppressed={isLocalEvidenceReadSuppressed(evidenceDrawerOpen, evidenceDrawerEntry)}
             openBookCount={completeCurrentProbeCompanies.length}
             asOf={outstandingsAsOfSelection.value}
+            asOfOperatorSelected={outstandingsAsOfSelection.operatorSelected}
             onAsOfChange={changeOutstandingsAsOf}
             onTallyReadActivityChange={changeChildTallyReadActivity}
             onExportNoticeChange={setOutstandingsExportNotice}

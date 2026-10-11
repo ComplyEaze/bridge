@@ -4884,8 +4884,8 @@
   "by": "author",
   "what": "the registry does not pass the refused-statement reason to bank_reconciliation",
   "file": "src/registry.rs",
-  "from": "c.bank_statement_refused.as_deref(),\n            )\n        },\n    },\n    PortedTest {\n        id: \"book_keeping_quality\",",
-  "to": "None,\n            )\n        },\n    },\n    PortedTest {\n        id: \"book_keeping_quality\","
+  "from": "crate::bank_reconciliation_on(e, b, r, &c.bank_statement)",
+  "to": "crate::bank_reconciliation_on(e, b, r, &match &c.bank_statement {\n                crate::documents::BankStatementLoad::Refused(_) => crate::documents::BankStatementLoad::NotSupplied,\n                other => other.clone(),\n            })"
  },
  {
   "id": "E2B2-01",
@@ -5108,8 +5108,8 @@
   "by": "author",
   "what": "the caller's AIS rows are not passed",
   "file": "src/registry.rs",
-  "from": "c.traces.ais_rows(),\n            )",
-  "to": "&[],\n            )"
+  "from": "c.traces.ais_rows())",
+  "to": "&[])"
  },
  {
   "id": "E2B2-29",
@@ -8036,8 +8036,8 @@
   "by": "author",
   "what": "a refused statement is reported as not supplied",
   "file": "src/high_value_register.rs",
-  "from": "                Some(reason) => {\n                    format!(\"the bank statement supplied was refused (it {reason})\")\n                }",
-  "to": "                Some(_reason) => {\n                    \"no bank statement supplied for this engagement\".to_string()\n                }"
+  "from": "BankStatementLoad::Refused(reason) => s194n_coverage_unavailable(\n            &mut r,\n            format!(\"the bank statement supplied was refused (it {reason})\"),\n        )?,",
+  "to": "BankStatementLoad::Refused(_reason) => s194n_coverage_unavailable(\n            &mut r,\n            \"no bank statement supplied for this engagement\".to_string(),\n        )?,"
  },
  {
   "id": "HV-28",
@@ -8052,8 +8052,8 @@
   "by": "author",
   "what": "the registry does not pass the caller's refused-statement reason",
   "file": "src/registry.rs",
-  "from": "c.bank_statement_refused.as_deref(),\n                c.traces.ais_rows(),",
-  "to": "None,\n                c.traces.ais_rows(),"
+  "from": "crate::high_value_register_on(e, b, r, &c.bank_statement, c.traces.ais_rows())",
+  "to": "crate::high_value_register_on(e, b, r, &match &c.bank_statement {\n                crate::documents::BankStatementLoad::Refused(_) => crate::documents::BankStatementLoad::NotSupplied,\n                other => other.clone(),\n            }, c.traces.ais_rows())"
  },
  {
   "id": "CP-01",
@@ -9460,7 +9460,7 @@
   "by": "author",
   "what": "the registry runs books_examined with no documents whatever the caller loaded",
   "file": "src/registry.rs",
-  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()?),",
+  "from": "run_on: |_, b, r, c| crate::books_examined_on(b, r, &c.documents_read()),",
   "to": "run_on: |_, b, r, _| crate::books_examined_on(b, r, &Default::default()),"
  },
  {
@@ -13664,20 +13664,12 @@
   "to": "            (sum.abs() >= TIE_TOLERANCE_PAISE).then(|| format!(\"TB {key} sums to {sum} paise\"))\n"
  },
  {
-  "id": "BE-30",
-  "by": "author",
-  "what": "a bank statement both held and refused is read",
-  "file": "src/registry.rs",
-  "from": "if self.bank_statement.is_some() && self.bank_statement_refused.is_some() {",
-  "to": "if false && (self.bank_statement.is_some() && self.bank_statement_refused.is_some()) {"
- },
- {
   "id": "BE-31",
   "by": "author",
   "what": "a refused bank statement is listed as examined",
   "file": "src/registry.rs",
-  "from": "(DocumentRead::BankStatement, self.bank_statement.is_some()),",
-  "to": "(DocumentRead::BankStatement, self.bank_statement.is_some() || self.bank_statement_refused.is_some()),"
+  "from": "matches!(self.bank_statement, BankStatementLoad::Read(_)),",
+  "to": "matches!(\n                    self.bank_statement,\n                    BankStatementLoad::Read(_) | BankStatementLoad::Refused(_)\n                ),"
  },
  {
   "id": "BE-32",
@@ -13716,8 +13708,8 @@
   "by": "author",
   "what": "a bank statement read is never listed",
   "file": "src/registry.rs",
-  "from": "(DocumentRead::BankStatement, self.bank_statement.is_some()),",
-  "to": "(DocumentRead::BankStatement, false),"
+  "from": "matches!(self.bank_statement, BankStatementLoad::Read(_)),",
+  "to": "false,"
  },
  {
   "id": "BE-37",
@@ -13750,5 +13742,29 @@
   "file": "src/documents.rs",
   "from": "        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),",
   "to": "        Value::Array(a) if a.is_empty() => Ok(None),\n        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),"
+ },
+ {
+  "id": "BE-41",
+  "by": "author",
+  "what": "a bank statement not supplied is listed as examined",
+  "file": "src/registry.rs",
+  "from": "matches!(self.bank_statement, BankStatementLoad::Read(_)),",
+  "to": "!matches!(self.bank_statement, BankStatementLoad::Refused(_)),"
+ },
+ {
+  "id": "E2A-83",
+  "by": "author",
+  "what": "bank_reconciliation runs, and gives a result, with no bank statement supplied",
+  "file": "src/lib.rs",
+  "from": "        documents::BankStatementLoad::NotSupplied => {\n            return Err(AuditError::Config(format!(",
+  "to": "        documents::BankStatementLoad::NotSupplied => {\n            if true {\n                return Ok(serde_json::Value::Null);\n            }\n            return Err(AuditError::Config(format!("
+ },
+ {
+  "id": "HV-33",
+  "by": "author",
+  "what": "a bank statement not supplied is reported as refused in s.194N's coverage",
+  "file": "src/high_value_register.rs",
+  "from": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"no bank statement supplied for this engagement\".to_string(),\n        )?,",
+  "to": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"the bank statement supplied was refused (it has no reason)\".to_string(),\n        )?,"
  }
 ]

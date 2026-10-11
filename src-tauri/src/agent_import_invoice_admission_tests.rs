@@ -6,9 +6,10 @@
 //! from one read of the disposable GST lab book (the `register-e2e` set; its
 //! PROVENANCE table is beside the fixtures). The voucher types and the number
 //! read's answers are Tally's own bytes from the Sales rehearsal on the same
-//! book (the `sales-rehearsal` set, 7 Oct 2026). Two things are not this
+//! book (the `sales-rehearsal` set, 7 Oct 2026). Three things are not this
 //! book's bytes and say so: the company's tax units (another synthetic book's
-//! capture, RE-LABELLED below) and the bill-wise catalogue row (HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
+//! capture, RE-LABELLED below), the bill-wise catalogue row and the rate
+//! listing (both HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
 //! so no case here is admitted.
 use super::*;
 use crate::agent::agent_import::invoice::InvoiceJudge;
@@ -34,6 +35,9 @@ const ADMISSION_ORDER: &str = concat!(
     "eNsNse",
     "eCsCse"
 );
+
+/// A rate listing that came back with no ledger row (HAND-WRITTEN).
+const EMPTY_RATE_LISTING: &str = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION></COLLECTION></DATA></BODY></ENVELOPE>";
 
 fn utf16(bytes: &[u8]) -> String {
     String::from_utf16(
@@ -86,10 +90,14 @@ fn plan(letter: char) -> ScenarioPlan {
         'P' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-paired.utf16le.xml")),
         'g' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-groups.utf16le.xml")),
         // HAND-WRITTEN, not Tally's bytes: this book's rates were never read, so
-        // the listing is an empty collection. No case here reaches the tax
-        // arithmetic (the party of each is refused first); the lab's own rate
-        // listing is replayed in the pilot-lab tests.
-        'Q' => "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION></COLLECTION></DATA></BODY></ENVELOPE>".to_string(),
+        // the listing holds one row, bound to the company, of a ledger no
+        // invoice here names (a listing with no row is a failed read). No case
+        // here reaches the tax arithmetic (the party of each is refused first);
+        // the lab's own rate listing is replayed in the pilot-lab tests.
+        'Q' => EMPTY_RATE_LISTING.replace(
+            "<COLLECTION></COLLECTION>",
+            &format!("<COLLECTION><LEDGER NAME=\"Synthetic Unnamed Ledger\"><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION>"),
+        ),
         'T' => voucher_types(),
         'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
         'C' => company_registration(),
@@ -200,7 +208,7 @@ fn sent(simulator: SequenceSimulator) -> usize {
 /// it or, with `observed`, as a build saved it for an unregistered customer.
 fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
     let mut voucher = json!({
-        "bridge_txn_id":"t1", "date":"2026-03-10", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
+        "bridge_txn_id":"t1", "date":"20260310", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
         "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan"},
         "entries":[
             {"ledger":party,"amount":"11800.00","side":"Dr"},
@@ -402,6 +410,47 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
         assert_eq!(sent(lab.simulator), 70);
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
+}
+
+/// A rate listing with no ledger row is a failed read under its own code,
+/// never "this ledger has no rate": the company's ledgers were listed just
+/// before it. The admission stops at that read (52 requests) and records no
+/// observation.
+#[tokio::test]
+async fn an_empty_rate_listing_fails_the_admission_at_that_read() {
+    let lab = lab(ADMISSION_ORDER
+        .chars()
+        .map(|letter| match letter {
+            'Q' => ScenarioPlan::new(Fixture::SyntheticXml(EMPTY_RATE_LISTING.to_string()))
+                .with_encoding(WireEncoding::Utf16LeNoBom)
+                .with_framing(ResponseFraming::ContentLength),
+            letter => plan(letter),
+        })
+        .collect());
+    let party = "Counter Sales - Unregistered";
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let outcome = match lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await
+    {
+        Ok(_) => panic!("admitted"),
+        Err(invoice::InvoiceAdmission::Refused(refusals)) => {
+            Err(refusals.into_iter().map(|r| r.code).collect::<Vec<_>>())
+        }
+        Err(invoice::InvoiceAdmission::Failed(failure)) => Ok(failure.code),
+    };
+    assert_eq!(
+        outcome,
+        Ok("invoice_ledger_rates_listing_empty".to_string())
+    );
+    assert_eq!(sent(lab.simulator), 52);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 
 /// The registration's state is the supplier's state that classification
@@ -620,7 +669,7 @@ fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
     let mut other_number = voucher.clone();
     other_number.voucher_number = Some("TG/25-26/901".to_string());
     let mut other_year = voucher.clone();
-    other_year.date = "2027-05-10".to_string();
+    other_year.date = bridge_tally_core::TallyDate::parse("20270510".to_string()).unwrap();
     for other in [other_number, other_year] {
         let carried = plan_of(&other, &ledger::NumberControl::NeverSent);
         assert_eq!(
@@ -673,7 +722,7 @@ fn an_invoice_without_reads_and_reads_without_an_invoice_are_refused_unseen() {
     };
     let invoice_voucher = invoice_to("Customer", "Sales Manual", true);
     let journal: ImportVoucher = serde_json::from_value(json!({
-        "bridge_txn_id":"j1", "date":"2026-03-10", "voucher_type":"Journal",
+        "bridge_txn_id":"j1", "date":"20260310", "voucher_type":"Journal",
         "entries":[
             {"ledger":"Customer","amount":"10.00","side":"Dr"},
             {"ledger":"Sales - Goods","amount":"10.00","side":"Cr"}

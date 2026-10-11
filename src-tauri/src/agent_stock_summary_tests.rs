@@ -24,7 +24,7 @@ const AS_OF: &str = "20260331";
 const BOOKS_FROM: &str = "20250401";
 /// The end of the basis of a read whose value total matched: exactly what was
 /// compared, and what was not.
-const MATCHED_SENTENCE: &str = "The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and quantities are not returned because nothing checks them.";
+const MATCHED_SENTENCE: &str = "The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and a quantity is returned only where Tally's own Stock Summary shows the same one (`closing.quantity`).";
 /// The part of a basis that is the same whatever Tally reported.
 const UNMEASURED_USE: &str =
     "how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured";
@@ -436,9 +436,10 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "`no_stock_items`: Tally's own stock item count is 0, the item list is empty and the Stock Summary is empty",
         "`not_established`: no item is returned (`items` is null)",
         "`remediation` says what to do next",
-        "Quantities are withheld: nothing checks them",
-        "`checks` says per field what is `checked`, `not_checked` or `withheld`",
-        "`closing` holds `value` only",
+        "A closing quantity is returned only where Tally's own plain Stock Summary shows the same item by name",
+        "`checks` says per field what is `checked`, `checked_per_item` or `not_checked`",
+        "`closing` holds `value` exactly as Tally sends it, and `quantity` (a `state`, with `amount` and `unit` when it is `agreed`)",
+        "`inside_stock_group`, `report_has_no_line`, `report_name_not_unique`, `report_differs`",
         "tally_stock_summary_shows_no_value",
         "stock_values_not_comparable",
         "only Tally's own stock item count vouches for it",
@@ -478,7 +479,8 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "unless its closing quantity is present and zero",
         "item names are not masked",
         "`opening` and `closing`",
-        // Nothing of the earlier shape, and no claim about quantities.
+        // Nothing of the earlier shape, and no quantity count the tool does not return
+        // (a quantity itself is described now: it is returned where the report agrees).
         "`observed`",
         "`unchecked`",
         "with its reason), and",
@@ -487,7 +489,6 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "empty_closing_quantity_count",
         "stock_quantity_unparseable",
         "how many items have a negative closing quantity",
-        "`amount`",
     ] {
         assert!(!description.contains(phrase), "{phrase}");
     }
@@ -547,7 +548,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
             "closing_value_total": "checked",
             "item_list_complete": "not_checked",
             "closing_value_each": "not_checked",
-            "closing_quantity": "withheld",
+            "closing_quantity": "checked_per_item",
             "name_parent_unit": "not_checked",
             "as_of_honoured": "not_checked",
         })
@@ -580,18 +581,20 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         json!({
             "name": "Carton Box Small", "guid": format!("{GUID}-00000110"),
             "parent": "Packaging", "base_unit": "Box",
-            "closing": {"value": "2500.00"},
+            "closing": {"value": "2500.00", "quantity": {"state": "inside_stock_group"}},
         })
     );
-    // No quantity leaves, on any item or in the totals: nothing checks one.
+    // This book's report lists three stock groups and no item: every item sits inside
+    // one, so none has a line of its own and no quantity leaves, and each says why (the
+    // items with no quantity say that Tally sent none).
     for item in page["items"].as_array().unwrap() {
-        assert_eq!(
-            item["closing"]
-                .as_object()
-                .unwrap()
-                .keys()
-                .collect::<Vec<_>>(),
-            ["value"],
+        let state = item["closing"]["quantity"]["state"].as_str().unwrap();
+        assert!(
+            ["inside_stock_group", "none_sent"].contains(&state),
+            "{item}"
+        );
+        assert!(
+            item["closing"]["quantity"].get("amount").is_none(),
             "{item}"
         );
     }
@@ -627,7 +630,8 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         assert!(limitations.iter().any(|found| found == line), "{line}");
     }
     for line in [
-        "Quantities are withheld: nothing checks them, so none is returned. A quantity ComplyEaze Bridge could not read (a compound unit, or a unit with a space in it) is counted in `totals.closing_quantity_unread_count` and does not refuse the read",
+        "A closing quantity is returned only where Tally's own plain Stock Summary shows the same item by name with the same quantity, unit and amount: `closing.quantity.state` is `agreed`, with `amount` and `unit`. Every other item says why not: `none_sent` (Tally sent none, which is not zero), `unread` (a compound unit, or a unit with a space in it; also counted in `totals.closing_quantity_unread_count`, and the read is not refused), `inside_stock_group` (the item's own parent is not the root, that is a stock group; in the captures the report listed only what sits directly under the root, so it is taken to have no line of its own), `report_has_no_line` (the item sits under the root and no line of the report carries its name: it has nothing to show, or the report names it differently; also given when Tally sent no parent, whatever a line shows), `report_name_not_unique` or `report_differs`",
+        "The Stock Summary does not say whether a line is a stock group or an item: a line is tied to an item by its name, quantity, unit and amount and by the item sitting directly under the root",
         "Item names, parents and base units come from one source and are not checked against another",
     ] {
         assert!(limitations.iter().any(|found| found == line), "{line}");
@@ -640,7 +644,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
     assert_eq!(page["snapshot"]["reused"], true);
     // A later page of a matched read says what its first page said.
     assert_eq!(page["state"], "value_total_matched");
-    assert_eq!(page["checks"]["closing_quantity"], "withheld");
+    assert_eq!(page["checks"]["closing_quantity"], "checked_per_item");
     assert!(page["items"]
         .as_array()
         .unwrap()
@@ -956,7 +960,10 @@ async fn a_single_value_sums_to_itself_at_its_own_scale() {
     let page = result(&response);
     assert_eq!(page["state"], "value_total_matched");
     assert_eq!(page["total"], 1);
-    assert_eq!(page["items"][0]["closing"], json!({"value": "2500.00"}));
+    assert_eq!(
+        page["items"][0]["closing"],
+        json!({"value": "2500.00", "quantity": {"state": "inside_stock_group"}})
+    );
     assert_eq!(page["totals"]["value_sum"], "2500.00");
     assert_eq!(page["tie_out"]["total"], "2500.00");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
@@ -1342,7 +1349,10 @@ async fn a_quantity_bridge_cannot_read_is_counted_and_does_not_refuse_the_book()
     assert_eq!(page["state"], "value_total_matched");
     assert_eq!(page["total"], 11);
     assert_eq!(page["totals"]["closing_quantity_unread_count"], 1);
-    assert_eq!(page["items"][0]["closing"], json!({"value": "2500.00"}));
+    assert_eq!(
+        page["items"][0]["closing"],
+        json!({"value": "2500.00", "quantity": {"state": "unread"}})
+    );
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }
 
@@ -1670,5 +1680,51 @@ async fn an_item_without_a_parent_keeps_a_null_parent_under_mask_parties() {
     let item = &result(&response)["items"][0];
     assert_eq!(item["name"], mask("Carton Box Small"));
     assert_eq!(item["parent"], Value::Null);
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_quantity_the_report_agrees_with_is_returned_through_the_tool() {
+    // The real captures of a book after a sale of an item that held none (item rows and
+    // the plain report), their company prefix moved to this test's company, with the
+    // flags' item count set to the two rows. The negative quantity with no value and the
+    // positive one come back under `closing.quantity`, whole, from the report's own lines.
+    let book = Book {
+        flags: flags_with_count(Some(" 2")),
+        items: decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml"
+        ))
+        .replace("7f3c9a10-5b2d-4e6a-9c41-0d2e8b6a1f37", GUID),
+        report: decode(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_negative_sale_lab_live.utf16le.xml"
+        )),
+    };
+    let one = OneServer::spawn(book.first_page(14, MARK));
+    let response = one.call(args(AS_OF, 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["state"], "value_total_matched");
+    assert_eq!(page["total"], 2);
+    let by_name = |name: &str| {
+        page["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                item["name"]
+                    .as_str()
+                    .is_some_and(|found| found.contains(name))
+            })
+            .unwrap_or_else(|| panic!("no item {name}: {page}"))
+            .clone()
+    };
+    assert_eq!(
+        by_name("Lab Item NEG")["closing"],
+        json!({"value": null, "quantity": {"state": "agreed", "amount": "-5", "unit": "Nos"}})
+    );
+    assert_eq!(
+        by_name("Lab Item POS")["closing"],
+        json!({"value": "-186.00", "quantity": {"state": "agreed", "amount": "18", "unit": "Nos"}})
+    );
+    assert_eq!(page["checks"]["closing_quantity"], "checked_per_item");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
 }

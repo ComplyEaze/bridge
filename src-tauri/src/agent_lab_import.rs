@@ -46,7 +46,9 @@
 //!   explicitly says is untested for anything but Sales). **Both are
 //!   UNVERIFIED for the gateway import path and need the one-voucher /
 //!   one-master live probe §9.4/§9.12 themselves prescribe before a real
-//!   batch** -- see this worker's final report.
+//!   batch** -- see this worker's final report. What a root parent is
+//!   written as is the one measured exception (bridge#974): see
+//!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
 use super::*;
 use bridge_tally_core::ExactDecimal;
@@ -167,11 +169,39 @@ struct BookUnit {
     decimal_places: Option<String>,
 }
 
+/// A book master's parent, parsed once where the book is read (P3).
+///
+/// `Root` is an absent parent or any spelling of Tally's reserved top-level
+/// root that [`book_names_reserved_root`] accepts, bare `Primary` included.
+/// What is written for it depends on the kind ([`render_parented_xml`],
+/// [`render_stock_item_xml`]): TallyPrime 7.1 refused the bare word as a
+/// stock group or godown name that does not exist (bridge#974). `Named` is
+/// never a root spelling and is never blank.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+enum BookParent {
+    #[default]
+    Root,
+    Named(String),
+}
+
+impl<'de> Deserialize<'de> for BookParent {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match Option::<String>::deserialize(deserializer)? {
+            None => Ok(Self::Root),
+            Some(parent) if book_names_reserved_root(&parent) => Ok(Self::Root),
+            Some(parent) if parent.trim().is_empty() => Err(serde::de::Error::custom(
+                "a book parent is a name or absent, not blank",
+            )),
+            Some(parent) => Ok(Self::Named(parent)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct BookNamedParent {
     name: String,
     #[serde(default)]
-    parent: Option<String>,
+    parent: BookParent,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -189,8 +219,13 @@ struct BookLedger {
     tax_type: Option<String>,
     #[serde(default)]
     gst_duty_head: Option<String>,
+    /// Read only so that a ledger carrying opening bills is refused
+    /// ([`refuse_unsendable_masters`]): Tally kept none of the bills this tool
+    /// once sent inside the ledger master (bridge#1500), and no shape for them
+    /// has been captured. Held as `IgnoredAny`, so no bill value can reach a
+    /// renderer.
     #[serde(default)]
-    opening_bill_allocations: Vec<BookBillAllocation>,
+    opening_bill_allocations: Vec<serde::de::IgnoredAny>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -205,7 +240,7 @@ struct BookBillAllocation {
 struct BookStockItem {
     name: String,
     #[serde(default)]
-    parent: Option<String>,
+    parent: BookParent,
     #[serde(default)]
     base_unit: Option<String>,
     #[serde(default)]
@@ -344,6 +379,40 @@ impl MasterKind {
                 "NAME,PARENT,BASEUNITS,OPENINGBALANCE,OPENINGRATE,OPENINGVALUE,\
                 GSTAPPLICABLE,HSNCODE,GUID,MASTERID,ALTERID"
             }
+        }
+    }
+
+    /// The book fields the post-Create read-back compares
+    /// ([`readback_mismatches`]). A parent is always compared (an absent one
+    /// is the root, bridge#974) and a ledger's `opening_balance` as `0.00`
+    /// when the book omits it; every other field only when the book gives it.
+    /// Nothing else is checked; in particular not a ledger's opening
+    /// bills (bridge#1500).
+    fn created_compared(self) -> &'static [&'static str] {
+        match self {
+            Self::Unit => &["decimal_places"],
+            Self::Godown | Self::StockGroup | Self::Group => &["parent"],
+            Self::Ledger => &["parent", "opening_balance", "party_gstin"],
+            Self::StockItem => &["parent", "opening_qty"],
+        }
+    }
+
+    /// The book fields compared before a master already in the target counts
+    /// as `already_present_verified`, or after a reconcile Alter as
+    /// `altered_verified` ([`already_present_verified_mismatches`]). A
+    /// ledger's `is_billwise_on` is compared as `No` when the book omits it,
+    /// and `tax_type` only when the renderer would send it.
+    fn present_compared(self) -> &'static [&'static str] {
+        match self {
+            Self::Ledger => &[
+                "parent",
+                "opening_balance",
+                "party_gstin",
+                "is_billwise_on",
+                "tax_type",
+                "gst_duty_head",
+            ],
+            other => other.created_compared(),
         }
     }
 
@@ -644,14 +713,38 @@ fn render_unit_xml(u: &BookUnit) -> String {
     )
 }
 
-fn render_parented_xml(tag: &str, item: &BookNamedParent) -> String {
-    let parent = item.parent.as_deref().unwrap_or("Primary");
+/// The one form of a root godown TallyPrime 7.1 accepted (bridge#974, third
+/// measurement; a bare `Primary` and an absent parent were both refused with
+/// "Godown 'Primary' does not exist!"). It is Tally's own export form of the
+/// reserved root, written as the literal reference text, so it must not pass
+/// through [`xml_escape`], which would turn the `&` into `&amp;`.
+const ROOT_GODOWN_PARENT_ELEMENT: &str = "<PARENT>&#4; Primary</PARENT>";
+
+/// A Godown, StockGroup or Group Create. What a root parent is written as
+/// depends on the kind (bridge#974): a godown carries the reserved-root
+/// reference, a stock group carries no `PARENT` (a bare `Primary` is
+/// unmeasured for it). A Group has no measured root form, so a root Group is
+/// refused here as well as before the first request
+/// ([`refuse_unsendable_masters`]).
+fn render_parented_xml(
+    kind: MasterKind,
+    item: &BookNamedParent,
+) -> Result<String, LabMastersRefusal> {
+    let parent = match (&item.parent, kind) {
+        (BookParent::Named(parent), _) => format!("<PARENT>{}</PARENT>", xml_escape(parent)),
+        (BookParent::Root, MasterKind::Godown) => ROOT_GODOWN_PARENT_ELEMENT.to_string(),
+        (BookParent::Root, MasterKind::StockGroup) => String::new(),
+        (BookParent::Root, _) => {
+            return Err(LabMastersRefusal::RootParentUnmeasured {
+                groups: vec![item.name.clone()],
+            })
+        }
+    };
+    let tag = kind.tally_type().to_ascii_uppercase();
     let name = xml_escape(&item.name);
-    format!(
-        "<TALLYMESSAGE><{tag} NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME><PARENT>{parent}</PARENT></{tag}></TALLYMESSAGE>",
-        tag = tag,
-        parent = xml_escape(parent)
-    )
+    Ok(format!(
+        "<TALLYMESSAGE><{tag} NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME>{parent}</{tag}></TALLYMESSAGE>"
+    ))
 }
 
 fn render_ledger_xml(l: &BookLedger) -> String {
@@ -700,31 +793,21 @@ fn render_ledger_xml(l: &BookLedger) -> String {
         .as_deref()
         .map(|d| format!("<GSTDUTYHEAD>{}</GSTDUTYHEAD>", xml_escape(d)))
         .unwrap_or_default();
-    // Opening bill-wise allocations, when the source captured them, nested
-    // under the ledger master the same way an accounting voucher's
-    // BILLALLOCATIONS.LIST nests under its ledger entry (§9.4a family) --
-    // this specific master-level placement has no live capture in this
-    // repository and is UNVERIFIED for the gateway; see module doc.
-    let opening_bills = l
-        .opening_bill_allocations
-        .iter()
-        .map(|b| {
-            let name = b.name.clone().unwrap_or_default();
-            format!(
-                "<BILLALLOCATIONS.LIST><NAME>{}</NAME><BILLTYPE>{}</BILLTYPE><AMOUNT>{}</AMOUNT></BILLALLOCATIONS.LIST>",
-                xml_escape(&name), xml_escape(&b.bill_type), xml_escape(&b.amount)
-            )
-        })
-        .collect::<String>();
     format!(
         "<TALLYMESSAGE><LEDGER NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME>\
-<PARENT>{parent}</PARENT>{billwise}{opening_balance}{gstin}{tax_type}{duty_head}{opening_bills}</LEDGER></TALLYMESSAGE>",
+<PARENT>{parent}</PARENT>{billwise}{opening_balance}{gstin}{tax_type}{duty_head}</LEDGER></TALLYMESSAGE>",
         parent = xml_escape(parent)
     )
 }
 
 fn render_stock_item_xml(s: &BookStockItem) -> String {
-    let parent = s.parent.as_deref().unwrap_or("Primary");
+    // A root stock item carries no `PARENT`: the bare `Primary` this once sent
+    // was refused with "Stock Group 'Primary' does not exist!", while the same
+    // item with no element was created under the root (bridge#974, bridge#692).
+    let parent = match &s.parent {
+        BookParent::Named(parent) => format!("<PARENT>{}</PARENT>", xml_escape(parent)),
+        BookParent::Root => String::new(),
+    };
     let name = xml_escape(&s.name);
     let base_units = s
         .base_unit
@@ -756,12 +839,15 @@ fn render_stock_item_xml(s: &BookStockItem) -> String {
         .unwrap_or_default();
     format!(
         "<TALLYMESSAGE><STOCKITEM NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME>\
-<PARENT>{parent}</PARENT>{base_units}{opening}{gst}{hsn}</STOCKITEM></TALLYMESSAGE>",
-        parent = xml_escape(parent)
+{parent}{base_units}{opening}{gst}{hsn}</STOCKITEM></TALLYMESSAGE>"
     )
 }
 
-fn render_master_batch_xml(company: &str, kind: MasterKind, masters: &BookMasters) -> String {
+fn render_master_batch_xml(
+    company: &str,
+    kind: MasterKind,
+    masters: &BookMasters,
+) -> Result<String, LabMastersRefusal> {
     let messages = match kind {
         MasterKind::Unit => masters
             .units
@@ -771,18 +857,18 @@ fn render_master_batch_xml(company: &str, kind: MasterKind, masters: &BookMaster
         MasterKind::Godown => masters
             .godowns
             .iter()
-            .map(|g| render_parented_xml("GODOWN", g))
-            .collect::<String>(),
+            .map(|g| render_parented_xml(kind, g))
+            .collect::<Result<String, _>>()?,
         MasterKind::StockGroup => masters
             .stock_groups
             .iter()
-            .map(|g| render_parented_xml("STOCKGROUP", g))
-            .collect::<String>(),
+            .map(|g| render_parented_xml(kind, g))
+            .collect::<Result<String, _>>()?,
         MasterKind::Group => masters
             .groups
             .iter()
-            .map(|g| render_parented_xml("GROUP", g))
-            .collect::<String>(),
+            .map(|g| render_parented_xml(kind, g))
+            .collect::<Result<String, _>>()?,
         MasterKind::Ledger => masters
             .ledgers
             .iter()
@@ -794,7 +880,7 @@ fn render_master_batch_xml(company: &str, kind: MasterKind, masters: &BookMaster
             .map(render_stock_item_xml)
             .collect::<String>(),
     };
-    render_import_envelope(company, "All Masters", &messages)
+    Ok(render_import_envelope(company, "All Masters", &messages))
 }
 
 // ---------------------------------------------------------------------------
@@ -815,18 +901,33 @@ fn diff_unit(u: &BookUnit, row: &BTreeMap<String, String>) -> Vec<String> {
     mismatches
 }
 
-fn diff_parented(tag: &str, item: &BookNamedParent, row: &BTreeMap<String, String>) -> Vec<String> {
-    let mut mismatches = Vec::new();
-    if let Some(expected) = item.parent.as_deref() {
-        let observed = row.get("PARENT").map(String::as_str).unwrap_or("");
-        if !lab_parent_matches(expected, observed) {
-            mismatches.push(format!(
-                "{tag} {}: parent expected {expected:?}, observed {observed:?}",
-                item.name
-            ));
-        }
+/// The parent difference between a book master and its read-back row, if any.
+/// The parent is always compared: a root master must read back under the
+/// reserved root, and that is the only thing that shows a root master landed
+/// there (the counters cannot, bridge#974).
+fn parent_mismatch(
+    label: &str,
+    name: &str,
+    expected: &BookParent,
+    row: &BTreeMap<String, String>,
+) -> Option<String> {
+    let observed = row.get("PARENT").map(String::as_str).unwrap_or("");
+    match expected {
+        BookParent::Root if is_tally_reserved_root(observed) => None,
+        BookParent::Root => Some(format!(
+            "{label} {name}: parent expected the reserved root, observed {observed:?}"
+        )),
+        BookParent::Named(parent) if lab_parent_matches(parent, observed) => None,
+        BookParent::Named(parent) => Some(format!(
+            "{label} {name}: parent expected {parent:?}, observed {observed:?}"
+        )),
     }
-    mismatches
+}
+
+fn diff_parented(tag: &str, item: &BookNamedParent, row: &BTreeMap<String, String>) -> Vec<String> {
+    parent_mismatch(tag, &item.name, &item.parent, row)
+        .into_iter()
+        .collect()
 }
 
 fn diff_ledger(l: &BookLedger, row: &BTreeMap<String, String>) -> Vec<String> {
@@ -861,16 +962,9 @@ fn diff_ledger(l: &BookLedger, row: &BTreeMap<String, String>) -> Vec<String> {
 }
 
 fn diff_stock_item(s: &BookStockItem, row: &BTreeMap<String, String>) -> Vec<String> {
-    let mut mismatches = Vec::new();
-    if let Some(expected) = s.parent.as_deref() {
-        let observed = row.get("PARENT").map(String::as_str).unwrap_or("");
-        if !lab_parent_matches(expected, observed) {
-            mismatches.push(format!(
-                "stock item {}: parent expected {expected:?}, observed {observed:?}",
-                s.name
-            ));
-        }
-    }
+    let mut mismatches: Vec<String> = parent_mismatch("stock item", &s.name, &s.parent, row)
+        .into_iter()
+        .collect();
     if let (Some(qty), Some(observed)) = (s.opening_qty.as_deref(), row.get("OPENINGBALANCE")) {
         if !amounts_equal(qty, observed) {
             mismatches.push(format!(
@@ -1002,11 +1096,99 @@ fn already_present_verified_mismatches(
 // lab_import_masters
 // ---------------------------------------------------------------------------
 
+/// A book this tool refuses before it reads or writes anything in Tally.
+#[derive(Debug, PartialEq, Eq)]
+enum LabMastersRefusal {
+    /// The ledgers that carry `opening_bill_allocations`. Sent inside the
+    /// ledger master, Tally kept none of them and the read-back, which does
+    /// not compare bills, passed (bridge#1500). No shape that Tally honours
+    /// has been captured.
+    OpeningBillsUnsupported { ledgers: Vec<String> },
+    /// The groups whose parent is the root (or absent). A bare `Primary` was
+    /// refused for a godown and a stock item (bridge#974), and no root form
+    /// has been measured for a Group, so none is sent.
+    RootParentUnmeasured { groups: Vec<String> },
+}
+
+impl LabMastersRefusal {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::OpeningBillsUnsupported { .. } => "lab_opening_bills_unsupported",
+            Self::RootParentUnmeasured { .. } => "lab_root_parent_unmeasured",
+        }
+    }
+
+    /// The precheck-log entries naming what was refused, in the
+    /// `Kind:Name:reason` form the reserved-root refusal already uses there.
+    fn logged_entries(&self) -> Vec<String> {
+        match self {
+            Self::OpeningBillsUnsupported { ledgers } => ledgers
+                .iter()
+                .map(|name| format!("Ledger:{name}:opening_bills"))
+                .collect(),
+            Self::RootParentUnmeasured { groups } => groups
+                .iter()
+                .map(|name| format!("Group:{name}:root_parent"))
+                .collect(),
+        }
+    }
+}
+
+fn refuse_unsendable_masters(masters: &BookMasters) -> Result<(), LabMastersRefusal> {
+    let ledgers: Vec<String> = masters
+        .ledgers
+        .iter()
+        .filter(|l| !l.opening_bill_allocations.is_empty())
+        .map(|l| l.name.clone())
+        .collect();
+    if !ledgers.is_empty() {
+        return Err(LabMastersRefusal::OpeningBillsUnsupported { ledgers });
+    }
+    let groups: Vec<String> = masters
+        .groups
+        .iter()
+        .filter(|g| g.parent == BookParent::Root)
+        .map(|g| g.name.clone())
+        .collect();
+    if groups.is_empty() {
+        Ok(())
+    } else {
+        Err(LabMastersRefusal::RootParentUnmeasured { groups })
+    }
+}
+
+/// The fields each requested kind's read-backs compared, by the state a
+/// master can end in, so that `ok` is never read as covering more.
+fn compared_report(masters: &BookMasters) -> Value {
+    let mut report = serde_json::Map::new();
+    for kind in MasterKind::IMPORT_ORDER {
+        if kind.count(masters) == 0 {
+            continue;
+        }
+        let mut states = serde_json::Map::new();
+        states.insert("created".into(), json!(kind.created_compared()));
+        states.insert(
+            "already_present_verified".into(),
+            json!(kind.present_compared()),
+        );
+        if kind == MasterKind::Ledger {
+            states.insert("altered_verified".into(), json!(kind.present_compared()));
+        }
+        report.insert(kind.tally_type().into(), Value::Object(states));
+    }
+    Value::Object(report)
+}
+
 pub(in crate::agent) async fn lab_import_masters(
     server: &Server,
     args: &Value,
 ) -> Result<ToolOutcome, ToolFailure> {
     let masters: BookMasters = parse_book_value(args, "masters", "masters")?;
+    // Before the first request: a refused book costs Tally nothing.
+    if let Err(refusal) = refuse_unsendable_masters(&masters) {
+        persist_lab_precheck_collisions(server, &refusal.logged_entries());
+        return Err(ToolFailure::from(refusal.code().to_string()));
+    }
     let guid = required_string(args, "company_guid")?;
 
     let (_company, identity, mut evidence) = admit_lab_target(server).await?;
@@ -1187,15 +1369,15 @@ pub(in crate::agent) async fn lab_import_masters(
         .stock_items
         .retain(|s| !already_present(MasterKind::StockItem, &s.name));
 
-    let mut batches = Vec::new();
-    let mut mismatches: Vec<String> = Vec::new();
+    let mut log = CreateBatchLog::default();
     let mut counts = serde_json::Map::new();
     // Per-master report (coordinator instruction, 2026-09-14): every master
     // actually Created in this call, "Kind:Name" -- alongside
     // `already_present_verified`/`altered_verified` below, this is the
     // `created` quarter of "created / already_present_verified /
-    // altered_verified / refused".
-    let mut created_masters: Vec<String> = Vec::new();
+    // altered_verified / refused". Held by `log` with the batch reports and
+    // the mismatches, so the loop below only calls the decisions that tests
+    // drive.
 
     'kinds: for kind in MasterKind::IMPORT_ORDER {
         let total = kind.count(&creatable);
@@ -1211,7 +1393,8 @@ pub(in crate::agent) async fn lab_import_masters(
 
             let chunk_masters = chunked_masters(&creatable, kind, chunk_start, MAX_MASTER_BATCH);
             let chunk_len = kind.count(&chunk_masters);
-            let xml = render_master_batch_xml(identity.display_name(), kind, &chunk_masters);
+            let xml = render_master_batch_xml(identity.display_name(), kind, &chunk_masters)
+                .map_err(|refusal| ToolFailure::from(refusal.code().to_string()))?;
             let (response, post_evidence) =
                 post_lab_batch(server, &identity, "lab_import_masters.write", xml).await?;
             evidence = combine_evidence(evidence.clone(), post_evidence);
@@ -1226,16 +1409,33 @@ pub(in crate::agent) async fn lab_import_masters(
                 // mandatory read-back rather than after it: a read-back can
                 // only ever say "not found", which does not distinguish a
                 // rejected write from one that was never sent.
-                batches.push(json!({
-                    "kind": kind.tally_type(),
-                    "requested": chunk_len,
-                    "state": "tally_rejected",
-                    "counters": tally_import_counters_json(counters),
-                    "tally_line_errors": outcome.tally_line_errors(),
-                    "tally_line_errors_omitted": outcome.tally_line_errors_omitted(),
-                    "ok": false,
-                }));
-                mismatches.push(tally_rejection_message(kind.tally_type(), &outcome));
+                //
+                // Then read once more, because a refused master can still be
+                // held: the three stock items refused with `EXCEPTIONS=3` in
+                // bridge#692 were kept as import-exception masters, and the
+                // book was blocked until it was restored. The read says
+                // which of the requested names it shows; when it shows none
+                // that is all it says (bridge#974).
+                let after = lab_dated_master_read(
+                    server,
+                    &identity,
+                    "lab_import_masters.readback.rejected",
+                    |period| {
+                        lab_write_master_collection_read(identity.display_name(), kind, period)
+                    },
+                )
+                .await;
+                let readback_after_rejection = match after {
+                    Ok((read_xml, read_evidence)) => {
+                        evidence = combine_evidence(evidence.clone(), read_evidence);
+                        match parse_lab_master_rows(&read_xml, kind.tally_type()) {
+                            Ok(rows) => rejected_batch_readback(kind, &chunk_masters, &rows),
+                            Err(code) => (read_after_rejection_failed(&code), Vec::new()),
+                        }
+                    }
+                    Err(failure) => (read_after_rejection_failed(&failure.code), Vec::new()),
+                };
+                log.record_rejected(kind, chunk_len, &outcome, readback_after_rejection);
                 break 'kinds;
             }
 
@@ -1253,28 +1453,25 @@ pub(in crate::agent) async fn lab_import_masters(
                 .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
 
             let batch_mismatches = readback_mismatches(kind, &chunk_masters, &rows);
-            let batch_ok = clean && batch_mismatches.is_empty();
-            batches.push(json!({
-                "kind": kind.tally_type(),
-                "requested": chunk_len,
-                "counters_clean": clean,
-                "mismatches": batch_mismatches,
-                "ok": batch_ok,
-            }));
-            if !batch_ok {
-                mismatches.extend(batch_mismatches);
+            if !log.record_read_back(
+                kind,
+                &chunk_masters,
+                clean,
+                (counters.created, counters.altered),
+                batch_mismatches,
+            ) {
                 break 'kinds; // stop on first mismatch, per the plan
             }
-            created_masters.extend(
-                kind.names(&chunk_masters)
-                    .into_iter()
-                    .map(|name| format!("{}:{name}", kind.tally_type())),
-            );
             created += chunk_len;
             chunk_start += MAX_MASTER_BATCH;
         }
         counts.insert(kind.tally_type().to_string(), json!(created));
     }
+    let CreateBatchLog {
+        mut batches,
+        mut mismatches,
+        created_masters,
+    } = log;
 
     // ---- Ledger reconcile: partial Alter for every pre-existing ledger --
     // Tally default (Cash/Profit & Loss A/c) or ordinary (coordinator
@@ -1425,6 +1622,7 @@ pub(in crate::agent) async fn lab_import_masters(
             "created": created_masters,
             "already_present_verified": already_present_verified,
             "altered_verified": altered_verified,
+            "compared": compared_report(&masters),
         }}),
         evidence,
         company_guid: Some(guid.to_string()),
@@ -1560,6 +1758,152 @@ fn tally_import_counters_json(counters: &bridge_tally_protocol::TallyImportResul
         "cancelled": counters.cancelled,
         "exceptions": counters.exceptions,
     })
+}
+
+/// What a `lab_import_masters` call has recorded about its Create batches:
+/// the per-batch reports, the result's `mismatches`, and the masters created.
+/// The loop calls [`Self::record_rejected`] and [`Self::record_read_back`] and
+/// reads nothing else of a batch's outcome, so the decision of what a batch
+/// adds to the result is these two methods, and tests drive them.
+#[derive(Default)]
+struct CreateBatchLog {
+    batches: Vec<Value>,
+    mismatches: Vec<String>,
+    created_masters: Vec<String>,
+}
+
+impl CreateBatchLog {
+    /// A batch Tally refused. The call stops after it.
+    ///
+    /// The result is not `ok` (the rejection is a mismatch), and every
+    /// requested name the read after the rejection showed is a mismatch too:
+    /// a refused master that is on the read-back is held somewhere
+    /// (bridge#692, bridge#974). `readback_after_rejection` is
+    /// [`rejected_batch_readback`]'s report and names.
+    fn record_rejected(
+        &mut self,
+        kind: MasterKind,
+        requested: usize,
+        outcome: &bridge_tally_protocol::TallyImportOutcome,
+        readback_after_rejection: (Value, Vec<String>),
+    ) {
+        let (report, present) = readback_after_rejection;
+        self.batches.push(json!({
+            "kind": kind.tally_type(),
+            "requested": requested,
+            "state": "tally_rejected",
+            "counters": tally_import_counters_json(outcome.counters()),
+            "tally_line_errors": outcome.tally_line_errors(),
+            "tally_line_errors_omitted": outcome.tally_line_errors_omitted(),
+            "readback_after_rejection": report,
+            "ok": false,
+        }));
+        self.mismatches
+            .push(tally_rejection_message(kind.tally_type(), outcome));
+        self.mismatches.extend(present.into_iter().map(|name| {
+            format!(
+                "{}:{name} is on the read-back although Tally rejected the batch",
+                kind.tally_type()
+            )
+        }));
+    }
+
+    /// A batch Tally accepted, with its read-back compared against the book.
+    /// Returns whether the call goes on.
+    ///
+    /// A batch is `ok` only with clean counters and a matching read-back. One
+    /// that is not adds to the result's `mismatches` (so the result is not
+    /// `ok`), including the case of unclean counters and a matching read-back
+    /// (bridge#974: a root godown answered `CREATED 0, ALTERED 1`).
+    fn record_read_back(
+        &mut self,
+        kind: MasterKind,
+        chunk: &BookMasters,
+        counters_clean: bool,
+        counters: (u64, u64),
+        read_back_mismatches: Vec<String>,
+    ) -> bool {
+        let batch_ok = counters_clean && read_back_mismatches.is_empty();
+        self.batches.push(json!({
+            "kind": kind.tally_type(),
+            "requested": kind.count(chunk),
+            "counters_clean": counters_clean,
+            "mismatches": read_back_mismatches,
+            "ok": batch_ok,
+        }));
+        if !batch_ok {
+            self.mismatches.extend(created_batch_mismatches(
+                kind.tally_type(),
+                counters_clean,
+                counters,
+                read_back_mismatches,
+            ));
+            return false;
+        }
+        self.created_masters.extend(
+            kind.names(chunk)
+                .into_iter()
+                .map(|name| format!("{}:{name}", kind.tally_type())),
+        );
+        true
+    }
+}
+
+/// What a Create batch that is not `ok` adds to the result's `mismatches`.
+///
+/// A batch whose counters are not a clean created-only success but whose
+/// read-back matches the book used to add nothing, so the result said `ok`
+/// while the batch did not (bridge#974: a root godown answered `CREATED 0,
+/// ALTERED 1` and read back as created). The counters are not taken as proof
+/// either way, and the batch is not passed on them.
+fn created_batch_mismatches(
+    label: &str,
+    counters_clean: bool,
+    (created, altered): (u64, u64),
+    read_back: Vec<String>,
+) -> Vec<String> {
+    let mut reported = Vec::new();
+    if !counters_clean {
+        reported.push(format!(
+            "{label}: import counters are not a clean created-only success \
+(CREATED={created} ALTERED={altered}); the counters are not taken as proof either way"
+        ));
+    }
+    reported.extend(read_back);
+    reported
+}
+
+/// What the read-back after a rejected master batch may say when it shows none
+/// of the requested names: that the read did not show them, and where to go
+/// back to. It says no more, because whether the gateway read can see a master
+/// Tally holds as an import exception is unmeasured (bridge#974).
+const REJECTED_BATCH_NOT_SHOWN: &str =
+    "the read did not show them; the pre-import backup is the way back if Tally holds them";
+
+/// The read after a rejected batch, by structure: which requested names the
+/// rows show, and the part of the result that says so.
+fn rejected_batch_readback(
+    kind: MasterKind,
+    chunk: &BookMasters,
+    rows: &[BTreeMap<String, String>],
+) -> (Value, Vec<String>) {
+    let present: Vec<String> = kind
+        .names(chunk)
+        .into_iter()
+        .filter(|name| find_readback_row(rows, name).is_some())
+        .collect();
+    let report = if present.is_empty() {
+        json!({"state": "not_shown", "note": REJECTED_BATCH_NOT_SHOWN})
+    } else {
+        json!({"state": "present", "present": present})
+    };
+    (report, present)
+}
+
+/// A read after a rejection that itself failed says so; it is not "not
+/// shown".
+fn read_after_rejection_failed(code: &str) -> Value {
+    json!({"state": "read_failed", "code": code})
 }
 
 /// The rejection as one line, with Tally's `LINEERROR` text as the import
@@ -1942,7 +2286,7 @@ fn parse_voucher_readback_nested(xml: &str) -> Result<Vec<ObservedVoucher>, Stri
     loop {
         match reader.read_event() {
             Ok(quick_xml::events::Event::Start(event)) => {
-                let tag = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let tag = event.name().as_ref().to_ascii_uppercase();
                 if path.len() == 4 && path == ["ENVELOPE", "BODY", "DATA", "COLLECTION"] {
                     if tag != "VOUCHER" {
                         return Err("agent_read_protocol_invalid".to_string());
@@ -1976,15 +2320,11 @@ fn parse_voucher_readback_nested(xml: &str) -> Result<Vec<ObservedVoucher>, Stri
             // And the same CDATA gap: a scalar split across a CDATA section
             // read back short, silently. All three event kinds feed one buffer.
             Ok(quick_xml::events::Event::CData(text)) => {
-                buffer.push(
-                    &text
-                        .decode()
-                        .map_err(|_| "agent_read_protocol_invalid".to_string())?,
-                );
+                buffer.push(&text);
             }
             Ok(quick_xml::events::Event::Empty(_)) => buffer.abandon(),
             Ok(quick_xml::events::Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 // `path` still holds the closing element, so its parent chain
                 // names the row the field belongs to.
                 if let Some((field, value)) = buffer.close(&end) {

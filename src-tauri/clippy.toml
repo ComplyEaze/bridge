@@ -44,9 +44,18 @@ disallowed-methods = [
   { path = "tauri::webview::Webview::navigate", reason = "webview navigation is egress" },
   { path = "tauri::webview::Webview::eval", reason = "script in the webview can reach the network" },
   # Process and socket calls through the FFI crates this workspace already depends on.
-  # The first Windows run reported the libc and windows_sys paths below as resolving to
-  # nothing there, so they are inert on Windows (scripts/tally-egress-census.json pins them as
-  # such, and the gate refuses their names in src-tauri Rust).
+  # On Windows (measured on a native host, #905) some of these resolve to nothing, for two
+  # different reasons, and scripts/tally-egress-census.json pins each one (a path that starts
+  # resolving fails the gate):
+  # - libc declares no posix_spawn, posix_spawnp or getaddrinfo for Windows.
+  # - ShellExecuteW, ShellExecuteA, CreateProcessW, CreateProcessA and WinExec resolve to
+  #   nothing only in build.rs's host graph, whose windows-sys 0.61.2 copy (through
+  #   tauri-build) lacks the features that compile them in. They are live in the shipped
+  #   targets (seen firing for WinExec in bridge_lib, and failing the census; the other four
+  #   resolve there the same way).
+  # - ShellExecuteExW is compiled out everywhere: it needs Win32_System_Registry, which no
+  #   crate enables, so a call to it would not compile.
+  # The gate also refuses all of these names in src-tauri Rust.
   { path = "libc::execve", reason = "a spawned process is egress" },
   { path = "libc::execv", reason = "a spawned process is egress" },
   { path = "libc::execvp", reason = "a spawned process is egress" },

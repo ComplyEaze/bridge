@@ -19,14 +19,14 @@ fn row(
         remote_id: None,
         guid: Some(format!("{GUID}-{suffix:08x}")),
         alter_id: Some(u64::from(suffix)),
-        date: Some("20260311".into()),
+        date: bridge_tally_core::TallyDate::parse("20260311").unwrap(),
         voucher_type: Some(voucher_type.into()),
         narration: None,
         voucher_number: number.map(str::to_string),
         master_id: Some(suffix.to_string()),
         cancelled: Some(false),
         optional: Some(false),
-        effective_date: Some("20260311".into()),
+        effective_date: Some(bridge_tally_core::TallyDate::parse("20260311").unwrap()),
         entries: entries
             .iter()
             .map(|(ledger, amount, positive)| ReadEntry {

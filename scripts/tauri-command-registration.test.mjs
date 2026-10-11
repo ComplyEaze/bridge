@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 function stripComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
@@ -120,7 +121,7 @@ test("the registration reader ignores commented-out entries and keeps the last p
 // deliberately built but not yet wired up should get its own named exemption here, with a reason,
 // rather than reviving a silent allow-list.
 test("every declared Tauri command is registered in generate_handler!", async () => {
-  const root = new URL("../src-tauri/src", import.meta.url).pathname;
+  const root = fileURLToPath(new URL("../src-tauri/src", import.meta.url));
   const declared = new Map();
   for (const file of await rustFiles(root)) {
     for (const name of declaredCommands(await readFile(file, "utf8"))) {

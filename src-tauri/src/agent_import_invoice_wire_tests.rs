@@ -764,6 +764,7 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
     assert_eq!(row.applicable_from.as_deref(), Some("20260401"));
     assert_eq!(row.taxability.as_deref(), Some("Taxable"));
     assert_eq!(row.source.as_deref(), Some("Specify Details Here"));
+    assert!(!row.empty);
     let [block] = row.states.as_slice() else {
         panic!("one block: {row:?}")
     };
@@ -807,6 +808,7 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
         (&None, &None, &None),
         "a row with no field is not a row with an empty string"
     );
+    assert!(empty.empty, "it holds no element and no text");
 }
 
 #[test]
@@ -860,6 +862,30 @@ fn a_rate_listing_that_is_not_this_companys_or_not_whole_is_refused() {
         ),
         Err("invoice_read_collection_absent")
     );
+}
+
+/// A listing with no ledger row is a read that went wrong, never "no ledger
+/// has a rate": a company always has ledgers (the invoice's own were read in
+/// the compliance listing before it). One that holds rows, but not the ledger
+/// asked for, reads as no row for that ledger.
+#[test]
+fn an_empty_rate_listing_is_its_own_failure_and_a_listing_without_the_ledger_is_not() {
+    for empty in [
+        "<COLLECTION></COLLECTION>",
+        "<COLLECTION> </COLLECTION>",
+        "<COLLECTION/>",
+    ] {
+        let xml = format!(
+            "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>{empty}</DATA></BODY></ENVELOPE>"
+        );
+        assert_eq!(
+            parse_ledger_rates(&xml, LAB_GUID, &["L"]),
+            Err("invoice_ledger_rates_listing_empty"),
+            "{empty}"
+        );
+    }
+    let other = parse_ledger_rates(&ledger_answer("Other", ""), LAB_GUID, &["L"]).unwrap();
+    assert!(other.is_empty());
 }
 
 /// One ledger row around `inner`, bound to the lab company.

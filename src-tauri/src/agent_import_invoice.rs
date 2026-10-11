@@ -376,11 +376,16 @@ const MAX_INVOICE_ENTRIES: usize = 6;
 
 /// The IGST rates GST has, in thousandths of a percent: the slab list the check
 /// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at
-/// any other rate (a mistyped one, or 3 or 0.25 percent) is refused, though the
-/// invoice and the ledger agree: the lab measured 5 percent and one exact 18
-/// percent bill only, so the list bounds which rates are worked out and says
-/// nothing of how Tally treats the rest.
+/// any other rate (a mistyped one, or 3 or 0.25 percent) is refused as no slab,
+/// though the invoice and the ledger agree.
 const SLAB_IGST_MILLI: &[i128] = &[5_000, 12_000, 18_000, 28_000, 40_000];
+
+/// The slabs the lab measured on this path (§9.17), the only ones admitted: 5
+/// percent (2.5 a head) and 18 percent (9 a head, on one exact two-rate bill,
+/// voucher 0009). A slab not here is refused as not measured. A lab
+/// measurement of Tally's expected tax at a rate would open it; the slabs it
+/// would open are 12, 28 and 40 percent.
+const MEASURED_IGST_MILLI: &[i128] = &[5_000, 18_000];
 
 /// The most sales lines an invoice may carry. Tax was measured on one and two
 /// lines (the lab, 10 Oct 2026); a third waits for a measured three-line bill.
@@ -489,6 +494,9 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
     if !SLAB_IGST_MILLI.contains(&igst) {
         return Err("invoice_sales_ledger_rate_not_a_slab");
     }
+    if !MEASURED_IGST_MILLI.contains(&igst) {
+        return Err("invoice_sales_ledger_rate_not_measured");
+    }
     Ok(cgst)
 }
 
@@ -553,7 +561,7 @@ pub(super) fn invoice_number_safe(number: &str) -> bool {
 /// What Tally returned is the build's to record, never the caller's: refused
 /// on the way in. A saved batch carries it (and `admit_saved` requires it), so
 /// this runs only on a caller's payload.
-pub(super) fn refuse_supplied_observed(vouchers: &[ImportVoucher]) -> Result<(), String> {
+pub(super) fn refuse_supplied_observed<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
         voucher
             .invoice
@@ -580,7 +588,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
-pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
+pub(super) fn validate_invoice_voucher<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
     if !voucher.voucher_type.is_invoice() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
@@ -689,6 +697,32 @@ pub(super) fn classify_sales_invoice(
                     "invoice_round_off_ledger_group",
                     &entry.ledger,
                 ));
+            }
+            // The lab's round-off ledger carried exactly one GST row and it
+            // was empty (the `pilot-lab` rate listing, where each of the
+            // fourteen ledgers carried exactly one row). A row that says
+            // anything, a rate or a taxability, might make Tally count the
+            // ledger in the tax; a ledger with no row, or with several, is a
+            // shape Tally was not seen to send. None of these was measured.
+            // Measured on one ledger under Indirect Expenses only: whether a
+            // group-level GST setting reaches a ledger whose own row is empty
+            // is not known.
+            match fact.rates.as_ref() {
+                None => refusals.push(refuse_ledger(
+                    "invoice_round_off_ledger_gst_unknown",
+                    &entry.ledger,
+                )),
+                Some(row) => match row.gst_rows.as_slice() {
+                    [] => refusals.push(refuse_ledger(
+                        "invoice_round_off_ledger_gst_row_absent",
+                        &entry.ledger,
+                    )),
+                    [only] if only.empty => {}
+                    _ => refusals.push(refuse_ledger(
+                        "invoice_round_off_ledger_gst_row",
+                        &entry.ledger,
+                    )),
+                },
             }
             round_off = Some(index);
         } else if fact.under("Sundry Debtors") {
@@ -1025,9 +1059,7 @@ impl super::super::Server {
         else {
             return Ok(None);
         };
-        let as_of = super::super::normalized_date(&voucher.date)
-            .map_err(|_| "invoice_date_invalid".to_string())?;
-        let year = financial_year_window(as_of.as_str())
+        let year = financial_year_window(voucher.date.as_str())
             .ok_or_else(|| "invoice_date_invalid".to_string())?;
         self.import_invoice_number_control(&line.company_guid, (&year.0, &year.1))
             .map(Some)
@@ -1403,10 +1435,8 @@ impl super::super::Server {
             return only("invoice_readback_book_too_large", mark_evidence);
         }
         let number = voucher.voucher_number.clone().unwrap_or_default();
-        let window = super::super::normalized_date(&voucher.date)
-            .ok()
-            .map(|date| date.as_str().to_string())
-            .and_then(|date| financial_year_window(&date).map(|year| (date, year)));
+        let date = voucher.date.as_str().to_string();
+        let window = financial_year_window(&date).map(|year| (date, year));
         let request = window.as_ref().and_then(|(_, year)| {
             super::super::invoice_readback_read(
                 &company.name,
@@ -1730,9 +1760,7 @@ fn queued_refusal(verdict: Verdict) -> ApprovedImportAdmissionError {
 
 impl InvoiceJudge<'_> {
     fn as_of(&self) -> Result<String, Verdict> {
-        super::super::normalized_date(&self.voucher.date)
-            .map(|date| date.as_str().to_string())
-            .map_err(|_| unusable("invoice_date_invalid"))
+        Ok(self.voucher.date.as_str().to_string())
     }
 
     fn year(&self) -> Result<(String, String), Verdict> {
@@ -2032,11 +2060,8 @@ impl super::super::Server {
         if voucher.invoice.is_none() {
             return Err(refused(refuse("invoice_detail_required")));
         }
-        let as_of = super::super::normalized_date(&voucher.date)
-            .map_err(|_| failed("invoice_date_invalid"))?
-            .as_str()
-            .to_string();
-        let year = financial_year_window(&as_of).ok_or_else(|| failed("invoice_date_invalid"))?;
+        let year = financial_year_window(voucher.date.as_str())
+            .ok_or_else(|| failed("invoice_date_invalid"))?;
 
         // A sent invoice of this company that is not verified posted stops
         // every further invoice until a person releases it (ADR 0004, slice

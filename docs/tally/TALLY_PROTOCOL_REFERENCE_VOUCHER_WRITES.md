@@ -143,6 +143,28 @@ returned `CREATED=1`.
 Note also that `EXCEPTIONS=1` arrived with **no `LINEERROR`** — a parser must treat a
 non-zero `EXCEPTIONS` as failure on its own, without waiting for an error string.
 
+**The method is kept per number series, not on the voucher type — verified 2026-10-09 on one
+book (PARTIAL).** On a synthetic book on Silver 7.1 on Windows 10, three voucher types were set on
+Tally's own screens (Journal Automatic; Payment Manual with duplicates prevented; Receipt Manual
+without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PREVENTDUPLICATES` and
+`VOUCHERNUMBERSERIES.*` (request 1,106 bytes, response 81,966 bytes; both committed as
+`voucher_type_numbering_series_*` with their provenance, bridge#724).
+
+- **VERIFIED:** each type holds exactly one `VOUCHERNUMBERSERIES.LIST`, named `Default`. The series'
+  `NUMBERINGMETHOD` and `PREVENTDUPLICATES` match the screen for all three types (`Automatic`/`No`,
+  `Manual`/`Yes`, `Manual`/`No`); the 21 types left alone read `Automatic`/`No`.
+- **VERIFIED:** the type-level `NUMBERINGMETHOD` reads `None` for the three types set by hand and
+  `Default` for the rest, and the type-level `PREVENTDUPLICATES` reads `No` on all 24, including
+  Payment, whose screen says Yes. The type level is not the method and is never read for it.
+- **Observed, meaning not established:** `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series,
+  Manual ones included; `DUPLICATECONTROL` is present and empty on all 24 series.
+- **Not established:** more than one series on a type; a single series not named `Default`; `Automatic (Manual Override)` on a captured
+  response (seen on a real book on 2026-09-28, not committed); Multi-user Auto; a type created new
+  rather than altered; other releases; macOS. A type with no series or several is a typed
+  observation, not a method, and a method outside `Automatic`, `Manual` and
+  `Automatic (Manual Override)` is kept raw and never read as `Manual`
+  (`native_voucher_type_numbering.rs`).
+
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
 **VERIFIED 2026-09-10 (licensed TallyPrime 7.1 Gold; five files imported by hand through
@@ -546,6 +568,123 @@ the official sample shapes verbatim** — the §9.5/§9.6 failures may be a requ
 on our side rather than an Edit Log restriction. This is the cheapest next step on the write
 path and it should be taken before the Phase 4 licensed-Tally gate.
 
+### 9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it
+
+**PARTIAL, and narrow: one synthetic company, licensed TallyPrime 7.1 Silver (the earlier rounds on that
+lab record the release and licence; these answers do not show them), CGST plus state tax within the
+company's own state, 5% services lines (one 18% goods line on a bill whose figures are exact), the invoice
+view, one book, one run per voucher. A "line" is a sales-ledger line in an Accounting Invoice
+(`VCHENTRYMODE`), with no stock items; the buyer is Unregistered/Consumer and the state Rajasthan on every
+voucher. The "Tax entered" column comes from the sitting's own record of how each voucher was made, not
+from these answers: the export cannot show who filled a figure.** Sixteen Sales vouchers were read back in one full voucher export;
+Tally's own GSTR-1 flag is in that export (`VCHGSTSTATUSISINCLUDED`, `VCHGSTSTATUSISUNCERTAIN`,
+`VCHGSTSTATUSISEXCLUDED`) and was checked against the uncertain list on Tally's screen, which named the
+same six vouchers with the reason "Mismatch between Expected Tax Amount and Modified Tax Amount in
+transaction". "Per line" is `half-up(line x rate / 2)` to two decimals for each sales line, summed per rate,
+for each of the two heads.
+
+| Voucher | Sales lines | CGST / SGST | Per line | Per bill | Tally flag | Tax entered |
+|---|---|---|---|---|---|---|
+| 0001 | 1000.00 | 25.00 / 25.00 | 25.00 | 25.00 | included | typed |
+| 0002 | 1001.00 | 25.03 / 25.02 | 25.03 | 25.03 | **uncertain** | typed |
+| 0003 | 1001.00 | 25.02 / 25.03 | 25.03 | 25.03 | **uncertain** | typed |
+| 0004 | 1001.00 | 25.03 / 25.03, round off -0.01 | 25.03 | 25.03 | included | typed |
+| 0005 | 1001.00 | 25.02 / 25.02, round off +0.01 | 25.03 | 25.03 | **uncertain** | typed |
+| 0006 | 1000.00 | 25.01 / 25.01 | 25.00 | 25.00 | **uncertain** | typed |
+| 0007 | 600.00 + 400.00 | 25.00 / 25.00 | 25.00 | 25.00 | included | typed |
+| 0008 | 601.00 + 400.00 | 25.03 / 25.02 | 25.03 | 25.03 | **uncertain** | typed |
+| 0009 | 600.00 at 5% + 700.00 at 18% | 15.00, 63.00 / 15.00, 63.00 | same | same | included | typed |
+| 0010 | 600.40 + 400.40 | 25.02 / 25.02, round off +0.16 | 25.02 | 25.02 | included | imported |
+| 0011 | 1001.00 | 25.03 / 25.03 | 25.03 | 25.03 | included | Tally filled |
+| 0012 | 100.10 + 100.10 | 5.00 / 5.00 | 5.00 | **5.01** | included | Tally filled |
+| 0013 | 100.20 + 100.20 | 5.02 / 5.02 | 5.02 | **5.01** | included | Tally filled |
+| 0014 | 100.60 + 100.60 | 5.04 / 5.04 | 5.04 | **5.03** | included | Tally filled |
+| 0015 | 100.20 + 100.20, the same ledger on two lines | 5.02 / 5.02 | 5.02 | **5.01** | included | Tally filled |
+| 0016 | 100.20 + 100.20 | 5.01 / 5.01 | **5.02** | 5.01 | **uncertain** | typed, the per-bill figure |
+
+- **VERIFIED (this book): for all sixteen vouchers, Tally's flag is "included" exactly when both heads equal
+  the per-line figure, and "uncertain" otherwise.** Every flagged voucher was 0.01 off the per-line figure
+  on at least one head; nothing larger was seen. The per-bill figure disagrees with Tally on four
+  included vouchers (0012 to 0015) and agrees with the one it flagged (0016).
+- **VERIFIED (this book, positive amounts, 2.5% heads): the rounding is half-up per line.** `0013`'s lines
+  are 2.505 each and Tally's figure is 5.02 (half-even would give 5.00); `0011`'s 25.025 gave 25.03
+  (half-even 25.02). `0014`'s 2.515 does not discriminate: half-even gives the same.
+- **VERIFIED (this book): per line, not per ledger or per bill.** `0015` carries one ledger on two lines
+  and Tally's figure is 5.02 (a ledger total would give 5.01).
+- **VERIFIED (this book): a difference of one paisa is flagged.** `0016` differs from the per-line figure by one
+  paisa; `0002`, `0003` and `0008` carry heads that differ from each other by one paisa and are flagged.
+  No tolerance showed: the four on-screen tax ledgers read `ROUNDINGMETHOD` Not Applicable and
+  `ROUNDINGLIMIT` 0 (the one tax ledger created by import reads an empty `ROUNDINGMETHOD` and 0, and is on none of
+  these vouchers), and the two company screens read, which show no setting that ignores a difference.
+- **A round off line does not decide the flag** (`0004`, `0010` are included with one).
+- **VERIFIED (this book): Accept As Is on `0016` alters the voucher and overrides the flag; it does not
+  change an amount.** Before: uncertain, `ISGSTOVERRIDDEN` No. After: included, `ISGSTOVERRIDDEN` Yes,
+  `ISGSTOVRDNCRC` 0 to a number, `ALTERID` 27 to 28, `ALTVCHID` 27 to 28; every leg and amount unchanged.
+- **What follows for a check on an invoice's tax (a reading of this table, not a further measurement).** A
+  check that admits the per-bill figure, or two heads that differ by a paisa, or a figure one paisa from
+  either head, admits vouchers this table shows Tally flags (the `0002` and `0016` kinds). Whether and how to
+  change a given check is a separate decision.
+- **Not measured:** inter-state tax, cess, inventory or discount lines, a registered buyer, a rate other than
+  5% with a tie, more than one rate with a tie, a sales ledger whose GST rate disagrees with the tax posted
+  (the rate sits on the sales ledger; the vouchers carry no rate element), Gold. Do not read the rule beyond what the table covers.
+
+Evidence: the answers (`workorder/vouchers-w1.xml`, `vouchers-w2-before.xml`, `vouchers-w2-after.xml`,
+`aw2-marks-*.xml`, `ledgers-w1.xml`) are held on the repository's `lab/1342-capture-answers` branch at
+`d78906775`, listed by SHA-256 in its `SHA256.txt`.
+
+### 9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions
+
+**PARTIAL: the same book, one run each, over the XML gateway with hand-built files and one file rendered by
+Bridge's code.** The voucher type setting is "Allow zero-valued transactions".
+
+- **VERIFIED (this book): all three zero-value Sales imports into `BRIDGE Sales` were refused.** The
+  accounting view, the invoice view and the one Bridge's code renders (three ids, each a single voucher
+  with a customer leg and one sales leg at 0.00) each answered `EXCEPTIONS=1`, `CREATED=0`, **with no
+  `LINEERROR`**, and the voucher mark did not move (28, 28, 28). A refusal with no `LINEERROR` and
+  `ERRORS=0` is the §9.2 trap in a new form.
+- **VERIFIED (this book): the setting decides.** A voucher type created with the setting at its default (No)
+  refused the same zero voucher the same way. A type created with it Yes answered `CREATED=1`
+  (`LASTVCHID` 21) and the voucher was found by the next read (accounting view, both legs 0.00).
+- **VERIFIED (screen, one try, accounting view): Tally's own data entry refused a zero line in `BRIDGE Sales`**
+  ("No Entries in Voucher!"); the invoice view was not tried.
+- **VERIFIED (screen): the GSTR-1 document summary lists a voucher type's zero voucher as an issued
+  document** (a line for the zero-value type, count 1). The counts for `BRIDGE Sales` fit "included
+  documents of a type": 11 before (16 numbered, five uncertain) and 12 after the normal invoice that
+  followed. That reading is an inference: the zero voucher's own GSTR-1 flag was not read.
+- **Not measured:** the GSTR-1 flag of the zero voucher (the voucher type was not in the export); a zero
+  invoice in the invoice view under the setting Yes; a zero line beside a non-zero one; Gold.
+
+Evidence: the requests (`w3-zero-accounting.xml`, `w3-zero-invoice.xml`, `w3-zero-code.xml`,
+`w3-zero-type-default.xml`, `w3-zero-type-yes.xml`, `w3-valid-after-refused.xml`) are on
+`lab/1342-capture-requests` at `5cc927e5` under `workorder/`; the answers `workorder/aw3-*.xml`,
+`vouchers-w3.xml`, `aw3-window-0802-extra.xml` and the screens
+`w3-0018-zero-keyed-error`, `w3-voucher-type-z0`, `w3-voucher-type-z1`, `w3-document-summary-before` and
+`w3-document-summary-after` on the same branch and commit.
+
+### 9.19 A keyed Purchase invoice, as the voucher export reads it
+
+**PARTIAL: the same book, two Purchase invoices keyed by hand in invoice mode, one run.** This is the shape
+Tally stored, not a measurement of Bridge posting a Purchase.
+
+- **VERIFIED from the export:** type `Purchase`, numbered by Tally (1 and 2), the supplier's invoice number
+  `SUP/0001` dated 3-Aug-2026 on both (`REFERENCE`, `REFERENCEDATE`), the voucher dated 4-Aug-2026,
+  `ISINVOICE` Yes, entry mode Accounting Invoice, view Invoice Voucher View. The supplier leg reads
+  1050.00, `ISDEEMEDPOSITIVE` No (a credit); the purchase leg -1000.00 and the CGST and SGST legs -25.00
+  each, `ISDEEMEDPOSITIVE` Yes. The header carries the supplier's GSTIN, `STATENAME` and `PLACEOFSUPPLY`
+  Rajasthan, `GSTREGISTRATIONTYPE` Regular, the company as the buyer name and its GSTIN as the consignee's.
+- **VERIFIED: Tally saved the second invoice with the same supplier invoice number and date.** The screen read
+  was taken after the save, so whether a warning appeared before it is not recorded.
+- **VERIFIED (screen): the bill reference is `SUP/0001`, and the two invoices share it.** The supplier's
+  pending bills show one row, opening 1,050.00 Cr and pending 2,100.00 Cr. **NOT established through
+  a read:** the export's bill allocation carries only an amount, and why is not established.
+- **Both vouchers read uncertain in GSTR (`VCHGSTSTATUSISUNCERTAIN` Yes). The cause is UNVERIFIED:** a
+  duplicate supplier invoice number is unlikely to explain the first one (its `ALTERID` is 31 and the
+  second's 32, so it was not re-saved, but no read was taken between the two saves and the flag is
+  stored), and the supplier's GSTIN is of the synthetic family, which Tally may not accept as valid.
+- **Not measured:** a purchase imported over the gateway, any GSTR-2 view, a Purchase in the accounting-voucher view, Gold.
+
+Evidence: `workorder/purchases-w4.xml` and the screens `w4-*` on the same branch and commit.
+
 ### 9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate
 
 **Scope of every item below.** TallyPrime 7.1 Silver, licensed, not Education, on a synthetic
@@ -681,7 +820,7 @@ A Sales invoice is an accounting invoice: the invoice view, `LEDGERENTRIES.LIST`
 - **The `VATDEALERTYPE` of a keyed invoice (PARTIAL).** The nine invoices keyed first read `Unknown`; the one keyed after them read `Regular`, as the imported one did. What changed between them is not known. In the voucher export, the nine that read `Unknown` carry `BASICBUYERNAME` `Bridge Walk-in`, the ledger's earlier spelling, and the two that read `Regular` carry `BRIDGE Walk-in`; the ledger's case-only rename is a candidate cause, **UNVERIFIED** (nothing was varied one at a time).
 - **The walk-in ledger's spelling (PARTIAL).** The customer ledger's row carried one spelling and the party's own name another until the contributor renamed it (a change of letter case only). ComplyEaze Bridge keys on the row spelling, so after the rename the row and the name agree and the earlier spelling is refused as a master that is not exact (a test pins this). The rename moved neither company counter in this book (the ledger's `ALTERID` read 215 in an earlier listing, on the contributor's branch and not committed here, and in the committed compliance listing after the rename; the master mark read 223 throughout); how the rename was made is not known.
 
-**What Bridge posts, once Sales is qualified.** Sales is not in the qualified list at this change: every Sales build is refused as `import_voucher_type_unqualified` before the first request, and no file is written (ADR 0004, the 6 Oct 2026 amendment). What follows is what the code builds; the rehearsal above ran it on two invoices. One Sales invoice per build and per post, in the shape above, with `REFERENCE` and `REFERENCEDATE` equal to the number and the date, as the keyed vouchers of the client sample book carried them (the keyed invoices of the lab company carry neither). The build reads the ledger compliance listing, the voucher types, the party's bill-wise flag from the V2 ledger catalogue (§12a.15), the number's absence among the Sales vouchers of its financial year (the vouchers carrying the number are read with a `$Date` formula on literal dates and a number equality, both of which ran in the rehearsal, because the date variables are not relied on to limit a collection (§5.1; one native read above was limited by its period, as §5.3 records for licensed mode), and the Sales class is decided client-side from the measured per-row `$$IsSales` compute, across every type), and the company's state; a book whose voucher mark is above 25,000 is refused, because the number read (twice: the invoice's number and its control) and the read-back each walk the book's vouchers (a provisional bound: formula-filtered voucher reads have been timed in seconds on books of a few thousand vouchers, and this read only on the rehearsal's book of under a hundred vouchers); a book whose master mark is above 5,000 is refused unless the company's own ledger count is 2,000 or fewer, because the whole ledger compliance listing is read three times per invoice; it refuses unless the named type resolves to the Sales class through its parent chain with exactly one Manual series that prevents duplicates (the guard of §9.8, PARTIAL: seen once, on a Journal type, never on a Sales type; `invoice_voucher_type_duplicates_allowed` otherwise), the customer is registered (a valid GSTIN in force, on an entry that says Regular, whose state is the place of supply) or positively unregistered (an entry in force that names no GSTIN and says so), the supply is made in the company's state, one or two Sales Accounts ledgers (a third waits for a measured three-line bill; the taxable value is their sum, each ledger at the rate its own dated GST row gives, read in a listing of its own, the compliance listing with four fields added (10 Oct 2026): one row in force, made of the elements the lab's rows carried, ledger-specified and taxable, one all-states block, CGST and state tax equal and IGST twice one of them, no cess, the same rate on every sales ledger; the approval window holds six legs in all when no ledger is approved On Account and the names are not long, and a longer invoice is refused as too large, never cut) and one central tax and one state-tax ledger (by duty head, each carrying that rate's half as its own rate and rounding nothing) are named. Each head must equal the tax Tally's GSTR-1 expects: the sum over the sales lines of each line's tax at the head's rate, rounded half-up to the paisa (§9.17 on master: sixteen vouchers, and any other figure, a paisa off included, was flagged); any other figure is refused with the one expected. Only 2.5 percent was measured with a line whose tax is not a whole paisa, so at any other rate such a line is refused. Any round off is under one rupee. IGST, cess, items, credit and debit notes, new ledgers, a reference and amendments are refused.
+**What Bridge posts, once Sales is qualified.** Sales is not in the qualified list at this change: every Sales build is refused as `import_voucher_type_unqualified` before the first request, and no file is written (ADR 0004, the 6 Oct 2026 amendment). What follows is what the code builds; the rehearsal above ran it on two invoices. One Sales invoice per build and per post, in the shape above, with `REFERENCE` and `REFERENCEDATE` equal to the number and the date, as the keyed vouchers of the client sample book carried them (the keyed invoices of the lab company carry neither). The build reads the ledger compliance listing, the voucher types, the party's bill-wise flag from the V2 ledger catalogue (§12a.15), the number's absence among the Sales vouchers of its financial year (the vouchers carrying the number are read with a `$Date` formula on literal dates and a number equality, both of which ran in the rehearsal, because the date variables are not relied on to limit a collection (§5.1; one native read above was limited by its period, as §5.3 records for licensed mode), and the Sales class is decided client-side from the measured per-row `$$IsSales` compute, across every type), and the company's state; a book whose voucher mark is above 25,000 is refused, because the number read (twice: the invoice's number and its control) and the read-back each walk the book's vouchers (a provisional bound: formula-filtered voucher reads have been timed in seconds on books of a few thousand vouchers, and this read only on the rehearsal's book of under a hundred vouchers); a book whose master mark is above 5,000 is refused unless the company's own ledger count is 2,000 or fewer, because the whole ledger compliance listing is read three times per invoice; it refuses unless the named type resolves to the Sales class through its parent chain with exactly one Manual series that prevents duplicates (the guard of §9.8, PARTIAL: seen once, on a Journal type, never on a Sales type; `invoice_voucher_type_duplicates_allowed` otherwise), the customer is registered (a valid GSTIN in force, on an entry that says Regular, whose state is the place of supply) or positively unregistered (an entry in force that names no GSTIN and says so), the supply is made in the company's state, one or two Sales Accounts ledgers (a third waits for a measured three-line bill; the taxable value is their sum, each ledger at the rate its own dated GST row gives, read in a listing of its own, the compliance listing with four fields added (10 Oct 2026): one row in force, made of the elements the lab's rows carried, ledger-specified and taxable, one all-states block, CGST and state tax equal and IGST twice one of them, no cess, the same rate on every sales ledger; the approval window holds six legs in all when no ledger is approved On Account and the names are not long, and a longer invoice is refused as too large, never cut) and one central tax and one state-tax ledger (by duty head, each carrying that rate's half as its own rate and rounding nothing) are named. Each head must equal the tax Tally's GSTR-1 expects, the per-line figure §9.17 measured: the sum over the sales lines of half-up(line x rate / 2) to the paisa, the rate being the sales ledger's own (§9.17: on sixteen vouchers of one book, Tally's flag read included exactly when both heads equalled that figure, and every voucher it flagged was one paisa off it on at least one head), so two heads that differ are never admitted; any other figure is refused (`invoice_tax_head_not_expected`) with the one expected. The round off is not part of that figure (§9.17: it did not decide the flag). Only 2.5 percent was measured with a line whose tax is not a whole paisa, so at any other rate such a line is refused. Any round off is under one rupee. The round-off ledger's own GST row must be the one empty row the lab's round-off ledger carried (PARTIAL: one ledger, under Indirect Expenses; whether a group-level GST setting reaches a ledger whose own row is empty was not measured); a ledger with no row, several rows or a row that says anything is refused. IGST, cess, items, credit and debit notes, new ledgers, a reference and amendments are refused.
 
 **Read back.** After a post, the standard window readback (date, type, number, entries, narration) is followed by a read of the invoice by type and number over its financial year, and `posted_verified` is kept only when the party, the GST header fields, the reference, every leg and the bill allocation read back as built.
 
@@ -693,7 +832,7 @@ A Sales invoice is an accounting invoice: the invoice view, `LEDGERENTRIES.LIST`
 - Among the elements written that no read-back compares (the list is not exhaustive): `PARTYNAME`, `BASICBASEPARTYNAME`, `COUNTRYOFRESIDENCE`, `PERSISTEDVIEW`, `VCHENTRYMODE`, the six of the buyer and consignee block, and the `OBJVIEW` attribute.
 - A bill of the same name: the party leg of a bill-wise customer is written as a New Ref named by the invoice number, and the customer's existing bills are not read. Whether Tally merges it with an open bill of that name on the same ledger (last year's invoice of the same number, or an opening bill) is not measured: the one such invoice the rehearsal sent was declined by Tally (above) and never reached the book. A read of the customer's bills before the build is the likely guard.
 - A company with more than one GST registration: no company registration is written on the voucher and none is read back, so which registration Tally files the invoice under is not measured.
-- The tax check's reach (10 Oct 2026): it rests on one book, TallyPrime 7.1 Silver, CGST and state tax inside the company's own state, 5% services lines (one 18% goods line only on an exact bill), the invoice view, an unregistered buyer, one or two lines (§9.17). A tax ledger whose own rate field reads 0 or is absent is refused, because the measured ledgers carried the rate there; a book whose tax ledgers carry it only in their GST rows is therefore refused, which is not measured as wrong. A sales ledger whose rate is not one of the five GST slabs (5, 12, 18, 28 and 40 percent) is refused, though the invoice and the ledger agree; only 5 percent and one exact 18 percent bill were measured. A sales ledger with more than one dated GST row is refused (only one row was read); so is one whose rate comes from its group or the company, one valued on anything but value, one with state-wise rows, and any cess. A row with an element the lab's rows did not carry (a slab-rate list that is not empty, a reverse-charge or per-unit field) is refused. How the build reads a rate row that changes during the year is not measured. The new listing is every ledger of the book with the GST rows and is read in each admission (three times for one invoice); its cost on a large book is not measured (the lab's answer was about 3.7 KB a ledger on the wire, so about 7 MB a read at the 2,000 ledgers the existing size gate admits, and each read is sent as a pair, so about twice that on the wire). HSN/SAC is not read, so an invoice whose sales ledger lacks one is checked for its tax only: the lab's three-line invoice had the exact tax and was flagged for its HSN/SAC. It is joined to the compliance listing by ledger name; a ledger deleted and made again under the same name between the two reads would take the new ledger's rates, and the post-time identity checks are what catch it.
+- The tax check's reach (10 Oct 2026): it rests on one book, TallyPrime 7.1 Silver, CGST and state tax inside the company's own state, 5% services lines (one 18% goods line only on an exact bill), the invoice view, an unregistered buyer, one or two lines (§9.17). A tax ledger whose own rate field reads 0 or is absent is refused, because the measured ledgers carried the rate there; a book whose tax ledgers carry it only in their GST rows is therefore refused, which is not measured as wrong. Only the two rates measured on this path are admitted on a sales ledger, 5 and 18 percent (§9.17: 5 percent on every voucher of its table, 18 percent on one line of one exact bill, 0009); a ledger at another GST slab (12, 28 or 40 percent) is refused as not measured (`invoice_sales_ledger_rate_not_measured`), and one at a rate that is no slab (3 percent, say) as such (`invoice_sales_ledger_rate_not_a_slab`), though the invoice and the ledger agree. A sales ledger with more than one dated GST row is refused (only one row was read); so is one whose rate comes from its group or the company, one valued on anything but value, one with state-wise rows, and any cess. A row with an element the lab's rows did not carry (a slab-rate list that is not empty, a reverse-charge or per-unit field) is refused. How the build reads a rate row that changes during the year is not measured. The new listing is every ledger of the book with the GST rows and is read in each admission (three times for one invoice); its cost on a large book is not measured (the lab's answer was about 3.7 KB a ledger on the wire, so about 7 MB a read at the 2,000 ledgers the existing size gate admits, and each read is sent as a pair, so about twice that on the wire). HSN/SAC is not read, so an invoice whose sales ledger lacks one is checked for its tax only: the lab's three-line invoice had the exact tax and was flagged for its HSN/SAC. It is joined to the compliance listing by ledger name; a ledger deleted and made again under the same name between the two reads would take the new ledger's rates, and the post-time identity checks are what catch it.
 - What the company's `STATENAME` is in a company with several registrations: its address state, which can differ there from the state of the GST registration a voucher is filed under (the voucher's `CMPGSTSTATE`). It decides CGST plus state tax against IGST. The two were equal on the rehearsal's company, where every voucher read carried the same registration.
 - Two of the element sets: a registered customer that is not bill-wise, and a round off on the debit side. The rehearsal posted the other two (a registered customer with a New Ref and a credit round off; an unregistered customer).
 - The buyer and consignee block: written since 8 Oct 2026 with the values the keyed invoices read (above), and imported once on 9 Oct 2026, when Tally stored all of it as sent (above). The three names are the customer ledger's name, because its mailing name is not read, so a ledger with a mailing name of its own gets its ledger name there, on the printed invoice too, and nothing shows it (on the rehearsal's book the two were the same, so which one Tally writes is not established); `VATDEALERTYPE` Regular for an unregistered customer rests on one keyed invoice and the one import (nine other keyed invoices of that book read `Unknown`). None of the six is fetched or compared by the read-back, so a value Tally drops or rewrites still reads as posted. Owed before Sales is qualified: on a company whose own registration is valid (on the rehearsal's company every voucher, keyed or posted, read as uncertain for that alone), one variable, whether an accounting invoice with the block and one without it read differently in Tally's GST status and its GSTR-1 view, for a registered and an unregistered customer, with the six read natively after the import; the party's mailing name read in a read of its own (the measured compliance listing unchanged), or the reference saying why the ledger name stands; and the six added to the read-back, or the gap accepted here. What it changes on a printed invoice or an e-way bill is not measured.
@@ -704,7 +843,7 @@ A Sales invoice is an accounting invoice: the invoice view, `LEDGERENTRIES.LIST`
 - A number used in an earlier financial year: the number read is by financial year, so such a number is admitted, and a voucher type whose series prevents duplicates may then decline the import (the PARTIAL observation above). Owed before Sales is qualified: establish which, and refuse at the build what Tally would decline.
 - A control beside the duplicate-number read: "not in use" is status 1, a collection and no Sales-class row, and a formula that Tally evaluates to false for every row, or rows nested one level deeper, reads the same. Built since 8 Oct 2026, never run against Tally: the answer stands only beside a control. The same read, for the newest invoice of the company that ComplyEaze Bridge's journal holds as verified posted (one of the invoice's financial year first), must return it, with its date and as Sales class, or the build is refused (`invoice_number_control_missing`). With no such invoice, the build is admitted only when the book's voucher mark is 0 or when no invoice of the company was ever sent (the first post, which then stands on the type's duplicate guard and its read-back); otherwise it is refused until the earlier post is verified (`invoice_number_control_unavailable`), which never happens for a post Tally declined or an invoice deleted since: the release for such a batch is owed (ADR 0004). Not caught: a break that depends on the number's own text, a wrong class for another Sales type, a twin in another Sales type on the first post, and a journal that was reset. Owed before Sales is qualified, one variable each: that a Sales type with the guard on declines a reused number; the first post on a company with no invoice sent; a second build controlled by it; the controlling invoice deleted by hand (refused as missing); a company with no voucher (mark 0); the cost of the extra read on a larger book. Measured earlier, towards a control from the year's rows: the same request without its number term returned every voucher of the year with its class (about 2.6 KB a voucher on the wire), and with the Sales class as a term of the formula, read after the two posts, 20 vouchers, every one Sales-class, where the first read had counted 18 before them, so the number can be compared outside Tally at that cost; a year with no Sales voucher still returns no row to stand as a control.
 - The customer's party type: it is not read, so a customer in a special economic zone in the company's own state, or a deemed export, would be taken as an ordinary intra-state supply. Owed before Sales is qualified: read it and refuse anything but the ordinary type.
-- The company's own registration on the invoice date: read since 9 Oct 2026 (§12a.18); the build refuses an invoice unless exactly one Regular GST registration is in force on its date. Not read: whether GST is switched on for the company, so a company with GST off is not refused for that; and how Tally writes a composition or inactive registration, which is not measured.
+- The company's own registration on the invoice date: read since 9 Oct 2026 (§12a.19); the build refuses an invoice unless exactly one Regular GST registration is in force on its date. Not read: whether GST is switched on for the company, so a company with GST off is not refused for that; and how Tally writes a composition or inactive registration, which is not measured.
 - E-invoicing (an invoice reference number for a registered customer) is outside what is posted.
 - Where Tally's GSTR-1 places a posted invoice (B2B for a registered customer, B2C for an unregistered one): Tally's report counted the four vouchers the month then held as uncertain, giving the company's GST registration details as invalid or not specified, so it showed only that the first posted invoice was counted as the keyed ones were (the list under the count was not opened, and the second invoice was posted after the look). HSN is not carried. On a company whose registration is valid, one imported invoice was listed as included (above); a registered customer was not tried there.
 - The invoice's masters inside the endpoint queue (#1337): built since 10 Oct 2026, never run against Tally. After the approval, inside the identity brackets of the POST and before any dispatch intent, the queue first judges the company's currency and the book's size limits on the marks and currencies it has read (the ledger count is read only for a book over the master mark), then sends the reads of the invoice's admission again (the compliance listing, the rates, the voucher types, the number and its control, the company's registration) and the admission's own judge decides on the answers; an observation that differs from the build's refuses the post as `import_invoice_masters_changed`, with the first field that differs as its cause. What stays outside it: a master changed after the queue's last invoice read is seen only through the company's master mark (`post_masters_moved`), and a number taken after the queue's number read only by the voucher type's own duplicate guard. Not measured: the time the extra reads add on a real book, and that every master change moves the master mark.

@@ -92,7 +92,7 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
     loop {
         match reader.read_event().map_err(|_| "invoice_read_malformed")? {
             Event::Start(start) => {
-                let name = String::from_utf8_lossy(start.name().as_ref()).into_owned();
+                let name = start.name().as_ref().to_string();
                 text.clear();
                 collection |= name == "COLLECTION";
                 // Only a direct child of the COLLECTION is a row: the answer's
@@ -106,12 +106,9 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                     current = Row::default();
                     for attribute in start.attributes().with_checks(true) {
                         let attribute = attribute.map_err(|_| "invoice_read_malformed")?;
-                        let key = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
+                        let key = attribute.key.as_ref().to_string();
                         let value = attribute
-                            .decoded_and_normalized_value(
-                                quick_xml::XmlVersion::Implicit1_0,
-                                reader.decoder(),
-                            )
+                            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                             .map_err(|_| "invoice_read_malformed")?;
                         current.attributes.insert(key, value.into_owned());
                     }
@@ -125,11 +122,11 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 path.push(name);
             }
             Event::Text(chunk) => {
-                text.push_str(&chunk.decode().map_err(|_| "invoice_read_malformed")?);
+                text.push_str(&chunk);
             }
             Event::GeneralRef(reference) => {
-                let name = reference.decode().map_err(|_| "invoice_read_malformed")?;
-                text.push_str(&entity(&name).ok_or("invoice_read_malformed")?);
+                let name: &str = &reference;
+                text.push_str(&entity(name).ok_or("invoice_read_malformed")?);
             }
             Event::End(_) => {
                 let Some(name) = path.pop() else {
@@ -177,12 +174,12 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 text.clear();
             }
             Event::Empty(empty) => {
-                collection |= empty.name().as_ref() == b"COLLECTION";
+                collection |= empty.name().as_ref() == "COLLECTION";
                 // A row written as an empty element is still a row, with no
                 // fields and no attributes: its reader refuses it or reports
                 // every field as different, and never counts it as "no rows".
                 if row_depth.is_none()
-                    && empty.name().as_ref() == row_tag.as_bytes()
+                    && empty.name().as_ref() == row_tag
                     && path.last().map(String::as_str) == Some("COLLECTION")
                 {
                     out.push(Row::default());
@@ -798,27 +795,22 @@ fn parse_tree(xml: &str) -> Result<Node, &'static str> {
         match reader.read_event().map_err(|_| "invoice_read_malformed")? {
             Event::Start(start) => {
                 let mut node = Node {
-                    name: String::from_utf8_lossy(start.name().as_ref()).into_owned(),
+                    name: start.name().as_ref().to_string(),
                     ..Node::default()
                 };
                 for attribute in start.attributes().with_checks(true) {
                     let attribute = attribute.map_err(|_| "invoice_read_malformed")?;
                     let value = attribute
-                        .decoded_and_normalized_value(
-                            quick_xml::XmlVersion::Implicit1_0,
-                            reader.decoder(),
-                        )
+                        .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                         .map_err(|_| "invoice_read_malformed")?;
-                    node.attributes.insert(
-                        String::from_utf8_lossy(attribute.key.as_ref()).into_owned(),
-                        value.into_owned(),
-                    );
+                    node.attributes
+                        .insert(attribute.key.as_ref().to_string(), value.into_owned());
                 }
                 stack.push(node);
             }
             Event::Empty(empty) => {
                 let node = Node {
-                    name: String::from_utf8_lossy(empty.name().as_ref()).into_owned(),
+                    name: empty.name().as_ref().to_string(),
                     ..Node::default()
                 };
                 stack
@@ -828,16 +820,15 @@ fn parse_tree(xml: &str) -> Result<Node, &'static str> {
                     .push(node);
             }
             Event::Text(chunk) => {
-                let text = chunk.decode().map_err(|_| "invoice_read_malformed")?;
                 stack
                     .last_mut()
                     .ok_or("invoice_read_malformed")?
                     .text
-                    .push_str(&text);
+                    .push_str(&chunk);
             }
             Event::GeneralRef(reference) => {
-                let name = reference.decode().map_err(|_| "invoice_read_malformed")?;
-                let text = entity(&name).ok_or("invoice_read_malformed")?;
+                let name: &str = &reference;
+                let text = entity(name).ok_or("invoice_read_malformed")?;
                 stack
                     .last_mut()
                     .ok_or("invoice_read_malformed")?
@@ -898,6 +889,9 @@ pub(super) struct GstRow {
     /// of the row, of a state-wise block or of a head's rate that is not in
     /// the measured set, or a slab-rate list that is not empty).
     pub(super) unmeasured: bool,
+    /// The row holds no element and no text, as the lab's round-off ledger's
+    /// row read (`BRIDGE Round Off`, the `pilot-lab` rate listing).
+    pub(super) empty: bool,
 }
 
 /// What the rate listing says of one ledger. Each field is the text Tally
@@ -943,6 +937,12 @@ pub(super) fn parse_ledger_rates(
         .all("COLLECTION")
         .next()
         .ok_or("invoice_read_collection_absent")?;
+    // A company always has ledgers (the invoice's own were read in the
+    // compliance listing before this one), so a listing with none is a read
+    // that went wrong, never "no ledger has a rate".
+    if collection.all("LEDGER").next().is_none() {
+        return Err("invoice_ledger_rates_listing_empty");
+    }
     let mut out = BTreeMap::new();
     for ledger in collection.all("LEDGER") {
         let bound = ledger.text_of("BRIDGECOMPANYGUID");
@@ -996,6 +996,7 @@ pub(super) fn parse_ledger_rates(
                 source: details.text_of("SRCOFGSTDETAILS")?,
                 states,
                 unmeasured,
+                empty: details.children.is_empty() && clean(&details.text).is_empty(),
             });
         }
         let row = LedgerRateRow {

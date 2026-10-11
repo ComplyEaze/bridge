@@ -1,0 +1,377 @@
+{
+ "comment": "Ledgers added from the TDS payee test's result. Wages is listed and also mapped 194C, with Cartage, Job Work, Hamali and Loading Charges; Consultancy is mapped 194J. That test pools n01, n02, n03, n04, n05 and n08 (a 194C-mapped debit paid from a bank, overdraft or cash ledger) under no named payee; n01 alone is over the single-sum limit, so its finding exists and cites all six. Added: Cartage (debited on n01, n03 and n04) and Job Work (n02, n08); Wages is debited on n05 but is already listed, so added_ledgers_count is 2. Not added: Consultancy (n04, mapped 194J); Hamali, which is only credited on a cited voucher (n03) and debited on vouchers the finding does not cite: n07 (a bill credited to a creditor), n09 (a Contra) and n10 (optional); Loading Charges, debited only on n06, a purchase voucher, which is not pooled. Read as a result: n01 (ALPHA TRADERS, 3500000 paise, over), n03 (BETA STORES, its Cartage debit of 50000), n04 (GAMMA MILLS, Cartage 20000, with Consultancy 30000 as a debit to another ledger) and n05 (DELTA WORKS); n02 (cash) and n08 (paid from Bank B OD, not among the bank ledgers given) are in not_through_bank_total (120000). n06 and n09 name payees on ledgers that are not read: no row.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_added-000"
+  },
+  {
+   "name": "Bank B OD",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-np_added-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_added-002"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_added-003"
+  },
+  {
+   "name": "Loading Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_added-004"
+  },
+  {
+   "name": "Cartage",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_added-005"
+  },
+  {
+   "name": "Job Work",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_added-006"
+  },
+  {
+   "name": "Hamali",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_added-007"
+  },
+  {
+   "name": "Consultancy",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-np_added-008"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-np_added-009"
+  },
+  {
+   "name": "Neem Supplies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-np_added-010"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3860000,
+   "closing": -3860000
+  },
+  {
+   "ledger": "Bank B OD",
+   "opening": 0,
+   "debit": 0,
+   "credit": 80000,
+   "closing": -80000
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 40000,
+   "closing": -40000
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 0,
+   "closing": 60000
+  },
+  {
+   "ledger": "Loading Charges",
+   "opening": 0,
+   "debit": 20000,
+   "credit": 0,
+   "closing": 20000
+  },
+  {
+   "ledger": "Cartage",
+   "opening": 0,
+   "debit": 3570000,
+   "credit": 0,
+   "closing": 3570000
+  },
+  {
+   "ledger": "Job Work",
+   "opening": 0,
+   "debit": 120000,
+   "credit": 0,
+   "closing": 120000
+  },
+  {
+   "ledger": "Hamali",
+   "opening": 0,
+   "debit": 160000,
+   "credit": 10000,
+   "closing": 150000
+  },
+  {
+   "ledger": "Consultancy",
+   "opening": 0,
+   "debit": 30000,
+   "credit": 0,
+   "closing": 30000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 100000,
+   "credit": 0,
+   "closing": 100000
+  },
+  {
+   "ledger": "Neem Supplies",
+   "opening": 0,
+   "debit": 0,
+   "credit": 70000,
+   "closing": -70000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "n01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-CARTAGE",
+   "lines": [
+    [
+     "Cartage",
+     3500000
+    ],
+    [
+     "Bank A",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "n02",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "Job work paid in cash",
+   "lines": [
+    [
+     "Job Work",
+     40000
+    ],
+    [
+     "Cash",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "n03",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-CARTAGE",
+   "lines": [
+    [
+     "Cartage",
+     50000
+    ],
+    [
+     "Hamali",
+     -10000
+    ],
+    [
+     "Bank A",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "n04",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-FEES",
+   "lines": [
+    [
+     "Consultancy",
+     30000
+    ],
+    [
+     "Cartage",
+     20000
+    ],
+    [
+     "Bank A",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "n05",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     60000
+    ],
+    [
+     "Bank A",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "n06",
+   "date": "2025-05-07",
+   "base_type": "Purchase",
+   "narration": "UPI-EPSILON CARRIERS-GOODS",
+   "lines": [
+    [
+     "Purchases",
+     100000
+    ],
+    [
+     "Loading Charges",
+     20000
+    ],
+    [
+     "Bank A",
+     -120000
+    ]
+   ]
+  },
+  {
+   "guid": "n07",
+   "date": "2025-05-08",
+   "base_type": "Journal",
+   "narration": "Hamali bill",
+   "lines": [
+    [
+     "Hamali",
+     70000
+    ],
+    [
+     "Neem Supplies",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "n08",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "narration": "UPI-ZETA-JOB WORK",
+   "lines": [
+    [
+     "Job Work",
+     80000
+    ],
+    [
+     "Bank B OD",
+     -80000
+    ]
+   ]
+  },
+  {
+   "guid": "n09",
+   "date": "2025-05-10",
+   "base_type": "Contra",
+   "narration": "UPI-ETA-HAMALI",
+   "lines": [
+    [
+     "Hamali",
+     90000
+    ],
+    [
+     "Bank A",
+     -90000
+    ]
+   ]
+  },
+  {
+   "guid": "n10",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "status": "optional",
+   "narration": "UPI-THETA-HAMALI",
+   "lines": [
+    [
+     "Hamali",
+     110000
+    ],
+    [
+     "Bank A",
+     -110000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "nature_by_ledger": {
+  "Cartage": "194C",
+  "Job Work": "194C",
+  "Hamali": "194C",
+  "Loading Charges": "194C",
+  "Wages": "194C",
+  "Consultancy": "194J"
+ },
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

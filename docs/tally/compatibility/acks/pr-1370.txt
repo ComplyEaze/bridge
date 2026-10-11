@@ -1,0 +1,4 @@
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/native_funds_flow.rs
+src-tauri/crates/bridge-tally-protocol/src/native_funds_flow_tests.rs
+reviewer: lamemustafa

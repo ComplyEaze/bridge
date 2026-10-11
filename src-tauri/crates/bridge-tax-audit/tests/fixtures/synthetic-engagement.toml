@@ -39,6 +39,9 @@ gst_payment_ledgers = []
 writeoff_discount_ledgers = []
 reissue_narration_terms = []
 tax_ledgers = {}
+# clause44 only: REQUIRED by the reference engine (role_ledger_set); no ledger of this invented book
+# lacks a GST supplier by nature.
+no_supplier_expense_ledgers = []
 
 # cash_payments_40a3 only: [loans.loan_ledgers.<ledger>] names a ledger the client has already
 # configured for the (not yet ported) loans_interest test; "Sunrise NBFC Loan" is covered here,
@@ -147,3 +150,8 @@ opening_summary = "from_masters"
 opening_date = "2025-04-01"
 closing_summary = "from_read"
 closing_date = "2026-03-31"
+
+# clause44 only (invented): the partners' interest ledger is a money item whose clause 44 treatment
+# the CA decides, so it stands outside the four columns.
+[clause44.money_category_by_ledger]
+"Interest to Partners" = "partner_interest_or_remuneration"

@@ -133,7 +133,6 @@ count once. The setup handlers come next:
 | runtime sessions | `runtimeSessions`, `runtimeError` | none | `refreshRuntime`, `cancelTallyRequest`; no source-text assertions. Smallest first hook. |
 | persisted company profiles | 5 + a load-version ref | none | writes `companies` (shared); `ux1-shell.test.mjs` asserts its `useState` and stale-load guard as text |
 | evidence drawer | 4 + 5 refs | none | focus lifecycle is covered by `evidence-drawer-focus.test.tsx` |
-| GST draft | `gstCompany`, `gstFinancialYear`, `draft`, `busy` | `draft` | shares `dashboardError` with `checkTally` |
 | mirror explorer | 2 | both | one loader |
 | write fixture | 5 | all 5 | attestation flags feed `enrollWriteFixture` |
 | sync evidence and proof preview | 4 + a request-version ref | all 4 | |

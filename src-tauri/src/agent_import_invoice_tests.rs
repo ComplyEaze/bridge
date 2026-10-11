@@ -34,21 +34,21 @@ fn detail() -> InvoiceDetail {
     }
 }
 
-/// A 12 percent invoice: 10,000.00 taxable, 600.00 and 600.00 tax.
+/// An 18 percent invoice: 10,000.00 taxable, 900.00 and 900.00 tax.
 fn voucher() -> ImportVoucher {
     ImportVoucher {
         bridge_txn_id: "t1".to_string(),
-        date: "2026-03-10".to_string(),
+        date: bridge_tally_core::TallyDate::parse("20260310").expect("a YYYYMMDD date"),
         voucher_type: VoucherType::Sales,
         narration: Some("Invoice 278".to_string()),
         reference: None,
         voucher_number: Some("278".to_string()),
         invoice: Some(detail()),
         entries: vec![
-            entry("Customer A", "11200.00", EntrySide::Dr),
+            entry("Customer A", "11800.00", EntrySide::Dr),
             entry("Sales", "10000.00", EntrySide::Cr),
-            entry("Output CGST", "600.00", EntrySide::Cr),
-            entry("Output SGST", "600.00", EntrySide::Cr),
+            entry("Output CGST", "900.00", EntrySide::Cr),
+            entry("Output SGST", "900.00", EntrySide::Cr),
         ],
     }
 }
@@ -87,6 +87,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
             taxability: Some("Taxable".to_string()),
             source: Some("Specify Details Here".to_string()),
             unmeasured: false,
+            empty: false,
             states: vec![wire::StateRates {
                 state: Some("Any".to_string()),
                 heads: vec![
@@ -138,11 +139,14 @@ fn good_facts() -> BTreeMap<String, LedgerFacts> {
     party.gstin = GstinEvidence::InForce(GSTIN_RJ.to_string());
     party.registration_type = Some("Regular".to_string());
     party.bill_wise = Some(true);
-    // The 12 percent of the fixture invoice: 6 and 6, IGST 12.
-    facts.get_mut("Sales").unwrap().rates = Some(sales_rates("6", "12"));
+    // The 18 percent of the fixture invoice: 9 and 9, IGST 18.
+    facts.get_mut("Sales").unwrap().rates = Some(sales_rates("9", "18"));
     for tax in ["Output CGST", "Output SGST"] {
-        facts.get_mut(tax).unwrap().rates = Some(tax_rates("6"));
+        facts.get_mut(tax).unwrap().rates = Some(tax_rates("9"));
     }
+    // The round-off ledger's empty GST row, as the lab's read.
+    facts.get_mut("Round Off").unwrap().rates =
+        lab_rates(&["BRIDGE Round Off"]).remove("BRIDGE Round Off");
     facts
 }
 
@@ -349,20 +353,20 @@ fn a_party_that_is_not_bill_wise_is_admitted() {
 fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     let refused = |v: &ImportVoucher| codes(classify_sales_invoice(v, &good_facts(), RAJ, AS_OF));
     let mut v = voucher();
-    v.entries[0].amount = "11201.00".to_string();
+    v.entries[0].amount = "11801.00".to_string();
     assert_eq!(refused(&v), vec!["invoice_party_amount_does_not_close"]);
     // One head off by a rupee: that head is named, with the figure Tally expects.
     let mut v = voucher();
-    v.entries[2].amount = "700.00".to_string();
+    v.entries[2].amount = "1000.00".to_string();
     let got = classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).unwrap_err();
     assert_eq!(
         got,
         vec![refuse_value(
             "invoice_tax_head_not_expected",
-            "CGST 700.00 expected 600.00"
+            "CGST 1000.00 expected 900.00"
         )]
     );
-    // 6 percent a head of 10.00 is 0.60: 0.01 is no tolerance.
+    // 9 percent a head of 10.00 is 0.90: 0.01 is no tolerance.
     let mut v = voucher();
     v.entries[0].amount = "10.02".to_string();
     v.entries[1].amount = "10.00".to_string();
@@ -375,9 +379,9 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     );
     // A paisa off, either way, either head: refused (the lab flagged 0.01).
     for (cgst, state) in [
-        ("600.01", "600.00"),
-        ("600.00", "599.99"),
-        ("600.01", "600.01"),
+        ("900.01", "900.00"),
+        ("900.00", "899.99"),
+        ("900.01", "900.01"),
     ] {
         let mut v = voucher();
         v.entries[2].amount = cgst.to_string();
@@ -388,15 +392,15 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
             "{cgst} / {state}"
         );
     }
-    // 6 percent a head of 10,000.50 is 600.03, a whole paisa: both heads are the figure.
+    // 9 percent a head of 10,001.00 is 900.09, a whole paisa: both heads are the figure.
     let mut v = voucher();
-    v.entries[1].amount = "10000.50".to_string();
-    v.entries[2].amount = "600.03".to_string();
-    v.entries[3].amount = "600.03".to_string();
-    v.entries[0].amount = "11200.56".to_string();
+    v.entries[1].amount = "10001.00".to_string();
+    v.entries[2].amount = "900.09".to_string();
+    v.entries[3].amount = "900.09".to_string();
+    v.entries[0].amount = "11801.18".to_string();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
     // The figure is worked out on the ledger's rate, not on the tax typed: the
-    // ledger says 12 percent, so heads of a 5 percent invoice are refused.
+    // ledger says 18 percent, so heads of a 5 percent invoice are refused.
     let mut v = voucher();
     v.entries[2].amount = "250.00".to_string();
     v.entries[3].amount = "250.00".to_string();
@@ -406,9 +410,9 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
 
 #[test]
 fn a_line_whose_tax_is_not_a_whole_paisa_at_another_rate_than_two_and_a_half_percent_is_refused() {
-    // 0.25 at 6 percent a head is 0.015, a tie; 100.10 is 6.006, no tie: the
+    // 0.50 at 9 percent a head is 0.045, a tie; 100.10 is 9.009, no tie: the
     // lab measured the rounding of inexact figures at 2.5 percent only.
-    for (line, party) in [("0.25", "0.55"), ("100.10", "112.40")] {
+    for (line, party) in [("0.50", "0.80"), ("100.10", "100.40")] {
         let mut v = voucher();
         v.entries[0].amount = party.to_string();
         v.entries[1].amount = line.to_string();
@@ -422,19 +426,19 @@ fn a_line_whose_tax_is_not_a_whole_paisa_at_another_rate_than_two_and_a_half_per
     }
     // A line whose tax is whole is admitted at that rate.
     let mut v = voucher();
-    v.entries[0].amount = "112.00".to_string();
+    v.entries[0].amount = "118.00".to_string();
     v.entries[1].amount = "100.00".to_string();
-    v.entries[2].amount = "6.00".to_string();
-    v.entries[3].amount = "6.00".to_string();
+    v.entries[2].amount = "9.00".to_string();
+    v.entries[3].amount = "9.00".to_string();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
 }
 
 #[test]
 fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
-    // Customer owes 11,200.40: a credit round off of 0.40.
+    // Customer owes 11,800.40: a credit round off of 0.40.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11200.40".to_string();
+    v.entries[0].amount = "11800.40".to_string();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert_eq!(validate_invoice_voucher(&v), Ok(()));
     assert_eq!(
@@ -443,16 +447,16 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
             .round_off,
         Some(4)
     );
-    // Owes 11,199.60: a debit round off of 0.40.
+    // Owes 11,799.60: a debit round off of 0.40.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11199.60".to_string();
+    v.entries[0].amount = "11799.60".to_string();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Dr));
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
     // Wrong direction does not close.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11200.40".to_string();
+    v.entries[0].amount = "11800.40".to_string();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Dr));
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -461,7 +465,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // A round off of a rupee or more is refused.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11201.00".to_string();
+    v.entries[0].amount = "11801.00".to_string();
     v.entries.push(entry("Round Off", "1.00", EntrySide::Cr));
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -472,10 +476,83 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     facts.get_mut("Round Off").unwrap().reserved_groups = vec!["Current Assets".into()];
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11200.40".to_string();
+    v.entries[0].amount = "11800.40".to_string();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert!(codes(classify_sales_invoice(&v, &facts, RAJ, AS_OF))
         .contains(&"invoice_round_off_ledger_group"));
+}
+
+/// The lab's rate listing (10 Oct 2026, the `pilot-lab` fixtures), read as the
+/// build reads it, for the ledgers named.
+fn lab_rates(named: &[&str]) -> BTreeMap<String, wire::LedgerRateRow> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    wire::parse_ledger_rates(&xml, "6b43e498-430c-4d5c-bfef-d32e2ab93c85", named).unwrap()
+}
+
+/// The round-off ledger's own GST row is read, and only the shape the lab's
+/// round-off ledger carried is admitted: `BRIDGE Round Off`, whose
+/// `GSTDETAILS.LIST` holds nothing, and it is the only row. A row that says anything
+/// (Taxable, with a rate) might be counted by Tally in the tax, which was not
+/// measured; a ledger the listing did not return is not known to carry none.
+#[test]
+fn a_round_off_ledger_is_admitted_only_with_the_empty_gst_row_the_lab_read() {
+    let lab = lab_rates(&["BRIDGE Round Off", "BRIDGE Svc 998313 5%"]);
+    let with = |rates: Option<wire::LedgerRateRow>| {
+        let mut facts = good_facts();
+        facts.get_mut("Round Off").unwrap().rates = rates;
+        let mut v = voucher();
+        v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
+        v.entries[0].amount = "11800.40".to_string();
+        v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
+        classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
+    };
+    let measured = lab["BRIDGE Round Off"].clone();
+    assert_eq!(with(Some(measured.clone())), Ok(Some(4)));
+    // No `GSTDETAILS.LIST` at all is a shape Tally was not seen to send: every
+    // one of the lab listing's fourteen ledgers carried exactly one.
+    let mut absent = measured.clone();
+    absent.gst_rows.clear();
+    assert_eq!(
+        with(Some(absent)),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_row_absent",
+            "Round Off"
+        )])
+    );
+    // Two rows, even both empty, are not the one row that was read.
+    let mut two = measured;
+    two.gst_rows.push(two.gst_rows[0].clone());
+    assert_eq!(
+        with(Some(two)),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_row",
+            "Round Off"
+        )])
+    );
+    // A taxable row with a rate: the lab's own 5 percent services ledger's row.
+    assert_eq!(
+        with(Some(lab["BRIDGE Svc 998313 5%"].clone())),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_row",
+            "Round Off"
+        )])
+    );
+    assert_eq!(
+        with(None),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_unknown",
+            "Round Off"
+        )])
+    );
 }
 
 fn observed() -> InvoiceObserved {
@@ -500,7 +577,7 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
     let xml =
         render_sales_invoice_xml(&v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
-    let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"11111111-1111-1111-1111-111111111111\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11200.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11200.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>600.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>600.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
+    let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"11111111-1111-1111-1111-111111111111\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11800.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11800.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
     assert_eq!(xml, expected.replace("@GSTIN@", GSTIN_RJ));
     assert!(
         !xml.contains("ALLLEDGERENTRIES"),
@@ -784,7 +861,7 @@ fn each_field_the_standard_readback_never_sees_is_compared_by_name() {
         vec!["PARTYLEDGERNAME"]
     );
     // A leg's amount.
-    assert_eq!(altered("<AMOUNT>600.00</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>Output SGST", "<AMOUNT>601.00</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>Output SGST"), vec!["legs"]);
+    assert_eq!(altered("<AMOUNT>900.00</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>Output SGST", "<AMOUNT>901.00</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>Output SGST"), vec!["legs"]);
     // The New Ref: another name, none at all, a wrong amount.
     assert_eq!(
         altered("<NAME>278</NAME>", "<NAME>279</NAME>"),
@@ -797,7 +874,7 @@ fn each_field_the_standard_readback_never_sees_is_compared_by_name() {
         ),
         vec!["bill_allocation"]
     );
-    let no_allocation = good.replace("<BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11200.00</AMOUNT></BILLALLOCATIONS.LIST>", "");
+    let no_allocation = good.replace("<BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11800.00</AMOUNT></BILLALLOCATIONS.LIST>", "");
     assert_eq!(differences(&v, &no_allocation), vec!["bill_allocation"]);
     // An allocation on a party that is not bill-wise is also a difference.
     let mut not_bill_wise = observed_voucher();
@@ -1002,18 +1079,18 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 <PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><VOUCHERTYPENAME TYPE=\"String\">Sales</VOUCHERTYPENAME><PARTYLEDGERNAME TYPE=\"String\">Customer A</PARTYLEDGERNAME>\
 <VOUCHERNUMBER TYPE=\"String\">278</VOUCHERNUMBER><REFERENCE TYPE=\"String\">278</REFERENCE><GSTREGISTRATIONTYPE TYPE=\"String\">Regular</GSTREGISTRATIONTYPE>\
 <ISINVOICE>Yes</ISINVOICE><ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL><ALTERID TYPE=\"Number\"> 77</ALTERID>\
-<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Customer A</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-11200.00</AMOUNT>\
-<BILLALLOCATIONS.LIST><NAME TYPE=\"String\">278</NAME><BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11200.00</AMOUNT></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Customer A</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT>\
+<BILLALLOCATIONS.LIST><NAME TYPE=\"String\">278</NAME><BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
-<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">600.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
-<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">600.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">900.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">900.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
     );
     let v = observed_voucher();
     assert_eq!(differences(&v, &xml), Vec::<String>::new());
     // An allocation whose amount did not come back is a difference, not an absence.
     let no_amount = xml.replace(
-        "<BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11200.00</AMOUNT>",
+        "<BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT>",
         "<BILLTYPE TYPE=\"String\">New Ref</BILLTYPE>",
     );
     assert_eq!(differences(&v, &no_amount), vec!["bill_allocation"]);
@@ -1064,7 +1141,7 @@ fn rehearsal_invoice(
     );
     ImportVoucher {
         bridge_txn_id: "rehearsal".to_string(),
-        date: date.to_string(),
+        date: bridge_tally_core::TallyDate::parse(date.replace('-', "")).expect("a rehearsal date"),
         voucher_type: VoucherType::Sales,
         narration: None,
         reference: None,
@@ -1485,27 +1562,37 @@ fn each_rate_is_admitted_on_the_ledgers_own_rate_and_no_other() {
     };
     for (half, igst, leg, total) in [
         ("2.5", "5", "250.00", "10500.00"),
-        ("6", "12", "600.00", "11200.00"),
         ("9", "18", "900.00", "11800.00"),
-        ("14", "28", "1400.00", "12800.00"),
-        ("20", "40", "2000.00", "14000.00"),
     ] {
         assert!(at(half, igst, leg, total).is_ok(), "{half}");
     }
+    // The slabs the lab did not measure are refused, the invoice and the
+    // ledger agreeing.
+    for (half, igst, leg, total) in [
+        ("6", "12", "600.00", "11200.00"),
+        ("14", "28", "1400.00", "12800.00"),
+        ("20", "40", "2000.00", "14000.00"),
+    ] {
+        assert_eq!(
+            at(half, igst, leg, total),
+            Err("invoice_sales_ledger_rate_not_measured"),
+            "{half}"
+        );
+    }
     // The ledger's rate decides, not the tax typed: heads that fit another slab
-    // (250.00 is 5 percent) are refused where the ledger says 12 percent, and
+    // (250.00 is 5 percent) are refused where the ledger says 18 percent, and
     // the reverse.
     assert_eq!(
-        at("6", "12", "250.00", "10500.00"),
+        at("9", "18", "250.00", "10500.00"),
         Err("invoice_tax_head_not_expected")
     );
     assert_eq!(
-        at("2.5", "5", "600.00", "11200.00"),
+        at("2.5", "5", "900.00", "11800.00"),
         Err("invoice_tax_head_not_expected")
     );
     // A paisa off the figure is refused at every rate.
     assert_eq!(
-        at("6", "12", "600.01", "11200.02"),
+        at("9", "18", "900.01", "11800.02"),
         Err("invoice_tax_head_not_expected")
     );
 }
@@ -1577,7 +1664,6 @@ fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
     for tax in ["Output CGST", "Output SGST"] {
         facts.get_mut(tax).unwrap().rates = Some(tax_rates("2.5"));
     }
-    facts.get_mut("Round Off").unwrap().rates = None;
     let cents = |text: &str| -> i128 {
         let negative = text.starts_with('-');
         let (whole, fraction) = text.trim_start_matches('-').split_once('.').unwrap();
@@ -1792,7 +1878,7 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
             ("Sales C", &["Sales Accounts"], DutyHead::NotTax),
         ]));
         for name in ["Sales B", "Sales C"] {
-            facts.get_mut(name).unwrap().rates = Some(sales_rates("6", "12"));
+            facts.get_mut(name).unwrap().rates = Some(sales_rates("9", "18"));
         }
         facts
     };
@@ -1804,9 +1890,9 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
             v.entries.push(entry(name, amount, EntrySide::Cr));
         }
         v.entries
-            .push(entry("Output CGST", "600.00", EntrySide::Cr));
+            .push(entry("Output CGST", "900.00", EntrySide::Cr));
         v.entries
-            .push(entry("Output SGST", "600.00", EntrySide::Cr));
+            .push(entry("Output SGST", "900.00", EntrySide::Cr));
         v
     };
     let two = split(&["6000.00", "4000.00"]);
@@ -1827,13 +1913,12 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
         codes(classify_sales_invoice(&short, &facts(), RAJ, AS_OF)),
         vec!["invoice_tax_head_not_expected"; 2]
     );
-    // 6 percent of 3,999.50 is 239.97 and of 6,000.00 is 360.00: 599.97 a head.
-    short.entries[2].amount = "3999.50".into();
-    short.entries[3].amount = "599.97".into();
-    short.entries[4].amount = "599.97".into();
-    short.entries[0].amount = "11199.44".into();
+    // 9 percent of 3,999.00 is 359.91 and of 6,000.00 is 540.00: 899.91 a head.
+    short.entries[3].amount = "899.91".into();
+    short.entries[4].amount = "899.91".into();
+    short.entries[0].amount = "11798.82".into();
     assert!(classify_sales_invoice(&short, &facts(), RAJ, AS_OF).is_ok());
-    short.entries[0].amount = "11200.00".into();
+    short.entries[0].amount = "11800.00".into();
     assert_eq!(
         codes(classify_sales_invoice(&short, &facts(), RAJ, AS_OF)),
         vec!["invoice_party_amount_does_not_close"]
@@ -2058,6 +2143,28 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
     assert_eq!(sales_rate_milli(&padded, AS_OF), Ok(2_500));
 }
 
+/// Only the rates the lab measured on this path are admitted: 5 percent (2.5
+/// a head) and 18 percent (9 a head, on one exact bill, voucher 0009 of
+/// §9.17). Every other GST slab is refused under its own code, apart from a
+/// rate that is no slab, until a lab measurement opens it.
+#[test]
+fn only_the_measured_rates_are_admitted_and_each_other_slab_is_refused_as_unmeasured() {
+    let rate = |half: &str, igst: &str| sales_rate_milli(&sales_rates(half, igst), AS_OF);
+    assert_eq!(rate("2.5", "5"), Ok(2_500));
+    assert_eq!(rate("9", "18"), Ok(9_000));
+    for (half, igst) in [("6", "12"), ("14", "28"), ("20", "40")] {
+        assert_eq!(
+            rate(half, igst),
+            Err("invoice_sales_ledger_rate_not_measured"),
+            "{igst}"
+        );
+    }
+    assert_eq!(
+        rate("1.5", "3"),
+        Err("invoice_sales_ledger_rate_not_a_slab")
+    );
+}
+
 #[test]
 fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
     let check = |change: &dyn Fn(&mut wire::LedgerRateRow)| {
@@ -2110,6 +2217,15 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
         refused(&|f| f.get_mut("Sales").unwrap().rates = None),
         vec![refuse_ledger("invoice_sales_ledger_rate_unknown", "Sales")]
     );
+    // A listing that holds rows, but none of the sales ledger: the lab's own,
+    // read for this invoice's ledgers, which it does not carry.
+    assert_eq!(
+        refused(&|f| {
+            let listed = lab_rates(&["Sales"]);
+            f.get_mut("Sales").unwrap().rates = listed.get("Sales").cloned();
+        }),
+        vec![refuse_ledger("invoice_sales_ledger_rate_unknown", "Sales")]
+    );
     // A tax ledger that rounds, or whose own rate is not the sales ledger's.
     assert_eq!(
         refused(&|f| f
@@ -2144,9 +2260,9 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
     two.entries.push(entry("Sales", "6000.00", EntrySide::Cr));
     two.entries.push(entry("Sales B", "4000.00", EntrySide::Cr));
     two.entries
-        .push(entry("Output CGST", "600.00", EntrySide::Cr));
+        .push(entry("Output CGST", "900.00", EntrySide::Cr));
     two.entries
-        .push(entry("Output SGST", "600.00", EntrySide::Cr));
+        .push(entry("Output SGST", "900.00", EntrySide::Cr));
     let mut facts = good_facts();
     facts.extend(facts_for(&[(
         "Sales B",

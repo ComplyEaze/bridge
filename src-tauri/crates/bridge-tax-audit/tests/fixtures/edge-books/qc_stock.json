@@ -1,0 +1,194 @@
+{
+ "comment": "A Stock-in-Hand ledger that two vouchers post to, so the stock count is 2; the closing-stock finding names the stock figure exactly as when the count is 0 (REND-0 once). s02, dated the period's last day, credits a ledger under Direct Expenses and is the one match; s01, in September, is not.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_stock-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-qc_stock-001"
+  },
+  {
+   "name": "Closing Stock",
+   "chain": [
+    "Stock-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_stock-002"
+  },
+  {
+   "name": "Expenses Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-qc_stock-003"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_stock-004"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-qc_stock-005"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-qc_stock-006"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-qc_stock-007"
+  },
+  {
+   "name": "Stock Adjustment",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_stock-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Closing Stock",
+   "opening": 0,
+   "debit": 140000,
+   "credit": 0,
+   "closing": 140000
+  },
+  {
+   "ledger": "Expenses Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 0,
+   "credit": 80000,
+   "closing": -80000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Stock Adjustment",
+   "opening": 0,
+   "debit": 0,
+   "credit": 60000,
+   "closing": -60000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "qc-stock-s01",
+   "date": "2025-09-30",
+   "base_type": "Journal",
+   "number": "JV-1",
+   "lines": [
+    [
+     "Closing Stock",
+     80000
+    ],
+    [
+     "Purchases",
+     -80000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-stock-s02",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-2",
+   "lines": [
+    [
+     "Closing Stock",
+     60000
+    ],
+    [
+     "Stock Adjustment",
+     -60000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "stock",
+  "questionnaire_cl13"
+ ],
+ "stock_opening": {
+  "as_of": "2025-03-31",
+  "rows": {}
+ },
+ "stock_closing": {
+  "as_of": "2026-03-31",
+  "rows": {}
+ }
+}

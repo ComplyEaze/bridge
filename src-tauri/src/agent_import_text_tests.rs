@@ -36,10 +36,7 @@ fn scalar_schema_limits_match_existing_boundary_admission() {
     for character in whitespace {
         let mut input = captured_catalogue_payload();
         input.vouchers[0].entries[0].ledger = character.to_string();
-        assert_eq!(
-            validate_payload(&input),
-            Err("voucher_entry_invalid".into())
-        );
+        assert_eq!(payload_verdict(&input), Err("voucher_entry_invalid".into()));
     }
 }
 
@@ -83,7 +80,7 @@ fn optional_text_constraints_publish_unicode_lengths_and_reject_controls() {
                 "reference" => input.vouchers[0].reference = text,
                 _ => unreachable!(),
             }
-            assert_eq!(validate_payload(&input), expected, "{field}");
+            assert_eq!(payload_verdict(&input), expected, "{field}");
         }
         for codepoint in (0..=0x1f).chain(0x7f..=0x9f) {
             let text = Some(format!("before{}after", char::from_u32(codepoint).unwrap()));
@@ -92,7 +89,7 @@ fn optional_text_constraints_publish_unicode_lengths_and_reject_controls() {
                 "reference" => input.vouchers[0].reference = text,
                 _ => unreachable!(),
             }
-            assert_eq!(validate_payload(&input), Err("voucher_text_invalid".into()));
+            assert_eq!(payload_verdict(&input), Err("voucher_text_invalid".into()));
         }
     }
     assert_eq!(
@@ -103,10 +100,10 @@ fn optional_text_constraints_publish_unicode_lengths_and_reject_controls() {
 
 #[test]
 fn maximum_unicode_text_is_preserved_by_import_rendering() {
-    let mut input = captured_catalogue_payload();
+    let mut input = admitted_captured_payload();
     input.vouchers[0].narration = Some("क".repeat(2000));
     input.vouchers[0].reference = Some("🧾".repeat(2000));
-    validate_payload(&input).unwrap();
+    payload_verdict(&input).unwrap();
     let xml = render_import_xml("WR2 Unicode Lab", &input.vouchers, "text-boundary");
     let mut reader = quick_xml::Reader::from_str(&xml);
     let mut narration = None;
@@ -114,17 +111,12 @@ fn maximum_unicode_text_is_preserved_by_import_rendering() {
     loop {
         match reader.read_event().unwrap() {
             quick_xml::events::Event::Start(tag)
-                if matches!(tag.name().as_ref(), b"NARRATION" | b"REFERENCE") =>
+                if matches!(tag.name().as_ref(), "NARRATION" | "REFERENCE") =>
             {
-                let value = reader
-                    .read_text(tag.name())
-                    .unwrap()
-                    .decode()
-                    .unwrap()
-                    .into_owned();
-                if tag.name().as_ref() == b"NARRATION" && narration.is_none() {
+                let value = reader.read_text(tag.name()).unwrap().to_string();
+                if tag.name().as_ref() == "NARRATION" && narration.is_none() {
                     narration = Some(value);
-                } else if tag.name().as_ref() == b"REFERENCE" && reference.is_none() {
+                } else if tag.name().as_ref() == "REFERENCE" && reference.is_none() {
                     reference = Some(value);
                 }
             }

@@ -8,7 +8,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::book::{Book, TbRow, VoucherStatus};
+use crate::book::{Book, OpeningStock, TbRow, VoucherStatus};
 use crate::error::Result;
 use crate::findings::TestResult;
 use crate::read::iso;
@@ -91,7 +91,8 @@ pub fn book_invariants(book: &Book) -> Result<(Vec<&'static str>, Vec<Violation>
         }
     }
 
-    // POP-3: TB opening and closing each sum to zero.
+    // POP-3: TB opening and closing each sum to zero once opening stock, which no ledger holds,
+    // is added (#1486); what remains is a difference in opening balances, reported, not hidden.
     for (key, sum) in [
         (
             "opening_paise",
@@ -102,12 +103,8 @@ pub fn book_invariants(book: &Book) -> Result<(Vec<&'static str>, Vec<Violation>
             book.tb.values().map(|t| t.closing_paise).sum::<i64>(),
         ),
     ] {
-        if sum.abs() > TIE_TOLERANCE_PAISE {
-            out.push(violation(
-                "POP-3",
-                key,
-                format!("TB {key} sums to {sum} paise"),
-            ));
+        if let Some(detail) = pop3_detail(key, sum, book.opening_stock) {
+            out.push(violation("POP-3", key, detail));
         }
     }
 
@@ -179,6 +176,31 @@ pub fn book_invariants(book: &Book) -> Result<(Vec<&'static str>, Vec<Violation>
         ],
         out,
     ))
+}
+
+/// POP-3's detail for one sum, or `None` when it ties. With no opening stock to add the text is
+/// the reference's original one, so a book without inventory reads exactly as before.
+fn pop3_detail(key: &str, sum: i64, stock: OpeningStock) -> Option<String> {
+    match stock {
+        OpeningStock::Valued(stock) if stock != 0 => {
+            let difference = sum + stock;
+            (difference.abs() > TIE_TOLERANCE_PAISE).then(|| {
+                format!(
+                    "TB {key} sums to {sum} paise; with opening stock of {stock} paise the \
+                     difference in opening balances is {difference} paise"
+                )
+            })
+        }
+        OpeningStock::Unknown(why) => (sum.abs() > TIE_TOLERANCE_PAISE).then(|| {
+            format!(
+                "TB {key} sums to {sum} paise; opening stock {}",
+                why.as_str()
+            )
+        }),
+        OpeningStock::NotApplicable | OpeningStock::Valued(_) => {
+            (sum.abs() > TIE_TOLERANCE_PAISE).then(|| format!("TB {key} sums to {sum} paise"))
+        }
+    }
 }
 
 /// The three result-level invariants, evaluated with this one result (REND-0, EVID-1, POP-4).
@@ -508,5 +530,124 @@ mod tests {
         );
         // An unresolvable ref is EVID-1's to report, not POP-4's.
         assert!(violations("excluded_voucher", "nowhere", "POP-4").is_empty());
+    }
+
+    /// POP-3's violations on a book whose ledger openings sum to `sum` (closing the same: no
+    /// movement), with `stock` as its opening stock.
+    fn pop3(sum: i64, stock: OpeningStock) -> Vec<(String, String)> {
+        let mut b = book();
+        let row = |opening_paise: i64| TbRow {
+            opening_paise,
+            debit_paise: 0,
+            credit_paise: 0,
+            closing_paise: opening_paise,
+        };
+        b.tb.insert("Shop debit".to_string(), row(20_000));
+        b.tb.insert("Capital".to_string(), row(sum - 20_000));
+        b.opening_stock = stock;
+        let (_, found) = book_invariants(&b).unwrap();
+        let mut pop3: Vec<(String, String)> = found
+            .into_iter()
+            .filter(|v| v.invariant == "POP-3")
+            .map(|v| (v.subject, v.detail))
+            .collect();
+        pop3.sort();
+        pop3
+    }
+
+    /// #1486: opening stock, which no ledger holds, is added before the sums are tested, and what
+    /// remains is named as the difference in opening balances.
+    #[test]
+    fn pop3_adds_opening_stock_and_reports_only_the_difference() {
+        assert!(pop3(-80_000, OpeningStock::Valued(80_000)).is_empty());
+        let both = |detail: &str| {
+            vec![
+                (
+                    "closing_paise".to_string(),
+                    detail.replace("{k}", "closing_paise"),
+                ),
+                (
+                    "opening_paise".to_string(),
+                    detail.replace("{k}", "opening_paise"),
+                ),
+            ]
+        };
+        assert_eq!(
+            pop3(-100_000, OpeningStock::Valued(80_000)),
+            both(
+                "TB {k} sums to -100000 paise; with opening stock of 80000 paise the \
+                 difference in opening balances is -20000 paise"
+            )
+        );
+    }
+
+    /// Without a stock term the text is the reference's original one, so no book without
+    /// inventory moves; an unknown term is named.
+    #[test]
+    fn pop3_without_a_stock_term_reads_as_before_and_names_an_unknown_one() {
+        let plain = vec![
+            (
+                "closing_paise".to_string(),
+                "TB closing_paise sums to -100000 paise".to_string(),
+            ),
+            (
+                "opening_paise".to_string(),
+                "TB opening_paise sums to -100000 paise".to_string(),
+            ),
+        ];
+        assert_eq!(pop3(-100_000, OpeningStock::NotApplicable), plain);
+        assert_eq!(pop3(-100_000, OpeningStock::Valued(0)), plain);
+        assert_eq!(
+            pop3(
+                -100_000,
+                OpeningStock::Unknown(crate::book::OpeningStockUnknown::NotRead)
+            ),
+            vec![
+                (
+                    "closing_paise".to_string(),
+                    "TB closing_paise sums to -100000 paise; opening stock not read".to_string(),
+                ),
+                (
+                    "opening_paise".to_string(),
+                    "TB opening_paise sums to -100000 paise; opening stock not read".to_string(),
+                ),
+            ]
+        );
+        assert!(pop3(
+            0,
+            OpeningStock::Unknown(crate::book::OpeningStockUnknown::NotRead)
+        )
+        .is_empty());
+    }
+
+    /// The one-rupee tolerance holds on every arm: 100 paise ties and 101 does not, a positive
+    /// remainder is reported with its sign, and ledgers that sum to zero with opening stock
+    /// beside them report the whole stock as the difference.
+    #[test]
+    fn pop3_tolerance_sign_and_a_zero_ledger_sum() {
+        let unknown = OpeningStock::Unknown(crate::book::OpeningStockUnknown::Unreadable);
+        assert!(pop3(-80_100, OpeningStock::Valued(80_000)).is_empty());
+        assert!(pop3(100, unknown).is_empty());
+        assert!(pop3(100, OpeningStock::NotApplicable).is_empty());
+        let one = |sum: i64, stock: OpeningStock| pop3(sum, stock).len();
+        assert_eq!(one(-80_101, OpeningStock::Valued(80_000)), 2);
+        assert_eq!(one(101, unknown), 2);
+        assert_eq!(one(101, OpeningStock::NotApplicable), 2);
+        assert_eq!(
+            pop3(0, OpeningStock::Valued(50_000))[1],
+            (
+                "opening_paise".to_string(),
+                "TB opening_paise sums to 0 paise; with opening stock of 50000 paise the \
+                 difference in opening balances is 50000 paise"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            pop3(30_000, unknown)[1],
+            (
+                "opening_paise".to_string(),
+                "TB opening_paise sums to 30000 paise; opening stock unreadable".to_string()
+            )
+        );
     }
 }

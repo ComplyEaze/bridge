@@ -69,6 +69,14 @@ pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
 #[path = "runtime_masters_tests.rs"]
 mod masters_tests;
 
+#[path = "runtime_company_features.rs"]
+mod company_features;
+pub(crate) use company_features::CompanyFeaturesReadError;
+
+#[cfg(test)]
+#[path = "runtime_company_features_tests.rs"]
+mod company_features_tests;
+
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
 pub(crate) use stock_summary::StockSummaryReadError;
@@ -508,7 +516,7 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
     loop {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if name == b"SVCURRENTCOMPANY" {
                     let anchored = path.len() == STATIC_VARIABLES.len()
                         && path
@@ -521,10 +529,7 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
                     let Ok(text) = reader.read_text(element.name()) else {
                         return false;
                     };
-                    let Ok(raw) = text.decode() else {
-                        return false;
-                    };
-                    let Ok(text) = quick_xml::escape::unescape(&raw) else {
+                    let Ok(text) = quick_xml::escape::unescape(&text) else {
                         return false;
                     };
                     named.push(text.into_owned());
@@ -536,7 +541,7 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"SVCURRENTCOMPANY") =>
+                    .eq_ignore_ascii_case("SVCURRENTCOMPANY") =>
             {
                 return false;
             }

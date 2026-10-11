@@ -452,8 +452,10 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
 
 /// The package of the host-date workbook, taken from master before #903
 /// changed anything: with no date typed, the bytes must not change.
-const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str = "pin from master";
-const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str = "pin from master";
+const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
+    "96744b5497a819ba52934b2bb25da6c55760b41bf7cf96ea08bd47c5784b1633";
+const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
+    "6eccc449e188b6176e7f96c373a08de3a21b16d002b828f21e6f2cbeba65727b";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {

@@ -477,7 +477,8 @@ async fn a_chosen_date_that_is_not_a_boundary_moves_to_the_next_one_and_says_so(
 
 /// The balance request of the host-date path, taken from master before #903
 /// changed anything: with no date typed, the request must not change.
-const HOST_DATE_BALANCE_REQUEST_SHA256: &str = "pin from master";
+const HOST_DATE_BALANCE_REQUEST_SHA256: &str =
+    "8dbb484997cb491660348481f5aa1376291855fa94d8303c2151b1c895d5fbcd";
 
 #[tokio::test]
 async fn party_source_host_date_balance_request_is_byte_for_byte_unchanged() {

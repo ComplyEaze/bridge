@@ -329,27 +329,6 @@
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_trial_balance/wire.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/completeness.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/compute.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/mod.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/model.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/parser.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/request.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/wire.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs"
     },
     {
@@ -834,9 +813,6 @@
     },
     {
       "path": "src-tauri/src/tally/mod.rs"
-    },
-    {
-      "path": "src-tauri/src/tally/outstandings_runtime.rs"
     },
     {
       "path": "src-tauri/src/tally/runtime.rs"

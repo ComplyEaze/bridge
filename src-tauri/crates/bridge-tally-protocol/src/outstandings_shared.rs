@@ -1,31 +1,15 @@
 //! The outstandings report contract, plus the company-identity/book-extent
-//! read both outstandings read strategies pin against, before they diverge.
+//! read the outstandings read pins against.
 //!
-//! Two independent strategies produce an [`OutstandingsReport`]:
-//!
-//! - `native_outstandings` -- always compiled -- reads Tally's own `Bills
-//!   Receivable`/`Bills Payable` and `List of Ledgers` reports directly.
-//! - `outstandings` -- compiled only under the `voucher-scan` feature --
-//!   scans every voucher in a date/AlterID-partitioned wildcard fetch and
-//!   derives outstandings from bill allocations.
+//! `native_outstandings` reads Tally's own `Bills Receivable`/`Bills Payable`
+//! and `List of Ledgers` reports directly and produces an
+//! [`OutstandingsReport`]. It begins by pinning a verified company identity
+//! and book extent (`PinnedCompany`, `CompanyBookExtent`, via
+//! `parse_company_book_extent`) and ends by producing that report shape
+//! (`OutstandingsReport` and its constituents).
 //!
 //! The bill credit-period type and its parser ([`CreditPeriod`],
-//! [`parse_credit_period`]) also live here, shared by the voucher-scan parser and
-//! the agent `vouchers` read.
-//!
-//! Both begin by pinning the same verified company identity and book extent
-//! (`PinnedCompany`, `CompanyBookExtent`, via `parse_company_book_extent`),
-//! and both end by producing the same report shape (`OutstandingsReport` and
-//! its constituents). None of that is scan machinery -- no date
-//! partitioning, no AlterID segmentation, no wildcard voucher fetch -- so it
-//! lives here, ungated, rather than inside `outstandings`. Gating
-//! `outstandings` wholesale would have taken this out with it and broken the
-//! native path, which is the live product path today.
-//!
-//! Everything scan-specific (`DateWindow`, `AlterIdRange`, `Voucher`,
-//! `LedgerEntry`, `BillAllocation`, segment/witness completeness proofs, the
-//! wildcard voucher request) stays in `outstandings`, gated behind
-//! `voucher-scan`.
+//! [`parse_credit_period`]) also live here, used by the agent `vouchers` read.
 
 use std::{fmt, sync::Arc};
 
@@ -48,12 +32,12 @@ use crate::xml_text::escape_text as xml_escape;
 /// populated allocation. Guessing its type would invent an allocation the book
 /// does not contain, so that case fails closed.
 ///
-/// This rule lives here, rather than at either boundary, because restating it
-/// is how it was got wrong. The voucher-scan boundary admitted placeholders
-/// while the agent read path required `BILLTYPE` unconditionally -- and because
-/// an amount-only row is not empty, one such row aborted an entire `vouchers`
-/// read with `bill_allocation_field_missing` instead of being skipped. Both
-/// boundaries now call this.
+/// This rule lives here, rather than at the boundary, because restating it
+/// is how it was got wrong. A removed voucher-scan boundary admitted
+/// placeholders while the agent read path required `BILLTYPE` unconditionally
+/// -- and because an amount-only row is not empty, one such row aborted an
+/// entire `vouchers` read with `bill_allocation_field_missing` instead of
+/// being skipped.
 pub fn bill_allocation_without_type_is_placeholder(name: Option<&str>) -> bool {
     name.is_none_or(|value| value.trim().is_empty())
 }
@@ -61,9 +45,8 @@ pub fn bill_allocation_without_type_is_placeholder(name: Option<&str>) -> bool {
 /// Tally's credit period on a bill: a magnitude and a unit, kept typed so a
 /// due date is a calendar operation (months are not a guessed number of days).
 /// [`parse_credit_period`] returns an error for an unknown wire unit, never a
-/// default; each boundary decides what that error costs (the voucher scan
-/// refuses the read, the agent `vouchers` read carries the text as
-/// `unrecognised`).
+/// default; the caller decides what that error costs (the agent `vouchers`
+/// read carries the text as `unrecognised`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CreditPeriod {
     Days(u32),
@@ -74,8 +57,7 @@ pub enum CreditPeriod {
 // Licensed TallyPrime 7.1 read-back on 2026-08-23 retained up to 9999 days,
 // but silently discarded 10000 days to an empty credit period. This is a
 // measured wire-format ceiling, not a business-term policy. Weeks and months
-// have no equivalent measured ceiling, so their checked resulting date is the
-// bound instead.
+// have no equivalent measured ceiling.
 const MAX_TALLY_CREDIT_PERIOD_DAYS: u32 = 9999;
 
 /// The error code for a credit period that is not `<n> Days|Weeks|Months`
@@ -83,10 +65,8 @@ const MAX_TALLY_CREDIT_PERIOD_DAYS: u32 = 9999;
 pub const BILL_CREDIT_PERIOD_INVALID: &str = "bill_credit_period_invalid";
 
 /// Parses Tally's `BILLCREDITPERIOD` text (`30 Days`, `2 Weeks`, `1 Months`).
-/// Blank text is `Days(0)`, the legacy scan's reading of "none set"; a caller
-/// that must tell "none set" from "zero" checks for blank before calling.
-/// This lives here so the voucher-scan boundary and the agent `vouchers`
-/// boundary cannot drift apart on what a credit period is.
+/// Blank text is `Days(0)`, the reading of "none set"; a caller that must
+/// tell "none set" from "zero" checks for blank before calling.
 pub fn parse_credit_period(value: &str) -> Result<CreditPeriod, &'static str> {
     let value = value.trim();
     if value.is_empty() {
@@ -148,13 +128,9 @@ pub fn parse_credit_period(value: &str) -> Result<CreditPeriod, &'static str> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OutstandingsError {
-    InvalidDateWindow,
-    InvalidAlterIdRange,
     InvalidCompanyIdentity,
     CompanyIdentityMismatch,
     InvalidResponse(&'static str),
-    InvalidAmount,
-    ArithmeticOverflow,
     /// A production bracket formed a [`CompanyBookExtent`] whose `ALTMSTID`
     /// (master-alteration high-water) witness is absent. The parser stays
     /// tolerant of this -- see [`parse_company_book_extent`] -- but a
@@ -167,13 +143,9 @@ pub enum OutstandingsError {
 impl fmt::Display for OutstandingsError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            Self::InvalidDateWindow => "outstandings date window is invalid",
-            Self::InvalidAlterIdRange => "outstandings AlterID range is invalid",
             Self::InvalidCompanyIdentity => "outstandings company identity is invalid",
             Self::CompanyIdentityMismatch => "Tally returned a different company identity",
             Self::InvalidResponse(code) => code,
-            Self::InvalidAmount => "Tally returned an invalid amount",
-            Self::ArithmeticOverflow => "outstandings arithmetic exceeded the exact-decimal bound",
             Self::MasterWitnessAbsent => {
                 "Tally omitted ALTMSTID, the master-alteration witness a paired-extent bracket needs to detect a master edit between its two reads"
             }
@@ -187,9 +159,8 @@ impl std::error::Error for OutstandingsError {}
 /// measured only in Educational mode; a licensed or unknown mode must retain
 /// ordinary calendar boundaries until endpoint-bound evidence says otherwise.
 ///
-/// This lives in the ungated shared module because master reads also send
-/// `SVFROMDATE`/`SVTODATE`; a master opening balance is no safer than a
-/// voucher window when Tally silently refuses a boundary.
+/// Master reads also send `SVFROMDATE`/`SVTODATE`; a master opening balance
+/// is no safer than a voucher window when Tally silently refuses a boundary.
 ///
 /// `EducationRestricted` is also how a caller knows that Education was
 /// observed at all, and it gates a second, independent Education hazard: a
@@ -208,23 +179,6 @@ impl DateBoundaryProfile {
         match self {
             Self::EducationRestricted => matches!(&date.as_str()[6..8], "01" | "02" | "31"),
             Self::ModeAgnostic => true,
-        }
-    }
-
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) fn accepts_partition_end(self, date: &TallyDate) -> bool {
-        match self {
-            Self::EducationRestricted => matches!(&date.as_str()[6..8], "01" | "31"),
-            Self::ModeAgnostic => true,
-        }
-    }
-
-    /// The greatest date at or before `limit` that this profile accepts as a
-    /// window boundary.
-    pub fn latest_boundary_at_or_before(self, limit: &TallyDate) -> Option<TallyDate> {
-        match self {
-            Self::ModeAgnostic => Some(limit.clone()),
-            Self::EducationRestricted => self.accepts_boundary(limit).then(|| limit.clone()),
         }
     }
 
@@ -505,11 +459,6 @@ pub struct OutstandingsReport {
 }
 
 // --- Wire scaffold + parsing for the paired `CompanyBookExtentV1` read. ---
-//
-// `outstandings::wire` re-exports the generic `Envelope`/`Header`/`Body`/
-// `Data`/`Value` scaffold from here rather than duplicating it, so its own
-// scan-only collections (vouchers, ledger openings) keep using the same
-// names they always had.
 
 #[derive(Deserialize)]
 pub(crate) struct Envelope<T> {

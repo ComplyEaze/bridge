@@ -437,8 +437,8 @@ export function OutstandingsScreen({
   // applied per party inside groupOpenBillsByParty, never to the flattened
   // cross-party list, so one party's bill count can never push another
   // party's real bills out of the map entirely. null when statement rows are
-  // absent altogether (voucher-scan path) -- distinct from a present map that
-  // simply has no entry for a given party (that party has zero bill rows).
+  // absent altogether -- distinct from a present map that simply has no entry
+  // for a given party (that party has zero bill rows).
   const openBillsByParty = React.useMemo(
     () => groupOpenBillsByParty(inrCompleteResult?.statement_open_bills, DISPLAY_OPEN_BILL_ROW_LIMIT),
     [inrCompleteResult],

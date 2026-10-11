@@ -47,10 +47,11 @@ pub enum PartyStatementDestinationApprovalError {
 /// Its field is private: only `PartyStatementDestinationApprovals::consume`
 /// can turn a renderer-provided token and destination into a value accepted by
 /// the bulk writer.
-#[cfg_attr(
-    not(feature = "live-calibration-harness"),
-    doc = "```compile_fail\nuse bridge_lib::reports::bulk_party_statement::ApprovedPartyStatementDestination;\nlet _ = ApprovedPartyStatementDestination(std::path::PathBuf::from(\"/tmp\"));\n```"
-)]
+///
+/// ```compile_fail
+/// use bridge_lib::reports::bulk_party_statement::ApprovedPartyStatementDestination;
+/// let _ = ApprovedPartyStatementDestination(std::path::PathBuf::from("/tmp"));
+/// ```
 #[derive(Debug)]
 pub struct ApprovedPartyStatementDestination(PathBuf);
 

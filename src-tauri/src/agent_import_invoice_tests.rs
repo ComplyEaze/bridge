@@ -485,8 +485,12 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
 /// The lab's rate listing (10 Oct 2026, the `pilot-lab` fixtures), read as the
 /// build reads it, for the ledgers named.
 fn lab_rates(named: &[&str]) -> BTreeMap<String, wire::LedgerRateRow> {
-    wire::parse_ledger_rates(&lab_rates_answer(), "6b43e498-430c-4d5c-bfef-d32e2ab93c85", named)
-        .unwrap()
+    wire::parse_ledger_rates(
+        &lab_rates_answer(),
+        "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+        named,
+    )
+    .unwrap()
 }
 
 /// The lab's rate listing as text.
@@ -625,9 +629,15 @@ fn a_round_off_ledger_is_admitted_only_with_the_rate_and_rounding_fields_the_lab
     );
     assert_eq!(round_off_with(measured.clone()), Ok(Some(4)));
     let changes: [(&str, fn(&mut wire::LedgerRateRow)); 9] = [
-        ("rate 2.50", |r| r.rate_of_tax_calculation = Some("2.50".into())),
-        ("rate 0.00", |r| r.rate_of_tax_calculation = Some("0.00".into())),
-        ("rate empty", |r| r.rate_of_tax_calculation = Some(String::new())),
+        ("rate 2.50", |r| {
+            r.rate_of_tax_calculation = Some("2.50".into())
+        }),
+        ("rate 0.00", |r| {
+            r.rate_of_tax_calculation = Some("0.00".into())
+        }),
+        ("rate empty", |r| {
+            r.rate_of_tax_calculation = Some(String::new())
+        }),
         ("rate absent", |r| r.rate_of_tax_calculation = None),
         ("limit 1", |r| r.rounding_limit = Some("1".into())),
         ("limit empty", |r| r.rounding_limit = Some(String::new())),

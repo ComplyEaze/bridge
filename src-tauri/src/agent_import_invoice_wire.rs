@@ -921,9 +921,10 @@ const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALU
 
 /// The rate listing by ledger name, for the ledgers an invoice names. Every
 /// row of the answer must carry the verified company's GUID (the
-/// `BRIDGECOMPANYGUID` compute); the rows of the named ledgers are read in
-/// full, and a name two of them claim refuses the answer. A row of any other
-/// ledger is not read, so one unrelated ledger cannot fail an invoice.
+/// `BRIDGECOMPANYGUID` compute) and a name; the rows of the named ledgers are
+/// read in full, and a name two of them claim refuses the answer. The rest of
+/// any other ledger's row is not read, so one unrelated ledger's fields
+/// cannot fail an invoice.
 pub(super) fn parse_ledger_rates(
     xml: &str,
     company_guid: &str,
@@ -952,8 +953,10 @@ pub(super) fn parse_ledger_rates(
         {
             return Err("invoice_ledger_rates_company_mismatch");
         }
+        // Every row of the lab's listing was named; one that is not cannot be
+        // told apart from a ledger the invoice names, so the read failed.
         let Some(name) = ledger.attributes.get("NAME").cloned() else {
-            continue;
+            return Err("invoice_ledger_rates_row_unnamed");
         };
         if !wanted.contains(&name.as_str()) {
             continue;

@@ -54,7 +54,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { BASENAME_ROWS_EXEMPT, FIXTURE_ROOTS } from "./fixture-roots.mjs";
 
 // --root lets the contract tests point this at a synthetic tree instead of
@@ -68,6 +68,9 @@ if (rootArgument !== -1 && !process.argv[rootArgument + 1]) {
   throw new Error("--root requires a repository path");
 }
 const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[rootArgument + 1]);
+// Repository paths are compared and printed in `/` form on every OS; on Windows
+// `relative` returns `\` (#1471).
+const repoPath = (path) => relative(repositoryRoot, path).split(sep).join("/");
 
 // The roots both fixture gates cover live only in fixture-roots.mjs (#838), so
 // this gate can never drift to cover a directory the byte-integrity gate does
@@ -193,12 +196,12 @@ for (const fixtureDirectory of fixtureDirectories) {
       const [, name, bytesText, sha256] = match;
       const bytes = Number(bytesText.replaceAll(",", ""));
       if (name.includes("/") || !basenameRows) {
-        const target = relative(repositoryRoot, resolve(dirname(markdownPath), name));
+        const target = repoPath(resolve(dirname(markdownPath), name));
         if (!declaredByPath.has(target)) declaredByPath.set(target, []);
         declaredByPath.get(target).push({
           bytes,
           sha256: sha256.toLowerCase(),
-          sourceFile: relative(repositoryRoot, markdownPath),
+          sourceFile: repoPath(markdownPath),
         });
         continue;
       }
@@ -206,7 +209,7 @@ for (const fixtureDirectory of fixtureDirectories) {
       declaredHashes.get(name).push({
         bytes,
         sha256: sha256.toLowerCase(),
-        sourceFile: relative(repositoryRoot, markdownPath),
+        sourceFile: repoPath(markdownPath),
       });
     }
   }
@@ -242,27 +245,27 @@ for (const fixtureDirectory of fixtureDirectories) {
             ? record.sha256
             : null;
       if (!declaredSha) continue;
-      const name = path.split("/").pop();
+      const name = repoPath(path).split("/").pop();
       const declaration = {
         // Absent rather than inferred. Falling back to the file's own size
         // compares it against itself, which can never fail -- a declared
         // invariant degraded into a restatement of whatever is on disk.
         bytes: typeof record.fixture_bytes === "number" ? record.fixture_bytes : null,
         sha256: declaredSha.toLowerCase(),
-        sourceFile: relative(repositoryRoot, recordPath),
+        sourceFile: repoPath(recordPath),
       };
       // The fixtures a sidecar names share its stem in its own directory, so
       // its declaration is keyed by that exact path (#838).
       const [declared, key] = basenameRows
         ? [declaredHashes, name]
-        : [declaredByPath, relative(repositoryRoot, path)];
+        : [declaredByPath, repoPath(path)];
       if (!declared.has(key)) declared.set(key, []);
       declared.get(key).push(declaration);
     }
   }
 
   for (const fixturePath of fixtureFiles) {
-    const relativePath = relative(repositoryRoot, fixturePath);
+    const relativePath = repoPath(fixturePath);
     const basename = relativePath.split("/").pop();
     // A record documents a fixture only by declaring its hash (#838): a path
     // row, a sidecar, or, under the exempt root, a basename row.
@@ -313,9 +316,9 @@ for (const fixtureDirectory of fixtureDirectories) {
   // A path row that checked no fixture is itself a failure, named for why:
   // it left this fixture root, it names a provenance record rather than a
   // fixture, or nothing is at that path. Each would otherwise check nothing.
-  const fixtureSet = new Set(fixtureFiles.map((path) => relative(repositoryRoot, path)));
+  const fixtureSet = new Set(fixtureFiles.map((path) => repoPath(path)));
   const recordSet = new Set(
-    allPaths.map((path) => relative(repositoryRoot, path)).filter((path) => !fixtureSet.has(path)),
+    allPaths.map((path) => repoPath(path)).filter((path) => !fixtureSet.has(path)),
   );
   for (const [target, declarations] of declaredByPath) {
     if (fixtureSet.has(target)) continue;

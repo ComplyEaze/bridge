@@ -13,6 +13,88 @@ pub(super) const MAX_RECORD_BYTES: usize = 32 * 1024 * 1024;
 /// §11c.5, PARTIAL); through Bridge's own post path it is not yet measured.
 pub(super) const MAX_BATCH_POST_VOUCHERS: usize = 50;
 
+/// The name of one saved proof pair: when it was saved and the SHA-256 of
+/// its JSON, written `<UTC stamp>.<sha256>`, so a person listing the folder
+/// sees the pairs in the order they were saved. Constructed only from a
+/// proof's own bytes or parsed whole, so a journal record or a file name
+/// can never carry a path (#911). The digest is the JSON's, and only the
+/// JSON is read back and checked against it; nothing in ComplyEaze Bridge
+/// reads the `.md` back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
+pub(super) struct ProofName {
+    stamp: String,
+    sha256: String,
+}
+
+impl ProofName {
+    pub(super) fn of(json: &[u8], saved_at: chrono::DateTime<Utc>) -> Self {
+        Self {
+            stamp: saved_at.format("%Y%m%dT%H%M%S%3fZ").to_string(),
+            sha256: sha256_hex(json),
+        }
+    }
+
+    pub(super) fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    /// The proof's JSON file name for `batch_id`.
+    pub(super) fn json_file(&self, batch_id: &str) -> String {
+        format!("{batch_id}.proof.{}.{}.json", self.stamp, self.sha256)
+    }
+
+    /// The proof's Markdown file name for `batch_id`.
+    pub(super) fn markdown_file(&self, batch_id: &str) -> String {
+        format!("{batch_id}.proof.{}.{}.md", self.stamp, self.sha256)
+    }
+}
+
+impl TryFrom<String> for ProofName {
+    type Error = String;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        let invalid = || "import_ledger_invalid".to_string();
+        let (stamp, sha256) = text.split_once('.').ok_or_else(invalid)?;
+        let digits = |range: std::ops::Range<usize>| {
+            stamp
+                .get(range)
+                .is_some_and(|part| part.bytes().all(|byte| byte.is_ascii_digit()))
+        };
+        if stamp.len() != 19
+            || !digits(0..8)
+            || stamp.as_bytes()[8] != b'T'
+            || !digits(9..18)
+            || stamp.as_bytes()[18] != b'Z'
+            || sha256.len() != 64
+            || !sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(invalid());
+        }
+        Ok(Self {
+            stamp: stamp.into(),
+            sha256: sha256.into(),
+        })
+    }
+}
+
+impl From<ProofName> for String {
+    fn from(name: ProofName) -> Self {
+        format!("{}.{}", name.stamp, name.sha256)
+    }
+}
+
+/// Which saved proof is a batch's current one: the pair its latest
+/// verification record names, or, for a record an older build wrote (or no
+/// record at all), the single `<batch>.proof.json` those builds replaced.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum CurrentProof {
+    Legacy,
+    Saved(ProofName),
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum StatusKind {
@@ -81,6 +163,12 @@ pub(in crate::agent) struct StatusRecord {
     /// A post-span verdict's refusal code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     binding_refusal: Option<String>,
+    /// The proof pair a verification saved before this record, which names
+    /// it current (#911). Only on a verification status record. A binary
+    /// older than this field refuses a journal holding one
+    /// (`deny_unknown_fields`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    proof: Option<ProofName>,
     /// A stop release's record of whether the fresh read at the release found
     /// the batch's invoice in the book attributed to it. `Some` only on a
     /// stop release. A binary older than this field refuses a journal holding
@@ -124,6 +212,7 @@ impl StatusRecord {
             pre_post_voucher_mark: None,
             bindings: None,
             binding_refusal: None,
+            proof: None,
             release_invoice_found: None,
         }
     }
@@ -174,6 +263,7 @@ impl StatusRecord {
             pre_post_voucher_mark: None,
             bindings,
             binding_refusal,
+            proof: None,
             release_invoice_found: None,
         }
     }
@@ -202,8 +292,19 @@ impl StatusRecord {
             pre_post_voucher_mark: None,
             bindings: None,
             binding_refusal: None,
+            proof: None,
             release_invoice_found: Some(invoice_found),
         }
+    }
+
+    /// The proof this record names current: a verification record names its
+    /// own, or the legacy file when an older build wrote it; others none.
+    fn current_proof(&self) -> Option<CurrentProof> {
+        matches!(self.record_type, StatusKind::VerificationStatus).then(|| {
+            self.proof
+                .clone()
+                .map_or(CurrentProof::Legacy, CurrentProof::Saved)
+        })
     }
 
     fn span_verdict(&self) -> Option<PostSpanVerdict> {
@@ -227,13 +328,23 @@ impl StatusRecord {
             pre_post_voucher_mark: None,
             bindings: None,
             binding_refusal: None,
+            proof: None,
             release_invoice_found: None,
         }
     }
 }
 
-impl From<&ImportLedgerLine> for StatusRecord {
-    fn from(batch: &ImportLedgerLine) -> Self {
+impl StatusRecord {
+    /// A verification's status record, naming the proof pair it saved: the
+    /// only verification record this build writes (#911).
+    pub(super) fn verified(batch: &ImportLedgerLine, proof: ProofName) -> Self {
+        Self {
+            proof: Some(proof),
+            ..Self::verification(batch)
+        }
+    }
+
+    fn verification(batch: &ImportLedgerLine) -> Self {
         Self {
             record_type: StatusKind::VerificationStatus,
             batch_id: batch.batch_id.clone(),
@@ -246,8 +357,17 @@ impl From<&ImportLedgerLine> for StatusRecord {
             pre_post_voucher_mark: None,
             bindings: None,
             binding_refusal: None,
+            proof: None,
             release_invoice_found: None,
         }
+    }
+}
+
+/// A verification record that names no proof, as an older build wrote one.
+#[cfg(test)]
+impl From<&ImportLedgerLine> for StatusRecord {
+    fn from(batch: &ImportLedgerLine) -> Self {
+        Self::verification(batch)
     }
 }
 
@@ -264,6 +384,8 @@ pub(super) struct BatchSnapshot {
     pub(super) pre_post_voucher_mark: Option<u64>,
     /// What binding the native post to its own span decided, if journaled.
     pub(super) span_verdict: Option<PostSpanVerdict>,
+    /// The proof the latest verification record names current.
+    pub(super) current_proof: CurrentProof,
     // Last matching physical journal record, including identical status appends.
     pub(super) generation: VerificationGeneration,
 }
@@ -295,6 +417,9 @@ pub(super) fn read_snapshot(
                 span_verdict: selected
                     .as_ref()
                     .and_then(|snapshot| snapshot.span_verdict.clone()),
+                current_proof: selected.as_ref().map_or(CurrentProof::Legacy, |snapshot| {
+                    snapshot.current_proof.clone()
+                }),
                 dispatched: selected
                     .as_ref()
                     .is_some_and(|snapshot| snapshot.dispatched),
@@ -319,6 +444,9 @@ pub(super) fn read_snapshot(
             }
             if let Some(verdict) = update.span_verdict() {
                 snapshot.span_verdict = Some(verdict);
+            }
+            if let Some(proof) = update.current_proof() {
+                snapshot.current_proof = proof;
             }
             if update.sets_status() {
                 snapshot.batch.status = update.status;
@@ -348,6 +476,9 @@ pub(super) fn read_lineage(
                 native_remote_id: prior.and_then(|snapshot| snapshot.native_remote_id.clone()),
                 pre_post_voucher_mark: prior.and_then(|snapshot| snapshot.pre_post_voucher_mark),
                 span_verdict: prior.and_then(|snapshot| snapshot.span_verdict.clone()),
+                current_proof: prior.map_or(CurrentProof::Legacy, |snapshot| {
+                    snapshot.current_proof.clone()
+                }),
                 dispatched: prior.is_some_and(|snapshot| snapshot.dispatched),
                 batch: *batch,
                 generation,
@@ -375,6 +506,9 @@ pub(super) fn read_lineage(
                 }
                 if let Some(verdict) = update.span_verdict() {
                     snapshot.span_verdict = Some(verdict);
+                }
+                if let Some(proof) = update.current_proof() {
+                    snapshot.current_proof = proof;
                 }
                 if update.sets_status() {
                     snapshot.batch.status = update.status;
@@ -463,6 +597,10 @@ pub(super) struct Settlement {
     pub(super) unsettled: usize,
     /// Of `unsettled`, the batches with no recorded response.
     pub(super) unsettled_no_response: usize,
+    /// Of `unsettled`, the batches with a response whose binding to their own
+    /// vouchers was refused: matched by content only, they stay unsettled for
+    /// good (#1039).
+    pub(super) unsettled_binding_refused: usize,
     /// Batches with no recorded dispatch that were never found posted. That
     /// includes a batch imported by hand whose verification is incomplete, which
     /// may well be in Tally: this is what the journal holds, not what Tally
@@ -481,6 +619,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         verified: bool,
         /// A readback found the batch posted at some point.
         found: bool,
+        binding_refused: bool,
     }
     let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
     scan_records(reader, |record, _| match record {
@@ -494,9 +633,10 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             match update.record_type {
                 StatusKind::DispatchIntent => progress.dispatched = true,
                 StatusKind::DispatchResponse => progress.responded = true,
-                StatusKind::VerificationStatus
-                | StatusKind::PostSpanVerdict
-                | StatusKind::StopRelease => {}
+                StatusKind::PostSpanVerdict => {
+                    progress.binding_refused = update.binding_refusal.is_some();
+                }
+                StatusKind::VerificationStatus | StatusKind::StopRelease => {}
             }
             // The latest status of every kind is the batch's status, as
             // `read_snapshot` takes it: a dispatch intent or a response after a
@@ -523,6 +663,10 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             .clone()
             .filter(|progress| !progress.responded)
             .count(),
+        unsettled_binding_refused: unsettled
+            .clone()
+            .filter(|progress| progress.responded && progress.binding_refused)
+            .count(),
         unsettled: unsettled.count(),
     })
 }
@@ -531,7 +675,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
 /// vouchers compare equal whatever order their ledgers were listed in and
 /// whichever ledgers they name. `None` when an amount cannot be read, which a
 /// caller treats as a match.
-type RowShape = (String, Vec<(String, bool)>);
+type RowShape = (bridge_tally_core::TallyDate, Vec<(String, bool)>);
 
 fn row_shape(voucher: &ImportVoucher) -> Option<RowShape> {
     let mut entries = voucher
@@ -577,8 +721,9 @@ pub(super) fn rows_already_posted(
 enum InvoiceFigures {
     /// Not an invoice: the guard reads nothing of it.
     NotInvoice,
-    /// An invoice whose amount or date cannot be read. The guard never takes
-    /// this for "no figures": on a saved batch it counts as a match.
+    /// An invoice whose amount cannot be read (its date is a `TallyDate`, so
+    /// always readable). The guard never takes this for "no figures": on a
+    /// saved batch it counts as a match.
     Unreadable,
     Of((String, String, Vec<String>)),
 }
@@ -594,14 +739,11 @@ fn invoice_figures(voucher: &ImportVoucher) -> InvoiceFigures {
             Err(_) => return InvoiceFigures::Unreadable,
         }
     }
-    match normalized_date(&voucher.date) {
-        Ok(date) => InvoiceFigures::Of((
-            date.as_str().to_string(),
-            voucher.filed_type_name().to_string(),
-            super::verification::expected_entry_fingerprint(&canonical),
-        )),
-        Err(_) => InvoiceFigures::Unreadable,
-    }
+    InvoiceFigures::Of((
+        voucher.date.as_str().to_string(),
+        voucher.filed_type_name().to_string(),
+        super::verification::expected_entry_fingerprint(&canonical),
+    ))
 }
 
 /// The id of another batch of the same company that Bridge sent to Tally (a
@@ -728,7 +870,7 @@ pub(super) fn invoice_number_control(
                         .iter()
                         .filter(|voucher| voucher.voucher_type.is_invoice())
                         .filter_map(|voucher| {
-                            let date = normalized_date(&voucher.date).ok()?.as_str().to_string();
+                            let date = voucher.date.as_str().to_string();
                             Some((date, voucher.voucher_number.clone()?))
                         })
                         .collect()
@@ -1049,6 +1191,12 @@ fn scan_records(
             } else if update.release_invoice_found.is_some() {
                 return Err("import_ledger_invalid".into());
             }
+            // A saved proof belongs only to a verification status record.
+            if update.proof.is_some()
+                && !matches!(update.record_type, StatusKind::VerificationStatus)
+            {
+                return Err("import_ledger_invalid".into());
+            }
             if matches!(update.record_type, StatusKind::PostSpanVerdict) {
                 admit_post_span_verdict(
                     &update,
@@ -1246,12 +1394,16 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
             let native_remote_id = prior.and_then(|snapshot| snapshot.native_remote_id.clone());
             let pre_post_voucher_mark = prior.and_then(|snapshot| snapshot.pre_post_voucher_mark);
             let span_verdict = prior.and_then(|snapshot| snapshot.span_verdict.clone());
+            let current_proof = prior.map_or(CurrentProof::Legacy, |snapshot| {
+                snapshot.current_proof.clone()
+            });
             latest.insert(batch.batch_id.clone(), batches.len());
             batches.push(BatchSnapshot {
                 response,
                 native_remote_id,
                 pre_post_voucher_mark,
                 span_verdict,
+                current_proof,
                 dispatched,
                 batch: *batch,
                 generation,
@@ -1271,6 +1423,9 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
             }
             if let Some(verdict) = update.span_verdict() {
                 snapshot.span_verdict = Some(verdict);
+            }
+            if let Some(proof) = update.current_proof() {
+                snapshot.current_proof = proof;
             }
             if update.sets_status() {
                 snapshot.batch.status = update.status;

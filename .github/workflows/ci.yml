@@ -134,10 +134,10 @@ jobs:
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
-    # The Playwright system packages are about 125 MB from the runner's apt mirror and are not run under `timeout`
-    # (see the install step). Normally that takes about 30 s, but on 2 Oct 2026 one runner fetched at a steady
-    # 77 kB/s, which needs about 27 minutes, and the old 15-minute limit cancelled the job (and, in the merge queue,
-    # dropped the entry). 40 minutes covers that rate with margin; a hung apt is still bounded by it.
+    # The Playwright system packages are about 125 MB from the runner's apt mirror. Normally that takes about 30 s,
+    # but on 2 Oct 2026 one runner fetched at a steady 77 kB/s, which needs about 27 minutes, and the old 15-minute
+    # limit cancelled the job (and, in the merge queue, dropped the entry). The install step limits each apt attempt
+    # to 600 s and ends itself in most cases; this limit bounds the rest (see the install step for the worst case).
     timeout-minutes: 40
     permissions:
       contents: read
@@ -170,21 +170,26 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
         run: |
-          # The system packages are installed by apt, as root, and are NOT run under `timeout`: when `timeout` stops the
-          # command it kills the wrapper but not the root apt-get it started, which keeps the dpkg lock, so the next
-          # attempt fails at once with "Could not get lock /var/lib/dpkg/lock-frontend". That is what failed this
-          # required job on all three attempts on 2 Oct 2026 (a slow mirror took longer than the 240 s limit; attempts
-          # 2 and 3 then met the orphaned apt-get). apt also waits for the lock, within reason, rather than failing.
-          # The job's own time limit (40 minutes, see its header) bounds a hung apt. At normal speed the worst case (a
-          # browser cache miss, two install attempts that each wait out the lock, a third that succeeds, then three
-          # timed-out downloads) takes about 18 minutes, inside that limit, and ends with the `exit 1` below. Only a
-          # slow apt download reaches the limit; the job's timeout then fails this required job as loudly as `exit 1`.
-          echo 'DPkg::Lock::Timeout "150";' | sudo tee /etc/apt/apt.conf.d/99-bridge-lock-timeout > /dev/null
+          # The system packages are installed by apt, as root, so the `timeout` that limits them runs as root too. On
+          # 2 Oct 2026 a `timeout` run as the runner user stopped Playwright but could not signal the root apt-get that
+          # Playwright had started through sudo; it kept the dpkg lock, and attempts 2 and 3 failed at once with "Could
+          # not get lock /var/lib/dpkg/lock-frontend". Here `node` itself runs as root, on an ephemeral runner image:
+          # Playwright then sees uid 0 and starts apt without sudo, so apt and its download processes stay in
+          # `timeout`'s process group and the limit kills all of them. `Dpkg::Use-Pty "0"` keeps dpkg in that group too
+          # (with a pty, apt starts dpkg in its own session). The limit is needed because apt's own timeout restarts on
+          # every byte: on 7 Oct 2026 its package-list update wrote nothing for 39 minutes, on an image that sets that
+          # timeout to 15 s (bridge#1426). 600 s covers update, download and unpack, normally under a minute. apt keeps
+          # finished packages between attempts and resumes a partial one, so three attempts still fit the 77 kB/s mirror
+          # of 2 Oct, with no margin. apt also waits for the dpkg lock, within reason, rather than failing.
+          # Worst case: three attempts that reach the limit end with the `exit 1` below about 31 minutes into the job.
+          # Two of them, a slow third that succeeds, a browser cache miss and three timed-out downloads take about
+          # 44 minutes; the job's own time limit (40 minutes, see its header) then ends it, as loudly as `exit 1`.
+          printf '%s\n' 'DPkg::Lock::Timeout "150";' 'Dpkg::Use-Pty "0";' | sudo tee /etc/apt/apt.conf.d/99-bridge-lock-timeout > /dev/null
           for attempt in 1 2 3; do
-            if corepack pnpm exec playwright install-deps chromium webkit; then
+            if sudo timeout --kill-after=10 600 "$(command -v node)" node_modules/@playwright/test/cli.js install-deps chromium webkit; then
               break
             fi
-            echo "Playwright system dependencies attempt $attempt of 3 failed"
+            echo "Playwright system dependencies attempt $attempt of 3 failed or timed out after 600 s"
             [ "$attempt" = 3 ] && exit 1
             # an apt that died mid-unpack leaves dpkg interrupted, and every retry would then fail; finish it first.
             # dpkg does not read apt's DPkg::Lock::Timeout, so if something holds the lock this fails at once and

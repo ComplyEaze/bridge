@@ -507,6 +507,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 7,
             unsettled: 4,
             unsettled_no_response: 2,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -517,6 +518,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -731,7 +733,7 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     );
     assert!(!already_posted(journal(&old), &extra));
     let mut later = same.clone();
-    later.vouchers[0].date = "20260902".into();
+    later.vouchers[0].date = bridge_tally_core::TallyDate::parse("20260902").unwrap();
     assert!(!already_posted(journal(&old), &later));
     // Another id with the same shape is another transaction.
     let renamed = plain("new", "t2", BANK_TO_B);
@@ -856,7 +858,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
     // In the build's year before a newer one outside it; the newest inside it.
     let dated = |id: &str, sha: char, number: &str, date: &str| {
         let mut line = invoice_batch(id, sha, (number, "Sales Manual"), SALE);
-        line.vouchers[0].date = date.to_string();
+        line.vouchers[0].date = bridge_tally_core::TallyDate::parse(date).unwrap();
         line
     };
     let last_year = dated("last-year", 'c', "INV/2", "20260310");
@@ -1045,13 +1047,13 @@ fn a_sent_invoice_that_is_not_verified_posted_stops_its_company() {
     );
 }
 
-/// The fold fails closed: an invoice whose number or date cannot be read still
-/// stops the company, though it can never be a number control.
+/// The fold fails closed: an invoice whose number cannot be read still stops
+/// the company, though it can never be a number control. (Its date is a
+/// `TallyDate`, so a saved batch's date is always readable.)
 #[test]
 fn an_unreadable_invoice_still_stops_its_company() {
     let mut nameless = invoice_batch("nameless", 'a', ("INV/1", "Sales Manual"), SALE);
     nameless.vouchers[0].voucher_number = None;
-    nameless.vouchers[0].date = "not-a-date".to_string();
     assert_eq!(
         stops(vec![record(&nameless), sent(&nameless)]),
         ["nameless"]

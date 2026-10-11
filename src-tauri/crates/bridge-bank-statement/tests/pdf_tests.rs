@@ -389,3 +389,67 @@ fn a_logo_and_a_watermark_do_not_change_the_words_that_are_read() {
     assert_eq!(with_images.len(), 1);
     assert_eq!(words(&with_images), words(&plain));
 }
+
+#[test]
+#[ignore = "needs PDFium: set BRIDGE_PDFIUM_LIBRARY and run with --ignored"]
+fn a_bob_statement_reads_newest_first_with_each_amount_on_its_own_line() {
+    let bank = Bank::Bob;
+    // opened with the empty user password, as a downloaded statement is
+    let pages = extract_pages(pdfium(), &pdf("bob-synthetic.pdf"), "").unwrap();
+    assert_eq!(pages.len(), 2);
+    let rows = parse_statement(&pages, bank).unwrap();
+    assert_eq!(rows.len(), 14);
+
+    // the dates run oldest first after the read; the wrapped rows are whole
+    assert_eq!(rows[0].get("date"), "03/08/2026");
+    assert_eq!(rows[13].get("date"), "10/08/2026");
+    assert_eq!(
+        rows[2].get("narr"),
+        "UPI/600000000002/11:20:45/UPI/northwind.traders.synthetic@okzzzzzz/SYNTH"
+    );
+    assert_eq!(
+        rows[4].get("narr"),
+        "RTGS-ZZZZZ00000000000000002-GREEN FIELD LTD"
+    );
+    assert_eq!(rows[11].get("chq"), "000417");
+    assert_eq!(
+        rows[11].get("narr"),
+        "SYNTHETIC SUPPLIES-MICR INWARD CLG (CTS)"
+    );
+    // the balance crosses zero on row 12 (an overdrawn Dr balance is negative)
+    assert_eq!(rows[10].get("bal"), "4858.84");
+    assert_eq!(rows[11].get("bal"), "-75141.16");
+    assert_eq!(rows[13].get("bal"), "-16141.16");
+    // amounts on their own line (+6pt, +11pt) and on the date line all land on their row
+    assert_eq!(rows[2].get("cr"), "9876.54");
+    assert_eq!(rows[6].get("dr"), "5.90");
+    assert_eq!(rows[0].get("cr"), "750.50");
+
+    let parties: Vec<String> = rows.iter().map(|row| bank.party(row)).collect();
+    assert_eq!(
+        parties,
+        [
+            "CASH DEPOSIT",
+            "nw@okzz",
+            "northwind.traders.synthetic@okzzzzzz",
+            "ACME INDUSTRIES-EAST",
+            "GREEN FIELD LTD",
+            "UNRESOLVED",
+            "BANK CHARGES",
+            "Loan Recovery For00000000000001",
+            "BANK CHARGES",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            "UNRESOLVED",
+            "BLUE RIVER CO",
+        ]
+    );
+    assert_eq!(
+        require_account_match(&pages, bank, "BOB CA 12399999999456").unwrap(),
+        "123XXXXXXXX456"
+    );
+    // opening 10,000.00 Cr; the statement prints neither it nor a closing balance
+    let controls = Controls::parse_optional("10,000.00", "-16,141.16", None, None).unwrap();
+    reconcile(&rows, &controls.opening, &controls.closing).unwrap();
+}

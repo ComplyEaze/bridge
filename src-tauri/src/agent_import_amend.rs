@@ -121,20 +121,14 @@ impl Lineage {
 
     /// The read window that holds both where each voucher is now and where the
     /// amendment will put it: an amendment may move a voucher's date.
-    pub(super) fn window(&self, vouchers: &[ImportVoucher]) -> (String, String) {
-        let dates = vouchers
-            .iter()
-            .flat_map(|voucher| {
-                std::iter::once(voucher.date.clone()).chain(
-                    self.versions(&voucher.bridge_txn_id)
-                        .map(|(_, recorded)| recorded.date.clone()),
-                )
-            })
-            .collect::<BTreeSet<_>>();
-        (
-            dates.first().cloned().unwrap_or_default(),
-            dates.last().cloned().unwrap_or_default(),
-        )
+    /// `None` only for no vouchers.
+    pub(super) fn window(&self, vouchers: &[ImportVoucher]) -> Option<(TallyDate, TallyDate)> {
+        super::date_window(vouchers.iter().flat_map(|voucher| {
+            std::iter::once(&voucher.date).chain(
+                self.versions(&voucher.bridge_txn_id)
+                    .map(|(_, recorded)| &recorded.date),
+            )
+        }))
     }
 
     /// The compare-and-swap. Returns per-voucher evidence when every amended

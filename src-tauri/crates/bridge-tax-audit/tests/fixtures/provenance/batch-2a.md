@@ -28,6 +28,11 @@ two edge books that deliberately share a voucher GUID (`creditor_ageing_short`,
 (`creditor_ageing_43bh`, `statutory_dues_43b`, and the `config` and `binding` loaders they use)
 are unchanged between that commit and the engine branch's current tip.
 
+Since #1243 the two edge goldens whose books share a voucher GUID (`edge.creditor_ageing_short` and
+`edge.statutory_dues_more`) are those of the later reference commit
+`ee17d80fe60e6d2734629aab7dc23ff0c3dc348d`, where each figure and finding that cited only the later of the two
+vouchers cites both; no value moved (see `dues-ageing-shared-guid-1243.md`). Their two rows below are from there.
+
 ## What the fixtures establish
 
 **Synthetic engagement.** `synthetic-engagement.toml` gains three things, all invented:
@@ -99,6 +104,6 @@ uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with js
 | `edge.statutory_dues_calendar.statutory_dues_43b.json` | 20,154 | `5fd84ff39c893bf9c9856915d5d0919bf955291d7e0c98a5f4209b888e5db193` | `golden/edge.statutory_dues_calendar.statutory_dues_43b.json` |
 | `edge.statutory_dues_coverage.statutory_dues_43b.json` | 4,538 | `dab09493fe329e360fbfb18298221d4ced6305780548857b2e17199b5d25967d` | `golden/edge.statutory_dues_coverage.statutory_dues_43b.json` |
 | `creditor_ageing_short.json` | 1,776 | `439f508c4d09ea3147b991f31293ee566b8e109e3a6178f3830ad48ba9deb902` | `edge-books/creditor_ageing_short.json` |
-| `edge.creditor_ageing_short.creditor_ageing_43bh.json` | 21,231 | `2f091e61f6b14e5ed8265a842dad5229c3e298c3597016c0d0664bcdc8d6d108` | `golden/edge.creditor_ageing_short.creditor_ageing_43bh.json` |
+| `edge.creditor_ageing_short.creditor_ageing_43bh.json` | 22,041 | `fa25b90abd7f0a09c278df2feaf8227e3a67e9f1fb0720dfca0fa1b51edaa0b4` | `golden/edge.creditor_ageing_short.creditor_ageing_43bh.json` |
 | `statutory_dues_more.json` | 2,660 | `f8b70c074525f01ee9f21d050a4df3312403e88dd3db07687d822c2785555f47` | `edge-books/statutory_dues_more.json` |
-| `edge.statutory_dues_more.statutory_dues_43b.json` | 13,919 | `8377c11fcd406ba132f0364292c7e3d0492d0ab2e75bb39dc843ee7f3cc8edb7` | `golden/edge.statutory_dues_more.statutory_dues_43b.json` |
+| `edge.statutory_dues_more.statutory_dues_43b.json` | 14,864 | `3a819e4f2280e71d454723e90fd8747c9d2babd304158b385f3c64da6795692b` | `golden/edge.statutory_dues_more.statutory_dues_43b.json` |

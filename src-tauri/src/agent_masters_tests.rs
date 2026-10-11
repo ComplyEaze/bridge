@@ -437,6 +437,58 @@ async fn an_unrecognised_numbering_method_is_returned_raw() {
     );
     assert_eq!(rows[1]["numbering_method"], "default");
     assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+    // The type-level value is not the method (#1485): the limitation a page carries
+    // and the tool description both say so, and neither claims the three values
+    // are the only ones seen.
+    let page = result(&response);
+    let limitations: Vec<&str> = page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line.as_str().unwrap())
+        .collect();
+    assert!(
+        limitations
+            .iter()
+            .any(|line| line.contains("not the voucher type's numbering method")),
+        "{limitations:?}"
+    );
+    assert!(!limitations
+        .iter()
+        .any(|line| line.contains("only those three seen")));
+    assert!(
+        limitations.iter().any(|line| line.contains(
+            "It can differ from the number series that decides what a supplied number does; do not pass it to voucher_presence's numbering."
+        )),
+        "{limitations:?}"
+    );
+    let definitions = catalog::registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "masters")
+        .unwrap()["description"]
+        .as_str()
+        .unwrap();
+    assert!(description.contains("is not the voucher type's numbering method"));
+    assert!(!description.contains("the only numbering methods seen"));
+    // voucher_presence takes the method the person confirms for the series, not this read's value.
+    let presence = definitions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "voucher_presence")
+        .unwrap();
+    let numbering = presence["inputSchema"]["properties"]["numbering"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(
+        numbering.contains(
+            "with its numbering method as the person confirms it for the series used, not the numbering_method of the masters tool:"
+        ),
+        "{numbering}"
+    );
 }
 
 #[tokio::test]

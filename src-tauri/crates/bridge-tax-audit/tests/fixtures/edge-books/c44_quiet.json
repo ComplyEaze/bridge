@@ -1,0 +1,187 @@
+{
+ "comment": "clause44: a book with no expenditure line at all (a sale and a receipt): every figure is zero, only the break-up finding is raised, and the Trial Balance tie holds at zero.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_quiet-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_quiet-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_quiet-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_quiet-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_quiet-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_quiet-005"
+  },
+  {
+   "name": "Debtor One",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_quiet-006",
+   "gstin": "27DEBTO1212D1Y2"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 108801,
+   "credit": 0,
+   "closing": 108801
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 113901,
+   "closing": -113901
+  },
+  {
+   "ledger": "Debtor One",
+   "opening": 0,
+   "debit": 5100,
+   "credit": 0,
+   "closing": 5100
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "q01",
+   "date": "2025-04-10",
+   "base_type": "Sales",
+   "party": "Debtor One",
+   "lines": [
+    [
+     "Debtor One",
+     113901
+    ],
+    [
+     "Sales",
+     -113901
+    ]
+   ],
+   "number": "S-1"
+  },
+  {
+   "guid": "q02",
+   "date": "2025-04-20",
+   "base_type": "Receipt",
+   "party": "Debtor One",
+   "lines": [
+    [
+     "Bank A",
+     108801
+    ],
+    [
+     "Debtor One",
+     -108801
+    ]
+   ],
+   "number": "BR-1"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "round_off_ledgers": [],
+  "money_category_by_ledger": {
+   "Sales": "bank_charges"
+  }
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

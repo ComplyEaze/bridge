@@ -1748,6 +1748,7 @@ profit is shown."
     fn each_value_a_stock_in_hand_ledger_can_carry_keeps_the_items_from_being_used() {
         let cases = [
             ("only the opening", 5_000, 0, 0, 0),
+            ("an opening wholly drawn down", 5_000, 0, 5_000, 0),
             ("only a debit movement", 0, 5_000, 0, 0),
             ("only a credit movement", 0, 0, 5_000, 0),
             ("only the TB's own closing field", 0, 0, 0, 5_000),

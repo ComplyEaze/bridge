@@ -71,10 +71,23 @@ fn a_duty_ledger_escapes_its_parent_and_places_its_gst_fields_last() {
 }
 
 #[test]
-fn a_name_with_markup_is_escaped_in_the_attribute_and_the_element() {
-    let message = ledger("A \"Q\" <B> & 'C'", "Sundry Creditors").render_message();
-    assert!(message.starts_with(
-        "<TALLYMESSAGE><LEDGER NAME=\"A &quot;Q&quot; &lt;B&gt; &amp; &apos;C&apos;\" ACTION=\"Create\">\
-<NAME>A &quot;Q&quot; &lt;B&gt; &amp; &apos;C&apos;</NAME>"
-    ));
+fn markup_in_every_field_is_escaped_once_in_the_whole_message() {
+    let message = LedgerCreate {
+        name: "A \"Q\" <B> & 'C'\r\n",
+        parent: "P <&> \"x\"",
+        is_billwise_on: true,
+        opening_balance: Some("1 & 2"),
+        party_gstin: Some("G<'>"),
+        tax_type: Some("T\""),
+        gst_duty_head: Some("D&"),
+    }
+    .render_message();
+    assert_eq!(
+        message,
+        "<TALLYMESSAGE><LEDGER NAME=\"A &quot;Q&quot; &lt;B&gt; &amp; &apos;C&apos;&#13;&#10;\" ACTION=\"Create\">\
+<NAME>A &quot;Q&quot; &lt;B&gt; &amp; &apos;C&apos;&#13;&#10;</NAME>\
+<PARENT>P &lt;&amp;&gt; &quot;x&quot;</PARENT><ISBILLWISEON>Yes</ISBILLWISEON>\
+<OPENINGBALANCE>1 &amp; 2</OPENINGBALANCE><PARTYGSTIN>G&lt;&apos;&gt;</PARTYGSTIN>\
+<TAXTYPE>T&quot;</TAXTYPE><GSTDUTYHEAD>D&amp;</GSTDUTYHEAD></LEDGER></TALLYMESSAGE>"
+    );
 }

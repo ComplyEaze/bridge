@@ -1,6 +1,9 @@
 //! The series-level numbering parser and request against the live capture
-//! (`tests/fixtures/voucher_type_numbering_series_*`). Every negative case is the
-//! captured text with one edit; none has a hand-written response.
+//! (`tests/fixtures/voucher_type_numbering_series_*`). Every parser test uses the
+//! captured text, and every negative case is that text with one edit; none has a
+//! hand-written response. The `join` module parses the captured numbering rows and
+//! builds the masters rows by hand from their names and GUIDs (no masters answer
+//! of that book was captured), then edits those rows.
 use super::*;
 use sha2::{Digest, Sha256};
 

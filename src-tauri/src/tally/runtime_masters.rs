@@ -176,8 +176,9 @@ pub(crate) fn check_masters_premise(
 }
 
 /// The premise of the numbering read, checked against its answer: its rows
-/// cannot outnumber the master mark and the response fits `limit_bytes`. Voucher types are unbounded before the read, so the limit
-/// is the whole budget.
+/// cannot outnumber the master mark and the response fits `limit_bytes`.
+/// Voucher types are unbounded before the read, so the limit is the whole
+/// budget.
 pub(crate) fn check_numbering_premise(
     rows: &[VoucherTypeNumberingRow],
     master_alter_id: u64,
@@ -227,9 +228,10 @@ impl TallyRuntime {
                         bracket_verified_company_identity(&client, &identity).await?;
                         let extent = client.fetch_company_book_extent(&identity).await?;
                         // A response Bridge cannot read refuses at once. Only a
-                        // broken size premise is held until the closing extent
-                        // is read: a book that moved mid-read is reported as
-                        // moved, not as the rows its new masters added.
+                        // broken size premise, the numbering's included, and a
+                        // numbering that does not join are held until the closing
+                        // extent is read: a book that moved mid-read is reported
+                        // as moved, not as the rows its new masters added.
                         let held: Result<MastersRows, MastersReadError> = match kind {
                             MastersKind::Native(native) => {
                                 let mark = extent

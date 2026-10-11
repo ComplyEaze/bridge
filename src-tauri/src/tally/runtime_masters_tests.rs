@@ -959,6 +959,49 @@ async fn the_numbering_read_adds_its_own_evidence() {
 }
 
 #[tokio::test]
+async fn the_numbering_request_is_folded_into_the_evidence_after_the_masters_request() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    let name = identity().display_name().to_string();
+    // A read that ends after the masters read: its evidence is the mode probe's
+    // and the masters pair's (the premise breaks, and the closing extent is read).
+    let (result, _) = run(
+        through_closing_extent(extent_with_mark(25), masters.clone(), extent_with_mark(25)),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let masters_only = result.err().expect("refused");
+    let masters_only = &masters_only
+        .downcast_ref::<RuntimeReadFailure>()
+        .unwrap()
+        .evidence;
+    // A read that ends after the numbering read (its answer does not parse):
+    // the same, and the numbering pair's.
+    let (result, _) = run(
+        through_numbering(
+            extent_with_mark(50_000_000),
+            masters,
+            numbering.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let with_numbering = result.err().expect("refused");
+    let with_numbering = &with_numbering
+        .downcast_ref::<RuntimeReadFailure>()
+        .unwrap()
+        .evidence;
+    assert_ne!(with_numbering.request_sha256, masters_only.request_sha256);
+    // The chain is `<earlier>:<next request>`: the numbering request's own hash,
+    // the bytes `render_voucher_type_numbering_request` renders, is the next link.
+    let numbering_request = request_hash(&render_voucher_type_numbering_request(&name));
+    assert_eq!(
+        with_numbering.request_sha256,
+        sha256_hex(format!("{}:{numbering_request}", masters_only.request_sha256).as_bytes())
+    );
+}
+
+#[tokio::test]
 async fn a_numbering_pair_that_changed_between_its_reads_refuses_the_whole_read() {
     let masters = capture(NativeMasterKind::VoucherTypes);
     let numbering = numbering_for(&masters);
@@ -1204,4 +1247,122 @@ fn the_numbering_premise_checks_refuse_each_way_its_answer_can_outgrow_its_mark(
     let budget = u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES).unwrap();
     assert!(check_numbering_premise(&rows, 24, MASTERS_RESPONSE_BUDGET_BYTES, budget).is_ok());
     assert!(check_numbering_premise(&rows, 24, MASTERS_RESPONSE_BUDGET_BYTES + 1, budget).is_err());
+}
+
+/// The numbering answer with `count` more types than `numbering` holds, each a
+/// copy of its `Contra` row under a new name and GUID.
+fn numbering_with_extra_types(numbering: &str, count: usize) -> String {
+    let contra = type_blocks(numbering)
+        .into_iter()
+        .find(|block| name_of(block) == "Contra")
+        .unwrap()
+        .to_string();
+    let guid = element(&contra, "GUID").to_string();
+    let extra = (0..count)
+        .map(|at| {
+            contra
+                .replacen("NAME=\"Contra\"", &format!("NAME=\"Extra {at}\""), 1)
+                .replacen(&guid, &format!("{GUID}-{:08x}", 0x1000_0000 + at), 1)
+        })
+        .collect::<String>();
+    let at = numbering.rfind("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+    format!("{}{extra}{}", &numbering[..at], &numbering[at..])
+}
+
+/// A voucher-types read whose numbering answer is `numbering`, at the master
+/// mark `mark` and with the closing extent's mark `closing`: held through the
+/// closing extent, which is all such a read sends.
+async fn read_with_numbering(
+    numbering: String,
+    mark: u64,
+    closing: u64,
+) -> (anyhow::Result<(MastersRead, CompanyBookExtent)>, usize) {
+    run(
+        through_closing_extent_numbered(
+            extent_with_mark(mark),
+            capture(NativeMasterKind::VoucherTypes),
+            numbering,
+            extent_with_mark(closing),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await
+}
+
+fn assert_numbering_premise_refusal(error: &anyhow::Error, reason: &'static str) {
+    let violated = cause::<MastersReadError>(error).expect("a premise refusal");
+    assert!(
+        matches!(violated, MastersReadError::PremiseViolated(found) if *found == reason),
+        "{violated:?}"
+    );
+    assert_eq!(violated.safe_code(), "masters_bound_premise_violated");
+    assert!(cause::<PairedReadValidationError>(error).is_none());
+}
+
+fn assert_reported_as_moved(error: &anyhow::Error) {
+    let changed = cause::<PairedReadValidationError>(error).expect("a stability refusal");
+    assert!(matches!(changed, PairedReadValidationError::MastersExtent));
+    assert_eq!(changed.safe_code(), "masters_extent_changed");
+    assert!(cause::<MastersReadError>(error).is_none());
+}
+
+#[tokio::test]
+async fn a_numbering_answer_with_more_rows_than_the_mark_is_a_premise_refusal() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    // The mark every masters row sits at or under, with one numbering row more
+    // than it: the masters answer's own premise holds (26 rows, none above it).
+    let rows = parse_native_masters(NativeMasterKind::VoucherTypes, &masters, GUID)
+        .unwrap()
+        .rows;
+    let mark = rows.iter().map(|row| row.alter_id).max().unwrap();
+    let extra = usize::try_from(mark).unwrap() + 1 - rows.len();
+    let numbering = numbering_with_extra_types(&numbering_for(&masters), extra);
+    assert_eq!(
+        parse_voucher_type_numbering(&numbering).unwrap().len() as u64,
+        mark + 1
+    );
+
+    let (result, dispatched) = read_with_numbering(numbering.clone(), mark, mark).await;
+    let error = result.err().expect("refused: no rows come back");
+    assert_numbering_premise_refusal(&error, "masters_numbering_rows_exceed_master_mark");
+    // Held until the closing extent was read, and it had not moved.
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+
+    // The book moved between the reads: reported as moved.
+    let (result, dispatched) = read_with_numbering(numbering, mark, mark + 1).await;
+    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+
+    // One row fewer is within the premise: the read goes on to the join, which
+    // refuses the extra types as a numbering with no masters row.
+    let within = numbering_with_extra_types(&numbering_for(&masters), extra - 1);
+    let (result, _) = read_with_numbering(within, mark, mark).await;
+    let error = result.err().expect("refused by the join");
+    assert!(matches!(
+        cause::<MastersReadError>(&error),
+        Some(MastersReadError::NumberingJoin(
+            NumberingJoinError::TypeOnOneSideOnly
+        ))
+    ));
+}
+
+#[tokio::test]
+async fn a_numbering_answer_over_the_admitted_bytes_is_a_premise_refusal() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    // A filler the parser does not read, past the whole budget in UTF-16.
+    let filler = MASTERS_RESPONSE_BUDGET_BYTES / 2 + 100_000;
+    let numbering = numbering_for(&masters).replacen(
+        "<DATA>",
+        &format!("<PAD>{}</PAD><DATA>", "x".repeat(filler)),
+        1,
+    );
+
+    let (result, dispatched) = read_with_numbering(numbering.clone(), 50_000_000, 50_000_000).await;
+    let error = result.err().expect("refused: no rows come back");
+    assert_numbering_premise_refusal(&error, "masters_numbering_response_over_admitted_bytes");
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+
+    let (result, dispatched) = read_with_numbering(numbering, 50_000_000, 50_000_001).await;
+    assert_reported_as_moved(&result.err().expect("refused"));
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
 }

@@ -394,7 +394,8 @@ numbering collection changing between its two reads
 (`masters_numbering_collection_changed`) and a numbering answer whose row count
 or size breaks the mark's premise (`masters_bound_premise_violated`). A
 numbering answer that does not parse, a missing or repeated GUID among the
-causes, refuses at once with a `masters_*` cause. Measured on one synthetic
+causes, refuses at once with a `masters_*` cause, and a moved book is reported
+as `masters_extent_changed` in place of a numbering or join refusal. Measured on one synthetic
 book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series
 named `Default`, of which three (Journal Automatic, Payment Manual with
 duplicates prevented, Receipt Manual with duplicates not prevented) were
@@ -437,7 +438,8 @@ than the mark, an AlterID above it, a repeated AlterID or an oversize response
 refuses the whole read as `masters_bound_premise_violated`, unless the closing
 extent shows the book moved, which is reported instead
 (`masters_extent_changed`). The voucher types' numbering answer is held to
-the same kind of checks (more rows than the mark or an oversize response). A response Bridge cannot read refuses at once with
+the same kind of checks (more rows than the mark or an oversize response).
+A response Bridge cannot read refuses at once with
 a `masters_*` cause (for `groups`, the group reader's, such as `group_xml_malformed`),
 without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every

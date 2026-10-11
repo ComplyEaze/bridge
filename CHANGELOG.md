@@ -27,7 +27,8 @@ These changes are in source and not yet in a published build.
   two reads (`masters_numbering_identity_differs`), refuses the whole read; so does the numbering read changing
   between its two reads (`masters_numbering_collection_changed`) and a numbering answer whose row count or size
   breaks the mark's premise (`masters_bound_premise_violated`), and one that does not parse (a missing or repeated
-  GUID among the causes) refuses at once. The type-level `numbering_method` stays as it was, with its limitation.
+  GUID among the causes) refuses at once; a moved book is reported as `masters_extent_changed` in place of a
+  numbering or join refusal. The type-level `numbering_method` stays as it was, with its limitation.
   Measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named
   `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with
   duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override), seen once on a real

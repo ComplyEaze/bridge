@@ -694,19 +694,31 @@ pub(super) fn classify_sales_invoice(
                     &entry.ledger,
                 ));
             }
-            // The lab's round-off ledger carried an empty GST row (the
-            // `pilot-lab` rate listing). A row that says anything, a rate or
-            // a taxability, might make Tally count the ledger in the tax,
-            // which was not measured.
+            // The lab's round-off ledger carried exactly one GST row and it
+            // was empty (the `pilot-lab` rate listing, where each of the
+            // fourteen ledgers carried exactly one row). A row that says
+            // anything, a rate or a taxability, might make Tally count the
+            // ledger in the tax; a ledger with no row, or with several, is a
+            // shape Tally was not seen to send. None of these was measured.
+            // Measured on one ledger under Indirect Expenses only: whether a
+            // group-level GST setting reaches a ledger whose own row is empty
+            // is not known.
             match fact.rates.as_ref() {
                 None => refusals.push(refuse_ledger(
                     "invoice_round_off_ledger_gst_unknown",
                     &entry.ledger,
                 )),
-                Some(row) if !row.gst_rows.iter().all(|gst| gst.empty) => refusals.push(
-                    refuse_ledger("invoice_round_off_ledger_gst_row", &entry.ledger),
-                ),
-                Some(_) => {}
+                Some(row) => match row.gst_rows.as_slice() {
+                    [] => refusals.push(refuse_ledger(
+                        "invoice_round_off_ledger_gst_row_absent",
+                        &entry.ledger,
+                    )),
+                    [only] if only.empty => {}
+                    _ => refusals.push(refuse_ledger(
+                        "invoice_round_off_ledger_gst_row",
+                        &entry.ledger,
+                    )),
+                },
             }
             round_off = Some(index);
         } else if fact.under("Sundry Debtors") {

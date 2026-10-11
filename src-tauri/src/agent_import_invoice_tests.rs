@@ -500,7 +500,7 @@ fn lab_rates(named: &[&str]) -> BTreeMap<String, wire::LedgerRateRow> {
 
 /// The round-off ledger's own GST row is read, and only the shape the lab's
 /// round-off ledger carried is admitted: `BRIDGE Round Off`, whose
-/// `GSTDETAILS.LIST` holds nothing, or no row at all. A row that says anything
+/// `GSTDETAILS.LIST` holds nothing, and it is the only row. A row that says anything
 /// (Taxable, with a rate) might be counted by Tally in the tax, which was not
 /// measured; a ledger the listing did not return is not known to carry none.
 #[test]
@@ -517,9 +517,27 @@ fn a_round_off_ledger_is_admitted_only_with_the_empty_gst_row_the_lab_read() {
     };
     let measured = lab["BRIDGE Round Off"].clone();
     assert_eq!(with(Some(measured.clone())), Ok(Some(4)));
-    let mut absent = measured;
+    // No `GSTDETAILS.LIST` at all is a shape Tally was not seen to send: every
+    // one of the lab listing's fourteen ledgers carried exactly one.
+    let mut absent = measured.clone();
     absent.gst_rows.clear();
-    assert_eq!(with(Some(absent)), Ok(Some(4)));
+    assert_eq!(
+        with(Some(absent)),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_row_absent",
+            "Round Off"
+        )])
+    );
+    // Two rows, even both empty, are not the one row that was read.
+    let mut two = measured;
+    two.gst_rows.push(two.gst_rows[0].clone());
+    assert_eq!(
+        with(Some(two)),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_row",
+            "Round Off"
+        )])
+    );
     // A taxable row with a rate: the lab's own 5 percent services ledger's row.
     assert_eq!(
         with(Some(lab["BRIDGE Svc 998313 5%"].clone())),

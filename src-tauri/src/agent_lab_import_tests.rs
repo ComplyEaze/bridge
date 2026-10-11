@@ -2820,8 +2820,12 @@ fn a_batch_with_clean_counters_and_a_read_back_difference_stops_the_call_and_is_
 ///
 /// The root rows are committed live captures. No named-parent godown or stock
 /// group row has been captured, so for those two kinds the named-parent row is
-/// a captured root row with its `PARENT` replaced by a name, and says so here;
-/// the group and stock item named-parent rows are captured as they are.
+/// SYNTHETIC: a captured root row with its `PARENT` replaced by a name. It is
+/// not a statement that Tally returns a godown or stock group in that shape;
+/// that is unmeasured, and the row only gives the comparison a `PARENT` that
+/// is not the root. A captured named-parent godown and stock group would
+/// replace it. The group and stock item named-parent rows are captured as
+/// they are.
 #[test]
 fn a_root_book_entry_is_compared_by_the_read_back_and_the_resume_check_of_every_parented_kind() {
     let godowns = captured_rows(
@@ -2860,7 +2864,8 @@ fn a_root_book_entry_is_compared_by_the_read_back_and_the_resume_check_of_every_
             .unwrap_or_else(|| panic!("a captured row with at_root={at_root}"))
             .clone()
     };
-    let under_a_name = |mut row: BTreeMap<String, String>| {
+    // SYNTHETIC (see above): the one element of a captured root row, replaced.
+    let synthetic_named_parent_row = |mut row: BTreeMap<String, String>| {
         row.insert("PARENT".into(), "Packaging".into());
         row
     };
@@ -2871,13 +2876,13 @@ fn a_root_book_entry_is_compared_by_the_read_back_and_the_resume_check_of_every_
             MasterKind::Godown,
             "godown",
             first_where(&godowns, true),
-            under_a_name(first_where(&godowns, true)),
+            synthetic_named_parent_row(first_where(&godowns, true)),
         ),
         (
             MasterKind::StockGroup,
             "stock group",
             first_where(&stock_groups, true),
-            under_a_name(first_where(&stock_groups, true)),
+            synthetic_named_parent_row(first_where(&stock_groups, true)),
         ),
         (
             MasterKind::Group,
@@ -2918,15 +2923,23 @@ fn a_root_book_entry_is_compared_by_the_read_back_and_the_resume_check_of_every_
                 let read_back = readback_mismatches(kind, &masters, std::slice::from_ref(row));
                 let resume = already_present_verified_mismatches(kind, &masters, &name, row);
                 if matches {
-                    assert_eq!(read_back, Vec::<String>::new(), "{label} {parent}");
-                    assert_eq!(resume, Vec::<String>::new(), "{label} {parent}");
+                    assert_eq!(
+                        read_back,
+                        Vec::<String>::new(),
+                        "read-back: {label} {parent}"
+                    );
+                    assert_eq!(resume, Vec::<String>::new(), "resume: {label} {parent}");
                 } else {
                     let expected = format!(
                         "{label} {name}: parent expected the reserved root, observed {:?}",
                         row["PARENT"]
                     );
-                    assert_eq!(read_back, vec![expected.clone()], "{label} {parent}");
-                    assert_eq!(resume, vec![expected], "{label} {parent}");
+                    assert_eq!(
+                        read_back,
+                        vec![expected.clone()],
+                        "read-back: {label} {parent}"
+                    );
+                    assert_eq!(resume, vec![expected], "resume: {label} {parent}");
                 }
             }
         }

@@ -561,7 +561,7 @@ used at BOTH ends, direct expenses included, so this ties to Form 3CD Clause 40.
     let f_gp_pct = d
         .gross_profit
         .map(|gp| {
-            Ok::<_, AuditError>(r.fig(
+            r.fig(
                 "gross_profit_pct_bp",
                 pct_bp(gp, d.sales).ok_or_else(overflow)?,
                 Unit::BasisPoints,
@@ -572,7 +572,7 @@ used at BOTH ends, direct expenses included, so this ties to Form 3CD Clause 40.
 closing stock)."
                 },
                 Vec::new(),
-            )?)
+            )
         })
         .transpose()?;
     if let Some(cs) = d.closing_stock {

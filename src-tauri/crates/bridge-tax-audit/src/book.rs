@@ -2053,7 +2053,7 @@ mod tests {
             "<STOCKITEM NAME=\"Hinge\"><CLOSINGVALUE>-1.00</CLOSINGVALUE></STOCKITEM>",
         );
         assert_eq!(
-            closing_stock(Some(true), &[summary.clone()], Some(&to)),
+            closing_stock(Some(true), std::slice::from_ref(&summary), Some(&to)),
             ClosingStock::Valued(98_050)
         );
         // Another date's summary beside it is not mixed in, whatever the order.
@@ -2062,11 +2062,11 @@ mod tests {
             ClosingStock::Valued(98_050)
         );
         assert_eq!(
-            closing_stock(Some(false), &[summary.clone()], Some(&to)),
+            closing_stock(Some(false), std::slice::from_ref(&summary), Some(&to)),
             ClosingStock::NotApplicable
         );
         assert_eq!(
-            closing_stock(None, &[summary.clone()], Some(&to)),
+            closing_stock(None, std::slice::from_ref(&summary), Some(&to)),
             ClosingStock::NotApplicable
         );
         assert_eq!(
@@ -2074,11 +2074,11 @@ mod tests {
             ClosingStock::Unknown(ClosingStockUnknown::NotRead)
         );
         assert_eq!(
-            closing_stock(Some(true), &[half.clone()], Some(&to)),
+            closing_stock(Some(true), std::slice::from_ref(&half), Some(&to)),
             ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)
         );
         assert_eq!(
-            closing_stock(Some(true), &[summary.clone()], None),
+            closing_stock(Some(true), std::slice::from_ref(&summary), None),
             ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)
         );
         assert_eq!(

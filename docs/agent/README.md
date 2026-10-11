@@ -2111,8 +2111,9 @@ that matches a captured request as that request.
 counts committed response bodies, including both accepted bodies of a paired read;
 it excludes auxiliary health and identity guards and is not total network traffic.
 Status commits its status and company-discovery responses. Scoped agent reads use
-a single attempt. Company discovery can retry transient failures; its commitments
-describe the terminal attempt, excluding earlier attempts. Read failures retain
+a single attempt. Company discovery can retry transient failures, but a request
+that timed out is not sent again; its commitments describe the terminal attempt,
+excluding earlier attempts. Read failures retain
 source observations already returned to the connector, including when parsing or
 window validation fails. Runtime-internal requests that fail without returning
 source evidence are not fabricated; zero retained bytes does not establish that

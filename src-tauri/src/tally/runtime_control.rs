@@ -133,11 +133,7 @@ impl ReadFailureClass {
     pub(super) const fn retryable(self) -> bool {
         matches!(
             self,
-            Self::Connection
-                | Self::RequestTimeout
-                | Self::RequestFailed
-                | Self::HttpServer
-                | Self::RateLimited
+            Self::Connection | Self::RequestFailed | Self::HttpServer | Self::RateLimited
         )
     }
 

@@ -87,6 +87,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
             taxability: Some("Taxable".to_string()),
             source: Some("Specify Details Here".to_string()),
             unmeasured: false,
+            empty: false,
             states: vec![wire::StateRates {
                 state: Some("Any".to_string()),
                 heads: vec![
@@ -143,6 +144,9 @@ fn good_facts() -> BTreeMap<String, LedgerFacts> {
     for tax in ["Output CGST", "Output SGST"] {
         facts.get_mut(tax).unwrap().rates = Some(tax_rates("6"));
     }
+    // The round-off ledger's empty GST row, as the lab's read.
+    facts.get_mut("Round Off").unwrap().rates =
+        lab_rates(&["BRIDGE Round Off"]).remove("BRIDGE Round Off");
     facts
 }
 
@@ -476,6 +480,61 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert!(codes(classify_sales_invoice(&v, &facts, RAJ, AS_OF))
         .contains(&"invoice_round_off_ledger_group"));
+}
+
+/// The lab's rate listing (10 Oct 2026, the `pilot-lab` fixtures), read as the
+/// build reads it, for the ledgers named.
+fn lab_rates(named: &[&str]) -> BTreeMap<String, wire::LedgerRateRow> {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    wire::parse_ledger_rates(&xml, "6b43e498-430c-4d5c-bfef-d32e2ab93c85", named).unwrap()
+}
+
+/// The round-off ledger's own GST row is read, and only the shape the lab's
+/// round-off ledger carried is admitted: `BRIDGE Round Off`, whose
+/// `GSTDETAILS.LIST` holds nothing, or no row at all. A row that says anything
+/// (Taxable, with a rate) might be counted by Tally in the tax, which was not
+/// measured; a ledger the listing did not return is not known to carry none.
+#[test]
+fn a_round_off_ledger_is_admitted_only_with_the_empty_gst_row_the_lab_read() {
+    let lab = lab_rates(&["BRIDGE Round Off", "BRIDGE Svc 998313 5%"]);
+    let with = |rates: Option<wire::LedgerRateRow>| {
+        let mut facts = good_facts();
+        facts.get_mut("Round Off").unwrap().rates = rates;
+        let mut v = voucher();
+        v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
+        v.entries[0].amount = "11200.40".to_string();
+        v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
+        classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
+    };
+    let measured = lab["BRIDGE Round Off"].clone();
+    assert_eq!(with(Some(measured.clone())), Ok(Some(4)));
+    let mut absent = measured;
+    absent.gst_rows.clear();
+    assert_eq!(with(Some(absent)), Ok(Some(4)));
+    // A taxable row with a rate: the lab's own 5 percent services ledger's row.
+    assert_eq!(
+        with(Some(lab["BRIDGE Svc 998313 5%"].clone())),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_row",
+            "Round Off"
+        )])
+    );
+    assert_eq!(
+        with(None),
+        Err(vec![refuse_ledger(
+            "invoice_round_off_ledger_gst_unknown",
+            "Round Off"
+        )])
+    );
 }
 
 fn observed() -> InvoiceObserved {
@@ -1533,7 +1592,6 @@ fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
     for tax in ["Output CGST", "Output SGST"] {
         facts.get_mut(tax).unwrap().rates = Some(tax_rates("2.5"));
     }
-    facts.get_mut("Round Off").unwrap().rates = None;
     let cents = |text: &str| -> i128 {
         let negative = text.starts_with('-');
         let (whole, fraction) = text.trim_start_matches('-').split_once('.').unwrap();

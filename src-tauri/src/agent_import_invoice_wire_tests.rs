@@ -764,6 +764,7 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
     assert_eq!(row.applicable_from.as_deref(), Some("20260401"));
     assert_eq!(row.taxability.as_deref(), Some("Taxable"));
     assert_eq!(row.source.as_deref(), Some("Specify Details Here"));
+    assert!(!row.empty);
     let [block] = row.states.as_slice() else {
         panic!("one block: {row:?}")
     };
@@ -807,6 +808,7 @@ fn the_captured_rate_listing_is_read_with_every_field_in_its_place() {
         (&None, &None, &None),
         "a row with no field is not a row with an empty string"
     );
+    assert!(empty.empty, "it holds no element and no text");
 }
 
 #[test]

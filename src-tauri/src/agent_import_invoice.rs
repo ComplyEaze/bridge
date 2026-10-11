@@ -686,6 +686,20 @@ pub(super) fn classify_sales_invoice(
                     &entry.ledger,
                 ));
             }
+            // The lab's round-off ledger carried an empty GST row (the
+            // `pilot-lab` rate listing). A row that says anything, a rate or
+            // a taxability, might make Tally count the ledger in the tax,
+            // which was not measured.
+            match fact.rates.as_ref() {
+                None => refusals.push(refuse_ledger(
+                    "invoice_round_off_ledger_gst_unknown",
+                    &entry.ledger,
+                )),
+                Some(row) if !row.gst_rows.iter().all(|gst| gst.empty) => refusals.push(
+                    refuse_ledger("invoice_round_off_ledger_gst_row", &entry.ledger),
+                ),
+                Some(_) => {}
+            }
             round_off = Some(index);
         } else if fact.under("Sundry Debtors") {
             if entry.side != EntrySide::Dr {

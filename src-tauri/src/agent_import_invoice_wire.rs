@@ -889,6 +889,9 @@ pub(super) struct GstRow {
     /// of the row, of a state-wise block or of a head's rate that is not in
     /// the measured set, or a slab-rate list that is not empty).
     pub(super) unmeasured: bool,
+    /// The row holds no element and no text, as the lab's round-off ledger's
+    /// row read (`BRIDGE Round Off`, the `pilot-lab` rate listing).
+    pub(super) empty: bool,
 }
 
 /// What the rate listing says of one ledger. Each field is the text Tally
@@ -987,6 +990,7 @@ pub(super) fn parse_ledger_rates(
                 source: details.text_of("SRCOFGSTDETAILS")?,
                 states,
                 unmeasured,
+                empty: details.children.is_empty() && clean(&details.text).is_empty(),
             });
         }
         let row = LedgerRateRow {

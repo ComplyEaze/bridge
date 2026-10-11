@@ -17,7 +17,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 use bridge_tax_audit::book::{
-    Book, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher, VoucherStatus,
+    Book, ClosingStock, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher,
+    VoucherStatus,
 };
 use bridge_tax_audit::canonical::canonical_test_result;
 use bridge_tax_audit::compare::compare;
@@ -211,6 +212,26 @@ fn opening_stock(s: &Value) -> OpeningStock {
     .unwrap_or_default()
 }
 
+/// `closing_stock`: integer paise, or one of the reasons it is unknown; absent means none applies.
+fn closing_stock(s: &Value) -> ClosingStock {
+    use bridge_tax_audit::book::ClosingStockUnknown as U;
+    typed(
+        s,
+        "closing_stock",
+        false,
+        "integer paise or a reason",
+        |v| {
+            v.as_i64().map(ClosingStock::Valued).or_else(|| {
+                [U::NotRead, U::NoSummaryAtPeriodEnd, U::Unreadable]
+                    .into_iter()
+                    .find(|u| v.as_str() == Some(u.as_str()))
+                    .map(ClosingStock::Unknown)
+            })
+        },
+    )
+    .unwrap_or_default()
+}
+
 fn build(s: &Value) -> Book {
     let groups = s["groups"]
         .as_object()
@@ -320,6 +341,7 @@ fn build(s: &Value) -> Book {
         currency_read: typed(s, "currency_read", false, "true or false", Value::as_bool)
             .unwrap_or(false),
         opening_stock: opening_stock(s),
+        closing_stock: closing_stock(s),
         ..Default::default()
     }
 }

@@ -2106,6 +2106,16 @@ mod tests {
             closing_stock(Some(true), &[broken], Some(&to)),
             ClosingStock::Unknown(ClosingStockUnknown::Unreadable)
         );
+        // A total that does not fit in paise is unreadable, never a wrapped or zero figure.
+        let huge = stock_summary_part(
+            "20260331",
+            "<STOCKITEM NAME=\"A\"><CLOSINGVALUE>-92233720368547758.07</CLOSINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"B\"><CLOSINGVALUE>-1.00</CLOSINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            closing_stock(Some(true), &[huge], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::Unreadable)
+        );
         // A part that lists no stock item is not a closing stock of zero. A part that lists items
         // with no closing value is still counted as nothing, as `stock_summary` counts it.
         let empty = stock_summary_part("20260331", "");

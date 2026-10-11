@@ -13796,16 +13796,16 @@
   "by": "author",
   "what": "book.rs: an unreadable Stock Summary read as a closing stock of zero",
   "file": "src/book.rs",
-  "from": "        Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),",
-  "to": "        Err(_) => ClosingStock::Valued(0),"
+  "from": "\n        Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),\n    }\n}",
+  "to": "\n        Err(_) => ClosingStock::Valued(0),\n    }\n}"
  },
  {
   "id": "CS-7",
   "by": "author",
   "what": "book.rs: closing stock counts only the Summary's positive values",
   "file": "src/book.rs",
-  "from": ".and_then(|s| s.total_value_paise())",
-  "to": ".and_then(|s| s.positive_value_paise())"
+  "from": "Ok(snapshot) => match snapshot.total_value_paise() {",
+  "to": "Ok(snapshot) => match snapshot.positive_value_paise() {"
  },
  {
   "id": "CS-8",
@@ -14022,5 +14022,13 @@
   "file": "src/financial_statements.rs",
   "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
   "to": "closing != 0 || row.closing_paise != 0;"
+ },
+ {
+  "id": "CS-10",
+  "by": "author",
+  "what": "book.rs: a Stock Summary whose total overflows is read as a closing stock of zero",
+  "file": "src/book.rs",
+  "from": "            Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),\n        },\n",
+  "to": "            Err(_) => ClosingStock::Valued(0),\n        },\n"
  }
 ]

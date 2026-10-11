@@ -84,24 +84,28 @@ fn plans(marks: &str) -> Vec<ScenarioPlan> {
     ]
 }
 
-/// The response and the requests the simulator saw, each as method, path and
-/// body fingerprint, in order.
-async fn run(plans: Vec<ScenarioPlan>, tool: &str, args: Value) -> (Value, Vec<String>) {
-    let simulator = SequenceSimulator::spawn(plans).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let server = Server::new(Settings {
+fn server_at(port: u16, directory: &std::path::Path) -> Server {
+    Server::new(Settings {
         endpoint: TallyEndpointConfig {
             host: "127.0.0.1".into(),
-            port: simulator.address().port(),
+            port,
         },
-        data_dir: directory.path().into(),
+        data_dir: directory.into(),
         max_rows: 500,
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
-    });
+    })
+}
+
+/// The response and the requests the simulator saw, each as method, path and
+/// body fingerprint, in order.
+async fn run(plans: Vec<ScenarioPlan>, tool: &str, args: Value) -> (Value, Vec<String>) {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address().port(), directory.path());
     let response = server.call_tool(tool, args).await;
     let seen = simulator
         .finish()
@@ -369,12 +373,13 @@ async fn the_answer_says_it_is_for_one_call_and_the_host_limits_are_the_read_cos
 
 #[tokio::test]
 async fn it_takes_no_window() {
-    let (response, seen) = run(
-        Vec::new(),
-        "voucher_read_cost",
-        json!({"company_guid": GUID, "from": "2026-04-01", "to": "2026-04-30"}),
-    )
-    .await;
+    // A refused argument sends nothing: the endpoint is one nothing listens on.
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(9, directory.path())
+        .call_tool(
+            "voucher_read_cost",
+            json!({"company_guid": GUID, "from": "2026-04-01", "to": "2026-04-30"}),
+        )
+        .await;
     assert_eq!(error(&response)["code"], "argument_unknown", "{response}");
-    assert!(seen.is_empty(), "nothing is sent for a refused argument");
 }

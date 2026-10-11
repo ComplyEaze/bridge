@@ -4,7 +4,7 @@
 )]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
-use crate::tally::TallyProduct;
+use crate::tally::{ConnectionStatus, TallyProduct};
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
@@ -1715,22 +1715,6 @@ async fn cancellation_registry_cancels_and_releases_requests() {
         0,
         "operator cancellation must not degrade endpoint health"
     );
-}
-
-#[test]
-fn telemetry_preview_is_privacy_reduced_and_checksummed() {
-    let preview = TallyRuntime::default()
-        .telemetry_preview()
-        .expect("telemetry preview");
-    assert_eq!(preview.schema, "bridge.tally.telemetry-preview/2");
-    assert_eq!(preview.payload_sha256.len(), 64);
-    let preview_value: serde_json::Value =
-        serde_json::from_str(&preview.preview_json).expect("valid preview JSON");
-    assert_eq!(
-        preview_value["privacy_profile"],
-        "fixed_dimensions_bucketed_values_v1"
-    );
-    assert_eq!(preview_value["authenticity_claim"], "none");
 }
 
 /// What each unallocated row says about its own composition, on captures of a

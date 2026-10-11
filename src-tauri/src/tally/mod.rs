@@ -25,7 +25,7 @@ pub use runtime::{
     CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
     OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
     OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
-    TallyTelemetryPreviewExport, UnallocatedComposition, UnallocatedParty,
+    UnallocatedComposition, UnallocatedParty,
 };
 pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
 

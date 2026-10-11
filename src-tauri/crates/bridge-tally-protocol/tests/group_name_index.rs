@@ -13,7 +13,7 @@
 
 use bridge_tally_protocol::native_outstandings::{
     parse_group_name_index, parse_native_group_snapshot, GroupNameIndexError, GroupNameRow,
-    NativeOutstandingsError,
+    NameShape, NativeOutstandingsError,
 };
 use bridge_tally_protocol::{decode_tally_xml_response_bytes_limited, ExpectedTallyTextEncoding};
 use quick_xml::events::Event;
@@ -231,29 +231,60 @@ fn the_shape_lab_alias_row_keeps_its_stored_name_first_and_its_alias_after() {
     }
 }
 
-/// The `NAME` attribute can differ from the stored name; the index reads the
-/// names only from `NAME.LIST`.
+/// The names come from `NAME.LIST`, and the row's `NAME=` attribute must agree
+/// with the stored (first) name. No capture shows them differing, so a
+/// disagreement is a shape the index refuses rather than resolves.
 #[test]
-fn names_come_from_the_name_list_never_the_name_attribute() {
+fn names_come_from_the_name_list_and_the_name_attribute_must_agree() {
     let text = shape_lab();
-    let changed = replace_once(
+    let row_number = row_of(&text, "Bank OD A/c");
+    let attribute = "<GROUP NAME=\"Bank OD A/c\" RESERVEDNAME=\"Bank OD A/c\">";
+    // The attribute alone changed.
+    let attribute_only = replace_once(
         &text,
-        "<GROUP NAME=\"Bank OD A/c\" RESERVEDNAME=\"Bank OD A/c\">",
+        attribute,
         "<GROUP NAME=\"Attribute Only\" RESERVEDNAME=\"Bank OD A/c\">",
     );
-    let index = parse(&changed).unwrap();
+    assert_eq!(
+        parse(&attribute_only),
+        Err(GroupNameIndexError::NameAttributeDisagrees { row: row_number })
+    );
+    // The stored name alone changed.
+    let list_only = replace_once(&text, "<NAME>Bank OD A/c</NAME>", "<NAME>List Only</NAME>");
+    assert_eq!(
+        parse(&list_only),
+        Err(GroupNameIndexError::NameAttributeDisagrees { row: row_number })
+    );
+    // An alias is not compared with the attribute.
+    let alias_changed = replace_once(
+        &text,
+        "<NAME>Bank OCC A/c</NAME>",
+        "<NAME>Other Alias</NAME>",
+    );
+    let row = parse(&alias_changed).unwrap();
+    assert_eq!(
+        row.iter()
+            .find(|row| row.guid == BANK_OD_GUID)
+            .unwrap()
+            .names,
+        ["Bank OD A/c", "Other Alias"]
+    );
+    // Both changed together agree, and the name read is the list's.
+    let both = replace_once(
+        &list_only,
+        attribute,
+        "<GROUP NAME=\"List Only\" RESERVEDNAME=\"Bank OD A/c\">",
+    );
+    let index = parse(&both).unwrap();
     let row = index.iter().find(|row| row.guid == BANK_OD_GUID).unwrap();
-    assert_eq!(row.names, ["Bank OD A/c", "Bank OCC A/c"]);
-    assert!(index
-        .iter()
-        .all(|row| !row.names.iter().any(|name| name == "Attribute Only")));
+    assert_eq!(row.names, ["List Only", "Bank OCC A/c"]);
 }
 
 #[test]
 fn every_name_list_of_every_language_list_is_read_in_document_order() {
     let text = shape_lab();
     // A second NAME.LIST in the same language list, then a second language
-    // list, then a stray NAME.LIST outside any language list.
+    // list.
     let span = language_list_span(&text, "<GROUP NAME=\"Bank OD A/c\"");
     let original = &text[span.clone()];
     let close = "</LANGUAGENAME.LIST>";
@@ -263,9 +294,8 @@ fn every_name_list_of_every_language_list_is_read_in_document_order() {
     );
     rebuilt.push_str(close);
     rebuilt.push_str("<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>Other Language</NAME></NAME.LIST><LANGUAGEID> 1081</LANGUAGEID></LANGUAGENAME.LIST>");
-    rebuilt.push_str("<NAME.LIST TYPE=\"String\"><NAME>Stray Outside</NAME></NAME.LIST>");
     let mut changed = text.clone();
-    changed.replace_range(span, &rebuilt);
+    changed.replace_range(span.clone(), &rebuilt);
     let index = parse(&changed).unwrap();
     let row = index.iter().find(|row| row.guid == BANK_OD_GUID).unwrap();
     assert_eq!(
@@ -284,6 +314,212 @@ fn every_name_list_of_every_language_list_is_read_in_document_order() {
         index.iter().map(|row| row.names.len()).sum::<usize>(),
         names
     );
+}
+
+/// A name the walk would otherwise step over is refused with its row, never
+/// dropped: a `NAME.LIST` outside any language list, a `NAME` outside any
+/// `NAME.LIST`, and anything but a `NAME` inside a `NAME.LIST`.
+#[test]
+fn a_name_in_a_shape_no_capture_shows_is_refused_not_dropped() {
+    let text = shape_lab();
+    let row_number = row_of(&text, "Bank OD A/c");
+    let span = language_list_span(&text, "<GROUP NAME=\"Bank OD A/c\"");
+    let original = text[span.clone()].to_string();
+    let close = "</LANGUAGENAME.LIST>";
+    let before_close = original[..original.len() - close.len()].to_string();
+    let cases: [(&str, String, NameShape); 7] = [
+        (
+            "NAME.LIST beside the language list",
+            format!("{original}<NAME.LIST TYPE=\"String\"><NAME>Stray Outside</NAME></NAME.LIST>"),
+            NameShape::NameListOutsideLanguageList,
+        ),
+        (
+            "NAME.LIST before the language list",
+            format!("<NAME.LIST TYPE=\"String\"><NAME>Stray Outside</NAME></NAME.LIST>{original}"),
+            NameShape::NameListOutsideLanguageList,
+        ),
+        (
+            "empty NAME.LIST beside the language list",
+            format!("{original}<NAME.LIST/>"),
+            NameShape::NameListOutsideLanguageList,
+        ),
+        (
+            "NAME directly under the language list",
+            format!("{before_close}<NAME>Bare Name</NAME>{close}"),
+            NameShape::NameDirectlyUnderLanguageList,
+        ),
+        (
+            "empty NAME directly under the language list",
+            format!("{before_close}<NAME/>{close}"),
+            NameShape::NameDirectlyUnderLanguageList,
+        ),
+        (
+            "other element inside a NAME.LIST",
+            original.replace("</NAME.LIST>", "<ALIAS>Not A Name</ALIAS></NAME.LIST>"),
+            NameShape::ElementOtherThanNameInNameList,
+        ),
+        (
+            "empty other element inside a NAME.LIST",
+            original.replace("</NAME.LIST>", "<ALIAS/></NAME.LIST>"),
+            NameShape::ElementOtherThanNameInNameList,
+        ),
+    ];
+    for (label, replacement, shape) in cases {
+        assert_ne!(replacement, original, "{label}");
+        let mut changed = text.clone();
+        changed.replace_range(span.clone(), &replacement);
+        assert_eq!(
+            parse(&changed),
+            Err(GroupNameIndexError::UnrecognisedNameShape {
+                row: row_number,
+                shape
+            }),
+            "{label}"
+        );
+    }
+}
+
+/// The index is the strict reader; the snapshot parser keeps reading these
+/// rows exactly as it did. A `GUID` with an invalid escape is read around by
+/// the snapshot and refused by the index, and a cut inside a language list
+/// keeps the snapshot's own error code.
+#[test]
+fn the_snapshot_parser_keeps_its_results_and_codes_where_the_index_is_stricter() {
+    let text = shape_lab();
+    let snapshot = parse_native_group_snapshot(&text, SHAPE_GUID).unwrap();
+
+    let bogus = replace_once(&text, BANK_ACCOUNTS_GUID, "<GUID>&bogus;</GUID>");
+    assert_eq!(
+        parse_native_group_snapshot(&bogus, SHAPE_GUID).as_ref(),
+        Ok(&snapshot),
+        "the snapshot does not read the GUID"
+    );
+    assert_eq!(
+        parse(&bogus),
+        Err(GroupNameIndexError::Response(
+            NativeOutstandingsError::InvalidResponse("native_xml_invalid_escape")
+        ))
+    );
+
+    let span = language_list_span(&text, "<GROUP NAME=\"Bank Accounts\"");
+    let cut = &text[..span.start + "<LANGUAGENAME.LIST>".len()];
+    assert_eq!(
+        parse_native_group_snapshot(cut, SHAPE_GUID),
+        Err(NativeOutstandingsError::InvalidResponse(
+            "ledger_subtree_unterminated"
+        ))
+    );
+    assert_eq!(
+        parse(cut),
+        Err(GroupNameIndexError::Response(
+            NativeOutstandingsError::InvalidResponse("group_row_unterminated")
+        ))
+    );
+
+    // Stray name shapes and a row moved out of the collection are the index's
+    // refusals only.
+    let stray = {
+        let mut changed = text.clone();
+        changed.insert_str(span.end, "<NAME.LIST><NAME>Stray</NAME></NAME.LIST>");
+        changed
+    };
+    assert_eq!(
+        parse_native_group_snapshot(&stray, SHAPE_GUID).as_ref(),
+        Ok(&snapshot)
+    );
+    assert!(parse(&stray).is_err());
+
+    // An empty collection keeps the snapshot's code.
+    let empty = without_rows(&text);
+    assert_eq!(
+        parse_native_group_snapshot(&empty, SHAPE_GUID),
+        Err(NativeOutstandingsError::InvalidResponse(
+            "group_response_company_guid_missing"
+        ))
+    );
+}
+
+/// The capture with every `GROUP` row removed from the collection.
+fn without_rows(text: &str) -> String {
+    let start = text.find("<GROUP NAME=").unwrap();
+    let end = text.rfind("</GROUP>").unwrap() + "</GROUP>".len();
+    format!("{}{}", &text[..start], &text[end..])
+}
+
+#[test]
+fn a_collection_with_no_rows_is_its_own_refusal() {
+    let text = shape_lab();
+    let empty = without_rows(&text);
+    assert_eq!(structure(&empty).0, 0);
+    assert_eq!(parse(&empty), Err(GroupNameIndexError::EmptyCollection));
+    // An unrelated empty collection is not a company mismatch either.
+    assert_eq!(
+        parse_group_name_index(&empty, "someone-else"),
+        Err(GroupNameIndexError::EmptyCollection)
+    );
+}
+
+/// A body cut after a row, whether the first or the last, is unterminated: the
+/// rows read so far must not be returned as the whole collection.
+#[test]
+fn a_body_cut_after_a_complete_row_is_refused_as_unterminated() {
+    let text = shape_lab();
+    let after_first = text.find("</GROUP>").unwrap() + "</GROUP>".len();
+    let after_last = text.rfind("</GROUP>").unwrap() + "</GROUP>".len();
+    assert!(after_first < after_last);
+    for (label, end) in [("first", after_first), ("last", after_last)] {
+        assert_eq!(
+            parse(&text[..end]),
+            Err(GroupNameIndexError::Response(
+                NativeOutstandingsError::InvalidResponse("group_envelope_unterminated")
+            )),
+            "cut after the {label} row"
+        );
+    }
+}
+
+/// A `GROUP` that is not under `ENVELOPE/BODY/DATA/COLLECTION` would be
+/// stepped over by the row walk, leaving fewer rows than Tally sent; the index
+/// refuses it. The bare `CMPINFO` counter is the one `GROUP` allowed elsewhere.
+#[test]
+fn a_group_outside_the_collection_is_refused_not_skipped() {
+    let text = shape_lab();
+    let start = text.find("<GROUP NAME=\"Bank OD A/c\"").unwrap();
+    let end = start + text[start..].find("</GROUP>").unwrap() + "</GROUP>".len();
+    let row = text[start..end].to_string();
+    let mut without = text.clone();
+    without.replace_range(start..end, "");
+    let (rows, _) = structure(&text);
+    assert_eq!(structure(&without).0, rows - 1);
+
+    let placements: [(&str, &str, String); 4] = [
+        (
+            "DATA, after the collection",
+            "</COLLECTION>",
+            format!("</COLLECTION>{row}"),
+        ),
+        (
+            "DESC, after the counters",
+            "</CMPINFO>",
+            format!("</CMPINFO>{row}"),
+        ),
+        ("BODY, after DATA", "</DATA>", format!("</DATA>{row}")),
+        (
+            "self-closing, in DATA",
+            "</COLLECTION>",
+            "</COLLECTION><GROUP/>".to_string(),
+        ),
+    ];
+    for (label, anchor, replacement) in placements {
+        let moved = replace_once(&without, anchor, &replacement);
+        assert_eq!(
+            parse(&moved),
+            Err(GroupNameIndexError::GroupOutsideCollection),
+            "{label}"
+        );
+    }
+    // The original, with its CMPINFO counter, is the control.
+    assert!(parse(&text).is_ok());
 }
 
 #[test]
@@ -450,8 +686,8 @@ fn a_row_with_no_names_is_refused() {
         "<LANGUAGENAME.LIST><LANGUAGEID> 1033</LANGUAGEID></LANGUAGENAME.LIST>",
         // A NAME.LIST with no NAME.
         "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"></NAME.LIST></LANGUAGENAME.LIST>",
-        // A NAME.LIST outside any language list does not count.
-        "<NAME.LIST TYPE=\"String\"><NAME>Bank Accounts</NAME></NAME.LIST>",
+        // An empty NAME.LIST.
+        "<LANGUAGENAME.LIST><NAME.LIST/></LANGUAGENAME.LIST>",
     ] {
         let mut changed = text.clone();
         changed.replace_range(span.clone(), replacement);
@@ -525,7 +761,11 @@ fn the_response_company_guid_must_be_present_and_the_expected_one() {
 #[test]
 fn a_response_that_is_not_a_usable_group_answer_is_a_response_error() {
     let text = shape_lab();
-    let cut = &text[..text.len() / 2];
+    // Cut on a character boundary at about the middle.
+    let middle = (text.len() / 2..=text.len())
+        .find(|&at| text.is_char_boundary(at))
+        .unwrap();
+    let cut = &text[..middle];
     assert!(matches!(
         parse(cut),
         Err(GroupNameIndexError::Response(

@@ -4,19 +4,23 @@
 //! it already fetches `GUID`, `ALTERID` and `PARENT`, and the response carries
 //! each group's `LANGUAGENAME.LIST`, whose `NAME.LIST` holds the stored name
 //! first and any aliases after it (measured on the Shape Lab capture: `Bank OD
-//! A/c` lists `Bank OCC A/c` as a second `NAME`). The row's `NAME=` attribute is
-//! deliberately not read, because it can differ from the stored name.
+//! A/c` lists `Bank OCC A/c` as a second `NAME`). Names are read only from
+//! `NAME.LIST`; the row's `NAME=` attribute is cross-checked against the stored
+//! name and a disagreement is refused. Every capture agrees, so a disagreement
+//! is a shape not yet observed.
 //!
 //! The envelope, `STATUS`, collection scoping and the per-row company binding
-//! are the snapshot parser's own ([`super::wire::walk_group_snapshot`]); this
-//! module only adds the identity checks the index needs and refuses, with a
-//! typed variant, every row it cannot admit.
+//! are the snapshot parser's own ([`super::wire::walk_group_snapshot`], in its
+//! stricter `NameIndex` mode); this module adds the identity checks the index
+//! needs and refuses, with a typed variant, every row or shape it cannot admit.
+//! The snapshot readers are not made stricter by any of this.
 
 use std::collections::HashMap;
 
 use super::model::NativeOutstandingsError;
 use super::wire::{
-    walk_group_snapshot, GroupRowIdentity, GROUP_COMPANY_GUID_MISMATCH, GROUP_COMPANY_GUID_MISSING,
+    walk_group_snapshot, GroupRowIdentity, GroupWalkMode, GROUP_COLLECTION_EMPTY,
+    GROUP_COMPANY_GUID_MISMATCH, GROUP_COMPANY_GUID_MISSING, GROUP_OUTSIDE_COLLECTION,
 };
 use crate::PartyLedgerMasterFieldObservation;
 
@@ -46,8 +50,7 @@ pub enum GroupNameIndexError {
     /// unterminated, `STATUS` failure or absent, no collection, or a row
     /// without its `NAME` or `PARENT`): the snapshot parser's own refusal.
     Response(NativeOutstandingsError),
-    /// A row's request-computed `BRIDGECOMPANYGUID` is absent or empty, or
-    /// the collection holds no rows to carry one.
+    /// A row's request-computed `BRIDGECOMPANYGUID` is absent or empty.
     CompanyGuidMissing,
     /// A row's `BRIDGECOMPANYGUID` is not the requested company's.
     CompanyGuidMismatch,
@@ -68,6 +71,27 @@ pub enum GroupNameIndexError {
     NoNames { row: usize },
     /// A `NAME` of the row is empty or whitespace.
     EmptyName { row: usize },
+    /// The row's `NAME=` attribute is not its first (stored) name.
+    NameAttributeDisagrees { row: usize },
+    /// The row holds names in a shape no capture shows, where reading around
+    /// it would drop a name silently.
+    UnrecognisedNameShape { row: usize, shape: NameShape },
+    /// A `GROUP` element sits outside `ENVELOPE/BODY/DATA/COLLECTION` (the
+    /// `CMPINFO` counter excepted), so the rows read would be fewer than sent.
+    GroupOutsideCollection,
+    /// The collection holds no `GROUP` rows at all.
+    EmptyCollection,
+}
+
+/// A name-bearing shape the index refuses rather than skips.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NameShape {
+    /// A `NAME.LIST` directly under `GROUP`, outside any `LANGUAGENAME.LIST`.
+    NameListOutsideLanguageList,
+    /// A `NAME` directly under `LANGUAGENAME.LIST`, outside any `NAME.LIST`.
+    NameDirectlyUnderLanguageList,
+    /// An element other than `NAME` inside a `NAME.LIST`.
+    ElementOtherThanNameInNameList,
 }
 
 /// Parses a `List of Groups` answer into the group name index.
@@ -81,15 +105,22 @@ pub fn parse_group_name_index(
     xml: &str,
     expected_company_guid: &str,
 ) -> Result<Vec<GroupNameRow>, GroupNameIndexError> {
-    let walked = walk_group_snapshot(xml, expected_company_guid).map_err(|error| match error {
-        NativeOutstandingsError::InvalidResponse(GROUP_COMPANY_GUID_MISSING) => {
-            GroupNameIndexError::CompanyGuidMissing
-        }
-        NativeOutstandingsError::InvalidResponse(GROUP_COMPANY_GUID_MISMATCH) => {
-            GroupNameIndexError::CompanyGuidMismatch
-        }
-        other => GroupNameIndexError::Response(other),
-    })?;
+    let walked = walk_group_snapshot(xml, expected_company_guid, GroupWalkMode::NameIndex)
+        .map_err(|error| match error {
+            NativeOutstandingsError::InvalidResponse(GROUP_COMPANY_GUID_MISSING) => {
+                GroupNameIndexError::CompanyGuidMissing
+            }
+            NativeOutstandingsError::InvalidResponse(GROUP_COMPANY_GUID_MISMATCH) => {
+                GroupNameIndexError::CompanyGuidMismatch
+            }
+            NativeOutstandingsError::InvalidResponse(GROUP_OUTSIDE_COLLECTION) => {
+                GroupNameIndexError::GroupOutsideCollection
+            }
+            NativeOutstandingsError::InvalidResponse(GROUP_COLLECTION_EMPTY) => {
+                GroupNameIndexError::EmptyCollection
+            }
+            other => GroupNameIndexError::Response(other),
+        })?;
 
     let mut first_row_of_guid: HashMap<String, usize> = HashMap::with_capacity(walked.len());
     let mut index = Vec::with_capacity(walked.len());
@@ -99,6 +130,7 @@ pub fn parse_group_name_index(
             guids,
             alter_ids,
             names,
+            unrecognised_name_shape,
         } = walked_row.row.identity;
 
         let guid = single(guids, row, |row| GroupNameIndexError::GuidRepeatedInRow {
@@ -121,11 +153,17 @@ pub fn parse_group_name_index(
         let alter_id =
             parse_alter_id(&alter_id).ok_or(GroupNameIndexError::AlterIdNotNumeric { row })?;
 
+        if let Some(shape) = unrecognised_name_shape {
+            return Err(GroupNameIndexError::UnrecognisedNameShape { row, shape });
+        }
         if names.is_empty() {
             return Err(GroupNameIndexError::NoNames { row });
         }
         if names.iter().any(|name| name.trim().is_empty()) {
             return Err(GroupNameIndexError::EmptyName { row });
+        }
+        if names[0] != walked_row.row.record.name {
+            return Err(GroupNameIndexError::NameAttributeDisagrees { row });
         }
 
         let parent = match walked_row.row.record.parent {

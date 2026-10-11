@@ -44,22 +44,33 @@ fn the_gst_duty_head_table_lists_six_distinct_heads_and_six_distinct_spellings()
     }
 }
 
-/// A new head fails to compile here until it is placed in the table.
+/// A head added to the enum fails to compile here until its spelling is
+/// written down, and fails the assertions until it is in `ALL`.
 #[test]
-fn the_gst_duty_head_table_holds_every_variant() {
-    fn position(head: GstDutyHead) -> usize {
+fn the_gst_duty_head_table_holds_every_variant_with_its_spelling() {
+    fn expected_spelling(head: GstDutyHead) -> &'static str {
         match head {
-            GstDutyHead::Cgst => 0,
-            GstDutyHead::Igst => 1,
-            GstDutyHead::StateTax => 2,
-            GstDutyHead::SgstUtgst => 3,
-            GstDutyHead::UtTax => 4,
-            GstDutyHead::Cess => 5,
+            GstDutyHead::Cgst => "CGST",
+            GstDutyHead::Igst => "IGST",
+            GstDutyHead::StateTax => "State Tax",
+            GstDutyHead::SgstUtgst => "SGST/UTGST",
+            GstDutyHead::UtTax => "UT Tax",
+            GstDutyHead::Cess => "Cess",
         }
     }
-    for (index, head) in GstDutyHead::ALL.into_iter().enumerate() {
-        assert_eq!(position(head), index);
+    let every_variant = [
+        GstDutyHead::Cgst,
+        GstDutyHead::Igst,
+        GstDutyHead::StateTax,
+        GstDutyHead::SgstUtgst,
+        GstDutyHead::UtTax,
+        GstDutyHead::Cess,
+    ];
+    for head in every_variant {
+        assert!(GstDutyHead::ALL.contains(&head), "{head:?} is not in ALL");
+        assert_eq!(head.tally_spelling(), expected_spelling(head), "{head:?}");
     }
+    assert_eq!(GstDutyHead::ALL.len(), every_variant.len());
 }
 
 /// Anything outside the table stays unrecognised, including the spellings

@@ -30,7 +30,7 @@ pub use compute::{
     NativeGroupSnapshot, NativeMasterSnapshot,
 };
 pub use date::{parse_native_bill_date, parse_native_due_date};
-pub use group_name_index::{parse_group_name_index, GroupNameIndexError, GroupNameRow};
+pub use group_name_index::{parse_group_name_index, GroupNameIndexError, GroupNameRow, NameShape};
 pub use ledger_currency::{
     classify_ledger_currencies, parse_currency_master_list, BaseCurrencyName, CurrencyMasters,
     ForeignCurrencyLedger, IdentifiedBaseCurrency, LedgerCurrencies, LedgerCurrencyRefusal,

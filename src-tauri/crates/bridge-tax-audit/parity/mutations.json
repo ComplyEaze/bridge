@@ -13744,7 +13744,30 @@
   "to": "        Value::Array(a) if a.is_empty() => Ok(None),\n        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),"
  },
  {
-<<<<<<< HEAD
+  "id": "BE-41",
+  "by": "author",
+  "what": "a bank statement not supplied is listed as examined",
+  "file": "src/registry.rs",
+  "from": "matches!(self.bank_statement, BankStatementLoad::Read(_)),",
+  "to": "!matches!(self.bank_statement, BankStatementLoad::Refused(_)),"
+ },
+ {
+  "id": "E2A-83",
+  "by": "author",
+  "what": "bank_reconciliation runs, and gives a result, with no bank statement supplied",
+  "file": "src/lib.rs",
+  "from": "        documents::BankStatementLoad::NotSupplied => {\n            return Err(AuditError::Config(format!(",
+  "to": "        documents::BankStatementLoad::NotSupplied => {\n            if true {\n                return Ok(serde_json::Value::Null);\n            }\n            return Err(AuditError::Config(format!("
+ },
+ {
+  "id": "HV-33",
+  "by": "author",
+  "what": "a bank statement not supplied is reported as refused in s.194N's coverage",
+  "file": "src/high_value_register.rs",
+  "from": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"no bank statement supplied for this engagement\".to_string(),\n        )?,",
+  "to": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"the bank statement supplied was refused (it has no reason)\".to_string(),\n        )?,"
+ },
+ {
   "id": "CS-1",
   "by": "author",
   "what": "book.rs: an unknown integration flag read as integrated for closing stock",
@@ -14023,29 +14046,5 @@
   "file": "src/book.rs",
   "from": "            Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),\n        },\n",
   "to": "            Err(_) => ClosingStock::Valued(0),\n        },\n"
-=======
-  "id": "BE-41",
-  "by": "author",
-  "what": "a bank statement not supplied is listed as examined",
-  "file": "src/registry.rs",
-  "from": "matches!(self.bank_statement, BankStatementLoad::Read(_)),",
-  "to": "!matches!(self.bank_statement, BankStatementLoad::Refused(_)),"
- },
- {
-  "id": "E2A-83",
-  "by": "author",
-  "what": "bank_reconciliation runs, and gives a result, with no bank statement supplied",
-  "file": "src/lib.rs",
-  "from": "        documents::BankStatementLoad::NotSupplied => {\n            return Err(AuditError::Config(format!(",
-  "to": "        documents::BankStatementLoad::NotSupplied => {\n            if true {\n                return Ok(serde_json::Value::Null);\n            }\n            return Err(AuditError::Config(format!("
- },
- {
-  "id": "HV-33",
-  "by": "author",
-  "what": "a bank statement not supplied is reported as refused in s.194N's coverage",
-  "file": "src/high_value_register.rs",
-  "from": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"no bank statement supplied for this engagement\".to_string(),\n        )?,",
-  "to": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"the bank statement supplied was refused (it has no reason)\".to_string(),\n        )?,"
->>>>>>> 9e7c2b35640867e998453a37f9b1270a5b9c6c6f
  }
 ]

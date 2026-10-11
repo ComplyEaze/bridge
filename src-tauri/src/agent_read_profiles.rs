@@ -210,6 +210,56 @@ pub(super) fn render_agent_lab_inventory_vouchers(
     render_windowed_vouchers(company, from, to, "", AGENT_LAB_INVENTORY_VOUCHER_FETCH, "")
 }
 
+/// A voucher type's name is quoted into a TDL string literal in the status
+/// read, where XML escaping cannot protect it (Tally decodes `&quot;` before
+/// evaluating, #861), so a name is admitted only when it holds nothing a
+/// literal could be closed or broken by. `&`, `<`, `>` and `'` are refused as
+/// well: Tally's handling of them inside the literal has not been measured.
+pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
+    !name.is_empty()
+        && name.chars().count() <= 100
+        && name == name.trim()
+        && !name
+            .chars()
+            .any(|c| matches!(c, '"' | '\\' | '&' | '<' | '>' | '\'') || c.is_control())
+}
+
+/// The GST status of the vouchers of one type in a date window (R7, 10 Oct
+/// 2026): the narrow field list and the by-name voucher-type filter the lab
+/// answered on a synthetic TallyPrime 7.1 Silver book, over two days holding
+/// Sales vouchers, Receipts and a second Sales-class type. The request is, character
+/// for character, the lab's file `w8-status-narrow-window-sales-byname.xml`
+/// (the identifiers are the ones it carried). The type is named, never
+/// classed: a type of the same class under another name is not selected.
+pub(super) fn render_gst_status_window(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    type_name: &str,
+) -> Result<String, String> {
+    let company = ValidatedCompanyName::new(company.to_string())
+        .map_err(|_| "company_name_invalid".to_string())?;
+    if !gst_status_type_name_literal_safe(type_name) {
+        return Err("gst_status_type_name_invalid".to_string());
+    }
+    // A quoted `$$Date:"…"` literal takes only a date (#861).
+    let (from, to) = (from.as_str(), to.as_str());
+    Ok(format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        xml_escape(company.as_str()),
+        xml_escape(type_name)
+    ))
+}
+
+pub(super) fn gst_status_read(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    type_name: &str,
+) -> Result<ReadRequest, String> {
+    render_gst_status_window(company, from, to, type_name).map(ReadRequest)
+}
+
 pub(super) fn render_agent_changed_vouchers(
     company: &str,
     checkpoint: u64,
@@ -444,6 +494,7 @@ mod sealed_read_tests {
             standard_ledger_catalog_read(company).unwrap(),
             native_group_snapshot_read(company),
             voucher_census_read(company, &from, &to, span).unwrap(),
+            gst_status_read(company, &from, &to, "Sales").unwrap(),
         ];
         for shape in [
             super::super::voucher_window::VoucherReadShape::ImportVerification,

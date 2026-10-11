@@ -425,6 +425,7 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
     assert!(description.contains("`series_numbering`"));
     assert!(description.contains("masters_numbering_names_differ"));
     assert!(description.contains("masters_numbering_identity_differs"));
+    assert!(description.contains("masters_numbering_collection_changed"));
     assert!(description.contains("which `series_numbering` returns instead"));
     assert!(
         !description.contains("which this read does not return"),
@@ -1372,5 +1373,32 @@ async fn a_numbering_answer_that_does_not_parse_is_a_tool_refusal_with_its_cause
     assert_eq!(error(&refused)["code"], "masters_read_failed");
     assert_eq!(error(&refused)["cause"], "masters_numbering_guid_missing");
     // Refused at once: no closing extent, identity or mode read.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_repeats_a_guid_is_a_tool_refusal_with_no_rows() {
+    let masters = capture("voucher_types");
+    let numbering = numbering_for(&masters);
+    // Payment's GUID in Journal's row too: the same GUID on two types.
+    let guid_of = |name: &str| {
+        let at = numbering
+            .find(&format!("<VOUCHERTYPE NAME=\"{name}\""))
+            .unwrap();
+        let open = at + numbering[at..].find("<GUID ").unwrap();
+        let text = open + numbering[open..].find('>').unwrap() + 1;
+        numbering[text..text + numbering[text..].find("</GUID>").unwrap()].to_string()
+    };
+    let repeated = numbering.replacen(&guid_of("Payment"), &guid_of("Journal"), 1);
+    assert_ne!(repeated, numbering);
+    let mut plans = through_opening_extent(14, MARK);
+    pair(&mut plans, xml(masters));
+    pair(&mut plans, xml(repeated));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args("voucher_types", 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed");
+    assert_eq!(error(&refused)["cause"], "masters_row_duplicate_guid");
+    assert!(refused["structuredContent"]["result"]["masters"].is_null());
+    // Refused at once, before the closing extent.
     assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4);
 }

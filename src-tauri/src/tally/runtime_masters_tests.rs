@@ -479,26 +479,24 @@ async fn every_kind_replays_through_every_bracket_at_its_admission_edge() {
         let (result, dispatched) = run(plans, MastersKind::Native(kind)).await;
 
         let (read, extent) = result.unwrap();
-        let MastersRows::Native(masters, numbering) = read.rows else {
-            panic!("a native kind reads a native collection");
+        // Voucher types read a second collection, the numbering, and each row
+        // is paired with its result; no other kind reads or carries it.
+        let rows = match (kind, read.rows) {
+            (NativeMasterKind::VoucherTypes, MastersRows::VoucherTypes(types)) => {
+                assert_eq!(dispatched, 18 + 4, "{kind:?}");
+                types.len()
+            }
+            (_, MastersRows::Native(masters)) if kind != NativeMasterKind::VoucherTypes => {
+                assert_eq!(dispatched, 18, "{kind:?}");
+                masters.rows.len()
+            }
+            _ => panic!("{kind:?} is read as its own collection"),
         };
-        assert_eq!(masters.rows.len(), captured_rows(kind), "{kind:?}");
+        assert_eq!(rows, captured_rows(kind), "{kind:?}");
         assert_eq!(
             extent.master_alter_id_high_water().map(|mark| mark.get()),
             Some(mark)
         );
-        // Voucher types read a second collection, the numbering, and carry one
-        // result per row; no other kind reads or carries it.
-        match kind {
-            NativeMasterKind::VoucherTypes => {
-                assert_eq!(numbering.map(|joined| joined.len()), Some(26));
-                assert_eq!(dispatched, 18 + 4, "{kind:?}");
-            }
-            _ => {
-                assert!(numbering.is_none(), "{kind:?}");
-                assert_eq!(dispatched, 18, "{kind:?}");
-            }
-        }
     }
 }
 
@@ -792,11 +790,10 @@ async fn a_zero_row_capture_reads_as_an_empty_collection_through_every_bracket()
     )
     .await;
 
-    let MastersRows::Native(masters, numbering) = result.unwrap().0.rows else {
+    let MastersRows::Native(masters) = result.unwrap().0.rows else {
         panic!("a native kind reads a native collection");
     };
     assert!(masters.rows.is_empty());
-    assert!(numbering.is_none());
     assert_eq!(dispatched, 18);
 }
 
@@ -899,17 +896,16 @@ async fn each_type_gets_the_numbering_of_its_own_series() {
     )
     .await;
     assert_eq!(dispatched, VOUCHER_TYPES_SEQUENCE);
-    let MastersRows::Native(masters, Some(numbering)) = result.unwrap().0.rows else {
+    let MastersRows::VoucherTypes(types) = result.unwrap().0.rows else {
         panic!("voucher types carry their numbering");
     };
-    assert_eq!(masters.rows.len(), 24);
-    assert_eq!(numbering.len(), 24);
+    assert_eq!(types.len(), 24);
+    let numbering = types
+        .iter()
+        .map(|(_, numbering)| numbering.clone())
+        .collect::<Vec<_>>();
     let of = |name: &str| {
-        let at = masters
-            .rows
-            .iter()
-            .position(|row| row.name == name)
-            .unwrap();
+        let at = types.iter().position(|(row, _)| row.name == name).unwrap();
         &numbering[at]
     };
     let observed = |method, duplicates| VoucherTypeNumbering::Observed { method, duplicates };
@@ -1155,39 +1151,30 @@ async fn a_book_that_moved_between_the_two_reads_is_reported_as_moved() {
 }
 
 #[tokio::test]
-async fn a_numbering_answer_that_repeats_a_guid_is_a_premise_refusal_held_to_the_closing_extent() {
+async fn a_numbering_answer_that_repeats_a_guid_is_refused_at_once_by_the_parser() {
     let masters = capture(NativeMasterKind::VoucherTypes);
     let numbering = numbering_for(&masters);
-    let journal = parse_voucher_type_numbering(&numbering)
-        .unwrap()
-        .into_iter()
-        .find(|row| row.name == "Journal")
-        .unwrap();
-    let payment = parse_voucher_type_numbering(&numbering)
-        .unwrap()
-        .into_iter()
-        .find(|row| row.name == "Payment")
-        .unwrap();
-    let repeated = numbering.replacen(&payment.guid, &journal.guid, 1);
+    let guid_of = |name: &str| {
+        parse_voucher_type_numbering(&numbering)
+            .unwrap()
+            .into_iter()
+            .find(|row| row.name == name)
+            .unwrap()
+            .guid
+    };
+    let repeated = numbering.replacen(&guid_of("Payment"), &guid_of("Journal"), 1);
     assert_ne!(repeated, numbering);
     let (result, dispatched) = run(
-        through_closing_extent_numbered(
-            extent_with_mark(50_000_000),
-            masters,
-            repeated,
-            extent_with_mark(50_000_000),
-        ),
+        through_numbering(extent_with_mark(50_000_000), masters, repeated),
         VOUCHER_TYPES_KIND,
     )
     .await;
-    let error = result.err().expect("refused");
-    let violated = cause::<MastersReadError>(&error).expect("a premise refusal");
-    assert!(matches!(
-        violated,
-        MastersReadError::PremiseViolated("masters_numbering_guid_repeated")
-    ));
-    assert_eq!(violated.safe_code(), "masters_bound_premise_violated");
-    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+    let error = result.err().expect("refused: no rows come back");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::DuplicateGuid)
+    );
+    assert_eq!(dispatched, 3 + 4 + 4 + 4);
 }
 
 #[test]
@@ -1207,13 +1194,6 @@ fn the_numbering_premise_checks_refuse_each_way_its_answer_can_outgrow_its_mark(
     assert_eq!(
         violated(check_numbering_premise(&rows, 23, 0, u64::MAX)),
         "masters_numbering_rows_exceed_master_mark"
-    );
-    // A GUID twice.
-    let mut repeated = rows.clone();
-    repeated[1].guid = repeated[0].guid.to_ascii_uppercase();
-    assert_eq!(
-        violated(check_numbering_premise(&repeated, 1_000, 0, u64::MAX)),
-        "masters_numbering_guid_repeated"
     );
     // A response one byte over the budget it is held to.
     assert_eq!(

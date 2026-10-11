@@ -387,14 +387,21 @@ name as a second equality. It is `{"observation":"observed","method":...,"duplic
 `{"unrecognised": "<raw text>"}`; `duplicates` is `prevented` or `not_prevented`),
 `{"observation":"series_count","count":n}` where a type has no series or
 several (nothing is read from it), or `{"observation":"field_invalid","code":...}`.
-A type found on one side only, or a GUID and name that disagree between the
-two answers, refuses the whole read (`masters_numbering_names_differ`,
-`masters_numbering_identity_differs`), and the second collection changing
-between its two reads refuses it as `masters_numbering_collection_changed`.
-Measured on one synthetic book (TallyPrime 7.1 Silver, Windows) on which every
-voucher type held one series, named `Default`; more than one series,
-Multi-user Auto, a single series not named `Default`, a voucher type created
-new and other releases are not measured, an `unrecognised` method is never
+A type found in one answer only (`masters_numbering_names_differ`), or a GUID
+and name that disagree between the two answers
+(`masters_numbering_identity_differs`), refuses the whole read; so does the
+numbering collection changing between its two reads
+(`masters_numbering_collection_changed`) and a numbering answer whose row count
+or size breaks the mark's premise (`masters_bound_premise_violated`). A
+numbering answer that does not parse, a missing or repeated GUID among the
+causes, refuses at once with a `masters_*` cause. Measured on one synthetic
+book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series
+named `Default`, of which three (Journal Automatic, Payment Manual with
+duplicates prevented, Receipt Manual with duplicates not prevented) were
+checked against Tally's screen. Automatic (Manual Override), seen once on a
+real book on 28 September 2026 and on no captured response, more than one
+series, Multi-user Auto, a single series not named `Default`, a voucher type
+created new and other releases are not measured, an `unrecognised` method is never
 `manual`, and the integrated read, the two captured requests sent as one tool
 call, has not yet been run on a live Tally.
 
@@ -430,8 +437,7 @@ than the mark, an AlterID above it, a repeated AlterID or an oversize response
 refuses the whole read as `masters_bound_premise_violated`, unless the closing
 extent shows the book moved, which is reported instead
 (`masters_extent_changed`). The voucher types' numbering answer is held to
-the same kind of checks (more rows than the mark, a repeated GUID or an
-oversize response). A response Bridge cannot read refuses at once with
+the same kind of checks (more rows than the mark or an oversize response). A response Bridge cannot read refuses at once with
 a `masters_*` cause (for `groups`, the group reader's, such as `group_xml_malformed`),
 without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every

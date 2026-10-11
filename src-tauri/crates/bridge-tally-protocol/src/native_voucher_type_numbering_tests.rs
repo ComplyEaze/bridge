@@ -353,14 +353,12 @@ fn an_envelope_that_is_not_the_closed_shape_is_refused() {
 const PAYMENT_GUID: &str = "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000022";
 const PAYMENT_GUID_ELEMENT: &str =
     "<GUID TYPE=\"String\">3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000022</GUID>";
-const PAYMENT_ALTERID_ELEMENT: &str = "<ALTERID TYPE=\"Number\"> 217</ALTERID>";
 
 #[test]
-fn every_captured_row_keeps_its_guid_and_alter_id() {
+fn every_captured_row_keeps_its_guid() {
     let text = response();
     // Counted from the file by element name, independently of the parser.
     assert_eq!(text.matches("<GUID ").count(), 24);
-    assert_eq!(text.matches("<ALTERID ").count(), 24);
     let rows = parse_voucher_type_numbering(&text).unwrap();
     assert_eq!(rows.len(), 24);
     for row in &rows {
@@ -369,24 +367,8 @@ fn every_captured_row_keeps_its_guid_and_alter_id() {
             "{}",
             row.name
         );
-        assert!(
-            text.contains(&format!(
-                "<ALTERID TYPE=\"Number\"> {}</ALTERID>",
-                row.alter_id
-            )),
-            "{}",
-            row.name
-        );
     }
     assert_eq!(row(&rows, "Payment").guid, PAYMENT_GUID);
-    assert_eq!(
-        [
-            row(&rows, "Journal").alter_id,
-            row(&rows, "Payment").alter_id,
-            row(&rows, "Receipt").alter_id
-        ],
-        [207, 217, 219]
-    );
     // 24 distinct GUIDs: the join key is unique in the capture.
     assert_eq!(
         rows.iter()
@@ -398,7 +380,7 @@ fn every_captured_row_keeps_its_guid_and_alter_id() {
 }
 
 #[test]
-fn a_missing_blank_or_repeated_guid_or_alter_id_is_a_typed_error_not_a_default() {
+fn a_missing_blank_or_repeated_guid_is_a_typed_error_not_a_default() {
     let refused =
         |from: &str, to: &str| parse_voucher_type_numbering(&edited(from, to)).unwrap_err();
     assert_eq!(
@@ -435,59 +417,40 @@ fn a_missing_blank_or_repeated_guid_or_alter_id_is_a_typed_error_not_a_default()
         ),
         repeated_guid
     );
-    assert_eq!(
-        refused(PAYMENT_ALTERID_ELEMENT, ""),
-        NativeMastersError::Malformed("masters_numbering_alter_id_missing")
-    );
-    assert_eq!(
-        refused(PAYMENT_ALTERID_ELEMENT, "<ALTERID/>"),
-        NativeMastersError::Malformed("masters_numbering_alter_id_missing")
-    );
-    let repeated_alter_id = NativeMastersError::Malformed("masters_numbering_alter_id_repeated");
-    assert_eq!(
-        refused(
-            PAYMENT_ALTERID_ELEMENT,
-            &format!("{PAYMENT_ALTERID_ELEMENT}{PAYMENT_ALTERID_ELEMENT}")
-        ),
-        repeated_alter_id
-    );
-    assert_eq!(
-        refused(
-            PAYMENT_ALTERID_ELEMENT,
-            &format!("{PAYMENT_ALTERID_ELEMENT}<ALTERID/>")
-        ),
-        repeated_alter_id
-    );
-    assert_eq!(
-        refused(
-            PAYMENT_ALTERID_ELEMENT,
-            "<ALTERID TYPE=\"Number\">abc</ALTERID>"
-        ),
-        NativeMastersError::RowFieldInvalid("alter_id")
-    );
-    assert_eq!(
-        refused(
-            PAYMENT_ALTERID_ELEMENT,
-            "<ALTERID TYPE=\"Number\"> -3</ALTERID>"
-        ),
-        NativeMastersError::RowFieldInvalid("alter_id")
-    );
 }
 
 #[test]
-fn a_guid_or_alter_id_nested_in_another_list_is_not_the_types() {
+fn a_guid_shared_by_two_types_is_refused_by_the_parser() {
+    let text = response();
+    let journal_guid = "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000026";
+    assert!(text.contains(journal_guid));
+    // Payment under Journal's GUID, exactly and differing only in case.
+    for shared in [journal_guid.to_string(), journal_guid.to_ascii_uppercase()] {
+        let shared_text = edited(
+            PAYMENT_GUID_ELEMENT,
+            &format!("<GUID TYPE=\"String\">{shared}</GUID>"),
+        );
+        assert_eq!(
+            parse_voucher_type_numbering(&shared_text).unwrap_err(),
+            NativeMastersError::DuplicateGuid,
+            "{shared}"
+        );
+    }
+}
+
+#[test]
+fn a_guid_nested_in_another_list_is_not_the_types() {
     // Only a direct child of the type is its identity: one inside the language
     // list or the series list neither repeats the type's nor stands in for it.
     let nested = edited(
         "<LANGUAGENAME.LIST>",
-        "<LANGUAGENAME.LIST><GUID>other</GUID><ALTERID> 1</ALTERID>",
+        "<LANGUAGENAME.LIST><GUID>other</GUID>",
     );
     let rows = parse_voucher_type_numbering(&nested).unwrap();
     assert_eq!(row(&rows, "Payment").guid, PAYMENT_GUID);
-    assert_eq!(row(&rows, "Payment").alter_id, 217);
     let series = edited(
         "<VOUCHERNUMBERSERIES.LIST>",
-        "<VOUCHERNUMBERSERIES.LIST><GUID>other</GUID><ALTERID> 1</ALTERID>",
+        "<VOUCHERNUMBERSERIES.LIST><GUID>other</GUID>",
     );
     let rows = parse_voucher_type_numbering(&series).unwrap();
     assert_eq!(row(&rows, "Payment").guid, PAYMENT_GUID);
@@ -514,7 +477,7 @@ mod join {
                 name: row.name.clone(),
                 guid: row.guid.clone(),
                 master_id: 1,
-                alter_id: row.alter_id,
+                alter_id: 1,
                 parent: None,
                 detail: NativeMasterDetail::VoucherType {
                     active: Some(true),
@@ -654,22 +617,6 @@ mod join {
         assert_eq!(
             join_series_numbering(&masters(&numbering), &other).unwrap_err(),
             NumberingJoinError::SameNameDifferentGuids
-        );
-    }
-
-    #[test]
-    fn a_repeated_guid_in_either_answer_refuses() {
-        let numbering = captured();
-        let mut repeated = numbering.clone();
-        repeated[1].guid = repeated[0].guid.clone();
-        let error = join_series_numbering(&masters(&numbering), &repeated).unwrap_err();
-        assert_eq!(error, NumberingJoinError::RepeatedGuid);
-        assert_eq!(error.code(), "masters_numbering_identity_differs");
-        let mut repeated_masters = masters(&numbering);
-        repeated_masters[1].guid = repeated_masters[0].guid.to_ascii_uppercase();
-        assert_eq!(
-            join_series_numbering(&repeated_masters, &numbering).unwrap_err(),
-            NumberingJoinError::RepeatedGuid
         );
     }
 

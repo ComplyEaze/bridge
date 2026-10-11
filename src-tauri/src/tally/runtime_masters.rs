@@ -7,7 +7,7 @@ use bridge_tally_protocol::native_masters::{
 };
 use bridge_tally_protocol::native_voucher_type_numbering::{
     join_series_numbering, parse_voucher_type_numbering, render_voucher_type_numbering_request,
-    NumberingJoinError, SeriesNumberingResult, VoucherTypeNumberingRow,
+    NumberingJoinError, VoucherTypeNumbering, VoucherTypeNumberingRow,
 };
 use bridge_tally_protocol::outstandings_shared::OutstandingsError;
 use bridge_tally_protocol::TallyNamedMaster;
@@ -49,10 +49,11 @@ impl MastersKind {
 }
 
 pub(crate) enum MastersRows {
-    /// The rows of one native kind. For `voucher_types` only, the second
-    /// field holds the series-level numbering joined to each row, in the
-    /// rows' order; for every other kind it is `None`.
-    Native(NativeMasters, Option<Vec<SeriesNumberingResult>>),
+    /// The rows of one native kind other than voucher types.
+    Native(NativeMasters),
+    /// The voucher types, each paired with the series-level numbering joined to
+    /// it: there is no such read without its numbering.
+    VoucherTypes(Vec<(NativeMasterRow, VoucherTypeNumbering)>),
     Groups(Vec<TallyNamedMaster>),
 }
 
@@ -175,8 +176,7 @@ pub(crate) fn check_masters_premise(
 }
 
 /// The premise of the numbering read, checked against its answer: its rows
-/// cannot outnumber the master mark, none can repeat a GUID, and the response
-/// fits `limit_bytes`. Voucher types are unbounded before the read, so the limit
+/// cannot outnumber the master mark and the response fits `limit_bytes`. Voucher types are unbounded before the read, so the limit
 /// is the whole budget.
 pub(crate) fn check_numbering_premise(
     rows: &[VoucherTypeNumberingRow],
@@ -187,15 +187,6 @@ pub(crate) fn check_numbering_premise(
     if u64::try_from(rows.len()).unwrap_or(u64::MAX) > master_alter_id {
         return Err(MastersReadError::PremiseViolated(
             "masters_numbering_rows_exceed_master_mark",
-        ));
-    }
-    let mut seen = HashSet::new();
-    if rows
-        .iter()
-        .any(|row| !seen.insert(row.guid.to_ascii_lowercase()))
-    {
-        return Err(MastersReadError::PremiseViolated(
-            "masters_numbering_guid_repeated",
         ));
     }
     if u64::try_from(received_bytes).unwrap_or(u64::MAX) > limit_bytes {
@@ -289,9 +280,14 @@ impl TallyRuntime {
                                             join_series_numbering(&masters.rows, &numbering)
                                                 .map_err(MastersReadError::NumberingJoin)
                                         })
-                                        .map(|joined| MastersRows::Native(masters, Some(joined)))
+                                        // The join returns one result for each masters row.
+                                        .map(|joined| {
+                                            MastersRows::VoucherTypes(
+                                                masters.rows.into_iter().zip(joined).collect(),
+                                            )
+                                        })
                                     }
-                                    Ok(()) => Ok(MastersRows::Native(masters, None)),
+                                    Ok(()) => Ok(MastersRows::Native(masters)),
                                 }
                             }
                             // The group snapshot as the statements read it: no

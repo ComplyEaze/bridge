@@ -5,7 +5,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Attendance",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000004e",
-        alter_id: 80,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -14,7 +13,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Contra",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000020",
-        alter_id: 34,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -23,7 +21,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Credit Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000028",
-        alter_id: 42,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -32,7 +29,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Debit Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000002a",
-        alter_id: 44,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -41,7 +37,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Delivery Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000030",
-        alter_id: 50,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -50,7 +45,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Job Work In Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000052",
-        alter_id: 84,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -59,7 +53,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Job Work Out Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000054",
-        alter_id: 86,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -68,7 +61,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Journal",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000026",
-        alter_id: 207,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -77,7 +69,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Material In",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000058",
-        alter_id: 90,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -86,7 +77,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Material Out",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000056",
-        alter_id: 88,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -95,7 +85,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Memorandum",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000003c",
-        alter_id: 62,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -104,7 +93,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Payment",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000022",
-        alter_id: 217,
         numbering: Observed {
             method: Manual,
             duplicates: Prevented,
@@ -113,7 +101,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Payroll",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000050",
-        alter_id: 82,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -122,7 +109,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Physical Stock",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000038",
-        alter_id: 58,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -131,7 +117,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Purchase",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000002e",
-        alter_id: 48,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -140,7 +125,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Purchase Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000042",
-        alter_id: 68,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -149,7 +133,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Receipt",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000024",
-        alter_id: 219,
         numbering: Observed {
             method: Manual,
             duplicates: NotPrevented,
@@ -158,7 +141,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Receipt Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000032",
-        alter_id: 52,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -167,7 +149,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Rejections In",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000036",
-        alter_id: 56,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -176,7 +157,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Rejections Out",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000034",
-        alter_id: 54,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -185,7 +165,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Reversing Journal",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000003e",
-        alter_id: 64,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -194,7 +173,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Sales",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000002c",
-        alter_id: 46,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -203,7 +181,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Sales Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000040",
-        alter_id: 66,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,
@@ -212,7 +189,6 @@ Ok([
     VoucherTypeNumberingRow {
         name: "Stock Journal",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000003a",
-        alter_id: 60,
         numbering: Observed {
             method: Automatic,
             duplicates: NotPrevented,

@@ -1142,7 +1142,6 @@ async fn witness_non_transport_failure_remains_an_in_band_partial() {
     );
 }
 
-#[cfg(feature = "voucher-scan")]
 #[test]
 fn outstandings_date_boundaries_follow_detected_mode_and_fallback_to_i12() {
     let mut profile = synthetic_probe_result().profile;

@@ -1757,12 +1757,13 @@ impl TallyClient {
     /// before any `(name, parent)` join can attach money to a master. The second
     /// value is the evidence of the reads that counted a marked book's ledgers:
     /// the catalogue pair (#668), the census's slices (#679), or both, empty
-    /// when the mark alone admitted the read. `today` is
-    /// the host's calendar date: the balance snapshot ends no later than it
-    /// (the next admissible boundary at or after), whatever the extent's last
-    /// voucher date says (#875). A date the CA typed ends it at the next
-    /// admissible boundary at or after that date instead, and is refused,
-    /// before any ledger request, when it precedes the start of the books (#903).
+    /// when the mark alone admitted the read. `basis` is the host's calendar
+    /// date, or a date the CA typed. With the host's date the balance snapshot
+    /// ends no later than it (the next admissible boundary at or after),
+    /// whatever the extent's last voucher date says (#875). A typed date ends
+    /// it at the next admissible boundary at or after that date instead, and is
+    /// refused, before any ledger request, when it precedes the start of the
+    /// books (#903).
     pub(crate) async fn fetch_party_ledger_master_source(
         &self,
         identity: &VerifiedCompanyIdentity,

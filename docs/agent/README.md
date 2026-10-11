@@ -426,7 +426,7 @@ marks of about 100,000 and 300,000, refuse godowns, units and stock groups (cost
 centres and categories were not tried on them); how common such
 marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
-read, and groups that of the group read `profit_and_loss` and `balance_sheet`
+read (their second, numbering read is likewise sent with no size check), and groups that of the group read `profit_and_loss` and `balance_sheet`
 make.
 
 The size rests on premises that are checked after the read, not assumed. For

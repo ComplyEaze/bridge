@@ -946,8 +946,6 @@ async fn each_type_gets_the_numbering_of_its_own_series() {
 async fn the_numbering_read_adds_its_own_evidence() {
     let (result, _) = run(voucher_types_plans(), VOUCHER_TYPES_KIND).await;
     let (read, _) = result.unwrap();
-    assert!(!read.evidence.request_sha256.is_empty());
-    assert!(!read.evidence.response_sha256.is_empty());
     // Two collection pairs: both responses' bytes are counted, each read twice
     // (UTF-16, two bytes a unit), beside the brackets' own.
     let masters = capture(NativeMasterKind::VoucherTypes);

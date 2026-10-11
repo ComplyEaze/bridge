@@ -4,6 +4,13 @@ Status: accepted for the portable aggregation contract and PR15 read-runtime
 collection; persistence, support-bundle integration, and performance budgets
 are not yet enabled.
 
+Amendment (2026-10-12): the privacy-reduced preview, its serialiser and its
+`tally_telemetry_preview` desktop command were deleted. No screen ever called
+the command and nothing exported the result. The collector still counts the
+read runtime's attempts into the fixed cells, and nothing reads them out; the
+paragraphs below describing the preview record the contract as it was
+designed, not a capability the application offers.
+
 ## Decision
 
 Bridge starts PR13 with a local-only `bridge-tally-observability` crate. Its

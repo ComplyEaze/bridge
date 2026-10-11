@@ -1,0 +1,8 @@
+# Tests of the Node suite (scripts/*.test.mjs) known to fail on windows-latest (bridge#1471).
+# One per line, as "<test file> > <test names from the file down to the test>", in the format the
+# job summary prints. A test that fails and is not listed here turns .github/workflows/node-windows.yml
+# red. Remove a line when its test passes.
+# Captured, not written by hand, from run 37879714728 of that workflow
+# (https://github.com/ComplyEaze/bridge/actions/runs/37879714728) at commit 06b3211f97b0e6f2e13a9b69e7cfaf2a8631d8ce:
+# 37 failing tests of 618, on windows-latest (image windows-2025-vs2026, version 20260901.588), Node 24.21.0 (.node-version), run under Git Bash.
+scripts/release-workflows.test.mjs > the site summary step is informational, permitted to read deployments, and shows what would go live

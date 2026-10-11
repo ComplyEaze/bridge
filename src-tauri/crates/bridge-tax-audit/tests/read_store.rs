@@ -265,3 +265,72 @@ fn a_ledger_of_a_read_carries_its_pan_and_the_gstin_in_force_on_the_period_end()
     assert_eq!(mine.len(), 1, "exactly the edited ledger carries the PAN");
     assert_eq!(mine[0].gstin, "G-IN-FORCE-AT-END");
 }
+
+/// Replaces one part's stored bytes (identity storage) and re-hashes it in the manifest.
+fn replace_part(store: &mut MemoryStore, id: &str, path: &str, bytes: Vec<u8>) {
+    let mut manifest = store.manifest();
+    let response = &mut part_mut(&mut manifest, id)["response"];
+    response["sha256"] = json!(hex(&bytes));
+    response["stored_sha256"] = json!(hex(&bytes));
+    response["bytes"] = json!(bytes.len());
+    response["stored_bytes"] = json!(bytes.len());
+    store.blobs.insert(path.to_string(), bytes);
+    store.set_manifest(&manifest);
+}
+
+/// #1486: `load_book` reads the opening stock POP-3 adds from the read itself: the company's
+/// integration flag, the stock items' opening values, and the trial balance's window against the
+/// books' first day. The synthetic read keeps no integrated inventory, so it has none.
+#[test]
+fn a_read_with_integrated_inventory_carries_its_opening_stock() {
+    use bridge_tax_audit::book::{load_book, OpeningStock, OpeningStockUnknown};
+    let plain = load_book(&open(&MemoryStore::synthetic()).unwrap(), "Invented").unwrap();
+    assert_eq!(plain.opening_stock, OpeningStock::NotApplicable);
+
+    let mut store = MemoryStore::synthetic();
+    let company = String::from_utf8(store.blobs["parts/company_object.xml"].clone()).unwrap();
+    let integrated = company.replacen(">No</ISINTEGRATED>", ">Yes</ISINTEGRATED>", 1);
+    assert_ne!(integrated, company);
+    replace_part(
+        &mut store,
+        "company",
+        "parts/company_object.xml",
+        integrated.into_bytes(),
+    );
+    let items = "<ENVELOPE><BODY><DATA><COLLECTION><STOCKITEM NAME=\"Hinge\">\
+        <OPENINGVALUE>-900.00</OPENINGVALUE></STOCKITEM></COLLECTION></DATA></BODY></ENVELOPE>";
+    replace_part(
+        &mut store,
+        "stock-items",
+        "parts/stock_items.xml",
+        items.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+    );
+    let book = load_book(&open(&store).unwrap(), "Invented").unwrap();
+    assert_eq!(book.opening_stock, OpeningStock::Valued(90_000));
+
+    // The same read whose books begin a year before its trial balance: the items' opening
+    // values stand on that earlier day, so they are not taken.
+    let mut earlier = store;
+    let mut manifest = earlier.manifest();
+    manifest["company"]["books_from"] = json!("2024-04-01");
+    earlier.set_manifest(&manifest);
+    let book = load_book(&open(&earlier).unwrap(), "Invented").unwrap();
+    assert_eq!(
+        book.opening_stock,
+        OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart)
+    );
+
+    // And with no stock-items part at all.
+    let mut manifest = earlier.manifest();
+    manifest["company"]["books_from"] = json!("2025-04-01");
+    manifest["parts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|part| part["kind"] != "stock_items");
+    earlier.set_manifest(&manifest);
+    let book = load_book(&open(&earlier).unwrap(), "Invented").unwrap();
+    assert_eq!(
+        book.opening_stock,
+        OpeningStock::Unknown(OpeningStockUnknown::NotRead)
+    );
+}

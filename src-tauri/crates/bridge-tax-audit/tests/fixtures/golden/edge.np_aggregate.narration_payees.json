@@ -1,0 +1,515 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "narration_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "491f22a8d7ad83c5",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded): debits to the ledgers the client lists, and any 194C-mapped ledger whose payees the TDS payee test could not name, when that test's finding lists them; bank payments read for the printed payee.",
+  "figures": [
+    {
+      "id": "narration_payees.added_ledgers_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "67832d0c861c0d90",
+      "definition_text": "194C-mapped ledgers read besides those the client lists, because the TDS payee test could not name the payee of their payments (its finding lists them; on a book whose vouchers share a blank or repeated identifier, a ledger debited on another voucher with the same identifier too). With no ledger listed or added, nothing was read.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.configured_ledgers_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "db736a29e0c67c2e",
+      "definition_text": "Ledgers the client lists as paid to payees named only in the bank narration.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.cut_handle_unjoined_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "572435bbb39da9af",
+      "definition_text": "Bank payments whose UPI address one bank printed cut short and no single full address among the bank payments completes under an agreeing name (none, several, or one printed under another name): joined to no other payee by it.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "1b9226a248db354e",
+      "definition_text": "Payees under both s.194C limits on the ledgers read, whose total with their debits to other ledgers exceeds the aggregate limit, or one of whose payments debits other ledgers by more than the single-sum limit.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.elsewhere_over_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bef05cdfc659c919",
+      "definition_text": "The debits to other ledgers of every such payee, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.not_through_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "62b8d7662ebec896",
+      "definition_text": "Debits on the ledgers read with no bank leg (cash or journal): no payee is read from a bank narration for them.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payee_channel_261a8d0e",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTA WORKS",
+          "label": "DELTA WORKS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_28289460",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_channel_59b16f20",
+      "value": "UPI",
+      "unit": "text",
+      "definition_sha256_16": "bd43e2364d790e61",
+      "definition_text": "How the bank paid this payee (UPI, IMPS, NEFT/RTGS, or a cheque encashed at the counter).",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA",
+          "label": "ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_261a8d0e",
+      "value": 4,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTA WORKS",
+          "label": "DELTA WORKS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_28289460",
+      "value": 5,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_count_59b16f20",
+      "value": 4,
+      "unit": "count",
+      "definition_sha256_16": "6266b66730126359",
+      "definition_text": "Bank payments to this payee on the ledgers read.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA",
+          "label": "ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_261a8d0e",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTA WORKS",
+          "label": "DELTA WORKS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_28289460",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_max_59b16f20",
+      "value": 3000000,
+      "unit": "paise",
+      "definition_sha256_16": "9a29a9467e0a9b78",
+      "definition_text": "Largest single payment.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA",
+          "label": "ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_261a8d0e",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTA WORKS",
+          "label": "DELTA WORKS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_28289460",
+      "value": "yes",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_over_194c_59b16f20",
+      "value": "no",
+      "unit": "text",
+      "definition_sha256_16": "fb6cae51d7a9261b",
+      "definition_text": "Whether a single payment exceeds the s.194C single-sum limit or the year's total exceeds the aggregate limit.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA",
+          "label": "ZETA"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_261a8d0e",
+      "value": 10000000,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "DELTA WORKS",
+          "label": "DELTA WORKS"
+        },
+        {
+          "kind": "voucher",
+          "id": "a01",
+          "label": "Payment a01 on 2025-05-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "a02",
+          "label": "Payment a02 on 2025-06-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "a03",
+          "label": "Payment a03 on 2025-07-07"
+        },
+        {
+          "kind": "voucher",
+          "id": "a04",
+          "label": "Payment a04 on 2025-08-07"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_28289460",
+      "value": 10000001,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "EPSILON CARRIERS",
+          "label": "EPSILON CARRIERS"
+        },
+        {
+          "kind": "voucher",
+          "id": "a11",
+          "label": "Payment a11 on 2025-05-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a12",
+          "label": "Payment a12 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a13",
+          "label": "Payment a13 on 2025-07-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-08-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a15",
+          "label": "Payment a15 on 2025-09-08"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payee_total_59b16f20",
+      "value": 9999999,
+      "unit": "paise",
+      "definition_sha256_16": "a17b3cddda9e5600",
+      "definition_text": "Total of those payments.",
+      "evidence": [
+        {
+          "kind": "payee_name",
+          "id": "ZETA",
+          "label": "ZETA"
+        },
+        {
+          "kind": "voucher",
+          "id": "a21",
+          "label": "Payment a21 on 2025-05-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "a22",
+          "label": "Payment a22 on 2025-06-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "a23",
+          "label": "Payment a23 on 2025-07-09"
+        },
+        {
+          "kind": "voucher",
+          "id": "a24",
+          "label": "Payment a24 on 2025-08-09"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.payees_count",
+      "value": 3,
+      "unit": "count",
+      "definition_sha256_16": "b6f907568524af65",
+      "definition_text": "Distinct payees printed by the bank: payments sharing a printed name or a whole UPI handle are one payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_count",
+      "value": 1,
+      "unit": "count",
+      "definition_sha256_16": "2400a2096d06bfa0",
+      "definition_text": "Of those, payees over a s.194C threshold.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.payees_over_194c_total",
+      "value": 10000001,
+      "unit": "paise",
+      "definition_sha256_16": "121fee500217c9d5",
+      "definition_text": "Total paid to the payees over a threshold.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "a11",
+          "label": "Payment a11 on 2025-05-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a12",
+          "label": "Payment a12 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a13",
+          "label": "Payment a13 on 2025-07-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-08-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a15",
+          "label": "Payment a15 on 2025-09-08"
+        }
+      ]
+    },
+    {
+      "id": "narration_payees.placeholder_payee_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "78e46136ab75d08c",
+      "definition_text": "Bank payments on the ledgers read where the bank printed a placeholder (such as \"Bank Acc\" or \"PhonePe\") in place of the payee: not read as any payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.possible_same_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "4f94c204008d6113",
+      "definition_text": "Groups of payees that a shortened UPI address might join, listed apart and never joined.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.resolved_total",
+      "value": 30000000,
+      "unit": "paise",
+      "definition_sha256_16": "0a0479b3fe570ca0",
+      "definition_text": "Total bank payments with a printed payee.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f0d6e165f7e7002d",
+      "definition_text": "Payees paid two or more times on one day, the day's total over the s.194C single-sum limit, counted once per payee and day.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.same_day_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8bc394ef74148d1d",
+      "definition_text": "The day totals of every payee paid more than once on one day, over the s.194C single-sum limit, added together.",
+      "evidence": []
+    },
+    {
+      "id": "narration_payees.unresolved_bank_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bb150e6493cc3554",
+      "definition_text": "Bank payments on the ledgers read whose narration names no payee that can be read (a placeholder in place of the payee included).",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "narration_payees/s194c_candidates/all",
+      "clauses": [
+        "s.194C",
+        "s.40(a)(ia)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "amount",
+          "figure_id": "narration_payees.payees_over_194c_total"
+        },
+        {
+          "name": "not_through_bank",
+          "figure_id": "narration_payees.not_through_bank_total"
+        },
+        {
+          "name": "payees",
+          "figure_id": "narration_payees.payees_over_194c_count"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "a11",
+          "label": "Payment a11 on 2025-05-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a12",
+          "label": "Payment a12 on 2025-06-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a13",
+          "label": "Payment a13 on 2025-07-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a14",
+          "label": "Payment a14 on 2025-08-08"
+        },
+        {
+          "kind": "voucher",
+          "id": "a15",
+          "label": "Payment a15 on 2025-09-08"
+        }
+      ],
+      "title_sha256_16": "18447265099f302d",
+      "title_text": "Payees paid through the bank beyond a s.194C threshold",
+      "limits_sha256_16": "a4e900ec49176bba",
+      "limits_text": [
+        "Tax was deductible only if the assessee was a deductor for the year (for an individual, previous-year business turnover above the limit) and the payee was a contractor, not an employee.",
+        "The payee is what the bank printed: payments sharing a printed name or a whole UPI handle are one row, so one handle under two names, or one name on two handles, is one payee, and two different people printed with the same name are one row too. A handle one bank prints cut short counts as the whole handle only when exactly one whole handle among the bank payments starts with it and a name printed with it starts with the cut payment's name (or the reverse); otherwise it joins nothing, and the payees it might join are listed apart. A person printed two ways with no handle to join them is two rows. Only outgoing bank payments are read, and joined; payments in cash or by journal on these ledgers are not read here."
+      ],
+      "ask_client_sha256_16": "3314b1a0ff03bf76",
+      "ask_client_text": [
+        "Confirm the previous year's business turnover.",
+        "For each payee listed, state whether an employee or a contractor, and provide PAN, and any TDS deducted and deposited."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "narration_payees.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

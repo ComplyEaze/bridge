@@ -1,0 +1,5 @@
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/native_ledger_collection.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/request.rs
+reviewer: lamemustafa

@@ -92,7 +92,7 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
     loop {
         match reader.read_event().map_err(|_| "invoice_read_malformed")? {
             Event::Start(start) => {
-                let name = String::from_utf8_lossy(start.name().as_ref()).into_owned();
+                let name = start.name().as_ref().to_string();
                 text.clear();
                 collection |= name == "COLLECTION";
                 // Only a direct child of the COLLECTION is a row: the answer's
@@ -106,12 +106,9 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                     current = Row::default();
                     for attribute in start.attributes().with_checks(true) {
                         let attribute = attribute.map_err(|_| "invoice_read_malformed")?;
-                        let key = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
+                        let key = attribute.key.as_ref().to_string();
                         let value = attribute
-                            .decoded_and_normalized_value(
-                                quick_xml::XmlVersion::Implicit1_0,
-                                reader.decoder(),
-                            )
+                            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
                             .map_err(|_| "invoice_read_malformed")?;
                         current.attributes.insert(key, value.into_owned());
                     }
@@ -125,11 +122,11 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 path.push(name);
             }
             Event::Text(chunk) => {
-                text.push_str(&chunk.decode().map_err(|_| "invoice_read_malformed")?);
+                text.push_str(&chunk);
             }
             Event::GeneralRef(reference) => {
-                let name = reference.decode().map_err(|_| "invoice_read_malformed")?;
-                text.push_str(&entity(&name).ok_or("invoice_read_malformed")?);
+                let name: &str = &reference;
+                text.push_str(&entity(name).ok_or("invoice_read_malformed")?);
             }
             Event::End(_) => {
                 let Some(name) = path.pop() else {
@@ -177,12 +174,12 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                 text.clear();
             }
             Event::Empty(empty) => {
-                collection |= empty.name().as_ref() == b"COLLECTION";
+                collection |= empty.name().as_ref() == "COLLECTION";
                 // A row written as an empty element is still a row, with no
                 // fields and no attributes: its reader refuses it or reports
                 // every field as different, and never counts it as "no rows".
                 if row_depth.is_none()
-                    && empty.name().as_ref() == row_tag.as_bytes()
+                    && empty.name().as_ref() == row_tag
                     && path.last().map(String::as_str) == Some("COLLECTION")
                 {
                     out.push(Row::default());

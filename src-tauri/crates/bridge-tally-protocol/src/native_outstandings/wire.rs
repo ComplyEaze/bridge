@@ -997,6 +997,8 @@ pub(super) struct GroupRowIdentity {
     /// Whether an element outside the captured vocabulary holds a `GROUP`,
     /// `GUID`, `NAME`, `NAME.LIST` or `LANGUAGENAME.LIST` somewhere inside it.
     pub(super) hidden_in_unknown_element: bool,
+    /// Whether a child the captures show only as a leaf holds elements.
+    pub(super) non_leaf_captured_child: bool,
 }
 
 /// The children of a `GROUP` row, other than the ones the index reads, that the
@@ -1028,10 +1030,42 @@ fn skip_child(
         .iter()
         .any(|known| name.as_ref().eq_ignore_ascii_case(known))
     {
-        return skip_subtree(reader);
+        identity.non_leaf_captured_child |= subtree_has_elements(reader)?;
+        return Ok(());
     }
     identity.hidden_in_unknown_element |= subtree_hides_a_name(reader)?;
     Ok(())
+}
+
+/// Consumes the subtree of an element just started and reports whether any
+/// element is inside it.
+fn subtree_has_elements(reader: &mut Reader<&[u8]>) -> Result<bool, NativeOutstandingsError> {
+    let mut depth = 1_u32;
+    let mut found = false;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(_) => {
+                depth += 1;
+                found = true;
+            }
+            Event::Empty(_) => found = true,
+            Event::End(_) => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(found);
+                }
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Consumes the subtree of an element just started and reports whether any
@@ -1163,6 +1197,11 @@ fn parse_group_row(
                 identity.note_shape(NameShape::NameListOutsideLanguageList);
                 skip_subtree(reader)?;
             }
+            // A name directly under the row belongs to no name list.
+            Event::Start(child) if index && child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.note_shape(NameShape::NameDirectlyUnderRow);
+                skip_subtree(reader)?;
+            }
             Event::Start(child) if index => {
                 skip_child(reader, &child, &CAPTURED_ROW_CHILDREN, &mut identity)?;
             }
@@ -1174,6 +1213,9 @@ fn parse_group_row(
                 if index && child.name().as_ref().eq_ignore_ascii_case("ALTERID") =>
             {
                 identity.alter_ids.push(String::new());
+            }
+            Event::Empty(child) if index && child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                identity.note_shape(NameShape::NameDirectlyUnderRow);
             }
             Event::Empty(child)
                 if index && child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") =>

@@ -29,7 +29,8 @@ use crate::PartyLedgerMasterFieldObservation;
 pub struct GroupNameRow {
     /// Every `NAME` of every `NAME.LIST` under the row's `LANGUAGENAME.LIST`
     /// elements, in document order: the stored name first, then the aliases.
-    /// Never empty, and no entry is empty.
+    /// Never empty, and no entry is empty. The names are verbatim, as Tally
+    /// wrote them: the caller folds case and whitespace when it matches.
     pub names: Vec<String>,
     /// The group's own `GUID`, non-empty and unique across the index.
     pub guid: String,
@@ -80,6 +81,12 @@ pub enum GroupNameIndexError {
     /// `NAME.LIST` or `LANGUAGENAME.LIST` somewhere inside it (in the row or in
     /// its language list), where a name or identity could be read around.
     HiddenInUnknownElement { row: usize },
+    /// A child the captures show only as a leaf (`RESERVEDNAME`,
+    /// `LANGUAGEID` and the like) holds elements, which the index does not read.
+    CapturedChildNotLeaf { row: usize },
+    /// A name holds U+FFFD. The parser replaces a forbidden numeric character
+    /// reference with it, so the stored text is not what Tally wrote.
+    NameNotRepresentable { row: usize },
     /// A `GROUP` element sits outside `ENVELOPE/BODY/DATA/COLLECTION` (the
     /// `CMPINFO` counter excepted), so the rows read would be fewer than sent.
     GroupOutsideCollection,
@@ -90,6 +97,8 @@ pub enum GroupNameIndexError {
 /// A name-bearing shape the index refuses rather than skips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NameShape {
+    /// A `NAME` directly under `GROUP`.
+    NameDirectlyUnderRow,
     /// A `NAME.LIST` directly under `GROUP`, outside any `LANGUAGENAME.LIST`.
     NameListOutsideLanguageList,
     /// A `NAME` directly under `LANGUAGENAME.LIST`, outside any `NAME.LIST`.
@@ -136,6 +145,7 @@ pub fn parse_group_name_index(
             names,
             unrecognised_name_shape,
             hidden_in_unknown_element,
+            non_leaf_captured_child,
         } = walked_row.row.identity;
 
         let guid = single(guids, row, |row| GroupNameIndexError::GuidRepeatedInRow {
@@ -161,6 +171,9 @@ pub fn parse_group_name_index(
         if hidden_in_unknown_element {
             return Err(GroupNameIndexError::HiddenInUnknownElement { row });
         }
+        if non_leaf_captured_child {
+            return Err(GroupNameIndexError::CapturedChildNotLeaf { row });
+        }
         if let Some(shape) = unrecognised_name_shape {
             return Err(GroupNameIndexError::UnrecognisedNameShape { row, shape });
         }
@@ -169,6 +182,9 @@ pub fn parse_group_name_index(
         }
         if names.iter().any(|name| name.trim().is_empty()) {
             return Err(GroupNameIndexError::EmptyName { row });
+        }
+        if names.iter().any(|name| name.contains('\u{fffd}')) {
+            return Err(GroupNameIndexError::NameNotRepresentable { row });
         }
         if names[0] != walked_row.row.record.name {
             return Err(GroupNameIndexError::NameAttributeDisagrees { row });

@@ -444,7 +444,13 @@ fn the_snapshot_parser_keeps_its_results_and_codes_where_the_index_is_stricter()
         parse_native_group_snapshot(&stray, SHAPE_GUID).as_ref(),
         Ok(&snapshot)
     );
-    assert!(parse(&stray).is_err());
+    assert_eq!(
+        parse(&stray),
+        Err(GroupNameIndexError::UnrecognisedNameShape {
+            row: row_of(&text, "Bank Accounts"),
+            shape: NameShape::NameListOutsideLanguageList
+        })
+    );
 
     // An empty collection keeps the snapshot's code.
     let empty = without_rows(&text);
@@ -493,6 +499,144 @@ fn a_body_cut_after_a_complete_row_is_refused_as_unterminated() {
             "cut after the {label} row"
         );
     }
+}
+
+/// Inserts `inserted` just before the closing tag of the row that opens with
+/// `row_open`.
+fn insert_in_row(text: &str, row_open: &str, inserted: &str) -> String {
+    let start = text.find(row_open).expect("the capture holds the row");
+    let close = start + text[start..].find("</GROUP>").unwrap();
+    let mut changed = text.to_string();
+    changed.insert_str(close, inserted);
+    changed
+}
+
+/// A `NAME` that is a direct child of `GROUP`, bare or self-closing, holds a
+/// name no `NAME.LIST` carries; the index refuses it instead of skipping it.
+/// A second `GUID`, in either form, and a self-closing language list are the
+/// shapes the existing arms already decide.
+#[test]
+fn a_name_directly_under_a_row_is_refused_and_the_other_direct_children_are_decided() {
+    let text = shape_lab();
+    let row_open = "<GROUP NAME=\"Bank OD A/c\"";
+    let row_number = row_of(&text, "Bank OD A/c");
+    for inserted in [
+        "<NAME>Direct</NAME>",
+        "<NAME></NAME>",
+        "<NAME/>",
+        "<NAME><Y/></NAME>",
+    ] {
+        assert_eq!(
+            parse(&insert_in_row(&text, row_open, inserted)),
+            Err(GroupNameIndexError::UnrecognisedNameShape {
+                row: row_number,
+                shape: NameShape::NameDirectlyUnderRow
+            }),
+            "{inserted}"
+        );
+    }
+    for inserted in ["<GUID>second</GUID>", "<GUID/>"] {
+        assert_eq!(
+            parse(&insert_in_row(&text, row_open, inserted)),
+            Err(GroupNameIndexError::GuidRepeatedInRow { row: row_number }),
+            "{inserted}"
+        );
+    }
+    for inserted in ["<NAME.LIST/>", "<NAME.LIST><NAME>Direct</NAME></NAME.LIST>"] {
+        assert_eq!(
+            parse(&insert_in_row(&text, row_open, inserted)),
+            Err(GroupNameIndexError::UnrecognisedNameShape {
+                row: row_number,
+                shape: NameShape::NameListOutsideLanguageList
+            }),
+            "{inserted}"
+        );
+    }
+    // A self-closing language list beside the real one adds no name.
+    assert_eq!(
+        parse(&insert_in_row(&text, row_open, "<LANGUAGENAME.LIST/>")),
+        parse(&text)
+    );
+    // A second, real language list adds its names.
+    let second = insert_in_row(
+        &text,
+        row_open,
+        "<LANGUAGENAME.LIST><NAME.LIST><NAME>Second Language</NAME></NAME.LIST></LANGUAGENAME.LIST>",
+    );
+    let index = parse(&second).unwrap();
+    let row = index.iter().find(|row| row.guid == BANK_OD_GUID).unwrap();
+    assert_eq!(
+        row.names,
+        ["Bank OD A/c", "Bank OCC A/c", "Second Language"]
+    );
+}
+
+/// The children the captures show as leaves are stepped over unread, so one
+/// that holds an element is refused: a name could be nested in it.
+#[test]
+fn a_captured_leaf_child_that_holds_elements_is_refused() {
+    let text = shape_lab();
+    let row_open = "<GROUP NAME=\"Bank OD A/c\"";
+    let row_number = row_of(&text, "Bank OD A/c");
+    for inserted in [
+        "<RESERVEDNAME><NAME>Hidden</NAME></RESERVEDNAME>",
+        "<MASTERID><Y/></MASTERID>",
+        "<PARENTSTRUCTURE>text<Y>1</Y></PARENTSTRUCTURE>",
+    ] {
+        assert_eq!(
+            parse(&insert_in_row(&text, row_open, inserted)),
+            Err(GroupNameIndexError::CapturedChildNotLeaf { row: row_number }),
+            "{inserted}"
+        );
+    }
+    // The same child in the language list.
+    let span = language_list_span(&text, row_open);
+    let at = span.start + text[span.clone()].find("<LANGUAGEID>").unwrap();
+    let mut changed = text.clone();
+    changed.insert_str(at + "<LANGUAGEID>".len(), "<Y/>");
+    assert_eq!(
+        parse(&changed),
+        Err(GroupNameIndexError::CapturedChildNotLeaf { row: row_number })
+    );
+    // The snapshot readers do not mind.
+    assert!(parse_native_group_snapshot(&changed, SHAPE_GUID).is_ok());
+}
+
+/// The parser rewrites a forbidden numeric character reference to U+FFFD, so
+/// a name holding one is not the name Tally wrote.
+#[test]
+fn a_name_holding_a_forbidden_character_reference_is_refused() {
+    let text = shape_lab();
+    let alias_row = row_of(&text, "Bank OD A/c");
+    let alias = replace_once(
+        &text,
+        "<NAME>Bank OCC A/c</NAME>",
+        "<NAME>Bank &#4;OCC A/c</NAME>",
+    );
+    assert_eq!(
+        parse(&alias),
+        Err(GroupNameIndexError::NameNotRepresentable { row: alias_row })
+    );
+    let stored = replace_once(
+        &text,
+        "<NAME>Bank Accounts</NAME>",
+        "<NAME>Bank &#4;Accounts</NAME>",
+    );
+    assert_eq!(
+        parse(&stored),
+        Err(GroupNameIndexError::NameNotRepresentable {
+            row: row_of(&text, "Bank Accounts")
+        })
+    );
+    // A legal reference is read as its character.
+    let legal = replace_once(
+        &text,
+        "<NAME>Bank OCC A/c</NAME>",
+        "<NAME>Bank &#65;OCC</NAME>",
+    );
+    let index = parse(&legal).unwrap();
+    let row = index.iter().find(|row| row.guid == BANK_OD_GUID).unwrap();
+    assert_eq!(row.names[1], "Bank AOCC");
 }
 
 /// The children the six captures show under a row and under its language list

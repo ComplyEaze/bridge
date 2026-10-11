@@ -8,7 +8,7 @@ import { afterEach, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 
-import { OutstandingsScreen } from "../src/OutstandingsScreen";
+import { OutstandingsExportNotice, OutstandingsScreen } from "../src/OutstandingsScreen";
 
 const config = { host: "127.0.0.1", port: 9000 };
 const company = {
@@ -355,4 +355,45 @@ test("a ledger-master export is blocked, not defaulted, when the chosen date can
   const { exports, notices } = await clickLedgerMasterExport({ asOf: "", asOfOperatorSelected: true });
   expect(exports).toHaveLength(0);
   expect(notices.at(-1)).toMatchObject({ message: expect.stringContaining("valid As of date") });
+});
+
+test("the export notice lists the workbook's notes by kind under the saved file", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <OutstandingsExportNotice
+        notice={{
+          message: "party-ledger-master-synthetic-20260831.xlsx",
+          path: "/exports/party-ledger-master-synthetic-20260831.xlsx",
+          notes: [
+            { kind: "date_moved", text: "synthetic moved text" },
+            { kind: "later_dated_voucher", text: "synthetic later text" },
+          ],
+        }}
+        onDismiss={() => {}}
+      />,
+    ),
+  );
+  const items = [...host.querySelectorAll(".outstandings-export-notes li")];
+  expect(items.map((item) => item.getAttribute("data-note-kind"))).toEqual([
+    "date_moved",
+    "later_dated_voucher",
+  ]);
+  expect(items.map((item) => item.textContent)).toEqual(["synthetic moved text", "synthetic later text"]);
+  root.unmount();
+});
+
+test("the export notice shows no notes list when the workbook had none", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <OutstandingsExportNotice notice={{ message: "x.xlsx", path: "/exports/x.xlsx", notes: [] }} onDismiss={() => {}} />,
+    ),
+  );
+  expect(host.querySelector(".outstandings-export-notes")).toBeNull();
+  root.unmount();
 });

@@ -46,8 +46,8 @@ use super::{
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
     reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
     verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
-    OutstandingsRequest, PartyLedgerMasterRequest, PersistedTallyCompany, SavedTallySetup,
-    SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
+    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -542,6 +542,34 @@ fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_bou
     for malformed in ["2026-07-31", "20260230", "", "2026073"] {
         assert!(request(Some(malformed)).is_err(), "{malformed}");
     }
+}
+
+#[test]
+fn the_export_response_is_the_path_and_the_typed_notes_the_app_reads() {
+    use crate::reports::party_ledger_master::{SourceNote, SourceNoteKind};
+    let response = PartyLedgerMasterExport {
+        path: "/exports/party-ledger-master-synthetic-20260831.xlsx".to_string(),
+        notes: vec![
+            SourceNote {
+                kind: SourceNoteKind::DateMoved,
+                text: "moved".to_string(),
+            },
+            SourceNote {
+                kind: SourceNoteKind::LaterDatedVoucher,
+                text: "later".to_string(),
+            },
+        ],
+    };
+    assert_eq!(
+        serde_json::to_value(&response).unwrap(),
+        serde_json::json!({
+            "path": "/exports/party-ledger-master-synthetic-20260831.xlsx",
+            "notes": [
+                { "kind": "date_moved", "text": "moved" },
+                { "kind": "later_dated_voucher", "text": "later" },
+            ],
+        })
+    );
 }
 
 #[test]

@@ -401,11 +401,33 @@ async fn a_chosen_date_before_the_books_is_refused_before_any_ledger_request() {
     assert_eq!(observed.len(), 7);
 }
 
+/// The hash of the balance request the book should have seen for a snapshot
+/// from the start of the books (20260401) to `to`, rendered here from the
+/// request builder and encoded as the wire carries it (UTF-16LE with a BOM).
+/// The date is the only thing in the request that depends on the basis.
+fn balance_request_sha256(company: &str, to: &str) -> String {
+    let period = bridge_tally_protocol::native_outstandings::NativeLedgerSnapshotPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse(to).unwrap(),
+    )
+    .unwrap();
+    let request = bridge_tally_protocol::native_outstandings::render_native_ledger_snapshot_request(
+        company, &period,
+    );
+    let mut encoded = vec![0xff, 0xfe];
+    encoded.extend(request.encode_utf16().flat_map(u16::to_le_bytes));
+    sha256_hex(&encoded)
+}
+
 #[tokio::test]
 async fn a_chosen_date_ends_the_balances_there_even_past_the_last_voucher() {
     // The host-date path clamps to the last voucher date (20260907), so a host
     // clock of 20261231 ends the balances at 20261001; a chosen 20261231 ends
-    // them at 20261231.
+    // them at 20261231. Each request is the one for its own end date, and the
+    // dates give three different requests.
+    let company = company_identity(&companies()).display_name().to_owned();
+    let mut seen = std::collections::BTreeSet::new();
     for (requested, to, kinds) in [
         (
             "20260401",
@@ -419,7 +441,7 @@ async fn a_chosen_date_ends_the_balances_there_even_past_the_last_voucher() {
         ),
         ("20261231", "20261231", vec![]),
     ] {
-        let (result, _) = party_source_with_basis(
+        let (result, observed) = party_source_with_basis(
             BalanceDateBasis::Requested(TallyDate::parse(requested).unwrap()),
             compliance_plans(ADMITTED_PROFILE_VARIANTS[0]),
         )
@@ -427,13 +449,24 @@ async fn a_chosen_date_ends_the_balances_there_even_past_the_last_voucher() {
         let source = result.unwrap();
         assert_eq!(source.to.as_str(), to, "chosen {requested}");
         assert_eq!(note_kinds(&source), kinds, "chosen {requested}");
+        assert_eq!(
+            observed[11].request_body_sha256,
+            balance_request_sha256(&company, to),
+            "the request carries the end date {to}"
+        );
+        seen.insert(observed[11].request_body_sha256.clone());
     }
-    let (host, _) = party_source_with_basis(
+    assert_eq!(seen.len(), 3, "distinct dates give distinct requests");
+    let (host, host_observed) = party_source_with_basis(
         BalanceDateBasis::HostToday(TallyDate::parse("20261231").unwrap()),
         compliance_plans(ADMITTED_PROFILE_VARIANTS[0]),
     )
     .await;
     assert_eq!(host.unwrap().to.as_str(), "20261001");
+    assert_eq!(
+        host_observed[11].request_body_sha256,
+        balance_request_sha256(&company, "20261001")
+    );
 }
 
 #[tokio::test]
@@ -460,6 +493,11 @@ async fn a_chosen_date_that_is_not_a_boundary_moves_to_the_next_one_and_says_so(
         balance_request(&exact_observed)
     );
     assert_eq!(
+        balance_request(&moved_observed),
+        balance_request_sha256(company_identity(&companies()).display_name(), "20260831"),
+        "the request carries the end date the typed one moved to, not the typed one"
+    );
+    assert_eq!(
         note_kinds(&moved),
         vec![SourceNoteKind::DateMoved, SourceNoteKind::LaterDatedVoucher]
     );
@@ -473,6 +511,41 @@ async fn a_chosen_date_that_is_not_a_boundary_moves_to_the_next_one_and_says_so(
     let past = past.unwrap();
     assert_eq!(past.to.as_str(), "20261231");
     assert_eq!(note_kinds(&past), vec![SourceNoteKind::DateMoved]);
+}
+
+#[tokio::test]
+async fn a_month_end_the_gateway_refuses_moves_to_the_first_of_the_next_month() {
+    // Only the 1st, 2nd and 31st are accepted as a period end, so the last day
+    // of a 30-day month or of February moves to the 1st, and that day's vouchers
+    // are in the balances: the note says so.
+    for (requested, to) in [
+        ("20260630", "20260701"),
+        ("20260930", "20261001"),
+        ("20261130", "20261201"),
+        ("20270228", "20270301"),
+    ] {
+        let (result, observed) = party_source_with_basis(
+            BalanceDateBasis::Requested(TallyDate::parse(requested).unwrap()),
+            compliance_plans(ADMITTED_PROFILE_VARIANTS[0]),
+        )
+        .await;
+        let source = result.unwrap();
+        assert_eq!(source.to.as_str(), to, "chosen {requested}");
+        assert!(
+            note_kinds(&source).contains(&SourceNoteKind::DateMoved),
+            "chosen {requested}"
+        );
+        let moved = source.date_moved_note().unwrap();
+        assert!(
+            moved.contains(&format!("include the vouchers dated {to}")),
+            "{moved}"
+        );
+        assert_eq!(
+            observed[11].request_body_sha256,
+            balance_request_sha256(company_identity(&companies()).display_name(), to),
+            "chosen {requested}"
+        );
+    }
 }
 
 /// The balance request of the host-date path, taken from master before #903

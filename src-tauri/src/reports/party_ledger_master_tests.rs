@@ -322,3 +322,20 @@ fn notes_carry_their_kind_the_moved_date_first_and_only_a_typed_date_can_move() 
     assert!(kinds(&typed).is_empty());
     assert_eq!(typed.notes_text(), None);
 }
+
+#[test]
+fn a_note_serialises_with_the_kind_the_app_reads() {
+    for (kind, name) in [
+        (SourceNoteKind::LaterDatedVoucher, "later_dated_voucher"),
+        (SourceNoteKind::DateMoved, "date_moved"),
+    ] {
+        let note = SourceNote {
+            kind,
+            text: "synthetic".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&note).unwrap(),
+            serde_json::json!({ "kind": name, "text": "synthetic" })
+        );
+    }
+}

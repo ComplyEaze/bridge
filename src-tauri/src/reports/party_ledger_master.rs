@@ -118,8 +118,9 @@ impl PartyLedgerMasterSource {
     pub(crate) fn date_moved_note(&self) -> Option<String> {
         match &self.balance_date_basis {
             BalanceDateBasis::Requested(requested) if requested != &self.to => Some(format!(
-                "The date chosen for this export, {}, is not a date Tally accepts as the end of a balance period. The balances end at the next date it accepts, {} (the 1st, 2nd or 31st of a month).",
+                "The date chosen for this export, {}, is not a date Tally accepts as the end of a balance period. The balances end at the next date it accepts, {} (the 1st, 2nd or 31st of a month), and include the vouchers dated {}.",
                 requested.as_str(),
+                self.to.as_str(),
                 self.to.as_str()
             )),
             _ => None,

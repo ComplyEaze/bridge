@@ -1787,6 +1787,19 @@ fn verify_observed_company_tuple_from_companies(
             "Probe again and choose an observed company identity.",
         ));
     }
+    // Parsed once, here. Probing again returns the same company, so the
+    // remediation is not to probe again.
+    let selected_guid =
+        bridge_tally_core::company_guid::CompanyGuid::parse(&selected_guid).map_err(|_| {
+            tally_command_error(
+                "company_selection_invalid",
+                "Tally application",
+                "The identity Tally gave this company is not in the expected form, so ComplyEaze Bridge cannot select it.",
+                "not_recommended",
+                false,
+                "Contact ComplyEaze support and tell them this company's name.",
+            )
+        })?;
     VerifiedCompanyIdentity::from_observed_companies(
         selected.display_name.clone(),
         selected_guid,

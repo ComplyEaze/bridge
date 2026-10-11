@@ -146,7 +146,9 @@ fn identity_from_company_extent(xml: &str) -> VerifiedCompanyIdentity {
         .expect("captured target company must remain present");
     VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        company.guid.clone().expect("captured target company GUID"),
+        crate::tally::test_company_guid(
+            &company.guid.clone().expect("captured target company GUID"),
+        ),
         company
             .company_number
             .clone()

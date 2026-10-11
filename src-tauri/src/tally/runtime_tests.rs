@@ -35,7 +35,7 @@ fn captured_aarav_company_list_and_identity() -> (String, VerifiedCompanyIdentit
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        row.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&row.guid.clone().unwrap()),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &rows,
@@ -1202,7 +1202,7 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
         host: "not-a-loopback-endpoint".to_string(),
         port: 9000,
     };
-    let identity = verified_identity("Synthetic Company", "synthetic-guid");
+    let identity = verified_identity("Synthetic Company", "9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27");
     let as_of = TallyDate::parse("20260731").unwrap();
     #[cfg(feature = "voucher-scan")]
     let error = runtime
@@ -1236,7 +1236,7 @@ async fn calibrated_voucher_scan_withholds_totals_before_endpoint_admission_with
                 host: "not-a-loopback-endpoint".to_string(),
                 port: 9000,
             },
-            &verified_identity("Synthetic Company", "synthetic-guid"),
+            &verified_identity("Synthetic Company", "9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27"),
             TallyDate::parse("20260731").unwrap(),
             OutstandingsCurrencyAssertion::Inr,
             OutstandingsAgeingAnchor::DueDate,

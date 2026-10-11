@@ -58,7 +58,7 @@ async fn captured_native_ledger_refusals_reach_command_validation_classification
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         selected.name.clone(),
-        selected.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&selected.guid.clone().unwrap()),
         selected.company_number.clone().unwrap(),
         selected.books_from.clone().unwrap(),
         &companies,

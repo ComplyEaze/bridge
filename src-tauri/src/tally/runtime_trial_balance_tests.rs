@@ -44,7 +44,7 @@ pub(super) fn identity() -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        GUID.into(),
+        crate::tally::test_company_guid(GUID),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &companies,
@@ -444,7 +444,7 @@ async fn the_desktop_trial_balance_reads_a_several_currency_books_base_ledgers()
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        FOREX.into(),
+        crate::tally::test_company_guid(FOREX),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &observed,
@@ -533,7 +533,7 @@ fn forex_identity() -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        FOREX.into(),
+        crate::tally::test_company_guid(FOREX),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &companies,

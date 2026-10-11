@@ -10,6 +10,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+pub mod company_guid;
 pub mod exact_arithmetic;
 pub mod text;
 

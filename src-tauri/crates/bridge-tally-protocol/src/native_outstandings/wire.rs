@@ -754,6 +754,35 @@ pub fn parse_native_group_snapshot_with_evidence(
     xml: &str,
     expected_company_guid: &str,
 ) -> Result<Vec<NativeGroupSnapshotEntry>, NativeOutstandingsError> {
+    Ok(walk_group_snapshot(xml, expected_company_guid)?
+        .into_iter()
+        .map(|walked| NativeGroupSnapshotEntry {
+            record: walked.row.record,
+            raw_source_sha256: walked.raw_source_sha256,
+        })
+        .collect())
+}
+
+/// The `InvalidResponse` code for a Group row whose request-computed
+/// `BRIDGECOMPANYGUID` is absent or empty, or for a collection with no rows.
+pub(super) const GROUP_COMPANY_GUID_MISSING: &str = "group_response_company_guid_missing";
+/// The `InvalidResponse` code for a Group row whose `BRIDGECOMPANYGUID` is not
+/// the requested company's.
+pub(super) const GROUP_COMPANY_GUID_MISMATCH: &str = "group_response_company_guid_mismatch";
+
+/// One Group row as the shared walk read it, with the hash of its exact bytes.
+pub(super) struct WalkedGroupRow {
+    pub(super) row: ParsedNativeGroupSnapshotRow,
+    pub(super) raw_source_sha256: String,
+}
+
+/// The one walk over a `List of Groups` response: envelope, `STATUS`,
+/// collection scoping and the per-row company binding live here, so the
+/// snapshot and the name index cannot read the envelope differently.
+pub(super) fn walk_group_snapshot(
+    xml: &str,
+    expected_company_guid: &str,
+) -> Result<Vec<WalkedGroupRow>, NativeOutstandingsError> {
     let sanitized = sanitize_invalid_numeric_references_with_provenance(xml);
     let mut reader = Reader::from_str(sanitized.as_str());
     reader.config_mut().trim_text(true);
@@ -809,18 +838,16 @@ pub fn parse_native_group_snapshot_with_evidence(
                 {
                     let row = parse_group_row(&mut reader, &element)?;
                     let response_company_guid = row.response_company_guid.as_deref().ok_or(
-                        NativeOutstandingsError::InvalidResponse(
-                            "group_response_company_guid_missing",
-                        ),
+                        NativeOutstandingsError::InvalidResponse(GROUP_COMPANY_GUID_MISSING),
                     )?;
                     if !response_company_guid.eq_ignore_ascii_case(expected_company_guid) {
                         return Err(NativeOutstandingsError::InvalidResponse(
-                            "group_response_company_guid_mismatch",
+                            GROUP_COMPANY_GUID_MISMATCH,
                         ));
                     }
                     let record_end = reader.buffer_position() as usize;
-                    entries.push(NativeGroupSnapshotEntry {
-                        record: row.record,
+                    entries.push(WalkedGroupRow {
+                        row,
                         raw_source_sha256: sha256_hex(
                             sanitized
                                 .original_fragment(event_start, record_end)
@@ -893,15 +920,32 @@ pub fn parse_native_group_snapshot_with_evidence(
     }
     if entries.is_empty() {
         return Err(NativeOutstandingsError::InvalidResponse(
-            "group_response_company_guid_missing",
+            GROUP_COMPANY_GUID_MISSING,
         ));
     }
     Ok(entries)
 }
 
-struct ParsedNativeGroupSnapshotRow {
-    record: TallyNamedMaster,
+/// One `GROUP` row's fields. The snapshot reads `record` and the response
+/// company; `identity` is what the name index validates, and is raw: the walk
+/// reports what Tally wrote, and the caller decides what is admissible.
+pub(super) struct ParsedNativeGroupSnapshotRow {
+    pub(super) record: TallyNamedMaster,
     response_company_guid: Option<String>,
+    pub(super) identity: GroupRowIdentity,
+}
+
+/// The identity-bearing children of one `GROUP` row, exactly as written.
+#[derive(Default)]
+pub(super) struct GroupRowIdentity {
+    /// The text of every direct `GUID` child, in document order.
+    pub(super) guids: Vec<String>,
+    /// The text of every direct `ALTERID` child, in document order.
+    pub(super) alter_ids: Vec<String>,
+    /// Every `NAME` of every `NAME.LIST` of every `LANGUAGENAME.LIST` child, in
+    /// document order, verbatim. An empty or self-closing `NAME` is an empty
+    /// string here.
+    pub(super) names: Vec<String>,
 }
 
 /// Parses one `GROUP` row and keeps the request-computed responder identity
@@ -925,6 +969,7 @@ fn parse_group_row(
     let mut parent_seen = false;
     let mut response_company_guid = None;
     let mut response_company_guid_seen = false;
+    let mut identity = GroupRowIdentity::default();
     loop {
         match reader
             .read_event()
@@ -956,7 +1001,31 @@ fn parse_group_row(
                 }
                 response_company_guid = (!value.is_empty()).then_some(value);
             }
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("GUID") => {
+                identity
+                    .guids
+                    .push(read_element_text(reader, child.name())?);
+            }
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("ALTERID") => {
+                identity
+                    .alter_ids
+                    .push(read_element_text(reader, child.name())?);
+            }
+            Event::Start(child)
+                if child
+                    .name()
+                    .as_ref()
+                    .eq_ignore_ascii_case("LANGUAGENAME.LIST") =>
+            {
+                read_language_name_list(reader, &mut identity.names)?;
+            }
             Event::Start(_) => skip_subtree(reader)?,
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("GUID") => {
+                identity.guids.push(String::new());
+            }
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("ALTERID") => {
+                identity.alter_ids.push(String::new());
+            }
             Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("PARENT") => {
                 if std::mem::replace(&mut parent_seen, true) {
                     return Err(NativeOutstandingsError::InvalidResponse(
@@ -998,7 +1067,72 @@ fn parse_group_row(
             reserved_name,
         },
         response_company_guid,
+        identity,
     })
+}
+
+/// Reads one `LANGUAGENAME.LIST` whose start has been consumed, appending
+/// every `NAME` of every `NAME.LIST` inside it. Other children (`LANGUAGEID`)
+/// are skipped. Names are kept verbatim: they are matched by exact codepoint.
+fn read_language_name_list(
+    reader: &mut Reader<&[u8]>,
+    names: &mut Vec<String>,
+) -> Result<(), NativeOutstandingsError> {
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") => {
+                read_name_list(reader, names)?;
+            }
+            Event::Start(_) => skip_subtree(reader)?,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .eq_ignore_ascii_case("LANGUAGENAME.LIST") =>
+            {
+                return Ok(())
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Reads one `NAME.LIST` whose start has been consumed.
+fn read_name_list(
+    reader: &mut Reader<&[u8]>,
+    names: &mut Vec<String>,
+) -> Result<(), NativeOutstandingsError> {
+    loop {
+        match reader
+            .read_event()
+            .map_err(|_| NativeOutstandingsError::InvalidResponse("group_xml_malformed"))?
+        {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                names.push(read_element_identifier_text(reader, child.name())?);
+            }
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("NAME") => {
+                names.push(String::new());
+            }
+            Event::Start(_) => skip_subtree(reader)?,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("NAME.LIST") => {
+                return Ok(())
+            }
+            Event::Eof => {
+                return Err(NativeOutstandingsError::InvalidResponse(
+                    "group_row_unterminated",
+                ))
+            }
+            _ => {}
+        }
+    }
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {

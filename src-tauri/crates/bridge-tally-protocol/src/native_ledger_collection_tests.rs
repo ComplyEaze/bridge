@@ -2,6 +2,82 @@ use super::*;
 
 const EXPECTED_COMPANY_GUID: &str = "11111111-1111-1111-1111-111111111111";
 
+fn returned(value: &str) -> PartyLedgerMasterFieldObservation {
+    PartyLedgerMasterFieldObservation::Returned(value.to_string())
+}
+
+/// The table behind the parser is the table callers see: every head, written
+/// the way Tally writes it on a GST ledger, parses back to that head.
+#[test]
+fn every_gst_duty_head_round_trips_through_its_tally_spelling() {
+    for head in GstDutyHead::ALL {
+        let spelling = head.tally_spelling();
+        assert_eq!(
+            GstDutyHeadObservation::from_observations(&returned("GST"), &returned(spelling)),
+            GstDutyHeadObservation::Recognized {
+                raw: spelling.to_string(),
+                head,
+            },
+            "{spelling}"
+        );
+    }
+}
+
+#[test]
+fn the_gst_duty_head_table_lists_six_distinct_heads_and_six_distinct_spellings() {
+    assert_eq!(GstDutyHead::ALL.len(), 6);
+    let spellings: Vec<&str> = GstDutyHead::ALL
+        .iter()
+        .map(|head| head.tally_spelling())
+        .collect();
+    assert_eq!(
+        spellings,
+        ["CGST", "IGST", "State Tax", "SGST/UTGST", "UT Tax", "Cess"]
+    );
+    let distinct_spellings: std::collections::BTreeSet<&str> = spellings.iter().copied().collect();
+    assert_eq!(distinct_spellings.len(), 6);
+    for (index, head) in GstDutyHead::ALL.iter().enumerate() {
+        assert!(
+            !GstDutyHead::ALL[..index].contains(head),
+            "{head:?} is listed twice"
+        );
+    }
+}
+
+/// A new head fails to compile here until it is placed in the table.
+#[test]
+fn the_gst_duty_head_table_holds_every_variant() {
+    fn position(head: GstDutyHead) -> usize {
+        match head {
+            GstDutyHead::Cgst => 0,
+            GstDutyHead::Igst => 1,
+            GstDutyHead::StateTax => 2,
+            GstDutyHead::SgstUtgst => 3,
+            GstDutyHead::UtTax => 4,
+            GstDutyHead::Cess => 5,
+        }
+    }
+    for (index, head) in GstDutyHead::ALL.into_iter().enumerate() {
+        assert_eq!(position(head), index);
+    }
+}
+
+/// Anything outside the table stays unrecognised, including the spellings
+/// that differ from a measured one only by case or by Tally's other name for
+/// the state head.
+#[test]
+fn a_spelling_outside_the_gst_duty_head_table_is_not_recognised() {
+    for raw in ["SGST", "sgst/utgst", "cgst", "Cess ", "UT", "Others"] {
+        assert_eq!(
+            GstDutyHeadObservation::from_observations(&returned("GST"), &returned(raw)),
+            GstDutyHeadObservation::Unrecognized {
+                raw: raw.to_string()
+            },
+            "{raw}"
+        );
+    }
+}
+
 fn master_response(response_company_guid: Option<&str>) -> String {
     master_response_with_extra(response_company_guid, "")
 }

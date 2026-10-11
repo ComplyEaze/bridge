@@ -249,6 +249,16 @@ fn names_come_from_the_name_list_and_the_name_attribute_must_agree() {
         parse(&attribute_only),
         Err(GroupNameIndexError::NameAttributeDisagrees { row: row_number })
     );
+    // A difference of case alone is a difference.
+    let cased = replace_once(
+        &text,
+        attribute,
+        "<GROUP NAME=\"bank od a/c\" RESERVEDNAME=\"Bank OD A/c\">",
+    );
+    assert_eq!(
+        parse(&cased),
+        Err(GroupNameIndexError::NameAttributeDisagrees { row: row_number })
+    );
     // The stored name alone changed.
     let list_only = replace_once(&text, "<NAME>Bank OD A/c</NAME>", "<NAME>List Only</NAME>");
     assert_eq!(
@@ -327,7 +337,14 @@ fn a_name_in_a_shape_no_capture_shows_is_refused_not_dropped() {
     let original = text[span.clone()].to_string();
     let close = "</LANGUAGENAME.LIST>";
     let before_close = original[..original.len() - close.len()].to_string();
-    let cases: [(&str, String, NameShape); 7] = [
+    let cases: [(&str, String, NameShape); 8] = [
+        (
+            "two shapes in one row: the first in document order is named",
+            format!(
+                "<NAME.LIST/>{before_close}<NAME>Bare Name</NAME><NAME.LIST><ALIAS/></NAME.LIST>{close}"
+            ),
+            NameShape::NameListOutsideLanguageList,
+        ),
         (
             "NAME.LIST beside the language list",
             format!("{original}<NAME.LIST TYPE=\"String\"><NAME>Stray Outside</NAME></NAME.LIST>"),

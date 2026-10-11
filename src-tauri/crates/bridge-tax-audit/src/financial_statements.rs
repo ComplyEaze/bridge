@@ -1588,6 +1588,7 @@ profit is shown."
             r.findings[0].ask_client,
             ["Whether the Stock-in-Hand ledger carries stock that the stock items also hold."]
         );
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
         // A Stock-in-Hand ledger that carries nothing does not stop the items being used.
         for name in ["Stale Stock", "Still Stock"] {
             *b.tb.get_mut(name).unwrap() = TbRow {

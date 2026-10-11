@@ -13750,5 +13750,229 @@
   "file": "src/documents.rs",
   "from": "        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),",
   "to": "        Value::Array(a) if a.is_empty() => Ok(None),\n        Value::Array(a) => a.iter().map(row).collect::<Result<_>>().map(Some),"
+ },
+ {
+  "id": "CS-1",
+  "by": "author",
+  "what": "book.rs: an unknown integration flag read as integrated for closing stock",
+  "file": "src/book.rs",
+  "from": "    if is_integrated != Some(true) {\n        return ClosingStock::NotApplicable;",
+  "to": "    if is_integrated == Some(false) {\n        return ClosingStock::NotApplicable;"
+ },
+ {
+  "id": "CS-2",
+  "by": "author",
+  "what": "book.rs: integrated inventory with no Stock Summary part read as closing stock not applicable",
+  "file": "src/book.rs",
+  "from": "        return ClosingStock::Unknown(ClosingStockUnknown::NotRead);",
+  "to": "        return ClosingStock::NotApplicable;"
+ },
+ {
+  "id": "CS-3",
+  "by": "author",
+  "what": "book.rs: a read with no trial-balance window read as closing stock not applicable",
+  "file": "src/book.rs",
+  "from": "    let Some(to) = tb_to else {\n        return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd);",
+  "to": "    let Some(to) = tb_to else {\n        return ClosingStock::NotApplicable;"
+ },
+ {
+  "id": "CS-4",
+  "by": "author",
+  "what": "book.rs: the Stock Summary taken is the one not dated the trial balance's last day",
+  "file": "src/book.rs",
+  "from": "p.as_of.as_ref() == Some(to)",
+  "to": "p.as_of.as_ref() != Some(to)"
+ },
+ {
+  "id": "CS-5",
+  "by": "author",
+  "what": "book.rs: two Stock Summaries dated the last day read as the first of them",
+  "file": "src/book.rs",
+  "from": "let (Some(part), None) = (at_end.next(), at_end.next()) else {",
+  "to": "let (Some(part), _) = (at_end.next(), at_end.next()) else {"
+ },
+ {
+  "id": "CS-6",
+  "by": "author",
+  "what": "book.rs: an unreadable Stock Summary read as a closing stock of zero",
+  "file": "src/book.rs",
+  "from": "        Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),",
+  "to": "        Err(_) => ClosingStock::Valued(0),"
+ },
+ {
+  "id": "CS-7",
+  "by": "author",
+  "what": "book.rs: closing stock counts only the Summary's positive values",
+  "file": "src/book.rs",
+  "from": ".and_then(|s| s.total_value_paise())",
+  "to": ".and_then(|s| s.positive_value_paise())"
+ },
+ {
+  "id": "CS-8",
+  "by": "author",
+  "what": "book.rs: the Summary is looked for on the trial balance's first day, not its last",
+  "file": "src/book.rs",
+  "from": "closing_stock(is_integrated, &summaries, tp.window.as_ref().map(|w| &w.to))",
+  "to": "closing_stock(is_integrated, &summaries, tp.window.as_ref().map(|w| &w.from))"
+ },
+ {
+  "id": "STB-1",
+  "by": "author",
+  "what": "financial_statements.rs: a book with no opening stock term is read as integrated with an opening stock of zero",
+  "file": "src/financial_statements.rs",
+  "from": "        OpeningStock::NotApplicable => return StockBasis::Ledgers,",
+  "to": "        OpeningStock::NotApplicable => Ok(0),"
+ },
+ {
+  "id": "STB-2",
+  "by": "author",
+  "what": "financial_statements.rs: a book with no closing stock term is read as having a closing stock of zero",
+  "file": "src/financial_statements.rs",
+  "from": "        ClosingStock::NotApplicable => Err(StockUnknown::Closing(ClosingStockUnknown::NotRead)),",
+  "to": "        ClosingStock::NotApplicable => Ok(0),"
+ },
+ {
+  "id": "STB-3",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger beside the stock items does not stop the items being used",
+  "file": "src/financial_statements.rs",
+  "from": "        (Ok(opening), Ok(closing)) if !ledger_has_value => StockBasis::Items { opening, closing },",
+  "to": "        (Ok(opening), Ok(closing)) => StockBasis::Items { opening, closing },"
+ },
+ {
+  "id": "STB-4",
+  "by": "author",
+  "what": "financial_statements.rs: an unknown term always adds the ledger-beside-items reason",
+  "file": "src/financial_statements.rs",
+  "from": "            if why.is_empty() {\n                why.push(StockUnknown::LedgerAlso);",
+  "to": "            if true {\n                why.push(StockUnknown::LedgerAlso);"
+ },
+ {
+  "id": "STB-5",
+  "by": "author",
+  "what": "financial_statements.rs: an unknown opening stock is shown as a figure of zero",
+  "file": "src/financial_statements.rs",
+  "from": "                opening: opening.ok(),\n",
+  "to": "                opening: Some(opening.unwrap_or(0)),\n"
+ },
+ {
+  "id": "STB-6",
+  "by": "author",
+  "what": "financial_statements.rs: an unknown stock term is taken as zero in the gross profit",
+  "file": "src/financial_statements.rs",
+  "from": "        StockBasis::Unknown { .. } => None,\n    };\n    let (opening_stock, closing_stock) = match &stock_basis {",
+  "to": "        StockBasis::Unknown {\n            opening, closing, ..\n        } => Some((opening.unwrap_or(0), closing.unwrap_or(0))),\n    };\n    let (opening_stock, closing_stock) = match &stock_basis {"
+ },
+ {
+  "id": "STB-7",
+  "by": "author",
+  "what": "financial_statements.rs: the item basis swaps the opening and closing stock",
+  "file": "src/financial_statements.rs",
+  "from": "        StockBasis::Items { opening, closing } => Some((*opening, *closing)),",
+  "to": "        StockBasis::Items { opening, closing } => Some((*closing, *opening)),"
+ },
+ {
+  "id": "STB-8",
+  "by": "author",
+  "what": "financial_statements.rs: the closing stock shown is the Stock-in-Hand ledgers' sum on every basis",
+  "file": "src/financial_statements.rs",
+  "from": "        _ => (stock_terms.map(|t| t.0), stock_terms.map(|t| t.1)),",
+  "to": "        _ => (stock_terms.map(|t| t.0), Some(closing_stock)),"
+ },
+ {
+  "id": "STB-9",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger that carries nothing counts as carrying a value",
+  "file": "src/financial_statements.rs",
+  "from": "r.opening_paise != 0 || r.recomputed_closing_paise != 0",
+  "to": "r.opening_paise == 0 || r.recomputed_closing_paise != 0"
+ },
+ {
+  "id": "STB-10",
+  "by": "author",
+  "what": "financial_statements.rs: profit before partners' interest is computed on a net profit that is not known",
+  "file": "src/financial_statements.rs",
+  "from": "            (Some(pi), net_profit.map(|np| add(np, pi)).transpose()?)",
+  "to": "            (Some(pi), Some(add(net_profit.unwrap_or(0), pi)?))"
+ },
+ {
+  "id": "STB-11",
+  "by": "author",
+  "what": "financial_statements.rs: the ledger wording and figures are used on the item basis",
+  "file": "src/financial_statements.rs",
+  "from": "    let on_items = !matches!(d.stock_basis, StockBasis::Ledgers);",
+  "to": "    let on_items = false;"
+ },
+ {
+  "id": "STB-12",
+  "by": "author",
+  "what": "financial_statements.rs: the stock to turnover ratio is shown on a closing stock that is not known",
+  "file": "src/financial_statements.rs",
+  "from": "    if let Some(cs) = d.closing_stock {\n        r.fig(\n            \"stock_to_turnover_pct_bp\",",
+  "to": "    if let Some(cs) = d.closing_stock.or(Some(0)) {\n        r.fig(\n            \"stock_to_turnover_pct_bp\","
+ },
+ {
+  "id": "STB-13",
+  "by": "author",
+  "what": "financial_statements.rs: a closing stock tie is claimed when the report carries no closing stock",
+  "file": "src/financial_statements.rs",
+  "from": "(Some(rep), None) if rep.closing_stock_paise.is_some() && d.closing_stock.is_some() => {",
+  "to": "(Some(rep), None) if rep.closing_stock_paise.is_some() || d.closing_stock.is_some() => {"
+ },
+ {
+  "id": "STB-14",
+  "by": "author",
+  "what": "financial_statements.rs: the finding for an unknown stock reads as a computed tie",
+  "file": "src/financial_statements.rs",
+  "from": "            confidence: Confidence::NeedsDocument,\n            limits,\n            ask_client: why.iter()",
+  "to": "            confidence: Confidence::Computed,\n            limits,\n            ask_client: why.iter()"
+ },
+ {
+  "id": "STB-15",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 swaps the item opening and closing stock",
+  "file": "src/financial_statements.rs",
+  "from": "StockBasis::Items { opening, closing } => (Some(closing), Some(profit(opening, closing)?)),",
+  "to": "StockBasis::Items { opening, closing } => (Some(closing), Some(profit(closing, opening)?)),"
+ },
+ {
+  "id": "STB-16",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 lets a net profit stand for a book whose stock is not known",
+  "file": "src/financial_statements.rs",
+  "from": "        (Some(derived), None) => out.push(format!(\n            \"FS-2: net_profit (",
+  "to": "        (Some(_), None) => {}\n        (Some(derived), None) => out.push(format!(\n            \"FS-2: net_profit ("
+ },
+ {
+  "id": "STB-17",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 lets a net profit be left out of a book whose stock is known",
+  "file": "src/financial_statements.rs",
+  "from": "        (None, Some(fresh_np)) => out.push(format!(",
+  "to": "        (None, Some(_)) => {}\n        (None, Some(fresh_np)) => out.push(format!("
+ },
+ {
+  "id": "STB-18",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 lets a closing stock stand that is not known",
+  "file": "src/financial_statements.rs",
+  "from": "        (Some(derived), None) => out.push(format!(\n            \"FS-2: closing_stock (",
+  "to": "        (Some(_), None) => {}\n        (Some(derived), None) => out.push(format!(\n            \"FS-2: closing_stock ("
+ },
+ {
+  "id": "STB-19",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value on a Stock-in-Hand ledger",
+  "file": "src/financial_statements.rs",
+  "from": "ledger_has_value |= row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "ledger_has_value |= false;"
+ },
+ {
+  "id": "STB-20",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 takes the ledger basis' closing stock from the opening",
+  "file": "src/financial_statements.rs",
+  "from": "StockBasis::Ledgers => (Some(close_stock), Some(profit(open_stock, close_stock)?)),",
+  "to": "StockBasis::Ledgers => (Some(open_stock), Some(profit(open_stock, close_stock)?)),"
  }
 ]

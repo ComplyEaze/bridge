@@ -248,6 +248,9 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         root,
         |name| match name {
             "agent-import-ledger.jsonl" => "journal",
+            // The master write journal and its pre-image sidecars are import
+            // journal files, not strays.
+            name if super::master_ledger::is_master_file(name) => "journal",
             "agent-egress.jsonl" => "egress_log",
             "agent-import-admission.lock" => "locks",
             _ => "other",

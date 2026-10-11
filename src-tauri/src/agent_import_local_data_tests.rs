@@ -40,6 +40,13 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     let root = directory.path();
     let journal_bytes = journal(false);
     write(&root.join("agent-import-ledger.jsonl"), &journal_bytes);
+    write(&root.join("agent-master-ledger.jsonl"), b"abc");
+    write(
+        &root.join("master-pre-image-bridge-00000000-0000-4000-8000-000000000001.json"),
+        b"{}",
+    );
+    // A look-alike with no batch id in its name is not one of ours.
+    write(&root.join("master-pre-image-x.json"), b"xy");
     write(&root.join("agent-egress.jsonl"), b"abcd");
     write(&root.join("agent-import-admission.lock"), b"");
     write(&root.join("notes.txt"), b"12345");
@@ -67,10 +74,10 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     let expect = |name: &str, files: u64, bytes: u64| {
         assert_eq!(*class(&report, name), Class { files, bytes }, "{name}");
     };
-    expect("journal", 1, journal_bytes.len() as u64);
+    expect("journal", 3, journal_bytes.len() as u64 + 5);
     expect("egress_log", 1, 4);
     expect("locks", 2, 0);
-    expect("other", 3, 8);
+    expect("other", 4, 10);
     expect("import_files", 1, 10);
     expect("proofs", 4, 14);
     expect("approval_notes", 1, 7);

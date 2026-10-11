@@ -2,6 +2,7 @@
 use super::*;
 use serde_json::json;
 use std::io::Cursor;
+use std::path::Path;
 use uuid::Uuid;
 
 fn batch_id() -> String {
@@ -104,6 +105,14 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
             })
             .collect(),
     }
+}
+
+fn lock() -> AdmissionLock {
+    tempfile::tempfile().unwrap()
+}
+
+fn write(directory: &Path, id: &str, image: &PreImage) -> Result<WrittenPreImage, PreImageError> {
+    write_pre_image(directory, &lock(), &batch(id), image)
 }
 
 fn line(record: &MasterRecord) -> String {
@@ -301,12 +310,15 @@ fn a_batch_id_reused_with_another_digest_or_content_is_refused() {
         .unwrap_err(),
         invalid(Invalid::BatchIdReused)
     );
-    // The identical batch written twice is one batch.
-    assert!(read(&journal_text(&[
-        MasterRecord::Batch(first.clone()),
-        MasterRecord::Batch(first)
-    ]))
-    .is_ok());
+    // The identical batch again is refused too: the caller reads the state.
+    assert_eq!(
+        read(&journal_text(&[
+            MasterRecord::Batch(first.clone()),
+            MasterRecord::Batch(first)
+        ]))
+        .unwrap_err(),
+        invalid(Invalid::BatchIdReused)
+    );
 }
 
 #[test]
@@ -368,26 +380,6 @@ fn an_intent_or_verdict_must_name_the_batchs_items_in_order() {
         ))
         .unwrap_err(),
         invalid(Invalid::ItemsMismatch)
-    );
-}
-
-#[test]
-fn the_latest_verdict_and_response_win() {
-    let batch = batch(&batch_id());
-    let mut records = full_records(&batch);
-    records.insert(
-        3,
-        MasterRecord::Verdict(verdict_for(
-            &batch,
-            MasterVerdictState::MastersAfterPostUnconfirmed,
-        )),
-    );
-    let journal = read(&journal_text(&records)).unwrap();
-    assert_eq!(
-        journal
-            .verdict(&batch.batch_id)
-            .map(|verdict| verdict.state),
-        Some(MasterVerdictState::PostedVerified)
     );
 }
 
@@ -462,7 +454,7 @@ fn empty_blank_and_repeated_names_and_blank_fields_are_refused() {
         invalid(Invalid::DuplicateName)
     );
     let mut blank_company = batch(&id);
-    blank_company.company.guid = " ".into();
+    blank_company.company.name = " ".into();
     assert_eq!(
         read(&line(&MasterRecord::Batch(blank_company))).unwrap_err(),
         invalid(Invalid::BlankField)
@@ -531,7 +523,7 @@ fn an_intent_refuses_two_marks_for_one_company() {
     let batch = batch(&batch_id());
     let mut intent = intent_for(&batch);
     intent.pre_post_master_marks.push(MasterMark {
-        company_guid: batch.company.guid.to_uppercase(),
+        company_guid: batch.company.guid.clone(),
         altmstid: 8,
     });
     assert_eq!(
@@ -688,8 +680,9 @@ fn appending_master_records_leaves_the_voucher_journal_byte_for_byte() {
         + "\n";
     std::fs::write(&voucher_path, &voucher_line).unwrap();
     let batch = batch(&batch_id());
+    let lock = lock();
     for record in full_records(&batch) {
-        append(directory.path(), record).unwrap();
+        append(directory.path(), &lock, record).unwrap();
     }
     assert_eq!(
         std::fs::read_to_string(&voucher_path).unwrap(),
@@ -708,8 +701,9 @@ fn a_missing_journal_is_empty_and_append_builds_it_in_order() {
     let directory = tempfile::tempdir().unwrap();
     assert!(!read_journal(directory.path()).unwrap().dispatched("x"));
     let batch = batch(&batch_id());
+    let lock = lock();
     for record in full_records(&batch) {
-        append(directory.path(), record).unwrap();
+        append(directory.path(), &lock, record).unwrap();
     }
     let on_disk = std::fs::read_to_string(directory.path().join(JOURNAL_FILE)).unwrap();
     assert_eq!(on_disk, journal_text(&full_records(&batch)));
@@ -721,25 +715,29 @@ fn append_never_writes_a_record_the_reader_would_refuse() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join(JOURNAL_FILE);
     let batch = batch(&batch_id());
+    let lock = lock();
     // Nothing is written for an intent whose batch is not there.
     assert_eq!(
         append(
             directory.path(),
+            &lock,
             MasterRecord::DispatchIntent(intent_for(&batch))
         )
         .unwrap_err(),
         invalid(Invalid::NoBatch)
     );
     assert!(!path.exists());
-    append(directory.path(), MasterRecord::Batch(batch.clone())).unwrap();
+    append(directory.path(), &lock, MasterRecord::Batch(batch.clone())).unwrap();
     append(
         directory.path(),
+        &lock,
         MasterRecord::DispatchIntent(intent_for(&batch)),
     )
     .unwrap();
     let before = std::fs::read(&path).unwrap();
     let error = append(
         directory.path(),
+        &lock,
         MasterRecord::DispatchIntent(intent_for(&batch)),
     )
     .unwrap_err();
@@ -753,7 +751,12 @@ fn a_corrupt_journal_file_blocks_appends() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join(JOURNAL_FILE), "garbage\n").unwrap();
     assert_eq!(
-        append(directory.path(), MasterRecord::Batch(batch(&batch_id()))).unwrap_err(),
+        append(
+            directory.path(),
+            &lock(),
+            MasterRecord::Batch(batch(&batch_id()))
+        )
+        .unwrap_err(),
         invalid(Invalid::Parse)
     );
 }
@@ -771,7 +774,9 @@ fn the_pre_image_is_sorted_lower_case_and_round_trips_through_its_sidecar() {
     let directory = tempfile::tempdir().unwrap();
     let id = batch_id();
     let image = pre_image();
-    let sha = write_pre_image(directory.path(), &id, &image).unwrap();
+    let written = write(directory.path(), &id, &image).unwrap();
+    let sha = written.sha256().to_string();
+    assert_eq!(written.count(), 2);
     let path = directory.path().join(format!("master-pre-image-{id}.json"));
     let bytes = std::fs::read(&path).unwrap();
     assert_eq!(
@@ -784,10 +789,10 @@ fn the_pre_image_is_sorted_lower_case_and_round_trips_through_its_sidecar() {
         image
     );
     // The same write repeated is accepted; different bytes under the name are not.
-    assert_eq!(write_pre_image(directory.path(), &id, &image).unwrap(), sha);
+    assert_eq!(write(directory.path(), &id, &image).unwrap(), written);
     let other = PreImage::new([("cccccccc-0000-0000-0000-000000000003".to_string(), 1)]).unwrap();
     assert_eq!(
-        write_pre_image(directory.path(), &id, &other).unwrap_err(),
+        write(directory.path(), &id, &other).unwrap_err(),
         PreImageError::ExistsDifferent
     );
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
@@ -824,7 +829,10 @@ fn a_pre_image_with_the_wrong_digest_or_count_or_no_file_is_refused() {
         read_pre_image(directory.path(), &id, &digest('a'), 2).unwrap_err(),
         PreImageError::Missing
     );
-    let sha = write_pre_image(directory.path(), &id, &pre_image()).unwrap();
+    let sha = write(directory.path(), &id, &pre_image())
+        .unwrap()
+        .sha256()
+        .to_string();
     assert_eq!(
         read_pre_image(directory.path(), &id, &digest('0'), 2).unwrap_err(),
         PreImageError::ShaMismatch
@@ -884,7 +892,7 @@ fn a_batch_id_that_could_leave_the_data_dir_is_refused_for_the_sidecar() {
         "bridge-not-a-uuid",
     ] {
         assert_eq!(
-            write_pre_image(&nested, id, &pre_image()).unwrap_err(),
+            write(&nested, id, &pre_image()).unwrap_err(),
             PreImageError::BadBatchId
         );
         assert_eq!(
@@ -907,4 +915,333 @@ fn every_error_has_a_stable_code() {
         PreImageError::ShaMismatch.code(),
         "master_pre_image_invalid"
     );
+}
+
+/// A batch of one ledger, under its own id.
+fn single(name: &str) -> MasterBatch {
+    batch_with(
+        &batch_id(),
+        &digest('a'),
+        vec![ledger(name, StoredLedgerKind::Suspense)],
+    )
+}
+
+/// An intent whose keys are chosen, so a test can collide one key at a time.
+fn keyed_intent(batch: &MasterBatch, canonical: &str, absence: &str) -> MasterDispatchIntent {
+    let mut intent = intent_for(batch);
+    for item in &mut intent.items {
+        item.canonical_key = canonical.into();
+        item.absence_key = absence.into();
+    }
+    intent
+}
+
+fn dispatched_batch(
+    name: &str,
+    canonical: &str,
+    absence: &str,
+) -> (MasterBatch, Vec<MasterRecord>) {
+    let batch = single(name);
+    let records = vec![
+        MasterRecord::Batch(batch.clone()),
+        MasterRecord::DispatchIntent(keyed_intent(&batch, canonical, absence)),
+    ];
+    (batch, records)
+}
+
+#[test]
+fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
+    let (first, mut records) = dispatched_batch("Synthetic One", "key-one", "absent-one");
+    // The same ledger under a new batch id, by canonical key only.
+    for (name, canonical, absence) in [
+        ("Synthetic Two", "key-one", "absent-two"),
+        ("Synthetic Three", "key-three", "absent-one"),
+    ] {
+        let (_, second) = dispatched_batch(name, canonical, absence);
+        let text = journal_text(&[records.clone(), second].concat());
+        assert_eq!(
+            read(&text).unwrap_err(),
+            MasterLedgerError::OpenDispatchOverlaps
+        );
+    }
+    assert_eq!(
+        MasterLedgerError::OpenDispatchOverlaps.code(),
+        "master_ledger_open_dispatch_overlaps"
+    );
+    // Other ledgers are not blocked.
+    let (_, other) = dispatched_batch("Synthetic Four", "key-four", "absent-four");
+    assert!(read(&journal_text(&[records.clone(), other.clone()].concat())).is_ok());
+    // An outcome left open by a verdict that settles nothing still blocks.
+    records.push(MasterRecord::Verdict(verdict_for(
+        &first,
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+    )));
+    let (_, again) = dispatched_batch("Synthetic Two", "key-one", "absent-two");
+    assert_eq!(
+        read(&journal_text(&[records.clone(), again.clone()].concat())).unwrap_err(),
+        MasterLedgerError::OpenDispatchOverlaps
+    );
+    // A terminal verdict settles it, and the same ledgers may be sent again.
+    records.push(MasterRecord::Verdict(verdict_for(
+        &first,
+        MasterVerdictState::PostedVerified,
+    )));
+    assert!(read(&journal_text(&[records, again].concat())).is_ok());
+}
+
+#[test]
+fn append_refuses_an_overlapping_intent_and_writes_nothing() {
+    let directory = tempfile::tempdir().unwrap();
+    let lock = lock();
+    let (_, first) = dispatched_batch("Synthetic One", "key-one", "absent-one");
+    for record in first {
+        append(directory.path(), &lock, record).unwrap();
+    }
+    let (_, second) = dispatched_batch("Synthetic One", "key-one", "absent-one");
+    append(directory.path(), &lock, second[0].clone()).unwrap();
+    let before = std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap();
+    assert_eq!(
+        append(directory.path(), &lock, second[1].clone()).unwrap_err(),
+        MasterLedgerError::OpenDispatchOverlaps
+    );
+    assert_eq!(
+        std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
+    let batch = batch(&batch_id());
+    let prefix = journal_text(&full_records(&batch)[..3]);
+    let verdict = |state| line(&MasterRecord::Verdict(verdict_for(&batch, state)));
+    // Verdicts that settle nothing may repeat and may be followed by a terminal one.
+    let open = [
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+        MasterVerdictState::ReconciliationRequired,
+    ];
+    let text = format!(
+        "{prefix}{}{}{}",
+        verdict(open[0]),
+        verdict(open[1]),
+        verdict(MasterVerdictState::PostedVerified)
+    );
+    let journal = read(&text).unwrap();
+    assert!(journal.state(&batch.batch_id).unwrap().is_settled());
+    assert_eq!(
+        journal
+            .verdict(&batch.batch_id)
+            .map(|verdict| verdict.state),
+        Some(MasterVerdictState::PostedVerified)
+    );
+    // After a terminal verdict nothing follows, of any state.
+    for terminal in [
+        MasterVerdictState::PostedVerified,
+        MasterVerdictState::PostedIntoExistingMaster,
+        MasterVerdictState::MasterWriteLocatedElsewhere,
+    ] {
+        for later in [terminal, open[0], MasterVerdictState::PostedVerified] {
+            assert_eq!(
+                read(&format!("{prefix}{}{}", verdict(terminal), verdict(later))).unwrap_err(),
+                invalid(Invalid::VerdictAfterTerminal)
+            );
+        }
+    }
+    assert!(!MasterVerdictState::ReconciliationRequired.is_terminal());
+    assert!(!MasterVerdictState::MastersAfterPostUnconfirmed.is_terminal());
+}
+
+#[test]
+fn a_batch_has_one_response() {
+    let batch = batch(&batch_id());
+    let text = journal_text(&[
+        MasterRecord::Batch(batch.clone()),
+        MasterRecord::DispatchIntent(intent_for(&batch)),
+        MasterRecord::DispatchResponse(response_for(&batch)),
+        MasterRecord::DispatchResponse(response_for(&batch)),
+    ]);
+    assert_eq!(read(&text).unwrap_err(), invalid(Invalid::SecondResponse));
+}
+
+#[test]
+fn an_intent_needs_marks_that_include_the_batchs_own_company() {
+    let batch = batch(&batch_id());
+    let batch_record = MasterRecord::Batch(batch.clone());
+    let with = |marks: Vec<MasterMark>| {
+        let mut intent = intent_for(&batch);
+        intent.pre_post_master_marks = marks;
+        read(&journal_text(&[
+            batch_record.clone(),
+            MasterRecord::DispatchIntent(intent),
+        ]))
+    };
+    let mark = |guid: &str| MasterMark {
+        company_guid: guid.into(),
+        altmstid: 3,
+    };
+    assert_eq!(with(vec![]).unwrap_err(), invalid(Invalid::MarksMissing));
+    assert_eq!(
+        with(vec![mark("00000000-0000-0000-0000-0000000000ff")]).unwrap_err(),
+        invalid(Invalid::MarksMissing)
+    );
+    assert_eq!(
+        with(vec![mark(
+            &batch.company.guid.to_uppercase().replace('0', "A")
+        )])
+        .unwrap_err(),
+        invalid(Invalid::BadGuid)
+    );
+    assert_eq!(with(vec![mark("")]).unwrap_err(), invalid(Invalid::BadGuid));
+    // Other loaded companies are recorded beside the batch's own.
+    assert!(with(vec![
+        mark("00000000-0000-0000-0000-0000000000ff"),
+        mark(&batch.company.guid)
+    ])
+    .is_ok());
+    // The company of the batch is a canonical GUID too.
+    let mut upper = batch.clone();
+    upper.company.guid = "ABCDEF00-0000-0000-0000-000000000001".into();
+    assert_eq!(
+        read(&line(&MasterRecord::Batch(upper))).unwrap_err(),
+        invalid(Invalid::BadGuid)
+    );
+}
+
+#[test]
+fn an_intent_is_built_only_from_the_sidecar_written_for_its_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let batch = batch(&batch_id());
+    let written = write_pre_image(directory.path(), &lock(), &batch, &pre_image()).unwrap();
+    let intent = MasterDispatchIntent::new(
+        &batch,
+        digest('b'),
+        intent_for(&batch).items,
+        written,
+        intent_for(&batch).pre_post_master_marks,
+    )
+    .unwrap();
+    assert_eq!(intent.pre_image_count(), 2);
+    // What the intent records is what the sidecar reads back with.
+    assert!(read_pre_image(
+        directory.path(),
+        &batch.batch_id,
+        intent.pre_image_sha256(),
+        intent.pre_image_count()
+    )
+    .is_ok());
+    // A token written for another batch is refused.
+    let other = single("Synthetic Other");
+    let foreign = write_pre_image(directory.path(), &lock(), &other, &pre_image()).unwrap();
+    assert_eq!(
+        MasterDispatchIntent::new(
+            &batch,
+            digest('b'),
+            intent_for(&batch).items,
+            foreign,
+            intent_for(&batch).pre_post_master_marks,
+        )
+        .unwrap_err(),
+        PreImageError::OtherBatch
+    );
+    // A reader still refuses a zero count, whoever wrote the line.
+    let mut zero = intent_for(&batch);
+    zero.pre_image_count = 0;
+    assert_eq!(
+        read(&journal_text(&[
+            MasterRecord::Batch(batch),
+            MasterRecord::DispatchIntent(zero)
+        ]))
+        .unwrap_err(),
+        invalid(Invalid::ZeroPreImageCount)
+    );
+}
+
+#[test]
+fn a_sidecar_the_reader_would_refuse_for_size_is_never_written() {
+    let directory = tempfile::tempdir().unwrap();
+    let batch = batch(&batch_id());
+    // 128-character GUIDs, about 135 bytes an entry, past the 32 MiB bound.
+    let entries = 260_000_u64;
+    let huge = PreImage::new((0..entries).map(|index| (format!("{index:0>128x}"), index))).unwrap();
+    assert_eq!(
+        write_pre_image(directory.path(), &lock(), &batch, &huge).unwrap_err(),
+        PreImageError::TooLargeToWrite
+    );
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+    assert_eq!(
+        PreImageError::TooLargeToWrite.code(),
+        "master_pre_image_write_failed"
+    );
+}
+
+#[test]
+fn a_directory_that_cannot_be_synced_is_an_error() {
+    let directory = tempfile::tempdir().unwrap();
+    assert!(sync_directory(directory.path()).is_ok());
+    #[cfg(unix)]
+    assert!(sync_directory(&directory.path().join("absent")).is_err());
+    assert_eq!(
+        MasterLedgerError::DirectorySyncFailed.code(),
+        "master_ledger_directory_sync_failed"
+    );
+}
+
+#[test]
+fn the_local_data_report_names_exactly_the_files_this_module_writes() {
+    let id = batch_id();
+    assert!(is_master_file("agent-master-ledger.jsonl"));
+    assert!(is_master_file(&format!("master-pre-image-{id}.json")));
+    for name in [
+        "master-pre-image-x.json",
+        "master-pre-image-.json",
+        &format!("master-pre-image-{id}.json.next"),
+        &format!("{id}.json"),
+        "agent-master-ledger.jsonl.bak",
+    ] {
+        assert!(!is_master_file(name), "{name}");
+    }
+}
+
+#[test]
+fn the_directory_is_synced_once_when_the_journal_is_created_and_a_failure_is_reported() {
+    let lock = lock();
+    let batch = batch(&batch_id());
+    let calls = std::cell::RefCell::new(Vec::new());
+    let sync = |result: std::io::Result<()>| {
+        let calls = &calls;
+        move |directory: &Path| {
+            calls.borrow_mut().push(directory.to_path_buf());
+            result
+        }
+    };
+    // The append that creates the journal syncs the data directory.
+    let directory = tempfile::tempdir().unwrap();
+    append_syncing(
+        directory.path(),
+        &lock,
+        MasterRecord::Batch(batch.clone()),
+        sync(Ok(())),
+    )
+    .unwrap();
+    assert_eq!(*calls.borrow(), [directory.path().to_path_buf()]);
+    // A later append, the journal being there, does not.
+    append_syncing(
+        directory.path(),
+        &lock,
+        MasterRecord::DispatchIntent(intent_for(&batch)),
+        sync(Ok(())),
+    )
+    .unwrap();
+    assert_eq!(calls.borrow().len(), 1);
+    // A failed sync is an error, not ignored.
+    let failing = tempfile::tempdir().unwrap();
+    let error = append_syncing(
+        failing.path(),
+        &lock,
+        MasterRecord::Batch(batch),
+        sync(Err(std::io::Error::other("injected"))),
+    )
+    .unwrap_err();
+    assert_eq!(error, MasterLedgerError::DirectorySyncFailed);
+    assert_eq!(calls.borrow().len(), 2);
 }

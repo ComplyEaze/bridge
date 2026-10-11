@@ -14,7 +14,10 @@
 //! a line back and to check a record before it is appended: a record the reader
 //! would refuse is never written. Callers hold the import admission lock
 //! (`Server::lock_import_admission`), which serializes every writer of this
-//! data directory; this module takes no lock of its own.
+//! data directory; this module takes no lock of its own. Every write takes the
+//! guard by reference ([`AdmissionLock`]), so a write with no lock held does not
+//! compile. The guard is a plain `File`, so the type shows that a lock was
+//! passed, not that it is the admission lock.
 //!
 //! Reuse: bounded record reading ([`ledger::read_record`]), the append that
 //! syncs and truncates a failed write back ([`append_private_import_ledger`]),
@@ -31,6 +34,22 @@ use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 
 const JOURNAL_FILE: &str = "agent-master-ledger.jsonl";
+const PRE_IMAGE_PREFIX: &str = "master-pre-image-";
+
+/// What `Server::lock_import_admission` returns, held while a master record or
+/// sidecar is written.
+pub(super) type AdmissionLock = std::fs::File;
+
+/// Whether `name` is a file this module writes: the journal, or a sidecar named
+/// for a well-formed batch id. The local-data report classes these with the
+/// import journal.
+pub(super) fn is_master_file(name: &str) -> bool {
+    name == JOURNAL_FILE
+        || name
+            .strip_prefix(PRE_IMAGE_PREFIX)
+            .and_then(|rest| rest.strip_suffix(".json"))
+            .is_some_and(valid_batch_id)
+}
 
 /// What kind of master write a batch is. One class today; the field is in the
 /// record so a later class is a new value, not a reinterpreted old record.
@@ -123,10 +142,45 @@ pub(super) struct MasterDispatchIntent {
     pub(super) batch_sha256: String,
     pub(super) native_request_sha256: String,
     pub(super) items: Vec<IntentItem>,
-    /// The digest of the pre-image sidecar written before this intent.
-    pub(super) pre_image_sha256: String,
-    pub(super) pre_image_count: u64,
+    /// The digest and count of the pre-image sidecar written before this
+    /// intent. Private: an intent takes them only from a [`WrittenPreImage`].
+    pre_image_sha256: String,
+    pre_image_count: u64,
+    /// Every loaded company's mark, the batch's own company included, so a
+    /// write that landed in another company can be told apart.
     pub(super) pre_post_master_marks: Vec<MasterMark>,
+}
+
+impl MasterDispatchIntent {
+    /// The intent of `batch`, bound to the sidecar `pre_image` was written for.
+    pub(super) fn new(
+        batch: &MasterBatch,
+        native_request_sha256: String,
+        items: Vec<IntentItem>,
+        pre_image: WrittenPreImage,
+        pre_post_master_marks: Vec<MasterMark>,
+    ) -> Result<Self, PreImageError> {
+        if pre_image.batch_id != batch.batch_id {
+            return Err(PreImageError::OtherBatch);
+        }
+        Ok(Self {
+            batch_id: batch.batch_id.clone(),
+            batch_sha256: batch.batch_sha256.clone(),
+            native_request_sha256,
+            items,
+            pre_image_sha256: pre_image.sha256,
+            pre_image_count: pre_image.count,
+            pre_post_master_marks,
+        })
+    }
+
+    pub(super) fn pre_image_sha256(&self) -> &str {
+        &self.pre_image_sha256
+    }
+
+    pub(super) fn pre_image_count(&self) -> u64 {
+        self.pre_image_count
+    }
 }
 
 /// Tally's import counters, as the response reported them.
@@ -161,6 +215,21 @@ pub(super) enum MasterVerdictState {
     PostedIntoExistingMaster,
     MastersAfterPostUnconfirmed,
     MasterWriteLocatedElsewhere,
+}
+
+impl MasterVerdictState {
+    /// Whether the outcome of the write is settled: the first terminal verdict
+    /// of a batch is its last, and it stops blocking later batches of the same
+    /// ledgers. A verdict that asks for a person's reconciliation, or that
+    /// could not confirm the masters after the post, leaves the outcome open.
+    pub(super) fn is_terminal(self) -> bool {
+        match self {
+            Self::PostedVerified
+            | Self::PostedIntoExistingMaster
+            | Self::MasterWriteLocatedElsewhere => true,
+            Self::ReconciliationRequired | Self::MastersAfterPostUnconfirmed => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -241,6 +310,14 @@ pub(super) enum Invalid {
     BatchIdReused,
     ResponseWithoutIntent,
     VerdictWithoutIntent,
+    /// A verdict after the batch's terminal verdict.
+    VerdictAfterTerminal,
+    /// A second response for a batch: one POST, one response.
+    SecondResponse,
+    /// An intent recording no company mark, or none for the batch's company.
+    MarksMissing,
+    /// A pre-image count of zero.
+    ZeroPreImageCount,
     /// An intent or verdict whose items are not the batch's, in order.
     ItemsMismatch,
     /// `posted_verified` for an item with no GUID.
@@ -256,6 +333,12 @@ pub(super) enum MasterLedgerError {
     RollbackFailed,
     /// A second dispatch intent for a batch that already has one.
     DuplicateDispatch,
+    /// An intent for ledgers an earlier dispatched batch also names, while that
+    /// batch's outcome is open: sending them again under a new batch id.
+    OpenDispatchOverlaps,
+    /// The journal file was created and its directory entry could not be made
+    /// durable. The record may be in the file; treat the dispatch as recorded.
+    DirectorySyncFailed,
     Invalid(Invalid),
 }
 
@@ -267,6 +350,8 @@ impl MasterLedgerError {
             Self::SerializationFailed => "master_ledger_serialization_failed",
             Self::RollbackFailed => "master_ledger_rollback_failed",
             Self::DuplicateDispatch => "master_ledger_duplicate_dispatch",
+            Self::OpenDispatchOverlaps => "master_ledger_open_dispatch_overlaps",
+            Self::DirectorySyncFailed => "master_ledger_directory_sync_failed",
             Self::Invalid(_) => "master_ledger_invalid",
         }
     }
@@ -343,8 +428,11 @@ impl MasterBatch {
             number,
             books_from,
         } = &self.company;
-        for field in [guid, name, number, books_from] {
+        for field in [name, number, books_from] {
             non_blank(field)?;
+        }
+        if !is_canonical_guid(guid) {
+            return Err(Invalid::BadGuid);
         }
         if self.items.is_empty() {
             return Err(Invalid::EmptyItems);
@@ -380,10 +468,18 @@ impl MasterDispatchIntent {
             non_blank(&item.canonical_key)?;
             non_blank(&item.absence_key)?;
         }
+        if self.pre_image_count == 0 {
+            return Err(Invalid::ZeroPreImageCount);
+        }
+        if self.pre_post_master_marks.is_empty() {
+            return Err(Invalid::MarksMissing);
+        }
         let mut companies = BTreeSet::new();
         for mark in &self.pre_post_master_marks {
-            non_blank(&mark.company_guid)?;
-            if !companies.insert(mark.company_guid.to_lowercase()) {
+            if !is_canonical_guid(&mark.company_guid) {
+                return Err(Invalid::BadGuid);
+            }
+            if !companies.insert(mark.company_guid.as_str()) {
                 return Err(Invalid::DuplicateMark);
             }
         }
@@ -451,8 +547,17 @@ pub(super) struct BatchState {
     pub(super) batch: MasterBatch,
     pub(super) intent: Option<MasterDispatchIntent>,
     pub(super) response: Option<MasterDispatchResponse>,
-    /// The latest verdict.
+    /// The latest verdict; once it is terminal, the last.
     pub(super) verdict: Option<MasterVerdict>,
+}
+
+impl BatchState {
+    /// Whether a terminal verdict has settled the batch's outcome.
+    pub(super) fn is_settled(&self) -> bool {
+        self.verdict
+            .as_ref()
+            .is_some_and(|verdict| verdict.state.is_terminal())
+    }
 }
 
 /// The admitted journal: per-batch state, built record by record.
@@ -480,10 +585,10 @@ impl MasterJournal {
 
     /// The state of the batch a record belongs to, if that batch is introduced
     /// and the record carries its digest.
-    fn batch_of(&mut self, record: &MasterRecord) -> Result<&mut BatchState, Invalid> {
+    fn batch_of(&self, record: &MasterRecord) -> Result<&BatchState, Invalid> {
         let state = self
             .batches
-            .get_mut(record.batch_id())
+            .get(record.batch_id())
             .ok_or(Invalid::NoBatch)?;
         if state.batch.batch_sha256 != record.batch_sha256() {
             return Err(Invalid::ShaMismatch);
@@ -491,27 +596,43 @@ impl MasterJournal {
         Ok(state)
     }
 
+    /// Whether another batch was dispatched, has no terminal verdict, and names
+    /// any ledger `intent` names (by canonical key or by absence key).
+    fn overlaps_open_dispatch(&self, intent: &MasterDispatchIntent) -> bool {
+        self.batches
+            .values()
+            .filter(|state| !state.is_settled())
+            .filter_map(|state| state.intent.as_ref())
+            .filter(|open| open.batch_id != intent.batch_id)
+            .any(|open| {
+                open.items.iter().any(|held| {
+                    intent.items.iter().any(|new| {
+                        new.canonical_key == held.canonical_key
+                            || new.absence_key == held.absence_key
+                    })
+                })
+            })
+    }
+
     /// Admit one record, or refuse it and leave the journal as it was.
     pub(super) fn admit(&mut self, record: MasterRecord) -> Result<(), MasterLedgerError> {
         record.validate().map_err(MasterLedgerError::Invalid)?;
         match &record {
             MasterRecord::Batch(batch) => {
-                match self.batches.get(&batch.batch_id) {
-                    // The same batch written twice is one batch.
-                    Some(held) if held.batch == *batch => {}
-                    Some(_) => return Err(MasterLedgerError::Invalid(Invalid::BatchIdReused)),
-                    None => {
-                        self.batches.insert(
-                            batch.batch_id.clone(),
-                            BatchState {
-                                batch: batch.clone(),
-                                intent: None,
-                                response: None,
-                                verdict: None,
-                            },
-                        );
-                    }
+                // A batch id is introduced once. The same batch again is
+                // refused too: the caller reads the state instead of writing.
+                if self.batches.contains_key(&batch.batch_id) {
+                    return Err(MasterLedgerError::Invalid(Invalid::BatchIdReused));
                 }
+                self.batches.insert(
+                    batch.batch_id.clone(),
+                    BatchState {
+                        batch: batch.clone(),
+                        intent: None,
+                        response: None,
+                        verdict: None,
+                    },
+                );
                 Ok(())
             }
             MasterRecord::DispatchIntent(intent) => {
@@ -527,7 +648,19 @@ impl MasterJournal {
                 if named != state.batch.names() {
                     return Err(MasterLedgerError::Invalid(Invalid::ItemsMismatch));
                 }
-                state.intent = Some(intent.clone());
+                if !intent
+                    .pre_post_master_marks
+                    .iter()
+                    .any(|mark| mark.company_guid == state.batch.company.guid)
+                {
+                    return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
+                }
+                if self.overlaps_open_dispatch(intent) {
+                    return Err(MasterLedgerError::OpenDispatchOverlaps);
+                }
+                if let Some(state) = self.batches.get_mut(&intent.batch_id) {
+                    state.intent = Some(intent.clone());
+                }
                 Ok(())
             }
             MasterRecord::DispatchResponse(response) => {
@@ -535,13 +668,21 @@ impl MasterJournal {
                 if state.intent.is_none() {
                     return Err(MasterLedgerError::Invalid(Invalid::ResponseWithoutIntent));
                 }
-                state.response = Some(response.clone());
+                if state.response.is_some() {
+                    return Err(MasterLedgerError::Invalid(Invalid::SecondResponse));
+                }
+                if let Some(state) = self.batches.get_mut(&response.batch_id) {
+                    state.response = Some(response.clone());
+                }
                 Ok(())
             }
             MasterRecord::Verdict(verdict) => {
                 let state = self.batch_of(&record).map_err(MasterLedgerError::Invalid)?;
                 if state.intent.is_none() {
                     return Err(MasterLedgerError::Invalid(Invalid::VerdictWithoutIntent));
+                }
+                if state.is_settled() {
+                    return Err(MasterLedgerError::Invalid(Invalid::VerdictAfterTerminal));
                 }
                 let named = verdict
                     .items
@@ -551,7 +692,9 @@ impl MasterJournal {
                 if named != state.batch.names() {
                     return Err(MasterLedgerError::Invalid(Invalid::ItemsMismatch));
                 }
-                state.verdict = Some(verdict.clone());
+                if let Some(state) = self.batches.get_mut(&verdict.batch_id) {
+                    state.verdict = Some(verdict.clone());
+                }
                 Ok(())
             }
         }
@@ -593,9 +736,44 @@ pub(super) fn read_journal(data_dir: &Path) -> Result<MasterJournal, MasterLedge
     }
 }
 
+/// Make the entries of `directory` durable.
+#[cfg(unix)]
+fn sync_directory(directory: &Path) -> std::io::Result<()> {
+    std::fs::File::open(directory)?.sync_all()
+}
+
+/// Windows has no directory handle to sync; the file's own sync is what holds.
+#[cfg(not(unix))]
+fn sync_directory(_directory: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 /// Append one record, after admitting it against the journal as it stands: a
 /// record the reader would refuse (a second intent included) is never written.
-pub(super) fn append(data_dir: &Path, record: MasterRecord) -> Result<(), MasterLedgerError> {
+/// The caller holds the admission lock. When this append creates the journal,
+/// the directory is synced after the write and a failure to do so is an error,
+/// not ignored: a journal file a power failure could make vanish is no record
+/// that a dispatch was recorded.
+pub(super) fn append(
+    data_dir: &Path,
+    lock: &AdmissionLock,
+    record: MasterRecord,
+) -> Result<(), MasterLedgerError> {
+    append_syncing(data_dir, lock, record, sync_directory)
+}
+
+/// [`append`] with the directory sync given, so a test can fail it.
+fn append_syncing(
+    data_dir: &Path,
+    _lock: &AdmissionLock,
+    record: MasterRecord,
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<(), MasterLedgerError> {
+    let path = journal_path(data_dir);
+    let created = matches!(
+        std::fs::symlink_metadata(&path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound
+    );
     let mut journal = read_journal(data_dir)?;
     let encoded =
         serde_json::to_string(&record).map_err(|_| MasterLedgerError::SerializationFailed)?;
@@ -604,15 +782,16 @@ pub(super) fn append(data_dir: &Path, record: MasterRecord) -> Result<(), Master
         return Err(MasterLedgerError::RecordTooLarge);
     }
     journal.admit(record)?;
-    append_private_import_ledger(
-        &journal_path(data_dir),
-        encoded.as_bytes(),
-        set_private_file,
-    )
-    .map_err(|code| match code.as_str() {
-        "import_ledger_rollback_failed" => MasterLedgerError::RollbackFailed,
-        _ => MasterLedgerError::Unavailable,
-    })
+    append_private_import_ledger(&path, encoded.as_bytes(), set_private_file).map_err(|code| {
+        match code.as_str() {
+            "import_ledger_rollback_failed" => MasterLedgerError::RollbackFailed,
+            _ => MasterLedgerError::Unavailable,
+        }
+    })?;
+    if created {
+        sync(data_dir).map_err(|_| MasterLedgerError::DirectorySyncFailed)?;
+    }
+    Ok(())
 }
 
 /// Why the pre-image sidecar could not be written or read back.
@@ -634,6 +813,10 @@ pub(super) enum PreImageError {
     CountMismatch,
     /// The sidecar's name already holds different bytes.
     ExistsDifferent,
+    /// More bytes than the reader admits: it would refuse what was written.
+    TooLargeToWrite,
+    /// A token written for another batch.
+    OtherBatch,
     WriteFailed,
 }
 
@@ -649,7 +832,10 @@ impl PreImageError {
             | Self::CountMismatch => "master_pre_image_invalid",
             Self::Missing => "master_pre_image_missing",
             Self::Unreadable | Self::TooLarge => "master_pre_image_unavailable",
-            Self::ExistsDifferent | Self::WriteFailed => "master_pre_image_write_failed",
+            Self::OtherBatch => "master_pre_image_invalid",
+            Self::ExistsDifferent | Self::TooLargeToWrite | Self::WriteFailed => {
+                "master_pre_image_write_failed"
+            }
         }
     }
 }
@@ -704,16 +890,42 @@ fn pre_image_path(data_dir: &Path, batch_id: &str) -> Result<PathBuf, PreImageEr
     Ok(data_dir.join(format!("master-pre-image-{batch_id}.json")))
 }
 
-/// Write the sidecar for `batch_id`, whole and synced, and return the digest
-/// the dispatch intent records. A sidecar already there with the same bytes is
-/// the same write repeated; with other bytes it is left alone and refused.
+/// A sidecar written for a batch: the digest and count its dispatch intent
+/// records, and nothing else can supply them. Only [`write_pre_image`] builds
+/// one, so an intent cannot name a digest or a count no sidecar was written
+/// with.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct WrittenPreImage {
+    batch_id: String,
+    sha256: String,
+    count: u64,
+}
+
+impl WrittenPreImage {
+    pub(super) fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    pub(super) fn count(&self) -> u64 {
+        self.count
+    }
+}
+
+/// Write the sidecar for `batch`, whole and synced, under the admission lock.
+/// A sidecar the reader would refuse for its size is never written. One already
+/// there with the same bytes is the same write repeated; with other bytes it is
+/// left alone and refused.
 pub(super) fn write_pre_image(
     data_dir: &Path,
-    batch_id: &str,
+    _lock: &AdmissionLock,
+    batch: &MasterBatch,
     pre_image: &PreImage,
-) -> Result<String, PreImageError> {
-    let path = pre_image_path(data_dir, batch_id)?;
+) -> Result<WrittenPreImage, PreImageError> {
+    let path = pre_image_path(data_dir, &batch.batch_id)?;
     let bytes = pre_image.bytes()?;
+    if bytes.len() > MAX_RECORD_BYTES {
+        return Err(PreImageError::TooLargeToWrite);
+    }
     match persistence::write_record_once(&path, &bytes) {
         Ok(()) => {}
         Err(RecordOnce::Exists) => {
@@ -724,7 +936,11 @@ pub(super) fn write_pre_image(
         }
         Err(RecordOnce::Failed) => return Err(PreImageError::WriteFailed),
     }
-    Ok(sha256_hex(&bytes))
+    Ok(WrittenPreImage {
+        batch_id: batch.batch_id.clone(),
+        sha256: sha256_hex(&bytes),
+        count: pre_image.len() as u64,
+    })
 }
 
 fn read_sidecar_bytes(path: &Path) -> Result<Vec<u8>, PreImageError> {

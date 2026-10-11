@@ -3,6 +3,7 @@ pub(crate) mod approved_import;
 pub mod capability_packs;
 pub mod connection;
 pub mod connector;
+pub(crate) mod ledger_create_item;
 #[cfg(feature = "voucher-scan")]
 pub(crate) mod outstandings_runtime;
 pub mod runtime;

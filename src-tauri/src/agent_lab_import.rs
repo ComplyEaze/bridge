@@ -15,10 +15,11 @@
 //! **What is reused, and what is not, and why:**
 //! - [`bridge_tally_protocol::parse_import_outcome`] parses every
 //!   `<RESPONSE>` (§9.1/§9.2) -- genuinely shared code, not duplicated.
-//! - The master-name matching predicate ([`canonical_master_key`]) is the
+//! - The master-name matching predicate ([`canonical_master_key`], defined in
+//!   `bridge_tally_core::master_binding`) is the
 //!   composed fold measured on **licensed TallyPrime 7.1** in §9.4d (space,
 //!   `-` and `/` interchangeable, internal runs collapsed, surrounding
-//!   whitespace ignored, ASCII case folded, otherwise exact codepoints; NFC/
+//!   whitespace ignored, Unicode-lowercase case folded, otherwise exact codepoints; NFC/
 //!   NFD is deliberately NOT folded -- §9.4d's own "canonical equivalence is
 //!   still refused" finding). §9.4d's measurement scope is *ledgers, one
 //!   company*; applying the same fold to every other master kind here is a
@@ -51,6 +52,7 @@
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
 use super::*;
+use bridge_tally_core::master_binding::canonical_master_key;
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::is_tally_reserved_root;
 use serde::Deserialize;
@@ -59,39 +61,6 @@ use uuid::Uuid;
 
 const MAX_MASTER_BATCH: usize = 200;
 const MAX_VOUCHER_BATCH: usize = 100;
-
-// ---------------------------------------------------------------------------
-// Master-name matching (§9.4d, licensed TallyPrime 7.1) -- see module doc.
-// ---------------------------------------------------------------------------
-
-/// The composed fold §9.4d measured on licensed TallyPrime 7.1: ASCII case
-/// folded, `-`/`/` treated as a space, internal whitespace runs collapsed to
-/// one, surrounding whitespace trimmed. Deliberately does **not** apply
-/// Unicode normalisation (NFC/NFD) -- §9.4d's own finding is that Tally
-/// refuses that fold.
-fn canonical_master_key(name: &str) -> String {
-    let mut out = String::with_capacity(name.len());
-    let mut last_was_space = true; // trims leading whitespace for free
-    for ch in name.chars() {
-        let mapped = match ch {
-            '-' | '/' => ' ',
-            other => other,
-        };
-        if mapped.is_whitespace() {
-            if !last_was_space {
-                out.push(' ');
-            }
-            last_was_space = true;
-        } else {
-            out.extend(mapped.to_lowercase());
-            last_was_space = false;
-        }
-    }
-    while out.ends_with(' ') {
-        out.pop();
-    }
-    out
-}
 
 /// The `company_guid` the caller supplied must be the admitted lab target's
 /// own GUID -- `admit_lab_target` already proved *a* target is loaded and

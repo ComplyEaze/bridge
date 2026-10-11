@@ -309,7 +309,8 @@ pub enum ClosingStock {
     NotApplicable,
     /// The sum of the closing values of the Stock Summary part dated the trial balance's last
     /// day, in paise, debit positive. An item with no closing value is not counted, as in
-    /// `stock_summary`. On the lab's inventory book that summary, read for 31 March, equalled the
+    /// `stock_summary`; a part that lists no item at all is not zero but unknown
+    /// ([`ClosingStockUnknown::NoStockItems`]). On the lab's inventory book that summary, read for 31 March, equalled the
     /// closing stock on Tally's own Profit and Loss screen [partial: one book]. Whether the
     /// values follow the request's window, a costing method that changes value, and a window
     /// across years are not measured.
@@ -367,8 +368,14 @@ fn closing_stock(
     let (Some(part), None) = (at_end.next(), at_end.next()) else {
         return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd);
     };
-    match crate::stock_read::stock_snapshot(part, to.clone()).and_then(|s| s.total_value_paise()) {
-        Ok(total) => ClosingStock::Valued(total),
+    match crate::stock_read::stock_snapshot(part, to.clone()) {
+        Ok(snapshot) if snapshot.rows.is_empty() => {
+            ClosingStock::Unknown(ClosingStockUnknown::NoStockItems)
+        }
+        Ok(snapshot) => match snapshot.total_value_paise() {
+            Ok(total) => ClosingStock::Valued(total),
+            Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),
+        },
         Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),
     }
 }

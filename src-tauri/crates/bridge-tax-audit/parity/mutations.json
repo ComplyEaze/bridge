@@ -13974,5 +13974,53 @@
   "file": "src/financial_statements.rs",
   "from": "StockBasis::Ledgers => (Some(close_stock), Some(profit(open_stock, close_stock)?)),",
   "to": "StockBasis::Ledgers => (Some(open_stock), Some(profit(open_stock, close_stock)?)),"
+ },
+ {
+  "id": "CS-9",
+  "by": "author",
+  "what": "book.rs: a Stock Summary that lists no stock item is read as a closing stock of zero",
+  "file": "src/book.rs",
+  "from": "        Ok(snapshot) if snapshot.rows.is_empty() => {\n            ClosingStock::Unknown(ClosingStockUnknown::NoStockItems)\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "STB-21",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger with a value only in the TB's own closing field counts as carrying none",
+  "file": "src/financial_statements.rs",
+  "from": " || r.tb_closing_field_paise != 0\n",
+  "to": "\n"
+ },
+ {
+  "id": "STB-22",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger with a value only in its movement counts as carrying none",
+  "file": "src/financial_statements.rs",
+  "from": "r.opening_paise != 0 || r.recomputed_closing_paise != 0 || r.tb_closing_field_paise != 0",
+  "to": "r.opening_paise != 0 || r.tb_closing_field_paise != 0"
+ },
+ {
+  "id": "STB-23",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value only in a Stock-in-Hand ledger's own closing field",
+  "file": "src/financial_statements.rs",
+  "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "row.opening_paise != 0 || closing != 0;"
+ },
+ {
+  "id": "STB-24",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value only in a Stock-in-Hand ledger's movement",
+  "file": "src/financial_statements.rs",
+  "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "row.opening_paise != 0 || row.closing_paise != 0;"
+ },
+ {
+  "id": "STB-25",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value only in a Stock-in-Hand ledger's opening",
+  "file": "src/financial_statements.rs",
+  "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "closing != 0 || row.closing_paise != 0;"
  }
 ]

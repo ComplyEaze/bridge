@@ -19,6 +19,19 @@
 //! compile. The guard is a plain `File`, so the type shows that a lock was
 //! passed, not that it is the admission lock.
 //!
+//! Two contracts a caller meets:
+//!
+//! - `canonical_key` and `absence_key` of an [`IntentItem`] are recorded as the
+//!   caller supplies them and must be the one shared derivation of the item
+//!   name (the master binding's canonical key and its absence key). No such
+//!   pair of functions exists in `bridge_tally_core::master_binding` yet (it has
+//!   `twin_fold_keys`), so this module does not compute them. The overlap
+//!   refusal therefore does not rest on them alone: it also compares
+//!   `twin_fold_keys` of the item names, which the module computes itself.
+//! - An intent with no terminal verdict blocks every overlapping batch for good.
+//!   The read-back-absent terminal state and the rules for it belong to the
+//!   dispatch slice; until then, recovering such a batch is an operator decision.
+//!
 //! Reuse: bounded record reading ([`ledger::read_record`]), the append that
 //! syncs and truncates a failed write back ([`append_private_import_ledger`]),
 //! the owner-only file mode ([`set_private_file`]), the batch-id validator
@@ -28,6 +41,7 @@ use super::ledger::{self, MAX_RECORD_BYTES};
 use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
+use bridge_tally_core::master_binding::twin_fold_keys;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Read};
@@ -135,8 +149,13 @@ pub(super) struct MasterMark {
 }
 
 /// Written before the POST. Its presence is the refusal to send again.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+///
+/// Serialize only. The one constructor is [`MasterDispatchIntent::new`], which
+/// takes the [`WrittenPreImage`] token; the module's own reader parses a line
+/// through a private wire type ([`parse_record`]) and admits the result, so no
+/// code outside this module can build an intent from JSON. A test pins that this
+/// type and [`MasterRecord`] do not implement `Deserialize`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub(super) struct MasterDispatchIntent {
     pub(super) batch_id: String,
     pub(super) batch_sha256: String,
@@ -251,7 +270,7 @@ pub(super) struct MasterVerdict {
 
 /// One journal line. Every `match` on it names every variant, so a new record
 /// kind is a compile error until each decision site handles it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "record_type")]
 pub(super) enum MasterRecord {
     #[serde(rename = "master_batch")]
@@ -264,7 +283,62 @@ pub(super) enum MasterRecord {
     Verdict(MasterVerdict),
 }
 
+/// The shape of an intent on disk. Private, so deserialising one is possible
+/// only here.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct IntentWire {
+    batch_id: String,
+    batch_sha256: String,
+    native_request_sha256: String,
+    items: Vec<IntentItem>,
+    pre_image_sha256: String,
+    pre_image_count: u64,
+    pre_post_master_marks: Vec<MasterMark>,
+}
+
+/// A journal line as it is read.
+#[derive(Deserialize)]
+#[serde(tag = "record_type")]
+enum RecordWire {
+    #[serde(rename = "master_batch")]
+    Batch(MasterBatch),
+    #[serde(rename = "master_dispatch_intent")]
+    DispatchIntent(IntentWire),
+    #[serde(rename = "master_dispatch_response")]
+    DispatchResponse(MasterDispatchResponse),
+    #[serde(rename = "master_verdict")]
+    Verdict(MasterVerdict),
+}
+
+/// Parse one journal line. The result is not yet admitted.
+fn parse_record(text: &str) -> Result<MasterRecord, serde_json::Error> {
+    Ok(match serde_json::from_str::<RecordWire>(text)? {
+        RecordWire::Batch(record) => MasterRecord::Batch(record),
+        RecordWire::DispatchIntent(wire) => MasterRecord::DispatchIntent(MasterDispatchIntent {
+            batch_id: wire.batch_id,
+            batch_sha256: wire.batch_sha256,
+            native_request_sha256: wire.native_request_sha256,
+            items: wire.items,
+            pre_image_sha256: wire.pre_image_sha256,
+            pre_image_count: wire.pre_image_count,
+            pre_post_master_marks: wire.pre_post_master_marks,
+        }),
+        RecordWire::DispatchResponse(record) => MasterRecord::DispatchResponse(record),
+        RecordWire::Verdict(record) => MasterRecord::Verdict(record),
+    })
+}
+
 impl MasterRecord {
+    /// Whether this is a dispatch intent, the record whose durability the
+    /// refusal to send twice rests on.
+    fn is_dispatch_intent(&self) -> bool {
+        match self {
+            Self::DispatchIntent(_) => true,
+            Self::Batch(_) | Self::DispatchResponse(_) | Self::Verdict(_) => false,
+        }
+    }
+
     pub(super) fn batch_id(&self) -> &str {
         match self {
             Self::Batch(record) => &record.batch_id,
@@ -609,6 +683,7 @@ impl MasterJournal {
                     intent.items.iter().any(|new| {
                         new.canonical_key == held.canonical_key
                             || new.absence_key == held.absence_key
+                            || names_may_be_one_master(&new.name, &held.name)
                     })
                 })
             })
@@ -707,8 +782,8 @@ impl MasterJournal {
         while ledger::read_record(&mut reader, &mut line).map_err(read_error)? {
             let text = std::str::from_utf8(&line)
                 .map_err(|_| MasterLedgerError::Invalid(Invalid::Parse))?;
-            let record: MasterRecord = serde_json::from_str(text)
-                .map_err(|_| MasterLedgerError::Invalid(Invalid::Parse))?;
+            let record =
+                parse_record(text).map_err(|_| MasterLedgerError::Invalid(Invalid::Parse))?;
             journal.admit(record)?;
         }
         Ok(journal)
@@ -721,6 +796,13 @@ fn read_error(code: String) -> MasterLedgerError {
         "import_ledger_record_too_large" => MasterLedgerError::RecordTooLarge,
         _ => MasterLedgerError::Unavailable,
     }
+}
+
+/// Whether Tally might take two names for one master: they agree on any fold
+/// the core knows. Computed here from the names, not supplied by a caller.
+fn names_may_be_one_master(a: &str, b: &str) -> bool {
+    let b_keys = twin_fold_keys(b);
+    twin_fold_keys(a).iter().any(|key| b_keys.contains(key))
 }
 
 fn journal_path(data_dir: &Path) -> PathBuf {
@@ -750,10 +832,12 @@ fn sync_directory(_directory: &Path) -> std::io::Result<()> {
 
 /// Append one record, after admitting it against the journal as it stands: a
 /// record the reader would refuse (a second intent included) is never written.
-/// The caller holds the admission lock. When this append creates the journal,
-/// the directory is synced after the write and a failure to do so is an error,
-/// not ignored: a journal file a power failure could make vanish is no record
-/// that a dispatch was recorded.
+/// The caller holds the admission lock. The data directory is synced after the
+/// write, and a failure to do so is an error, not ignored, when the journal was
+/// empty or absent before the write and for every dispatch intent: a journal file
+/// a power failure could make vanish is no record that a dispatch was recorded.
+/// The state is read afresh on each append, so an earlier append that created the
+/// file and then failed does not excuse a later one.
 pub(super) fn append(
     data_dir: &Path,
     lock: &AdmissionLock,
@@ -770,10 +854,13 @@ fn append_syncing(
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<(), MasterLedgerError> {
     let path = journal_path(data_dir);
-    let created = matches!(
-        std::fs::symlink_metadata(&path),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound
-    );
+    // A journal file that is absent or empty has not yet been made durable by an
+    // earlier append that got that far, and an intent must never rest on a file
+    // a power failure could take back: sync for either, and for every intent.
+    let empty_before = std::fs::symlink_metadata(&path)
+        .ok()
+        .is_none_or(|meta| meta.len() == 0);
+    let sync_after = empty_before || record.is_dispatch_intent();
     let mut journal = read_journal(data_dir)?;
     let encoded =
         serde_json::to_string(&record).map_err(|_| MasterLedgerError::SerializationFailed)?;
@@ -788,7 +875,7 @@ fn append_syncing(
             _ => MasterLedgerError::Unavailable,
         }
     })?;
-    if created {
+    if sync_after {
         sync(data_dir).map_err(|_| MasterLedgerError::DirectorySyncFailed)?;
     }
     Ok(())

@@ -147,10 +147,7 @@ fn every_record_round_trips_and_the_journal_reports_its_state() {
     let records = full_records(&batch);
     for record in &records {
         let text = serde_json::to_string(record).unwrap();
-        assert_eq!(
-            &serde_json::from_str::<MasterRecord>(&text).unwrap(),
-            record
-        );
+        assert_eq!(&parse_record(&text).unwrap(), record);
     }
     let journal = read(&journal_text(&records)).unwrap();
     assert!(journal.dispatched(&id));
@@ -1202,46 +1199,179 @@ fn the_local_data_report_names_exactly_the_files_this_module_writes() {
     }
 }
 
+/// Appends with a recording sync, one per call, in a fresh data directory.
+struct SyncProbe {
+    calls: std::cell::RefCell<Vec<std::path::PathBuf>>,
+}
+
+impl SyncProbe {
+    fn append(
+        &self,
+        directory: &Path,
+        lock: &AdmissionLock,
+        record: MasterRecord,
+        result: std::io::Result<()>,
+    ) -> Result<(), MasterLedgerError> {
+        append_syncing(directory, lock, record, |synced: &Path| {
+            self.calls.borrow_mut().push(synced.to_path_buf());
+            result
+        })
+    }
+
+    fn count(&self) -> usize {
+        self.calls.borrow().len()
+    }
+}
+
+fn probe() -> SyncProbe {
+    SyncProbe {
+        calls: std::cell::RefCell::new(Vec::new()),
+    }
+}
+
+fn injected() -> std::io::Result<()> {
+    Err(std::io::Error::other("injected"))
+}
+
 #[test]
-fn the_directory_is_synced_once_when_the_journal_is_created_and_a_failure_is_reported() {
+fn the_directory_is_synced_for_the_first_append_and_for_every_intent_only() {
     let lock = lock();
     let batch = batch(&batch_id());
-    let calls = std::cell::RefCell::new(Vec::new());
-    let sync = |result: std::io::Result<()>| {
-        let calls = &calls;
-        move |directory: &Path| {
-            calls.borrow_mut().push(directory.to_path_buf());
-            result
-        }
-    };
-    // The append that creates the journal syncs the data directory.
     let directory = tempfile::tempdir().unwrap();
-    append_syncing(
-        directory.path(),
-        &lock,
-        MasterRecord::Batch(batch.clone()),
-        sync(Ok(())),
-    )
-    .unwrap();
-    assert_eq!(*calls.borrow(), [directory.path().to_path_buf()]);
-    // A later append, the journal being there, does not.
-    append_syncing(
-        directory.path(),
-        &lock,
-        MasterRecord::DispatchIntent(intent_for(&batch)),
-        sync(Ok(())),
-    )
-    .unwrap();
-    assert_eq!(calls.borrow().len(), 1);
-    // A failed sync is an error, not ignored.
-    let failing = tempfile::tempdir().unwrap();
-    let error = append_syncing(
-        failing.path(),
-        &lock,
-        MasterRecord::Batch(batch),
-        sync(Err(std::io::Error::other("injected"))),
-    )
-    .unwrap_err();
-    assert_eq!(error, MasterLedgerError::DirectorySyncFailed);
-    assert_eq!(calls.borrow().len(), 2);
+    let probe = probe();
+    // The append that creates the journal syncs the data directory.
+    probe
+        .append(
+            directory.path(),
+            &lock,
+            MasterRecord::Batch(batch.clone()),
+            Ok(()),
+        )
+        .unwrap();
+    assert_eq!(*probe.calls.borrow(), [directory.path().to_path_buf()]);
+    // The intent syncs again, the journal being there.
+    probe
+        .append(
+            directory.path(),
+            &lock,
+            MasterRecord::DispatchIntent(intent_for(&batch)),
+            Ok(()),
+        )
+        .unwrap();
+    assert_eq!(probe.count(), 2);
+    // A response or a verdict on a journal that is already durable does not.
+    probe
+        .append(
+            directory.path(),
+            &lock,
+            MasterRecord::DispatchResponse(response_for(&batch)),
+            Ok(()),
+        )
+        .unwrap();
+    probe
+        .append(
+            directory.path(),
+            &lock,
+            MasterRecord::Verdict(verdict_for(&batch, MasterVerdictState::PostedVerified)),
+            Ok(()),
+        )
+        .unwrap();
+    assert_eq!(probe.count(), 2);
+}
+
+#[test]
+fn a_failed_first_sync_does_not_excuse_the_intent_that_follows() {
+    let lock = lock();
+    let batch = batch(&batch_id());
+    let directory = tempfile::tempdir().unwrap();
+    let probe = probe();
+    // The first append creates the file and writes the record, then its sync fails.
+    assert_eq!(
+        probe
+            .append(
+                directory.path(),
+                &lock,
+                MasterRecord::Batch(batch.clone()),
+                injected()
+            )
+            .unwrap_err(),
+        MasterLedgerError::DirectorySyncFailed
+    );
+    assert!(directory.path().join(JOURNAL_FILE).exists());
+    assert_eq!(probe.count(), 1);
+    // The file now exists and is not empty; the intent still syncs, checked.
+    assert_eq!(
+        probe
+            .append(
+                directory.path(),
+                &lock,
+                MasterRecord::DispatchIntent(intent_for(&batch)),
+                injected()
+            )
+            .unwrap_err(),
+        MasterLedgerError::DirectorySyncFailed
+    );
+    assert_eq!(probe.count(), 2);
+    probe
+        .append(
+            directory.path(),
+            &lock,
+            MasterRecord::DispatchResponse(response_for(&batch)),
+            Ok(()),
+        )
+        .unwrap();
+    // A response after a durable intent needs no sync of its own.
+    assert_eq!(probe.count(), 2);
+}
+
+#[test]
+fn an_empty_journal_file_is_synced_on_any_append() {
+    let lock = lock();
+    let directory = tempfile::tempdir().unwrap();
+    // A file left empty by an earlier append that stopped before writing.
+    std::fs::write(directory.path().join(JOURNAL_FILE), b"").unwrap();
+    let probe = probe();
+    assert_eq!(
+        probe
+            .append(
+                directory.path(),
+                &lock,
+                MasterRecord::Batch(batch(&batch_id())),
+                injected()
+            )
+            .unwrap_err(),
+        MasterLedgerError::DirectorySyncFailed
+    );
+    assert_eq!(probe.count(), 1);
+}
+
+#[test]
+fn an_intent_and_a_record_cannot_be_deserialised_outside_the_reader() {
+    // Compiles only while neither type implements `Deserialize`: with one
+    // impl, the item below is ambiguous. The module's reader parses a line
+    // through a private wire type instead.
+    trait AmbiguousIfDeserialize<A> {
+        fn probe() {}
+    }
+    impl<T: ?Sized> AmbiguousIfDeserialize<()> for T {}
+    impl<T: serde::de::DeserializeOwned> AmbiguousIfDeserialize<u8> for T {}
+    <MasterDispatchIntent as AmbiguousIfDeserialize<_>>::probe();
+    <MasterRecord as AmbiguousIfDeserialize<_>>::probe();
+    // The reader itself still builds an intent from a written line.
+    let batch = batch(&batch_id());
+    let record = MasterRecord::DispatchIntent(intent_for(&batch));
+    assert_eq!(
+        parse_record(&serde_json::to_string(&record).unwrap()).unwrap(),
+        record
+    );
+}
+
+#[test]
+fn names_that_fold_together_overlap_whatever_keys_the_caller_supplied() {
+    let (_, first) = dispatched_batch("Synthetic Rent", "key-a", "absent-a");
+    let (_, second) = dispatched_batch("synthetic   RENT", "key-b", "absent-b");
+    assert_eq!(
+        read(&journal_text(&[first, second].concat())).unwrap_err(),
+        MasterLedgerError::OpenDispatchOverlaps
+    );
 }

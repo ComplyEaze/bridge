@@ -337,16 +337,11 @@ async fn the_measured_block_is_constant_text_with_its_markers() {
         assert_eq!(point["book"], "an inventory-heavy book");
     }
     assert_eq!(block["kind"], "measured_census_runs_not_a_bound");
-    // Each point is exactly what the public reference records.
-    let reference = include_str!(
-        "../../docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md"
-    );
-    for recorded in [
-        "inventory-heavy book, mark ~250,000: one-day `vouchers` complete in 34.3 s (31 census spans, 2 data parts)",
-        "one-month `ledger_movement` complete in 104.7 s (31 census spans, 5 data parts",
-    ] {
-        assert!(reference.contains(recorded), "{recorded}");
-    }
+    // The figures are the ones protocol reference 11c.5 records: one-day `vouchers`
+    // 34.3 s (31 census spans, 2 data parts), one-month `ledger_movement` 104.7 s
+    // (31, 5). This test does not read that document: it is outside the native
+    // job's scope, so an edit to it would never run this test (the consistency
+    // check refuses the include); the block's `source` names the section.
     assert_eq!(points[0]["seconds"], 34.3);
     assert_eq!(points[0]["census_reads"], 31);
     assert_eq!(points[0]["data_parts"], 2);

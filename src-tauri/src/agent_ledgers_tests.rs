@@ -3001,6 +3001,64 @@ mod through_the_tool {
         }
     }
 
+    /// bridge#1520: the `compliance` object of every row is the bytes it was
+    /// before `gst_details` existed (#1518). The golden is the tool's own rows
+    /// on this capture, produced by the tree at `90bcaa67^`; its provenance
+    /// note gives the command.
+    #[tokio::test]
+    async fn compliance_rows_are_byte_for_byte_the_ones_read_before_gst_details() {
+        let (response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let compliance = items(&response)
+            .iter()
+            .map(|row| &row["compliance"])
+            .collect::<Vec<_>>();
+        assert!(!compliance.is_empty());
+        assert!(compliance.iter().all(|value| value.is_object()));
+        let actual = serde_json::to_string(&compliance).unwrap();
+        let golden = include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/ledger_masters_compliance_rows_before_gst_details.json"
+        );
+        let first_difference = actual
+            .bytes()
+            .zip(golden.bytes())
+            .position(|(left, right)| left != right)
+            .unwrap_or(actual.len().min(golden.len()));
+        assert!(
+            actual == golden,
+            "{} rows differ from the golden ({} bytes, golden {}) from byte {first_difference}",
+            compliance.len(),
+            actual.len(),
+            golden.len()
+        );
+    }
+
+    /// bridge#1520: no `fields=compliance` row names `gst_details`, anywhere,
+    /// until a caller asks for the GST details read.
+    #[tokio::test]
+    async fn compliance_rows_carry_no_gst_details_key() {
+        let (response, _) = call(
+            compliance_plans(masters(), balances()),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let rows = items(&response);
+        assert!(!rows.is_empty());
+        for row in rows {
+            assert!(
+                !row["compliance"]
+                    .as_object()
+                    .unwrap()
+                    .contains_key("gst_details"),
+                "{row}"
+            );
+        }
+        assert!(!response.to_string().contains("gst_details"));
+    }
+
     /// bridge#653: `as_of` sets the date every row's `party_gstin` is read as
     /// of, in either spelling. Which entry is in force on a date is pinned over
     /// the live registration-history capture by

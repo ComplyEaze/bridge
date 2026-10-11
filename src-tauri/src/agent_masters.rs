@@ -5,6 +5,9 @@ use crate::tally::runtime::{MastersKind, MastersRows};
 use bridge_tally_protocol::native_masters::{
     NativeMasterDetail, NativeMasterKind, NativeMasterRow, NativeNumberingMethod,
 };
+use bridge_tally_protocol::native_voucher_type_numbering::{
+    DuplicateSetting, SeriesNumberingMethod, SeriesNumberingResult, VoucherTypeNumbering,
+};
 
 impl Server {
     pub(super) async fn masters(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -42,10 +45,17 @@ impl Server {
                             .with_prior_evidence(prior.clone())
                     })?;
                 let rows = match &read.rows {
-                    MastersRows::Native(masters) => masters
+                    MastersRows::Native(masters, numbering) => masters
                         .rows
                         .iter()
-                        .map(|row| native_row(row, marks_party_text(kind)))
+                        .enumerate()
+                        .map(|(index, row)| {
+                            let mut json = native_row(row, marks_party_text(kind));
+                            if let Some(result) = numbering.as_ref().and_then(|n| n.get(index)) {
+                                json["series_numbering"] = series_numbering_json(result);
+                            }
+                            json
+                        })
                         .collect::<Vec<_>>(),
                     MastersRows::Groups(groups) => groups
                         .iter()
@@ -100,6 +110,10 @@ impl Server {
                 "The company's voucher-type count (NUMVOUCHERTYPES) did not equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book equalled the number-series count (inferred to count series, unmeasured): do not check these rows against it",
                 "The completeness of this list is unverified: absence from it is not evidence that a voucher type is absent from the book",
                 "Voucher types are read whole with no size check before the read; rows, AlterIDs and response size are checked after it",
+                "series_numbering is the numbering a voucher type's series prints (series level), read from a second paired read of the voucher-type export and joined to each row by GUID with the name as a second equality; a type on one side only, or a GUID and name that disagree between the two reads, refuses the whole read (`masters_numbering_names_differ`, `masters_numbering_identity_differs`)",
+                "series_numbering was measured on one synthetic book (TallyPrime 7.1 Silver, Windows) on which every voucher type held one series, named `Default`; more than one series (returned as `series_count`, with nothing read from it), Multi-user Auto, a single series not named `Default`, a voucher type created new and other releases were not measured",
+                "An `unrecognised` series method is never `manual`; a series that lacks a method or duplicate setting, repeats one, or prints a duplicate setting other than Yes or No is returned as `field_invalid`, never defaulted",
+                "The integrated read, the two captured requests sent as one tool call, has not yet been run on a live Tally",
             ]),
             MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
                 limitations.extend([
@@ -151,6 +165,33 @@ const fn marks_party_text(kind: MastersKind) -> bool {
                 | NativeMasterKind::CostCategories
         )
     )
+}
+
+/// One voucher type's series-level numbering as the tool returns it.
+fn series_numbering_json(result: &SeriesNumberingResult) -> Value {
+    match result {
+        VoucherTypeNumbering::Observed { method, duplicates } => json!({
+            "observation": "observed",
+            "method": match method {
+                SeriesNumberingMethod::Automatic => json!("automatic"),
+                SeriesNumberingMethod::Manual => json!("manual"),
+                SeriesNumberingMethod::AutomaticManualOverride => {
+                    json!("automatic_manual_override")
+                }
+                SeriesNumberingMethod::Unrecognised(raw) => json!({"unrecognised": raw}),
+            },
+            "duplicates": match duplicates {
+                DuplicateSetting::Prevented => "prevented",
+                DuplicateSetting::NotPrevented => "not_prevented",
+            },
+        }),
+        VoucherTypeNumbering::SeriesCount(count) => {
+            json!({"observation": "series_count", "count": count})
+        }
+        VoucherTypeNumbering::FieldInvalid(code) => {
+            json!({"observation": "field_invalid", "code": code})
+        }
+    }
 }
 
 /// One native row as the tool returns it: the fields every kind has, then its

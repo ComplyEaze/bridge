@@ -3,7 +3,7 @@
 //! double's company. The runtime read's own faults are `runtime_masters_tests`.
 use super::super::*;
 use bridge_tally_protocol::native_masters::{
-    masters_worst_row_bytes, NativeMasterKind, MASTERS_RESPONSE_BUDGET_BYTES,
+    masters_worst_row_bytes, parse_native_masters, NativeMasterKind, MASTERS_RESPONSE_BUDGET_BYTES,
 };
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
@@ -63,6 +63,69 @@ fn capture(kind: &str) -> String {
         .replace(CAPTURE_GUID, GUID)
         .replace("7c0de000-0000-4000-8000-0000000000a1", GUID)
         .replace("de2e15f2-6d42-4715-b6e7-b7a95a68abe8", GUID)
+}
+
+/// The real series-level numbering capture's book, replaced by the test double's company.
+const NUMBERING_CAPTURE_GUID: &str = "3479ef95-3ecd-49b3-9349-d3a8e24b0db2";
+
+/// A numbering answer for a voucher-type masters answer: the real numbering
+/// capture's envelope, and for each masters row the capture's row of the same
+/// name (or its `Contra` row where the capture has none) with only the row's
+/// name, GUID and ids set to the masters row's.
+fn numbering_for(masters: &str) -> String {
+    let real = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
+    ))
+    .trim_start_matches('\u{feff}')
+    .replace(NUMBERING_CAPTURE_GUID, GUID);
+    let mut templates = Vec::new();
+    let mut rest = real.as_str();
+    while let Some(start) = rest.find("<VOUCHERTYPE ") {
+        let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        templates.push(&rest[start..end]);
+        rest = &rest[end..];
+    }
+    let name_of = |block: &str| {
+        let at = block.find("NAME=\"").unwrap() + "NAME=\"".len();
+        block[at..at + block[at..].find('"').unwrap()].to_string()
+    };
+    let set = |block: &str, tag: &str, value: &str| {
+        let open = block.find(&format!("<{tag} ")).unwrap();
+        let text = open + block[open..].find('>').unwrap() + 1;
+        let end = text + block[text..].find(&format!("</{tag}>")).unwrap();
+        format!("{}{}{}", &block[..text], value, &block[end..])
+    };
+    let rows = parse_native_masters(NativeMasterKind::VoucherTypes, masters, GUID)
+        .unwrap()
+        .rows
+        .iter()
+        .map(|row| {
+            assert!(!row.name.contains(['&', '"', '<']), "{}", row.name);
+            let block = templates
+                .iter()
+                .find(|block| name_of(block) == row.name)
+                .or_else(|| templates.iter().find(|block| name_of(block) == "Contra"))
+                .unwrap();
+            let block = format!(
+                "<VOUCHERTYPE NAME=\"{0}\" RESERVEDNAME=\"{0}\"{1}",
+                row.name,
+                &block[block.find('>').unwrap()..]
+            );
+            let block = set(&block, "GUID", &row.guid);
+            let block = set(&block, "ALTERID", &format!(" {}", row.alter_id));
+            set(&block, "MASTERID", &format!(" {}", row.master_id))
+        })
+        .collect::<String>();
+    let start = real.find("<VOUCHERTYPE ").unwrap();
+    let end = real.rfind("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+    format!("{}{}{}", &real[..start], rows, &real[end..])
+}
+
+/// `text` with the first `from` at or after `anchor` replaced by `to`.
+fn edit_after(text: &str, anchor: &str, from: &str, to: &str) -> String {
+    let anchor = text.find(anchor).expect(anchor);
+    let at = anchor + text[anchor..].find(from).expect(from);
+    format!("{}{}{}", &text[..at], to, &text[at + from.len()..])
 }
 
 fn groups() -> String {
@@ -137,6 +200,10 @@ const MARK: u64 = 1_000;
 /// closing extent (4), identity and mode again (3).
 const FIRST_PAGE_REQUESTS: usize = 4 + 3 + 4 + 4 + 4 + 3;
 
+/// The same for the voucher types, which read a second collection pair, the
+/// series-level numbering, between the first and the closing extent.
+const VOUCHER_TYPE_PAGE_REQUESTS: usize = FIRST_PAGE_REQUESTS + 4;
+
 /// A whole first-page call: identity, then the runtime read's brackets
 /// around `collection`, as `runtime_masters_tests` replays them.
 fn first_page_plans(collection: String, vouchers: u64) -> Vec<ScenarioPlan> {
@@ -150,6 +217,42 @@ fn first_page_plans_at(collection: String, vouchers: u64, mark: u64) -> Vec<Scen
     pair(&mut plans, xml(extents(vouchers, mark)));
     plans.extend([companies.clone(), status(), companies]);
     plans
+}
+
+/// A whole first-page call of the voucher types: the collection pair, then the
+/// numbering pair read after it, inside the same two extents.
+fn voucher_type_plans(
+    collection: String,
+    numbering: String,
+    vouchers: u64,
+    mark: u64,
+) -> Vec<ScenarioPlan> {
+    let companies = xml(companies());
+    let mut plans = voucher_type_plans_to_closing_extent(collection, numbering, vouchers, mark);
+    plans.extend([companies.clone(), status(), companies]);
+    plans
+}
+
+/// The same up to and including the closing extent: all a read sends that is
+/// refused after it (a refusal held until the extent was read).
+fn voucher_type_plans_to_closing_extent(
+    collection: String,
+    numbering: String,
+    vouchers: u64,
+    mark: u64,
+) -> Vec<ScenarioPlan> {
+    let mut plans = through_opening_extent(vouchers, mark);
+    pair(&mut plans, xml(collection));
+    pair(&mut plans, xml(numbering));
+    pair(&mut plans, xml(extents(vouchers, mark)));
+    plans
+}
+
+/// The captured voucher types and the numbering answer made for them.
+fn captured_voucher_type_plans(vouchers: u64, mark: u64) -> Vec<ScenarioPlan> {
+    let masters = capture("voucher_types");
+    let numbering = numbering_for(&masters);
+    voucher_type_plans(masters, numbering, vouchers, mark)
 }
 
 /// A continuation page: identity, then the bracketed, paired extent read.
@@ -318,6 +421,17 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
     ));
     assert!(description.contains("configuration labels, not counterparties"));
     assert!(description.contains("masters_voucher_types_empty"));
+    // The series-level numbering, its refusals and what was measured.
+    assert!(description.contains("`series_numbering`"));
+    assert!(description.contains("masters_numbering_names_differ"));
+    assert!(description.contains("masters_numbering_identity_differs"));
+    assert!(description.contains("which `series_numbering` returns instead"));
+    assert!(
+        !description.contains("which this read does not return"),
+        "the series level is now returned"
+    );
+    assert!(description.contains("a single series not named `Default`"));
+    assert!(description.contains("has not yet been run on a live Tally"));
 }
 
 #[tokio::test]
@@ -390,7 +504,7 @@ async fn a_moved_book_or_another_snapshot_refuses_a_page_that_names_its_snapshot
 
 #[tokio::test]
 async fn voucher_types_report_their_numbering_and_flags() {
-    let one = OneServer::spawn(first_page_plans(capture("voucher_types"), 14));
+    let one = OneServer::spawn(captured_voucher_type_plans(14, MARK));
     let response = one.call(args("voucher_types", 0, 500, None)).await;
     let page = result(&response);
     assert_eq!(page["total"], 26);
@@ -418,7 +532,7 @@ async fn voucher_types_report_their_numbering_and_flags() {
         .unwrap()
         .iter()
         .any(|line| line.as_str().unwrap().contains("unrecognised")));
-    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+    assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
 }
 
 #[tokio::test]
@@ -428,7 +542,8 @@ async fn an_unrecognised_numbering_method_is_returned_raw() {
         "<NUMBERINGMETHOD TYPE=\"String\">Serial</NUMBERINGMETHOD>",
         1,
     );
-    let one = OneServer::spawn(first_page_plans(unknown, 14));
+    let numbering = numbering_for(&unknown);
+    let one = OneServer::spawn(voucher_type_plans(unknown, numbering, 14, MARK));
     let response = one.call(args("voucher_types", 0, 500, None)).await;
     let rows = result(&response)["masters"].as_array().unwrap().clone();
     assert_eq!(
@@ -436,7 +551,7 @@ async fn an_unrecognised_numbering_method_is_returned_raw() {
         json!({"unrecognised":"Serial"})
     );
     assert_eq!(rows[1]["numbering_method"], "default");
-    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+    assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
     // The type-level value is not the method (#1485): the limitation a page carries
     // and the tool description both say so, and neither claims the three values
     // are the only ones seen.
@@ -843,14 +958,10 @@ async fn a_cost_category_row_that_carries_a_parent_returns_none() {
 #[tokio::test]
 async fn voucher_types_have_no_size_check_before_the_read() {
     // A mark no godown, unit or stock group read would be admitted at.
-    let one = OneServer::spawn(first_page_plans_at(
-        capture("voucher_types"),
-        14,
-        50_000_000,
-    ));
+    let one = OneServer::spawn(captured_voucher_type_plans(14, 50_000_000));
     let response = one.call(args("voucher_types", 0, 500, None)).await;
     assert_eq!(result(&response)["total"], 26);
-    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+    assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
 }
 
 #[tokio::test]
@@ -932,7 +1043,7 @@ async fn godown_names_and_parents_are_masked_and_voucher_type_names_are_not() {
     // server are not.
     let godowns = with_last_parent(&capture("godowns"), "Factory Floor");
     let mut plans = first_page_plans(godowns, 14);
-    plans.extend(first_page_plans(capture("voucher_types"), 14));
+    plans.extend(captured_voucher_type_plans(14, MARK));
     let one = OneServer::spawn_with(plans, Redaction::MaskParties);
 
     let response = one.call(args("godowns", 0, 500, None)).await;
@@ -968,7 +1079,10 @@ async fn godown_names_and_parents_are_masked_and_voucher_type_names_are_not() {
             .as_str()
             .unwrap()
             .contains("not masked by mask_parties")));
-    assert_eq!(one.requests(), 2 * FIRST_PAGE_REQUESTS);
+    assert_eq!(
+        one.requests(),
+        FIRST_PAGE_REQUESTS + VOUCHER_TYPE_PAGE_REQUESTS
+    );
 }
 
 #[tokio::test]
@@ -1050,4 +1164,213 @@ async fn a_voucher_type_answer_with_no_rows_is_refused_with_its_cause() {
     assert_eq!(error(&refused)["cause"], "masters_voucher_types_empty");
     // Refused at once: no closing extent, identity or mode read.
     assert_eq!(one.requests(), 4 + 3 + 4 + 4);
+}
+
+/// The tool's numbering of the row named `name`.
+fn series_numbering<'a>(rows: &'a [Value], name: &str) -> &'a Value {
+    let row = rows.iter().find(|row| row["name"] == name).expect(name);
+    &row["series_numbering"]
+}
+
+#[tokio::test]
+async fn each_voucher_type_row_carries_the_numbering_of_its_own_series() {
+    let masters = capture("voucher_types");
+    let numbering = numbering_for(&masters);
+    // Contra: two series. Credit Note: a series with no method.
+    // Debit Note: a method Tally printed outside the measured set.
+    // Delivery Note: the override method, seen on a real book but not captured.
+    // Memorandum: a duplicate setting that is neither Yes nor No.
+    let series_of = |name: &str| {
+        let at = numbering
+            .find(&format!("<VOUCHERTYPE NAME=\"{name}\""))
+            .unwrap();
+        let from = at + numbering[at..].find("<VOUCHERNUMBERSERIES.LIST>").unwrap();
+        let to = from
+            + numbering[from..]
+                .find("</VOUCHERNUMBERSERIES.LIST>")
+                .unwrap()
+            + "</VOUCHERNUMBERSERIES.LIST>".len();
+        numbering[from..to].to_string()
+    };
+    let contra = series_of("Contra");
+    let numbering = edit_after(
+        &numbering,
+        "<VOUCHERTYPE NAME=\"Contra\"",
+        &contra,
+        &format!("{contra}{contra}"),
+    );
+    let numbering = edit_after(
+        &numbering,
+        "<VOUCHERTYPE NAME=\"Credit Note\"",
+        "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
+        "",
+    );
+    let numbering = edit_after(
+        &numbering,
+        "<VOUCHERTYPE NAME=\"Debit Note\"",
+        "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
+        "<NUMBERINGMETHOD>Serial</NUMBERINGMETHOD>",
+    );
+    let numbering = edit_after(
+        &numbering,
+        "<VOUCHERTYPE NAME=\"Delivery Note\"",
+        "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
+        "<NUMBERINGMETHOD>Automatic (Manual Override)</NUMBERINGMETHOD>",
+    );
+    let numbering = edit_after(
+        &numbering,
+        "<VOUCHERTYPE NAME=\"Memorandum\"",
+        "<PREVENTDUPLICATES>No</PREVENTDUPLICATES>",
+        "<PREVENTDUPLICATES>Maybe</PREVENTDUPLICATES>",
+    );
+    let one = OneServer::spawn(voucher_type_plans(masters, numbering, 14, MARK));
+    let response = one.call(args("voucher_types", 0, 500, None)).await;
+    let page = result(&response);
+    let rows = page["masters"].as_array().unwrap();
+    assert_eq!(rows.len(), 26);
+    // The three types the capture's book had set on the screen.
+    assert_eq!(
+        series_numbering(rows, "Journal"),
+        &json!({"observation":"observed","method":"automatic","duplicates":"not_prevented"})
+    );
+    assert_eq!(
+        series_numbering(rows, "Payment"),
+        &json!({"observation":"observed","method":"manual","duplicates":"prevented"})
+    );
+    assert_eq!(
+        series_numbering(rows, "Receipt"),
+        &json!({"observation":"observed","method":"manual","duplicates":"not_prevented"})
+    );
+    // A row whose series count is not one: nothing is read from it.
+    assert_eq!(
+        series_numbering(rows, "Contra"),
+        &json!({"observation":"series_count","count":2})
+    );
+    // A series without a method, and one with an unreadable duplicate setting.
+    assert_eq!(
+        series_numbering(rows, "Credit Note"),
+        &json!({"observation":"field_invalid","code":"series_method"})
+    );
+    assert_eq!(
+        series_numbering(rows, "Memorandum"),
+        &json!({"observation":"field_invalid","code":"series_duplicates"})
+    );
+    // An unrecognised method is kept raw and is never `manual`.
+    assert_eq!(
+        series_numbering(rows, "Debit Note"),
+        &json!({"observation":"observed","method":{"unrecognised":"Serial"},"duplicates":"not_prevented"})
+    );
+    assert_eq!(
+        series_numbering(rows, "Delivery Note"),
+        &json!({"observation":"observed","method":"automatic_manual_override","duplicates":"not_prevented"})
+    );
+    // Every row has one, and the type-level field and its text are unchanged:
+    // it still reads `default` on 24 rows, `automatic` on one and `manual` on one.
+    assert!(rows.iter().all(|row| row["series_numbering"].is_object()));
+    let method = |value: &str| {
+        rows.iter()
+            .filter(|row| row["numbering_method"] == value)
+            .count()
+    };
+    assert_eq!(
+        (method("default"), method("automatic"), method("manual")),
+        (24, 1, 1)
+    );
+    let limitations = page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line.as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert!(limitations
+        .iter()
+        .any(|line| line.starts_with("numbering_method is the type-level value")));
+    let shipped = |needle: &str| limitations.iter().any(|line| line.contains(needle));
+    assert!(shipped(
+        "series_numbering is the numbering a voucher type's series prints"
+    ));
+    assert!(shipped(
+        "one synthetic book (TallyPrime 7.1 Silver, Windows)"
+    ));
+    assert!(shipped("Multi-user Auto"));
+    assert!(shipped("a single series not named `Default`"));
+    assert!(shipped("a voucher type created new"));
+    assert!(shipped("An `unrecognised` series method is never `manual`"));
+    assert!(shipped("has not yet been run on a live Tally"));
+    assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn no_other_kind_carries_a_series_numbering() {
+    let one = OneServer::spawn(first_page_plans(capture("godowns"), 14));
+    let response = one.call(args("godowns", 0, 500, None)).await;
+    let page = result(&response);
+    assert!(!page["masters"].as_array().unwrap().is_empty());
+    for row in page["masters"].as_array().unwrap() {
+        assert!(row.get("series_numbering").is_none(), "{row}");
+    }
+    assert!(!page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line.as_str().unwrap().contains("series_numbering")));
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_does_not_join_is_a_tool_refusal_with_no_rows() {
+    let masters = capture("voucher_types");
+    let numbering = numbering_for(&masters);
+    // Payroll is in the masters answer and not in the numbering answer.
+    let at = numbering.find("<VOUCHERTYPE NAME=\"Payroll\"").unwrap();
+    let end = at + numbering[at..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+    let missing = format!("{}{}", &numbering[..at], &numbering[end..]);
+    let one = OneServer::spawn(voucher_type_plans_to_closing_extent(
+        masters.clone(),
+        missing,
+        14,
+        MARK,
+    ));
+    let refused = one.call(args("voucher_types", 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_numbering_names_differ");
+    assert!(refused["structuredContent"]["result"]["masters"].is_null());
+    // Held until the closing extent was read, and it had not moved.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4);
+
+    // One GUID under another name: an identity difference.
+    let renamed = numbering.replacen(
+        "<VOUCHERTYPE NAME=\"Payroll\" RESERVEDNAME=\"Payroll\"",
+        "<VOUCHERTYPE NAME=\"Payrolls\" RESERVEDNAME=\"Payrolls\"",
+        1,
+    );
+    assert_ne!(renamed, numbering);
+    let one = OneServer::spawn(voucher_type_plans_to_closing_extent(
+        masters, renamed, 14, MARK,
+    ));
+    let refused = one.call(args("voucher_types", 0, 500, None)).await;
+    assert_eq!(
+        error(&refused)["code"],
+        "masters_numbering_identity_differs"
+    );
+    assert!(refused["structuredContent"]["result"]["masters"].is_null());
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_does_not_parse_is_a_tool_refusal_with_its_cause() {
+    let masters = capture("voucher_types");
+    let numbering = numbering_for(&masters);
+    let at = numbering.find("<VOUCHERTYPE NAME=\"Payment\"").unwrap();
+    let from = at + numbering[at..].find("<GUID ").unwrap();
+    let to = from + numbering[from..].find("</GUID>").unwrap() + "</GUID>".len();
+    let no_guid = format!("{}{}", &numbering[..from], &numbering[to..]);
+    let mut plans = through_opening_extent(14, MARK);
+    pair(&mut plans, xml(masters));
+    pair(&mut plans, xml(no_guid));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args("voucher_types", 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed");
+    assert_eq!(error(&refused)["cause"], "masters_numbering_guid_missing");
+    // Refused at once: no closing extent, identity or mode read.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 4);
 }

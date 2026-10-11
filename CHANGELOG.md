@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `masters` with `kind` `voucher_types` now returns, on each row, `series_numbering`: the numbering method
+  (`automatic`, `manual`, `automatic_manual_override`, or the raw text under `unrecognised`, never read as
+  `manual`) and whether duplicate numbers are prevented, read at the number-series level from a second paired
+  read of the voucher-type export and joined to the row by GUID with the name as a second equality; a type with no
+  series or several returns `series_count` and nothing is read from it, and a series missing or repeating a field
+  returns `field_invalid`. A type found in one read only, or a GUID and name that disagree between the two reads,
+  refuses the whole read (`masters_numbering_names_differ`, `masters_numbering_identity_differs`). The type-level
+  `numbering_method` stays as it was, with its limitation. Measured on one synthetic book (TallyPrime 7.1 Silver,
+  Windows) whose voucher types each held one series named `Default`; more than one series, Multi-user Auto, a
+  single series not named `Default`, a type created new and other releases are not measured, and the two requests
+  have not yet been run together as one tool call on a live Tally (part of #724).
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
   Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
   and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,

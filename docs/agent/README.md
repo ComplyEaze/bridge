@@ -376,6 +376,28 @@ reads those allocations yet. A `groups` row carries `name`,
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
 
+A `voucher_types` row also carries `series_numbering`, the numbering of the
+type's number series, which `numbering_method` is not (that is the type-level
+value, which read `None` for types set to Automatic and to Manual on the
+screen). It is read from a second paired read of the voucher-type export with
+the series-level fields added, inside the same brackets and between the first
+collection and the closing extent, and is joined to each row by GUID with the
+name as a second equality. It is `{"observation":"observed","method":...,"duplicates":...}`
+(`method` is `automatic`, `manual`, `automatic_manual_override` or
+`{"unrecognised": "<raw text>"}`; `duplicates` is `prevented` or `not_prevented`),
+`{"observation":"series_count","count":n}` where a type has no series or
+several (nothing is read from it), or `{"observation":"field_invalid","code":...}`.
+A type found on one side only, or a GUID and name that disagree between the
+two answers, refuses the whole read (`masters_numbering_names_differ`,
+`masters_numbering_identity_differs`), and the second collection changing
+between its two reads refuses it as `masters_numbering_collection_changed`.
+Measured on one synthetic book (TallyPrime 7.1 Silver, Windows) on which every
+voucher type held one series, named `Default`; more than one series,
+Multi-user Auto, a single series not named `Default`, a voucher type created
+new and other releases are not measured, an `unrecognised` method is never
+`manual`, and the integrated read, the two captured requests sent as one tool
+call, has not yet been run on a live Tally.
+
 The read runs inside the same company, mode and identity brackets as
 `trial_balance`, with the book extent read before and after (they must be
 equal) and the collection read twice and compared. Education mode is refused.
@@ -407,7 +429,9 @@ both reads) are checked against the mark and the admitted size: more rows
 than the mark, an AlterID above it, a repeated AlterID or an oversize response
 refuses the whole read as `masters_bound_premise_violated`, unless the closing
 extent shows the book moved, which is reported instead
-(`masters_extent_changed`). A response Bridge cannot read refuses at once with
+(`masters_extent_changed`). The voucher types' numbering answer is held to
+the same kind of checks (more rows than the mark, a repeated GUID or an
+oversize response). A response Bridge cannot read refuses at once with
 a `masters_*` cause (for `groups`, the group reader's, such as `group_xml_malformed`),
 without waiting for the closing extent. A `voucher_types`
 answer with no rows refuses as `masters_voucher_types_empty`, because every

@@ -5,6 +5,10 @@ use bridge_tally_protocol::native_masters::{
     masters_worst_row_bytes, parse_native_masters, render_native_masters_request, NativeMasterKind,
     NativeMasterRow, NativeMasters, MASTERS_RESPONSE_BUDGET_BYTES,
 };
+use bridge_tally_protocol::native_voucher_type_numbering::{
+    join_series_numbering, parse_voucher_type_numbering, render_voucher_type_numbering_request,
+    NumberingJoinError, SeriesNumberingResult, VoucherTypeNumberingRow,
+};
 use bridge_tally_protocol::outstandings_shared::OutstandingsError;
 use bridge_tally_protocol::TallyNamedMaster;
 use std::collections::HashSet;
@@ -45,7 +49,10 @@ impl MastersKind {
 }
 
 pub(crate) enum MastersRows {
-    Native(NativeMasters),
+    /// The rows of one native kind. For `voucher_types` only, the second
+    /// field holds the series-level numbering joined to each row, in the
+    /// rows' order; for every other kind it is `None`.
+    Native(NativeMasters, Option<Vec<SeriesNumberingResult>>),
     Groups(Vec<TallyNamedMaster>),
 }
 
@@ -73,6 +80,9 @@ pub(crate) enum MastersReadError {
     /// master mark bounds the rows; the response fits the estimate).
     #[error("masters_bound_premise_violated")]
     PremiseViolated(&'static str),
+    /// The voucher-type numbering answer does not join the masters answer.
+    #[error("{}", .0.code())]
+    NumberingJoin(NumberingJoinError),
 }
 
 impl MastersReadError {
@@ -81,6 +91,7 @@ impl MastersReadError {
             Self::EducationUnqualified => "masters_education_unqualified",
             Self::TooLarge { .. } => "masters_too_large",
             Self::PremiseViolated(_) => "masters_bound_premise_violated",
+            Self::NumberingJoin(join) => join.code(),
         }
     }
 }
@@ -163,6 +174,38 @@ pub(crate) fn check_masters_premise(
     Ok(())
 }
 
+/// The premise of the numbering read, checked against its answer: its rows
+/// cannot outnumber the master mark, none can repeat a GUID, and the response
+/// fits `limit_bytes`. Voucher types are unbounded before the read, so the limit
+/// is the whole budget.
+pub(crate) fn check_numbering_premise(
+    rows: &[VoucherTypeNumberingRow],
+    master_alter_id: u64,
+    received_bytes: usize,
+    limit_bytes: u64,
+) -> Result<(), MastersReadError> {
+    if u64::try_from(rows.len()).unwrap_or(u64::MAX) > master_alter_id {
+        return Err(MastersReadError::PremiseViolated(
+            "masters_numbering_rows_exceed_master_mark",
+        ));
+    }
+    let mut seen = HashSet::new();
+    if rows
+        .iter()
+        .any(|row| !seen.insert(row.guid.to_ascii_lowercase()))
+    {
+        return Err(MastersReadError::PremiseViolated(
+            "masters_numbering_guid_repeated",
+        ));
+    }
+    if u64::try_from(received_bytes).unwrap_or(u64::MAX) > limit_bytes {
+        return Err(MastersReadError::PremiseViolated(
+            "masters_numbering_response_over_admitted_bytes",
+        ));
+    }
+    Ok(())
+}
+
 impl TallyRuntime {
     /// One kind of master, with the same queue, mode and identity brackets as
     /// the Trial Balance and its book-extent pair: the extent before and after
@@ -217,8 +260,39 @@ impl TallyRuntime {
                                     .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
                                 let masters =
                                     parse_native_masters(native, &xml, identity.company_guid())?;
-                                check_masters_premise(&masters.rows, mark, bytes, limit)
-                                    .map(|()| MastersRows::Native(masters))
+                                match check_masters_premise(&masters.rows, mark, bytes, limit) {
+                                    Err(violated) => Err(violated),
+                                    // Voucher types only: the series-level numbering is
+                                    // a second collection, read and compared the same
+                                    // way, inside the same opening and closing extents.
+                                    Ok(()) if native == NativeMasterKind::VoucherTypes => {
+                                        let request = render_voucher_type_numbering_request(
+                                            identity.display_name(),
+                                        );
+                                        let (xml, bytes, hash) = client
+                                            .fetch_native_report_paired(request.clone())
+                                            .await?
+                                            .require_stable(
+                                                PairedReadValidationError::MastersNumberingCollection,
+                                            )?;
+                                        evidence = evidence.clone().combine(
+                                            RuntimeReadEvidence::paired(&request, hash, bytes),
+                                        );
+                                        let numbering = parse_voucher_type_numbering(&xml)?;
+                                        check_numbering_premise(
+                                            &numbering,
+                                            mark,
+                                            bytes,
+                                            budget_bytes(),
+                                        )
+                                        .and_then(|()| {
+                                            join_series_numbering(&masters.rows, &numbering)
+                                                .map_err(MastersReadError::NumberingJoin)
+                                        })
+                                        .map(|joined| MastersRows::Native(masters, Some(joined)))
+                                    }
+                                    Ok(()) => Ok(MastersRows::Native(masters, None)),
+                                }
                             }
                             // The group snapshot as the statements read it: no
                             // size admission of its own.

@@ -1,19 +1,26 @@
 //! Masters reads replayed from captures, with one admission or stability fault
 //! at a time. The sequence is the Trial Balance's without its currency pair:
 //! mode probe and identity (3), opening extent (4), the collection pair (4),
-//! closing extent (4), identity and mode again (3).
+//! closing extent (4), identity and mode again (3). Voucher types read a
+//! second collection, the series-level numbering, as a second pair between the
+//! first and the closing extent.
 use super::masters::{
-    admit_masters_size, check_masters_premise, limit_for, sized_before_the_read, MastersRead,
+    admit_masters_size, check_masters_premise, check_numbering_premise, limit_for,
+    sized_before_the_read, MastersRead,
 };
 use super::trial_balance_tests::{
     companies, config, decode, education, extents, identity, pair, status, xml, GUID,
 };
 use super::*;
 use bridge_tally_protocol::native_masters::{
-    masters_worst_row_bytes, parse_native_masters, NativeMasterKind, NativeMastersError,
-    MASTERS_RESPONSE_BUDGET_BYTES,
+    masters_worst_row_bytes, parse_native_masters, render_native_masters_request, NativeMasterKind,
+    NativeMastersError, MASTERS_RESPONSE_BUDGET_BYTES,
 };
-use tally_protocol_simulator::{ScenarioPlan, SequenceSimulator};
+use bridge_tally_protocol::native_voucher_type_numbering::{
+    parse_voucher_type_numbering, render_voucher_type_numbering_request, DuplicateSetting,
+    NumberingJoinError, SeriesNumberingMethod, VoucherTypeNumbering,
+};
+use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
 
 /// The synthetic book the masters captures came from. Its GUID is replaced by
 /// the test double's company, so a captured collection binds to it.
@@ -67,6 +74,118 @@ fn groups() -> String {
     .replace(GROUPS_GUID, GUID)
 }
 
+/// The real series-level numbering capture (24 voucher types, one synthetic
+/// book), with its company GUID replaced by the test double's company.
+const NUMBERING_CAPTURE_GUID: &str = "3479ef95-3ecd-49b3-9349-d3a8e24b0db2";
+
+fn numbering_capture() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
+    ))
+    .trim_start_matches('\u{feff}')
+    .replace(NUMBERING_CAPTURE_GUID, GUID)
+}
+
+/// Each `VOUCHERTYPE` element of `text`, opening tag to closing tag.
+fn type_blocks(text: &str) -> Vec<&str> {
+    let mut blocks = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("<VOUCHERTYPE ") {
+        let end = rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        blocks.push(&rest[start..start + end]);
+        rest = &rest[start + end..];
+    }
+    blocks
+}
+
+/// The text of the first `<tag ...>` element in `block`.
+fn element<'a>(block: &'a str, tag: &str) -> &'a str {
+    let open = block.find(&format!("<{tag} ")).expect(tag);
+    let text = open + block[open..].find('>').unwrap() + 1;
+    &block[text..text + block[text..].find(&format!("</{tag}>")).unwrap()]
+}
+
+fn name_of(block: &str) -> &str {
+    let at = block.find("NAME=\"").unwrap() + "NAME=\"".len();
+    &block[at..at + block[at..].find('"').unwrap()]
+}
+
+/// A masters answer for the types of the real numbering capture: each type's
+/// name, GUID, parent, type-level method and ids as the capture printed them,
+/// in the shape of the captured masters answer.
+fn masters_for_numbering_capture() -> String {
+    let numbering = numbering_capture();
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let rows = type_blocks(&numbering)
+        .into_iter()
+        .map(|block| {
+            let name = name_of(block);
+            format!(
+                "<VOUCHERTYPE NAME=\"{name}\" RESERVEDNAME=\"{name}\"><GUID TYPE=\"String\">{}</GUID><PARENT TYPE=\"String\">{}</PARENT><NUMBERINGMETHOD TYPE=\"String\">{}</NUMBERINGMETHOD><ISACTIVE TYPE=\"Logical\">Yes</ISACTIVE><ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL><ALTERID TYPE=\"Number\">{}</ALTERID><MASTERID TYPE=\"Number\">{}</MASTERID><BRIDGECOMPANYGUID TYPE=\"String\">{GUID}</BRIDGECOMPANYGUID></VOUCHERTYPE>",
+                element(block, "GUID"),
+                element(block, "PARENT"),
+                element(block, "NUMBERINGMETHOD"),
+                element(block, "ALTERID"),
+                element(block, "MASTERID"),
+            )
+        })
+        .collect::<String>();
+    let start = masters.find("<VOUCHERTYPE ").unwrap();
+    let end = masters.rfind("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+    format!("{}{}{}", &masters[..start], rows, &masters[end..])
+}
+
+/// A numbering answer for any voucher-type masters answer: the real numbering
+/// capture's envelope, and for each masters row the capture's row of the same
+/// name (or its `Contra` row where the capture has none) with only the row's
+/// name, GUID and ids set to the masters row's.
+fn numbering_for(masters: &str) -> String {
+    let real = numbering_capture();
+    let templates = type_blocks(&real);
+    let template = |name: &str| {
+        templates
+            .iter()
+            .find(|block| name_of(block) == name)
+            .or_else(|| templates.iter().find(|block| name_of(block) == "Contra"))
+            .copied()
+            .unwrap()
+    };
+    let set = |block: &str, tag: &str, value: &str| {
+        let open = block.find(&format!("<{tag} ")).unwrap();
+        let text = open + block[open..].find('>').unwrap() + 1;
+        let end = text + block[text..].find(&format!("</{tag}>")).unwrap();
+        format!("{}{}{}", &block[..text], value, &block[end..])
+    };
+    let rows = parse_native_masters(NativeMasterKind::VoucherTypes, masters, GUID)
+        .unwrap()
+        .rows
+        .iter()
+        .map(|row| {
+            assert!(!row.name.contains(['&', '"', '<']), "{}", row.name);
+            let block = template(&row.name);
+            let tag_end = block.find('>').unwrap();
+            let block = format!(
+                "<VOUCHERTYPE NAME=\"{0}\" RESERVEDNAME=\"{0}\"{1}",
+                row.name,
+                &block[tag_end..]
+            );
+            let block = set(&block, "GUID", &row.guid);
+            let block = set(&block, "ALTERID", &format!(" {}", row.alter_id));
+            set(&block, "MASTERID", &format!(" {}", row.master_id))
+        })
+        .collect::<String>();
+    let start = real.find("<VOUCHERTYPE ").unwrap();
+    let end = real.rfind("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+    format!("{}{}{}", &real[..start], rows, &real[end..])
+}
+
+/// `text` with the first `from` at or after `anchor` replaced by `to`.
+fn edit_after(text: &str, anchor: &str, from: &str, to: &str) -> String {
+    let anchor = text.find(anchor).expect(anchor);
+    let at = anchor + text[anchor..].find(from).expect(from);
+    format!("{}{}{}", &text[..at], to, &text[at + from.len()..])
+}
+
 /// The books' extent with its master mark set to `mark`.
 fn extent_with_mark(mark: u64) -> String {
     let captured = extents();
@@ -110,6 +229,63 @@ fn complete(
     plans
 }
 
+/// The opening, then the voucher-type collection pair, the numbering pair and
+/// the closing extent (every plan of a voucher-types read up to its brackets).
+fn through_closing_extent_numbered(
+    opening_extent: String,
+    collection: String,
+    numbering: String,
+    closing_extent: String,
+) -> Vec<ScenarioPlan> {
+    let mut plans = opening(opening_extent);
+    pair(&mut plans, xml(collection));
+    pair(&mut plans, xml(numbering));
+    pair(&mut plans, xml(closing_extent));
+    plans
+}
+
+/// The opening, then the voucher-type collection pair and the numbering pair:
+/// all a read that is refused at once, on the numbering answer, sends.
+fn through_numbering(
+    opening_extent: String,
+    collection: String,
+    numbering: String,
+) -> Vec<ScenarioPlan> {
+    let mut plans = opening(opening_extent);
+    pair(&mut plans, xml(collection));
+    pair(&mut plans, xml(numbering));
+    plans
+}
+
+/// A whole voucher-types read: also the identity and mode brackets after the
+/// closing extent.
+fn complete_numbered(
+    opening_extent: String,
+    collection: String,
+    numbering: String,
+    closing_extent: String,
+) -> Vec<ScenarioPlan> {
+    let companies = xml(companies());
+    let mut plans =
+        through_closing_extent_numbered(opening_extent, collection, numbering, closing_extent);
+    plans.extend([companies.clone(), status(), companies]);
+    plans
+}
+
+/// The whole voucher-types read of the captured masters answer and the
+/// numbering answer made for it, at a mark no kind sized by the mark would be
+/// admitted at.
+fn voucher_types_plans() -> Vec<ScenarioPlan> {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    complete_numbered(
+        extent_with_mark(50_000_000),
+        masters,
+        numbering,
+        extent_with_mark(50_000_000),
+    )
+}
+
 /// The largest master mark a collection read of `kind` is admitted at.
 fn largest_admitted_mark(kind: NativeMasterKind) -> u64 {
     u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(kind)).unwrap()
@@ -124,6 +300,28 @@ async fn run(
         .fetch_masters_with_extent(config(&simulator), &identity(), kind)
         .await;
     (result, simulator.finish().unwrap().len())
+}
+
+/// As [`run`], with the requests the Tally double received.
+async fn run_observed(
+    plans: Vec<ScenarioPlan>,
+    kind: MastersKind,
+) -> (
+    anyhow::Result<(MastersRead, CompanyBookExtent)>,
+    Vec<ObservedRequest>,
+) {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = TallyRuntime::default()
+        .fetch_masters_with_extent(config(&simulator), &identity(), kind)
+        .await;
+    (result, simulator.finish().unwrap())
+}
+
+/// The body hash the Tally double records for `request`.
+fn request_hash(request: &str) -> String {
+    sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+        request,
+    ))
 }
 
 fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
@@ -263,18 +461,25 @@ async fn every_kind_replays_through_every_bracket_at_its_admission_edge() {
         } else {
             50_000_000
         };
-        let (result, dispatched) = run(
+        let plans = if kind == NativeMasterKind::VoucherTypes {
+            let masters = capture(kind);
+            complete_numbered(
+                extent_with_mark(mark),
+                masters.clone(),
+                numbering_for(&masters),
+                extent_with_mark(mark),
+            )
+        } else {
             complete(
                 extent_with_mark(mark),
                 capture(kind),
                 extent_with_mark(mark),
-            ),
-            MastersKind::Native(kind),
-        )
-        .await;
+            )
+        };
+        let (result, dispatched) = run(plans, MastersKind::Native(kind)).await;
 
         let (read, extent) = result.unwrap();
-        let MastersRows::Native(masters) = read.rows else {
+        let MastersRows::Native(masters, numbering) = read.rows else {
             panic!("a native kind reads a native collection");
         };
         assert_eq!(masters.rows.len(), captured_rows(kind), "{kind:?}");
@@ -282,7 +487,18 @@ async fn every_kind_replays_through_every_bracket_at_its_admission_edge() {
             extent.master_alter_id_high_water().map(|mark| mark.get()),
             Some(mark)
         );
-        assert_eq!(dispatched, 18, "{kind:?}");
+        // Voucher types read a second collection, the numbering, and carry one
+        // result per row; no other kind reads or carries it.
+        match kind {
+            NativeMasterKind::VoucherTypes => {
+                assert_eq!(numbering.map(|joined| joined.len()), Some(26));
+                assert_eq!(dispatched, 18 + 4, "{kind:?}");
+            }
+            _ => {
+                assert!(numbering.is_none(), "{kind:?}");
+                assert_eq!(dispatched, 18, "{kind:?}");
+            }
+        }
     }
 }
 
@@ -576,9 +792,436 @@ async fn a_zero_row_capture_reads_as_an_empty_collection_through_every_bracket()
     )
     .await;
 
-    let MastersRows::Native(masters) = result.unwrap().0.rows else {
+    let MastersRows::Native(masters, numbering) = result.unwrap().0.rows else {
         panic!("a native kind reads a native collection");
     };
     assert!(masters.rows.is_empty());
+    assert!(numbering.is_none());
     assert_eq!(dispatched, 18);
+}
+
+const VOUCHER_TYPES_KIND: MastersKind = MastersKind::Native(NativeMasterKind::VoucherTypes);
+
+/// The whole sequence of a voucher-types read: the mode probe and identity (3),
+/// the opening extent (4), the masters pair (4), the numbering pair (4), the
+/// closing extent (4), identity and mode again (3).
+const VOUCHER_TYPES_SEQUENCE: usize = 3 + 4 + 4 + 4 + 4 + 3;
+
+#[tokio::test]
+async fn voucher_types_send_the_masters_request_then_the_numbering_request_between_the_extents() {
+    let (result, observed) = run_observed(voucher_types_plans(), VOUCHER_TYPES_KIND).await;
+    result.unwrap();
+
+    let name = identity().display_name().to_string();
+    let masters = request_hash(&render_native_masters_request(
+        NativeMasterKind::VoucherTypes,
+        &name,
+    ));
+    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    assert_ne!(masters, numbering);
+    assert_eq!(observed.len(), VOUCHER_TYPES_SEQUENCE);
+    let hash = |at: usize| observed[at].request_body_sha256.as_str();
+    // Opening extent (twice), masters (twice), numbering (twice), closing
+    // extent (twice): each a POST, with a health check between and after.
+    let extent = hash(3);
+    for at in [3, 5, 7, 9, 11, 13, 15, 17] {
+        assert_eq!(observed[at].method, "POST", "{at}");
+        assert_eq!(observed[at + 1].method, "GET", "{at}");
+    }
+    assert_eq!([hash(5), hash(15), hash(17)], [extent; 3]);
+    assert_ne!(extent, masters);
+    assert_ne!(extent, numbering);
+    assert_eq!([hash(7), hash(9)], [masters.as_str(); 2]);
+    assert_eq!([hash(11), hash(13)], [numbering.as_str(); 2]);
+}
+
+#[tokio::test]
+async fn every_other_kind_sends_no_numbering_request() {
+    let name = identity().display_name().to_string();
+    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    for kind in NativeMasterKind::ALL {
+        if kind == NativeMasterKind::VoucherTypes {
+            continue;
+        }
+        let mark = largest_admitted_mark(kind);
+        let (result, observed) = run_observed(
+            complete(
+                extent_with_mark(mark),
+                capture(kind),
+                extent_with_mark(mark),
+            ),
+            MastersKind::Native(kind),
+        )
+        .await;
+        result.unwrap();
+        // The sequence of one collection pair, as before the numbering read.
+        assert_eq!(observed.len(), 18, "{kind:?}");
+        let masters = request_hash(&render_native_masters_request(kind, &name));
+        assert_eq!(observed[7].request_body_sha256, masters, "{kind:?}");
+        assert_eq!(observed[9].request_body_sha256, masters, "{kind:?}");
+        assert!(
+            observed
+                .iter()
+                .all(|request| request.request_body_sha256 != numbering),
+            "{kind:?}"
+        );
+    }
+    // The group snapshot neither.
+    let (result, observed) = run_observed(
+        complete(
+            extent_with_mark(50_000_000),
+            groups(),
+            extent_with_mark(50_000_000),
+        ),
+        MastersKind::Groups,
+    )
+    .await;
+    result.unwrap();
+    assert_eq!(observed.len(), 18);
+    assert!(observed
+        .iter()
+        .all(|request| request.request_body_sha256 != numbering));
+}
+
+#[tokio::test]
+async fn each_type_gets_the_numbering_of_its_own_series() {
+    // The real numbering capture, joined to a masters answer made from the same
+    // capture's own identities: Journal, Payment and Receipt were set on the
+    // screen, the other 21 types were not altered.
+    let (result, dispatched) = run(
+        complete_numbered(
+            extent_with_mark(50_000_000),
+            masters_for_numbering_capture(),
+            numbering_capture(),
+            extent_with_mark(50_000_000),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    assert_eq!(dispatched, VOUCHER_TYPES_SEQUENCE);
+    let MastersRows::Native(masters, Some(numbering)) = result.unwrap().0.rows else {
+        panic!("voucher types carry their numbering");
+    };
+    assert_eq!(masters.rows.len(), 24);
+    assert_eq!(numbering.len(), 24);
+    let of = |name: &str| {
+        let at = masters
+            .rows
+            .iter()
+            .position(|row| row.name == name)
+            .unwrap();
+        &numbering[at]
+    };
+    let observed = |method, duplicates| VoucherTypeNumbering::Observed { method, duplicates };
+    assert_eq!(
+        of("Journal"),
+        &observed(
+            SeriesNumberingMethod::Automatic,
+            DuplicateSetting::NotPrevented
+        )
+    );
+    assert_eq!(
+        of("Payment"),
+        &observed(SeriesNumberingMethod::Manual, DuplicateSetting::Prevented)
+    );
+    assert_eq!(
+        of("Receipt"),
+        &observed(
+            SeriesNumberingMethod::Manual,
+            DuplicateSetting::NotPrevented
+        )
+    );
+    assert_eq!(
+        numbering
+            .iter()
+            .filter(|result| matches!(
+                result,
+                VoucherTypeNumbering::Observed {
+                    method: SeriesNumberingMethod::Automatic,
+                    duplicates: DuplicateSetting::NotPrevented
+                }
+            ))
+            .count(),
+        22
+    );
+}
+
+#[tokio::test]
+async fn the_numbering_read_adds_its_own_evidence() {
+    let (result, _) = run(voucher_types_plans(), VOUCHER_TYPES_KIND).await;
+    let (read, _) = result.unwrap();
+    assert!(!read.evidence.request_sha256.is_empty());
+    assert!(!read.evidence.response_sha256.is_empty());
+    // Two collection pairs: both responses' bytes are counted, each read twice
+    // (UTF-16, two bytes a unit), beside the brackets' own.
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    let collections =
+        ((masters.encode_utf16().count() + numbering.encode_utf16().count()) * 2 * 2) as u64;
+    let counted = u64::try_from(read.evidence.bytes).unwrap();
+    assert!(counted >= collections, "{counted} < {collections}");
+}
+
+#[tokio::test]
+async fn a_numbering_pair_that_changed_between_its_reads_refuses_the_whole_read() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    let mut plans = opening(extent_with_mark(50_000_000));
+    pair(&mut plans, xml(masters));
+    plans.extend([
+        xml(numbering.clone()),
+        status(),
+        xml(format!("{numbering}\n")),
+        status(),
+    ]);
+    let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
+
+    let error = result.err().expect("refused: no rows come back");
+    let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
+    assert!(matches!(
+        changed,
+        PairedReadValidationError::MastersNumberingCollection
+    ));
+    // Not the masters read's refusal: it names which of the two drifted.
+    assert_eq!(changed.safe_code(), "masters_numbering_collection_changed");
+    assert_ne!(changed.safe_code(), "masters_collection_changed");
+    // Refused at once: no closing extent.
+    assert_eq!(dispatched, 3 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_masters_pair_that_changed_still_names_the_masters_read() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let mut plans = opening(extent_with_mark(50_000_000));
+    plans.extend([
+        xml(masters.clone()),
+        status(),
+        xml(format!("{masters}\n")),
+        status(),
+    ]);
+    let (result, dispatched) = run(plans, VOUCHER_TYPES_KIND).await;
+
+    let error = result.err().expect("refused");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&error),
+        Some(PairedReadValidationError::MastersCollection)
+    ));
+    assert_eq!(dispatched, 3 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_does_not_parse_refuses_at_once_with_the_parsers_cause() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    for (refused, expected) in [
+        (
+            numbering.replacen("<STATUS>1</STATUS>", "<STATUS>0</STATUS>", 1),
+            NativeMastersError::TallyReportedFailure,
+        ),
+        (
+            numbering.replacen("</ENVELOPE>", "", 1),
+            NativeMastersError::Malformed("masters_envelope_unterminated"),
+        ),
+    ] {
+        let (result, dispatched) = run(
+            through_numbering(extent_with_mark(50_000_000), masters.clone(), refused),
+            VOUCHER_TYPES_KIND,
+        )
+        .await;
+        let error = result.err().expect("refused: no rows come back");
+        assert_eq!(cause::<NativeMastersError>(&error), Some(&expected));
+        // The masters pair and the numbering pair were read, nothing after.
+        assert_eq!(dispatched, 3 + 4 + 4 + 4);
+        // Both completed reads are kept as evidence.
+        let evidence = &error.downcast_ref::<RuntimeReadFailure>().unwrap().evidence;
+        assert!(!evidence.response_sha256.is_empty());
+    }
+    // A type with no GUID in the numbering answer: a typed parse error, not a default.
+    let without_guid = {
+        let at = numbering.find("<VOUCHERTYPE NAME=\"Payment\"").unwrap();
+        let from = at + numbering[at..].find("<GUID ").unwrap();
+        let to = from + numbering[from..].find("</GUID>").unwrap() + "</GUID>".len();
+        format!("{}{}", &numbering[..from], &numbering[to..])
+    };
+    let (result, _) = run(
+        through_numbering(extent_with_mark(50_000_000), masters, without_guid),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    assert_eq!(
+        cause::<NativeMastersError>(&result.err().expect("refused")),
+        Some(&NativeMastersError::Malformed(
+            "masters_numbering_guid_missing"
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_does_not_join_refuses_the_whole_read_after_the_closing_extent() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    let without_payroll = {
+        let at = numbering.find("<VOUCHERTYPE NAME=\"Payroll\"").unwrap();
+        let end = at + numbering[at..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        format!("{}{}", &numbering[..at], &numbering[end..])
+    };
+    // A type in the masters answer and not in the numbering answer.
+    let (result, dispatched) = run(
+        through_closing_extent_numbered(
+            extent_with_mark(50_000_000),
+            masters.clone(),
+            without_payroll.clone(),
+            extent_with_mark(50_000_000),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let error = result.err().expect("refused: no rows come back");
+    let refused = cause::<MastersReadError>(&error).expect("a join refusal");
+    assert!(matches!(
+        refused,
+        MastersReadError::NumberingJoin(NumberingJoinError::TypeOnOneSideOnly)
+    ));
+    assert_eq!(refused.safe_code(), "masters_numbering_names_differ");
+    // Held until the closing extent was read, and it had not moved.
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+    // The completed reads are kept as evidence.
+    let evidence = &error.downcast_ref::<RuntimeReadFailure>().unwrap().evidence;
+    assert!(!evidence.response_sha256.is_empty());
+
+    // The same GUID under another name.
+    let renamed = edit_after(
+        &numbering,
+        "<VOUCHERTYPE NAME=\"Payroll\"",
+        "<VOUCHERTYPE NAME=\"Payroll\" RESERVEDNAME=\"Payroll\">",
+        "<VOUCHERTYPE NAME=\"Payrolls\" RESERVEDNAME=\"Payrolls\">",
+    );
+    let (result, _) = run(
+        through_closing_extent_numbered(
+            extent_with_mark(50_000_000),
+            masters.clone(),
+            renamed,
+            extent_with_mark(50_000_000),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let error = result.err().expect("refused");
+    let refused = cause::<MastersReadError>(&error).expect("a join refusal");
+    assert!(matches!(
+        refused,
+        MastersReadError::NumberingJoin(NumberingJoinError::SameGuidDifferentNames)
+    ));
+    assert_eq!(refused.safe_code(), "masters_numbering_identity_differs");
+
+    // The book moved between the two reads: reported as moved, not as the
+    // join its new type broke.
+    let (result, dispatched) = run(
+        through_closing_extent_numbered(
+            extent_with_mark(50_000_000),
+            masters,
+            without_payroll,
+            extent_with_mark(50_000_001),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let error = result.err().expect("refused");
+    let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
+    assert!(matches!(changed, PairedReadValidationError::MastersExtent));
+    assert!(cause::<MastersReadError>(&error).is_none());
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_book_that_moved_between_the_two_reads_is_reported_as_moved() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    let (result, dispatched) = run(
+        through_closing_extent_numbered(
+            extent_with_mark(50_000_000),
+            masters,
+            numbering,
+            extent_with_mark(50_000_010),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let error = result.err().expect("refused");
+    let changed = cause::<PairedReadValidationError>(&error).expect("a stability refusal");
+    assert!(matches!(changed, PairedReadValidationError::MastersExtent));
+    assert_eq!(changed.safe_code(), "masters_extent_changed");
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_repeats_a_guid_is_a_premise_refusal_held_to_the_closing_extent() {
+    let masters = capture(NativeMasterKind::VoucherTypes);
+    let numbering = numbering_for(&masters);
+    let journal = parse_voucher_type_numbering(&numbering)
+        .unwrap()
+        .into_iter()
+        .find(|row| row.name == "Journal")
+        .unwrap();
+    let payment = parse_voucher_type_numbering(&numbering)
+        .unwrap()
+        .into_iter()
+        .find(|row| row.name == "Payment")
+        .unwrap();
+    let repeated = numbering.replacen(&payment.guid, &journal.guid, 1);
+    assert_ne!(repeated, numbering);
+    let (result, dispatched) = run(
+        through_closing_extent_numbered(
+            extent_with_mark(50_000_000),
+            masters,
+            repeated,
+            extent_with_mark(50_000_000),
+        ),
+        VOUCHER_TYPES_KIND,
+    )
+    .await;
+    let error = result.err().expect("refused");
+    let violated = cause::<MastersReadError>(&error).expect("a premise refusal");
+    assert!(matches!(
+        violated,
+        MastersReadError::PremiseViolated("masters_numbering_guid_repeated")
+    ));
+    assert_eq!(violated.safe_code(), "masters_bound_premise_violated");
+    assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+}
+
+#[test]
+fn the_numbering_premise_checks_refuse_each_way_its_answer_can_outgrow_its_mark() {
+    let rows = parse_voucher_type_numbering(&numbering_capture()).unwrap();
+    assert_eq!(rows.len(), 24);
+    let violated = |result: Result<(), MastersReadError>| match result {
+        Err(error @ MastersReadError::PremiseViolated(reason)) => {
+            assert_eq!(error.safe_code(), "masters_bound_premise_violated");
+            reason
+        }
+        other => panic!("{other:?}"),
+    };
+    // 24 rows, a mark of 24, a response that just fits.
+    assert!(check_numbering_premise(&rows, 24, 1_000, 1_000).is_ok());
+    // One row more than the mark.
+    assert_eq!(
+        violated(check_numbering_premise(&rows, 23, 0, u64::MAX)),
+        "masters_numbering_rows_exceed_master_mark"
+    );
+    // A GUID twice.
+    let mut repeated = rows.clone();
+    repeated[1].guid = repeated[0].guid.to_ascii_uppercase();
+    assert_eq!(
+        violated(check_numbering_premise(&repeated, 1_000, 0, u64::MAX)),
+        "masters_numbering_guid_repeated"
+    );
+    // A response one byte over the budget it is held to.
+    assert_eq!(
+        violated(check_numbering_premise(&rows, 24, 1_001, 1_000)),
+        "masters_numbering_response_over_admitted_bytes"
+    );
+    // The numbering answer is held to the whole budget, as voucher types are.
+    let budget = u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES).unwrap();
+    assert!(check_numbering_premise(&rows, 24, MASTERS_RESPONSE_BUDGET_BYTES, budget).is_ok());
+    assert!(check_numbering_premise(&rows, 24, MASTERS_RESPONSE_BUDGET_BYTES + 1, budget).is_err());
 }

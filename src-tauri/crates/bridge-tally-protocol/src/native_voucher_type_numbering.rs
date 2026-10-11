@@ -17,16 +17,19 @@
 //! default: a type with no series or several, a method outside the measured set,
 //! a missing or unrecognised duplicate setting. An envelope that is not the closed
 //! shape is an error. This parser does not bind rows to a company; the read that
-//! uses it does (it computes the company GUID onto every row).
+//! uses it does (it computes the company GUID onto every row). Each row keeps
+//! the type's `GUID` and `ALTERID` as printed, so that the read can join this
+//! answer to the voucher-type masters answer by identity, not by position
+//! ([`join_series_numbering`]). The committed capture carries both on all 24 rows.
 
 use crate::native_masters::{
     name_attribute, path_is, read_text, refuse_error_element, refuse_stray_text, skip_subtree,
-    upper, within_name_bound, NativeMastersError,
+    upper, within_name_bound, NativeMasterRow, NativeMastersError,
 };
 use crate::native_outstandings::render_native_voucher_type_export_request;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use quick_xml::{events::Event, Reader};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// The `FETCH` that was sent live: the type's identity and, at both levels, the
 /// two numbering fields, with every field of the series list.
@@ -80,6 +83,10 @@ pub enum VoucherTypeNumbering {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoucherTypeNumberingRow {
     pub name: String,
+    /// The type's `GUID` as printed (the join key); never defaulted: a row
+    /// without one, or with it repeated, is a typed parse error.
+    pub guid: String,
+    pub alter_id: u64,
     pub numbering: VoucherTypeNumbering,
 }
 
@@ -207,6 +214,8 @@ fn parse_row(
     name: &str,
 ) -> Result<VoucherTypeNumberingRow, NativeMastersError> {
     let mut series = Vec::<SeriesFields>::new();
+    let mut guid = None::<String>;
+    let mut alter_id = None::<String>;
     loop {
         match reader
             .read_event()
@@ -217,6 +226,20 @@ fn parse_row(
                 refuse_error_element(&child)?;
                 if child == b"VOUCHERNUMBERSERIES.LIST" {
                     series.push(parse_series(reader)?);
+                } else if child == b"GUID" {
+                    let text = read_text(reader, element.name())?;
+                    if guid.replace(text).is_some() {
+                        return Err(NativeMastersError::Malformed(
+                            "masters_numbering_guid_repeated",
+                        ));
+                    }
+                } else if child == b"ALTERID" {
+                    let text = read_text(reader, element.name())?;
+                    if alter_id.replace(text).is_some() {
+                        return Err(NativeMastersError::Malformed(
+                            "masters_numbering_alter_id_repeated",
+                        ));
+                    }
                 } else {
                     skip_subtree(reader)?;
                 }
@@ -227,6 +250,14 @@ fn parse_row(
                 // A self-closed series list is still a series, with no method.
                 if child == b"VOUCHERNUMBERSERIES.LIST" {
                     series.push(SeriesFields::default());
+                } else if child == b"GUID" && guid.replace(String::new()).is_some() {
+                    return Err(NativeMastersError::Malformed(
+                        "masters_numbering_guid_repeated",
+                    ));
+                } else if child == b"ALTERID" && alter_id.replace(String::new()).is_some() {
+                    return Err(NativeMastersError::Malformed(
+                        "masters_numbering_alter_id_repeated",
+                    ));
                 }
             }
             Event::Text(text) => refuse_stray_text(&text)?,
@@ -238,8 +269,26 @@ fn parse_row(
             _ => {}
         }
     }
+    // Identity is the join key and is never defaulted: an absent or blank
+    // GUID or ALTERID refuses the whole answer.
+    let guid = guid
+        .filter(|guid| !guid.trim().is_empty())
+        .ok_or(NativeMastersError::Malformed(
+            "masters_numbering_guid_missing",
+        ))?;
+    within_name_bound(&guid)?;
+    let alter_id = alter_id
+        .filter(|text| !text.trim().is_empty())
+        .ok_or(NativeMastersError::Malformed(
+            "masters_numbering_alter_id_missing",
+        ))?
+        .trim()
+        .parse()
+        .map_err(|_| NativeMastersError::RowFieldInvalid("alter_id"))?;
     Ok(VoucherTypeNumberingRow {
         name: name.to_string(),
+        guid,
+        alter_id,
         numbering: classify(&series)?,
     })
 }
@@ -318,6 +367,109 @@ fn classify(series: &[SeriesFields]) -> Result<VoucherTypeNumbering, NativeMaste
         _ => return Ok(VoucherTypeNumbering::FieldInvalid("series_duplicates")),
     };
     Ok(VoucherTypeNumbering::Observed { method, duplicates })
+}
+
+/// What the numbering answer says about one voucher type of the masters answer.
+/// The parser's closed observation, carried to the masters row it belongs to.
+pub type SeriesNumberingResult = VoucherTypeNumbering;
+
+/// Why the masters answer and the numbering answer cannot be joined. Each is a
+/// refusal of the whole read, never a row value: a type missing a result would
+/// read as "no numbering".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumberingJoinError {
+    /// A type is in one answer, and the other holds it by neither GUID nor name.
+    TypeOnOneSideOnly,
+    /// One GUID names two different types in the two answers.
+    SameGuidDifferentNames,
+    /// One name carries two different GUIDs in the two answers.
+    SameNameDifferentGuids,
+    /// A GUID is repeated within one answer.
+    RepeatedGuid,
+}
+
+impl NumberingJoinError {
+    /// The refusal's stable code, which carries no data.
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::TypeOnOneSideOnly => "masters_numbering_names_differ",
+            Self::SameGuidDifferentNames | Self::SameNameDifferentGuids | Self::RepeatedGuid => {
+                "masters_numbering_identity_differs"
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for NumberingJoinError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "voucher-type numbering does not join the masters answer ({})",
+            self.code()
+        )
+    }
+}
+
+impl std::error::Error for NumberingJoinError {}
+
+/// A type found by neither GUID: the same name under another GUID is an
+/// identity difference, any other is a type on one side only.
+fn unmatched<'a>(name: &str, mut other_names: impl Iterator<Item = &'a str>) -> NumberingJoinError {
+    if other_names.any(|other| other.eq_ignore_ascii_case(name)) {
+        NumberingJoinError::SameNameDifferentGuids
+    } else {
+        NumberingJoinError::TypeOnOneSideOnly
+    }
+}
+
+/// Joins the numbering answer to the masters answer by GUID, comparing the
+/// names as a second equality (ASCII case fold, as both parsers key their
+/// names, and nothing wider). One result per masters row, in the masters
+/// order. Nothing is joined by position or by name alone, and every type must
+/// be on both sides.
+pub fn join_series_numbering(
+    masters: &[NativeMasterRow],
+    numbering: &[VoucherTypeNumberingRow],
+) -> Result<Vec<SeriesNumberingResult>, NumberingJoinError> {
+    let mut by_guid = HashMap::new();
+    for (index, row) in numbering.iter().enumerate() {
+        if by_guid
+            .insert(row.guid.to_ascii_lowercase(), index)
+            .is_some()
+        {
+            return Err(NumberingJoinError::RepeatedGuid);
+        }
+    }
+    let mut master_guids = HashSet::new();
+    if masters
+        .iter()
+        .any(|row| !master_guids.insert(row.guid.to_ascii_lowercase()))
+    {
+        return Err(NumberingJoinError::RepeatedGuid);
+    }
+    let mut matched = vec![false; numbering.len()];
+    let mut joined = Vec::with_capacity(masters.len());
+    for row in masters {
+        let Some(&index) = by_guid.get(&row.guid.to_ascii_lowercase()) else {
+            return Err(unmatched(
+                &row.name,
+                numbering.iter().map(|other| other.name.as_str()),
+            ));
+        };
+        let found = &numbering[index];
+        if !found.name.eq_ignore_ascii_case(&row.name) {
+            return Err(NumberingJoinError::SameGuidDifferentNames);
+        }
+        matched[index] = true;
+        joined.push(found.numbering.clone());
+    }
+    if let Some(index) = matched.iter().position(|seen| !seen) {
+        return Err(unmatched(
+            &numbering[index].name,
+            masters.iter().map(|other| other.name.as_str()),
+        ));
+    }
+    Ok(joined)
 }
 
 #[cfg(test)]

@@ -1,11 +1,14 @@
 //! The Terms-of-Use gate of the MCP server.
 //!
 //! The extension asks the user to accept the Terms of Use in its settings, and the setting arrives
-//! here as `BRIDGE_TERMS_ACCEPTED`. A host cannot be relied on to make a required checkbox mean
-//! "ticked" (an unticked box is still a value), so the server is the gate: until the setting is on,
-//! every `tools/call` refuses in band, before any argument is read and before any request to
-//! Tally. `initialize` and `tools/list` still answer, so the host shows the tools and the user
-//! reads the reason in the chat rather than in a generic "server disconnected".
+//! here as `BRIDGE_TERMS_ACCEPTED`. The setting is deliberately not `required` in the manifest:
+//! Claude Desktop starts no server while a required setting has no stored value, which is what an
+//! update leaves when new terms rename it, so this refusal would never be shown (bridge#1413). A
+//! host's checkbox is not a gate either (an unticked box is still a value), so the server is the
+//! gate: until the setting is on, every `tools/call` refuses in band, before any argument is read
+//! and before any request to Tally. `initialize` and `tools/list` still answer, so the host shows
+//! the tools and the user reads the reason in the chat rather than in a generic "server
+//! disconnected".
 //!
 //! An absent, empty or unrecognised value is "not accepted". When it is on, a line per terms
 //! version is appended to `terms-acceptance.jsonl` in the data folder (version, time, source); if

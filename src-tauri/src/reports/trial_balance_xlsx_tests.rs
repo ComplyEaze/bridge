@@ -83,21 +83,20 @@ fn worksheet_numeric_cells(bytes: &[u8]) -> BTreeMap<String, String> {
     let mut in_value = false;
     loop {
         match reader.read_event().unwrap() {
-            Event::Start(tag) if tag.name().as_ref() == b"c" => {
+            Event::Start(tag) if tag.name().as_ref() == "c" => {
                 cell = tag.attributes().find_map(|attribute| {
                     let attribute = attribute.ok()?;
-                    (attribute.key.as_ref() == b"r")
-                        .then(|| String::from_utf8_lossy(attribute.value.as_ref()).into_owned())
+                    (attribute.key.as_ref() == "r").then(|| attribute.value.into_owned())
                 });
             }
-            Event::Start(tag) if tag.name().as_ref() == b"v" => in_value = true,
+            Event::Start(tag) if tag.name().as_ref() == "v" => in_value = true,
             Event::Text(text) if in_value => {
                 if let Some(reference) = cell.as_ref() {
-                    cells.insert(reference.clone(), text.decode().unwrap().into_owned());
+                    cells.insert(reference.clone(), text.to_string());
                 }
             }
-            Event::End(tag) if tag.name().as_ref() == b"v" => in_value = false,
-            Event::End(tag) if tag.name().as_ref() == b"c" => cell = None,
+            Event::End(tag) if tag.name().as_ref() == "v" => in_value = false,
+            Event::End(tag) if tag.name().as_ref() == "c" => cell = None,
             Event::Eof => break,
             _ => {}
         }

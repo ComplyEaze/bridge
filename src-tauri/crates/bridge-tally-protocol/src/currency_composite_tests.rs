@@ -1,5 +1,10 @@
-//! Every composite here is read from a committed capture, never typed.
-use super::is_currency_composite;
+//! Every composite read as a value here is one a committed capture holds,
+//! except the typed shapes in `the_shapes_admitted_without_a_capture_are_pinned`.
+//! A refusal is tested on a captured composite with one feature changed, or,
+//! for the zero amounts, the signed zero and the negative rate, on a typed one.
+use super::*;
+use crate::native_outstandings::{parse_company_currency_name, parse_currency_master_list};
+use std::collections::BTreeMap;
 
 /// A native Trial Balance of the synthetic several-currency lab book
 /// (licensed 7.1), whose amount fields hold composites.
@@ -203,4 +208,311 @@ fn a_composite_in_one_currency_is_not_one() {
     assert_ne!(one_currency, captured);
     assert!(one_currency.starts_with("-I\u{20b9} "), "{one_currency}");
     assert!(!is_currency_composite(&one_currency), "{one_currency}");
+}
+
+// ---- parse_currency_composite (#683), on the committed captures only --------
+
+/// Every capture that holds a composite, by file name, as committed.
+const CAPTURES: [(&str, &[u8]); 9] = [
+    (
+        "balance_snapshot_forex_live",
+        include_bytes!("../tests/fixtures/balance_snapshot_forex_live.utf16le.xml"),
+    ),
+    (
+        "balance_snapshot_forex_post_receipt_live",
+        include_bytes!("../tests/fixtures/balance_snapshot_forex_post_receipt_live.utf16le.xml"),
+    ),
+    (
+        "compliance_master_forex_live",
+        include_bytes!("../tests/fixtures/compliance_master_forex_live.utf16le.xml"),
+    ),
+    (
+        "ledgers_currency_forex_live",
+        include_bytes!("../tests/fixtures/ledgers_currency_forex_live.utf16le.xml"),
+    ),
+    (
+        "ledgers_forex_composite_live",
+        include_bytes!("../tests/fixtures/ledgers_forex_composite_live.utf16le.xml"),
+    ),
+    (
+        "trial_balance_currency_forex_live",
+        include_bytes!("../tests/fixtures/trial_balance_currency_forex_live.utf16le.xml"),
+    ),
+    (
+        "trial_balance_forex_live",
+        include_bytes!("../tests/fixtures/trial_balance_forex_live.utf16le.xml"),
+    ),
+    (
+        "vouchers-forex-bill-allocation-20260915",
+        include_bytes!(
+            "../tests/fixtures/agent/vouchers-forex-bill-allocation-20260915.utf16le.xml"
+        ),
+    ),
+    (
+        "vouchers-forex-composite-20260915",
+        include_bytes!("../tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml"),
+    ),
+];
+
+const COMPANY_CURRENCY_LIVE: &[u8] =
+    include_bytes!("../tests/fixtures/company_currencyname_live.utf16le.xml");
+const CURRENCY_ORIGINALNAME_FOREX: &[u8] =
+    include_bytes!("../tests/fixtures/currency_originalname_forex_live.utf16le.xml");
+const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+
+fn decode(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The book's base currency as production identifies it: from the captured
+/// currency masters and the company's own currency name.
+fn forex_base() -> BaseCurrencyName {
+    let masters = parse_currency_master_list(&decode(CURRENCY_ORIGINALNAME_FOREX)).unwrap();
+    let name = parse_company_currency_name(&decode(COMPANY_CURRENCY_LIVE), FOREX_GUID).unwrap();
+    masters.identify_base(Some(&name)).unwrap().base().clone()
+}
+
+/// Every text node of a capture that holds a composite, with how often.
+fn composites_by_text_node() -> BTreeMap<String, usize> {
+    let mut found = BTreeMap::new();
+    for (_, bytes) in CAPTURES {
+        let capture = decode(bytes);
+        for segment in capture.split('<') {
+            let Some((_, text)) = segment.split_once('>') else {
+                continue;
+            };
+            let text = text.trim();
+            if text.contains(" @ ") && text.contains(" = ") {
+                *found.entry(text.to_string()).or_default() += 1;
+            }
+        }
+    }
+    found
+}
+
+const CAPTURED: &str = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
+
+fn parse(text: &str) -> Result<CurrencyComposite, CompositeRefusal> {
+    parse_currency_composite(text, &forex_base())
+}
+
+#[test]
+fn the_captures_hold_fifteen_distinct_composites_and_all_are_read() {
+    let found = composites_by_text_node();
+    assert_eq!(found.len(), 15, "{found:?}");
+    assert_eq!(found.values().sum::<usize>(), 53);
+    let mut zero = 0;
+    for composite in found.keys() {
+        assert!(is_currency_composite(composite), "{composite}");
+        match parse(composite).unwrap_or_else(|refusal| panic!("{composite}: {refusal:?}")) {
+            CurrencyComposite::Zero { foreign_symbol } => {
+                assert_eq!(foreign_symbol, "$");
+                zero += 1;
+            }
+            CurrencyComposite::Valued(valued) => {
+                assert_eq!(valued.foreign_symbol(), "$");
+                // the side is the sign the text carries
+                let negative = composite.starts_with('-');
+                assert_eq!(valued.side() == Side::Negative, negative, "{composite}");
+            }
+        }
+    }
+    // the one composite with no value is the empty-rate zero in the trial balance
+    assert_eq!(zero, 1);
+}
+
+#[test]
+fn a_captured_composite_is_read_into_its_parts_and_the_base_is_the_text() {
+    let CurrencyComposite::Valued(valued) = parse(CAPTURED).unwrap() else {
+        panic!("a valued composite");
+    };
+    assert_eq!(valued.side(), Side::Negative);
+    assert_eq!(valued.foreign().magnitude().as_str(), "100.00");
+    assert_eq!(valued.rate().as_str(), "86");
+    assert_eq!(valued.base().magnitude().as_str(), "8600.00");
+    // and the positive side of the same capture
+    let CurrencyComposite::Valued(positive) =
+        parse("$ 100.00 @ I\u{20b9} 86/$  = I\u{20b9} 8600.00").unwrap()
+    else {
+        panic!("a valued composite");
+    };
+    assert_eq!(positive.side(), Side::Positive);
+    assert_eq!(positive.foreign().magnitude().as_str(), "100.00");
+    assert_eq!(positive.rate().as_str(), "86");
+    assert_eq!(positive.base().magnitude().as_str(), "8600.00");
+    // the captured fractional rate: the base is Tally's own figure, kept as written
+    let CurrencyComposite::Valued(fractional) =
+        parse("-$ 60.00 @ I\u{20b9} 279.6667/$  = -I\u{20b9} 16780.00").unwrap()
+    else {
+        panic!("a valued composite");
+    };
+    assert_eq!(fractional.rate().as_str(), "279.6667");
+    assert_eq!(fractional.base().magnitude().as_str(), "16780.00");
+}
+
+/// A measurement, not a rule: on every captured composite (one currency pair,
+/// `$` against the rupee, release 7.1) the quoted rate is the base over the
+/// foreign amount, rounded to four decimal places (13 of the 14 are exact
+/// integers, so the rounding itself rests on the one fractional rate, 279.6667:
+/// it rules out truncation, not every other rounding). So the rate is derived
+/// from the base and the base is never rebuilt from the rate: for a larger
+/// amount the product can differ from the base by the foreign amount times
+/// 0.00005.
+#[test]
+fn measured_the_rate_is_the_base_over_the_foreign_amount_to_four_places() {
+    fn scaled(text: &str, places: usize) -> i128 {
+        let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+        let padded = format!("{fraction:0<places$}");
+        format!("{whole}{padded}").parse().unwrap()
+    }
+    let mut checked = 0;
+    for composite in composites_by_text_node().keys() {
+        let CurrencyComposite::Valued(valued) = parse(composite).unwrap() else {
+            continue;
+        };
+        let foreign = scaled(valued.foreign().magnitude().as_str(), 2);
+        let base = scaled(valued.base().magnitude().as_str(), 2);
+        // base/foreign in units of 0.0001, rounded to the nearest
+        let derived = (base * 10_000 * 2 + foreign) / (2 * foreign);
+        assert_eq!(derived, scaled(valued.rate().as_str(), 4), "{composite}");
+        checked += 1;
+    }
+    assert_eq!(checked, 14);
+}
+
+#[test]
+fn a_composite_in_another_base_currency_is_refused() {
+    let other = BaseCurrencyName::among_several_for_tests("\u{20ac}");
+    assert_eq!(
+        parse_currency_composite(CAPTURED, &other),
+        Err(CompositeRefusal::BaseNotBookBase)
+    );
+}
+
+/// One feature of a captured string changed at a time, each refused under its
+/// own name.
+#[test]
+fn every_shape_no_capture_shows_is_refused_under_its_own_name() {
+    let change = |from: &str, to: &str| {
+        assert_eq!(CAPTURED.matches(from).count(), 1, "{from}");
+        parse(&CAPTURED.replacen(from, to, 1))
+    };
+    assert_eq!(change(" @ ", " @"), Err(CompositeRefusal::NotComposite));
+    // the rate quoted in another symbol, or per another foreign symbol
+    assert_eq!(
+        change("I\u{20b9} 86/", "\u{20ac} 86/"),
+        Err(CompositeRefusal::NotComposite)
+    );
+    assert_eq!(
+        change("86/$", "86/\u{20ac}"),
+        Err(CompositeRefusal::NotComposite)
+    );
+    assert_eq!(change("100.00", "100"), Err(CompositeRefusal::AmountScale));
+    assert_eq!(change("/$  =", "/$ ="), Err(CompositeRefusal::Spacing));
+    assert_eq!(change("/$  =", "/$   ="), Err(CompositeRefusal::Spacing));
+    assert_eq!(
+        change("100.00", "100.0"),
+        Err(CompositeRefusal::AmountScale)
+    );
+    assert_eq!(
+        change("8600.00", "8600.000"),
+        Err(CompositeRefusal::AmountScale)
+    );
+    assert_eq!(
+        change(" 86/", " 86.12345/"),
+        Err(CompositeRefusal::RatePrecision)
+    );
+    assert_eq!(
+        change(" 86/", " 0/"),
+        Err(CompositeRefusal::RateNotPositive)
+    );
+    // a leading zero in the rate or an amount
+    assert_eq!(change(" 86/", " 0086/"), Err(CompositeRefusal::LeadingZero));
+    assert_eq!(
+        change("100.00", "0100.00"),
+        Err(CompositeRefusal::LeadingZero)
+    );
+    assert_eq!(
+        change("8600.00", "08600.00"),
+        Err(CompositeRefusal::LeadingZero)
+    );
+    assert_eq!(change("= -I", "= I"), Err(CompositeRefusal::SignsDisagree));
+    assert_eq!(
+        change(" 86/", " /"),
+        Err(CompositeRefusal::EmptyRateWithValue)
+    );
+    assert_eq!(
+        parse("$ 100.00 @ I\u{20b9} 86/$  = I\u{20b9} 0.00"),
+        Err(CompositeRefusal::ZeroBaseWithForeign)
+    );
+    // a zero foreign amount with a value elsewhere, and a signed zero
+    assert_eq!(
+        parse("$ 0.00 @ I\u{20b9} 86/$  = I\u{20b9} 8600.00"),
+        Err(CompositeRefusal::ZeroForeignWithValue)
+    );
+    assert_eq!(
+        parse("$ 0.00 @ I\u{20b9} 86/$  = I\u{20b9} 0.00"),
+        Err(CompositeRefusal::ZeroForeignWithValue)
+    );
+    for signed_zero in [
+        "-$ 0.00 @ I\u{20b9} /$  = I\u{20b9} 0.00",
+        "$ 0.00 @ I\u{20b9} /$  = -I\u{20b9} 0.00",
+        "$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 0.00",
+    ] {
+        assert_eq!(
+            parse(signed_zero),
+            Err(CompositeRefusal::SignedZero),
+            "{signed_zero}"
+        );
+    }
+    // a negative rate is not a composite at all
+    assert_eq!(
+        parse("$ 100.00 @ I\u{20b9} -86/$  = I\u{20b9} 8600.00"),
+        Err(CompositeRefusal::NotComposite)
+    );
+}
+
+/// The shapes the parse admits although no committed capture shows them. They
+/// are pinned here so that refusing or widening one is a visible change, and
+/// each waits for a capture (the lab steps in the pull request).
+#[test]
+fn the_shapes_admitted_without_a_capture_are_pinned() {
+    // a zero composite that quotes a zero rate (the captured zero has none)
+    assert_eq!(
+        parse("$ 0.00 @ I\u{20b9} 0/$  = I\u{20b9} 0.00"),
+        Ok(CurrencyComposite::Zero {
+            foreign_symbol: "$".to_string()
+        })
+    );
+    // a foreign symbol other than `$`, not checked against a list
+    let CurrencyComposite::Valued(valued) =
+        parse("-US$ 100.00 @ I\u{20b9} 86/US$  = -I\u{20b9} 8600.00").unwrap()
+    else {
+        panic!("a valued composite");
+    };
+    assert_eq!(valued.foreign_symbol(), "US$");
+    // a rate with one to three decimals (the captured ones have none or four)
+    for rate in ["86.5", "86.50", "86.500"] {
+        let text = format!("$ 100.00 @ I\u{20b9} {rate}/$  = I\u{20b9} 8650.00");
+        let CurrencyComposite::Valued(valued) = parse(&text).unwrap() else {
+            panic!("a valued composite");
+        };
+        assert_eq!(valued.rate().as_str(), rate);
+    }
+    // a foreign amount below one, with its lone zero before the point (the
+    // smallest captured amount other than zero is 40.00)
+    assert!(parse("$ 0.50 @ I\u{20b9} 86/$  = I\u{20b9} 43.00").is_ok());
+    // a rate below one (every captured rate is 84 or more)
+    assert!(parse("$ 100.00 @ I\u{20b9} 0.5/$  = I\u{20b9} 50.00").is_ok());
+    // a book whose base is not the rupee: the book's own base is accepted
+    let euro = BaseCurrencyName::among_several_for_tests("\u{20ac}");
+    assert!(
+        parse_currency_composite("-$ 100.00 @ \u{20ac} 0.9/$  = -\u{20ac} 90.00", &euro).is_ok()
+    );
 }

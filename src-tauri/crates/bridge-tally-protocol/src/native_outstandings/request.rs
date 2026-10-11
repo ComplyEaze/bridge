@@ -258,7 +258,27 @@ pub fn render_party_ledger_master_request(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None)
+    render_party_ledger_master(company, period, None, "")
+}
+
+/// What [`render_party_ledger_master_request_with_gst_details`] appends to the
+/// compliance read's `FETCH`: the dated GST details, and the three ledger
+/// fields the captured request also named. Those three
+/// (`RATEOFTAXCALCULATION`, `ROUNDINGMETHOD`, `ROUNDINGLIMIT`) are fetched only
+/// to keep this request the one that was captured; the parser skips them.
+const GST_DETAILS_FETCH_SUFFIX: &str =
+    ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
+
+/// The compliance master read with each ledger's `GSTDETAILS.LIST` named in its
+/// `FETCH`: the request whose answer is the fixture
+/// `ledger_gst_details_live.utf16le.xml`. Nothing calls this renderer yet; the
+/// production compliance request ([`render_party_ledger_master_request`]) is
+/// unchanged.
+pub fn render_party_ledger_master_request_with_gst_details(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+) -> String {
+    render_party_ledger_master(company, period, None, GST_DETAILS_FETCH_SUFFIX)
 }
 
 /// The compliance master read restricted to the ledgers under one
@@ -268,21 +288,19 @@ pub fn render_party_ledger_master_request_for_parents(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part))
+    render_party_ledger_master(company, period, Some(part), "")
 }
 
 fn render_party_ledger_master(
     company: &str,
     period: &NativeLedgerExportPeriod,
     part: Option<&ParentPart>,
+    fetch_suffix: &str,
 ) -> String {
-    render_native_ledger_collection_request(
-        company,
-        period,
-        "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST",
-        true,
-        part,
-    )
+    let fetch = format!(
+        "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST{fetch_suffix}"
+    );
+    render_native_ledger_collection_request(company, period, &fetch, true, part)
 }
 
 fn render_native_ledger_collection_request(

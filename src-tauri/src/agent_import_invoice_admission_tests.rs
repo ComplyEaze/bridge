@@ -6,9 +6,10 @@
 //! from one read of the disposable GST lab book (the `register-e2e` set; its
 //! PROVENANCE table is beside the fixtures). The voucher types and the number
 //! read's answers are Tally's own bytes from the Sales rehearsal on the same
-//! book (the `sales-rehearsal` set, 7 Oct 2026). Two things are not this
+//! book (the `sales-rehearsal` set, 7 Oct 2026). Three things are not this
 //! book's bytes and say so: the company's tax units (another synthetic book's
-//! capture, RE-LABELLED below) and the bill-wise catalogue row (HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
+//! capture, RE-LABELLED below), the bill-wise catalogue row and the rate
+//! listing (both HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
 //! so no case here is admitted.
 use super::*;
 
@@ -32,6 +33,9 @@ const ADMISSION_ORDER: &str = concat!(
     "eNsNse",
     "eCsCse"
 );
+
+/// A rate listing that came back with no ledger row (HAND-WRITTEN).
+const EMPTY_RATE_LISTING: &str = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION></COLLECTION></DATA></BODY></ENVELOPE>";
 
 fn utf16(bytes: &[u8]) -> String {
     String::from_utf16(
@@ -235,7 +239,7 @@ fn sent(simulator: SequenceSimulator) -> usize {
 /// it or, with `observed`, as a build saved it for an unregistered customer.
 fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
     let mut voucher = json!({
-        "bridge_txn_id":"t1", "date":"2026-03-10", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
+        "bridge_txn_id":"t1", "date":"20260310", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
         "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan"},
         "entries":[
             {"ledger":party,"amount":"11800.00","side":"Dr"},
@@ -437,6 +441,47 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
         assert_eq!(sent(lab.simulator), 70);
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
+}
+
+/// A rate listing with no ledger row is a failed read under its own code,
+/// never "this ledger has no rate": the company's ledgers were listed just
+/// before it. The admission stops at that read (52 requests) and records no
+/// observation.
+#[tokio::test]
+async fn an_empty_rate_listing_fails_the_admission_at_that_read() {
+    let lab = lab(ADMISSION_ORDER
+        .chars()
+        .map(|letter| match letter {
+            'Q' => ScenarioPlan::new(Fixture::SyntheticXml(EMPTY_RATE_LISTING.to_string()))
+                .with_encoding(WireEncoding::Utf16LeNoBom)
+                .with_framing(ResponseFraming::ContentLength),
+            letter => plan(letter),
+        })
+        .collect());
+    let party = "Counter Sales - Unregistered";
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let outcome = match lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await
+    {
+        Ok(_) => panic!("admitted"),
+        Err(invoice::InvoiceAdmission::Refused(refusals)) => {
+            Err(refusals.into_iter().map(|r| r.code).collect::<Vec<_>>())
+        }
+        Err(invoice::InvoiceAdmission::Failed(failure)) => Ok(failure.code),
+    };
+    assert_eq!(
+        outcome,
+        Ok("invoice_ledger_rates_listing_empty".to_string())
+    );
+    assert_eq!(sent(lab.simulator), 52);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 
 /// The registration's state is the supplier's state that classification

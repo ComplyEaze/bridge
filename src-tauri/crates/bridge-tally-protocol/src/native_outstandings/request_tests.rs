@@ -426,3 +426,47 @@ fn the_complement_part_request_lists_each_not_formula_in_one_filters_element() {
     assert_eq!(xml.matches("<FILTERS>").count(), 1);
     assert!(xml.contains("<FILTERS>BridgeNot0,BridgeNot1</FILTERS></COLLECTION></TDLMESSAGE>"));
 }
+
+const GST_DETAILS_REQUEST: &[u8] =
+    include_bytes!("../../tests/fixtures/ledger_gst_details_request.utf16le.xml");
+
+fn gst_details_period() -> NativeLedgerExportPeriod {
+    NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse("20260801").unwrap(),
+    )
+    .expect("mode-agnostic profile accepts valid calendar dates")
+}
+
+#[test]
+fn the_gst_details_request_is_byte_for_byte_the_one_sent_live() {
+    assert_eq!(
+        render_party_ledger_master_request_with_gst_details(
+            "BRIDGE PILOT LAB",
+            &gst_details_period()
+        ),
+        crate::text_encoding::decode_xml_bytes(GST_DETAILS_REQUEST).unwrap()
+    );
+}
+
+#[test]
+fn the_gst_details_request_differs_from_the_production_compliance_request_only_by_its_fetch_suffix()
+{
+    let period = gst_details_period();
+    let production = render_party_ledger_master_request("BRIDGE PILOT LAB", &period);
+    let with_details =
+        render_party_ledger_master_request_with_gst_details("BRIDGE PILOT LAB", &period);
+    let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
+    assert_eq!(
+        production.replacen(
+            "LEDGSTREGDETAILS.LIST</FETCH>",
+            &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"),
+            1
+        ),
+        with_details
+    );
+    // The production request is pinned by its own bytes: the fetch it has always sent.
+    assert!(production.contains("<FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST</FETCH>"));
+    assert!(!production.contains("GSTDETAILS.LIST,"));
+}

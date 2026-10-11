@@ -40,6 +40,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -99,6 +100,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -158,6 +160,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -217,6 +220,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -276,6 +280,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -335,6 +340,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -394,6 +400,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -453,6 +460,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -512,6 +520,7 @@ Ok(ParsedExport {
                     tax_type: NotObserved,
                     gst_duty_head: Absent,
                     gst_registrations: NotObserved,
+                    gst_details: NotObserved,
                 },
             },
             source_id: Some(

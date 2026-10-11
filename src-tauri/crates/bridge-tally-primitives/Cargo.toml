@@ -1,7 +1,7 @@
 [package]
 name = "bridge-tally-primitives"
 version = "0.1.0"
-description = "Portable Tally value types (exact decimal, validated date) shared below bridge-tally-core"
+description = "Portable Tally value types (exact decimal, validated date, visible text) shared below bridge-tally-core"
 license = "Apache-2.0"
 repository = "https://github.com/ComplyEaze/bridge"
 publish = false
@@ -12,6 +12,7 @@ rust-version = "1.96"
 workspace = true
 
 [dependencies]
+icu_properties = "2.2"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 

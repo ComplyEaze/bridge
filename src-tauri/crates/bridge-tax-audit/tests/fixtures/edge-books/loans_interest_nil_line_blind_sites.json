@@ -1,0 +1,183 @@
+{
+ "comment": "loans_interest, bridge#1259 item 3, a firm: two sites the reference left reading a nil line's ledger. Loan K: a journal debiting an expense ledger and crediting the loan, beside a nil line on Bank A, is a loan taken (clause 31 row) that is not charge-shaped, because the counter ledgers the charge test reads include the ledger on the nil line, which is no expense ledger (no expense entry count). Loan L: a TDS journal beside a nil line on Suspense is still a TDS journal, neither taken nor repaid (repaid total 0, TDS on the loan 100000, no tds_in_principal).",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-001"
+  },
+  {
+   "name": "TDS Payable",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-002"
+  },
+  {
+   "name": "Expense X",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-003"
+  },
+  {
+   "name": "Suspense",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-004"
+  },
+  {
+   "name": "Loan K",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-005"
+  },
+  {
+   "name": "Loan L",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-loans_interest_nil_line_blind_sites-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Expense X",
+   "opening": 0,
+   "debit": 300000,
+   "credit": 0,
+   "closing": 300000
+  },
+  {
+   "ledger": "Loan K",
+   "opening": -5000000,
+   "debit": 0,
+   "credit": 300000,
+   "closing": -5300000
+  },
+  {
+   "ledger": "Loan L",
+   "opening": -5000000,
+   "debit": 100000,
+   "credit": 0,
+   "closing": -4900000
+  },
+  {
+   "ledger": "Suspense",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "TDS Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expense X",
+     300000
+    ],
+    [
+     "Loan K",
+     -300000
+    ],
+    [
+     "Bank A",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-06-12",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Loan L",
+     100000
+    ],
+    [
+     "TDS Payable",
+     -100000
+    ],
+    [
+     "Suspense",
+     0
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "loans_interest"
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "loans": {
+  "Loan K": {
+   "lender": "Invented K Lender",
+   "lender_type": "person"
+  },
+  "Loan L": {
+   "lender": "Invented L Lender",
+   "lender_type": "person"
+  }
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

@@ -5,7 +5,6 @@ use crate::db::tally_mirror::{
     LocalReconciliationMismatch, ProofSummary, RedactedProofExport, ReviewedSetupInput,
     SourceIdentityInput, WriteFixtureEnrollmentInput, WriteFixtureEnrollmentStatus,
 };
-use crate::gst::{GstDraftRequest, GstReturnDraft};
 use crate::reports::bulk_party_statement::{
     bulk_party_statement_party_count, write_bulk_party_statements_with_ageing_anchor,
     BulkPartyStatementRequest, PartyStatementDestinationApprovals,
@@ -2344,15 +2343,6 @@ pub fn tally_telemetry_preview(
     runtime
         .telemetry_preview()
         .map_err(tally_runtime_command_error)
-}
-
-#[tauri::command]
-pub async fn prepare_gst_return_draft(request: GstDraftRequest) -> Result<GstReturnDraft, String> {
-    let _ = request;
-    Err(
-        "GST return drafting is not implemented; ComplyEaze Bridge did not produce a GST result"
-            .to_string(),
-    )
 }
 
 #[tauri::command]

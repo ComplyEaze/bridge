@@ -5,15 +5,15 @@
 use std::{
     collections::BTreeMap,
     io::{Read, Write},
-    net::TcpStream,
+    net::{Shutdown, TcpStream},
     time::{Duration, Instant},
 };
 
 use bridge_tally_core::ExactDecimal;
 use quick_xml::{events::Event, Reader};
 use tally_protocol_simulator::{
-    decode, Delivery, Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, Simulator,
-    WireEncoding, MAX_SEQUENCE_REQUESTS,
+    decode, Delivery, Fixture, ProductStatus, RefusedRequest, RequestFault, ScenarioPlan,
+    SequenceSimulator, Simulator, WireEncoding, MAX_SEQUENCE_REQUESTS,
 };
 
 fn request(simulator: Simulator, method: &str, path: &str) -> (Vec<u8>, bool) {
@@ -117,6 +117,188 @@ fn sequence_request_count_is_fail_closed() {
             .collect()
     )
     .is_err());
+}
+
+/// Sends `raw` to a fresh simulator, ends the stream, and returns the typed
+/// refusal `finish()` reports.
+fn refusal(raw: &[u8]) -> RefusedRequest {
+    let simulator =
+        Simulator::spawn(ScenarioPlan::new(Fixture::ExportStatusOne)).expect("spawn simulator");
+    let mut stream = TcpStream::connect(simulator.address()).expect("connect loopback simulator");
+    stream.write_all(raw).expect("write synthetic request");
+    stream
+        .shutdown(Shutdown::Write)
+        .expect("end the request stream");
+    let error = simulator
+        .finish()
+        .expect_err("the simulator refuses the request");
+    *error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<RefusedRequest>())
+        .unwrap_or_else(|| panic!("a RefusedRequest payload, not {error:?}"))
+}
+
+#[test]
+fn a_stream_that_ends_before_the_declared_length_is_refused_not_served() {
+    // Before #1148 the three bytes were served as the whole request.
+    let head = "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n";
+    assert_eq!(
+        refusal(format!("{head}abc").as_bytes()),
+        RefusedRequest {
+            plan: 0,
+            plans: 1,
+            fault: RequestFault::EndedEarly {
+                received: head.len() + 3,
+                expected: Some(head.len() + 100),
+            },
+        }
+    );
+}
+
+#[test]
+fn a_declared_length_that_cannot_be_trusted_is_refused_by_its_own_fault() {
+    let declared_too_large = "POST / HTTP/1.1\r\nContent-Length: 200000\r\n\r\n";
+    // The first value fits in `usize` but the head plus it does not; the second does not fit.
+    let fits_alone = format!("Content-Length: {}\r\n", usize::MAX);
+    let past_usize = format!("Content-Length: {}0\r\n", usize::MAX);
+    let cases = [
+        (
+            "Content-Length: abc\r\n",
+            RequestFault::UnparseableContentLength,
+        ),
+        (
+            "Content-Length: +5\r\n",
+            RequestFault::UnparseableContentLength,
+        ),
+        (
+            "Content-Length: \r\n",
+            RequestFault::UnparseableContentLength,
+        ),
+        (
+            "Content-Length: 1\r\ncontent-length: 1\r\n",
+            RequestFault::RepeatedContentLength,
+        ),
+        (fits_alone.as_str(), RequestFault::LengthOverflow),
+        (past_usize.as_str(), RequestFault::LengthOverflow),
+        ("", RequestFault::MissingContentLength),
+        (
+            "Content-Length: 200000\r\n",
+            RequestFault::TooLarge {
+                bytes: declared_too_large.len() + 200_000,
+            },
+        ),
+    ];
+    for (headers, fault) in cases {
+        let raw = format!("POST / HTTP/1.1\r\n{headers}\r\n");
+        assert_eq!(
+            refusal(raw.as_bytes()),
+            RefusedRequest {
+                plan: 0,
+                plans: 1,
+                fault
+            },
+            "headers {headers:?}"
+        );
+    }
+}
+
+/// A simulator whose worker has refused a request cut short, with that
+/// refusal. The worker has returned by the time the connection closes.
+fn failed_simulator() -> (Simulator, RefusedRequest) {
+    let head = "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\n";
+    let simulator =
+        Simulator::spawn(ScenarioPlan::new(Fixture::ExportStatusOne)).expect("spawn simulator");
+    let mut stream = TcpStream::connect(simulator.address()).expect("connect loopback simulator");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .expect("set read timeout");
+    stream
+        .write_all(format!("{head}abc").as_bytes())
+        .expect("write synthetic request");
+    stream
+        .shutdown(Shutdown::Write)
+        .expect("end the request stream");
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .expect("the simulator closes the connection");
+    assert!(response.is_empty(), "a refused request is not answered");
+    let refused = RefusedRequest {
+        plan: 0,
+        plans: 1,
+        fault: RequestFault::EndedEarly {
+            received: head.len() + 3,
+            expected: Some(head.len() + 100),
+        },
+    };
+    (simulator, refused)
+}
+
+#[test]
+fn dropping_a_simulator_whose_worker_failed_fails_the_test() {
+    // Before #1148 `Drop` discarded the worker's result, so a test that never
+    // called `finish()` could not tell a failed double from a quiet one.
+    let (simulator, refused) = failed_simulator();
+
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(simulator)))
+        .expect_err("dropping a failed simulator fails the test");
+
+    assert_eq!(
+        payload.downcast_ref::<String>(),
+        Some(&format!("simulator worker failed: {refused}"))
+    );
+}
+
+#[test]
+fn a_failed_simulator_dropped_while_a_test_panics_leaves_that_panic_alone() {
+    // A second panic while unwinding would abort the whole test binary.
+    let (simulator, _) = failed_simulator();
+
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        let _held = simulator;
+        panic!("the test's own failure");
+    }))
+    .expect_err("the test's own panic propagates");
+
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"the test's own failure")
+    );
+}
+
+#[test]
+fn dropping_a_simulator_whose_worker_panicked_fails_the_test() {
+    // The worker panics through an existing route, not a test seam: a header
+    // delay of `Duration::MAX` overflows `Instant::now() + delay` while it
+    // holds the response, and std panics on an `Instant` it cannot represent.
+    let simulator = Simulator::spawn(
+        ScenarioPlan::new(Fixture::ExportStatusOne)
+            .with_delivery(Delivery::SlowHeaders(Duration::MAX)),
+    )
+    .expect("spawn simulator");
+    let mut stream = TcpStream::connect(simulator.address()).expect("connect loopback simulator");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .expect("set read timeout");
+    stream
+        .write_all(
+            b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        )
+        .expect("write synthetic request");
+    // The connection closes as the worker unwinds, after its panic began.
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .expect("the simulator closes the connection");
+    assert!(response.is_empty(), "a panicked worker sends nothing");
+
+    let payload = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(simulator)))
+        .expect_err("dropping a panicked simulator fails the test");
+
+    assert_eq!(
+        payload.downcast_ref::<&str>(),
+        Some(&"simulator worker panicked")
+    );
 }
 
 fn element_values(xml: &str, element_name: &[u8]) -> Result<Vec<String>, String> {

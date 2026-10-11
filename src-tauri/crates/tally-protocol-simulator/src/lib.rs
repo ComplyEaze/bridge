@@ -21,5 +21,6 @@ pub use master_generator::{
     MAX_GENERATED_MASTERS, MAX_MASTER_TEXT_WIDTH,
 };
 pub use server::{
-    NoRequestForPlan, ObservedRequest, SequenceSimulator, Simulator, MAX_SEQUENCE_REQUESTS,
+    NoRequestForPlan, ObservedRequest, RefusedRequest, RequestFault, SequenceSimulator, Simulator,
+    MAX_SEQUENCE_REQUESTS,
 };

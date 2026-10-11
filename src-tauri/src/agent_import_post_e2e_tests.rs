@@ -1090,13 +1090,7 @@ async fn a_declined_post_sends_nothing_and_journals_no_intent() {
     );
     // The readback before the post left a proof of a batch never sent: it says
     // the batch is not verified, and must not forbid sending it (bridge#804).
-    let markdown = fs::read_to_string(
-        server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{}.proof.md", line.batch_id)),
-    )
-    .unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(&line.batch_id)[1]).unwrap();
     assert!(
         markdown.contains("**Not verified — this report does not confirm posting.**"),
         "{markdown}"
@@ -4059,11 +4053,24 @@ fn a_masters_verdict_never_clears_an_observed_doubt() {
         server.record_masters_verdict("batch-a", unchanged.clone()),
         doubt
     );
+    // A later doubt naming another ledger does not replace the first (#911).
+    assert_eq!(
+        server.record_masters_verdict(
+            "batch-a",
+            json!({"state":"posted_under_changed_masters","ledgers":["Bank"]})
+        ),
+        doubt
+    );
     assert_eq!(read_masters_check(&imports, "batch-a"), Some(doubt.clone()));
+    // Each verdict went to a file of its own; the pending mark is as written.
+    assert_eq!(
+        read_masters_record(&imports.join("batch-a.masters_check.json")),
+        Some(pending.clone())
+    );
 
-    // The check record cannot be written: a clear verdict stays pending, and
+    // The verdict record cannot be written: a clear verdict stays pending, and
     // an observed doubt is still kept by its own file.
-    block(imports.join("batch-b.masters_check.json"));
+    block(imports.join("batch-b.masters_verdict.json"));
     assert_eq!(server.record_masters_verdict("batch-b", unchanged), pending);
     assert_eq!(
         server.record_masters_verdict("batch-b", doubt.clone()),
@@ -4512,7 +4519,9 @@ async fn post_and_verify(
         )
         .unwrap();
         origin = later_origin;
+        let found = every_file(directory.path());
         verified.push(later_server.call_tool("verify_import", args.clone()).await);
+        assert_nothing_replaced(&found, directory.path());
         let _ = sent(simulator);
     }
     let verdicts = String::from_utf8(journal(directory.path()))
@@ -4522,6 +4531,50 @@ async fn post_and_verify(
         .filter(|record| record["record_type"] == "post_span_verdict")
         .collect::<Vec<_>>();
     (posted, verified, verdicts)
+}
+
+/// Every file under `root`, by path: its bytes and its identity on the volume,
+/// so a file replaced by one with the same bytes still reads as changed.
+fn every_file(root: &Path) -> std::collections::BTreeMap<PathBuf, (Vec<u8>, u64)> {
+    let mut found = std::collections::BTreeMap::new();
+    let mut folders = vec![root.to_path_buf()];
+    while let Some(folder) = folders.pop() {
+        for entry in fs::read_dir(&folder).unwrap() {
+            let entry = entry.unwrap();
+            let kind = entry.file_type().unwrap();
+            if kind.is_dir() {
+                folders.push(entry.path());
+            } else if kind.is_file() {
+                let identity = crate::local_files::file::file_identity(&entry.path());
+                found.insert(entry.path(), (fs::read(entry.path()).unwrap(), identity));
+            }
+        }
+    }
+    found
+}
+
+/// A call that is not destructive replaces and removes nothing it found under
+/// `root` (#911): each file is the same file with the same bytes, except that
+/// a journal or log (`.jsonl`) may have grown, its earlier bytes kept.
+fn assert_nothing_replaced(
+    before: &std::collections::BTreeMap<PathBuf, (Vec<u8>, u64)>,
+    root: &Path,
+) {
+    let after = every_file(root);
+    for (path, (bytes, identity)) in before {
+        let (now, now_identity) = after
+            .get(path)
+            .unwrap_or_else(|| panic!("{} was removed", path.display()));
+        assert_eq!(now_identity, identity, "{} was replaced", path.display());
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "jsonl")
+        {
+            assert!(now.starts_with(bytes), "{} lost bytes", path.display());
+        } else {
+            assert_eq!(now, bytes, "{} was rewritten", path.display());
+        }
+    }
 }
 
 fn bound_journal_identity() -> Value {
@@ -4722,10 +4775,8 @@ async fn a_step_other_than_created_refuses_the_binding_for_good() {
     assert_eq!(verdicts[0]["binding_refusal"], "span_step_not_created");
 }
 
-/// The tagged capture is not what the untagged post sent: its narration
-/// carries the tag, so the binding refuses on content, for good.
-#[tokio::test]
-async fn a_readback_whose_narration_differs_refuses_the_binding() {
+/// The tagged capture, renumbered into the span an untagged post of it left.
+fn tagged_capture_in_span() -> String {
     let mut tagged_in_span = captured_posted_journal();
     tagged_in_span = replaced_once(
         &tagged_in_span,
@@ -4737,11 +4788,16 @@ async fn a_readback_whose_narration_differs_refuses_the_binding() {
         "<MASTERID TYPE=\"Number\"> 5</MASTERID>",
         "<MASTERID TYPE=\"Number\"> 295</MASTERID>",
     );
-    tagged_in_span =
-        tagged_in_span.replace(&format!("{GUID}-00000005"), &format!("{GUID}-00000127"));
+    tagged_in_span.replace(&format!("{GUID}-00000005"), &format!("{GUID}-00000127"))
+}
+
+/// The tagged capture is not what the untagged post sent: its narration
+/// carries the tag, so the binding refuses on content, for good.
+#[tokio::test]
+async fn a_readback_whose_narration_differs_refuses_the_binding() {
     let (posted, _, verdicts) = post_and_verify(
         company_marks(11, 50, "WR2 Unicode Lab"),
-        span_readback(tagged_in_span, 11),
+        span_readback(tagged_capture_in_span(), 11),
         Vec::new(),
     )
     .await;
@@ -4761,6 +4817,45 @@ async fn a_readback_whose_narration_differs_refuses_the_binding() {
     );
     assert_eq!(
         result["vouchers"][0]["marker"], "accounting_fingerprint",
+        "{posted}"
+    );
+    // The first line says the book holds a voucher of the same content, and
+    // never that it is this post's (#1039).
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For each voucher it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.",
+        "{posted}"
+    );
+}
+
+/// A voucher matched by content only that is optional is not in the accounts:
+/// the first line never says the book holds it (#1039).
+#[tokio::test]
+async fn a_refused_binding_matched_only_by_an_optional_voucher_keeps_the_open_line() {
+    let optional = replaced_once(
+        &tagged_capture_in_span(),
+        "<ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL>",
+        "<ISOPTIONAL TYPE=\"Logical\">Yes</ISOPTIONAL>",
+    );
+    let (posted, _, _) = post_and_verify(
+        company_marks(11, 50, "WR2 Unicode Lab"),
+        span_readback(optional, 11),
+        Vec::new(),
+    )
+    .await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(result["post_span_binding"]["state"], "refused", "{posted}");
+    assert_eq!(
+        result["vouchers"][0]["status"], "matching_content_observed",
+        "{posted}"
+    );
+    assert_eq!(
+        result["vouchers"][0]["accounting_effective"], false,
+        "{posted}"
+    );
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again.",
         "{posted}"
     );
 }
@@ -5204,6 +5299,13 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     assert_eq!(result["counts"]["posted_verified"], 0, "{posted}");
     assert_eq!(result["counts"]["matching_content_observed"], 2, "{posted}");
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{posted}");
+    // Two of three are matched by content: the first line says so, and never
+    // that they are this post's (#1039).
+    assert_eq!(
+        result["post_span_binding"]["summary"],
+        "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again.",
+        "{posted}"
+    );
     assert_eq!(result["counts"]["not_found"], 0, "{posted}");
     // Which rows landed, by transaction id: each matched by the content it
     // carries (its amount), never by position.
@@ -5438,6 +5540,35 @@ fn built_or_panic(outcome: Result<ToolOutcome, ToolFailure>) -> ToolOutcome {
     }
 }
 
+/// Each element directly under the root of Tally's answer to an import, with
+/// its text, in answer order. A malformed answer panics; an element with no
+/// text reads as empty.
+fn pilot_answer_elements(xml: &str) -> Vec<(String, String)> {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut depth = 0usize;
+    let mut elements = Vec::new();
+    loop {
+        match reader.read_event().expect("a well-formed import answer") {
+            quick_xml::events::Event::Start(start) => {
+                depth += 1;
+                if depth == 2 {
+                    let name = start.name().as_ref().to_string();
+                    elements.push((name, String::new()));
+                }
+            }
+            quick_xml::events::Event::Text(text) if depth == 2 => {
+                elements.last_mut().unwrap().1.push_str(&text);
+            }
+            quick_xml::events::Event::End(_) => depth -= 1,
+            quick_xml::events::Event::Eof => break,
+            _ => {}
+        }
+    }
+    assert_eq!(depth, 0, "the answer's elements are all closed");
+    elements
+}
+
 fn pilot_args(walk_in: &str, cgst: &str, party: &str) -> Value {
     json!({"company_guid":PILOT_GUID, "vouchers":[{
     "bridge_txn_id":"t1", "date":"2026-08-01", "voucher_type":"Sales", "voucher_number":"BP/26-27/0010",
@@ -5521,6 +5652,40 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
         ),
         (&json!(1), &json!(0), &json!(0))
     );
+    // Every counter of Tally's answer to the import, by name: the seven the
+    // code parses, from its own parse, and all eight, COMBINED among them, from
+    // the committed answer's elements, each present exactly once.
+    for (name, value) in [
+        ("created", 1),
+        ("altered", 0),
+        ("deleted", 0),
+        ("ignored", 0),
+        ("errors", 0),
+        ("cancelled", 0),
+        ("exceptions", 0),
+    ] {
+        assert_eq!(counters[name], json!(value), "{name}");
+    }
+    let answered = pilot_answer_elements(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"
+    )));
+    for (name, value) in [
+        ("CREATED", "1"),
+        ("ALTERED", "0"),
+        ("DELETED", "0"),
+        ("COMBINED", "0"),
+        ("IGNORED", "0"),
+        ("CANCELLED", "0"),
+        ("ERRORS", "0"),
+        ("EXCEPTIONS", "0"),
+    ] {
+        let found = answered
+            .iter()
+            .filter(|(element, _)| element == name)
+            .map(|(_, text)| text.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(found, [value], "{name}");
+    }
     // Every answer was asked for, none more; the one write is the request Tally
     // accepted, once.
     assert_eq!(observed.len(), PILOT_ORDER.len());
@@ -5570,6 +5735,27 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
         ),
         (Some(16), Some(223))
     );
+    // The company's marks around the import, read by the code's own parser
+    // from the two committed marks answers the replay served: the voucher mark
+    // stepped by one and the master mark did not move.
+    let marks_before = crate::agent::parse_company_marks(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml"
+        )),
+        PILOT_GUID,
+    )
+    .unwrap();
+    let marks_after = crate::agent::parse_company_marks(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
+        )),
+        PILOT_GUID,
+    )
+    .unwrap();
+    assert_eq!(marks_before, (16, 223));
+    assert_eq!(marks_after.0, 17);
+    assert_eq!(marks_after.1, 223);
+    assert_eq!(marks_after.1, marks_before.1);
 }
 
 /// The walk-in ledger's row is spelled `BRIDGE Walk-in` in the pilot lab's

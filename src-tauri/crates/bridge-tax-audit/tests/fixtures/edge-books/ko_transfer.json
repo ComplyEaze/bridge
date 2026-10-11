@@ -1,0 +1,129 @@
+{
+ "comment": "A transfer between a bank ledger and a cash ledger booked as a type other than Contra. t01 is a Payment of 500,000 paise from Bank A to Petty Cash with no line on any other ledger, and its narration names Alpha Traders, which is not on the voucher: it moves one amount, so the larger side counts once (500,000). t02 is a Journal with the same two money lines (500,000 out of Bank A, 490,000 into Petty Cash) plus a 10,000 line on Office Rent and the same narration: it has a line on another ledger, so both money lines count (990,000).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_transfer-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_transfer-001"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_transfer-002"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_transfer-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 1000000,
+   "closing": -1000000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 10000,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 990000,
+   "credit": 0,
+   "closing": 990000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "t01",
+   "date": "2025-06-04",
+   "base_type": "Payment",
+   "narration": "Cash for Alpha Traders",
+   "lines": [
+    [
+     "Petty Cash",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "t02",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "narration": "Cash for Alpha Traders",
+   "lines": [
+    [
+     "Petty Cash",
+     490000
+    ],
+    [
+     "Office Rent",
+     10000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ]
+}

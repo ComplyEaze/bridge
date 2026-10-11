@@ -1,0 +1,223 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "trial_balance",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "1430e3c5655e7b13",
+  "population_note_text": "Tally's own Trial Balance export for the period; no voucher is re-read here.",
+  "figures": [
+    {
+      "id": "trial_balance.ledger_rows_count",
+      "value": 2,
+      "unit": "count",
+      "definition_sha256_16": "799f3a578b67bb08",
+      "definition_text": "Ledgers with any opening, movement or closing in the period.",
+      "evidence": []
+    },
+    {
+      "id": "trial_balance.tb_closing_44262e3e",
+      "value": -1000000,
+      "unit": "paise",
+      "definition_sha256_16": "a4ac582c6d1edf85",
+      "definition_text": "Closing balance per the Trial Balance (Dr positive).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Owner Capital",
+          "label": "Owner Capital"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_closing_98cef3d6",
+      "value": 150000,
+      "unit": "paise",
+      "definition_sha256_16": "a4ac582c6d1edf85",
+      "definition_text": "Closing balance per the Trial Balance (Dr positive).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Shop Fittings",
+          "label": "Shop Fittings"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_credit_44262e3e",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f69a73eb9de60cc2",
+      "definition_text": "Credits in the period per the Trial Balance.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Owner Capital",
+          "label": "Owner Capital"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_credit_98cef3d6",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f69a73eb9de60cc2",
+      "definition_text": "Credits in the period per the Trial Balance.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Shop Fittings",
+          "label": "Shop Fittings"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_debit_44262e3e",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f5934a8122c04df0",
+      "definition_text": "Debits in the period per the Trial Balance.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Owner Capital",
+          "label": "Owner Capital"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_debit_98cef3d6",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f5934a8122c04df0",
+      "definition_text": "Debits in the period per the Trial Balance.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Shop Fittings",
+          "label": "Shop Fittings"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_group_44262e3e",
+      "value": "Capital Account",
+      "unit": "text",
+      "definition_sha256_16": "5c791b5aad2328ac",
+      "definition_text": "The ledger's Tally group chain, primary group first.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Owner Capital",
+          "label": "Owner Capital"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_group_98cef3d6",
+      "value": "Fixed Assets",
+      "unit": "text",
+      "definition_sha256_16": "5c791b5aad2328ac",
+      "definition_text": "The ledger's Tally group chain, primary group first.",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Shop Fittings",
+          "label": "Shop Fittings"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_opening_44262e3e",
+      "value": -1000000,
+      "unit": "paise",
+      "definition_sha256_16": "20b5722ff1ca7a64",
+      "definition_text": "Opening balance per the Trial Balance (Dr positive).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Owner Capital",
+          "label": "Owner Capital"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.tb_opening_98cef3d6",
+      "value": 150000,
+      "unit": "paise",
+      "definition_sha256_16": "20b5722ff1ca7a64",
+      "definition_text": "Opening balance per the Trial Balance (Dr positive).",
+      "evidence": [
+        {
+          "kind": "ledger",
+          "id": "Shop Fittings",
+          "label": "Shop Fittings"
+        }
+      ]
+    },
+    {
+      "id": "trial_balance.total_closing",
+      "value": -850000,
+      "unit": "paise",
+      "definition_sha256_16": "0e551969baf93db4",
+      "definition_text": "Sum of closings (Dr positive); equals the opening difference when the period's entries balance.",
+      "evidence": []
+    },
+    {
+      "id": "trial_balance.total_credit",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c26cae3f33447f4c",
+      "definition_text": "Sum of the credit column as Tally exports it.",
+      "evidence": []
+    },
+    {
+      "id": "trial_balance.total_debit",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8e595340031a8442",
+      "definition_text": "Sum of the debit column as Tally exports it (a Stock-in-Hand ledger's column can carry stock values that do not move its closing, so this need not equal the credit column).",
+      "evidence": []
+    },
+    {
+      "id": "trial_balance.total_opening",
+      "value": -850000,
+      "unit": "paise",
+      "definition_sha256_16": "e9f4abadf9015380",
+      "definition_text": "Sum of openings (Dr positive); non-zero is Tally's 'Difference in opening balances'.",
+      "evidence": []
+    }
+  ],
+  "findings": [],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to -850000 paise; opening stock not taken: the read does not show the trial balance starting on the books' first day"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "opening_paise",
+      "detail": "TB opening_paise sums to -850000 paise; opening stock not taken: the read does not show the trial balance starting on the books' first day"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "trial_balance.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

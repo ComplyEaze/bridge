@@ -1,0 +1,42 @@
+# fixture: tests/fixtures/stock_summary_report_negative_sale_lab_live.utf16le.xml
+# parser: parse_native_stock_summary_report
+# source: captured
+Ok(Lines {
+    total: Some(
+        ExactDecimal(
+            "-186.00",
+        ),
+    ),
+    present: 1,
+    empty: 1,
+    lines: [
+        NativeReportLine {
+            name: "Lab Item NEG",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "-5",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: None,
+        },
+        NativeReportLine {
+            name: "Lab Item POS",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "18",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-186.00",
+                ),
+            ),
+        },
+    ],
+})

@@ -1,0 +1,40 @@
+{
+ "comment": "No voucher at all, on an individual's book with no previous-year turnover recorded. tds_payees gives the deductor status 'unknown' and its question, with no payee row; partners_40b_194t does not apply to an individual. The caller assembles no row, so tds_interest_201 publishes its 17 fixed figures (the as-of date, the three rates, the totals and the counts, all totals and counts 0) and no finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_empty-ledger-00a"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_empty-ledger-01a"
+  }
+ ],
+ "tb": [],
+ "vouchers": [],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ]
+}

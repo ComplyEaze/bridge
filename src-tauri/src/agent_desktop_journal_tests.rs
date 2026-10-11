@@ -431,7 +431,10 @@ fn review_details_come_from_the_admitted_saved_journal() {
     .unwrap();
 
     let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+    // Both reach the approval window as the eight digits `displayJournalDate`
+    // reformats (#1307).
     assert_eq!(review.details.date, "20260901");
+    assert_eq!(review.company.books_from, "20260401");
     assert_eq!(review.details.total_debit, "12.5");
     assert_eq!(review.details.total_credit, "12.5");
     assert_eq!(

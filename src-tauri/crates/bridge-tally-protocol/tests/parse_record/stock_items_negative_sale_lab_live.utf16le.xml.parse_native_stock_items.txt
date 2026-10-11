@@ -1,0 +1,73 @@
+# fixture: tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml
+# parser: parse_native_stock_items
+# source: captured
+Ok(NativeStockItems {
+    rows: [
+        NativeStockItem {
+            name: "Lab Item NEG",
+            guid: "7f3c9a10-5b2d-4e6a-9c41-0d2e8b6a1f37-000000d5",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "-5",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: None,
+            },
+        },
+        NativeStockItem {
+            name: "Lab Item POS",
+            guid: "7f3c9a10-5b2d-4e6a-9c41-0d2e8b6a1f37-000000d4",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Empty,
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "18",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-186.00",
+                    ),
+                ),
+            },
+        },
+    ],
+})

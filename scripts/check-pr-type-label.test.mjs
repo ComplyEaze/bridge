@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
 
 import { TYPE_LABELS, typeLabelProblem } from "./check-pr-type-label.mjs";
 
-const script = new URL("./check-pr-type-label.mjs", import.meta.url).pathname;
+const script = fileURLToPath(new URL("./check-pr-type-label.mjs", import.meta.url));
 const run = (labels) => spawnSync(process.execPath, [script], { env: { ...process.env, PR_LABELS: labels }, encoding: "utf8" });
 
 test("exactly one known type label passes", () => {

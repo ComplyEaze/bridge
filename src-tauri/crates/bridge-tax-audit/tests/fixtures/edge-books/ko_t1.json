@@ -1,0 +1,375 @@
+{
+ "comment": "Pattern 1, journals settling one party through another. t01 is a journal between a debtor and a creditor. t02 joins a ledger under Unsecured Loans (a sub-group of Loans (Liability)) and one under Loans & Advances (Asset). t03 is a credit note between a debtor and a ledger under Debtors North (a sub-group of Sundry Debtors), with an empty voucher number and a GUID shorter than 12 characters. t04 has three parties, one of them on two lines that net to a credit, and a discount ledger; its parties are listed in code-point order (capitals first). t05 (GUID t05-journal-zero-bank) has a zero-amount bank line, which does not count as a bank line, an empty number and a long GUID. t06 is a sales voucher of type Sales GST that debits two debtors. t07 has two parties and a cash line, so it is not listed. t08 has Alpha Traders on two lines that net to zero beside Beta Stores: both are listed, Alpha Traders at zero. t02 moves five lakh rupees (Indian digit grouping).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Debtors North": "Sundry Debtors"
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t1-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t1-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t1-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_t1-cap-1"
+  },
+  {
+   "name": "Delta Loans Ltd",
+   "chain": [
+    "Unsecured Loans",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-ko_t1-004"
+  },
+  {
+   "name": "Discount Allowed",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_t1-005"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t1-006"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-ko_t1-007"
+  },
+  {
+   "name": "Staff Advance Eta",
+   "chain": [
+    "Loans & Advances (Asset)",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t1-008"
+  },
+  {
+   "name": "Theta Branch",
+   "chain": [
+    "Debtors North",
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t1-009"
+  },
+  {
+   "name": "Zeta Agencies",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_t1-010"
+  },
+  {
+   "name": "alpha retail",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_t1-011"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 1300000,
+   "credit": 1800000,
+   "closing": -500000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 1600000,
+   "credit": 850000,
+   "closing": 750000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Delta Loans Ltd",
+   "opening": 0,
+   "debit": 50000000,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Discount Allowed",
+   "opening": 0,
+   "debit": 0,
+   "credit": 150000,
+   "closing": -150000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 100000,
+   "closing": -100000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 800000,
+   "closing": -800000
+  },
+  {
+   "ledger": "Staff Advance Eta",
+   "opening": 0,
+   "debit": 0,
+   "credit": 50000000,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Theta Branch",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 0,
+   "closing": 600000
+  },
+  {
+   "ledger": "Zeta Agencies",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "alpha retail",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "t01",
+   "date": "2025-04-15",
+   "base_type": "Journal",
+   "narration": "Set off against Beta Stores dues",
+   "lines": [
+    [
+     "Beta Stores",
+     1200000
+    ],
+    [
+     "Alpha Traders",
+     -1200000
+    ]
+   ]
+  },
+  {
+   "guid": "t02",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Delta Loans Ltd",
+     50000000
+    ],
+    [
+     "Staff Advance Eta",
+     -50000000
+    ]
+   ]
+  },
+  {
+   "guid": "t03",
+   "date": "2025-06-12",
+   "base_type": "Credit Note",
+   "number": "",
+   "narration": "Transferred to branch",
+   "lines": [
+    [
+     "Alpha Traders",
+     -300000
+    ],
+    [
+     "Theta Branch",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "t04",
+   "date": "2025-07-08",
+   "base_type": "Journal",
+   "narration": "Three-way adjustment",
+   "lines": [
+    [
+     "Zeta Agencies",
+     400000
+    ],
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Beta Stores",
+     -250000
+    ],
+    [
+     "alpha retail",
+     -200000
+    ],
+    [
+     "Discount Allowed",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "t05-journal-zero-bank",
+   "date": "2025-08-19",
+   "base_type": "Journal",
+   "number": "",
+   "narration": "Contra settlement",
+   "lines": [
+    [
+     "Alpha Traders",
+     600000
+    ],
+    [
+     "Beta Stores",
+     -600000
+    ],
+    [
+     "Bank A",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "t06",
+   "date": "2025-09-25",
+   "base_type": "Sales",
+   "vtype": "Sales GST",
+   "narration": "Goods to two outlets",
+   "lines": [
+    [
+     "Sales",
+     -800000
+    ],
+    [
+     "Alpha Traders",
+     500000
+    ],
+    [
+     "Theta Branch",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "t07",
+   "date": "2025-10-30",
+   "base_type": "Payment",
+   "narration": "Part cash, part set off",
+   "lines": [
+    [
+     "Beta Stores",
+     200000
+    ],
+    [
+     "Alpha Traders",
+     -100000
+    ],
+    [
+     "Petty Cash",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "t08",
+   "date": "2025-11-14",
+   "base_type": "Journal",
+   "narration": "Reversal and discount",
+   "lines": [
+    [
+     "Alpha Traders",
+     200000
+    ],
+    [
+     "Alpha Traders",
+     -200000
+    ],
+    [
+     "Beta Stores",
+     100000
+    ],
+    [
+     "Discount Allowed",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ]
+}

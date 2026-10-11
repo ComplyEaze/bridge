@@ -549,7 +549,7 @@ pub(super) fn invoice_number_safe(number: &str) -> bool {
 /// What Tally returned is the build's to record, never the caller's: refused
 /// on the way in. A saved batch carries it (and `admit_saved` requires it), so
 /// this runs only on a caller's payload.
-pub(super) fn refuse_supplied_observed(vouchers: &[ImportVoucher]) -> Result<(), String> {
+pub(super) fn refuse_supplied_observed<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
         voucher
             .invoice
@@ -576,7 +576,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
-pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
+pub(super) fn validate_invoice_voucher<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
     if !voucher.voucher_type.is_invoice() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
@@ -1219,10 +1219,8 @@ impl super::super::Server {
             return only("invoice_readback_book_too_large", mark_evidence);
         }
         let number = voucher.voucher_number.clone().unwrap_or_default();
-        let window = super::super::normalized_date(&voucher.date)
-            .ok()
-            .map(|date| date.as_str().to_string())
-            .and_then(|date| financial_year_window(&date).map(|year| (date, year)));
+        let date = voucher.date.as_str().to_string();
+        let window = financial_year_window(&date).map(|year| (date, year));
         let request = window.as_ref().and_then(|(_, year)| {
             super::super::invoice_readback_read(
                 &company.name,
@@ -1436,10 +1434,7 @@ impl super::super::Server {
         let Some(detail) = voucher.invoice.as_ref() else {
             return Err(refused(refuse("invoice_detail_required")));
         };
-        let as_of = super::super::normalized_date(&voucher.date)
-            .map_err(|_| failed("invoice_date_invalid"))?
-            .as_str()
-            .to_string();
+        let as_of = voucher.date.as_str().to_string();
         let type_name = detail.voucher_type_name.clone();
         let party_name = party_entry(voucher)
             .map(|entry| entry.ledger.clone())

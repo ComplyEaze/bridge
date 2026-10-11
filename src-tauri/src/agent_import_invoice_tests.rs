@@ -38,7 +38,7 @@ fn detail() -> InvoiceDetail {
 fn voucher() -> ImportVoucher {
     ImportVoucher {
         bridge_txn_id: "t1".to_string(),
-        date: "2026-03-10".to_string(),
+        date: bridge_tally_core::TallyDate::parse("20260310").expect("a YYYYMMDD date"),
         voucher_type: VoucherType::Sales,
         narration: Some("Invoice 278".to_string()),
         reference: None,
@@ -1064,7 +1064,7 @@ fn rehearsal_invoice(
     );
     ImportVoucher {
         bridge_txn_id: "rehearsal".to_string(),
-        date: date.to_string(),
+        date: bridge_tally_core::TallyDate::parse(date.replace('-', "")).expect("a rehearsal date"),
         voucher_type: VoucherType::Sales,
         narration: None,
         reference: None,

@@ -1,6 +1,6 @@
 # W10: a ledger with two rates, a ledger switched off, and one 12% and one 18% bill
 
-After W9. This work writes: it creates four ledgers, alters one of them, and keys two vouchers, all in `BRIDGE PILOT LAB` only. Part A is what we need first; Part B only if time allows. Stop wherever time runs out.
+After W9. This work writes: it creates four ledgers, alters one of them, and keys up to four vouchers, all in `BRIDGE PILOT LAB` only. Part A is what we need first; Part B only if time allows. Stop wherever time runs out.
 
 **Stop rule.** Stop and tell us, before going on, if any of these happens: Tally shows a dialog or a warning that this list does not mention; a request answer is not a complete envelope with a `COLLECTION` element (or carries a `LINEERROR`); a voucher is refused or Tally fills no tax amount; a ledger would have to be created in a company other than `BRIDGE PILOT LAB`; anything differs from the steps. Never use Accept As Is. Do not alter or delete any other ledger or voucher.
 
@@ -24,16 +24,19 @@ After W9. This work writes: it creates four ledgers, alters one of them, and key
 4. Alter `BRIDGE Svc NA 5%`: change its GST applicability to Not Applicable and save. Screenshot the screen before you save, and say what Tally did with the 5% row and whether it asked anything.
 5. Send `w10-ledger-gst-switch-fields.xml` again, saved as `aw10-switch-after.xml`, and `w10-rates-build-window.xml` again, saved as `aw10-rates-build-after.xml`. Say whether `BRIDGE Svc NA 5%` still carries its 5% row.
 
-## Part B (optional): one 12% bill and one 18% bill
+## Part B (optional): a 12% bill, an 18% bill, and two bills on the 2.5% ledgers
 
 6. Create `BRIDGE CGST 6%` and `BRIDGE SGST 6%` like `BRIDGE CGST 2.5%` and `BRIDGE SGST 2.5%` (same group, same duty head, rate 6, no rounding), and the sales ledger `BRIDGE Svc 12%` under Sales Accounts (taxable, 12%, rate specified in the ledger). Screenshot each ledger's GST details.
 7. Key `BP/26-27/0022`: type `BRIDGE Sales`, dated 6-Aug-2026, the walk-in customer, invoice mode, no round off. One sales line, `BRIDGE Svc 12%`, 100.10. Select `BRIDGE CGST 6%` and `BRIDGE SGST 6%` and leave the amounts exactly as Tally fills them. If Tally fills no amount, stop and tell us. Save it. Screenshot the voucher.
 8. Key `BP/26-27/0023` the same way, one sales line 100.10 on the 18% sales ledger that voucher `0009` used, with the 9% central and state tax ledgers that `0009` used. Same rule about the amounts. Save it. Screenshot the voucher.
-9. Send `w10-status-window-0806.xml`, saved as `aw10-status-0806.xml`.
-10. Screens (look, change nothing): GSTR-1 for August 2026, showing whether `0022` and `0023` are included or uncertain, with Tally's reason if uncertain.
+9. Send `w10-status-window-0806.xml`, saved as `aw10-status-0806.xml` (after step 8, so it holds `0022` and `0023`).
+10. Key `BP/26-27/0024` the same way as `0022` (dated 6-Aug-2026, walk-in customer, invoice mode, no round off): one sales line `BRIDGE Svc 998314 5%` 100.30, `BRIDGE CGST 2.5%` and `BRIDGE SGST 2.5%`, amounts left as Tally fills them. The tax on this line is 2.5075 for each head, a fraction above half a paisa. Save it. Screenshot the voucher.
+11. Key `BP/26-27/0025` the same way: three sales lines of 100.10 each on `BRIDGE Svc 998313 5%`, `BRIDGE Svc 998314 5%` and `BRIDGE Svc 998315 5%`, with `BRIDGE CGST 2.5%` and `BRIDGE SGST 2.5%`. Tally fills 7.50 for each head; **change both amounts to 7.51** (the figure worked out on the whole bill) before you save. If Tally refuses to save, stop and tell us. Screenshot the voucher before and after the change.
+12. Send `w10-status-window-0806.xml` again, saved as `aw10-status-0806-b.xml`, once all vouchers you keyed are saved (send it once at the end if you did steps 7 to 11 in one sitting; one answer holds every voucher of 6-Aug-2026).
+13. Screens (look, change nothing): GSTR-1 for August 2026, showing whether each of `0022` to `0025` is included or uncertain, with Tally's reason if uncertain.
 
 **What to post back.** The answers, the backup's place and the screenshots in a folder `workorder/` on the same branch, their hashes added to `SHA256.txt`, and for each step what happened, with curl's exit code and printed line. Say whether you did anything that differs from this list.
 
 ---
 
-*For the reader (not for the lab):* the answers settle three open points of the Sales tax check. (a) Whether a ledger's rate rows come back whole under the window the build sends or are cut by it (Part A, the three listings). (b) Whether a ledger switched off GST still returns its old rate row, and under which field the switch shows (steps 4-5). (c) Whether Tally's own flag holds for a 12% and an 18% single-rate bill with a tax figure that is not a whole paisa (Part B), which decides whether those rates are admitted.
+*For the reader (not for the lab):* the answers settle three open points of the Sales tax check. (a) Whether a ledger's rate rows come back whole under the window the build sends or are cut by it (Part A, the three listings). (b) Whether a ledger switched off GST still returns its old rate row, and under which field the switch shows (steps 4-5). (c) Whether Tally's own flag holds for a 12% and an 18% single-rate bill with a tax figure that is not a whole paisa (Part B, `0022` and `0023`), which decides whether those rates are admitted. (d) Whether half-up per line holds on a line whose tax fraction is above half a paisa (`0024`). (e) Whether a three-line bill whose only difference is its tax (the whole-bill figure, 7.51) is flagged, apart from any HSN/SAC reason (`0025`).

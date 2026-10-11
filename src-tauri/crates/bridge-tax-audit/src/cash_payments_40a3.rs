@@ -80,10 +80,8 @@ const GROUP_BY_KIND: [(&str, &str); 5] = [
 /// pool several people's cash, and says so.
 const POOLING_LEDGER_GROUPS: [&str; 3] =
     ["Purchase Accounts", "Direct Expenses", "Indirect Expenses"];
-const SALES_ACCOUNTS_GROUP: &str = "Sales Accounts";
 const PURCHASE_ACCOUNTS_GROUP: &str = "Purchase Accounts";
 const LOANS_LIABILITY_GROUP: &str = "Loans (Liability)";
-const DUTIES_TAXES_GROUP: &str = "Duties & Taxes";
 
 fn overflow() -> AuditError {
     AuditError::Config("cash_payments_40a3: a total overflowed i64 paise".to_string())

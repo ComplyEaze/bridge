@@ -948,6 +948,50 @@ fn an_empty_rate_listing_is_its_own_failure_and_a_listing_without_the_ledger_is_
     assert!(other.is_empty());
 }
 
+/// A ledger row of the listing with no name is a read that went wrong, refused
+/// once the row is known to be this company's, whatever the invoice names. The
+/// lab's listing has none: its fourteen rows are named and read whole (the
+/// nameless `LEDGER` element in it is a count inside `CMPINFO`, not a row).
+#[test]
+fn a_nameless_ledger_row_fails_the_rate_read_and_the_captured_listing_has_none() {
+    let nameless = ledger_answer("L", "").replace("<LEDGER NAME=\"L\">", "<LEDGER>");
+    assert_eq!(
+        parse_ledger_rates(&nameless, LAB_GUID, &["L"]),
+        Err("invoice_ledger_rates_row_unnamed")
+    );
+    let beside = ledger_answer("L", "").replace(
+        "</COLLECTION>",
+        &format!("<LEDGER><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION>"),
+    );
+    assert_eq!(
+        parse_ledger_rates(&beside, LAB_GUID, &["L"]),
+        Err("invoice_ledger_rates_row_unnamed")
+    );
+    // Another company's nameless row is refused as another company's.
+    assert_eq!(
+        parse_ledger_rates(&nameless, "00000000-0000-4000-8000-000000000001", &["L"]),
+        Err("invoice_ledger_rates_company_mismatch")
+    );
+    let named = [
+        "BRIDGE CGST 2.5%",
+        "BRIDGE CGST 9%",
+        "BRIDGE Goods 18%",
+        "BRIDGE Output CGST XML",
+        "BRIDGE Purchase Svc 5%",
+        "BRIDGE Round Off",
+        "BRIDGE SGST 2.5%",
+        "BRIDGE SGST 9%",
+        "BRIDGE Supplier RJ",
+        "BRIDGE Svc 998313 5%",
+        "BRIDGE Svc 998314 5%",
+        "BRIDGE Walk-in",
+        "Cash",
+        "Profit & Loss A/c",
+    ];
+    let rates = parse_ledger_rates(&rehearsal(RATES_ANSWER), LAB_GUID, &named).unwrap();
+    assert_eq!(rates.keys().map(String::as_str).collect::<Vec<_>>(), named);
+}
+
 /// One ledger row around `inner`, bound to the lab company.
 fn ledger_answer(name: &str, inner: &str) -> String {
     format!(

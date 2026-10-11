@@ -485,17 +485,26 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
 /// The lab's rate listing (10 Oct 2026, the `pilot-lab` fixtures), read as the
 /// build reads it, for the ledgers named.
 fn lab_rates(named: &[&str]) -> BTreeMap<String, wire::LedgerRateRow> {
+    wire::parse_ledger_rates(
+        &lab_rates_answer(),
+        "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+        named,
+    )
+    .unwrap()
+}
+
+/// The lab's rate listing as text.
+fn lab_rates_answer() -> String {
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"
     );
-    let xml = String::from_utf16(
+    String::from_utf16(
         &bytes
             .chunks_exact(2)
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
             .collect::<Vec<_>>(),
     )
-    .unwrap();
-    wire::parse_ledger_rates(&xml, "6b43e498-430c-4d5c-bfef-d32e2ab93c85", named).unwrap()
+    .unwrap()
 }
 
 /// The round-off ledger's own GST row is read, and only the shape the lab's
@@ -553,6 +562,104 @@ fn a_round_off_ledger_is_admitted_only_with_the_empty_gst_row_the_lab_read() {
             "Round Off"
         )])
     );
+}
+
+/// The round-off ledger as an invoice names it, with `rates` for its row of the
+/// rate listing: the round-off line it is admitted on, or the refusals.
+fn round_off_with(rates: wire::LedgerRateRow) -> Result<Option<usize>, Vec<InvoiceRefusal>> {
+    let mut facts = good_facts();
+    facts.get_mut("Round Off").unwrap().rates = Some(rates);
+    let mut v = voucher();
+    v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
+    v.entries[0].amount = "11800.40".to_string();
+    v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
+    classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
+}
+
+/// A GST row that carries an attribute says something, even with no element
+/// and no text: it is not the empty row the lab's round-off ledger read, in
+/// either way an element can be written.
+#[test]
+fn a_round_off_ledgers_gst_row_with_an_attribute_is_not_the_empty_row_the_lab_read() {
+    let answer = lab_rates_answer();
+    let ledger = answer.find("<LEDGER NAME=\"BRIDGE Round Off\"").unwrap();
+    let close = answer[ledger..].find("</LEDGER>").unwrap() + ledger;
+    let row = "<GSTDETAILS.LIST>     </GSTDETAILS.LIST>";
+    let at = answer[ledger..close].find(row).unwrap() + ledger;
+    for attributed in [
+        "<GSTDETAILS.LIST TYPE=\"String\">     </GSTDETAILS.LIST>",
+        "<GSTDETAILS.LIST TYPE=\"String\"/>",
+    ] {
+        let mut edited = answer.clone();
+        edited.replace_range(at..at + row.len(), attributed);
+        let mut rates = wire::parse_ledger_rates(
+            &edited,
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+            &["BRIDGE Round Off"],
+        )
+        .unwrap();
+        assert_eq!(
+            round_off_with(rates.remove("BRIDGE Round Off").unwrap()),
+            Err(vec![refuse_ledger(
+                "invoice_round_off_ledger_gst_row",
+                "Round Off"
+            )]),
+            "{attributed}"
+        );
+    }
+}
+
+/// The round-off ledger's own rate and rounding fields are read, and only what
+/// the lab's round-off ledger carried is admitted: `RATEOFTAXCALCULATION` 0,
+/// `ROUNDINGLIMIT` 0 and no `ROUNDINGMETHOD` element (the `pilot-lab` rate
+/// listing). An absent field, an empty one and a zero are different answers;
+/// no other value of any of the three was measured on a round-off ledger.
+#[test]
+fn a_round_off_ledger_is_admitted_only_with_the_rate_and_rounding_fields_the_lab_read() {
+    let measured = lab_rates(&["BRIDGE Round Off"])
+        .remove("BRIDGE Round Off")
+        .unwrap();
+    assert_eq!(
+        (
+            measured.rate_of_tax_calculation.as_deref(),
+            measured.rounding_limit.as_deref(),
+            measured.rounding_method.as_deref()
+        ),
+        (Some("0"), Some("0"), None)
+    );
+    assert_eq!(round_off_with(measured.clone()), Ok(Some(4)));
+    type Change = fn(&mut wire::LedgerRateRow);
+    let changes: [(&str, Change); 9] = [
+        ("rate 2.50", |r| {
+            r.rate_of_tax_calculation = Some("2.50".into())
+        }),
+        ("rate 0.00", |r| {
+            r.rate_of_tax_calculation = Some("0.00".into())
+        }),
+        ("rate empty", |r| {
+            r.rate_of_tax_calculation = Some(String::new())
+        }),
+        ("rate absent", |r| r.rate_of_tax_calculation = None),
+        ("limit 1", |r| r.rounding_limit = Some("1".into())),
+        ("limit empty", |r| r.rounding_limit = Some(String::new())),
+        ("limit absent", |r| r.rounding_limit = None),
+        ("method empty", |r| r.rounding_method = Some(String::new())),
+        ("method Not Applicable", |r| {
+            r.rounding_method = Some("Not Applicable".into())
+        }),
+    ];
+    for (label, change) in changes {
+        let mut row = measured.clone();
+        change(&mut row);
+        assert_eq!(
+            round_off_with(row),
+            Err(vec![refuse_ledger(
+                "invoice_round_off_ledger_tax_fields",
+                "Round Off"
+            )]),
+            "{label}"
+        );
+    }
 }
 
 fn observed() -> InvoiceObserved {
@@ -2196,13 +2303,23 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
             "Output SGST"
         )]
     );
+    // A tax ledger the listing did not return: its rate is not known, which
+    // is not a rate that differs.
     assert_eq!(
         refused(&|f| f.get_mut("Output CGST").unwrap().rates = None),
         vec![refuse_ledger(
-            "invoice_tax_ledger_rate_mismatch",
+            "invoice_tax_ledger_rate_unknown",
             "Output CGST"
         )]
     );
+    assert_eq!(
+        refused(&|f| f.get_mut("Output SGST").unwrap().rates = None),
+        vec![refuse_ledger(
+            "invoice_tax_ledger_rate_unknown",
+            "Output SGST"
+        )]
+    );
+    // A tax ledger that was returned with another rate.
     assert_eq!(
         refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(tax_rates("2.5"))),
         vec![refuse_ledger(

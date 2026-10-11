@@ -5666,6 +5666,10 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     ] {
         assert_eq!(counters[name], json!(value), "{name}");
     }
+    // The eight below pin the capture's own figures: they are read out of the
+    // committed answer and compared with literals, and no code under test
+    // produces them. What the code produces is the seven counters above, from
+    // its own parse of the answer the replay served.
     let answered = pilot_answer_elements(&captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"
     )));
@@ -5737,7 +5741,9 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     );
     // The company's marks around the import, read by the code's own parser
     // from the two committed marks answers the replay served: the voucher mark
-    // stepped by one and the master mark did not move.
+    // stepped by one and the master mark did not move. These pin the capture's
+    // own figures, the committed answers compared with literals: no code under
+    // test produces them, and they say nothing of what the code does with them.
     let marks_before = crate::agent::parse_company_marks(
         &captured(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml"

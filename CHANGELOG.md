@@ -347,10 +347,11 @@ counter Tally keeps that moves when vouchers or ledgers change.
   100 characters and the written-out break 4: a text with a line over the
   cap is refused, never cut, except that a batch's per-voucher lines give
   way to a reason line.
-  Not measured: such a voucher posted through the dialog against a live
-  Tally, what Tally returns when it is read back (and so whether such a
-  post ends verified), and how macOS and Windows draw and wrap the mark and
-  the quoted name (#626).
+  Measured once on a licensed TallyPrime 7.1 Silver on Windows: one Journal
+  on such a ledger posted through the dialog, Tally read the name back with
+  the break as `&#13;&#10;`, and the post ended verified; the read-back is
+  now the test's fixture. Not measured: how macOS draws and wraps the mark
+  and the quoted name, and the review dialog against a live Tally (#626).
 
 **Safer or fixed**
 

@@ -865,31 +865,39 @@ fn an_unsettled_bind_is_left_out_of_the_journal_and_a_later_read_binds() {
     );
 }
 
+/// The read-back of one Journal posted on a ledger whose name ends in CR LF
+/// (`fixtures/POST_LINE_BREAK_CAPTURE_PROVENANCE.md`).
+const LINE_BREAK_READ: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-line-break-ledger-readback.utf16le.xml"
+);
+const LINE_BREAK_COMPANY_GUID: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
+
 /// bridge#626: what the row parser makes of a `LEDGERNAME` that carries a
-/// line break at its end, in the two ways an answer can write one. Written
-/// as two character references, the row's name ends in CR LF. Written as
-/// the two raw characters, the row's name ends in CR LF as well: the parser
-/// does not fold line ends. This compares the parser's output with the text
-/// put into a captured read; it says nothing of what Tally sends for a
-/// voucher on such a ledger, which is a capture still to make.
+/// line break at its end. Tally wrote it back as two character references
+/// (measured live, 10 Oct 2026), and the row's name ends in CR LF. Written as
+/// the two raw characters, which no capture has shown, the row's name ends
+/// in CR LF as well: the parser does not fold line ends. That second
+/// spelling is the capture with that one value changed.
 #[test]
 fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
-    for spelling in ["&#13;&#10;", "\r\n"] {
-        let xml = captured(SPAN_READ).replace(
-            ">Test Expense A</LEDGERNAME>",
-            &format!(">Test Expense A{spelling}</LEDGERNAME>"),
-        );
-        let rows = parse_import_voucher_rows(&xml, COMPANY_GUID).unwrap();
-        let named: Vec<&str> = rows
+    let sent = captured(LINE_BREAK_READ);
+    let raw = sent.replace(
+        ">Lab Line Break Ledger&#13;&#10;</LEDGERNAME>",
+        ">Lab Line Break Ledger\r\n</LEDGERNAME>",
+    );
+    assert_ne!(raw, sent, "the capture spells the break as references");
+    for (spelling, xml) in [("references", &sent), ("raw", &raw)] {
+        let rows = parse_import_voucher_rows(xml, LINE_BREAK_COMPANY_GUID).unwrap();
+        assert_eq!(rows.len(), 1, "{spelling}");
+        let named: Vec<&str> = rows[0]
+            .entries
             .iter()
-            .flat_map(|row| &row.entries)
             .map(|entry| entry.ledger.as_str())
-            .filter(|ledger| ledger.starts_with("Test Expense A"))
             .collect();
-        assert!(!named.is_empty());
-        assert!(
-            named.iter().all(|ledger| *ledger == "Test Expense A\r\n"),
-            "{spelling:?}: {named:?}"
+        assert_eq!(
+            named,
+            ["Lab Line Break Ledger\r\n", "Lab Plain Ledger"],
+            "{spelling}"
         );
     }
 }

@@ -14,17 +14,6 @@ default-run = "bridge"
 workspace = true
 
 [features]
-# Legacy voucher-scan outstandings path. Shipped/default builds take the
-# native Bills Receivable/Payable + List of Ledgers path unconditionally;
-# this gate exists so the ~4,800 lines of scan machinery (date/AlterID
-# partitioning, segment completeness proofs, the wildcard voucher fetch) do
-# not compile into a shipped build at all. Not a default feature.
-voucher-scan = ["bridge-tally-protocol/voucher-scan", "bridge-tally-transport/voucher-scan"]
-# Manual-only admission for the ignored, corpus-bound Unit A reconciliation
-# harness. Shipped/default builds have no constructor for an AlterID width.
-# The harness is what actually drives a voucher scan, so it implies the scan
-# machinery it needs.
-live-calibration-harness = ["voucher-scan"]
 # LAB-ONLY additive surface for the audit-sprint 2026-09-14 local rebuild
 # workflow (Phase 3). Not default; never enable in a release or CI workflow
 # (`tests/lab_writes_ci_gate.rs` fails the build if any `.github/workflows/*`

@@ -6,10 +6,8 @@ use std::sync::{
     atomic::{AtomicU64, AtomicU8, Ordering},
     Arc,
 };
-#[cfg(feature = "voucher-scan")]
-use std::time::{Duration, Instant};
 
-use super::xml_parser::{TallyLedger, TallyVoucher};
+use super::xml_parser::TallyLedger;
 use super::{
     standard_ledger_catalog::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
@@ -28,14 +26,6 @@ use bridge_tally_core::{
     CapabilityEvidence, CapabilityFeatureId, CapabilityPackId, CapabilityProfile, CapabilityState,
     EvidenceConfidence, LicenseTier, TransportId,
 };
-#[cfg(feature = "voucher-scan")]
-use bridge_tally_protocol::outstandings::{
-    parse_ledger_opening_coverage, verify_empty_partition_witness_pair_with_wire_evidence,
-    verify_segment_pair_with_wire_evidence, voucher_empty_partition_witness_request,
-    voucher_outstandings_request, AlterIdRange, LedgerOpeningCoverage, NarrowDateWindow,
-    PinnedCompany, SegmentVerification, SegmentWireEvidence, VoucherOutstandingsRequestXml,
-    WitnessPairVerification,
-};
 use bridge_tally_protocol::{
     ledger_census::{
         render_ledger_census_slice_request, CensusLimits, LedgerCensus, LedgerCensusError,
@@ -45,10 +35,10 @@ use bridge_tally_protocol::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
         render_native_ledger_export_request, render_native_ledger_snapshot_request,
-        render_native_ledger_snapshot_request_for_parents, render_native_voucher_export_request,
-        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
-        BaseCurrencyName, ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
-        NativeLedgerSnapshotPeriod, NativeOutstandingsError,
+        render_native_ledger_snapshot_request_for_parents, render_party_ledger_master_request,
+        render_party_ledger_master_request_for_parents, BaseCurrencyName, ForeignCurrencyLedger,
+        LedgerSnapshotEntry, NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
+        NativeOutstandingsError,
     },
     outstandings_shared::{
         parse_company_book_extent_v2, parse_company_ledger_count,
@@ -59,8 +49,8 @@ use bridge_tally_protocol::{
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
     parse_ledger_census_slice, parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_leaving_unparsed,
-    parse_native_party_ledger_master_structure, parse_native_voucher_source_records_with_evidence,
-    parse_standard_ledger_catalog, parse_standard_ledger_identity_observation,
+    parse_native_party_ledger_master_structure, parse_standard_ledger_catalog,
+    parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
     TallyTextEncoding, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
@@ -758,20 +748,6 @@ pub(crate) enum DirectCompanyBootstrapError {
     IncompleteTuple,
 }
 
-#[cfg(feature = "voucher-scan")]
-#[derive(Debug)]
-pub(crate) struct OutstandingsSegmentObservation {
-    pub(crate) verification: SegmentVerification,
-    pub(crate) first_read_elapsed: Duration,
-    pub(crate) second_read_elapsed: Duration,
-}
-
-#[cfg(feature = "voucher-scan")]
-pub(crate) enum LedgerOpeningCoverageRead {
-    Stable(LedgerOpeningCoverage),
-    Drifted,
-}
-
 /// An HTTP response entity kept byte for byte, with its decoded text.
 #[derive(Debug, Clone)]
 pub(crate) struct RawTallyResponse {
@@ -911,13 +887,6 @@ impl NativePairedRead {
             }
         }
     }
-}
-
-#[cfg(feature = "voucher-scan")]
-struct OutstandingsWireResponse {
-    text: String,
-    encoded_bytes: usize,
-    encoded_sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1116,24 +1085,6 @@ impl TallyClient {
             observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
-    }
-
-    pub async fn check_connection(&self) -> anyhow::Result<ConnectionStatus> {
-        match self.check_connection_strict_with_wire_evidence().await {
-            Ok((status, _)) => Ok(status),
-            Err(error) => Ok(ConnectionStatus {
-                reachable: false,
-                compatible: false,
-                server_text: String::new(),
-                product: TallyProduct::Unknown,
-                error: Some(error.safe_code().to_string()),
-            }),
-        }
-    }
-
-    pub(crate) async fn check_connection_strict(&self) -> anyhow::Result<ConnectionStatus> {
-        let (status, _) = self.check_connection_strict_with_wire_evidence().await?;
-        Ok(status)
     }
 
     /// The `/status` read. Its one failure is the transport's own, so a caller
@@ -1563,42 +1514,6 @@ impl TallyClient {
         self.record_observed_body_bytes(encoded_bytes);
         self.record_observed_encoding(response.encoding());
         Ok((response.into_text(), encoded_bytes, encoded_sha256))
-    }
-
-    #[cfg(feature = "voucher-scan")]
-    async fn post_outstandings_xml_with_encoded_bytes(
-        &self,
-        request: VoucherOutstandingsRequestXml,
-    ) -> anyhow::Result<OutstandingsWireResponse> {
-        let response = self.http.post_outstandings_xml_decoded(request).await?;
-        let encoded_bytes = response.encoded_bytes();
-        let encoded_sha256 = response.encoded_sha256().to_string();
-        self.record_observed_body_bytes(encoded_bytes);
-        self.record_observed_encoding(response.encoding());
-        Ok(OutstandingsWireResponse {
-            text: response.into_text(),
-            encoded_bytes,
-            encoded_sha256,
-        })
-    }
-
-    /// Uses the ordinary 32 MiB XML cap. Only the wildcard outstandings
-    /// profile is allowed through `post_outstandings_xml_decoded`.
-    #[cfg(feature = "voucher-scan")]
-    async fn post_xml_with_wire_evidence(
-        &self,
-        request: String,
-    ) -> anyhow::Result<OutstandingsWireResponse> {
-        let response = self.http.post_xml_decoded(request).await?;
-        let encoded_bytes = response.encoded_bytes();
-        let encoded_sha256 = response.encoded_sha256().to_string();
-        self.record_observed_body_bytes(encoded_bytes);
-        self.record_observed_encoding(response.encoding());
-        Ok(OutstandingsWireResponse {
-            text: response.into_text(),
-            encoded_bytes,
-            encoded_sha256,
-        })
     }
 
     /// Discovers companies through Tally's documented `Company` collection
@@ -2311,41 +2226,6 @@ impl TallyClient {
         )?)
     }
 
-    /// One extra paired read per scan: bill-wise OPENING balances live on
-    /// ledger masters, so a voucher-only scan is blind to them.
-    ///
-    /// Takes the already GUID-verified `PinnedCompany` rather than a bare name.
-    /// The ledger profile fetches every master GUID and verifies its company
-    /// GUID prefix, so a name-only selection cannot make another loaded
-    /// company's coverage look like the pinned book.
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) async fn fetch_ledger_opening_coverage(
-        &self,
-        company: &PinnedCompany,
-    ) -> anyhow::Result<LedgerOpeningCoverageRead> {
-        let company_name = ValidatedCompanyName::new(company.name().to_string())?;
-        let request = ReadOnlyProfile::LedgerOpeningCoverageV1 {
-            company: &company_name,
-        }
-        .render();
-        let first = self.post_xml(request.clone()).await?;
-        self.http
-            .get_status_decoded()
-            .await
-            .context("Tally health check between ledger opening reads failed")?;
-        let second = self.post_xml(request).await?;
-        self.http
-            .get_status_decoded()
-            .await
-            .context("Tally health check after ledger opening reads failed")?;
-        let first = parse_ledger_opening_coverage(&first, company)?;
-        let second = parse_ledger_opening_coverage(&second, company)?;
-        if first != second {
-            return Ok(LedgerOpeningCoverageRead::Drifted);
-        }
-        Ok(LedgerOpeningCoverageRead::Stable(first))
-    }
-
     pub async fn fetch_company_book_extent(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -2408,11 +2288,10 @@ impl TallyClient {
     /// closing snapshot.
     ///
     /// These responses are small — measured 11 KB for 48 bills and 41 KB for 88
-    /// ledgers — so the whole-response byte comparison this performs is cheap,
-    /// and it replaces the date/AlterID partition-completeness machinery the
-    /// voucher scan needs. A drift between the two reads means the book moved
-    /// mid-sequence; the caller must treat that as Partial rather than pick a
-    /// side.
+    /// ledgers — so the whole-response byte comparison this performs is cheap
+    /// and needs no date/AlterID partition-completeness machinery. A drift
+    /// between the two reads means the book moved mid-sequence; the caller
+    /// must treat that as Partial rather than pick a side.
     ///
     /// Health checks bracket both requests and sit between them, so a gateway
     /// that stalls mid-pair is distinguishable from a clean pair. See the
@@ -2557,142 +2436,6 @@ impl TallyClient {
     pub(crate) async fn status_probe(&self) -> anyhow::Result<()> {
         self.http.get_status_decoded().await?;
         Ok(())
-    }
-
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) async fn fetch_outstandings_segment_pair(
-        &self,
-        company: &PinnedCompany,
-        segment_window: NarrowDateWindow,
-        alter_id_range: AlterIdRange,
-    ) -> anyhow::Result<OutstandingsSegmentObservation> {
-        let request = voucher_outstandings_request(company, &segment_window, alter_id_range);
-        let range_label = format!(
-            "{}..{}",
-            alter_id_range.exclusive_start(),
-            alter_id_range.inclusive_end()
-        );
-        let first_started = Instant::now();
-        let first = self
-            .post_outstandings_xml_with_encoded_bytes(request.clone())
-            .await
-            .with_context(|| {
-                format!("outstandings first segment read failed for AlterID {range_label}")
-            })?;
-        let first_read_elapsed = first_started.elapsed();
-        self.http.get_status_decoded().await.with_context(|| {
-            format!(
-                "Tally health check between outstandings reads failed for AlterID {range_label}"
-            )
-        })?;
-        let second_started = Instant::now();
-        let second = self
-            .post_outstandings_xml_with_encoded_bytes(request)
-            .await
-            .with_context(|| {
-                format!("outstandings second segment read failed for AlterID {range_label}")
-            })?;
-        let second_read_elapsed = second_started.elapsed();
-        self.http.get_status_decoded().await.with_context(|| {
-            format!("Tally health check after outstandings reads failed for AlterID {range_label}")
-        })?;
-        let verification = verify_segment_pair_with_wire_evidence(
-            SegmentWireEvidence::new(&first.text, first.encoded_bytes, &first.encoded_sha256),
-            SegmentWireEvidence::new(&second.text, second.encoded_bytes, &second.encoded_sha256),
-            company,
-            segment_window.into_date_window(),
-            alter_id_range,
-        )?;
-        Ok(OutstandingsSegmentObservation {
-            verification,
-            first_read_elapsed,
-            second_read_elapsed,
-        })
-    }
-
-    /// Executes one paired, date-only I5 witness read. This is intentionally
-    /// separate from `fetch_outstandings_segment_pair`: it has no AlterID
-    /// predicate and uses the ordinary 32 MiB transport cap. Its supervised
-    /// live qualification is recorded in TALLY_PROTOCOL_REFERENCE.md §12.7;
-    /// runtime may use it only for a primary-empty partition's control or
-    /// shifted cover.
-    #[cfg(feature = "voucher-scan")]
-    pub(crate) async fn fetch_empty_partition_witness_pair(
-        &self,
-        company: &PinnedCompany,
-        window: NarrowDateWindow,
-    ) -> anyhow::Result<WitnessPairVerification> {
-        let request = voucher_empty_partition_witness_request(company, &window).into_xml();
-        let label = format!("{}..{}", window.from().as_str(), window.to().as_str());
-        let first = self
-            .post_xml_with_wire_evidence(request.clone())
-            .await
-            .with_context(|| format!("empty-date witness first read failed for {label}"))?;
-        self.http.get_status_decoded().await.with_context(|| {
-            format!("Tally health check between empty-date witness reads for {label}")
-        })?;
-        let second = self
-            .post_xml_with_wire_evidence(request)
-            .await
-            .with_context(|| format!("empty-date witness second read failed for {label}"))?;
-        self.http.get_status_decoded().await.with_context(|| {
-            format!("Tally health check after empty-date witness reads for {label}")
-        })?;
-        verify_empty_partition_witness_pair_with_wire_evidence(
-            SegmentWireEvidence::new(&first.text, first.encoded_bytes, &first.encoded_sha256),
-            SegmentWireEvidence::new(&second.text, second.encoded_bytes, &second.encoded_sha256),
-            company,
-            window.into_date_window(),
-        )
-        .map_err(anyhow::Error::from)
-    }
-
-    pub async fn fetch_vouchers(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        from: &str,
-        to: &str,
-    ) -> anyhow::Result<Vec<TallyVoucher>> {
-        // Fail closed: `from`/`to` feed a quoted `$$Date:"..."` TDL formula
-        // argument, where XML escaping alone cannot contain an embedded
-        // quote (Tally decodes `&quot;` back to `"` before evaluating the
-        // formula). Requiring a validated `TallyDate` -- exactly 8 ASCII
-        // digits -- closes that off at the source instead of sanitising.
-        let from = bridge_tally_core::TallyDate::parse(from)
-            .context("voucher export from-date must be a valid YYYYMMDD date")?;
-        let to = bridge_tally_core::TallyDate::parse(to)
-            .context("voucher export to-date must be a valid YYYYMMDD date")?;
-        let xml = self
-            .post_xml(render_native_voucher_export_request(
-                identity.display_name(),
-                &from,
-                &to,
-            ))
-            .await?;
-        let parsed =
-            parse_native_voucher_source_records_with_evidence(&xml, identity.company_guid())?;
-        if parsed.records.is_empty() {
-            // A native Voucher collection carries no envelope company GUID,
-            // so a zero-row response has no per-row identity to bind to the
-            // pinned company either -- `parse_native_voucher_source_records_with_evidence`
-            // accepts it unauthenticated. Since the voucher request is now
-            // filtered by date, a refused period boundary yields the exact
-            // same zero-row, byte-identical response as a genuinely empty
-            // window. Confirm the pinned company out-of-band with the same
-            // GUID-verified, paired book-extent bracket the core window uses
-            // for exactly this situation (see `RuntimeTallyConnector::extract_core_window`
-            // in connector.rs), instead of accepting the empty result as-is.
-            // Paid only here: a non-empty response keeps its existing
-            // row-GUID binding and issues no extra request.
-            self.fetch_company_book_extent(identity).await.context(
-                "empty voucher response could not confirm the pinned company book extent",
-            )?;
-        }
-        Ok(parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect())
     }
 
     pub(crate) fn reset_observed_body_bytes(&self) {

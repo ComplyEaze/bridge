@@ -2297,6 +2297,11 @@ const SALES_REHEARSAL: &str = "answers of the GST Sales rehearsal (7 Oct 2026), 
      this crate reads: the app crate's invoice code parses them (src/agent_import_invoice_wire.rs), \
      and its tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
      pin what each parse returns; sales-rehearsal/PROVENANCE.md says what each file is";
+const PILOT_LAB_TAX_UNITS: &str = "an answer of the pilot lab (9 Oct 2026), the company's tax \
+     units read through a request typed by hand and sent as UTF-8, which no parser of this crate \
+     reads: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs), and its \
+     tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
+     pin what the parse returns; pilot-lab/PROVENANCE.md says what it is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
@@ -2331,6 +2336,11 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml",
         SALES_REHEARSAL,
+    ),
+    // The pilot lab's tax-unit answer.
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml",
+        PILOT_LAB_TAX_UNITS,
     ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),

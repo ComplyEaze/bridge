@@ -111,6 +111,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
+#[path = "agent_read_cost_preview.rs"]
+mod read_cost_preview;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -2193,6 +2195,7 @@ impl Server {
             "validate_masters" => self.validate_masters(args).await,
             "verify_import" => self.verify_import(args).await,
             "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_read_cost" => self.voucher_read_cost(args).await,
             "voucher_schema" => self.voucher_schema().map_err(Into::into),
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]

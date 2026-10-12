@@ -170,6 +170,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
   - **What the reads added since 0.5.0 send, under each setting.**
+    - The read-cost preview (`voucher_read_cost`) sends the company name,
+      its identifier, company number and books-from date, the company's voucher
+      mark, and counts and seconds derived from it, with constant text. It holds
+      no amounts and no narrations, and `mask_parties` has nothing to shorten in it.
     - The company settings read (`company_features`) sends the company name,
       its identifier, company number and books-from date, the cost-centre, GST
       and batch-wise settings as yes, no or not reported, and the currency

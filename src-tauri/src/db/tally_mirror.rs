@@ -121,8 +121,6 @@ pub enum MirrorError {
     IdentityCollision,
     #[error("a fallback identity cannot be upgraded without an explicit audit event")]
     IdentityUpgradeRequiresAudit,
-    #[error("the record has already been observed in this batch")]
-    DuplicateObservation,
     #[error("the replayed observation conflicts with the record already stored in this batch")]
     ObservationConflict,
     #[error("the snapshot window attempt is no longer open")]
@@ -233,6 +231,7 @@ pub struct SourceIdentityInput {
     pub confidence: Option<Confidence>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub struct CompanyInput {
     pub endpoint_id: String,
@@ -488,7 +487,6 @@ pub struct BeginBatchInput {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObservationStatus {
     Accepted,
-    Rejected,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -501,7 +499,6 @@ impl ObservationStatus {
     fn as_str(self) -> &'static str {
         match self {
             Self::Accepted => "accepted",
-            Self::Rejected => "rejected",
         }
     }
 }
@@ -1301,54 +1298,6 @@ impl TallyMirrorRepository {
         )
     }
 
-    /// Retains the ordinary observed-support contract used by non-snapshot capability flows.
-    pub async fn capability_snapshot_matches_plan(
-        &self,
-        snapshot_id: &str,
-        company_id: &str,
-        profile_version: u16,
-        product: &str,
-        release: Option<&str>,
-        mode: Option<&str>,
-    ) -> Result<bool, MirrorError> {
-        validate_nonempty(snapshot_id, 128, "capability_snapshot_id")?;
-        validate_nonempty(company_id, 128, "company_id")?;
-        if profile_version == 0 {
-            return Err(MirrorError::InvalidInput("profile_version"));
-        }
-        validate_nonempty(product, 128, "product")?;
-        validate_optional_text(release, 128, "release")?;
-        validate_optional_text(mode, 64, "mode")?;
-        let matches = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM tally_capability_snapshots AS snapshot \
-             JOIN tally_companies AS company ON company.endpoint_id = snapshot.endpoint_id \
-             WHERE snapshot.id = ?1 AND company.id = ?2 \
-               AND snapshot.profile_version = ?3 AND snapshot.product = ?4 \
-               AND snapshot.release IS ?5 AND snapshot.mode IS ?6 \
-               AND EXISTS (SELECT 1 FROM tally_capability_items AS transport \
-                 WHERE transport.snapshot_id = snapshot.id \
-                   AND transport.capability_kind = 'transport' \
-                   AND transport.capability_key = 'xml_http' \
-                   AND transport.capability_state = 'supported' \
-                   AND transport.confidence = 'observed') \
-               AND EXISTS (SELECT 1 FROM tally_capability_items AS pack \
-                 WHERE pack.snapshot_id = snapshot.id \
-                   AND pack.capability_kind = 'pack' \
-                   AND pack.capability_key = 'core_accounting' \
-                   AND pack.capability_state = 'supported' \
-                   AND pack.confidence = 'observed')",
-        )
-        .bind(snapshot_id)
-        .bind(company_id)
-        .bind(i64::from(profile_version))
-        .bind(product)
-        .bind(release)
-        .bind(mode)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(matches == 1)
-    }
-
     pub async fn migrate(&self) -> Result<(), MirrorError> {
         let mut transaction = self.pool.begin().await?;
         sqlx::query(
@@ -1818,6 +1767,7 @@ impl TallyMirrorRepository {
         })
     }
 
+    #[cfg(test)]
     pub async fn upsert_company(&self, input: CompanyInput) -> Result<CompanyRef, MirrorError> {
         validate_company_input(&input)?;
         let mut transaction = self.pool.begin().await?;
@@ -1826,6 +1776,7 @@ impl TallyMirrorRepository {
         Ok(company)
     }
 
+    #[cfg(test)]
     async fn upsert_company_in_transaction(
         transaction: &mut Transaction<'_, Sqlite>,
         input: CompanyInput,
@@ -2209,15 +2160,7 @@ impl TallyMirrorRepository {
         Ok(id)
     }
 
-    pub async fn observe_record(&self, input: ObservedRecordInput) -> Result<String, MirrorError> {
-        match self.observe_record_idempotent(input).await {
-            Ok(ObserveRecordOutcome::Inserted { observation_id }) => Ok(observation_id),
-            Ok(ObserveRecordOutcome::AlreadyPresentIdentical { .. })
-            | Err(MirrorError::ObservationConflict) => Err(MirrorError::DuplicateObservation),
-            Err(error) => Err(error),
-        }
-    }
-
+    #[cfg(test)]
     pub async fn observe_record_idempotent(
         &self,
         input: ObservedRecordInput,
@@ -2462,15 +2405,6 @@ impl TallyMirrorRepository {
             },
             prior_abandonment,
         })
-    }
-
-    pub async fn stage_snapshot_window_membership(
-        &self,
-        attempt: &SnapshotWindowAttemptRef,
-        membership: SnapshotWindowMembershipInput,
-    ) -> Result<StageSnapshotWindowMembershipsResult, MirrorError> {
-        self.stage_snapshot_window_memberships(attempt, vec![membership])
-            .await
     }
 
     pub async fn abandon_snapshot_window_attempt(
@@ -3387,27 +3321,10 @@ impl TallyMirrorRepository {
         })
     }
 
-    pub async fn commit_receipt_for_batch(
-        &self,
-        batch_id: &str,
-        run_id: &str,
-    ) -> Result<CommitResult, MirrorError> {
-        self.proof_receipt_for_batch(batch_id, run_id, true).await
-    }
-
     pub(crate) async fn historical_commit_receipt_for_batch(
         &self,
         batch_id: &str,
         run_id: &str,
-    ) -> Result<CommitResult, MirrorError> {
-        self.proof_receipt_for_batch(batch_id, run_id, false).await
-    }
-
-    async fn proof_receipt_for_batch(
-        &self,
-        batch_id: &str,
-        run_id: &str,
-        require_current_checkpoint: bool,
     ) -> Result<CommitResult, MirrorError> {
         validate_nonempty(batch_id, 128, "batch_id")?;
         validate_nonempty(run_id, 128, "run_id")?;
@@ -3514,22 +3431,8 @@ impl TallyMirrorRepository {
         }
 
         let checkpoint_advanced = if verification == VerificationState::Verified {
-            let checkpoint_after = checkpoint_after
-                .as_deref()
-                .ok_or(MirrorError::VerificationInvariant)?;
-            if require_current_checkpoint {
-                let matches = sqlx::query_scalar::<_, i64>(
-                    "SELECT COUNT(*) FROM tally_checkpoints WHERE proof_id = ?1 AND run_id = ?2 \
-                     AND checkpoint_token = ?3",
-                )
-                .bind(&proof_id)
-                .bind(run_id)
-                .bind(checkpoint_after)
-                .fetch_one(&self.pool)
-                .await?;
-                if matches != 1 {
-                    return Err(MirrorError::VerificationInvariant);
-                }
+            if checkpoint_after.is_none() {
+                return Err(MirrorError::VerificationInvariant);
             }
             true
         } else {
@@ -4081,6 +3984,7 @@ async fn find_identity_matches(
     identity: &SourceIdentityInput,
 ) -> Result<Vec<IdentityRow>, MirrorError> {
     let rows = match (table, owner_column) {
+        #[cfg(test)]
         ("tally_companies", "endpoint_id") => {
             sqlx::query(
                 "SELECT id, company_guid AS guid, remote_id, master_id, fallback_fingerprint \
@@ -4189,6 +4093,7 @@ fn identity_confidence(identity: &SourceIdentityInput) -> Confidence {
 
 /// Generic identity matching lacks the complete Company-collection tuple, so
 /// it cannot create or promote an observed company pin.
+#[cfg(test)]
 fn generic_company_confidence(identity: &SourceIdentityInput) -> Confidence {
     match identity_confidence(identity) {
         Confidence::Observed => Confidence::Documented,
@@ -4522,6 +4427,7 @@ fn validate_books_from_yyyymmdd(value: &str) -> Result<(), MirrorError> {
         .map_err(|_| MirrorError::InvalidInput("books_from_yyyymmdd"))
 }
 
+#[cfg(test)]
 fn validate_company_input(input: &CompanyInput) -> Result<(), MirrorError> {
     validate_nonempty(&input.endpoint_id, 128, "endpoint_id")?;
     validate_nonempty(&input.display_name, 512, "display_name")?;
@@ -4557,11 +4463,6 @@ fn validate_observation_shape(input: &ObservedRecordInput) -> Result<(), MirrorE
             if input.canonical_sha256.is_some()
                 && input.canonical_payload.is_some()
                 && input.safe_rejection_code.is_none() =>
-        {
-            Ok(())
-        }
-        ObservationStatus::Rejected
-            if input.canonical_payload.is_none() && input.safe_rejection_code.is_some() =>
         {
             Ok(())
         }

@@ -1023,11 +1023,6 @@ async fn identical_lost_ack_replay_returns_existing_observation_without_duplicat
     .await
     .expect("count replay observations");
     assert_eq!(observation_count, 1);
-
-    assert!(matches!(
-        repository.observe_record(replay).await,
-        Err(MirrorError::DuplicateObservation)
-    ));
 }
 
 #[tokio::test]
@@ -1084,12 +1079,6 @@ async fn changed_replay_is_a_conflict_and_mutates_neither_record_nor_observation
     assert!(matches!(
         repository.observe_record_idempotent(changed).await,
         Err(MirrorError::ObservationConflict)
-    ));
-    let mut legacy_changed = replayable_observation(&batch_id);
-    legacy_changed.raw_source_sha256 = HASH_B.to_string();
-    assert!(matches!(
-        repository.observe_record(legacy_changed).await,
-        Err(MirrorError::DuplicateObservation)
     ));
 
     let source_after = sqlx::query_as::<_, (Option<String>, String, Option<i64>)>(
@@ -1228,9 +1217,9 @@ async fn normalized_window_staging_is_idempotent_and_loads_bounded_receipt_and_m
     );
     assert!(matches!(
         repository
-            .stage_snapshot_window_membership(
+            .stage_snapshot_window_memberships(
                 &attempt,
-                unavailable_membership("voucher\0later", HASH_B, "Later")
+                vec![unavailable_membership("voucher\0later", HASH_B, "Later")]
             )
             .await,
         Err(MirrorError::WindowAttemptClosed)
@@ -1271,9 +1260,9 @@ async fn membership_content_conflict_rolls_back_the_entire_chunk() {
     let batch_id = begin_batch(&repository, &snapshot, &company, "window-conflict-run").await;
     let first = begin_window_attempt(&repository, &batch_id, 3_000).await;
     repository
-        .stage_snapshot_window_membership(
+        .stage_snapshot_window_memberships(
             &first,
-            unavailable_membership("voucher\0stable", HASH_A, "Stable"),
+            vec![unavailable_membership("voucher\0stable", HASH_A, "Stable")],
         )
         .await
         .expect("seed immutable membership");
@@ -1318,13 +1307,13 @@ async fn completion_detects_membership_from_abandoned_partial_attempt_and_allows
     let crashed = begin_window_attempt(&repository, &batch_id, 3_000).await;
     let old = unavailable_membership("voucher\0old", HASH_A, "Old");
     repository
-        .stage_snapshot_window_membership(&crashed, old.clone())
+        .stage_snapshot_window_memberships(&crashed, vec![old.clone()])
         .await
         .expect("stage before synthetic crash");
     let resumed = begin_window_attempt(&repository, &batch_id, 4_000).await;
     let addition = unavailable_membership("voucher\0addition", HASH_B, "Addition");
     repository
-        .stage_snapshot_window_membership(&resumed, addition)
+        .stage_snapshot_window_memberships(&resumed, vec![addition])
         .await
         .expect("stage addition on resumed attempt");
     assert!(matches!(
@@ -1334,7 +1323,7 @@ async fn completion_detects_membership_from_abandoned_partial_attempt_and_allows
         Err(MirrorError::WindowMembershipDisappeared)
     ));
     repository
-        .stage_snapshot_window_membership(&resumed, old)
+        .stage_snapshot_window_memberships(&resumed, vec![old])
         .await
         .expect("re-observe pre-crash membership");
     let receipt = repository
@@ -1372,9 +1361,9 @@ async fn chunk_limit_and_owner_binding_fail_closed_without_mutation() {
     };
     assert!(matches!(
         repository
-            .stage_snapshot_window_membership(
+            .stage_snapshot_window_memberships(
                 &forged,
-                unavailable_membership("voucher\0forged", HASH_A, "Forged")
+                vec![unavailable_membership("voucher\0forged", HASH_A, "Forged")]
             )
             .await,
         Err(MirrorError::NotFound)
@@ -1393,9 +1382,13 @@ async fn explicit_window_abandon_clamps_clock_rollback_and_is_terminal_immutable
     let batch_id = begin_batch(&repository, &snapshot, &company, "window-abandon-run").await;
     let attempt = begin_window_attempt(&repository, &batch_id, 3_000).await;
     repository
-        .stage_snapshot_window_membership(
+        .stage_snapshot_window_memberships(
             &attempt,
-            unavailable_membership("voucher\0partial", HASH_A, "Partial"),
+            vec![unavailable_membership(
+                "voucher\0partial",
+                HASH_A,
+                "Partial",
+            )],
         )
         .await
         .expect("stage partial membership");
@@ -1526,9 +1519,9 @@ async fn window_completion_clamps_and_reloads_clock_rollback_evidence() {
     .await;
     let attempt = begin_window_attempt(&repository, &batch_id, 5_000).await;
     repository
-        .stage_snapshot_window_membership(
+        .stage_snapshot_window_memberships(
             &attempt,
-            unavailable_membership("voucher\0clock", HASH_A, "Clock"),
+            vec![unavailable_membership("voucher\0clock", HASH_A, "Clock")],
         )
         .await
         .unwrap();
@@ -1553,9 +1546,13 @@ async fn completed_window_attempt_cannot_be_abandoned() {
     let batch_id = begin_batch(&repository, &snapshot, &company, "window-complete-run").await;
     let attempt = begin_window_attempt(&repository, &batch_id, 3_000).await;
     repository
-        .stage_snapshot_window_membership(
+        .stage_snapshot_window_memberships(
             &attempt,
-            unavailable_membership("voucher\0complete", HASH_A, "Complete"),
+            vec![unavailable_membership(
+                "voucher\0complete",
+                HASH_A,
+                "Complete",
+            )],
         )
         .await
         .expect("stage complete membership");
@@ -1586,9 +1583,9 @@ async fn commit_rejects_open_attempt_until_proof_bound_cleanup_completes() {
     let batch_id = begin_batch(&repository, &snapshot, &company, run_id).await;
     let attempt = begin_window_attempt(&repository, &batch_id, 3_000).await;
     repository
-        .stage_snapshot_window_membership(
+        .stage_snapshot_window_memberships(
             &attempt,
-            unavailable_membership("voucher\0orphan", HASH_A, "Orphan"),
+            vec![unavailable_membership("voucher\0orphan", HASH_A, "Orphan")],
         )
         .await
         .expect("stage unavailable orphan membership");
@@ -1642,9 +1639,9 @@ async fn commit_rejects_open_attempt_until_proof_bound_cleanup_completes() {
     );
     assert!(matches!(
         repository
-            .stage_snapshot_window_membership(
+            .stage_snapshot_window_memberships(
                 &attempt,
-                unavailable_membership("voucher\0late", HASH_B, "Late"),
+                vec![unavailable_membership("voucher\0late", HASH_B, "Late")]
             )
             .await,
         Err(MirrorError::WindowAttemptClosed)
@@ -2521,144 +2518,6 @@ async fn observed_company_identity_constraint_rejects_incomplete_tuples_and_pres
         " \t\r\n",
         "a later observed tuple must not overwrite a legacy pin's identity"
     );
-
-    let generic = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Documented metadata only".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("documented-metadata-guid".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("generic metadata writer remains valid without an observed tuple");
-    assert_eq!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT identity_confidence FROM tally_companies WHERE id = ?1",
-        )
-        .bind(generic.id)
-        .fetch_one(&repository.pool)
-        .await
-        .expect("read documented generic company confidence"),
-        "documented"
-    );
-
-    for (label, confidence) in [
-        ("unknown", Confidence::Unknown),
-        ("inferred", Confidence::Inferred),
-    ] {
-        let identity_guid = format!("{label}-generic-metadata-guid");
-        let initial = repository
-            .upsert_company(CompanyInput {
-                endpoint_id: snapshot.endpoint_id.clone(),
-                display_name: format!("{label} generic metadata"),
-                identity: SourceIdentityInput {
-                    guid: Some(identity_guid.clone()),
-                    confidence: Some(confidence),
-                    ..Default::default()
-                },
-                observed_at_unix_ms: 2_100,
-            })
-            .await
-            .expect("save explicitly non-observed generic company");
-        let refreshed = repository
-            .upsert_company(CompanyInput {
-                endpoint_id: snapshot.endpoint_id.clone(),
-                display_name: format!("{label} generic metadata refresh"),
-                identity: SourceIdentityInput {
-                    guid: Some(identity_guid),
-                    confidence: Some(confidence),
-                    ..Default::default()
-                },
-                observed_at_unix_ms: 2_200,
-            })
-            .await
-            .expect("refresh explicitly non-observed generic company");
-        assert_eq!(refreshed.id, initial.id);
-        assert_eq!(
-            sqlx::query_scalar::<_, String>(
-                "SELECT identity_confidence FROM tally_companies WHERE id = ?1",
-            )
-            .bind(initial.id)
-            .fetch_one(&repository.pool)
-            .await
-            .expect("read preserved generic confidence"),
-            confidence.as_str(),
-            "a generic {label} refresh must preserve its explicit confidence"
-        );
-    }
-
-    let reviewed = repository
-        .save_reviewed_setup(reviewed_setup_input(HASH_B))
-        .await
-        .expect("save independently reviewed observed company");
-    let pin_before_refresh = repository
-        .snapshot_source_pin(&reviewed.company.id)
-        .await
-        .expect("reviewed company supplies a durable source pin");
-    let profile_before_refresh = repository
-        .persisted_company_profiles()
-        .await
-        .expect("load reviewed company profile before generic refresh")
-        .profiles
-        .into_iter()
-        .find(|profile| profile.mirror_company_id == reviewed.company.id)
-        .expect("find reviewed company profile before generic refresh");
-    let refreshed = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: reviewed.snapshot.endpoint_id,
-            display_name: "Synthetic reviewed metadata refresh".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("reviewed-company-guid".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 3_000,
-        })
-        .await
-        .expect("generic metadata refresh remains valid");
-    assert_eq!(refreshed.id, reviewed.company.id);
-    let pin_after_refresh = repository
-        .snapshot_source_pin(&reviewed.company.id)
-        .await
-        .expect("generic metadata refresh preserves the observed source pin");
-    assert_eq!(pin_after_refresh.company_id, pin_before_refresh.company_id);
-    assert_eq!(
-        pin_after_refresh.display_name,
-        pin_before_refresh.display_name
-    );
-    assert_eq!(
-        pin_after_refresh.endpoint_id,
-        pin_before_refresh.endpoint_id
-    );
-    assert_eq!(
-        pin_after_refresh.company_guid,
-        pin_before_refresh.company_guid
-    );
-    assert_eq!(
-        pin_after_refresh.company_number,
-        pin_before_refresh.company_number
-    );
-    assert_eq!(
-        pin_after_refresh.books_from_yyyymmdd,
-        pin_before_refresh.books_from_yyyymmdd
-    );
-    let profile_after_refresh = repository
-        .persisted_company_profiles()
-        .await
-        .expect("load reviewed company profile after generic refresh")
-        .profiles
-        .into_iter()
-        .find(|profile| profile.mirror_company_id == reviewed.company.id)
-        .expect("find reviewed company profile after generic refresh");
-    assert_eq!(profile_after_refresh.name, profile_before_refresh.name);
-    assert_eq!(
-        profile_after_refresh.correlation_key,
-        profile_before_refresh.correlation_key
-    );
 }
 
 #[tokio::test]
@@ -2761,49 +2620,6 @@ async fn observed_identity_migration_revokes_demoted_fixture_enrollment() {
                 .expect("read v25 migration revocation timestamp"),
         )
         .expect("compute canonical v25 migration revocation payload")
-    );
-}
-
-#[tokio::test]
-async fn generic_guid_upsert_maps_observed_to_documented_before_tuple_constraint() {
-    let (repository, snapshot, _) = seeded_repository().await;
-    sqlx::query(
-        "INSERT INTO tally_companies(\
-           id, endpoint_id, display_name, company_guid, remote_id, master_id, \
-           fallback_fingerprint, identity_confidence, first_observed_at_unix_ms, \
-           last_observed_at_unix_ms, company_number, books_from_yyyymmdd\
-         ) VALUES ('legacy-incomplete-generic', ?1, 'Legacy generic metadata', \
-                   'generic-constraint-guid', NULL, NULL, NULL, 'unknown', 1, 1, NULL, NULL)",
-    )
-    .bind(&snapshot.endpoint_id)
-    .execute(&repository.pool)
-    .await
-    .expect("seed incomplete non-observed legacy company");
-
-    let saved = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Generic metadata refresh".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("generic-constraint-guid".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("generic GUID metadata must not claim observed without a tuple");
-
-    assert_eq!(saved.id, "legacy-incomplete-generic");
-    assert_eq!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT identity_confidence FROM tally_companies WHERE id = ?1",
-        )
-        .bind(saved.id)
-        .fetch_one(&repository.pool)
-        .await
-        .expect("read generic confidence after refresh"),
-        "documented"
     );
 }
 
@@ -3062,19 +2878,6 @@ async fn v7_fails_closed_on_legacy_casefold_company_guid_collision() {
 
 #[tokio::test]
 async fn commit_pending_restart_accepts_only_exact_sealed_core_evidence() {
-    let (ordinary, ordinary_snapshot, ordinary_company) = seeded_repository().await;
-    assert!(ordinary
-        .capability_snapshot_matches_plan(
-            &ordinary_snapshot.id,
-            &ordinary_company.id,
-            1,
-            "TallyPrime",
-            None,
-            Some("Education"),
-        )
-        .await
-        .expect("ordinary observed-support contract remains available to other flows"));
-
     let (repository, snapshot, company) = seeded_repository_with_core_evidence(
         CapabilityState::Unknown,
         Confidence::Observed,
@@ -3235,66 +3038,63 @@ async fn recovery_migration_fails_closed_on_duplicate_legacy_run_ids() {
 }
 
 #[tokio::test]
-async fn stable_company_identity_survives_rename() {
-    let (repository, snapshot, original) = seeded_repository().await;
-    let renamed = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Synthetic Bridge Test Renamed".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("company-guid-1".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("rename company by stable identity");
-    assert_eq!(original.id, renamed.id);
-    assert_eq!(renamed.display_name, "Synthetic Bridge Test Renamed");
-}
-
-#[tokio::test]
 async fn company_guid_casing_resolves_to_one_stable_pin() {
-    let (repository, snapshot, _) = seeded_repository().await;
-    let uppercase = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic Case Company".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("CASE-GUID-2".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
+    let repository = repository().await;
+    let first = repository
+        .save_reviewed_setup(reviewed_setup_input(HASH_A))
         .await
-        .expect("save uppercase GUID");
-    let lowercase = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic Case Company Renamed".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("case-guid-2".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 3_000,
-        })
+        .expect("save reviewed setup with the observed GUID casing");
+    let mut recased = reviewed_setup_input(HASH_B);
+    let guid = recased
+        .company_identity
+        .guid
+        .clone()
+        .expect("reviewed setup carries a GUID");
+    let uppercase = guid.to_ascii_uppercase();
+    assert_ne!(uppercase, guid, "the variant must differ in casing");
+    recased.company_identity.guid = Some(uppercase);
+    let second = repository
+        .save_reviewed_setup(recased)
         .await
-        .expect("save lowercase GUID");
+        .expect("save reviewed setup with a re-cased GUID");
 
-    assert_eq!(uppercase.id, lowercase.id);
+    assert_eq!(first.company.id, second.company.id);
     let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM tally_companies \
-         WHERE endpoint_id = ?1 AND company_guid = ?2 COLLATE NOCASE",
+        "SELECT COUNT(*) FROM tally_companies WHERE company_guid = ?1 COLLATE NOCASE",
     )
-    .bind(&snapshot.endpoint_id)
-    .bind("case-guid-2")
+    .bind(&guid)
     .fetch_one(&repository.pool)
     .await
     .expect("count case-folded company pins");
     assert_eq!(count, 1);
+}
+
+#[tokio::test]
+async fn renamed_reviewed_setup_gets_a_distinct_company_pin() {
+    let repository = repository().await;
+    let original = repository
+        .save_reviewed_setup(reviewed_setup_input(HASH_A))
+        .await
+        .expect("save reviewed setup");
+    let mut renamed = reviewed_setup_input(HASH_B);
+    renamed.company_display_name = "Synthetic Reviewed Company Renamed".to_string();
+    let renamed = repository
+        .save_reviewed_setup(renamed)
+        .await
+        .expect("save reviewed setup under a new display name");
+
+    assert_ne!(
+        original.company.id, renamed.company.id,
+        "a rename is a different pin, so the old pin's evidence is never reattributed"
+    );
+    let count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM tally_companies WHERE company_guid = ?1 COLLATE NOCASE",
+    )
+    .bind("reviewed-company-guid")
+    .fetch_one(&repository.pool)
+    .await
+    .expect("count company pins for the GUID");
+    assert_eq!(count, 2);
 }
 
 #[test]
@@ -3458,7 +3258,7 @@ async fn mirror_explorer_is_paged_and_omits_source_content() {
         ("voucher-guid-sensitive", "Private Receipt Voucher", HASH_B),
     ] {
         repository
-            .observe_record(ObservedRecordInput {
+            .observe_record_idempotent(ObservedRecordInput {
                 batch_id: batch_id.clone(),
                 object_type: if guid.starts_with("ledger") {
                     "ledger".to_string()
@@ -3666,48 +3466,54 @@ async fn composite_identity_schema_rejects_legacy_v7_runner() {
 
 #[tokio::test]
 async fn fallback_identity_is_not_silently_upgraded() {
-    let repository = repository().await;
-    let snapshot = repository
-        .save_capability_snapshot(CapabilitySnapshotInput {
-            canonical_origin: "http://127.0.0.1:9000".to_string(),
-            observed_at_unix_ms: 1,
-            profile_version: 1,
-            product: "TallyPrime".to_string(),
-            release: None,
-            license_tier: None,
-            mode: None,
-            mode_confidence: Confidence::Unknown,
-            items: vec![],
-        })
-        .await
-        .expect("save snapshot");
+    let (repository, snapshot, company) = seeded_repository().await;
+    let batch_id = begin_batch(&repository, &snapshot, &company, "fallback-upgrade-run").await;
+    let attempt = begin_window_attempt(&repository, &batch_id, 3_000).await;
+    let mut fallback_only = replayable_observation(&batch_id);
+    fallback_only.identity = SourceIdentityInput {
+        fallback_fingerprint: Some("fp-1".to_string()),
+        confidence: Some(Confidence::Inferred),
+        ..Default::default()
+    };
     repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic".to_string(),
-            identity: SourceIdentityInput {
-                fallback_fingerprint: Some("fallback-1".to_string()),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 1,
-        })
+        .stage_snapshot_window_memberships(
+            &attempt,
+            vec![SnapshotWindowMembershipInput::Observed {
+                record_key: "ledger\0fp-1".to_string(),
+                observation: Box::new(fallback_only.clone()),
+            }],
+        )
         .await
-        .expect("save fallback identity");
+        .expect("stage a record known only by its fallback fingerprint");
+    let counts = || async {
+        (
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_source_records")
+                .fetch_one(&repository.pool)
+                .await
+                .expect("count source records"),
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_record_observations")
+                .fetch_one(&repository.pool)
+                .await
+                .expect("count observations"),
+        )
+    };
+    let before = counts().await;
+    assert_eq!(before, (1, 1));
+
+    let mut upgraded = fallback_only;
+    upgraded.identity.guid = Some("new-guid".to_string());
     let error = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Synthetic".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("new-guid".to_string()),
-                fallback_fingerprint: Some("fallback-1".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2,
-        })
+        .stage_snapshot_window_memberships(
+            &attempt,
+            vec![SnapshotWindowMembershipInput::Observed {
+                record_key: "ledger\0fp-1".to_string(),
+                observation: Box::new(upgraded),
+            }],
+        )
         .await
         .expect_err("identity upgrade must require an audit event");
     assert!(matches!(error, MirrorError::IdentityUpgradeRequiresAudit));
+    assert_eq!(counts().await, before, "the refused upgrade stores nothing");
 }
 
 #[tokio::test]
@@ -3717,7 +3523,7 @@ async fn verified_commit_atomically_advances_checkpoint_and_proof_is_immutable()
     let resumed_batch_id = begin_batch(&repository, &snapshot, &company, "run-1").await;
     assert_eq!(resumed_batch_id, batch_id);
     repository
-        .observe_record(ObservedRecordInput {
+        .observe_record_idempotent(ObservedRecordInput {
             batch_id: batch_id.clone(),
             object_type: "ledger".to_string(),
             display_name: Some("Synthetic Sales".to_string()),
@@ -3761,7 +3567,7 @@ async fn verified_commit_atomically_advances_checkpoint_and_proof_is_immutable()
     assert!(commit.checkpoint_advanced);
     assert_eq!(commit.proof_sha256.len(), 64);
     let recovered = repository
-        .commit_receipt_for_batch(&batch_id, "run-1")
+        .historical_commit_receipt_for_batch(&batch_id, "run-1")
         .await
         .expect("recover exact proof receipt");
     assert_eq!(recovered.proof_id, commit.proof_id);
@@ -3813,12 +3619,6 @@ async fn verified_commit_atomically_advances_checkpoint_and_proof_is_immutable()
         }))
         .await
         .expect("advance generic checkpoint with a later verified proof");
-    assert!(matches!(
-        repository
-            .commit_receipt_for_batch(&batch_id, "run-1")
-            .await,
-        Err(MirrorError::VerificationInvariant)
-    ));
     let historical = repository
         .historical_commit_receipt_for_batch(&batch_id, "run-1")
         .await
@@ -3839,7 +3639,7 @@ async fn partial_batch_cannot_advance_checkpoint_and_float_payloads_are_rejected
     let (repository, snapshot, company) = seeded_repository().await;
     let batch_id = begin_batch(&repository, &snapshot, &company, "run-2").await;
     let float_error = repository
-        .observe_record(ObservedRecordInput {
+        .observe_record_idempotent(ObservedRecordInput {
             batch_id: batch_id.clone(),
             object_type: "ledger".to_string(),
             display_name: None,
@@ -3864,27 +3664,6 @@ async fn partial_batch_cannot_advance_checkpoint_and_float_payloads_are_rejected
     ));
 
     repository
-        .observe_record(ObservedRecordInput {
-            batch_id: batch_id.clone(),
-            object_type: "ledger".to_string(),
-            display_name: None,
-            identity: SourceIdentityInput {
-                guid: Some("ledger-guid-2".to_string()),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_100,
-            raw_source_sha256: HASH_A.to_string(),
-            canonical_sha256: None,
-            canonical_payload: None,
-            exact_decimals: BTreeMap::new(),
-            observed_alter_id: None,
-            status: ObservationStatus::Rejected,
-            safe_rejection_code: Some("invalid_exact_decimal".to_string()),
-        })
-        .await
-        .expect("store safe rejection evidence");
-
-    repository
         .commit_batch(CommitBatchInput::test_only(CommitBatchParts {
             batch_id,
             proof_contract_version: 1,
@@ -3896,7 +3675,7 @@ async fn partial_batch_cannot_advance_checkpoint_and_float_payloads_are_rejected
             expected_checkpoint_before: None,
             checkpoint_after: None,
             freshness_target_seconds: 60,
-            gap_codes: vec!["rejected_records_present".to_string()],
+            gap_codes: vec!["reconciliation_mismatch".to_string()],
             warning_codes: vec![],
         }))
         .await

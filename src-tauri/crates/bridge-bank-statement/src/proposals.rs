@@ -504,6 +504,9 @@ pub fn build(
                     mapped_ledger
                 };
                 if treatment == Treatment::Skip {
+                    // The other account's ledger is a ledger name like any
+                    // other: the later pairing looks for the Contra under it.
+                    require_ledger(&ledger, "skipped transfer's other ledger", Some(number))?;
                     // The other account's Contra is found under this ledger; the
                     // statement's own bank ledger would look for the transfer in
                     // the account it was read from.

@@ -511,6 +511,14 @@ fn summary(
                     proposal.entries.iter().map(|entry| entry.ledger.as_str())
                 }),
             )
+            // A skipped row posts nothing, but its ledger is the other bank
+            // account's, under which its Contra is looked for.
+            .chain(
+                records
+                    .iter()
+                    .filter(|record| record.disposition == Disposition::Skipped)
+                    .map(|record| record.ledger.as_str()),
+            )
             .collect();
     ledgers.sort_unstable();
     ledgers.dedup();

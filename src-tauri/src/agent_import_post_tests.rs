@@ -3125,7 +3125,7 @@ fn voucher_block(preview: &str) -> Vec<&str> {
 
 /// A batch of at most ten lists each voucher on one line (#1063): its type,
 /// date, value, the ledger a statement row names (a Receipt's first credit,
-/// any other type's first debit, "+N" for the rest of that side) and its
+/// any other type's first debit, "+N more" for the rest of that side) and its
 /// narration as posted, in the batch file's order.
 #[test]
 fn a_small_batch_lists_each_voucher_on_one_line() {
@@ -3159,8 +3159,8 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
     assert_eq!(
         voucher_block(&preview)[2..4],
         [
-            "Journal 20260901  12.5  Dr \"Expense\" +1  Cr \"Cash\"  \"Synthetic test only\"",
-            "Receipt 20260902  40  \"Party C\" +1  \"Synthetic test only\"",
+            "Journal 20260901  12.5  Dr \"Expense\" +1 more  Cr \"Cash\"  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party C\" +1 more  \"Synthetic test only\"",
         ],
         "{preview}"
     );
@@ -3197,7 +3197,7 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
 }
 
 /// A Journal's line names its first debit and first credit ledger, each with
-/// "+N" for the rest of its side, so the person sees what each Journal
+/// "+N more" for the rest of its side, so the person sees what each Journal
 /// credits; its narration is cut at 20 characters, marked. A Journal line too
 /// wide for the window leaves the totals and the reason line instead, never a
 /// cut ledger name.
@@ -3214,7 +3214,7 @@ fn a_journal_line_names_a_ledger_on_each_side() {
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
     assert_eq!(
         voucher_block(&preview)[2],
-        "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\" +1  \"Reclass of July rent\"… (+18 characters)",
+        "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\" +1 more  \"Reclass of July rent\"… (+18 characters)",
         "{preview}"
     );
     // The Payment, Receipt and Contra lines still name one side.

@@ -110,11 +110,13 @@ These changes are in source and not yet in a published build.
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
   its first debit ledger, so the person could not see what each Journal credited; it now shows
-  `Dr "<first debit>" +N  Cr "<first credit>" +M`, with up to 20 characters of its narration
-  (other types keep 40). A Journal line that does not fit leaves the totals and the reason
-  line, as any line that does not fit does. The line above the voucher lines said each
+  `Dr "<first debit>" +N more  Cr "<first credit>" +M more`, with up to 20 characters of its
+  narration (other types keep 40). A Journal line that does not fit leaves the totals and the
+  reason line, as any line that does not fit does. The line above the voucher lines said each
   narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
-  it now says a cut narration is marked. Payment, Receipt and Contra lines are unchanged.
+  it now says a cut narration is marked. Payment, Receipt and Contra lines still name one
+  ledger. On every line, further ledgers on a side now read "+N more", never a bare "+N" that
+  could be read as an amount.
 
 ## [0.5.1] - 2026-10-09
 

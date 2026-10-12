@@ -2768,8 +2768,9 @@ pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
 /// One line per voucher of a small batch (#1063): its type and date, its
 /// value (the sum of its debits), the ledger a statement row names (a
 /// Receipt's first credit, a Payment's or Contra's first debit, in the batch
-/// file's order, with "+N" for the rest of that side; a Journal's first debit
-/// and first credit, each so, as `Dr … Cr …`) and its narration as posted,
+/// file's order, with "+N more" for the rest of that side, never a bare
+/// "+N" that could read as an amount; a Journal's first debit and first
+/// credit, each so, as `Dr … Cr …`) and its narration as posted,
 /// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` (a Journal's at
 /// `BATCH_REVIEW_JOURNAL_NARRATION_CHARS`) with the cut marked, or
 /// `NARRATION_WITHHELD` when it reads like a line of this dialog; the On
@@ -2820,7 +2821,7 @@ fn voucher_review_lines(
             Ok(match named.as_slice() {
                 [] => "(none)".to_string(),
                 [only] => shown(only)?,
-                [first, rest @ ..] => format!("{} +{}", shown(first)?, rest.len()),
+                [first, rest @ ..] => format!("{} +{} more", shown(first)?, rest.len()),
             })
         };
         // A Journal has no bank side fixed by its type, so its line names

@@ -1585,22 +1585,6 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     }
 }
 
-/// The next step of `import_invoice_masters_changed` when its cause is the
-/// listing date (#1337). That refusal compares plans before any read, so it says
-/// nothing of the book: the day turned between the plan and the post. The text of
-/// the code (a master changed, build again) would be wrong for it.
-fn invoice_cause_remediation(code: &str, cause: Option<&str>) -> Option<&'static str> {
-    match (code, cause) {
-        ("import_invoice_masters_changed", Some("listing_date")) => Some(
-            "The day turned between this invoice's last check and the post, so the plan \
-             the post carried was made on an earlier day. This refusal compared nothing \
-             in Tally. Nothing was posted. Call post_import again with the same batch: \
-             it checks the invoice's masters afresh and asks the user for a new approval.",
-        ),
-        _ => None,
-    }
-}
-
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -2005,8 +1989,7 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) = invoice_cause_remediation(&code, cause)
-                    .or_else(|| refusal_remediation(&code))
+                if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
                     .or_else(|| {

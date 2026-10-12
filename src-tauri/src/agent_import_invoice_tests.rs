@@ -2275,31 +2275,3 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
         vec![refuse("invoice_sales_ledgers_rates_differ")]
     );
 }
-
-/// The next step of the masters-changed refusal depends on its cause (#1337):
-/// a master that moved says to build again; the listing date says the day
-/// turned, that nothing in Tally was compared, and to call post_import again.
-#[test]
-fn the_listing_date_refusal_has_its_own_next_step() {
-    let moved = crate::agent::refusal_remediation("import_invoice_masters_changed").unwrap();
-    let date = crate::agent::invoice_cause_remediation(
-        "import_invoice_masters_changed",
-        Some("listing_date"),
-    )
-    .unwrap();
-    assert!(moved.contains("Build the invoice again"));
-    assert!(date.contains("The day turned") && date.contains("compared nothing in Tally"));
-    assert!(date.contains("call post_import again") || date.contains("Call post_import again"));
-    assert!(!date.contains("Build the invoice again") && !date.contains("has changed"));
-    // Any other cause, or another code, keeps the code's own text.
-    for cause in [Some("voucher_type"), Some("number_control"), None] {
-        assert_eq!(
-            crate::agent::invoice_cause_remediation("import_invoice_masters_changed", cause),
-            None
-        );
-    }
-    assert_eq!(
-        crate::agent::invoice_cause_remediation("import_masters_changed", Some("listing_date")),
-        None
-    );
-}

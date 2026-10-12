@@ -4491,7 +4491,7 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
 async fn same_day_twins_in_one_batch_pass_the_check_before_the_dialog() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_batch_with_second(&server, |second| {
         second.narration = Some("Second payee, same amount".into());
     });

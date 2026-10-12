@@ -96,7 +96,8 @@ also off by default and used only with posting on (bridge#712, bridge#1090).
 Batch posting through Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was
 raised, and verified; through the extension's setting, batches of 10 and 50 and a
-bank statement in two windows of 7 posted and verified on 2026-10-12; it is not
+bank statement in two windows of 7 posted and verified on 2026-10-12 (evidence:
+branch `lab/1516-rehearsal-evidence`); it is not
 proven on a multi-user book (bridge#725). A Payment, Receipt or Contra is
 refused if any of its ledgers, or their groups, moved since the file was built
 so that a bank or cash leg no longer classifies as it did. Tally assigns the number. Bridge uses a private request identity

@@ -529,7 +529,8 @@ command-line setting, not in the MCPB extension, until a live batch post through
 proved. (Deviation, 2026-10-10, #1090, superseding "not in the MCPB extension" above: the
 extension now carries its own setting for it, `enable_batch_post`, off by default and used only
 with posting on. A batch post through the extension ran on a synthetic company on 2026-10-12:
-batches of 10 and 50, and a statement in two windows of 7, each read back verified. Not measured:
+batches of 10 and 50, and a statement in two windows of 7, each read back verified (evidence:
+branch `lab/1516-rehearsal-evidence`). Not measured:
 an approval clicked while the call that opened its window was still waiting, a book with other
 people keying at the same time, and macOS. The cap and every safeguard below are unchanged.)
 With it off, a batch of more than one voucher refuses exactly as before

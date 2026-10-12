@@ -25,7 +25,8 @@ These changes are in source and not yet in a published build.
   each ledger, with a line per voucher only for 10 or fewer and only when those lines fit. The cap, the
   checks before and after the post, and the per-voucher read-back are unchanged. A batch post through the
   extension has run on a live Tally (licensed TallyPrime on Windows, a synthetic company): batches of 10
-  and 50, and a bank statement posted in two windows of 7, each read back verified. Not measured: an
+  and 50, and a bank statement posted in two windows of 7, each read back verified (evidence on the
+  branch `lab/1516-rehearsal-evidence`). Not measured: an
   approval clicked while the call that opened its window was still waiting (every batch posted on the next
   call, within the approval's 15 minutes), a book with other people keying at the same time, and macOS.
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where

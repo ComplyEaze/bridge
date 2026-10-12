@@ -92,4 +92,6 @@ authorized by this ADR.
 The live-read tool's two voucher steps (an expected-empty and an expected-populated range) and the
 fixture fields that served them (voucher sentinel, both date windows, voucher count bounds) were
 deleted, together with the `xml_voucher_empty_range_v1` and `xml_voucher_populated_range_v1`
-read-profile ids. The run now ends after the ledger step. The decision text above is unchanged.
+read-profile ids. The run now ends after the ledger step, and a `supported` claim now requires
+only the company enumeration, fixture marker and ledger read profiles; no claim of that level
+existed. The decision text above is unchanged.

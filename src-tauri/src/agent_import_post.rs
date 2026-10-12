@@ -1456,6 +1456,13 @@ impl Server {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
                 }
+                // The code's next step, under the same rule, and only when the
+                // journal shows nothing was sent (#1573).
+                if let Some(nothing_sent) = NothingSent::observed(attempted) {
+                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                        attach_next_step(&mut outcome.payload, cause, nothing_sent);
+                    }
+                }
                 // Name the earlier batch to verify. Both refusal paths land
                 // here; the journal only grows, so a later read finds one unless a later
                 // record of that batch replaced its row set, or the lock or the read failed
@@ -1683,6 +1690,48 @@ fn reconciliation_failure_payload(
         }
     }
     payload
+}
+
+/// That a refused post sent nothing to Tally: the batch's journal, re-read by
+/// [`Server::post_failure_attempt_observation`] under the dispatch
+/// observation lease, records no dispatch of it (#1573). A next step is
+/// attached only with one, so no refusal after a send, or after a send that
+/// could not be ruled out, is ever told what to try next.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct NothingSent(());
+
+impl NothingSent {
+    /// One only from the observation's `Some(false)`; a send (`Some(true)`)
+    /// or an unknown (`None`) gives none.
+    pub(super) fn observed(attempted: Option<bool>) -> Option<Self> {
+        (attempted == Some(false)).then_some(Self(()))
+    }
+}
+
+/// Adds the general next step, the code's else its cause's (as every other
+/// tool's refusal is given), as `error.next_step` to a post refusal that sent
+/// nothing, unless the post already set its own (a busy port, a row
+/// another batch posted) or its message already is the step (a saved text that
+/// cannot be posted, #1055). Before #1573 a code raised inside the post had a
+/// next step no caller was ever shown.
+pub(super) fn attach_next_step(
+    payload: &mut Value,
+    cause: Option<&str>,
+    _nothing_sent: NothingSent,
+) {
+    let error = &mut payload["result"]["error"];
+    if error.get("next_step").is_some() {
+        return;
+    }
+    let Some(code) = error["code"].as_str() else {
+        return;
+    };
+    if code == "voucher_text_invalid" {
+        return;
+    }
+    if let Some(step) = crate::agent::remediation_for(code, cause) {
+        error["next_step"] = json!(step);
+    }
 }
 
 fn mark_reconciliation_required(payload: &mut Value) {

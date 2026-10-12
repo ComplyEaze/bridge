@@ -719,7 +719,7 @@ pub(crate) async fn setup() -> (
     store.migrate().await.unwrap();
     let company_identity = SourceIdentity {
         bridge_source_lineage: "lineage".to_string(),
-        company_guid: "company-guid".to_string(),
+        company_guid: "e2b8c4f6-17a3-4d90-85c1-a6f3d0b9724e".to_string(),
         observed_fingerprint: "fingerprint".to_string(),
     };
     let ReviewedSetupRef {

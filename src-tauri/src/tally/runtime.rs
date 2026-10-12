@@ -1,7 +1,7 @@
 use super::TallyProbeResult;
 use super::{TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity};
 use crate::endpoint_wire::WireGateConfig;
-use crate::reports::party_ledger_master::PartyLedgerMasterSource;
+use crate::reports::party_ledger_master::{BalanceDateBasis, PartyLedgerMasterSource};
 use crate::tally::connection::canonical_loopback_origin;
 use crate::tally::connection::{ComplianceRead, NativePairedRead, PairedReadValidationError};
 use crate::tally::connector::SealedReadRequest;
@@ -2915,14 +2915,14 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
-        today: TallyDate,
+        basis: BalanceDateBasis,
         read: ComplianceRead,
     ) -> anyhow::Result<PartyLedgerMasterSource> {
         self.fetch_party_ledger_master_source_with_evidence(
             config,
             identity,
             currency_assertion,
-            today,
+            basis,
             read,
         )
         .await
@@ -2934,7 +2934,7 @@ impl TallyRuntime {
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
-        today: TallyDate,
+        basis: BalanceDateBasis,
         read: ComplianceRead,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -2942,7 +2942,7 @@ impl TallyRuntime {
         self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
             let identity = identity.clone();
             let currency_assertion = currency_assertion.clone();
-            let today = today.clone();
+            let basis = basis.clone();
             async move {
                 let mut evidence = RuntimeReadEvidence::empty();
                 let result = async {
@@ -2955,7 +2955,7 @@ impl TallyRuntime {
                             &identity,
                             boundary_profile,
                             currency_assertion,
-                            &today,
+                            &basis,
                             read,
                         )
                         .await?;
@@ -3014,7 +3014,11 @@ impl TallyRuntime {
             .into_compliance_assertion();
         let (source, source_evidence) = self
             .fetch_party_ledger_master_source_with_evidence(
-                config, identity, assertion, today, read,
+                config,
+                identity,
+                assertion,
+                BalanceDateBasis::HostToday(today),
+                read,
             )
             .await
             .map_err(|error| with_read_evidence(error, currency_evidence.clone()))?;

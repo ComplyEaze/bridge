@@ -2068,7 +2068,11 @@ book keyed past it again after a restore is not seen as rolled back. Tally then
 gives the vouchers keyed again the MasterIDs, GUIDs and numbers the post's
 vouchers held (measured once on a synthetic company, bridge#1050), so a bound
 voucher names another voucher, which reads `posted_divergent`, or a false
-`posted_verified` when its content is the same. Bridge still records those rows as posted, so a rebuilt batch holding
+`posted_verified` when its content is the same. In plain words: after a restore, a native
+voucher keyed again with the same content before any check can read verified,
+and no identifier a read returns tells the two apart (measured once on
+TallyPrime 7.1 Silver, with Tally's security off), so
+after restoring a backup over a company, check its posted vouchers in Tally. Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for

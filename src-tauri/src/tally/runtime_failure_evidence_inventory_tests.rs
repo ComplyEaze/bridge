@@ -164,7 +164,7 @@ async fn party_master_drift_retains_prior_reports_and_exact_typed_cause() {
                 &identity,
                 DateBoundaryProfile::ModeAgnostic,
                 assertion(&extents(), &identity),
-                &TallyDate::parse("20990101").unwrap(),
+                &BalanceDateBasis::HostToday(TallyDate::parse("20990101").unwrap()),
                 crate::tally::connection::ComplianceRead::Standard,
             )
             .await

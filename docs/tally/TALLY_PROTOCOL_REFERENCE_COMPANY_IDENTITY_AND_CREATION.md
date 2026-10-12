@@ -124,6 +124,18 @@ against a schema that can contain same-GUID books.
 pin by guessing fields from a current listing: re-observe and review the full tuple. This rule
 is implemented by the composite-identity migration and `snapshot_source_pin`.
 
+**Shape of the GUID.** **VERIFIED on the captured releases; UNVERIFIED for other releases.**
+The captured releases are those named in each fixture's provenance file. Every XML file under
+`src-tauri` that git tracks was decoded by its bytes as UTF-8 or UTF-16. The files that parse as
+XML hold 211 `COMPANY` elements with a `GUID` child, 28 distinct GUIDs in 46 files, all in the
+lowercase `8-4-4-4-12` hexadecimal form; some of those files are synthetic. The files that do not
+parse as XML were searched as text, and none holds a `COMPANY` element with a `GUID`. Bridge therefore accepts only that shape (either case,
+stored lowercase) when it builds a verified company identity, and refuses any other spelling at
+the point a company is selected or verified. The type's parse never trims, but company
+discovery and the desktop selection trim surrounding whitespace before it. A release that
+writes a different spelling is not covered by this capture and would be refused there until it
+is observed.
+
 ### 9.11c Extent reads must retain the verified company tuple — **VERIFIED on one endpoint**
 
 **VERIFIED 2026-09-09 field and versioned request observations on one endpoint.**

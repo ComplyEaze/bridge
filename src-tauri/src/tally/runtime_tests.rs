@@ -36,7 +36,7 @@ fn captured_aarav_company_list_and_identity() -> (String, VerifiedCompanyIdentit
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        row.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&row.guid.clone().unwrap()),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &rows,
@@ -70,6 +70,9 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").expect("source from"),
         to: TallyDate::parse("20260731").expect("source to"),
+        balance_date_basis: BalanceDateBasis::HostToday(
+            TallyDate::parse("20260731").expect("source to"),
+        ),
         last_voucher_date: TallyDate::parse("20260731").expect("source to"),
         rows: Vec::new(),
         request_sha256: "0".repeat(64),
@@ -1021,7 +1024,7 @@ async fn the_outstandings_read_refuses_a_non_loopback_endpoint() {
         host: "not-a-loopback-endpoint".to_string(),
         port: 9000,
     };
-    let identity = verified_identity("Synthetic Company", "synthetic-guid");
+    let identity = verified_identity("Synthetic Company", "9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27");
     let as_of = TallyDate::parse("20260731").unwrap();
     let error = runtime
         .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)

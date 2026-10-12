@@ -15,15 +15,25 @@
 //!   the same direction on the skip's own bank ledger (a withdrawal skipped from
 //!   its bank is a Contra that credits that bank, so a return transfer never
 //!   matches), equal amounts, and a Contra from outside the skip's lineage and
-//!   built from the OTHER bank's statement (one from the skip's own statement
-//!   is that statement's own row).
+//!   built from the other ledger's own statement (one from the skip's own
+//!   statement is that statement's own row; one from a third bank's is another
+//!   transfer).
 //! * Round 1, by reference: both rows carry a reference and they are equal.
 //!   A pair forms only where the skip and the Contra each have exactly one such
 //!   edge.
 //! * Round 2, without a reference: on what round 1 left, one side has no
-//!   reference, and the dates are within k days. A pair forms only where both ends have exactly one such
-//!   edge. A row that took part in round 1 without pairing does not pair here,
-//!   although it still counts against the rows that could.
+//!   reference, and the dates are within k days. A pair forms only where both
+//!   ends have exactly one such edge, and only when the other ledger's verified
+//!   windows hold the skip's date +/- k and the skip's own ledger's hold the
+//!   Contra's: a pair by date claims that nothing else exists. A row that took
+//!   part in round 1 without pairing does not pair here, although it still
+//!   counts against the rows that could.
+//! * A Contra that is double-booked (also booked from a second statement) pairs
+//!   in neither round; a skip whose candidate it is stays `Ambiguous`.
+//!
+//! Contras are grouped once by (ledger pair, side on each, canonical amount), so
+//! a skip reads only the same-amount, same-direction Contras, by reference or
+//! as a date range.
 //!
 //! Unverified Contras count as candidates (a second possible match must make a
 //! skip ambiguous, not paired) but never pair: a skip whose candidates are all
@@ -106,10 +116,19 @@ pub(crate) enum Direction {
     Inflow,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Side {
     Debit,
     Credit,
+}
+
+impl Side {
+    fn opposite(self) -> Self {
+        match self {
+            Self::Debit => Self::Credit,
+            Self::Credit => Self::Debit,
+        }
+    }
 }
 
 impl Direction {
@@ -233,6 +252,104 @@ pub(crate) enum PairingInputError {
     DuplicateContra { key: ContraKey },
 }
 
+/// What one transfer shares, so that a skip looks up only the Contras it can
+/// match: company, endpoint, the two ledgers (in a fixed order), the side the
+/// Contra takes on the first of them, and the amount in canonical form.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct GroupKey {
+    company: CompanyGuid,
+    endpoint: EndpointOrigin,
+    low: LedgerGuid,
+    high: LedgerGuid,
+    low_side: Side,
+    amount: String,
+}
+
+/// The Contras of one group, as indices into the sorted Contras.
+#[derive(Default)]
+struct Group<'a> {
+    /// Ordered by date (then key), so the dates within k of a day are a range.
+    by_date: Vec<usize>,
+    by_reference: BTreeMap<&'a BankReference, Vec<usize>>,
+}
+
+/// The amount without sign or scale artefacts, so equal values are equal text:
+/// `500`, `500.00` and `0500.0` are one amount. Done once per fact.
+fn canonical_amount(amount: &ExactDecimal) -> String {
+    let text = amount.as_str();
+    let (negative, unsigned) = text
+        .strip_prefix('-')
+        .map_or((false, text), |rest| (true, rest));
+    let (whole, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    let whole = whole.trim_start_matches('0');
+    let fraction = fraction.trim_end_matches('0');
+    let mut canonical = String::new();
+    if whole.is_empty() && fraction.is_empty() {
+        return "0".to_string();
+    }
+    if negative {
+        canonical.push('-');
+    }
+    canonical.push_str(if whole.is_empty() { "0" } else { whole });
+    if !fraction.is_empty() {
+        canonical.push('.');
+        canonical.push_str(fraction);
+    }
+    canonical
+}
+
+fn group_key(
+    company: &CompanyGuid,
+    endpoint: &EndpointOrigin,
+    amount: String,
+    first: (&LedgerGuid, Side),
+    second: (&LedgerGuid, Side),
+) -> Option<GroupKey> {
+    if first.0 == second.0 || first.1 == second.1 {
+        return None;
+    }
+    let (low, high) = if first.0 < second.0 {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    Some(GroupKey {
+        company: company.clone(),
+        endpoint: endpoint.clone(),
+        low: low.0.clone(),
+        high: high.0.clone(),
+        low_side: low.1,
+        amount,
+    })
+}
+
+/// A Contra has a group only when its legs are two distinct ledgers on
+/// opposite sides, which is what a Contra is.
+fn contra_group_key(contra: &ContraFact) -> Option<GroupKey> {
+    let [first, second] = &contra.legs;
+    group_key(
+        &contra.company,
+        &contra.endpoint_origin,
+        canonical_amount(&contra.amount),
+        (&first.ledger, first.side),
+        (&second.ledger, second.side),
+    )
+}
+
+/// The group the skip's other side would be in: the Contra's side on the skip's
+/// own bank ledger is the one its direction needs, and the other ledger takes
+/// the opposite.
+fn skip_group_key(skip: &SkipFact) -> Option<GroupKey> {
+    let own_side = skip.direction.contra_side();
+    group_key(
+        &skip.key.company,
+        &skip.key.endpoint_origin,
+        canonical_amount(&skip.amount),
+        (&skip.key.bank_ledger, own_side),
+        (&skip.other_ledger, own_side.opposite()),
+    )
+}
+
 pub(crate) fn transfer_pairing_view(
     skips: &[SkipFact],
     contras: &[ContraFact],
@@ -253,64 +370,56 @@ pub(crate) fn transfer_pairing_view(
             key: pair[0].key.clone(),
         });
     }
+    let coverage = MergedCoverage::new(coverage);
 
-    // Contras bucketed by (company, endpoint, ledger pair), so a skip looks only
-    // at the transfers between its own two ledgers.
-    let mut buckets: BTreeMap<Bucket, Vec<usize>> = BTreeMap::new();
+    let mut groups: BTreeMap<GroupKey, Group> = BTreeMap::new();
     for (index, contra) in contras.iter().enumerate() {
-        if let Some(bucket) = contra_bucket(contra) {
-            buckets.entry(bucket).or_default().push(index);
+        if let Some(key) = contra_group_key(contra) {
+            groups.entry(key).or_default().by_date.push(index);
         }
     }
-
-    // `structural[s]`: the Contras that are an edge of skip `s` before any
-    // reference or date is looked at.
-    let structural: Vec<Vec<usize>> = skips
+    for group in groups.values_mut() {
+        // stable, so equal dates stay in key order
+        group
+            .by_date
+            .sort_by(|&left, &right| contras[left].date.cmp(&contras[right].date));
+        for &index in &group.by_date {
+            let contra: &ContraFact = contras[index];
+            if let Some(reference) = &contra.reference {
+                group.by_reference.entry(reference).or_default().push(index);
+            }
+        }
+    }
+    let skip_groups: Vec<Option<&Group>> = skips
         .iter()
-        .map(|skip| {
-            skip_bucket(skip)
-                .and_then(|bucket| buckets.get(&bucket))
-                .map(|indices| {
-                    indices
-                        .iter()
-                        .copied()
-                        .filter(|&index| is_edge(skip, contras[index]))
-                        .collect()
-                })
-                .unwrap_or_default()
-        })
+        .map(|skip| skip_group_key(skip).and_then(|key| groups.get(&key)))
         .collect();
 
     // A Contra booked from two statements pairs with nothing: which of the two
     // is the real one is not for this view to say.
-    let double_booked = double_booked(&contras, &buckets, k_days);
-    let doubled: BTreeSet<&ContraKey> = double_booked
-        .iter()
-        .flat_map(|found| [&found.first, &found.second])
-        .collect();
+    let (double_booked, doubled) = find_double_booked(&contras, &groups, k_days);
 
-    // Round 1: equal references.
-    let mut reference_edges: Vec<Vec<usize>> = Vec::new();
+    // Round 1: equal references. There is no date bound here: the design pairs
+    // a reference whatever the dates, since one transfer can print on different
+    // days on the two statements.
+    let mut reference_edges: Vec<Vec<usize>> = vec![Vec::new(); skips.len()];
     let mut contra_reference_edges: Vec<Vec<usize>> = vec![Vec::new(); contras.len()];
-    for (s, edges) in structural.iter().enumerate() {
-        let matching: Vec<usize> = edges
-            .iter()
-            .copied()
-            .filter(|&c| skips[s].reference.is_some() && skips[s].reference == contras[c].reference)
-            .collect();
-        for &c in &matching {
-            contra_reference_edges[c].push(s);
+    for (s, skip) in skips.iter().enumerate() {
+        let (Some(group), Some(reference)) = (skip_groups[s], skip.reference.as_ref()) else {
+            continue;
+        };
+        for &c in group.by_reference.get(reference).into_iter().flatten() {
+            if is_edge(skip, contras[c]) {
+                reference_edges[s].push(c);
+                contra_reference_edges[c].push(s);
+            }
         }
-        reference_edges.push(matching);
     }
     let mut pairs: Vec<Option<(PairRound, usize)>> = vec![None; skips.len()];
     let mut contra_taken = vec![false; contras.len()];
     for (s, edges) in reference_edges.iter().enumerate() {
         if let [c] = edges[..] {
-            if contra_reference_edges[c].len() == 1
-                && is_verified(contras[c])
-                && !doubled.contains(&contras[c].key)
-            {
+            if contra_reference_edges[c].len() == 1 && is_verified(contras[c]) && !doubled[c] {
                 pairs[s] = Some((PairRound::Reference, c));
                 contra_taken[c] = true;
             }
@@ -318,16 +427,25 @@ pub(crate) fn transfer_pairing_view(
     }
 
     // Round 2: on what round 1 left, one side without a reference, the dates
-    // within k. Rows that round 1 contested count
-    // against the others here but cannot pair themselves.
+    // within k. Rows that round 1 contested count against the others here but
+    // cannot pair themselves. With k = 0 only the same printed day matches; a
+    // transfer printed on different days by the two banks is open until the
+    // evidence for k is in.
     let mut loose_edges: Vec<Vec<usize>> = vec![Vec::new(); skips.len()];
     let mut contra_loose_edges: Vec<Vec<usize>> = vec![Vec::new(); contras.len()];
-    for (s, edges) in structural.iter().enumerate() {
+    for (s, skip) in skips.iter().enumerate() {
+        let Some(group) = skip_groups[s] else {
+            continue;
+        };
         if pairs[s].is_some() {
             continue;
         }
-        for &c in edges {
-            if !contra_taken[c] && is_loose_edge(skips[s], contras[c], k_days) {
+        for &c in dates_within(group, &contras, &skip.date, k_days) {
+            let contra = contras[c];
+            if !contra_taken[c]
+                && (skip.reference.is_none() || contra.reference.is_none())
+                && is_edge(skip, contra)
+            {
                 loose_edges[s].push(c);
                 contra_loose_edges[c].push(s);
             }
@@ -339,7 +457,7 @@ pub(crate) fn transfer_pairing_view(
                 && contra_reference_edges[c].is_empty()
                 && contra_loose_edges[c].len() == 1
                 && is_verified(contras[c])
-                && !doubled.contains(&contras[c].key)
+                && !doubled[c]
             {
                 pairs[s] = Some((PairRound::NoReference, c));
             }
@@ -354,9 +472,8 @@ pub(crate) fn transfer_pairing_view(
                 // A pair by date claims that nothing else exists, so both
                 // statements must be known around the dates it rests on.
                 Some((PairRound::NoReference, c))
-                    if !(covers(coverage, skip, &skip.other_ledger, &skip.date, k_days)
-                        && covers(
-                            coverage,
+                    if !(coverage.holds(skip, &skip.other_ledger, &skip.date, k_days)
+                        && coverage.holds(
                             skip,
                             &skip.key.bank_ledger,
                             &contras[c].date,
@@ -375,7 +492,7 @@ pub(crate) fn transfer_pairing_view(
                     } else {
                         &reference_edges[s]
                     };
-                    open_state(skip, candidates, &contras, coverage, k_days)
+                    open_state(skip, candidates, &contras, &coverage, k_days)
                 }
             };
             (skip.key.clone(), state)
@@ -388,72 +505,33 @@ pub(crate) fn transfer_pairing_view(
     })
 }
 
-/// Company, endpoint and the two ledgers, in a fixed order.
-type Bucket = (CompanyGuid, EndpointOrigin, LedgerGuid, LedgerGuid);
-
-fn bucket(
-    company: &CompanyGuid,
-    endpoint: &EndpointOrigin,
-    first: &LedgerGuid,
-    second: &LedgerGuid,
-) -> Option<Bucket> {
-    (first != second).then(|| {
-        let (low, high) = if first < second {
-            (first, second)
-        } else {
-            (second, first)
-        };
-        (company.clone(), endpoint.clone(), low.clone(), high.clone())
-    })
+/// The Contras of a group a skip dated `date` can reach within k days: a range
+/// of the date-ordered members.
+fn dates_within<'g>(
+    group: &'g Group,
+    contras: &[&ContraFact],
+    date: &TallyDate,
+    k_days: u32,
+) -> &'g [usize] {
+    let days_apart =
+        |from: &TallyDate, to: &TallyDate| DateSpan::new(from, to).map(|span| span.days());
+    let start = group.by_date.partition_point(|&index| {
+        let before = &contras[index].date;
+        before < date && days_apart(before, date).is_some_and(|days| days > k_days)
+    });
+    let end = group.by_date.partition_point(|&index| {
+        let after = &contras[index].date;
+        after <= date || days_apart(date, after).is_some_and(|days| days <= k_days)
+    });
+    &group.by_date[start..end.max(start)]
 }
 
-fn skip_bucket(skip: &SkipFact) -> Option<Bucket> {
-    bucket(
-        &skip.key.company,
-        &skip.key.endpoint_origin,
-        &skip.key.bank_ledger,
-        &skip.other_ledger,
-    )
-}
-
-/// A Contra has a bucket only when its legs are two distinct ledgers on
-/// opposite sides, which is what a Contra is.
-fn contra_bucket(contra: &ContraFact) -> Option<Bucket> {
-    let [first, second] = &contra.legs;
-    if first.side == second.side {
-        return None;
-    }
-    bucket(
-        &contra.company,
-        &contra.endpoint_origin,
-        &first.ledger,
-        &second.ledger,
-    )
-}
-
-fn side_on<'a>(contra: &'a ContraFact, ledger: &LedgerGuid) -> Option<&'a Side> {
-    contra
-        .legs
-        .iter()
-        .find(|leg| &leg.ledger == ledger)
-        .map(|leg| &leg.side)
-}
-
-/// The structural edge: the same bucket (checked by the caller's lookup), the
-/// Contra's side on the skip's own bank ledger the one its direction needs,
-/// equal amounts, another lineage, and a Contra built from the OTHER bank's
-/// statement: one from the skip's own statement is that statement's own row,
-/// whatever reference it carries.
+/// The edge beyond the group (same company, endpoint, ledgers, direction and
+/// amount): a Contra from another lineage, built from the OTHER ledger's own
+/// statement. One from the skip's own statement is that statement's own row,
+/// and one from a third bank's is a different transfer.
 fn is_edge(skip: &SkipFact, contra: &ContraFact) -> bool {
-    side_on(contra, &skip.key.bank_ledger) == Some(&skip.direction.contra_side())
-        && skip.amount.numeric_eq(&contra.amount)
-        && skip.lineage != contra.lineage
-        && contra.statement_bank_ledger == skip.other_ledger
-}
-
-fn is_loose_edge(skip: &SkipFact, contra: &ContraFact, k_days: u32) -> bool {
-    (skip.reference.is_none() || contra.reference.is_none())
-        && within(&skip.date, &contra.date, k_days)
+    skip.lineage != contra.lineage && contra.statement_bank_ledger == skip.other_ledger
 }
 
 fn is_verified(contra: &ContraFact) -> bool {
@@ -471,17 +549,16 @@ fn open_state(
     skip: &SkipFact,
     candidates: &[usize],
     contras: &[&ContraFact],
-    coverage: &Coverage,
+    coverage: &MergedCoverage,
     k_days: u32,
 ) -> SkipState {
     if candidates.is_empty() {
-        return if covers(coverage, skip, &skip.other_ledger, &skip.date, k_days) {
+        return if coverage.holds(skip, &skip.other_ledger, &skip.date, k_days) {
             SkipState::NotFound
         } else {
             SkipState::NotEstablished
         };
     }
-    // contras are sorted by key, so are the candidate indices
     let unverified: BTreeSet<&BatchId> = candidates
         .iter()
         .filter_map(|&index| match &contras[index].status {
@@ -504,91 +581,120 @@ fn open_state(
     SkipState::Ambiguous { candidates: keys }
 }
 
-/// Whether the ledger's verified windows (same company and endpoint as the
-/// skip) hold the whole `date` -/+ k interval. Windows that overlap or touch
-/// are one window.
-fn covers(
-    coverage: &Coverage,
-    skip: &SkipFact,
-    ledger: &LedgerGuid,
-    date: &TallyDate,
-    k_days: u32,
-) -> bool {
-    let Some(windows) = coverage.0.get(&(
-        skip.key.company.clone(),
-        skip.key.endpoint_origin.clone(),
-        ledger.clone(),
-    )) else {
-        return false;
-    };
-    let mut windows: Vec<&ParseWindow> = windows
-        .iter()
-        .filter(|window| window.from <= window.to)
-        .collect();
-    windows.sort_by(|left, right| left.from.cmp(&right.from));
-    let mut merged: Vec<(TallyDate, TallyDate)> = Vec::new();
-    for window in windows {
-        match merged.last_mut() {
-            Some((_, end))
-                if window.from <= *end
-                    || end
-                        .next_day()
-                        .is_ok_and(|following| window.from <= following) =>
-            {
-                if window.to > *end {
-                    *end = window.to.clone();
+/// The verified windows of each ledger, with those that overlap or touch merged
+/// into one, built once.
+struct MergedCoverage(
+    BTreeMap<(CompanyGuid, EndpointOrigin, LedgerGuid), Vec<(TallyDate, TallyDate)>>,
+);
+
+impl MergedCoverage {
+    fn new(coverage: &Coverage) -> Self {
+        let merged = coverage
+            .0
+            .iter()
+            .map(|(key, windows)| {
+                let mut windows: Vec<&ParseWindow> = windows
+                    .iter()
+                    .filter(|window| window.from <= window.to)
+                    .collect();
+                windows.sort_by(|left, right| left.from.cmp(&right.from));
+                let mut merged: Vec<(TallyDate, TallyDate)> = Vec::new();
+                for window in windows {
+                    match merged.last_mut() {
+                        Some((_, end))
+                            if window.from <= *end
+                                || end
+                                    .next_day()
+                                    .is_ok_and(|following| window.from <= following) =>
+                        {
+                            // a window nested in the last one must not shorten it
+                            if window.to > *end {
+                                *end = window.to.clone();
+                            }
+                        }
+                        _ => merged.push((window.from.clone(), window.to.clone())),
+                    }
                 }
-            }
-            _ => merged.push((window.from.clone(), window.to.clone())),
-        }
+                (key.clone(), merged)
+            })
+            .collect();
+        Self(merged)
     }
-    let room = |from: &TallyDate, to: &TallyDate| {
-        DateSpan::new(from, to).is_some_and(|span| span.days() >= k_days)
-    };
-    merged
-        .iter()
-        .any(|(from, to)| room(from, date) && room(date, to))
+
+    /// Whether the ledger's verified windows (same company and endpoint as the
+    /// skip) hold the whole `date` -/+ k interval.
+    fn holds(&self, skip: &SkipFact, ledger: &LedgerGuid, date: &TallyDate, k_days: u32) -> bool {
+        let key = (
+            skip.key.company.clone(),
+            skip.key.endpoint_origin.clone(),
+            ledger.clone(),
+        );
+        let room = |from: &TallyDate, to: &TallyDate| {
+            DateSpan::new(from, to).is_some_and(|span| span.days() >= k_days)
+        };
+        self.0.get(&key).is_some_and(|windows| {
+            windows
+                .iter()
+                .any(|(from, to)| room(from, date) && room(date, to))
+        })
+    }
 }
 
-/// Contra pairs between two different bank statements for one transfer.
-fn double_booked(
+/// Contra pairs between two different bank statements for one transfer, and
+/// which Contras appear in one. Within a group everything but the statements,
+/// the lineages, the references and the dates is already equal.
+fn find_double_booked(
     contras: &[&ContraFact],
-    buckets: &BTreeMap<Bucket, Vec<usize>>,
+    groups: &BTreeMap<GroupKey, Group>,
     k_days: u32,
-) -> Vec<DoubleBooked> {
+) -> (Vec<DoubleBooked>, Vec<bool>) {
+    let two_statements = |left: usize, right: usize| {
+        contras[left].statement_bank_ledger != contras[right].statement_bank_ledger
+            && contras[left].lineage != contras[right].lineage
+    };
     let mut found = Vec::new();
-    for (bucket, indices) in buckets {
-        let low = &bucket.2;
-        for (position, &left) in indices.iter().enumerate() {
-            for &right in &indices[position + 1..] {
-                let (first, second) = (contras[left], contras[right]);
-                let same_transfer = side_on(first, low) == side_on(second, low)
-                    && first.amount.numeric_eq(&second.amount)
-                    && first.statement_bank_ledger != second.statement_bank_ledger
-                    && first.lineage != second.lineage;
-                if !same_transfer {
-                    continue;
+    let mut doubled = vec![false; contras.len()];
+    let mut record = |left: usize, right: usize, class: DoubleBookedClass| {
+        doubled[left] = true;
+        doubled[right] = true;
+        let (first, second) = if contras[left].key < contras[right].key {
+            (left, right)
+        } else {
+            (right, left)
+        };
+        found.push(DoubleBooked {
+            first: contras[first].key.clone(),
+            second: contras[second].key.clone(),
+            class,
+        });
+    };
+    for group in groups.values() {
+        // equal references, whatever the dates
+        for members in group.by_reference.values() {
+            for (position, &left) in members.iter().enumerate() {
+                for &right in &members[position + 1..] {
+                    if two_statements(left, right) {
+                        record(left, right, DoubleBookedClass::RefuseAtBuild);
+                    }
                 }
-                let class = match (&first.reference, &second.reference) {
-                    (Some(left_ref), Some(right_ref)) => {
-                        (left_ref == right_ref).then_some(DoubleBookedClass::RefuseAtBuild)
-                    }
-                    _ => {
-                        within(&first.date, &second.date, k_days).then_some(DoubleBookedClass::List)
-                    }
-                };
-                if let Some(class) = class {
-                    found.push(DoubleBooked {
-                        first: first.key.clone(),
-                        second: second.key.clone(),
-                        class,
-                    });
+            }
+        }
+        // a reference missing on one side, the dates within k
+        for (position, &left) in group.by_date.iter().enumerate() {
+            for &right in &group.by_date[position + 1..] {
+                if !within(&contras[left].date, &contras[right].date, k_days) {
+                    break;
+                }
+                if (contras[left].reference.is_none() || contras[right].reference.is_none())
+                    && two_statements(left, right)
+                {
+                    record(left, right, DoubleBookedClass::List);
                 }
             }
         }
     }
     found.sort_by(|left, right| (&left.first, &left.second).cmp(&(&right.first, &right.second)));
-    found
+    (found, doubled)
 }
 
 #[cfg(test)]

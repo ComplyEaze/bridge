@@ -1035,6 +1035,123 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
     }
 }
 
+/// 2,000 transfers of one amount between one pair of ledgers: one group.
+const MANY: usize = 2_000;
+
+fn many_covered() -> Coverage {
+    covering(&[
+        ("b1", "20191201", "20300101"),
+        ("b2", "20191201", "20300101"),
+    ])
+}
+
+#[test]
+fn transfer_pairing_two_thousand_references_in_one_group_each_pair_with_their_own() {
+    let reference_of = |index: usize| reference(&format!("6000{index:08}"));
+    let skips: Vec<SkipFact> = (0..MANY)
+        .map(|index| {
+            let mut fact = skip(&format!("st-{index:04}"));
+            fact.reference = Some(reference_of(index));
+            fact
+        })
+        .collect();
+    let contras: Vec<ContraFact> = (0..MANY)
+        .map(|index| {
+            let mut fact = contra(&format!("batch-{index:04}"), &format!("t{index:04}"));
+            fact.reference = Some(reference_of(index));
+            fact
+        })
+        .collect();
+    let view = view_of(
+        &shuffled(&skips, 7),
+        &shuffled(&contras, 8),
+        &many_covered(),
+        0,
+    );
+    assert_eq!(view.skips.len(), MANY);
+    for index in 0..MANY {
+        assert_eq!(
+            state_of(&view, &format!("st-{index:04}")),
+            paired(
+                PairRound::Reference,
+                &format!("batch-{index:04}"),
+                &format!("t{index:04}")
+            )
+        );
+    }
+    assert!(view.double_booked.is_empty());
+}
+
+#[test]
+fn transfer_pairing_two_thousand_dated_transfers_in_one_group_each_pair_with_their_own() {
+    let day_of = |index: usize| {
+        date("20200101")
+            .add_days(u32::try_from(index).unwrap())
+            .unwrap()
+    };
+    let skips: Vec<SkipFact> = (0..MANY)
+        .map(|index| {
+            let mut fact = skip(&format!("st-{index:04}"));
+            fact.date = day_of(index);
+            fact
+        })
+        .collect();
+    let contras: Vec<ContraFact> = (0..MANY)
+        .map(|index| {
+            let mut fact = contra(&format!("batch-{index:04}"), &format!("t{index:04}"));
+            fact.date = day_of(index);
+            fact
+        })
+        .collect();
+    let view = view_of(
+        &shuffled(&skips, 9),
+        &shuffled(&contras, 10),
+        &many_covered(),
+        0,
+    );
+    for index in 0..MANY {
+        assert_eq!(
+            state_of(&view, &format!("st-{index:04}")),
+            paired(
+                PairRound::NoReference,
+                &format!("batch-{index:04}"),
+                &format!("t{index:04}")
+            )
+        );
+    }
+    // with k = 1 each day has three neighbours' worth of candidates: the middle
+    // ones are ambiguous, so the window really is a range
+    let view = view_of(&skips, &contras, &many_covered(), 1);
+    assert!(matches!(
+        state_of(&view, "st-0100"),
+        SkipState::Ambiguous { ref candidates } if candidates.len() == 3
+    ));
+    assert!(matches!(
+        state_of(&view, "st-0000"),
+        SkipState::Ambiguous { ref candidates } if candidates.len() == 2
+    ));
+}
+
+#[test]
+fn transfer_pairing_two_thousand_double_booked_contras_in_one_group_are_found() {
+    let reference_of = |index: usize| reference(&format!("6000{index:08}"));
+    let mut contras = Vec::new();
+    for index in 0..MANY {
+        let mut first = contra(&format!("batch-a{index:04}"), &format!("t{index:04}"));
+        first.reference = Some(reference_of(index));
+        let mut second = contra_from_b2(&format!("batch-b{index:04}"), &format!("u{index:04}"));
+        second.reference = Some(reference_of(index));
+        contras.push(first);
+        contras.push(second);
+    }
+    let view = view_of(&[], &shuffled(&contras, 11), &Coverage::default(), 0);
+    assert_eq!(view.double_booked.len(), MANY);
+    assert!(view
+        .double_booked
+        .iter()
+        .all(|found| found.class == DoubleBookedClass::RefuseAtBuild));
+}
+
 #[test]
 fn transfer_pairing_a_contra_from_a_third_banks_statement_is_no_edge() {
     // only the other ledger's own statement carries the other side of the skip

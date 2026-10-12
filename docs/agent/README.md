@@ -1638,7 +1638,12 @@ that turns that on.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
-   `agent-import-ledger.jsonl` line. On a `Journal`, `voucher_number` and
+   `agent-import-ledger.jsonl` line. The result's `path` is where a person finds
+   that file, and `path_state` says how it was obtained: `resolved` (Windows
+   reported the file's real location, which on a Microsoft Store install of
+   Claude Desktop can be inside the package's own folder), `as_is` (macOS or
+   Linux, shown as written), or `unresolved` (it could not be resolved; this is
+   the logical path, not confirmed to exist). On a `Journal`, `voucher_number` and
    `reference` are optional: when a number is absent Tally applies the voucher
    type's own numbering configuration, and when supplied it is validated and
    sent so a Manual-type duplicate policy can reject it. On `Payment`,

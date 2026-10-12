@@ -37,6 +37,15 @@
 //!   in the date column; the same line's dates entering the narration went
 //!   unseen. Embedded fonts were not measured.
 //!
+//! Only text the PDF draws is read. A character in render mode 3 (`Invisible`,
+//! what a scanner app writes as the OCR layer under a page image) is left out,
+//! as a character that draws nothing is; PDFium's own generated spaces and line
+//! breaks are kept, and their render mode is never asked (they have no text
+//! object). Mode 7 (`InvisibleClipping`) is read as before: content painted
+//! afterwards can show through its glyph shapes. Other hidden text (a zero
+//! alpha fill, a soft mask, an optional-content layer that is off, text under
+//! an opaque box, or text drawn under the page image) is still read.
+//!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).
 //! A rotated page is refused rather than guessed at: every column bound assumes
@@ -193,8 +202,88 @@ fn unreadable(message: &str) -> Refusal {
     Refusal::new("unreadable_pdf", message)
 }
 
+/// What a character PDFium reports is, for reading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// A space or line break PDFium inserted; it splits words.
+    Generated,
+    /// Text the page draws.
+    Drawn,
+    /// Text in render mode 3, which draws nothing.
+    Hidden,
+}
+
+/// Classify one character. The render mode is asked only of a character that
+/// is not generated: a generated one has no text object, so asking fails.
+/// Either PDFium answer failing, or an `Unknown` mode, refuses: an unclassified
+/// character could be hidden, and dropping it could lose a drawn figure.
+fn classify<E>(
+    generated: Result<bool, E>,
+    mode: impl FnOnce() -> Result<PdfPageTextRenderMode, E>,
+) -> Result<Origin, Refusal> {
+    match generated {
+        Err(_) => Err(unreadable("a character's origin could not be read")),
+        Ok(true) => Ok(Origin::Generated),
+        Ok(false) => match mode() {
+            Ok(PdfPageTextRenderMode::Invisible) => Ok(Origin::Hidden),
+            Ok(PdfPageTextRenderMode::Unknown) | Err(_) => {
+                Err(unreadable("a character's render mode could not be read"))
+            }
+            Ok(_) => Ok(Origin::Drawn),
+        },
+    }
+}
+
+/// The document's own characters, hidden and drawn; generated ones are not
+/// counted.
+#[derive(Debug, Default)]
+struct TextCounts {
+    hidden: usize,
+    drawn: usize,
+}
+
+impl TextCounts {
+    fn add(&mut self, origin: Origin) {
+        match origin {
+            Origin::Hidden => self.hidden += 1,
+            Origin::Drawn => self.drawn += 1,
+            Origin::Generated => {}
+        }
+    }
+
+    /// More are hidden than drawn: an OCR layer under page images, whatever a
+    /// scanner app stamps on top.
+    fn mostly_hidden(&self) -> bool {
+        self.hidden > self.drawn
+    }
+}
+
+/// The words of a statement PDF, and whether most of its text was hidden.
+#[derive(Debug)]
+pub struct StatementText {
+    pages: Vec<Page>,
+    mostly_hidden: bool,
+}
+
+impl StatementText {
+    /// Every page's words. A statement is prepared from them with
+    /// [`crate::pipeline::prepare_text`], which names a hidden text layer.
+    pub fn pages(&self) -> &[Page] {
+        &self.pages
+    }
+
+    /// More of the document's own characters were hidden than drawn.
+    pub fn mostly_hidden(&self) -> bool {
+        self.mostly_hidden
+    }
+}
+
 /// Every page's words, top-left coordinates.
-pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<Vec<Page>, Refusal> {
+pub fn extract_pages(
+    engine: &PdfEngine,
+    pdf: &[u8],
+    password: &str,
+) -> Result<StatementText, Refusal> {
     if pdf.len() > MAX_PDF_BYTES {
         return Err(unreadable(
             "the statement is larger than the accepted PDF size",
@@ -225,6 +314,7 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
         ));
     }
     let mut out = Vec::new();
+    let mut counts = TextCounts::default();
     for page in pages.iter() {
         let rotation = page
             .rotation()
@@ -251,37 +341,47 @@ pub fn extract_pages(engine: &PdfEngine, pdf: &[u8], password: &str) -> Result<V
                 "a page carries more characters than the accepted limit",
             ));
         }
-        let glyphs = chars.iter().map(|character| {
-            let bounds = character.loose_bounds().ok()?;
-            Some(Glyph {
+        let mut glyphs = Vec::with_capacity(chars.len());
+        for character in chars.iter() {
+            let origin = classify(character.is_generated(), || character.render_mode())?;
+            counts.add(origin);
+            if origin == Origin::Hidden {
+                // left out, so the word around it goes on
+                continue;
+            }
+            glyphs.push(character.loose_bounds().ok().map(|bounds| Glyph {
                 character: printed_character(character.unicode_char()),
                 left: f64::from(bounds.left().value) - origin_left,
                 right: f64::from(bounds.right().value) - origin_left,
                 top: origin_top - f64::from(bounds.top().value),
                 bottom: origin_top - f64::from(bounds.bottom().value),
                 size: f64::from(character.scaled_font_size().value),
-            })
-        });
+            }));
+        }
         out.push(assemble_words(glyphs));
     }
     require_readable_text(&out)?;
-    Ok(out)
+    Ok(StatementText {
+        pages: out,
+        mostly_hidden: counts.mostly_hidden(),
+    })
 }
 
 /// Refuse a document whose words carry no numeric character at all: a scan, a
-/// printout with glyphs drawn as paths, or a scan with only a scanner app's
-/// stamp. Such a document would otherwise be refused further on under a name
-/// that points at the wrong fix (`no_account_number_line` or
-/// `page_sequence_unproven`).
+/// printout with glyphs drawn as paths, a scan with only a scanner app's stamp,
+/// or a scan whose only text is a hidden OCR layer (not read). Such a document
+/// would otherwise be refused further on under a name that points at the wrong
+/// fix (`no_account_number_line` or `page_sequence_unproven`).
 ///
 /// Judged on the whole document, so an image-only terms page inside a bank PDF
 /// does not trigger it. A numeric character (Unicode Nd, Nl or No, a superset of
 /// what the account check's `\d` reads) is the test because every statement that
 /// gets past `parse::require_account_match` has one (its account-number line), so
-/// this renames a refusal that was certain; it cannot refuse a statement that is
-/// read today. Residual: a scan whose text layer carries a digit (an OCR layer, or a
-/// stamp that prints a date) is not caught here and is still refused or read as
-/// before, by the balance chain and the account check.
+/// this renames a refusal that was certain for the words read. Since hidden text
+/// is not read, a PDF whose figures exist only as hidden text is refused here
+/// although it was read before; no held bank statement has a hidden character.
+/// A scan that also draws a digit (a stamp with a date, page numbers) passes
+/// here; when its parse then refuses, [`crate::pipeline::prepare_text`] names it.
 fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
     let has_figures = pages
         .iter()
@@ -290,10 +390,15 @@ fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
     if has_figures {
         return Ok(());
     }
-    Err(Refusal::new(
+    Err(no_readable_text())
+}
+
+pub(crate) fn no_readable_text() -> Refusal {
+    Refusal::new(
         "no_readable_text",
-        "no figures could be read from the PDF: a scan, a printed copy or an image has none",
-    ))
+        "no figures could be read from the text the PDF draws: a scan, a printed copy or an \
+         image has none, and a scan's hidden OCR layer is not read",
+    )
 }
 
 #[cfg(test)]

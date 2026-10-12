@@ -480,3 +480,14 @@ fn operation_and_retry_surface_are_read_only_and_redacted() {
         Err(RuntimeConfigurationError::RetryPolicyInvalid)
     );
 }
+
+#[test]
+fn a_failed_response_body_counts_as_the_transport_failure_a_failed_request_does() {
+    let body = ReadFailureClass::ResponseBodyFailed;
+    let request = ReadFailureClass::RequestFailed;
+    assert_eq!(body.response_outcome(), ResponseOutcome::Transport);
+    assert_eq!(body.response_outcome(), request.response_outcome());
+    assert_eq!(body.circuit_outcome(), CircuitOutcome::TransportFailure);
+    assert_eq!(body.circuit_outcome(), request.circuit_outcome());
+    assert!(!body.retryable());
+}

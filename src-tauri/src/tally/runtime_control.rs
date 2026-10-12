@@ -103,6 +103,10 @@ pub(super) enum ReadFailureClass {
     Connection,
     RequestTimeout,
     RequestFailed,
+    /// The response head had arrived, so Tally had received the read and begun answering it
+    /// before the body failed. A resend makes Tally produce that answer again behind a gateway
+    /// that serialises (IMPLEMENTATION_GUIDE rule I7), so this class is not retryable.
+    ResponseBodyFailed,
     HttpServer,
     RateLimited,
     HttpClient,
@@ -138,7 +142,9 @@ impl ReadFailureClass {
 
     const fn response_outcome(self) -> ResponseOutcome {
         match self {
-            Self::Connection | Self::RequestFailed => ResponseOutcome::Transport,
+            Self::Connection | Self::RequestFailed | Self::ResponseBodyFailed => {
+                ResponseOutcome::Transport
+            }
             Self::RequestTimeout => ResponseOutcome::Timeout,
             Self::HttpServer | Self::RateLimited | Self::HttpClient => ResponseOutcome::HttpStatus,
             Self::SizeLimit => ResponseOutcome::SizeLimit,
@@ -153,6 +159,7 @@ impl ReadFailureClass {
             Self::Connection
             | Self::RequestTimeout
             | Self::RequestFailed
+            | Self::ResponseBodyFailed
             | Self::HttpServer
             | Self::RateLimited => CircuitOutcome::TransportFailure,
             Self::HttpClient

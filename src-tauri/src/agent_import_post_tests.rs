@@ -3199,8 +3199,8 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
 /// A Journal's line names its first debit and first credit ledger, each with
 /// "+N more" for the rest of its side, so the person sees what each Journal
 /// credits; its narration is cut at 20 characters, marked. A Journal line too
-/// wide for the window leaves the totals and the reason line instead, never a
-/// cut ledger name.
+/// wide at every cut down to 10 characters leaves the totals and the reason
+/// line instead, never a cut ledger name.
 #[test]
 fn a_journal_line_names_a_ledger_on_each_side() {
     let (mut line, endpoint) = batch_of_every_type();
@@ -3222,6 +3222,40 @@ fn a_journal_line_names_a_ledger_on_each_side() {
     line.vouchers[0].entries = serde_json::from_value(json!([
         {"ledger":format!("Expense {}", "E".repeat(40)),"amount":"12.50","side":"Dr"},
         {"ledger":format!("Cash {}", "C".repeat(40)),"amount":"12.50","side":"Cr"}]))
+    .unwrap();
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(preview.contains(VOUCHER_LINES_DO_NOT_FIT), "{preview}");
+    assert!(
+        !preview
+            .lines()
+            .any(|shown| shown.starts_with("Journal 2026")),
+        "{preview}"
+    );
+}
+
+/// A Journal whose line would be too wide at the usual 20-character cut
+/// cuts its narration shorter, down to 10 characters, until the line fits,
+/// so the voucher lines stay; one that fits only below 10 leaves the totals.
+#[test]
+fn a_journal_line_cuts_its_narration_shorter_to_fit() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Depreciation","amount":"300.00","side":"Dr"},
+        {"ledger":"Furniture","amount":"200.00","side":"Cr"},
+        {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[0].narration = Some("Depreciation for September".into());
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let journal = "Journal 20260901  300  Dr \"Depreciation\"  Cr \"Furniture\" +1 more  \"Depreciation f\"… (+12 characters)";
+    assert_eq!(journal.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS);
+    assert_eq!(voucher_block(&preview)[2], journal, "{preview}");
+    // A debit ledger of seventeen characters fits only at a 9-character cut.
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Depreciation 2026","amount":"300.00","side":"Dr"},
+        {"ledger":"Furniture","amount":"200.00","side":"Cr"},
+        {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
     .unwrap();
     refresh_batch_sha256(&mut line);
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();

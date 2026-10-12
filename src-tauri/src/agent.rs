@@ -1434,8 +1434,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              customer's GSTIN, state, registration type or bill-wise setting, the voucher \
              type, or the state of the company's GST registration. Nothing was posted. Build the invoice again, so it \
              is checked against the book as it is now, and show the user the new approval \
-             text. When the cause is listing_date, nothing in Tally changed: the day turned \
-             between the last check and the post, so call post_import again.",
+             text.",
         ),
         "invoice_company_registration_absent"
         | "invoice_company_registration_not_yet_in_force"
@@ -1581,6 +1580,22 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
         ),
         "endpoint_circuit_cooldown" => Some(
             "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
+/// The next step of `import_invoice_masters_changed` when its cause is the
+/// listing date (#1337). That refusal compares plans before any read, so it says
+/// nothing of the book: the day turned between the plan and the post. The text of
+/// the code (a master changed, build again) would be wrong for it.
+fn invoice_cause_remediation(code: &str, cause: Option<&str>) -> Option<&'static str> {
+    match (code, cause) {
+        ("import_invoice_masters_changed", Some("listing_date")) => Some(
+            "The day turned between this invoice's last check and the post, so the plan \
+             the post carried was made on an earlier day. This refusal compared nothing \
+             in Tally. Nothing was posted. Call post_import again with the same batch: \
+             it checks the invoice's masters afresh and asks the user for a new approval.",
         ),
         _ => None,
     }
@@ -1990,7 +2005,8 @@ impl Server {
                 // A shared operation code can still have a cause with its own
                 // next step (#637), so the cause is consulted when the code has
                 // none.
-                if let Some(remediation) = refusal_remediation(&code)
+                if let Some(remediation) = invoice_cause_remediation(&code, cause)
+                    .or_else(|| refusal_remediation(&code))
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
                     .or_else(|| {

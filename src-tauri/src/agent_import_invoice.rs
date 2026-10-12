@@ -1145,8 +1145,8 @@ pub(super) fn fit_plan(
 /// the build judged them by and held to what the build recorded (#1337).
 ///
 /// Refused, each before any intent: a plan that is not the one this invoice
-/// calls for on `today` (a wiring fault); a number control that moved since the
-/// plan; the judge's own refusal; and an observation that differs from the
+/// calls for (a wiring fault); a plan made on another day than `today`, named
+/// by its date; a number control that moved since the plan; the judge's own refusal; and an observation that differs from the
 /// recorded one, naming the first field that does. The size limits and the
 /// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(

@@ -255,8 +255,8 @@ GUID is malformed, and then it carries neither. Other argument refusals carry no
 such as `2026-02-30`, is `invalid_date`; it gets the same date guidance in `remediation`.
 
 A `post_import` refusal does not carry `remediation`. When its journal shows that nothing was sent
-(`attempt_recorded` is `false`), it carries the same next step as `error.next_step` instead: its
-code's, or else its cause's, under the same 4,096-byte rule. A step the post sets itself, for a busy
+(`attempt_recorded` is `false`), it carries the same next step as `error.next_step` instead, when
+one exists: its code's, or else its cause's, under the same 4,096-byte rule. A step the post sets itself, for a busy
 port or a row another batch posted, is kept. A refusal after a send, or when a send could not be ruled
 out, is given no such step: it is reconciled with `verify_import`, never retried (#1573).
 

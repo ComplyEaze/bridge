@@ -2663,28 +2663,6 @@ impl TallyRuntime {
         .await
     }
 
-    /// As [`Self::fetch_companies`], also returning whether the same
-    /// `CompanyListV2` response may come from an Education-mode endpoint
-    /// ([`TallyClient::fetch_companies_observing_education_mode`]). No further
-    /// request is made.
-    pub async fn fetch_companies_observing_education_mode(
-        &self,
-        config: TallyConfig,
-    ) -> anyhow::Result<(Vec<TallyCompany>, bool)> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        self.execute(
-            config,
-            ReadRetryPolicy::transient_default(),
-            |client| async move {
-                client
-                    .fetch_companies_observing_education_mode()
-                    .await
-                    .map(|(companies, _, education)| (companies, education))
-            },
-        )
-        .await
-    }
-
     /// Reads the documented company collection and retains evidence for the
     /// exact raw response bytes used to produce the parsed company list. As in
     /// the shared retry runtime, only the terminal attempt contributes evidence.

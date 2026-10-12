@@ -3,6 +3,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use bridge_tally_core::{ExactDecimal, ReadWindow};
 use std::net::SocketAddr;
 use tally_protocol_simulator::{Fixture, ScenarioPlan, SequenceSimulator, WireEncoding};
 use tokio::{
@@ -617,16 +618,6 @@ fn failed_or_unobserved_canary_cannot_authorize_snapshot_start() {
     }
 }
 
-#[test]
-fn period_report_company_guid_matching_is_ascii_case_insensitive_only() {
-    assert!(company_guids_equal(
-        "4C42A771-AbCd-4DeF-8AbC-001122AaBbCc",
-        "4c42a771-abcd-4def-8abc-001122aabbcc"
-    ));
-    assert!(!company_guids_equal("company-guid-a", "company-guid-b"));
-    assert!(!company_guids_equal("company-guid", " company-guid "));
-}
-
 #[tokio::test]
 async fn presentation_equivalent_company_snapshot_probe_stops_before_core_exports() {
     let _simulator_guard = simulator_test_lock().lock().await;
@@ -681,16 +672,15 @@ async fn presentation_equivalent_company_snapshot_probe_stops_before_core_export
 }
 
 #[tokio::test]
-async fn failed_period_read_preserves_its_error_after_a_closing_identity_request() {
+async fn failed_source_read_preserves_its_error_after_a_failed_closing_identity_request() {
     let _simulator_guard = simulator_test_lock().lock().await;
     let company_guid = "synthetic-company-guid";
     let company_collection = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
     let (address, server) = spawn_method_routed_server(vec![
-        company_collection.clone(),
-        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
         company_collection,
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
     ])
     .await;
     let config = TallyConfig {
@@ -708,7 +698,7 @@ async fn failed_period_read_preserves_its_error_after_a_closing_identity_request
         display_name: "Synthetic Company".to_string(),
     };
     let context = RequestContext {
-        run_id: "run-period-source-failure".to_string(),
+        run_id: "run-source-failure".to_string(),
         company: company.clone(),
         pack: CapabilityPackId::CoreAccounting,
         schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
@@ -720,120 +710,27 @@ async fn failed_period_read_preserves_its_error_after_a_closing_identity_request
         filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
     };
     let connector =
-        RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
-            .unwrap();
-
-    let error = connector
-        .read_core_period_balance_report(&context)
+        RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context).unwrap();
+    let opening = connector
+        .verify_snapshot_identity()
         .await
-        .expect_err("the rejected period response must remain the reported failure");
+        .expect("opening identity");
+
+    // The closing identity request is itself rejected; the earlier source
+    // failure must still be the one reported.
+    let error = connector
+        .finish_snapshot_source_read::<()>(
+            Err(protocol_error("synthetic_source_failure")),
+            &opening,
+        )
+        .await
+        .expect_err("the source failure must remain the reported failure");
     assert!(matches!(
         error,
-        TallyError::Protocol { code } if code == "application_response_rejected"
+        TallyError::Protocol { code } if code == "synthetic_source_failure"
     ));
     let methods = server.await.expect("join source-failure server");
-    assert_eq!(methods, ["POST", "POST", "POST"]);
-}
-
-/// The period report is a custom report whose TDL Education answers with a
-/// blocking dialog on the Tally screen (bridge#45). With Education observed,
-/// by the identity read that precedes it or by the run's own probe, it is
-/// refused before it is sent. Licensed, the same read goes out.
-#[tokio::test]
-async fn the_period_report_is_refused_before_sending_when_education_is_observed() {
-    let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
-    let collection = |edumode: &str| {
-        format!(
-            r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM><EDUMODE TYPE="Logical">{edumode}</EDUMODE></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
-        )
-    };
-    let education_profile = bridge_tally_core::CapabilityProfile {
-        profile_version: 4,
-        product: "TallyPrime".to_string(),
-        release: Some("7.1".to_string()),
-        license_tier: None,
-        mode: Some("Education".to_string()),
-        transports: Default::default(),
-        features: Default::default(),
-        packs: Default::default(),
-    };
-    for (case, responses, probed_education) in [
-        (
-            "identity read reports Education",
-            vec![collection("Yes")],
-            false,
-        ),
-        ("probe reported Education", vec![collection("No")], true),
-        (
-            "licensed",
-            vec![
-                collection("No"),
-                "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
-                collection("No"),
-            ],
-            false,
-        ),
-    ] {
-        let licensed = case == "licensed";
-        let (address, server) = spawn_method_routed_server_refusing_extra_requests(responses).await;
-        let config = TallyConfig {
-            host: address.ip().to_string(),
-            port: address.port(),
-        };
-        let company = CompanyRef {
-            identity: company_source_identity(
-                &format!("tally_xml_http:http://{address}"),
-                company_guid,
-                "100001",
-                "Synthetic Company",
-                "20260401",
-            ),
-            display_name: "Synthetic Company".to_string(),
-        };
-        let context = RequestContext {
-            run_id: "run-period-education".to_string(),
-            company: company.clone(),
-            pack: CapabilityPackId::CoreAccounting,
-            schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
-            window: ReadWindow {
-                from_yyyymmdd: "20260701".to_string(),
-                to_yyyymmdd: "20260701".to_string(),
-            },
-            query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
-            filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
-        };
-        let connector =
-            RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
-                .unwrap();
-        if probed_education {
-            assert_eq!(
-                connector
-                    .observe_snapshot_profile(&education_profile)
-                    .unwrap(),
-                DateBoundaryProfile::EducationRestricted
-            );
-        }
-        let error = connector
-            .read_core_period_balance_report(&context)
-            .await
-            .expect_err(case);
-        let methods = server.await.expect("join period server");
-        if licensed {
-            // The report was sent (and its rejection is the reported failure).
-            assert!(
-                matches!(&error, TallyError::Protocol { code } if code == "application_response_rejected"),
-                "{case}: {error:?}"
-            );
-            assert_eq!(methods, ["POST", "POST", "POST"], "{case}");
-        } else {
-            assert!(
-                matches!(&error, TallyError::Unsupported { code } if code == "education_report_family_unsupported"),
-                "{case}: {error:?}"
-            );
-            assert_eq!(methods, ["POST"], "{case}: only the identity read went out");
-        }
-    }
+    assert_eq!(methods, ["POST", "POST"]);
 }
 
 /// `discover_companies` requests the native `Company` collection

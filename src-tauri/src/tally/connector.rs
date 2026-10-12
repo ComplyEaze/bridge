@@ -1,14 +1,10 @@
 use crate::tally::canonical_window::build_core_window;
-use bridge_tally_core::report_tie_out::{LedgerPeriodBalance, LedgerPeriodBalanceReport};
 use bridge_tally_core::{
     CanonicalPackWindow, CapabilityEvidence, CapabilityPackId, CapabilityProfile, CapabilityState,
-    CompanyRef, EvidenceConfidence, ExactDecimal, PackBatch, ProbeResult, ReadResponseScope,
-    ReadWindow, RequestContext, SourceIdentity, TallyConnector, TallyDate, TallyError,
-    CORE_ACCOUNTING_SCHEMA_VERSION,
+    CompanyRef, EvidenceConfidence, PackBatch, ProbeResult, ReadResponseScope, RequestContext,
+    SourceIdentity, TallyConnector, TallyDate, TallyError, CORE_ACCOUNTING_SCHEMA_VERSION,
 };
-use bridge_tally_protocol::xml_read_profiles::{
-    ReadOnlyProfile, ValidatedCompanyName, EDUCATION_REPORT_FAMILY_UNSUPPORTED,
-};
+use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
 use bridge_tally_protocol::{
     native_outstandings::{
         render_native_group_snapshot_request, render_native_ledger_export_request,
@@ -19,8 +15,7 @@ use bridge_tally_protocol::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
         CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
     },
-    parse_companies_from_collection, parse_ledger_period_balance_report,
-    parse_native_group_source_records_with_evidence,
+    parse_companies_from_collection, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
     parse_native_voucher_type_source_records_with_evidence, ParsedExport, ParsedSourceRecord,
@@ -34,8 +29,7 @@ use tokio_util::sync::CancellationToken;
 use super::connection::DirectCompanyBootstrapError;
 use super::runtime::{TallyRuntimeControlError, TallyRuntimeReadError};
 use super::{
-    tdl_engine, TallyCompany, TallyConfig, TallyRuntime, VerifiedCompanyIdentity,
-    VerifiedCompanyIdentityError,
+    TallyCompany, TallyConfig, TallyRuntime, VerifiedCompanyIdentity, VerifiedCompanyIdentityError,
 };
 
 const CORE_QUERY_PROFILE: &str = "core_accounting_v3";
@@ -428,22 +422,6 @@ impl RuntimeTallyConnector {
         self.verify_snapshot_identity_from_companies(&companies)
     }
 
-    /// As [`Self::verify_snapshot_identity`], also returning whether the same
-    /// company-list response reports Education mode. No further request.
-    async fn verify_snapshot_identity_observing_mode(
-        &self,
-    ) -> Result<(VerifiedCompanyIdentity, bool), TallyError> {
-        let (companies, education) = self
-            .runtime
-            .fetch_companies_observing_education_mode(self.config.clone())
-            .await
-            .map_err(map_transport_error)?;
-        Ok((
-            self.verify_snapshot_identity_from_companies(&companies)?,
-            education,
-        ))
-    }
-
     async fn verify_closing_snapshot_identity(
         &self,
         opening: &VerifiedCompanyIdentity,
@@ -547,106 +525,6 @@ impl TallyConnector for RuntimeTallyConnector {
             .extract_core_window(context, boundary_profile, &identity)
             .await;
         self.finish_snapshot_source_read(window, &identity).await
-    }
-
-    async fn read_core_period_balance_report(
-        &self,
-        context: &RequestContext,
-    ) -> Result<LedgerPeriodBalanceReport, TallyError> {
-        if context.company.identity != self.company.identity
-            || context.pack != CapabilityPackId::CoreAccounting
-            || context.schema_version != CORE_ACCOUNTING_SCHEMA_VERSION
-            || context.query_profile.as_str() != CORE_QUERY_PROFILE
-        {
-            return Err(invalid_data("period_report_scope_mismatch"));
-        }
-        let expected_company_guid = self.company.identity.company_guid.clone();
-        let expected_from = context.window.from_yyyymmdd.clone();
-        let expected_to = context.window.to_yyyymmdd.clone();
-        let validation_company_guid = expected_company_guid.clone();
-        let validation_from = expected_from.clone();
-        let validation_to = expected_to.clone();
-        // Fail closed: `from`/`to` feed a quoted `<SET>"..."</SET>` TDL
-        // literal in `ledger_period_balances_request`, where XML escaping
-        // cannot protect the argument (Tally decodes `&quot;` back to a
-        // literal `"` before the formula runs). Requiring a validated
-        // `TallyDate` here -- exactly 8 ASCII digits -- closes that off at
-        // the boundary instead of relying on every caller of this connector
-        // having validated the window already (bridge#832).
-        let request_from = TallyDate::parse(expected_from)?;
-        let request_to = TallyDate::parse(expected_to)?;
-        let (identity, education) = self.verify_snapshot_identity_observing_mode().await?;
-        // The period report is a custom report whose TDL Education answers with
-        // a blocking dialog on the Tally screen (bridge#45). Either this
-        // identity read or the run's own probe reporting Education refuses it
-        // before it is sent; the run records the tie-out as unavailable.
-        let probed_education = *self
-            .snapshot_boundary_profile
-            .read()
-            .map_err(|_| invalid_data("snapshot_boundary_profile_unavailable"))?
-            == Some(DateBoundaryProfile::EducationRestricted);
-        if education || probed_education {
-            return Err(TallyError::Unsupported {
-                code: EDUCATION_REPORT_FAMILY_UNSUPPORTED.to_string(),
-            });
-        }
-        let xml = self
-            .post_xml_validated(
-                tdl_engine::ledger_period_balances_request(
-                    &self.company.display_name,
-                    &request_from,
-                    &request_to,
-                ),
-                move |xml| {
-                    parse_ledger_period_balance_report(xml).is_ok_and(|parsed| {
-                        company_guids_equal(&parsed.context.company_guid, &validation_company_guid)
-                            && parsed.context.from_yyyymmdd == validation_from
-                            && parsed.context.to_yyyymmdd == validation_to
-                            && parsed.context.ordinary_books_requested
-                    })
-                },
-            )
-            .await;
-        let xml = self.finish_snapshot_source_read(xml, &identity).await?;
-        let parsed = parse_ledger_period_balance_report(&xml)
-            .map_err(|_| protocol_error("period_report_invalid"))?;
-        if !company_guids_equal(
-            &parsed.context.company_guid,
-            &self.company.identity.company_guid,
-        ) || parsed.context.from_yyyymmdd != context.window.from_yyyymmdd
-            || parsed.context.to_yyyymmdd != context.window.to_yyyymmdd
-            || !parsed.context.ordinary_books_requested
-        {
-            return Err(invalid_data("period_report_scope_mismatch"));
-        }
-        let balances = parsed
-            .records
-            .into_iter()
-            .map(|row| {
-                Ok(LedgerPeriodBalance {
-                    ledger_source_id: row
-                        .source_id
-                        .ok_or_else(|| invalid_data("period_report_identity_missing"))?,
-                    opening_balance: ExactDecimal::parse(row.record.opening_balance)?,
-                    closing_balance: ExactDecimal::parse(row.record.closing_balance)?,
-                })
-            })
-            .collect::<Result<Vec<_>, TallyError>>()?;
-        let report = LedgerPeriodBalanceReport {
-            source_identity: self.company.identity.clone(),
-            window: ReadWindow {
-                from_yyyymmdd: parsed.context.from_yyyymmdd,
-                to_yyyymmdd: parsed.context.to_yyyymmdd,
-            },
-            // The report echoes Bridge's requested profile, but Tally does not
-            // attest that TBalOpening/TBalClosing exclude every scenario,
-            // optional, post-dated, or tracking-note effect. A live,
-            // release-specific capability receipt must opt this in later.
-            ordinary_books_scope_observed: false,
-            source_reported_count: parsed.context.source_record_count,
-            balances,
-        };
-        Ok(report)
     }
 }
 
@@ -755,10 +633,6 @@ fn native_groups_for_core_window(
 ) -> Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>, TallyError> {
     parse_native_group_source_records_with_evidence(xml, expected_company_guid)
         .map_err(|_| protocol_error("group_export_invalid"))
-}
-
-fn company_guids_equal(left: &str, right: &str) -> bool {
-    left.eq_ignore_ascii_case(right)
 }
 
 fn map_transport_error(error: anyhow::Error) -> TallyError {

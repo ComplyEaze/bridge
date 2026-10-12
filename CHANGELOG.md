@@ -43,6 +43,15 @@ These changes are in source and not yet in a published build.
   book whose report lists a group and an item under the root side by side, an item inside a stock group, a
   compound unit, other dates, other releases, macOS, and a group that carries an item's name.
 
+- `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says whether the bank ledger in
+  Tally stands where the statement says it stood at the start and at the end of the statement's dates, as three
+  gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
+  after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
+  dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
+  parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
+  proved against a live book: one run on two synthetic companies by an outside contributor is only partly recorded (see
+  the pull request).
+
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
   return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a

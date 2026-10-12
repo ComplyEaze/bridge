@@ -55,3 +55,21 @@ Three answers to the code's own read-back request with the four GSTR-1 status fi
 | `pilot-lab-invoice-readback-status-resaved.utf16le.xml` | 98,450 | `e563f64f40fbec180295a2d3c56bec2da8d48d03786cddfc5da3dd62eb9c4ef6` | `workorder/aw7d-readback-status-0021.xml` (commit `fb5911696`) | `w7c-readback-status-0021.xml` (`b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5`) | the same read after `BP/26-27/0021` was opened and saved in Tally with no change: included Yes, uncertain No, excluded No, overridden No (AlterID 35) |
 
 Not in these files: the screenshots, the earlier reads of the first and second rounds (`fixed2` and before), and the reads made after the screen work (the marks and the window were read again then and are byte-equal to the post-import reads above), which stay on the branch.
+
+## The company-level HSN/SAC (2026-10-12)
+
+One answer of the Windows lab (the same synthetic company, TallyPrime 7.1 Silver, licensed mode) to the company object read with every field, sent once with `curl.exe -o` in lab request set W14, step 1, before anything in that set was changed. The answer is on `lab/1342-w14-answers` (commit `2a88062d1`) with a hash table; the file here is byte-equal to it. The company-level HSN/SAC and `CMPGSTDETAILS.LIST` had been set on the company's screens in W11.
+
+| Fixture | Bytes | SHA-256 | Published as | Request (SHA-256 of the request file) | What it is |
+| --- | ---: | --- | --- | --- | --- |
+| `pilot-lab-company-object.utf16le.xml` | 84,634 | `9641605954377dc2f105ab325f47f331841bacfbc1ceb72d4fd03f528d8fcd77` | `answers/aw14-company-object-0.xml` (commit `2a88062d1`) | `w14-company-object.xml` (`72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648`) | the company object: its GUID, `ISGSTCLASSIFON` No, one `HSNDETAILS.LIST` row (from 1 Apr 2026, `Specify Details Here`, a six-digit code) and one `CMPGSTDETAILS.LIST` row (`HSNSOURCEPRIORITY` Ledger) |
+| `pilot-lab-company-object.request.utf16le.xml` | 750 | `72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648` | `workorder/w14-company-object.xml` in `lab/1342-capture-requests` (commit `99e750ac6`) | the code renders it: the company object request with `FETCH` `*` | the request that was answered, with a byte order mark |
+
+## The HSN/SAC check's requests (2026-10-12, not yet answered)
+
+Two request files of lab request set W16, each an answered request above with field names added to its field list and nothing else changed. They are here so a test pins the code's requests to them byte for byte; no answer to either exists yet, and none is used as evidence.
+
+| Fixture | Bytes | SHA-256 | Published as | What it is |
+| --- | ---: | --- | --- | --- |
+| `pilot-lab-ledger-rates-hsn.request.utf16le.xml` | 1,974 | `03de8fa7e3e3477a527e2a1ecf4c0c69a2bf2d190fa76b5c8def9e595eb94c5e` | `workorder/w16-ledger-rates-hsn.xml` in `lab/1342-capture-requests` (commit `b426aeb76`) | `w7-ledgers-rates.xml` with `HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE` added |
+| `pilot-lab-groups-hsn.request.utf16le.xml` | 1,100 | `237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02` | `workorder/w16-groups-hsn.xml` in `lab/1342-capture-requests` (commit `b426aeb76`) | `r07-groups.xml` with `HSNDETAILS.LIST` added |

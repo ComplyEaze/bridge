@@ -1438,6 +1438,26 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              is checked against the book as it is now, and show the user the new approval \
              text.",
         ),
+        "invoice_sales_ledger_hsn_unresolved" => Some(
+            "The named sales ledger has no HSN/SAC code on the invoice date: not on the \
+             ledger, not on any group above it, and not at company level. Nothing was \
+             written. Ask the user to set the code in Tally on the ledger, a group or the \
+             company, dated on or before the invoice date, then build again. Do not post \
+             first and fix the code after: Tally keeps an invoice saved without a code out \
+             of GSTR-1 even after the master is corrected, until the invoice is opened and \
+             saved again. ComplyEaze Bridge does not choose or suggest the code.",
+        ),
+        "invoice_sales_ledger_hsn_source_not_measured" => Some(
+            "The HSN/SAC code of the named sales ledger, or the company's GST settings for \
+             it, are set up in a way ComplyEaze Bridge has not checked against Tally, so it \
+             cannot confirm that Tally will accept the code: for example a code from GST \
+             classification, several entries on one date, no entry in force on the invoice \
+             date, a group chain deeper than two groups, a code shorter than the minimum \
+             length in the company's GST details, or company HSN/SAC settings other than \
+             the ones checked. Nothing was written. Tell the user which ledger it is and \
+             ask them to check its HSN/SAC details and the company's GST details in Tally. \
+             Do not change the invoice to get past this.",
+        ),
         "invoice_company_registration_absent"
         | "invoice_company_registration_not_yet_in_force"
         | "invoice_company_registration_inactive"
@@ -1868,11 +1888,34 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         request: ReadRequest,
     ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
-        let request = request.into_xml();
-        let admitted = crate::tally::agent_read_request::AgentReadRequest::parse(request.clone())
-            .map_err(|error| error.to_string())?;
+        let admitted =
+            crate::tally::agent_read_request::AgentReadRequest::parse(request.into_xml())
+                .map_err(|error| error.to_string())?;
+        self.post_admitted_read(identity, admitted).await
+    }
+
+    /// The company object read of an invoice build's HSN/SAC check: the one
+    /// Object export a tool sends, from its pinned profile, never through
+    /// [`Self::post_read`] (which admits Collection exports only).
+    async fn post_invoice_company_hsn_read(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+    ) -> Result<(String, Evidence), ToolFailure> {
+        let admitted =
+            crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn(identity)
+                .map_err(|error| error.to_string())?;
+        self.post_admitted_read(identity, admitted)
+            .await
+            .map(|(body, evidence, _)| (body, evidence))
+    }
+
+    async fn post_admitted_read(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        admitted: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
         let request_sha256 = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
-            &request,
+            &admitted.clone().into_xml(),
         ));
         let response = self
             .runtime

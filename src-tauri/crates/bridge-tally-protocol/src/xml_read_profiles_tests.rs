@@ -173,6 +173,10 @@ fn profile_ids_and_template_hashes_are_stable() {
             "ff023f06940b80c8e922d8b238772cd77e18f220b2fd7a4be7af667029948acf",
         ),
         (
+            ReadOnlyProfileId::InvoiceCompanyHsnV1,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ),
+        (
             ReadOnlyProfileId::AuditLedgersV1,
             "788333480a34bd0af0f5d724f2ac5cb8dd4d888c4a8db8e67039583fc295aa5f",
         ),
@@ -273,6 +277,30 @@ fn element_paths(xml: &str) -> Vec<(String, String)> {
     out.into_iter()
         .map(|(path, text)| (path, text.trim().to_string()))
         .collect()
+}
+
+/// The invoice build's company read is, character for character, the
+/// request the lab answered on 12 Oct 2026 (the file starts with a byte order
+/// mark), and differs from the audit part's only in its field list.
+#[test]
+fn invoice_company_hsn_is_the_company_object_request_the_lab_answered() {
+    let bytes = include_bytes!(
+        "../tests/fixtures/agent/pilot-lab/pilot-lab-company-object.request.utf16le.xml"
+    );
+    let units = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    let sent = String::from_utf16(&units).unwrap();
+    let company = ValidatedCompanyName::new("BRIDGE PILOT LAB").unwrap();
+    let invoice = ReadOnlyProfile::InvoiceCompanyHsnV1 { company: &company }.render();
+    assert_eq!(sent.trim_start_matches('\u{feff}'), invoice);
+    let audit = ReadOnlyProfile::AuditCompanyObjectV1 { company: &company }.render();
+    let fields = AUDIT_COMPANY_FETCH
+        .iter()
+        .map(|field| format!("<FETCH>{field}</FETCH>"))
+        .collect::<String>();
+    assert_eq!(audit.replace(&fields, "<FETCH>*</FETCH>"), invoice);
 }
 
 #[test]
@@ -592,6 +620,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::LedgersV1
             | ReadOnlyProfileId::VouchersV2
             | ReadOnlyProfileId::AuditCompanyObjectV1
+            | ReadOnlyProfileId::InvoiceCompanyHsnV1
             | ReadOnlyProfileId::AuditLedgersV1
             | ReadOnlyProfileId::AuditVouchersV1
             | ReadOnlyProfileId::AuditStockItemsV1 => {}
@@ -608,6 +637,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::LedgersV1,
         ReadOnlyProfileId::VouchersV2,
         ReadOnlyProfileId::AuditCompanyObjectV1,
+        ReadOnlyProfileId::InvoiceCompanyHsnV1,
         ReadOnlyProfileId::AuditLedgersV1,
         ReadOnlyProfileId::AuditVouchersV1,
         ReadOnlyProfileId::AuditStockItemsV1,

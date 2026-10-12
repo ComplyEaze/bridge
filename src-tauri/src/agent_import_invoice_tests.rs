@@ -61,6 +61,7 @@ fn facts_for(names: &[(&str, &[&str], DutyHead)]) -> BTreeMap<String, LedgerFact
                 name.to_string(),
                 LedgerFacts {
                     reserved_groups: groups.iter().map(|g| g.to_string()).collect(),
+                    group_names: groups.iter().map(|g| g.to_string()).collect(),
                     duty_head: *head,
                     gstin: GstinEvidence::NotReported,
                     registration_type: None,

@@ -17,15 +17,12 @@ test("native provenance labels its receivable-only count while native rows inclu
     readFile(new URL("../src-tauri/src/tally/runtime_tests.rs", import.meta.url), "utf8"),
   ]);
 
-  assert.equal(readProvenance({ read_strategy: "native_bills", source_voucher_count: 0, open_receivable_bill_count: 1 }), "1 open receivable bill read from Tally");
-  assert.equal(readProvenance({ read_strategy: "native_bills", source_voucher_count: 0, open_receivable_bill_count: 2 }), "2 open receivable bills read from Tally");
-  assert.equal(readProvenance({ read_strategy: "voucher_scan", source_voucher_count: 0, open_receivable_bill_count: 0 }), "0 vouchers verified");
-  assert.equal(readProvenance({ read_strategy: "voucher_scan", source_voucher_count: 1, open_receivable_bill_count: 2 }), "1 voucher verified");
+  assert.equal(readProvenance({ read_strategy: "native_bills", open_receivable_bill_count: 1 }), "1 open receivable bill read from Tally");
+  assert.equal(readProvenance({ read_strategy: "native_bills", open_receivable_bill_count: 2 }), "2 open receivable bills read from Tally");
   assert.match(screen, /readProvenance: \{\s*read_strategy: inrCompleteResult\.read_strategy,/s);
   assert.match(screen, /read_strategy: OutstandingsReadProvenance\["read_strategy"\]/);
   assert.match(screen, /readProvenance: \{\s*read_strategy: inrCompleteResult\.read_strategy,/s);
   assert.match(runtime, /read_strategy: OutstandingsReadStrategy::NativeBills,/);
-  assert.match(runtime, /read_strategy: OutstandingsReadStrategy::VoucherScan,/);
   assert.ok(
     /all_open_bill_rows\(\s*&receivable_rows,\s*&payable_rows,\s*ageing_anchor,\s*&as_of,?\s*\)/.test(runtime),
     "native statement rows must consume both receivable and payable sources",

@@ -499,6 +499,15 @@ synthetic read responses and the exact native master/balance/group responses are
 the repository's `master_fields_lab` fixtures; every request in the lab run was bracketed by a
 200 `/status` response and every write was explicitly scoped to the lab company.
 
+**A sent list is not merged (PARTIAL; 2026-10-08; one licensed TallyPrime 7.1 Gold book, one
+stock item, once).** An `Alter` that carried a stock item's GST details list holding one new
+dated entry left the item with only the entry sent: its older entry, which held the HSN, was
+gone. The preservation above is of an omitted scalar field; a list that is sent stands for the
+whole list. Not measured: a ledger's lists (GST rate and HSN details, the dated registration
+history, the mailing details), and other releases. Until they are, a writer treats every list it
+sends as replacing the stored one, and sends the whole list as read, with its addition. The run's
+request and responses are not in this repository.
+
 ### 9.4b Master-name matching: case- and separator-insensitive, otherwise exact
 
 **VERIFIED 2026-07-30** — recorded in `IMPLEMENTATION_GUIDE.md` §3.3a's sibling §3.3b since then,
@@ -666,8 +675,8 @@ none is `ledger_not_found`; and **more than one is `ledger_ambiguous` — an err
 comparison that returns the first match is the failure this rule exists to prevent.
 
 **Copy its discipline, not its fold.** That resolver's `ledger_lookup_key` keeps only alphanumerics,
-which is *looser* than anything §3.3b measured — it drops `&` outright, so `A & B` and `AB` share a
-key.
+which is *looser* than anything `IMPLEMENTATION_GUIDE.md` §3.3b measured — it drops `&` outright,
+so `A & B` and `AB` share a key.
 
 Be exact about what was and was not tested there, because I was not. §3.3b sent
 `ZZ Ram AND Sons Pvt Ltd` against `ZZ Ram & Sons Pvt Ltd` and it was **rejected** — that tested

@@ -107,9 +107,12 @@ property that matters.**
 
 This is a rule Bridge chose, not an observation of Tally. `bridge-tally-protocol` exposes it as
 `mark_forbidden_numeric_references`. Its native collection parsers, the standard `List of
-Ledgers` catalogue, the Bridge-schema group and voucher-type parser, and every agent-facing parser
+Ledgers` catalogue, and every agent-facing parser
 in the app apply it to decoded text before an XML parser sees it, so one wire text has one
-spelling in all of them.
+spelling in all of them. (Note, 2026-10-12: the Bridge-schema group and voucher-type parser the
+list here once named was deleted; no shipped path sent those request shapes. **UNVERIFIED** that
+no real Tally ever answered one: `IMPROVEMENT_PLAN_2026H2.md` records Groups and Voucher Types as
+never probed on 2026-07-29, and nothing later is known to have probed them.)
 
 - A decimal or hexadecimal (`x` or `X`) numeric reference to a code point XML 1.0 forbids (a C0
   control other than tab, LF and CR, a surrogate, U+FFFE, U+FFFF, or beyond U+10FFFF) becomes the

@@ -1929,7 +1929,6 @@ async fn immediate_checkpoint_cas_loss_terminalizes_instead_of_returning_resumab
             gap_codes: Vec::new(),
             warning_codes: Vec::new(),
         }),
-        safe_mismatches: Vec::new(),
     };
     let result = engine
         .commit_decision(
@@ -3014,7 +3013,6 @@ async fn committed_over_budget_pending_recovers_exact_proof_without_hydration() 
             gap_codes: vec!["source_count_unavailable".to_string()],
             warning_codes: Vec::new(),
         }),
-        safe_mismatches: Vec::new(),
     };
     let connector = FakeConnector {
         batch: Mutex::new(VecDeque::new()),

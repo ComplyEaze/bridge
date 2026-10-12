@@ -45,8 +45,8 @@ use bridge_tally_protocol::native_trial_balance::{
 };
 use bridge_tally_protocol::native_voucher_type_numbering::parse_voucher_type_numbering;
 use bridge_tally_protocol::outstandings_shared::{
-    parse_company_book_extent, parse_company_book_extent_v2, parse_company_ledger_count,
-    CompanyBookExtent, CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
+    parse_company_book_extent_v2, parse_company_ledger_count, CompanyBookExtent,
+    CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
 };
 use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
@@ -60,8 +60,8 @@ use bridge_tally_protocol::{
     parse_native_voucher_type_source_records_with_evidence,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    parse_voucher_source_records_with_evidence, parse_vouchers_with_evidence,
-    ExpectedTallyTextEncoding, TallyImportApplicationStatus, TallyImportResult,
+    parse_voucher_source_records_with_evidence, ExpectedTallyTextEncoding,
+    TallyImportApplicationStatus, TallyImportResult,
 };
 use sha2::{Digest, Sha256};
 
@@ -276,7 +276,6 @@ const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
-const AARAV_NAME: &str = "Aarav Trading Company Demo";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
@@ -610,20 +609,8 @@ const ROWS: &[Row] = &[
         parser: "parse_company_gateway_capability_observation",
         parse: |_, text| gateway(text),
     },
-    // Company book extents: tests/outstandings_shared.rs (V1 and the split V2 tuple); the app's
+    // Company book extents: tests/outstandings_shared.rs (the split V2 tuple); the app's
     // replays for the rest, against the expectation built from the paired company list.
-    Row {
-        fixture: "tests/fixtures/unit_a_company_extent_live.xml",
-        source: Source::Captured,
-        parser: "parse_company_book_extent(Aarav)",
-        parse: |_, text| extent(parse_company_book_extent(text, AARAV_NAME, AARAV_GUID)),
-    },
-    Row {
-        fixture: "tests/fixtures/native/company_extent_9000.xml",
-        source: Source::Captured,
-        parser: "parse_company_book_extent(Aarav)",
-        parse: |_, text| extent(parse_company_book_extent(text, AARAV_NAME, AARAV_GUID)),
-    },
     Row {
         fixture: "tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml",
         source: Source::Captured,
@@ -1730,7 +1717,7 @@ const ROWS: &[Row] = &[
         parse: |_, text| party_masters(text, "6b43e498-430c-4d5c-bfef-d32e2ab93c85"),
     },
     // Group snapshots: tests/native_outstandings_live_fixtures.rs, tests/native_core_regressions.rs,
-    // tests/decoder_convergence.rs, src/native_outstandings/wire_group_tests.rs; the app's replays
+    // src/native_outstandings/wire_group_tests.rs; the app's replays
     // (src/reports/statements_tests.rs, src/agent_register_tests.rs, src/agent_import_bank_tests.rs,
     // src/agent_voucher_groups_tests.rs, src/tally/runtime_*_tests.rs) for the rest.
     Row {
@@ -2106,8 +2093,7 @@ const ROWS: &[Row] = &[
         parse: |_, text| bills(text, "20250401", "20260923"),
     },
     // The simulator's authored corpus (../tally-protocol-simulator/fixtures/PROVENANCE.md):
-    // tests/simulator_corpus.rs. `inconsistent_date_filter.xml` has no parsing test; it is a
-    // Bridge-schema voucher export, read here as `voucher_export.xml` is.
+    // tests/simulator_corpus.rs.
     Row {
         fixture: "../tally-protocol-simulator/fixtures/export_status_1.xml",
         source: Source::Synthetic,
@@ -2195,20 +2181,8 @@ const ROWS: &[Row] = &[
     Row {
         fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
         source: Source::Synthetic,
-        parser: "parse_vouchers_with_evidence",
-        parse: |_, text| untyped(parse_vouchers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
-        source: Source::Synthetic,
         parser: "parse_voucher_source_records_with_evidence",
         parse: |_, text| untyped(parse_voucher_source_records_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/inconsistent_date_filter.xml",
-        source: Source::Synthetic,
-        parser: "parse_vouchers_with_evidence",
-        parse: |_, text| untyped(parse_vouchers_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",
@@ -2283,22 +2257,35 @@ const APP_HIGH_WATER: &str = "recorded by the app crate's record (#1198 slice 2)
      parse_company_high_water / parse_company_marks (a company ALTVCHID/ALTMSTID read)";
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
-const VOUCHER_SCAN_AND_APP: &str = "recorded by the app crate's record (#1198 slice 2): \
-     parse_agent_rows; this crate parses it only through the voucher-scan feature's pub(super) \
-     parse_segment (behind verify_segment_pair), which the default build does not compile";
-const VOUCHER_SCAN_ONLY: &str = "parsed only by the voucher-scan feature's pub(super) \
-     parse_segment (behind verify_segment_pair), which the default build does not compile; no \
-     public parser of the default build reads this voucher export";
+const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
+     crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
+const GST_STATUS_READ: &str = "an answer of the GST status read (10 Oct 2026), which no parser of \
+     this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
+     tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
+     agent/gst-status/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    // The GST status read answers.
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-sales-window.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-three-vouchers.utf16le.xml",
+        GST_STATUS_READ,
+    ),
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml",
+        GST_STATUS_READ,
+    ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/l1-reentry-import.xml", IMPORT_REQUEST),
@@ -2430,6 +2417,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VERIFICATION,
     ),
     (
+        "tests/fixtures/agent/post-line-break-ledger-readback.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
         "tests/fixtures/agent/post-span-guid-absent.utf16le.xml",
         APP_VERIFICATION,
     ),
@@ -2514,30 +2505,30 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml",
         APP_FOREX_VOUCHERS,
     ),
-    // The legacy voucher-scan exports.
+    // Voucher exports captured for the removed voucher-scan parser.
     (
         "tests/fixtures/unit_a_optional_voucher_live.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/vouchers_gst_credit_periods_live.utf16le.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/vouchers_settle_then_reopen_live.utf16le.xml",
-        VOUCHER_SCAN_AND_APP,
+        APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/unit_a_vouchers_wildcard_live.xml",
-        VOUCHER_SCAN_ONLY,
+        VOUCHER_EXPORT_NO_PARSER,
     ),
     (
         "tests/fixtures/vouchers_ageing_corpus_live.utf16le.xml",
-        VOUCHER_SCAN_ONLY,
+        VOUCHER_EXPORT_NO_PARSER,
     ),
     // Built-in reports no parser reads.
     (

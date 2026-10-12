@@ -334,3 +334,49 @@ fn a_read_with_integrated_inventory_carries_its_opening_stock() {
         OpeningStock::Unknown(OpeningStockUnknown::NotRead)
     );
 }
+
+/// #1505: `load_book` reads the closing stock `financial_statements` adds from the Stock Summary
+/// part dated the trial balance's last day, for integrated inventory only.
+#[test]
+fn a_read_with_integrated_inventory_carries_its_closing_stock() {
+    use bridge_tax_audit::book::{load_book, ClosingStock, ClosingStockUnknown};
+    let plain = load_book(&open(&MemoryStore::synthetic()).unwrap(), "Invented").unwrap();
+    assert_eq!(plain.closing_stock, ClosingStock::NotApplicable);
+
+    let mut store = MemoryStore::synthetic();
+    let company = String::from_utf8(store.blobs["parts/company_object.xml"].clone()).unwrap();
+    let integrated = company.replacen(">No</ISINTEGRATED>", ">Yes</ISINTEGRATED>", 1);
+    assert_ne!(integrated, company);
+    replace_part(
+        &mut store,
+        "company",
+        "parts/company_object.xml",
+        integrated.into_bytes(),
+    );
+    // The synthetic Stock Summary is dated 31 March 2026, the trial balance's last day: its four
+    // closing values (-4750.00, 750.00, 1200.00, -3000.00) sum to 5800.00 Dr.
+    let book = load_book(&open(&store).unwrap(), "Invented").unwrap();
+    assert_eq!(book.closing_stock, ClosingStock::Valued(580_000));
+
+    // Dated another day, it is not the period end's.
+    let mut manifest = store.manifest();
+    part_mut(&mut manifest, "stock-summary-close")["as_of"] = json!("2025-09-30");
+    store.set_manifest(&manifest);
+    let book = load_book(&open(&store).unwrap(), "Invented").unwrap();
+    assert_eq!(
+        book.closing_stock,
+        ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)
+    );
+
+    // And with no Stock Summary part at all.
+    manifest["parts"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|part| part["kind"] != "stock_summary");
+    store.set_manifest(&manifest);
+    let book = load_book(&open(&store).unwrap(), "Invented").unwrap();
+    assert_eq!(
+        book.closing_stock,
+        ClosingStock::Unknown(ClosingStockUnknown::NotRead)
+    );
+}

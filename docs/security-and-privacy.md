@@ -65,9 +65,10 @@ and a request failed with a 400 error; the published file, switched on, was not
 started either ("Unable to connect to extension server"). Neither error mentioned
 the Terms (section 4). From 0.5.1 the setting is not marked required, so Claude
 Desktop starts the extension and every tool answers `terms_not_accepted`, naming
-the setting (bridge#1413). That was seen on one Mac with a test package; it has
-not yet been checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
-or `1` is not asked.
+the setting (bridge#1413). The tools the assistant called gave that answer on one
+Mac with a test package and on one Windows computer with the build our checks
+made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
+`true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -172,6 +173,13 @@ or `1` is not asked.
       and batch-wise settings as yes, no or not reported, and the currency
       symbol. It holds no amounts and no narrations, and `mask_parties` has
       nothing to shorten in it.
+    - The GSTR-1 status read (`gst_status`) sends the company name and its
+      identifier, the voucher type name you gave and the dates, and for each
+      voucher its number, date, voucher type name, Tally's identifier and
+      change number, and the voucher's GSTR-1 status (included, uncertain,
+      excluded or not in the return) and whether it was accepted as it
+      stands. It holds no amounts, no party or ledger names and no
+      narrations, and `mask_parties` has nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

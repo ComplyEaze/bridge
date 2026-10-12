@@ -1,0 +1,5 @@
+src-tauri/crates/bridge-tally-core/src/master_binding.rs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-transport/src/lib.rs
+src-tauri/crates/bridge-tally-transport/tests/http_transport.rs
+reviewer: lamemustafa

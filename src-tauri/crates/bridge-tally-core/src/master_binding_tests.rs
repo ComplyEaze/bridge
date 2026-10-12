@@ -3353,3 +3353,266 @@ fn indic_orthography_is_not_treated_as_deception() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// canonical_master_key -- the fold measured in §9.4d on licensed TallyPrime 7.1
+// ---------------------------------------------------------------------------
+
+#[test]
+fn canonical_master_key_folds_the_composed_9_4d_rules() {
+    let base = canonical_master_key("MB-PROBE-LEDGER-A");
+    assert_eq!(
+        canonical_master_key("MB PROBE LEDGER A"),
+        base,
+        "hyphen == space"
+    );
+    assert_eq!(
+        canonical_master_key("mb probe ledger a"),
+        base,
+        "case folds"
+    );
+    assert_eq!(
+        canonical_master_key("  mb probe  ledger a "),
+        base,
+        "surrounding + collapsed runs"
+    );
+    assert_eq!(
+        canonical_master_key("mb/probe/ledger/a"),
+        base,
+        "slash == space"
+    );
+}
+
+#[test]
+fn canonical_master_key_does_not_fold_unmeasured_separators() {
+    // §9.4d: an en dash and an underscore are ordinary characters to Tally,
+    // not separators -- a class-based fold would wrongly merge these.
+    assert_ne!(canonical_master_key("A_B"), canonical_master_key("A B"));
+    assert_ne!(
+        canonical_master_key("A\u{2013}B"),
+        canonical_master_key("A B")
+    );
+}
+
+#[test]
+fn canonical_master_key_does_not_normalise_unicode_forms() {
+    // §9.4d: "canonical equivalence is still refused" -- NFC vs NFD must stay
+    // distinguishable through this fold, unlike every other transformation.
+    let nfc = "\u{00e9}"; // é, single codepoint
+    let nfd = "e\u{0301}"; // e + combining acute accent
+    assert_ne!(canonical_master_key(nfc), canonical_master_key(nfd));
+}
+
+/// Characters biased to the folds' decisions: letters of both cases, ASCII and
+/// Unicode whitespace, the separators `-` and `/`, the Unicode dashes the wide
+/// fold unifies, an underscore and `&`, a few non-ASCII letters, and the
+/// letters and combining marks for which lowercasing and NFC do not commute
+/// (`J`/`T`/`H`/`W`/`Y` with a caron, macron below, diaeresis, Greek dialytika
+/// tonos or ring; `İ` and `i` with a dot above and a mark below it).
+const FOLD_ALPHABET: &[char] = &[
+    'a', 'B', 'c', 'Z', 'z', 'K', 'k', ' ', ' ', '\t', '\r', '\n', '\u{a0}', '\u{2003}', '-', '/',
+    '\u{2013}', '\u{2014}', '_', '&', '0', '9', '\u{e9}', '\u{c9}', '\u{3a3}', '\u{928}', 'J', 'j',
+    'T', 't', 'H', 'h', 'W', 'w', 'Y', 'y', 'I', 'i', '\u{130}', '\u{301}', '\u{30c}', '\u{331}',
+    '\u{308}', '\u{344}', '\u{30a}', '\u{307}', '\u{316}',
+];
+
+fn biased_string(max_len: usize) -> proptest::strategy::BoxedStrategy<String> {
+    use proptest::strategy::Strategy;
+    proptest::collection::vec(proptest::sample::select(FOLD_ALPHABET), 0..max_len)
+        .prop_map(|characters| characters.into_iter().collect::<String>())
+        .boxed()
+}
+
+/// `base` against a copy of itself changed character by character: kept,
+/// upper- or lower-cased, a space turned into `-` or `/` or doubled, then the
+/// whole copy left as is, decomposed (NFD) or composed (NFC). Pairs built this
+/// way share a fold key far more often than two independent strings do.
+fn related_pair(
+    base: proptest::strategy::BoxedStrategy<String>,
+) -> proptest::strategy::BoxedStrategy<(String, String)> {
+    use proptest::strategy::Strategy;
+    use unicode_normalization::UnicodeNormalization;
+    (base, proptest::collection::vec(0_u8..8, 0..16), 0_u8..3)
+        .prop_map(|(original, choices, form)| {
+            let mut changed = String::new();
+            for (position, character) in original.chars().enumerate() {
+                match choices.get(position).copied().unwrap_or(0) {
+                    2 => changed.extend(character.to_uppercase()),
+                    3 => changed.extend(character.to_lowercase()),
+                    4 if character == ' ' => changed.push('-'),
+                    5 if character == ' ' => changed.push('/'),
+                    6 if character.is_whitespace() => changed.extend([character, ' ']),
+                    _ => changed.push(character),
+                }
+            }
+            let changed = match form {
+                0 => changed,
+                1 => changed.nfd().collect(),
+                _ => changed.nfc().collect(),
+            };
+            (original, changed)
+        })
+        .boxed()
+}
+
+fn pair_generators() -> Vec<(
+    &'static str,
+    proptest::strategy::BoxedStrategy<(String, String)>,
+)> {
+    use proptest::strategy::Strategy;
+    vec![
+        (
+            "independent biased strings (up to 3 characters)",
+            (biased_string(4), biased_string(4)).boxed(),
+        ),
+        ("related biased strings", related_pair(biased_string(12))),
+        ("related arbitrary text", related_pair("\\PC{0,8}".boxed())),
+    ]
+}
+
+/// Runs `conclusion` on every generated pair satisfying `premise` (with a
+/// non-empty key, so an empty-equals-empty pair proves nothing), under a fixed
+/// seed, and returns how many pairs satisfied the premise in this very run.
+fn check_implication(
+    seed: u64,
+    strategy: &proptest::strategy::BoxedStrategy<(String, String)>,
+    premise_key: fn(&str) -> String,
+    conclusion_key: fn(&str) -> String,
+) -> usize {
+    let premises = std::cell::Cell::new(0_usize);
+    let mut runner = proptest::test_runner::TestRunner::new(proptest::test_runner::Config {
+        cases: 20_000,
+        rng_seed: proptest::test_runner::RngSeed::Fixed(seed),
+        failure_persistence: None,
+        ..proptest::test_runner::Config::default()
+    });
+    runner
+        .run(strategy, |(a, b)| {
+            let key = premise_key(&a);
+            if !key.is_empty() && key == premise_key(&b) {
+                premises.set(premises.get() + 1);
+                proptest::prop_assert_eq!(
+                    conclusion_key(&a),
+                    conclusion_key(&b),
+                    "premise key {:?} equal for {:?} / {:?}",
+                    key,
+                    a,
+                    b
+                );
+            }
+            Ok(())
+        })
+        .unwrap_or_else(|failure| panic!("{failure}"));
+    premises.get()
+}
+
+fn twin_key_0(value: &str) -> String {
+    let [wide, _, _] = twin_fold_keys(value);
+    wide
+}
+
+fn twin_key_1(value: &str) -> String {
+    let [_, narrow, _] = twin_fold_keys(value);
+    narrow
+}
+
+#[test]
+fn absence_key_is_the_third_twin_fold_key() {
+    for name in [
+        "Alpha Traders",
+        "Rent/Office\r\n",
+        "Cafe\u{301}/X",
+        "",
+        " - ",
+    ] {
+        assert_eq!(absence_key(name), twin_fold_keys(name)[2], "{name:?}");
+    }
+}
+
+/// Twin key 0 equal implies `absence_key` equal. `absence_key` is a function
+/// of key 0, so this is structural; the property pins it against a refactor.
+#[test]
+fn equality_on_twin_key_0_implies_equality_on_the_absence_key() {
+    for (index, (name, strategy)) in pair_generators().iter().enumerate() {
+        let premises = check_implication(
+            0x6162_7365_6E63_6500 + index as u64,
+            strategy,
+            twin_key_0,
+            absence_key,
+        );
+        eprintln!("key0 => absence_key, {name}: {premises} premise pairs of 20000");
+        assert!(premises >= 30, "{name}: only {premises} premise pairs");
+    }
+}
+
+/// Twin key 1 equal means equal up to ASCII case, `-`, `/` and ASCII-space
+/// runs, all of which `canonical_master_key` folds too.
+#[test]
+fn equality_on_twin_key_1_implies_equality_on_the_canonical_key() {
+    for (index, (name, strategy)) in pair_generators().iter().enumerate() {
+        let premises = check_implication(
+            0x6361_6E6F_6E00 + index as u64,
+            strategy,
+            twin_key_1,
+            canonical_master_key,
+        );
+        eprintln!("key1 => canonical, {name}: {premises} premise pairs of 20000");
+        assert!(premises >= 30, "{name}: only {premises} premise pairs");
+    }
+}
+
+/// The two keys the index matches on each catch pairs the other misses, so
+/// neither can be dropped: lowercasing and NFC do not commute.
+#[test]
+fn neither_the_canonical_key_nor_the_absence_key_subsumes_the_other() {
+    // Canonical only.
+    assert_eq!(
+        canonical_master_key("j\u{30c}"),
+        canonical_master_key("J\u{30c}")
+    );
+    assert_ne!(absence_key("j\u{30c}"), absence_key("J\u{30c}"));
+    // Absence key only: NFC against NFD, and an en dash against a space.
+    assert_ne!(
+        canonical_master_key("\u{e9}"),
+        canonical_master_key("e\u{301}")
+    );
+    assert_eq!(absence_key("\u{e9}"), absence_key("e\u{301}"));
+    assert_ne!(
+        canonical_master_key("A\u{2013}B"),
+        canonical_master_key("A B")
+    );
+    assert_eq!(absence_key("A\u{2013}B"), absence_key("A B"));
+}
+
+/// Search both ways over the generators for pairs one key accepts and the
+/// other does not, so the test above is not the only witness.
+#[test]
+fn each_key_catches_pairs_the_other_misses_in_generated_text() {
+    use proptest::strategy::{Strategy, ValueTree};
+    let mut runner = proptest::test_runner::TestRunner::deterministic();
+    let strategy = related_pair(biased_string(12));
+    let (mut canonical_only, mut absence_only) = (0_usize, 0_usize);
+    for _ in 0..20_000 {
+        let (a, b) = strategy.new_tree(&mut runner).expect("tree").current();
+        let canonical = canonical_master_key(&a) == canonical_master_key(&b);
+        let absence = absence_key(&a) == absence_key(&b);
+        canonical_only += usize::from(canonical && !absence);
+        absence_only += usize::from(absence && !canonical);
+    }
+    eprintln!("canonical only: {canonical_only}, absence key only: {absence_only} of 20000");
+    assert!(canonical_only > 0 && absence_only > 0);
+}
+
+/// An earlier version of the fold tests claimed that an equal canonical key
+/// always comes with an agreeing twin key. It does not: `İ` plus a mark of
+/// combining class below 230 lowercases to `i`, a dot above and the mark, a
+/// spelling NFC orders differently.
+#[test]
+fn an_equal_canonical_key_does_not_imply_an_agreeing_twin_key() {
+    let (a, b) = ("\u{130}\u{316}", "i\u{307}\u{316}");
+    assert_eq!(canonical_master_key(a), canonical_master_key(b));
+    assert!(twin_fold_keys(a)
+        .iter()
+        .zip(twin_fold_keys(b).iter())
+        .all(|(left, right)| left != right));
+}

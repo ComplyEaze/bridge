@@ -1,5 +1,6 @@
 //! Captured read replay with mode/date fault injection; no live Education calls.
 use super::*;
+use crate::tally::ConnectionStatus;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -78,7 +79,7 @@ fn stale_cache(runtime: &TallyRuntime, config: &TallyConfig) {
                 reachable: true,
                 compatible: true,
                 server_text: String::new(),
-                product: super::super::TallyProduct::Unknown,
+                product: super::super::connection::TallyProduct::Unknown,
                 error: None,
             },
             companies,

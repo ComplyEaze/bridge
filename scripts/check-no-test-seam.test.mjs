@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,6 +16,7 @@ import {
   holdsMarker,
   markedFiles,
   tauriBuildExecutables,
+  testBuildExecutables,
 } from "./check-no-test-seam.mjs";
 
 function scratch() {
@@ -50,7 +51,7 @@ test("the PDFium marker is the variable the Rust override reads, under bare cfg(
 });
 
 test("the stand-in marker is the one the approval stand-in example uses at run time", () => {
-  const source = readFileSync(new URL("../src-tauri/examples/approval_standin.rs", import.meta.url), "utf8");
+  const source = readFileSync(new URL("../src-tauri/crates/bridge-approval-standin/examples/approval_standin.rs", import.meta.url), "utf8");
   assert.ok(source.includes(`const STANDIN_MARKER: &str = "${STANDIN_MARKER}";`));
   assert.ok(source.includes("    std::hint::black_box(STANDIN_MARKER);\n"));
 });
@@ -252,4 +253,54 @@ test("each positive control passes on its own test build and fails on the other'
       assert.deepEqual(missing(result), [1, marker], `${control} without ${marker}`);
     }
   }
+});
+
+// A `cargo` that records its command line and answers like a build that made the two test executables, so the
+// commands the control runs are read, not assumed. (A shell script on the PATH: not run on Windows.)
+function withFakeCargo(run) {
+  const directory = scratch();
+  const log = join(directory, "cargo-calls.jsonl");
+  const shim = join(directory, "cargo");
+  writeFileSync(
+    shim,
+    `#!/usr/bin/env node
+const { appendFileSync } = require("node:fs");
+const args = process.argv.slice(2);
+appendFileSync(process.env.FAKE_CARGO_LOG, JSON.stringify(args) + "\\n");
+const artifact = (name, kind, test, executable) => JSON.stringify({ reason: "compiler-artifact", target: { name, kind: [kind] }, profile: { test }, executable });
+console.log(artifact("bridge_lib", "lib", true, "/fake/bridge_lib-test"));
+console.log(artifact("approval_standin", "example", false, "/fake/approval_standin"));
+`,
+  );
+  chmodSync(shim, 0o755);
+  const before = { PATH: process.env.PATH, FAKE_CARGO_LOG: process.env.FAKE_CARGO_LOG };
+  process.env.PATH = `${directory}${process.platform === "win32" ? ";" : ":"}${process.env.PATH}`;
+  process.env.FAKE_CARGO_LOG = log;
+  try {
+    const found = run(directory);
+    const calls = readFileSync(log, "utf8").trim().split("\n").map((line) => JSON.parse(line));
+    return { found, calls };
+  } finally {
+    for (const [name, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
+
+test("the release control builds the stand-in in its own package, never as an example of bridge", { skip: process.platform === "win32" }, () => {
+  const { found, calls } = withFakeCargo((directory) => testBuildExecutables(true, directory));
+  assert.deepEqual(found, { harness: "/fake/bridge_lib-test", standin: "/fake/approval_standin" });
+  const words = calls.map((call) => call.filter((word) => !word.startsWith("--manifest-path") && !word.includes("Cargo.toml")));
+  assert.deepEqual(words, [
+    ["test", "--no-run", "--lib", "-p", "bridge", "--release", "--locked", "--message-format=json"],
+    ["build", "--example", "approval_standin", "-p", "bridge-approval-standin", "--release", "--locked", "--message-format=json"],
+  ]);
+});
+
+test("the debug control reads both executables from one workspace build", { skip: process.platform === "win32" }, () => {
+  const { found, calls } = withFakeCargo((directory) => testBuildExecutables(false, directory));
+  assert.deepEqual(found, { harness: "/fake/bridge_lib-test", standin: "/fake/approval_standin" });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].slice(0, 3), ["test", "--no-run", "--workspace"]);
 });

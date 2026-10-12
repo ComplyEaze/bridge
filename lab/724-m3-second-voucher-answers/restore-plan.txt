@@ -1,0 +1,7 @@
+724-M3 s6 restore plan (written 2026-10-12T13:57:53Z, before any restore step).
+Backup file: TDBK1800_100048_1.001 (the #1393 run's backup taken after its Journal-type change), as found at C:\tieout\TDBK1800_100048_1.001, 27,354 B, last write 10-Oct-2026 11:07 IST, sha256 f3343cadf1ba17861519062f8a29653cd51d74ca2682deb224ca5be2d8610bb9.
+  The same folder also holds TDBK1800_100048.001 (27,199 B, 10-Oct 10:03): NOT used. To keep Tally from choosing it, only the _1 file was copied (byte-identical, sha256 f3343cadf1ba17861519062f8a29653cd51d74ca2682deb224ca5be2d8610bb9) to the restore SOURCE folder C:\bridge-lab\724-M3\s6-src\ (holds that one file only).
+Company: 100048 (BRIDGE REFUSAL LAB).
+Restore DESTINATION (new scratch data folder, empty, created for this step; never the live data path C:\Users\Public\TallyPrimeEditLog\data): C:\bridge-lab\724-M3\s6-scratch-data
+Expected restore screen: Destination = C:\bridge-lab\724-M3\s6-scratch-data; Source/Backup path = C:\bridge-lab\724-M3\s6-src; company listed = BRIDGE REFUSAL LAB (100048) only. Tally's "Accept ?" is expected; any other dialog, or a screen that differs (other destination, other company, a Replace/overwrite prompt), = STOP before confirming.
+Then: load that company alone from the scratch folder; Chart of Accounts > Voucher Types > Journal (alteration screen, the only route): screenshot Method of Voucher Numbering + Prevent duplicate Voucher Nos.; Ctrl+Q without accepting; shut the company; leave the scratch folder in place.

@@ -1,0 +1,13 @@
+# sha256  file  bytes (published copies; send-log.txt has the company GSTIN replaced by the same-length ZZZZZZZZZZZZZZZ; lab log.txt sha256 last)
+9a326b8094f77da24d47c74141ed748616e66761dea21d7567051cc8204f33ad  RESULTS.md  4311
+140a904381fec8ed3ff0eb583beda76d168ffafce3dbb6acf3150dab064506f7  answers/r1-outstandings-receivable-20260331.json  8446
+b54d5d070b03d64538488a42ab018efa169a64626d28427f1eefa68306ee7c56  answers/r2-profit-and-loss-fy2526.json  5257
+73fa72402bc080a64b56bdb35b595e5d1f7fa314d6f3e4c1adf8b19962a449ea  answers/r3-sales-register-fy2526-page2-extract.json  1697
+996b9d642efbf01933a214548ed494aed63ab38e12581a2a24db27af3d691b4b  answers/r3-sales-register-fy2526.json  93073
+de4d89b319eafd7655f1c98793a8da2eab5d2613b9d9f1e1622c7b8316181030  answers/r4-stock-summary-20260331.json  4144
+2444440eb5ae29020451dae2a742ac934271572194112f76725952e934514cc5  answers/r5-vouchers-20251114.json  2411
+a047c7eeb9fbeca6b7ca6d5be4c31d346d7e76094dd60f97a5e9bece24ddc08a  answers/r6-ledger-movement-saraswati-fy2526.json  1345
+0b42e0a55b1f6c119d7e3414533e39fd2f339f8d16593c64ccc5961c747ae1b2  implast.py  460
+77cedf4b72320e18e617cf92d62e396f36ac18f7bfc7469e5d887eae4c3397e4  import-log.txt  4494
+c968184f4d8f734528d4933c38682ba5f7c51cefb4beaa1b3ba37ed2f63088f8  send-log.txt  4625
+b531dceed83484a9dd2c2995c21df69a0e889296f9545aabe502a87fbc69d52a  (lab) log.txt  4625

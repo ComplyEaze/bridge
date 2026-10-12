@@ -2577,8 +2577,56 @@ async fn a_readback_refused_by_its_census_after_a_post_sends_the_caller_to_verif
         "The saved batch requires reconciliation. Use verify_import with this original batch; never rebuild it to retry."
     );
     assert!(result["error"].get("remediation").is_none(), "{response}");
+    // Nor a next step: one is given only when nothing was sent (#1573).
+    assert!(result["error"].get("next_step").is_none(), "{response}");
     assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
     assert_journaled_clean_create(directory.path());
+}
+
+/// #1573: a post refused before anything was sent carries the next step every
+/// other tool gives for its refusal. Here the window read before the approval
+/// is refused by its census, so the step is the census's, which may say to call
+/// again: nothing was sent, and the person is asked to approve again.
+/// Under the response budget `cause` needs, the step is left out with it.
+#[tokio::test]
+async fn a_post_refused_before_anything_was_sent_carries_its_next_step() {
+    let step = json!(crate::agent::refusal_remediation("part_census_mismatch").unwrap());
+    for (max_bytes, expected) in [
+        (200_000, Some(step)),
+        (crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET - 1, None),
+    ] {
+        let mut plans = Vec::new();
+        plans.extend(probe());
+        plans.extend(verified_company());
+        plans.extend(paired(
+            marks().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>1000</ALTVCHID>"),
+        ));
+        plans.extend(paired(captured_posted_journal()));
+        plans.extend(paired(empty_collection()));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let mut server = server_at(simulator.address(), directory.path());
+        let args = saved_captured_batch(&server);
+        server.settings.max_bytes = max_bytes;
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+        assert_eq!(
+            result["error"]["code"], "voucher_window_part_not_admitted",
+            "{response}"
+        );
+        assert_eq!(
+            result["error"].get("next_step").cloned(),
+            expected,
+            "{max_bytes}: {response}"
+        );
+    }
 }
 
 // bridge#551: a post goes only into a book with exactly one Currency master,

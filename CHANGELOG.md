@@ -118,6 +118,14 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A `post_import` refusal made before anything was sent now says what to do next.** Its
+  `error.next_step` carries the same step every other tool gives for that refusal: its code's,
+  or else its cause's. Before, a code raised inside the post, such as a date range too large to
+  check in one request, came back with no step. Only when the journal shows nothing was sent: a
+  refusal after a send, or when a send could not be ruled out, still carries no such step, and is
+  reconciled with `verify_import`. The steps the post already gave (a busy port, a row another
+  batch posted) are unchanged (#1573).
+
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
   its first debit ledger, so the person could not see what each Journal credited; it now shows

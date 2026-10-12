@@ -396,14 +396,22 @@ fn product_status_catalog_covers_prime_erp9_and_unknown() {
 
 #[test]
 fn utf8_bom_and_both_utf16_endiannesses_have_identical_text() {
-    let source = Fixture::NormalExport.body().into_owned();
+    // Native-shaped export text with Devanagari, a rupee sign, an escaped
+    // ampersand and a character outside the BMP (a UTF-16 surrogate pair).
+    let fixture = Fixture::SyntheticXml(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>\
+         <COLLECTION><LEDGER NAME=\"BVL \u{90f}\u{92a}\u{94d}\u{938}\u{93f}\u{932}\u{949}\u{928} \u{20b9} R&amp;D \u{1f4b0}\">\
+         <PARENT TYPE=\"String\">Sundry Debtors</PARENT></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"
+        .to_string(),
+    );
+    let source = fixture.body().into_owned();
     for encoding in [
         WireEncoding::Utf8,
         WireEncoding::Utf8Bom,
         WireEncoding::Utf16Le,
         WireEncoding::Utf16Be,
     ] {
-        let plan = ScenarioPlan::new(Fixture::NormalExport).with_encoding(encoding);
+        let plan = ScenarioPlan::new(fixture.clone()).with_encoding(encoding);
         let bytes = plan.response_bytes();
         assert_eq!(decode(&bytes).expect("decode supported encoding"), source);
 

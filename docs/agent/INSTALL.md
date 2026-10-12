@@ -155,9 +155,9 @@ A settings window opens with five lines. Go from top to bottom.
 | Line | What to do | What it is |
 | --- | --- | --- |
 | **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
-| **Tally host** | Do not change it. It says `localhost`. | "This computer". Only a local address is accepted. |
+| **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer's own address is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
-| **Response redaction** | Do not change it. It says `none`. | A way to limit what reaches the AI provider in Claude's answers. The other two values are `mask_parties` (shortens party names; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts, GSTIN and PAN, and company names are never hidden. |
+| **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. The other two values are `mask_parties` (shortens party names; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references are never hidden in what ComplyEaze Bridge sends to the AI provider. |
 | **Allow voucher posting (Journal, Payment, Receipt, Contra)** | Leave it **off**. | Lets Claude make entries in Tally, each one only after you approve it. |
 
 Click **Save**.
@@ -207,7 +207,7 @@ Still stuck? See [Help](#help).
   [Privacy Policy](https://bridge.complyeaze.com/privacy).
 - **Take a backup first** (Alt+Y, Backup & Restore, in TallyPrime).
 - **Leave Tally's port alone.** Do not open it to the internet, and do not try to reach a Tally on another computer.
-  ComplyEaze Bridge accepts only a local address on this computer.
+  ComplyEaze Bridge accepts only this computer's own address.
 - **Reading and posting are separate.** Asking questions reads. Preparing a voucher file and reading a bank statement
   write nothing to Tally. Only posting writes, and it is off in a new install.
 
@@ -234,7 +234,9 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   may leave ComplyEaze Bridge's data folder on the computer, unencrypted. It holds the import journal and saved batches
   (every voucher it prepared or posted, with dates, narrations, amounts and ledgers, unmasked), the bank-statement
   proposals (every row of a statement you asked it to read, with date, amount, bank reference and narration,
-  unmasked), and the receipt log (tool names, times and sizes; no names or amounts). Section 7 of the
+  unmasked, including the account number's last four digits), the receipt log (tool names, times and sizes; no
+  names or amounts), and a small record for each review of a posted voucher you record, including your
+  operating-system account name. Section 7 of the
   [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how to archive them: keep the import journal in an
   encrypted archive rather than deleting it. Section 4 of [Security and privacy](../security-and-privacy.md) lists
   every file.

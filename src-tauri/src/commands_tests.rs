@@ -197,6 +197,12 @@ fn setup_refuses_a_company_guid_that_is_not_strict_shaped_and_does_not_say_probe
             "{guid:?}: {}",
             error.message
         );
+        assert_eq!(error.retry, "not_recommended", "{guid:?}");
+        assert_eq!(
+            error.remediation,
+            "Contact ComplyEaze support and tell them this company's name.",
+            "{guid:?}"
+        );
         assert!(
             !error.message.contains("Probe again") && !error.remediation.contains("Probe again"),
             "probing again returns the same company: {error:?}"

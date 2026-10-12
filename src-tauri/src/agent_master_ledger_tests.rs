@@ -57,11 +57,7 @@ fn intent_for(batch: &MasterBatch) -> MasterDispatchIntent {
         items: batch
             .items
             .iter()
-            .map(|item| IntentItem {
-                name: item.name.clone(),
-                canonical_key: item.name.to_lowercase(),
-                absence_key: format!("absent:{}", item.name.to_lowercase()),
-            })
+            .map(|item| IntentItem::of(&item.name))
             .collect(),
         pre_image_sha256: digest('c'),
         pre_image_count: 2,
@@ -937,7 +933,7 @@ fn single(name: &str) -> MasterBatch {
     )
 }
 
-/// An intent whose keys are chosen, so a test can collide one key at a time.
+/// An intent whose recorded keys are overwritten, as a hand-edited line would be.
 fn keyed_intent(batch: &MasterBatch, canonical: &str, absence: &str) -> MasterDispatchIntent {
     let mut intent = intent_for(batch);
     for item in &mut intent.items {
@@ -947,28 +943,22 @@ fn keyed_intent(batch: &MasterBatch, canonical: &str, absence: &str) -> MasterDi
     intent
 }
 
-fn dispatched_batch(
-    name: &str,
-    canonical: &str,
-    absence: &str,
-) -> (MasterBatch, Vec<MasterRecord>) {
+fn dispatched_batch(name: &str) -> (MasterBatch, Vec<MasterRecord>) {
     let batch = single(name);
     let records = vec![
         MasterRecord::Batch(batch.clone()),
-        MasterRecord::DispatchIntent(keyed_intent(&batch, canonical, absence)),
+        MasterRecord::DispatchIntent(intent_for(&batch)),
     ];
     (batch, records)
 }
 
 #[test]
 fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
-    let (first, mut records) = dispatched_batch("Synthetic One", "key-one", "absent-one");
-    // The same ledger under a new batch id, by canonical key only.
-    for (name, canonical, absence) in [
-        ("Synthetic Two", "key-one", "absent-two"),
-        ("Synthetic Three", "key-three", "absent-one"),
-    ] {
-        let (_, second) = dispatched_batch(name, canonical, absence);
+    let (first, mut records) = dispatched_batch("Synthetic One");
+    // The same ledger under a new batch id: by case and separator (both keys),
+    // and NFC against NFD (the absence key only).
+    for name in ["SYNTHETIC-ONE", "Synthetic One\u{301}"] {
+        let (_, second) = dispatched_batch(name);
         let text = journal_text(&[records.clone(), second].concat());
         assert_eq!(
             read(&text).unwrap_err(),
@@ -980,14 +970,14 @@ fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
         "master_ledger_open_dispatch_overlaps"
     );
     // Other ledgers are not blocked.
-    let (_, other) = dispatched_batch("Synthetic Four", "key-four", "absent-four");
+    let (_, other) = dispatched_batch("Synthetic Four");
     assert!(read(&journal_text(&[records.clone(), other.clone()].concat())).is_ok());
     // An outcome left open by a verdict that settles nothing still blocks.
     records.push(MasterRecord::Verdict(verdict_for(
         &first,
         MasterVerdictState::MastersAfterPostUnconfirmed,
     )));
-    let (_, again) = dispatched_batch("Synthetic Two", "key-one", "absent-two");
+    let (_, again) = dispatched_batch("synthetic one");
     assert_eq!(
         read(&journal_text(&[records.clone(), again.clone()].concat())).unwrap_err(),
         MasterLedgerError::OpenDispatchOverlaps
@@ -1004,11 +994,11 @@ fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
 fn append_refuses_an_overlapping_intent_and_writes_nothing() {
     let directory = tempfile::tempdir().unwrap();
     let lock = lock();
-    let (_, first) = dispatched_batch("Synthetic One", "key-one", "absent-one");
+    let (_, first) = dispatched_batch("Synthetic One");
     for record in first {
         put(directory.path(), &lock, record).unwrap();
     }
-    let (_, second) = dispatched_batch("Synthetic One", "key-one", "absent-one");
+    let (_, second) = dispatched_batch("Synthetic One");
     put(directory.path(), &lock, second[0].clone()).unwrap();
     let before = std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap();
     assert_eq!(
@@ -1126,7 +1116,6 @@ fn an_intent_is_built_only_from_the_sidecar_written_for_its_batch() {
     let intent = MasterDispatchIntent::new(
         &batch,
         digest('b'),
-        intent_for(&batch).items,
         written,
         intent_for(&batch).pre_post_master_marks,
     )
@@ -1147,7 +1136,6 @@ fn an_intent_is_built_only_from_the_sidecar_written_for_its_batch() {
         MasterDispatchIntent::new(
             &batch,
             digest('b'),
-            intent_for(&batch).items,
             foreign,
             intent_for(&batch).pre_post_master_marks,
         )
@@ -1388,13 +1376,87 @@ fn an_intent_and_a_record_cannot_be_deserialised_outside_the_reader() {
 }
 
 #[test]
-fn names_that_fold_together_overlap_whatever_keys_the_caller_supplied() {
-    let (_, first) = dispatched_batch("Synthetic Rent", "key-a", "absent-a");
-    let (_, second) = dispatched_batch("synthetic   RENT", "key-b", "absent-b");
+fn an_intent_takes_its_items_and_keys_from_its_batch() {
+    let batch = batch_with(
+        &batch_id(),
+        &digest('a'),
+        vec![
+            ledger("J\u{30c}ournal-A", StoredLedgerKind::Suspense),
+            ledger("Cafe\u{301} Traders", StoredLedgerKind::Suspense),
+        ],
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let written = write_pre_image(directory.path(), &lock(), &batch, &pre_image()).unwrap();
+    let intent = MasterDispatchIntent::new(
+        &batch,
+        digest('b'),
+        written,
+        intent_for(&batch).pre_post_master_marks,
+    )
+    .unwrap();
+    let names: Vec<&str> = intent.items().iter().map(IntentItem::name).collect();
+    assert_eq!(names, batch.names());
+    for item in intent.items() {
+        assert_eq!(item.canonical_key(), canonical_master_key(item.name()));
+        assert_eq!(item.absence_key(), absence_key(item.name()));
+    }
+}
+
+#[test]
+fn names_decide_an_overlap_and_recorded_keys_do_not() {
+    // Names that may be one master overlap whatever keys the lines record.
+    let rent = single("Synthetic Rent");
+    let spaced = single("synthetic   RENT");
+    let records = |a: &MasterBatch, a_keys: (&str, &str), b: &MasterBatch, b_keys: (&str, &str)| {
+        journal_text(&[
+            MasterRecord::Batch(a.clone()),
+            MasterRecord::DispatchIntent(keyed_intent(a, a_keys.0, a_keys.1)),
+            MasterRecord::Batch(b.clone()),
+            MasterRecord::DispatchIntent(keyed_intent(b, b_keys.0, b_keys.1)),
+        ])
+    };
     assert_eq!(
-        read(&journal_text(&[first, second].concat())).unwrap_err(),
+        read(&records(
+            &rent,
+            ("key-a", "absent-a"),
+            &spaced,
+            ("key-b", "absent-b")
+        ))
+        .unwrap_err(),
         MasterLedgerError::OpenDispatchOverlaps
     );
+    // Names that are not one master do not overlap, even with equal recorded keys.
+    let other = single("Synthetic Water");
+    for keys in [("same", "absent-a"), ("key-a", "same"), ("same", "same")] {
+        let shared = (keys.0, keys.1);
+        assert!(
+            read(&records(&rent, ("same", "same"), &other, shared)).is_ok(),
+            "{keys:?}"
+        );
+    }
+}
+
+#[test]
+fn a_batch_or_an_overlap_refuses_a_pair_matching_on_one_index_key() {
+    // `J` + caron and `j` + caron share the canonical key, not the absence key;
+    // NFC and NFD share the absence key, not the canonical key.
+    for (a, b) in [
+        ("J\u{30c}ournal", "j\u{30c}ournal"),
+        ("Caf\u{e9} Traders", "Cafe\u{301} Traders"),
+    ] {
+        assert!(names_may_be_one_master(a, b), "{a:?} {b:?}");
+        assert!(names_may_be_one_master(b, a), "{a:?} {b:?}");
+        let (_, first) = dispatched_batch(a);
+        let (_, second) = dispatched_batch(b);
+        assert_eq!(
+            read(&journal_text(&[first, second].concat())).unwrap_err(),
+            MasterLedgerError::OpenDispatchOverlaps
+        );
+    }
+    assert!(!names_may_be_one_master(
+        "Synthetic Rent",
+        "Synthetic Water"
+    ));
 }
 
 #[test]
@@ -1493,6 +1555,9 @@ fn names_that_fold_together_cannot_share_a_batch() {
         &["Rent-A", "Rent A"][..],
         &["Rent/A", "Rent A"][..],
         &["Alpha", "Beta", "RENT\tA", "Rent A"][..],
+        &["J\u{30c}ournal", "j\u{30c}ournal"][..],
+        &["Caf\u{e9}", "Cafe\u{301}"][..],
+        &["Cafe\u{301}/A", "Caf\u{e9} a"][..],
     ] {
         assert_eq!(
             read(&line(&record(names))).unwrap_err(),
@@ -1602,10 +1667,10 @@ fn a_pre_image_cannot_be_deserialised_outside_the_reader() {
 
 #[test]
 fn the_summary_counts_open_intents() {
-    let (first, mut records) = dispatched_batch("Synthetic One", "key-one", "absent-one");
-    let (_, second) = dispatched_batch("Synthetic Two", "key-two", "absent-two");
+    let (first, mut records) = dispatched_batch("Synthetic One");
+    let (_, second) = dispatched_batch("Synthetic Two");
     records.extend(second);
-    let (_, never_sent) = dispatched_batch("Synthetic Three", "key-3", "absent-3");
+    let (_, never_sent) = dispatched_batch("Synthetic Three");
     records.push(never_sent[0].clone());
     records.push(MasterRecord::Verdict(verdict_for(
         &first,

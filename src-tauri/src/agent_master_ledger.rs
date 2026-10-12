@@ -24,15 +24,15 @@
 //! [`MasterJournal::dispatched`] reads without the lock and is for reporting,
 //! not a gate for a send.
 //!
-//! Two contracts a caller meets:
+//! What a caller relies on:
 //!
-//! - `canonical_key` and `absence_key` of an [`IntentItem`] are recorded as the
-//!   caller supplies them and must be the one shared derivation of the item
-//!   name (the master binding's canonical key and its absence key). No such
-//!   pair of functions exists in `bridge_tally_core::master_binding` yet (it has
-//!   `twin_fold_keys`), so this module does not compute them. The overlap
-//!   refusal therefore does not rest on them alone: it also compares
-//!   `twin_fold_keys` of the item names, which the module computes itself.
+//! - An intent's items are its batch's names, and this module derives each
+//!   item's `canonical_key` and `absence_key` from the name with the master
+//!   name index's two keys; a caller cannot supply them. Nothing decides on a
+//!   recorded key: whether two names may be one master (inside a batch, and
+//!   against an open dispatch) is computed from the names every time, by
+//!   [`names_may_be_one_master`], so a journal written before a fold widened is
+//!   still judged by the wider fold.
 //! - An intent with no terminal verdict blocks every overlapping batch for good.
 //!   The read-back-absent terminal state and the rules for it belong to the
 //!   dispatch slice; until then, recovering such a batch is an operator decision.
@@ -54,7 +54,7 @@ use super::ledger::{self, MAX_RECORD_BYTES};
 use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
-use bridge_tally_core::master_binding::twin_fold_keys;
+use bridge_tally_core::master_binding::{absence_key, canonical_master_key, twin_fold_keys};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Read};
@@ -181,12 +181,36 @@ pub(super) struct MasterBatch {
 }
 
 /// What the intent records of one item, so a later read can look for it again.
+/// Built only from a batch name ([`IntentItem::of`]); the keys are the record's,
+/// and no refusal reads them back (see the module notes).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct IntentItem {
-    pub(super) name: String,
-    pub(super) canonical_key: String,
-    pub(super) absence_key: String,
+    name: String,
+    canonical_key: String,
+    absence_key: String,
+}
+
+impl IntentItem {
+    fn of(name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            canonical_key: canonical_master_key(name),
+            absence_key: absence_key(name),
+        }
+    }
+
+    pub(super) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(super) fn canonical_key(&self) -> &str {
+        &self.canonical_key
+    }
+
+    pub(super) fn absence_key(&self) -> &str {
+        &self.absence_key
+    }
 }
 
 /// A company's master mark (`ALTMSTID`) in the last read before the post.
@@ -226,10 +250,10 @@ pub(super) struct MasterDispatchIntent {
 
 impl MasterDispatchIntent {
     /// The intent of `batch`, bound to the sidecar `pre_image` was written for.
+    /// Its items are the batch's names, in order.
     pub(super) fn new(
         batch: &MasterBatch,
         native_request_sha256: String,
-        items: Vec<IntentItem>,
         pre_image: WrittenPreImage,
         pre_post_master_marks: Vec<MasterMark>,
     ) -> Result<Self, PreImageError> {
@@ -240,7 +264,11 @@ impl MasterDispatchIntent {
             batch_id: batch.batch_id.clone(),
             batch_sha256: batch.batch_sha256.clone(),
             native_request_sha256,
-            items,
+            items: batch
+                .items
+                .iter()
+                .map(|item| IntentItem::of(&item.name))
+                .collect(),
             pre_image_sha256: pre_image.sha256,
             pre_image_count: pre_image.count,
             pre_post_master_marks,
@@ -582,16 +610,15 @@ impl MasterBatch {
         if self.items.is_empty() {
             return Err(Invalid::EmptyItems);
         }
-        // Two names Tally might take for one master (any fold the core knows,
-        // across every position) cannot go in one POST.
-        let mut folds = BTreeSet::new();
-        for item in &self.items {
+        // Two names Tally might take for one master cannot go in one POST.
+        for (position, item) in self.items.iter().enumerate() {
             item.validate()?;
-            let keys = twin_fold_keys(&item.name);
-            if keys.iter().any(|key| folds.contains(key)) {
+            if self.items[..position]
+                .iter()
+                .any(|earlier| names_may_be_one_master(&earlier.name, &item.name))
+            {
                 return Err(Invalid::DuplicateName);
             }
-            folds.extend(keys);
         }
         match self.class {
             MasterClass::LedgerCreate => Ok(()),
@@ -775,7 +802,7 @@ impl MasterJournal {
     }
 
     /// Whether another batch was dispatched, has no terminal verdict, and names
-    /// any ledger `intent` names (by canonical key or by absence key).
+    /// a ledger that may be one master with a ledger `intent` names.
     fn overlaps_open_dispatch(&self, intent: &MasterDispatchIntent) -> bool {
         self.batches
             .values()
@@ -784,11 +811,10 @@ impl MasterJournal {
             .filter(|open| open.batch_id != intent.batch_id)
             .any(|open| {
                 open.items.iter().any(|held| {
-                    intent.items.iter().any(|new| {
-                        new.canonical_key == held.canonical_key
-                            || new.absence_key == held.absence_key
-                            || names_may_be_one_master(&new.name, &held.name)
-                    })
+                    intent
+                        .items
+                        .iter()
+                        .any(|new| names_may_be_one_master(&new.name, &held.name))
                 })
             })
     }
@@ -902,9 +928,16 @@ fn read_error(code: String) -> MasterLedgerError {
     }
 }
 
-/// Whether Tally might take two names for one master: they agree on any fold
-/// the core knows. Computed here from the names, not supplied by a caller.
+/// Whether Tally might take two names for one master: they agree on either key
+/// the master name index matches on (`canonical_master_key`, `absence_key`), or
+/// on any `twin_fold_keys` fold in any position. The index's keys are the rule
+/// the dispatch checks the books with; the twin folds keep this journal from
+/// ever being narrower than it was. Computed from the names, never from a
+/// recorded key.
 fn names_may_be_one_master(a: &str, b: &str) -> bool {
+    if canonical_master_key(a) == canonical_master_key(b) || absence_key(a) == absence_key(b) {
+        return true;
+    }
     let b_keys = twin_fold_keys(b);
     twin_fold_keys(a).iter().any(|key| b_keys.contains(key))
 }

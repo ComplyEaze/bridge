@@ -1,0 +1,5 @@
+Payment vouchers after Payment type saved as Manual (Bridge MCP vouchers voucher_class Payment 20260401-20270331, 08:31:02Z, response_sha256 98a153d83d45419ea10c13cb85878e515b7d2822d33981b65f1a384571d875e0, state complete, total 32; snapshot master_alter_id 226 (was 224), voucher_alter_id 87 (unchanged)).
+Every one of the 32 Payment vouchers now reads voucher_number "" (blank); before: 1..32.
+master_id, alter_id, guid, date, amounts and narration of every voucher are unchanged from the 08:25:47Z read (alter_ids 2,3,4,5,12-15,22-25,32-35,42-45,52-55,65-70,73,74).
+Prompts seen (in order): "Changing the method of voucher numbering will affect voucher numbers of existing transactions. Continue?" (Yes, twice, once on choosing Manual and once on leaving the field again) and on Ctrl+A "Are you sure you want to update the voucher numbers of existing vouchers? Y: Accept Master & Update Vouchers / N: Back" (Y).
+Prevent creating duplicate Voucher Nos.: shows No; the cursor skips it (keyboard Enter/Shift+Tab, mouse click/double-click, re-opening the alteration); not set.

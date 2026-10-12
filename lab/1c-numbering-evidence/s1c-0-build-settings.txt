@@ -1,0 +1,1 @@
+bridge_mcp.exe sha256 411f7cca80ca4a5fee543f4f44d14b911ce23e982169785b1762d8d50472e5a6 (installed extension, running pid 10124); settings enable_writes true, enable_batch_post true, redaction none (Claude Extensions Settings json) at 2026-10-12T08:23:26Z

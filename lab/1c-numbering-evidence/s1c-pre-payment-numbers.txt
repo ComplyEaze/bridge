@@ -1,0 +1,35 @@
+Payment vouchers before 1c (Bridge MCP vouchers voucher_class Payment 20260401-20270331, 08:25:47Z, response_sha256 be5ddc3b1a41e5ae4c1fdd7aa1d6d0088adf67cbc0091a092107653afb5df75b, state complete, total 32, voucher mark 87, master mark 224)
+voucher_number master_id date
+1 2
+2 3
+3 4
+4 5
+5 12
+6 13
+7 14
+8 15
+9 22
+10 23
+11 24
+12 25
+13 32
+14 33
+15 34
+16 35
+17 42
+18 43
+19 44
+20 45
+21 52
+22 53
+23 54
+24 55
+25 65
+26 66
+27 67
+28 68
+29 69
+30 70
+31 73
+32 74
+Dates: 1-4 on 20260715; 5-8 20260716; 9-12 20260717; 13-16 20260718; 17-20 20260719; 21-24 20260720; 25-26 20260804; 27-28 20260805; 29-30 20260806; 31-32 20260808. Numbers 1..32 contiguous.

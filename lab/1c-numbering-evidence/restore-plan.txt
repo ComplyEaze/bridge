@@ -1,0 +1,7 @@
+1c restore plan (<lane> option a), written before the restore at 2026-10-12T08:32:05Z
+Backup to restore: C:\bridge-lab\1c\backup-pre\TDBK1800_100050.001 (57,180 B, sha256 a7a2c589ec8e05c510a6448ce8ee9eafa68e7596e5364f37397f461e754d3298, taken 08:25Z before any 1c change)
+Company being restored: BRIDGE BATCH LAB, company number 100050 (only this company is selected)
+Restore Data Path (destination): C:\Users\Public\TallyPrimeEditLog\data (BATCH LAB's existing data folder, as Tally's company list shows)
+Company is shut before the restore; no other company is loaded or selected.
+STOP before confirming if the restore screen differs from this plan, or on any repair / rewrite / migrate offer.
+Restore done 2026-10-12T08:34:11Z. Prompts: 'Accept ? Yes or No' (Yes); 'Company data folder (100050) already exists. Selecting Skip will cancel the Restore process for this company. Selecting Replace will overwrite the existing folder. R: Replace / S: Skip' (Replace). No repair/migrate offer.

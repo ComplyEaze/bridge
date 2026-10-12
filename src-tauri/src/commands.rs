@@ -2033,13 +2033,17 @@ async fn fetch_selected_ledger_entries_once(
     })
 }
 
-/// STUB for the failing-first run: the always-host version a test must refuse.
+/// What ends the ledger-master export's balances: the date the CA chose, else
+/// the Bridge host's (#903). The host's date is asked for only when none was
+/// chosen, so a chosen date never reads the clock.
 fn party_ledger_master_balance_basis(
     chosen: Option<TallyDate>,
     host_today: impl FnOnce() -> Result<TallyDate, TallyCommandError>,
 ) -> Result<BalanceDateBasis, TallyCommandError> {
-    let _ = chosen;
-    host_today().map(BalanceDateBasis::HostToday)
+    match chosen {
+        Some(requested) => Ok(BalanceDateBasis::Requested(requested)),
+        None => host_today().map(BalanceDateBasis::HostToday),
+    }
 }
 
 fn requested_outstandings_as_of(

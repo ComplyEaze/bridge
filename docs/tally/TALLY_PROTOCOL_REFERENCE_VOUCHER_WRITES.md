@@ -184,11 +184,20 @@ observation.**
   Voucher Nos." as No, and the field never took focus (keyboard or mouse). So Manual with
   duplicates prevented could not be set by hand there. The capture above shows the same field
   set on a Payment screen elsewhere, so this is not a rule.
-- **Inference, not measured:** a stored voucher field can change while neither the voucher's
-  `ALTERID` nor `ALTVCHID` moves. A read that treats a voucher as unchanged because its AlterID
-  has not moved could keep a stale voucher number.
+- **Consequence:** a stored voucher field can change while neither the voucher's `ALTERID` nor
+  `ALTVCHID` moves.
+  - **Checked in the code, 2026-10-12:** no ComplyEaze Bridge read reuses a number across such a
+    change. The held `vouchers` pages compare both company marks, so this switch's `ALTMSTID`
+    move refuses or re-reads them; the mirror re-reads and hashes content; and the
+    `changed_since` cursor is disabled.
+  - A change that moves neither mark would still be served from held pages until they expire,
+    as already documented for them.
   - A native post is unaffected: it supplies no voucher number, and its read-back compares the
     number only when the batch supplied one.
+  - **Known limit:** an amendment's build-time check treats an unchanged `ALTERID` as "not
+    altered since verified", and compares the number only when the batch supplied one. So a
+    blanked number does not stop such a build. Posting an amendment natively is refused, so no
+    post follows from it.
 - Evidence: the never-merged branch `lab/1c-numbering-evidence` (`s1c-RESULT.md`,
   `s1c-pre-payment-numbers.txt`, `s1c-after-manual-payment-numbers.txt`).
 

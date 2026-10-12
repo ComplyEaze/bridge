@@ -75,8 +75,10 @@ key; **Ctrl** is the **Control** key.
      > all of the Mac's addresses. If the rule cannot be limited like that, the Mac's firewall must block the port
      > from outside. Two tests: (1) `http://localhost:9000/status` opens in Safari on the Mac; (2) from another
      > computer on the same network, first confirm it can reach this Mac at all (for example, it can open a page or
-     > a shared folder the Mac offers); then `http://<this Mac's network address>:9000/status` must NOT open. A
-     > computer that cannot reach the Mac at all proves nothing.
+     > a shared folder the Mac offers); then `http://<this Mac's network address>:9000/status` must NOT open. If the
+     > Windows virtual machine has its own address on the network (for example in bridged networking), then
+     > `http://<the virtual machine's network address>:9000/status` must NOT open either. A computer that cannot
+     > reach the Mac at all proves nothing.
 
 In Claude Desktop on a Mac, a candidate build of 0.4.0 has been installed and its tools have loaded in a chat. The
 package CI built for 0.4.1 was later installed over it, and two tools, `tally_status` and `list_companies`, answered
@@ -92,8 +94,9 @@ it on. It changes one setting in TallyPrime and no data.
 without asking for a password. In one test by a maintainer on TallyPrime 7.1, a browser on another computer on the
 same network opened the Tally computer's network address and the port, and got Tally's "TallyPrime Server is Running"
 answer. We did not test what else the gateway shows. ComplyEaze Bridge only ever calls Tally from this same computer, but the setting is Tally's own. What keeps
-other computers out is this computer's firewall. Check that the firewall does not allow incoming connections to the
-port, and that you are on a network you trust.
+other computers out is the firewall of the computer Tally runs on: on a Mac, that is the Windows firewall inside the
+virtual machine. Check that the firewall does not allow incoming connections to the port, and that you are on a
+network you trust.
 
 1. Open TallyPrime and open your test company.
 2. Press **F1**. A Help menu opens. Choose **Settings**, then **Connectivity**.

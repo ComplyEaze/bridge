@@ -70,7 +70,7 @@ These changes are in source and not yet in a published build.
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
   every other compared field matched and it read `posted_verified`, and a divergent voucher never
   listed a narration difference. A narration edited in Tally after the post therefore leaves the
-  batch unsettled until it is reviewed. The read-back, the post's span binding and the amendment
+  batch unsettled until the narration in Tally matches the approved text again. The read-back, the post's span binding and the amendment
   check now share one comparison: the text as written (trimmed, with its `[BRIDGE:…]` tag for a
   file imported by hand) against the text read, byte for byte; a narration Tally holds none of
   equals only an empty one written. Whether Tally changes trailing spaces or line breaks on import

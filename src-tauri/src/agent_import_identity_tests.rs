@@ -420,6 +420,39 @@ fn a_narration_edited_in_tally_reads_divergent() {
     assert_eq!(result["counts"]["posted_verified"], 0);
 }
 
+/// A voucher matched by its content only is compared against the narration
+/// its batch wrote, and only reports it (#1608): an untagged row reads as a
+/// native post wrote it, so a native batch lists nothing, while a file's batch,
+/// which wrote the tag, lists the narration the row lacks.
+#[test]
+fn a_content_match_reports_the_narration_its_batch_wrote() {
+    let (captured, line) = captured_journal_and_line();
+    let untagged = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = line.vouchers[0].narration.clone();
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
+    let native = verify_batch(&line, &untagged, Attribution::Span(None)).unwrap();
+    assert_eq!(
+        native["vouchers"][0]["status"], "matching_content_observed",
+        "{native}"
+    );
+    assert_eq!(native["vouchers"][0]["diffs"], json!([]));
+    let file = verify_batch(&line, &untagged, Attribution::Tag).unwrap();
+    assert_eq!(
+        file["vouchers"][0]["status"], "matching_content_observed",
+        "{file}"
+    );
+    assert_eq!(file["vouchers"][0]["diffs"], json!(["narration"]));
+}
+
 /// The GUID found the row, but its MasterID is not the one bound: refused,
 /// never attributed (the GUID is the company GUID plus the MasterID).
 #[test]

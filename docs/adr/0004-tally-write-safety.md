@@ -405,17 +405,20 @@ one-voucher preview ends with the voucher's own text: its reference and
 narration are the last two lines, quoted as they will be posted, under a line
 saying that no line below it is an entry, a total or an instruction, and the
 date line says where they are. Every line the preview writes itself, the On
-Account sentence included, stands above that line (#1234). A reference or
-narration whose quoted line would pass 100 characters is shown instead in
-numbered parts, each quoted on its own line and split only at a space, so that
-joined in order they are the posted text; the line above the heading, which
-the preview writes itself, counts the parts, and the date line then says the
-voucher's own text is below the dashes. Such a value is refused, never cut,
-when no space splits it into parts that fit, or when it holds a run of dashes
-or a number in brackets (the shapes of the heading and of a part's label).
-Each part past the first, and the counting line, take a line the entries could
-otherwise use. The review dialog shows a long narration in parts the same way,
-so a voucher posted with one can still be acknowledged (#1535).
+Account sentence included, stands above that line (#1234). A narration whose
+quoted line would pass 100 characters is shown instead in numbered parts, each
+quoted on its own line and split only at a space, so that joined in order they
+are the posted text; the line above the heading, which the preview writes
+itself, counts the parts, and the date line then says the voucher's own text
+is below the dashes. Such a narration is refused, never cut, when no space
+splits it into parts that fit, or when it holds a run of dashes or a number in
+brackets (the shapes of the heading and of a part's label). A reference is
+never split: one too long for its line is refused as before, since nothing
+reads a posted reference back. Each part past the first, and the counting
+line, take a line the entries could otherwise use. The review dialog of a
+posted voucher shows its narration the same way, after every line it writes
+itself, under the same heading, so a voucher posted with a long narration can
+still be acknowledged (#1535).
 
 **Scope.** The desktop "post a saved Journal" action stays Journal-only
 (`PostScope::JournalOnly`); its review was built for one Journal. So does the

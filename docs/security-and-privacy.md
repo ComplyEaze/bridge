@@ -400,9 +400,11 @@ refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
 characters it cannot show safely, or do not fit, it refuses. In the next build,
-a reference or narration too long for one line is shown instead in numbered
-parts, each quoted and split only at a space, under a line that counts them;
-one that cannot be split so is still refused (#1535). A window for a
+a narration too long for one line is shown instead in numbered parts, each
+quoted and split only at a space, under a line that counts them; one that
+cannot be split so, and a reference too long for one line, are still refused.
+The review window for a posted voucher shows its narration last, under the
+same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten

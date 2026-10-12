@@ -3751,76 +3751,63 @@ fn parts_below(lines: &[&str], label: &str) -> Vec<String> {
         .collect()
 }
 
-/// #1535: a narration or reference too long for one line is shown in parts
-/// below the heading, each quoted on its own line and split only at a space,
-/// so that joined in order they are the posted text. The line above the
-/// heading counts them, the date line points below the dashes, and the
-/// desktop Journal route shows the same text.
+/// #1535: a narration too long for one line is shown in parts below the
+/// heading, each quoted on its own line and split only at a space, so that
+/// joined in order they are the posted text. The line above the heading
+/// counts them, the date line points below the dashes, and the desktop
+/// Journal route shows the same text. A reference is never split.
 #[test]
-fn a_long_voucher_text_is_shown_in_quoted_parts_below_the_dashes() {
+fn a_long_narration_is_shown_in_quoted_parts_below_the_dashes() {
     let (mut line, endpoint) = batch();
     let narration = "Synthetic statement row: cash deposit at the branch counter 000123 | Synthetic Bank Ledger | 03-08-2026 | cash purpose not confirmed";
-    let reference = "Synthetic reference that is long enough to need two parts in this approval dialog, with spaces in it";
-    for (reference, count, reference_parts) in [
-        (
-            "REF-1",
-            "the reference in 1 part, the narration in 2 parts.",
-            1,
-        ),
-        (
-            reference,
-            "the reference in 2 parts, the narration in 2 parts.",
-            2,
-        ),
-    ] {
-        line.vouchers[0].narration = Some(narration.into());
-        line.vouchers[0].reference = Some(reference.into());
-        refresh_batch_sha256(&mut line);
-        let text = review_preview_with(&line, &endpoint, &[]).unwrap();
-        let lines: Vec<&str> = text.lines().collect();
-        let heading = lines
+    line.vouchers[0].narration = Some(narration.into());
+    refresh_batch_sha256(&mut line);
+    let text = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let heading = lines
+        .iter()
+        .position(|shown| *shown == VOUCHER_TEXT_HEADING)
+        .unwrap();
+    assert_eq!(
+        lines[heading - 1],
+        "Below the dashes: the reference on one line, then the narration in 2 parts.",
+        "{text}"
+    );
+    assert_eq!(
+        lines[4],
+        format!("Date: 20260901  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE_PARTS}"),
+        "{text}"
+    );
+    // One dashed line, and everything the voucher wrote is under it.
+    assert_eq!(
+        lines.iter().filter(|shown| shown.contains("----")).count(),
+        1
+    );
+    let below = &lines[heading + 1..];
+    assert_eq!(below[0], "Reference: \"REF-1\"", "{text}");
+    let parts = parts_below(below, "Narration");
+    assert_eq!(parts.len(), 2, "{text}");
+    assert_eq!(below.len(), 1 + parts.len(), "{text}");
+    assert_eq!(parts.concat(), narration, "{text}");
+    assert!(parts[0].ends_with(' '), "{text}");
+    assert!(
+        lines
             .iter()
-            .position(|shown| *shown == VOUCHER_TEXT_HEADING)
-            .unwrap();
-        assert_eq!(
-            lines[heading - 1],
-            format!("Below the dashes: {count}"),
-            "{text}"
-        );
-        assert_eq!(
-            lines[4],
-            format!("Date: 20260901  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE_PARTS}"),
-            "{text}"
-        );
-        // One dashed line, and everything the voucher wrote is under it.
-        assert_eq!(
-            lines.iter().filter(|shown| shown.contains("----")).count(),
-            1
-        );
-        let below = &lines[heading + 1..];
-        let narration_parts = parts_below(below, "Narration");
-        assert_eq!(narration_parts.concat(), narration, "{text}");
-        assert_eq!(narration_parts.len(), 2, "{text}");
-        assert!(narration_parts[0].ends_with(' '), "{text}");
-        if reference_parts == 1 {
-            assert_eq!(below[0], "Reference: \"REF-1\"", "{text}");
-            assert_eq!(below.len(), 1 + narration_parts.len(), "{text}");
-        } else {
-            let parts = parts_below(below, "Reference");
-            assert_eq!(parts.concat(), reference, "{text}");
-            assert_eq!(parts.len(), reference_parts, "{text}");
-            assert_eq!(below.len(), parts.len() + narration_parts.len(), "{text}");
-        }
-        assert!(
-            lines
-                .iter()
-                .all(|shown| shown.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS),
-            "{text}"
-        );
-        assert!(VOUCHER_TEXT_CUE_PARTS.chars().count() <= VOUCHER_TEXT_CUE.chars().count() + 2);
-        // The desktop Journal route shows the same text.
-        assert_eq!(admit_saved_journal(&line, &endpoint).unwrap().1, text);
-    }
+            .all(|shown| shown.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS),
+        "{text}"
+    );
+    assert!(VOUCHER_TEXT_CUE_PARTS.chars().count() <= VOUCHER_TEXT_CUE.chars().count() + 2);
+    // The desktop Journal route shows the same text.
+    assert_eq!(admit_saved_journal(&line, &endpoint).unwrap().1, text);
+    // A reference too long for one line is refused, as before.
+    line.vouchers[0].reference = Some(
+        "Synthetic reference that is long enough to pass one line of this approval dialog, with spaces".into(),
+    );
+    refresh_batch_sha256(&mut line);
+    assert_eq!(
+        review_preview_with(&line, &endpoint, &[]).unwrap_err(),
+        "import_review_too_large"
+    );
 }
 
 /// #1535: a narration in parts that holds the On Account legend's words and a

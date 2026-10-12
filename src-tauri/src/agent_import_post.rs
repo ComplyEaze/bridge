@@ -2551,7 +2551,8 @@ pub(super) use on_account::ON_ACCOUNT_LEGEND;
 use on_account::{reads_like_the_legend, ReviewText};
 #[cfg(test)]
 use on_account::{ON_ACCOUNT_MARK, ON_ACCOUNT_UNMARKED};
-pub(super) use voucher_text::{VoucherText, VoucherTextRefusal};
+use voucher_text::VoucherText;
+pub(super) use voucher_text::VoucherTextRefusal;
 
 fn review_preview_with(
     line: &ImportLedgerLine,
@@ -2608,16 +2609,14 @@ fn review_text(
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
-    let reference = voucher_text_lines("Reference", voucher.reference.as_deref())?;
-    let narration = voucher_text_lines("Narration", super::posted_narration(voucher))?;
-    // In parts (#1535), the date line points below the dashed line, and the
-    // line above it, which ComplyEaze Bridge writes, counts the parts.
-    let parts = (reference.len() > 1 || narration.len() > 1).then(|| {
-        let count = |n: usize| format!("{n} part{}", if n == 1 { "" } else { "s" });
+    let narration = approval_narration_lines(super::posted_narration(voucher))?;
+    // A narration in parts (#1535): the date line points below the dashed
+    // line, and the line above it, which ComplyEaze Bridge writes, counts the
+    // parts. A reference is never split: it stays one line, under the caps.
+    let parts = (narration.len() > 1).then(|| {
         format!(
-            "Below the dashes: the reference in {}, the narration in {}.",
-            count(reference.len()),
-            count(narration.len())
+            "Below the dashes: the reference on one line, then the narration in {} parts.",
+            narration.len()
         )
     });
     let cue = if parts.is_some() {
@@ -2635,8 +2634,17 @@ fn review_text(
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
         .chain(parts)
-        .chain(std::iter::once(VOUCHER_TEXT_HEADING.to_string()))
-        .chain(reference)
+        .chain([
+            VOUCHER_TEXT_HEADING.to_string(),
+            format!(
+                "Reference: {}",
+                voucher
+                    .reference
+                    .as_deref()
+                    .map(quoted)
+                    .unwrap_or_else(|| "(none)".into())
+            ),
+        ])
         .chain(narration)
         .collect::<Vec<_>>()
         .join("\n");
@@ -2658,35 +2666,41 @@ pub(super) const VOUCHER_TEXT_HEADING: &str =
     "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----";
 /// What the date line of a one-voucher approval text says about them.
 pub(super) const VOUCHER_TEXT_CUE: &str = "(the voucher's own text: last two lines)";
-/// What it says when the reference or the narration is shown in parts
-/// (#1535): the line above the heading counts them.
+/// What it says when the narration is shown in parts (#1535): the line
+/// above the heading counts them.
 pub(super) const VOUCHER_TEXT_CUE_PARTS: &str = "(the voucher's own text: below the dashes)";
 /// The most characters a line of a one-voucher approval text takes.
 const REVIEW_LINE_CHARS: usize = 100;
 
-/// A reference's or narration's lines under the heading: `<label>: <quoted>`
-/// or `<label>: (none)` when it fits one line, as before #1535; else
-/// `<label> (k): <quoted part>` for each part, split only at a space. A value
-/// that cannot be shown so is refused, never cut.
-fn voucher_text_lines(label: &str, value: Option<&str>) -> Result<Vec<String>, String> {
+/// A narration's lines under the heading: `Narration: <quoted>` or
+/// `Narration: (none)` when it fits one line, as before #1535; else
+/// `Narration (k): <quoted part>` for each part, split only at a space. A
+/// narration that cannot be shown so is refused, never cut. The one-voucher
+/// approval and review texts both show a narration so.
+pub(super) fn narration_lines(value: Option<&str>) -> Result<Vec<String>, VoucherTextRefusal> {
+    const LABEL: &str = "Narration";
     let Some(text) = value else {
-        return Ok(vec![format!("{label}: (none)")]);
+        return Ok(vec![format!("{LABEL}: (none)")]);
     };
-    let one_line = REVIEW_LINE_CHARS - format!("{label}: ").chars().count();
+    let one_line = REVIEW_LINE_CHARS - format!("{LABEL}: ").chars().count();
     let shown = VoucherText::of(text, one_line, |k| {
-        REVIEW_LINE_CHARS.saturating_sub(format!("{label} ({k}): ").chars().count())
-    })
-    .map_err(|refusal| match refusal {
-        VoucherTextRefusal::DoesNotFit => "import_review_too_large".to_string(),
-        VoucherTextRefusal::Layout => ReviewTextRefusal::Layout.import_code(),
+        REVIEW_LINE_CHARS.saturating_sub(format!("{LABEL} ({k}): ").chars().count())
     })?;
     Ok(match shown.parts() {
-        [only] => vec![format!("{label}: {}", voucher_text::quoted(only))],
+        [only] => vec![format!("{LABEL}: {}", voucher_text::quoted(only))],
         parts => parts
             .iter()
             .enumerate()
-            .map(|(at, part)| format!("{label} ({}): {}", at + 1, voucher_text::quoted(part)))
+            .map(|(at, part)| format!("{LABEL} ({}): {}", at + 1, voucher_text::quoted(part)))
             .collect(),
+    })
+}
+
+/// [`narration_lines`] for the approval: a refusal as the import code.
+fn approval_narration_lines(value: Option<&str>) -> Result<Vec<String>, String> {
+    narration_lines(value).map_err(|refusal| match refusal {
+        VoucherTextRefusal::DoesNotFit => "import_review_too_large".to_string(),
+        VoucherTextRefusal::Layout => ReviewTextRefusal::Layout.import_code(),
     })
 }
 

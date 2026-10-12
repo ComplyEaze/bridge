@@ -46,7 +46,11 @@ fn the_review_shows_the_doubt_and_the_voucher() {
         "Record that you reviewed ONE Journal in \"Books\"",
         "  \"Cash\"",
         "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
-        "Narration:\n  \"Paid\"",
+        "\nNarration: below the dashes\nDr 1.00",
+        &format!(
+            "reconciliation_required.\n{}\nNarration: \"Paid\"",
+            post::VOUCHER_TEXT_HEADING
+        ),
         "Dr 1.00  \"Ledger 0\"",
         "Cr 1.00  \"Ledger 1\"",
         &format!("Batch: {BATCH}"),
@@ -114,38 +118,45 @@ fn a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is() 
 /// a cap that stopped being checked lets its fixture through.
 #[test]
 fn each_review_cap_refuses_on_its_own() {
+    // Every line of the characters fixture is at most 100 wide and there are
+    // at most 24: the text passes 1,600 characters only by being full.
     let wide_ledgers = |entries: usize| {
         let mut voucher = row(entries, "Paid");
         for (index, entry) in voucher.entries.iter_mut().enumerate() {
-            entry.ledger = format!("{index:02}{}", "L".repeat(85));
+            entry.ledger = format!("{index:02}{}", "L".repeat(87));
         }
+        voucher.voucher_number = Some("V".repeat(45));
         voucher
     };
-    let long_doubt = json!({"state":"posted_under_changed_masters","ledgers":["D".repeat(90)]});
+    let long_doubt = json!({"state":"posted_under_changed_masters","ledgers":["D".repeat(96)]});
+    let long_company = "C".repeat(55);
     let cases = [
-        ("line_width", row(2, &"n".repeat(120)), doubt()),
-        ("lines", row(20, "Paid"), doubt()),
+        ("line_width", row(2, &"n".repeat(120)), doubt(), "Books"),
+        ("lines", row(20, "Paid"), doubt(), "Books"),
         (
             "characters",
             {
-                let mut voucher = wide_ledgers(10);
-                voucher.narration = Some("n".repeat(90));
+                let mut voucher = wide_ledgers(8);
+                voucher.narration = Some("n".repeat(87));
                 voucher
             },
             long_doubt,
+            long_company.as_str(),
         ),
     ];
-    for (cap, voucher, doubt) in cases {
-        let preview = review_preview(BATCH, MARKER, "Books", &doubt, &voucher);
+    for (cap, voucher, doubt, company) in cases {
+        let preview = review_preview(BATCH, MARKER, company, &doubt, &voucher);
         assert_eq!(preview, Err("ack_review_too_large".to_string()), "{cap}");
-        let rendered = render_review_text(BATCH, MARKER, "Books", &doubt, &voucher).unwrap();
+        let rendered = render_review_text(BATCH, MARKER, company, &doubt, &voucher).unwrap();
         assert_eq!(caps_exceeded(&rendered), [cap], "{cap}: only its own cap");
     }
 }
 
 #[test]
 fn a_review_too_long_to_show_is_refused_not_truncated() {
-    assert!(review_preview(BATCH, MARKER, "Books", &doubt(), &row(10, "Paid")).is_ok());
+    // Nine entries fit under the narration's heading (#1535); the approval
+    // window fits fewer, so every voucher it posted can be reviewed.
+    assert!(review_preview(BATCH, MARKER, "Books", &doubt(), &row(9, "Paid")).is_ok());
     assert_eq!(
         review_preview(BATCH, MARKER, "Books", &doubt(), &row(40, "Paid")),
         Err("ack_review_too_large".to_string())
@@ -191,11 +202,12 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
     }
 }
 
-/// #1535: a narration too long for one line is shown in parts, each quoted
-/// on its own line and split only at a space, under a line that counts them,
-/// so that a voucher posted with it can still be reviewed.
+/// #1535: the review shows the narration as the approval does, after every
+/// line ComplyEaze Bridge writes, under the approval's heading: on one line,
+/// or when too long for one, in quoted parts split only at a space, counted
+/// on the line in its place; so a voucher posted with it can be reviewed.
 #[test]
-fn a_long_narration_is_reviewed_in_quoted_parts() {
+fn a_long_narration_is_reviewed_in_quoted_parts_under_the_heading() {
     let narration = "Synthetic statement row: cash deposit at the branch counter 000123 | Synthetic Bank Ledger | 03-08-2026 | cash purpose not confirmed";
     let preview = review_preview(
         BATCH,
@@ -205,24 +217,30 @@ fn a_long_narration_is_reviewed_in_quoted_parts() {
         &row(2, &format!("{narration} {MARKER}")),
     )
     .unwrap();
-    let (_, after) = preview.split_once("Narration, in 2 parts:\n").unwrap();
-    let parts: Vec<String> = after
+    assert!(
+        preview.contains("\nNarration: below the dashes, in 2 parts\nDr 1.00"),
+        "{preview}"
+    );
+    let (above, below) = preview
+        .split_once(&format!("\n{}\n", post::VOUCHER_TEXT_HEADING))
+        .unwrap();
+    assert!(above.ends_with("reconciliation_required."), "{preview}");
+    let parts: Vec<String> = below
         .lines()
-        .take(2)
         .enumerate()
         .map(|(at, shown)| {
-            let quoted = shown.strip_prefix(&format!("  ({}) ", at + 1)).unwrap();
+            let quoted = shown
+                .strip_prefix(&format!("Narration ({}): ", at + 1))
+                .unwrap_or_else(|| panic!("{shown}: {preview}"));
             serde_json::from_str(quoted).unwrap()
         })
         .collect();
+    assert_eq!(parts.len(), 2, "{preview}");
     assert_eq!(parts.concat(), narration, "{preview}");
     assert!(
         preview.lines().all(|shown| shown.chars().count() <= 100),
         "{preview}"
     );
-    // A short one is shown on one line as before.
-    let short = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid")).unwrap();
-    assert!(short.contains("Narration:\n  \"Paid\"\n"), "{short}");
     // A long one holding a part label's shape is refused, never cut.
     assert_eq!(
         review_preview(
@@ -245,7 +263,7 @@ fn the_narration_is_shown_whole_except_this_batchs_trailing_marker() {
     let shown = |narration: &str| {
         let preview = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, narration)).unwrap();
         preview
-            .split_once("Narration:\n  ")
+            .split_once(&format!("{}\nNarration: ", post::VOUCHER_TEXT_HEADING))
             .unwrap()
             .1
             .lines()
@@ -1310,8 +1328,7 @@ fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             "",
             "As it is in Tally now:",
             "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
-            "Narration:",
-            "  \"Paid\"",
+            "Narration: below the dashes",
             r#"Dr 1.00  Line break  "Ledger 0\r\n""#,
             "Dr 1.00  \"Ledger 1\"",
             r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",
@@ -1320,6 +1337,8 @@ fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
             &format!("Choosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally."),
             "It is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,",
             "and the batch still reads reconciliation_required.",
+            post::VOUCHER_TEXT_HEADING,
+            "Narration: \"Paid\"",
         ]
         .join("\n")
     );

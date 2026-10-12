@@ -622,10 +622,12 @@ is accepted, and loud.
 ## Amendment — owner decision, 2026-10-12: one posting setting for one voucher and a batch
 
 This supersedes "exactly one voucher per call" in the sections above (the "What it can send" item
-and the "Small batches" row), the MCPB key named in the "Gates" item and row 2 (now
-`enable_posting_2026_10`), and the 2026-09-22 amendment's "one voucher per call", and replaces the
-setting described in "batch posting behind a setting" below; that amendment otherwise stands, and
-its safeguards, summary approval and outcome rules are unchanged (#1090).
+and the "Small batches" row), the MCPB key `enable_writes` and the desktop's `writes_enabled: true`
+in the "Gates" item (now `enable_posting_2026_10` and `Posting::On`), row 2's "an earlier install may
+still have 'on' saved", and the 2026-09-22 amendment's "one voucher per call". It replaces the
+setting described in the amendment "batch posting behind a setting (slice D2a)" above; that
+amendment otherwise stands, and its safeguards, summary approval and outcome rules are unchanged
+(#1090).
 
 - **One setting.** `BRIDGE_AGENT_ENABLE_WRITES` governs every post: one voucher per approval, or a
   saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, under one approval
@@ -635,7 +637,7 @@ its safeguards, summary approval and outcome rules are unchanged (#1090).
   voucher posting, one voucher or a batch of up to 50". The released `enable_writes` offered one
   voucher at a time, so a value stored for it is mapped to nothing and every upgrader starts with
   posting off, as for the Terms (`agent_terms.rs`). This covers the extension only: a hand-set
-  `BRIDGE_AGENT_ENABLE_WRITES=true` on the command line now admits batches with no new prompt,
+  `BRIDGE_AGENT_ENABLE_WRITES=true` on the command line now admits batches with no new consent setting,
   by design (#1090), and the changelog says so. An absent or empty value, or the key's own
   unresolved placeholder, reads as off; any other value that is not a plain boolean still refuses at
   startup. What Claude Desktop passes for a new key on an upgrade is not yet measured.

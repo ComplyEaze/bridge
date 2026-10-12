@@ -868,10 +868,12 @@ async fn the_retired_batch_setting_refuses_one_voucher_but_not_a_review() {
     );
     assert!(sent(simulator).is_empty());
     let review = server.call_tool("acknowledge_post_review", args).await;
-    let code = &review["structuredContent"]["result"]["error"]["code"];
-    assert!(code.is_string(), "{review}");
-    assert_ne!(code, "setting_retired", "{review}");
-    assert_ne!(code, "import_posting_disabled", "{review}");
+    // Its own first refusal for a batch never posted: the call reached the
+    // review's handler rather than a gate in front of it.
+    assert_eq!(
+        review["structuredContent"]["result"]["error"]["code"], "ack_batch_not_posted",
+        "{review}"
+    );
 }
 
 /// The same REMOTEID recorded by another process while the dialog is open is

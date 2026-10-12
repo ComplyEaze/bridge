@@ -365,7 +365,7 @@ impl Settings {
             #[cfg(unix)]
             DirectoryAdmissionError::Permissions => "agent_data_dir_permissions_failed".to_string(),
         })?;
-        let posting = posting_from_env(|name| env::var_os(name))?;
+        let posting = posting_from_env(process_variable)?;
         let writes_enabled = posting.enabled();
         Ok(Self {
             endpoint,
@@ -418,6 +418,10 @@ fn posting_setting(value: Option<&str>) -> Result<bool, String> {
         Some("" | POSTING_PLACEHOLDER) => Ok(false),
         other => boolean_setting(other),
     }
+}
+
+fn process_variable(name: &str) -> Option<std::ffi::OsString> {
+    env::var_os(name)
 }
 
 /// The posting setting and whether the retired batch setting is present, read

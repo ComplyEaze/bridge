@@ -166,7 +166,7 @@ async fn empty_company_response_stops_after_one_request_and_retains_no_marker() 
                 continue;
             }
         };
-        assert_eq!(receipt.operations.len(), 5);
+        assert_eq!(receipt.operations.len(), 3);
         assert_eq!(receipt.operations[0].safe_reason_code.as_deref(), None);
         assert_eq!(receipt.operations[0].outcome, OperationOutcome::Passed);
         assert_eq!(receipt.operations[1].outcome, OperationOutcome::Failed);

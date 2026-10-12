@@ -114,8 +114,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, and a name written inside a narration or reference stays
-    as it is.
+    addresses or IFSCs, or the last four digits of a bank statement's account
+    number (`account_last4`), and a name written inside a narration or reference
+    stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.

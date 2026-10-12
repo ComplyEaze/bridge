@@ -479,8 +479,9 @@ installations default to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties`
 or `drop_narration` (one value, not both) before launch when that better fits
 the workflow. These settings shorten party and ledger names and bank account
 numbers or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
-IFSC, MSME or Udyam registration numbers, contact details or references. The
-package installation settings expose the same choices.
+IFSC, MSME or Udyam registration numbers, contact details or references, or the
+last four digits of a bank statement's account number. The package installation
+settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed
 or Education mode are observed, then list the loaded companies. Select a

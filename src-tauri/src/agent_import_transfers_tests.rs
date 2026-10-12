@@ -480,3 +480,33 @@ fn a_double_booking_names_the_other_batch_whichever_side_the_build_is() {
     assert_eq!(double_booked_with(&two, "batch-b"), Some("batch-a"));
     assert_eq!(double_booked_with(&view_of(Vec::new()), "batch-a"), None);
 }
+
+#[test]
+fn trimming_a_section_adds_to_what_was_already_left_out() {
+    let TransferSummary::Computed { .. } = many_open(10) else {
+        panic!("computed");
+    };
+    let mut section = many_open(10).render(usize::MAX);
+    section["open_omitted"] = json!(5);
+    let trimmed = trim_section(&section, 3);
+    assert_eq!(trimmed["open"].as_array().unwrap().len(), 3);
+    assert_eq!(trimmed["open_omitted"], 12);
+    assert!(trimmed["next_steps"]["open_omitted"].is_string());
+    // keeping every row of a section that left nothing out changes nothing
+    let whole = many_open(10).render(usize::MAX);
+    assert_eq!(trim_section(&whole, 10), whole);
+    assert_eq!(trim_section(&whole, 99), whole);
+    // counts only: no step texts, and no step for rows not cut
+    let counts = counts_only_section(&whole);
+    assert_eq!(counts["open_omitted"], 10);
+    assert_eq!(
+        counts["next_steps"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
+        ["open_omitted"]
+    );
+    let empty = many_open(0).render(usize::MAX);
+    assert_eq!(counts_only_section(&empty)["next_steps"], json!({}));
+}

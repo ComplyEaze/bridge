@@ -975,24 +975,35 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
 }
 
 #[tokio::test]
-async fn a_skip_two_contras_could_carry_can_be_withdrawn() {
+async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
+    const PAIRED: &str = "st-20260901-00000000000000d1";
+    const THIRD: &str = "st-20260901-00000000000000c3";
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
         [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
-        .await;
-    // bank B's statement books two equal Contras, both verified
+    // a row that pairs by reference, and one that two Contras could carry
+    rig.build(a_skips(
+        directory.path(),
+        &[(SKIPPED, None), (PAIRED, Some(REFERENCE))],
+    ))
+    .await;
+    // bank B's statement books three equal Contras, all verified
     let built = rig
         .build(statement_v2(
             directory.path(),
             BANK_B,
             window(),
-            json!([contra_voucher(BOOKED), contra_voucher(OTHER_BOOKED)]),
+            json!([
+                contra_voucher(BOOKED),
+                contra_voucher(OTHER_BOOKED),
+                contra_voucher(THIRD)
+            ]),
             json!([
                 contra_record(BOOKED, None),
-                contra_record(OTHER_BOOKED, None)
+                contra_record(OTHER_BOOKED, None),
+                contra_record(THIRD, Some(REFERENCE))
             ]),
         ))
         .await;
@@ -1000,6 +1011,11 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn() {
     let built = rig.build(withdrawing(directory.path())).await;
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
+    // the withdrawn row is held by the new batch
+    let rows = open_rows(&built["transfers"]);
+    assert!(rows
+        .iter()
+        .any(|row| row["bridge_txn_id"] == SKIPPED && row["state"] == "held_elsewhere"));
 }
 
 // ---- a small response cap, hundreds of open rows --------------------------------

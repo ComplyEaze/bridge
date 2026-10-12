@@ -679,4 +679,12 @@ fn a_section_that_already_fits_or_is_not_computed_is_left_alone() {
     let mut note = json!({"result": {"items": [], "padding": "x".repeat(2_000),
         "transfers": {"state": "not_established", "next_steps": {}}}});
     assert!(fit_response(&mut note, "", 500, |value| len_of(value)).is_err());
+    // and a page cut around it leaves it as it was
+    let items: Vec<Value> = (0..50).map(|id| json!({"id": id})).collect();
+    let mut paged = json!({"result": {"offset": 0, "items": items,
+        "transfers": {"state": "not_established", "next_steps": {"check_not_run": "again"}}}});
+    let before = paged["result"]["transfers"].clone();
+    assert!(fit_response(&mut paged, "", 300, |value| len_of(value)).unwrap());
+    assert!(paged["result"]["items"].as_array().unwrap().len() < 50);
+    assert_eq!(paged["result"]["transfers"], before);
 }

@@ -255,7 +255,13 @@ test("main.tsx tells the Outstandings screen whether the operator chose the As o
   const element = frontend.slice(start, frontend.indexOf("/>", start));
   assert.match(element, /asOf=\{outstandingsAsOfSelection\.value\}/);
   assert.match(element, /asOfOperatorSelected=\{outstandingsAsOfSelection\.operatorSelected\}/);
+  // The screen reports the operator's date through the handler that marks it as chosen;
+  // a no-op handler would leave the automatic (host) date in force for the export.
+  assert.match(element, /onAsOfChange=\{changeOutstandingsAsOf\}/);
   // An operator's date is the one that marks it as chosen; the automatic one never does.
-  assert.match(frontend, /setOutstandingsAsOfSelection\(operatorSelectedOutstandingsAsOf\(value\)\)/);
+  assert.match(
+    frontend,
+    /const changeOutstandingsAsOf = React\.useCallback\(\(value: string\) => \{\s*setOutstandingsAsOfSelection\(operatorSelectedOutstandingsAsOf\(value\)\);/,
+  );
   assert.match(frontend, /useState\(\s*\(\) => automaticOutstandingsAsOf\(\),\s*\)/);
 });

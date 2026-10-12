@@ -1,0 +1,169 @@
+Phase 4 element parse (phase3-parse.py modes), run 2026-10-12T14:55:43Z.
+
+== m1-before R-PARTY
+m1-before-R-PARTY: 24366 bytes; LEDGER rows 10
+(MLab M1 Party absent before, as expected)
+
+######## M1-PARTY
+m1-M1-PARTY-M1-PARTY: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+n-e-after-R-MARKS: 3310 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=223 ALTVCHID=absent
+after:
+m1-M1-PARTY-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=224 ALTVCHID=absent
+m1-M1-PARTY-after-R-V3: 17544 bytes; LEDGER rows 11; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Party', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Party' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 ALTERID=224 PARENT='Sundry Debtors' ISBILLWISEON='Yes' NAMES=['MLab M1 Party']
+
+######## M1-SUSP
+m1-M1-SUSP-M1-SUSP: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-PARTY-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=224 ALTVCHID=absent
+after:
+m1-M1-SUSP-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=225 ALTVCHID=absent
+m1-M1-SUSP-after-R-V3: 18838 bytes; LEDGER rows 12; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Suspense' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 ALTERID=225 PARENT='Suspense A/c' ISBILLWISEON='No' NAMES=['MLab M1 Suspense']
+
+######## M1-DUTY-CGST
+m1-M1-DUTY-CGST-M1-DUTY-CGST: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-SUSP-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=225 ALTVCHID=absent
+after:
+m1-M1-DUTY-CGST-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=226 ALTVCHID=absent
+m1-M1-DUTY-CGST-after-R-V3: 20148 bytes; LEDGER rows 13; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Duty CGST', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Duty CGST' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 ALTERID=226 PARENT='Duties & Taxes' ISBILLWISEON='No' NAMES=['MLab M1 Duty CGST']
+
+######## M1-DUTY-IGST
+m1-M1-DUTY-IGST-M1-DUTY-IGST: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-DUTY-CGST-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=226 ALTVCHID=absent
+after:
+m1-M1-DUTY-IGST-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=227 ALTVCHID=absent
+m1-M1-DUTY-IGST-after-R-V3: 21458 bytes; LEDGER rows 14; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Duty CGST', 'MLab M1 Duty IGST', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Duty IGST' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da ALTERID=227 PARENT='Duties & Taxes' ISBILLWISEON='No' NAMES=['MLab M1 Duty IGST']
+
+######## M1-DUTY-STATE
+m1-M1-DUTY-STATE-M1-DUTY-STATE: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-DUTY-IGST-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=227 ALTVCHID=absent
+after:
+m1-M1-DUTY-STATE-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=228 ALTVCHID=absent
+m1-M1-DUTY-STATE-after-R-V3: 22788 bytes; LEDGER rows 15; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Duty CGST', 'MLab M1 Duty IGST', 'MLab M1 Duty State Tax', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Duty State Tax' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db ALTERID=228 PARENT='Duties & Taxes' ISBILLWISEON='No' NAMES=['MLab M1 Duty State Tax']
+
+######## M1-DUTY-SGSTUTGST
+m1-M1-DUTY-SGSTUTGST-M1-DUTY-SGSTUTGST: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-DUTY-STATE-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=228 ALTVCHID=absent
+after:
+m1-M1-DUTY-SGSTUTGST-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=229 ALTVCHID=absent
+m1-M1-DUTY-SGSTUTGST-after-R-V3: 24122 bytes; LEDGER rows 16; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Duty CGST', 'MLab M1 Duty IGST', 'MLab M1 Duty SGST UTGST', 'MLab M1 Duty State Tax', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Duty SGST UTGST' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc ALTERID=229 PARENT='Duties & Taxes' ISBILLWISEON='No' NAMES=['MLab M1 Duty SGST UTGST']
+
+######## M1-DUTY-UT
+m1-M1-DUTY-UT-M1-DUTY-UT: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-DUTY-SGSTUTGST-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=229 ALTVCHID=absent
+after:
+m1-M1-DUTY-UT-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=230 ALTVCHID=absent
+m1-M1-DUTY-UT-after-R-V3: 25440 bytes; LEDGER rows 17; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Duty CGST', 'MLab M1 Duty IGST', 'MLab M1 Duty SGST UTGST', 'MLab M1 Duty State Tax', 'MLab M1 Duty UT Tax', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Duty UT Tax' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd ALTERID=230 PARENT='Duties & Taxes' ISBILLWISEON='No' NAMES=['MLab M1 Duty UT Tax']
+
+######## M1-DUTY-CESS
+m1-M1-DUTY-CESS-M1-DUTY-CESS: 538 bytes utf-16
+  CREATED: ['1']
+  ALTERED: ['0']
+  DELETED: ['0']
+  LASTVCHID: ['0']
+  LASTMID: ['0']
+  COMBINED: ['0']
+  IGNORED: ['0']
+  ERRORS: ['0']
+  CANCELLED: ['0']
+  EXCEPTIONS: ['0']
+before:
+m1-M1-DUTY-UT-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=230 ALTVCHID=absent
+after:
+m1-M1-DUTY-CESS-after-R-MARKS: 3308 bytes; COMPANY rows 1; BRIDGE MASTERS LAB GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6 ALTMSTID=231 ALTVCHID=absent
+m1-M1-DUTY-CESS-after-R-V3: 26750 bytes; LEDGER rows 18; all: ['Cash', 'MLab Alias Target', 'MLAB CASE TARGET', 'MLab Dash Target', 'MLab Exact Target', 'MLab Fresh Party', 'MLab Group Target', 'MLab M1 Duty Cess', 'MLab M1 Duty CGST', 'MLab M1 Duty IGST', 'MLab M1 Duty SGST UTGST', 'MLab M1 Duty State Tax', 'MLab M1 Duty UT Tax', 'MLab M1 Party', 'MLab M1 Suspense', 'MLab Slash Target', 'MLab  Space Target', 'Profit & Loss A/c']
+  ROW NAME='MLab M1 Duty Cess' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de ALTERID=231 PARENT='Duties & Taxes' ISBILLWISEON='No' NAMES=['MLab M1 Duty Cess']
+
+== m1-end R-PARTY (each new ledger as returned)
+LEDGER rows 18
+MLab M1 Duty Cess: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de PARENT='Duties & Taxes' TAXTYPE='GST' GSTDUTYHEAD='Cess' PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'
+MLab M1 Duty CGST: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 PARENT='Duties & Taxes' TAXTYPE='GST' GSTDUTYHEAD='CGST' PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'
+MLab M1 Duty IGST: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da PARENT='Duties & Taxes' TAXTYPE='GST' GSTDUTYHEAD='IGST' PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'
+MLab M1 Duty SGST UTGST: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc PARENT='Duties & Taxes' TAXTYPE='GST' GSTDUTYHEAD='SGST/UTGST' PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'
+MLab M1 Duty State Tax: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db PARENT='Duties & Taxes' TAXTYPE='GST' GSTDUTYHEAD='State Tax' PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'
+MLab M1 Duty UT Tax: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd PARENT='Duties & Taxes' TAXTYPE='GST' GSTDUTYHEAD='UT Tax' PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'
+MLab M1 Party: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 PARENT='Sundry Debtors' TAXTYPE='Others' GSTDUTYHEAD=absent PARTYGSTIN='ZZZZZZZZZZZZZZZ' OPENINGBALANCE='0.00' LANGUAGEID='0'
+  LEDGSTREGDETAILS.LIST elements: 1 ; child elements in each: [0] ; text: ["'     '"]
+MLab M1 Suspense: GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 PARENT='Suspense A/c' TAXTYPE='Others' GSTDUTYHEAD=absent PARTYGSTIN=absent OPENINGBALANCE='0.00' LANGUAGEID='0'

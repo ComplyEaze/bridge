@@ -38,13 +38,14 @@ def text(n, extra=None, drop=None):
     return k
 k_log = text('log.txt', drop=r' \(item [^)]*\)')
 k_p3 = text('phase3-parse.txt')
+k_p4 = text('phase4-parse.txt') if os.path.exists(os.path.join(SRC, 'phase4-parse.txt')) else 0
 for n in ('phase2-parse.txt', 'phase2-parse.py', 'phase3-parse.py', 'send-read.sh'):
     shutil.copyfile(os.path.join(SRC, n), os.path.join(dst, n))
 shutil.copyfile(__file__, os.path.join(dst, 'build_push.py'))
 with open(os.path.join(dst, 'SHA256-evidence.txt'), 'w', encoding='utf-8', newline='\n') as f:
     f.write('# lab-file-sha256  published-copy-sha256  file  bytes  gstin-masks\n')
     f.write('\n'.join(rows) + '\n')
-    for n in ('log.txt', 'phase3-parse.txt'):
+    for n in [x for x in ('log.txt', 'phase3-parse.txt', 'phase4-parse.txt') if os.path.exists(os.path.join(SRC, x))]:
         f.write('%s  %s  %s\n' % (sha(os.path.join(SRC, n)), sha(os.path.join(dst, n)), n))
 shots = sorted(n for n in os.listdir(SRC + '/screenshots') if n.endswith('.jpg'))
 with open(os.path.join(dst, 'SHA256-screenshots.txt'), 'w', encoding='utf-8', newline='\n') as f:
@@ -57,9 +58,9 @@ rep = open(os.path.join(SRC, 'REPORT.md'), encoding='utf-8').read()
 rep = re.sub(r'GST Regular, GSTIN \S+, Monthly\.', "GST Regular, Monthly, with the run sheet's company GSTIN (shown here as the same-length mask ZZZZZZZZZZZZZZZ).", rep)
 rep = re.sub(r'Regular, GSTIN \S+\.', "Regular, with the run sheet's party GSTIN (mask ZZZZZZZZZZZZZZZ).", rep)
 rep, k_rep = GSTIN.subn(MASK, rep)
-rep += ('\n## Masking\nThe run sheet\'s two synthetic GSTINs (company and party) are written as the same-length mask ZZZZZZZZZZZZZZZ.\n'
-        '- **Text:** the mask is used in log.txt, phase3-parse.txt and this report. The published log.txt also drops one scheduling note from its first line.\n'
-        '- **XML answers:** the mask is used inside the two R-PARTY answers (n-0b-party-before/-after, 1 GSTIN each). It keeps their byte length and adds no markup; the answers keep Tally\'s own &#4; references (see the parsing note). No other answer contains a GSTIN, and they are published byte for byte.\n'
+rep += ('\n## Masking\nThe run sheet\'s synthetic GSTINs (company, party and M1 party) are written as the same-length mask ZZZZZZZZZZZZZZZ.\n'
+        '- **Text:** the mask is used in log.txt, the phase parse files and this report. The published log.txt also drops one scheduling note from its first line.\n'
+        '- **XML answers:** the mask is used inside the R-PARTY answers (n-0b-party-before/-after, m1-before, m1-end). It keeps their byte length and adds no markup; the answers keep Tally\'s own &#4; references (see the parsing note). No other answer contains a GSTIN, and they are published byte for byte.\n'
         '- **Hashes:** SHA256-evidence.txt lists the lab hash and the published hash of every file.\n')
 open(os.path.join(dst, 'REPORT.md'), 'w', encoding='utf-8', newline='\n').write(rep)
 print('files', len(os.listdir(dst)), 'masks log', k_log, 'p3', k_p3, 'report', k_rep, 'answers', sum(int(r.split()[-1]) for r in rows))

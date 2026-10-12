@@ -103,8 +103,50 @@ All GUIDs share the company prefix f107e523-3d6b-4516-bd24-5b1a14498fa6. Every c
 - **CMPINFO's `<LEDGER>` count element** (not a row count) went 6, 7, 8, 8, 9, 10, 11, 12, 13 across R-MARKS nr…n-e-after. It steps on every created or altered ledger, not on the refused write. COLLECTION rows went 8 → 9 (N-0a) → 10 (N-e).
 - phase3-parse.py and phase3-parse.txt hold the per-case element parse. Phase 4 was not run.
 
+## Phase 4: L-M1 (after GO; 8 writes, 26 reads, 14:52:39Z-14:55:26Z)
+- **Before the run:**
+  - Tally was restarted twice between phases 3 and 4, during another item on another company. After the restart Tally showed "Application settings are lost". Connectivity was unchanged: Both, ODBC Yes, port 9001.
+  - BRIDGE MASTERS LAB was reloaded alone with no prompt.
+  - tally_status at 14:52:39Z showed it ALONE. 21/21 hashes were OK.
+- **The run:**
+  - Each request was sent once in the run sheet's order. Every send returned curl exit 0 and HTTP 200.
+  - No dialog appeared after any write. A screenshot after each write stays on the PC, by hash.
+  - R-MARKS returned 1 COMPANY row every time.
+
+| Write | Counters | ALTMSTID | New row in R-V3 after (GUID, PARENT, ISBILLWISEON, names) |
+|---|---|---|---|
+| M1-PARTY | CREATED 1, others 0 | 223 → 224 | …-000000d7, Sundry Debtors, Yes, [MLab M1 Party] |
+| M1-SUSP | CREATED 1 | 224 → 225 | …-000000d8, Suspense A/c, No, [MLab M1 Suspense] |
+| M1-DUTY-CGST | CREATED 1 | 225 → 226 | …-000000d9, Duties & Taxes, No, [MLab M1 Duty CGST] |
+| M1-DUTY-IGST | CREATED 1 | 226 → 227 | …-000000da, Duties & Taxes, No, [MLab M1 Duty IGST] |
+| M1-DUTY-STATE | CREATED 1 | 227 → 228 | …-000000db, Duties & Taxes, No, [MLab M1 Duty State Tax] |
+| M1-DUTY-SGSTUTGST | CREATED 1 | 228 → 229 | …-000000dc, Duties & Taxes, No, [MLab M1 Duty SGST UTGST] |
+| M1-DUTY-UT | CREATED 1 | 229 → 230 | …-000000dd, Duties & Taxes, No, [MLab M1 Duty UT Tax] |
+| M1-DUTY-CESS | CREATED 1 | 230 → 231 | …-000000de, Duties & Taxes, No, [MLab M1 Duty Cess] |
+
+**R-PARTY at m1-end** (each field as returned; R-PARTY at m1-before had no MLab M1 rows):
+
+| Ledger | TAXTYPE | GSTDUTYHEAD | PARTYGSTIN | OPENINGBALANCE |
+|---|---|---|---|---|
+| MLab M1 Party | Others | absent | **present**: the request's party GSTIN, as sent | 0.00 |
+| MLab M1 Suspense | Others | absent | absent | 0.00 |
+| MLab M1 Duty CGST | GST | CGST | absent | 0.00 |
+| MLab M1 Duty IGST | GST | IGST | absent | 0.00 |
+| MLab M1 Duty State Tax | GST | State Tax | absent | 0.00 |
+| MLab M1 Duty SGST UTGST | GST | SGST/UTGST | absent | 0.00 |
+| MLab M1 Duty UT Tax | GST | UT Tax | absent | 0.00 |
+| MLab M1 Duty Cess | GST | Cess | absent | 0.00 |
+
+- **All six duty heads were stored exactly as sent.** No head was dropped.
+- **MLab M1 Party, LEDGSTREGDETAILS.LIST rows:** one element, empty, with no child elements: no APPLICABLEFROM, GSTREGISTRATIONTYPE, PLACEOFSUPPLY or GSTIN.
+  - So a gateway Create carrying PARTYGSTIN stores the GSTIN in the top-level PARTYGSTIN field and builds no registration row.
+  - This is the reverse of the screen-keyed MLab Exact Target. There the GSTIN is only inside LEDGSTREGDETAILS.LIST, and PARTYGSTIN is absent (phase 3).
+- **LANGUAGEID** is 0 on every ledger created through the gateway (phases 3 and 4). It is 1033 on the ledgers keyed on screen.
+- **NAME attributes after the restart:** since Tally's restart, R-V3 and R-PARTY carry the phase-3 spellings in the NAME attribute too (for example "MLAB CASE TARGET", "MLab  Space Target"). So the stale attribute seen within the phase-3 session was session state, not stored data.
+- R-V3 rows went 10 → 18. phase4-parse.txt holds the per-write parse.
+
 ## Masking
-The run sheet's two synthetic GSTINs (company and party) are written as the same-length mask ZZZZZZZZZZZZZZZ.
-- **Text:** the mask is used in log.txt, phase3-parse.txt and this report. The published log.txt also drops one scheduling note from its first line.
-- **XML answers:** the mask is used inside the two R-PARTY answers (n-0b-party-before/-after, 1 GSTIN each). It keeps their byte length and adds no markup; the answers keep Tally's own &#4; references (see the parsing note). No other answer contains a GSTIN, and they are published byte for byte.
+The run sheet's synthetic GSTINs (company, party and M1 party) are written as the same-length mask ZZZZZZZZZZZZZZZ.
+- **Text:** the mask is used in log.txt, the phase parse files and this report. The published log.txt also drops one scheduling note from its first line.
+- **XML answers:** the mask is used inside the R-PARTY answers (n-0b-party-before/-after, m1-before, m1-end). It keeps their byte length and adds no markup; the answers keep Tally's own &#4; references (see the parsing note). No other answer contains a GSTIN, and they are published byte for byte.
 - **Hashes:** SHA256-evidence.txt lists the lab hash and the published hash of every file.

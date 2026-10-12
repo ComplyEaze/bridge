@@ -516,8 +516,6 @@ pub enum ReadProfileId {
     XmlCompanyEnumerationV1,
     XmlSyntheticFixtureMarkerV1,
     XmlLedgerReadV1,
-    XmlVoucherEmptyRangeV1,
-    XmlVoucherPopulatedRangeV1,
     XmlEducationModeProbeV1,
     JsonExSemanticShadowV1,
 }
@@ -784,12 +782,8 @@ impl LiveCompatibilityReceipt {
         }
         if !self.fixture_marker_verified {
             for operation in &self.operations {
-                if matches!(
-                    operation.profile,
-                    ReadProfileId::XmlLedgerReadV1
-                        | ReadProfileId::XmlVoucherEmptyRangeV1
-                        | ReadProfileId::XmlVoucherPopulatedRangeV1
-                ) && operation.outcome != OperationOutcome::NotAttempted
+                if matches!(operation.profile, ReadProfileId::XmlLedgerReadV1)
+                    && operation.outcome != OperationOutcome::NotAttempted
                 {
                     return Err(invalid("company_read_without_fixture_marker"));
                 }
@@ -1598,8 +1592,6 @@ fn validate_claim(claim: &SupportClaim) -> Result<(), CompatibilityError> {
             ReadProfileId::XmlCompanyEnumerationV1,
             ReadProfileId::XmlSyntheticFixtureMarkerV1,
             ReadProfileId::XmlLedgerReadV1,
-            ReadProfileId::XmlVoucherEmptyRangeV1,
-            ReadProfileId::XmlVoucherPopulatedRangeV1,
         ]
         .into_iter()
         .collect();

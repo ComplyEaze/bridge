@@ -592,7 +592,12 @@ function baseNumbers() {
     "origin/master",
     "master",
   ].filter(Boolean);
-  for (const ref of candidates) {
+  for (const candidate of candidates) {
+    // The base is where the checked-out tree left the branch (the merge-base), not the branch's tip now. A pull request's
+    // merge ref can lag the base branch: when the tip has moved on (a heading retitled with redirects, say), the tree has
+    // not got those changes, and the tip would report its redirects as reused and missing. On a push or in a merge-queue
+    // run the tree contains the tip, so the merge-base is the tip and nothing changes.
+    const ref = mergeBaseOf(candidate);
     const baseReferences = referencesAt(ref);
     if (!baseReferences) continue;
     const numbers = new Map();
@@ -602,6 +607,12 @@ function baseNumbers() {
     return { ref, numbers, references: baseReferences, indexText: showAt(ref, canonicalReference).stdout };
   }
   return null;
+}
+
+function mergeBaseOf(ref) {
+  const found = spawnSync("git", ["merge-base", ref, "HEAD"], { cwd: repository, encoding: "utf8" });
+  const revision = found.status === 0 ? found.stdout.trim() : "";
+  return /^[0-9a-f]{40}$/.test(revision) ? revision : ref;
 }
 
 const occurrences = new Map();

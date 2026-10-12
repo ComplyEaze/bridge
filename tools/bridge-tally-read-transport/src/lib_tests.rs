@@ -36,17 +36,10 @@ async fn sends_only_the_rendered_sealed_read_profile() {
 
 #[tokio::test]
 async fn an_education_transport_refuses_the_report_formula_profiles_before_sending() {
-    use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
+    use bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName;
     use tally_protocol_simulator::SequenceSimulator;
     let company = ValidatedCompanyName::new("Synthetic Co").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
-    let refused = [
-        ReadOnlyProfile::LedgersV1 { company: &company },
-        ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        },
-    ];
+    let refused = [ReadOnlyProfile::LedgersV1 { company: &company }];
     let simulator = SequenceSimulator::spawn(vec![
         ScenarioPlan::new(Fixture::EmptyExport).with_encoding(WireEncoding::Utf16Le),
         ScenarioPlan::new(Fixture::EmptyExport).with_encoding(WireEncoding::Utf16Le),

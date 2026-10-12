@@ -955,9 +955,8 @@ fn dispatched_batch(name: &str) -> (MasterBatch, Vec<MasterRecord>) {
 #[test]
 fn an_open_dispatch_blocks_a_new_batch_of_the_same_ledgers() {
     let (first, mut records) = dispatched_batch("Synthetic One");
-    // The same ledger under a new batch id: by case and separator (both keys),
-    // and NFC against NFD (the absence key only).
-    for name in ["SYNTHETIC-ONE", "Synthetic One\u{301}"] {
+    // The same ledger under a new batch id, by case and either separator.
+    for name in ["SYNTHETIC-ONE", "synthetic/one"] {
         let (_, second) = dispatched_batch(name);
         let text = journal_text(&[records.clone(), second].concat());
         assert_eq!(

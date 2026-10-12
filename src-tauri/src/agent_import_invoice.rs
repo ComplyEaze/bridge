@@ -1222,7 +1222,82 @@ fn invoice_readback_differences(
     if !allocation_ok {
         diffs.push("bill_allocation".to_string());
     }
+    diffs.extend(
+        gst_status_differences(&read.fields)
+            .into_iter()
+            .map(|difference| difference.code().to_string()),
+    );
     diffs
+}
+
+/// A state of Tally's GSTR-1 status of a posted invoice other than the one
+/// that leaves it verified, each under its own code.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GstStatusDifference {
+    /// The return lists the invoice as uncertain.
+    Uncertain,
+    /// The return lists it as excluded (never observed on the lab's book).
+    Excluded,
+    /// All three flags No: the return does not list it at all.
+    NotInReturn,
+    /// A person accepted it as it stands (Accept As Is).
+    Overridden,
+    /// The flags came back in a combination that states no status.
+    Unreadable,
+    /// The flags did not come back.
+    NotReported,
+}
+
+impl GstStatusDifference {
+    fn code(self) -> &'static str {
+        match self {
+            Self::Uncertain => "gst_status_uncertain",
+            Self::Excluded => "gst_status_excluded",
+            Self::NotInReturn => "gst_status_not_in_return",
+            Self::Overridden => "gst_status_overridden",
+            Self::Unreadable => "gst_status_unreadable",
+            Self::NotReported => "gst_status_not_reported",
+        }
+    }
+
+    /// Why the status module read no state: the flags were absent, or anything
+    /// else, which is never read as a state.
+    fn unread(code: &str) -> Self {
+        if code == "gst_status_not_reported" {
+            Self::NotReported
+        } else {
+            Self::Unreadable
+        }
+    }
+}
+
+/// What Tally's own GSTR-1 says of the posted invoice, through the GST status
+/// read's own readings of the four flags (`status_of_flags`, `overridden_of`).
+/// Only an invoice the return lists as included, and that no one accepted as
+/// it stands, is clean (§9.16). A flag that did not come back is never a pass.
+fn gst_status_differences(fields: &BTreeMap<String, String>) -> Vec<GstStatusDifference> {
+    use super::super::gst_status::{overridden_of, status_of_flags, GstStatus};
+    let flag = |name: &str| fields.get(name).map(String::as_str);
+    let status = match status_of_flags(
+        flag("VCHGSTSTATUSISINCLUDED"),
+        flag("VCHGSTSTATUSISUNCERTAIN"),
+        flag("VCHGSTSTATUSISEXCLUDED"),
+    ) {
+        Ok(GstStatus::Included) => None,
+        Ok(GstStatus::Uncertain) => Some(GstStatusDifference::Uncertain),
+        Ok(GstStatus::Excluded) => Some(GstStatusDifference::Excluded),
+        Ok(GstStatus::NotInReturn) => Some(GstStatusDifference::NotInReturn),
+        Err(code) => Some(GstStatusDifference::unread(code)),
+    };
+    let overridden = match overridden_of(flag("ISGSTOVERRIDDEN")) {
+        Ok(false) => None,
+        Ok(true) => Some(GstStatusDifference::Overridden),
+        Err(code) => Some(GstStatusDifference::unread(code)),
+    };
+    let mut differences = status.into_iter().chain(overridden).collect::<Vec<_>>();
+    // Four absent fields are one finding, never two.
+    differences.dedup();
+    differences
 }
 
 impl super::super::Server {

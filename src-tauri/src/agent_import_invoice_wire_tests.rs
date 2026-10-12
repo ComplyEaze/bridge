@@ -1048,3 +1048,32 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
         Err("invoice_ledger_rates_head_unnamed")
     );
 }
+
+/// The read-back request with the four GSTR-1 status fields is, byte for byte,
+/// the one the lab answered for `BP/26-27/0010` on 10 Oct 2026 (the file begins
+/// with the byte order mark the request is sent with); for `BP/26-27/0021` it
+/// has the SHA-256 of the request file the lab sent for that number.
+#[test]
+fn the_status_read_back_request_is_the_one_the_lab_answered() {
+    let sent = |number: &str| {
+        let rendered = render_invoice_readback_request(
+            "BRIDGE PILOT LAB",
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce",
+            number,
+            ("20260401", "20270331"),
+        )
+        .unwrap();
+        [0xFF, 0xFE]
+            .into_iter()
+            .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect::<Vec<u8>>()
+    };
+    let answered: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.request.utf16le.xml"
+    );
+    assert_eq!(sent("BP/26-27/0010"), answered);
+    assert_eq!(
+        crate::agent::sha256_hex(&sent("BP/26-27/0021")),
+        "b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5"
+    );
+}

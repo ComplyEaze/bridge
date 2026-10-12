@@ -432,7 +432,10 @@ pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<b
 /// agent's voucher reads use (it returns the legs of an invoice-view voucher
 /// as ALLLEDGERENTRIES.LIST, measured on a committed Sales capture) plus the GST
 /// header fields. Measured together on the two invoices the rehearsal posted
-/// (7 Oct 2026, §9.16): every field below came back.
+/// (7 Oct 2026, §9.16): every field below came back. The four GSTR-1 status
+/// fields at the end were added on 10 Oct 2026, when the lab answered this
+/// request byte for byte (§9.16; the `pilot-lab-invoice-readback-status`
+/// fixtures).
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &str,
@@ -448,7 +451,7 @@ pub(in crate::agent) fn render_invoice_readback_request(
         return None;
     }
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     ))
 }
@@ -485,28 +488,7 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
         [voucher] => voucher,
         _ => return Ok(Readback::Several),
     };
-    let mut fields = BTreeMap::new();
-    for key in [
-        "DATE",
-        "VOUCHERNUMBER",
-        "VOUCHERTYPENAME",
-        "REFERENCE",
-        "REFERENCEDATE",
-        "PARTYLEDGERNAME",
-        "PARTYGSTIN",
-        "STATENAME",
-        "PLACEOFSUPPLY",
-        "GSTREGISTRATIONTYPE",
-        "ISINVOICE",
-        "ISCANCELLED",
-        "ISOPTIONAL",
-        "GUID",
-        "ALTERID",
-    ] {
-        if let Some(value) = voucher.one(key)? {
-            fields.insert(key.to_string(), value.to_string());
-        }
-    }
+    let fields = readback_fields(voucher)?;
     let mut legs = Vec::new();
     for (tag, entry) in &voucher.lists {
         if tag != "ALLLEDGERENTRIES.LIST" {
@@ -551,6 +533,38 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
         });
     }
     Ok(Readback::One(ReadInvoice { fields, legs }))
+}
+
+/// The voucher-level fields of one read-back voucher, by tag: a field that did
+/// not come back, or came back empty, is absent; a repeated one fails the read.
+pub(super) fn readback_fields(voucher: &Row) -> Result<BTreeMap<String, String>, &'static str> {
+    let mut fields = BTreeMap::new();
+    for key in [
+        "DATE",
+        "VOUCHERNUMBER",
+        "VOUCHERTYPENAME",
+        "REFERENCE",
+        "REFERENCEDATE",
+        "PARTYLEDGERNAME",
+        "PARTYGSTIN",
+        "STATENAME",
+        "PLACEOFSUPPLY",
+        "GSTREGISTRATIONTYPE",
+        "ISINVOICE",
+        "ISCANCELLED",
+        "ISOPTIONAL",
+        "GUID",
+        "ALTERID",
+        "VCHGSTSTATUSISINCLUDED",
+        "VCHGSTSTATUSISUNCERTAIN",
+        "VCHGSTSTATUSISEXCLUDED",
+        "ISGSTOVERRIDDEN",
+    ] {
+        if let Some(value) = voucher.one(key)? {
+            fields.insert(key.to_string(), value.to_string());
+        }
+    }
+    Ok(fields)
 }
 
 /// The number of vouchers an answer holds (the status check included).

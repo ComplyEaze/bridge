@@ -827,7 +827,9 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// The collection answer a posted invoice reads back as: the voucher the build
 /// rendered, with its entries under the export's element name and the
 /// attributes Tally adds, wrapped as a collection response. Built from the
-/// renderer, so what is written and what is compared cannot drift apart.
+/// renderer, so what is written and what is compared cannot drift apart. Its
+/// four GSTR-1 status elements are the lab's, copied as Tally wrote them for an
+/// invoice it lists as included (`included_status_elements`).
 fn readback_xml(v: &ImportVoucher) -> String {
     let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
     let rendered =
@@ -836,7 +838,7 @@ fn readback_xml(v: &ImportVoucher) -> String {
         .replace("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\">", "")
         .replace("</TALLYMESSAGE>", "")
         .replace("LEDGERENTRIES.LIST", "ALLLEDGERENTRIES.LIST")
-        .replace("<DATE>", "<ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><GUID>g-1</GUID><ALTERID> 77</ALTERID><DATE>")
+        .replace("<DATE>", &format!("<ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><GUID>g-1</GUID><ALTERID> 77</ALTERID>{}<DATE>", included_status_elements()))
         // The export also gives every leg an empty allocation container.
         .replace("</ISDEEMEDPOSITIVE>", "</ISDEEMEDPOSITIVE><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>");
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>")
@@ -1178,6 +1180,7 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
 /// and numbers are synthetic.
 #[test]
 fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
+    let status = included_status_elements();
     let xml = format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
 <VOUCHER REMOTEID=\"22222222-2222-2222-2222-222222222222\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
@@ -1185,7 +1188,7 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 <GUID TYPE=\"String\">g-1</GUID><PARTYGSTIN TYPE=\"String\">{GSTIN_RJ}</PARTYGSTIN><STATENAME TYPE=\"String\">Rajasthan</STATENAME>\
 <PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><VOUCHERTYPENAME TYPE=\"String\">Sales</VOUCHERTYPENAME><PARTYLEDGERNAME TYPE=\"String\">Customer A</PARTYLEDGERNAME>\
 <VOUCHERNUMBER TYPE=\"String\">278</VOUCHERNUMBER><REFERENCE TYPE=\"String\">278</REFERENCE><GSTREGISTRATIONTYPE TYPE=\"String\">Regular</GSTREGISTRATIONTYPE>\
-<ISINVOICE>Yes</ISINVOICE><ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL><ALTERID TYPE=\"Number\"> 77</ALTERID>\
+<ISINVOICE>Yes</ISINVOICE><ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL><ALTERID TYPE=\"Number\"> 77</ALTERID>{status}\
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Customer A</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT>\
 <BILLALLOCATIONS.LIST><NAME TYPE=\"String\">278</NAME><BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
@@ -1210,7 +1213,10 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 /// set; its PROVENANCE table is beside the fixtures), decoded and compared
 /// with `expected` as a post compares them. In the registered customer's two
 /// read-backs the GSTIN is a substituted token (that table says so), so its
-/// comparison there shows the element is read, not what Tally stored.
+/// comparison there shows the element is read, not what Tally stored. The
+/// rehearsal's request asked for no GSTR-1 status (it was added on 10 Oct
+/// 2026), so each of its answers carries none and says so once, last; the rest
+/// is returned.
 fn rehearsal_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<String> {
     let xml = String::from_utf16(
         &bytes
@@ -1220,7 +1226,15 @@ fn rehearsal_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> 
     )
     .unwrap();
     match wire::parse_invoice_readback(&xml).unwrap() {
-        wire::Readback::One(read) => invoice_readback_differences(expected, &read, date),
+        wire::Readback::One(read) => {
+            let mut found = invoice_readback_differences(expected, &read, date);
+            assert_eq!(
+                found.pop().as_deref(),
+                Some("gst_status_not_reported"),
+                "{found:?}"
+            );
+            found
+        }
         other => panic!("one voucher expected, got {other:?}"),
     }
 }
@@ -2346,5 +2360,256 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
     assert_eq!(
         classify_sales_invoice(&two, &facts, RAJ, AS_OF).unwrap_err(),
         vec![refuse("invoice_sales_ledgers_rates_differ")]
+    );
+}
+
+// ---- Tally's GSTR-1 status of a posted invoice (10 Oct 2026, the pilot lab) ----
+
+/// The lab's read-back of `BP/26-27/0010` with the four status fields, the
+/// request the code renders: Tally lists it as included, not accepted as it
+/// stands.
+const STATUS_INCLUDED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+);
+/// The same request for `BP/26-27/0021` after its sales ledger's HSN/SAC was
+/// set, the voucher untouched: uncertain.
+const STATUS_UNCERTAIN: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-uncertain.utf16le.xml"
+);
+/// The same request for `BP/26-27/0021` once the voucher was saved again with
+/// no change: included.
+const STATUS_RESAVED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml"
+);
+/// The read-back of `BP/26-27/0010` the invoice round took (9 Oct 2026), whose
+/// request asked for no status field.
+const STATUS_NOT_ASKED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"
+);
+/// The same field list as the read-back for three numbers at once:
+/// `BP/26-27/0002` uncertain, `0010` included, `0016` accepted as it stands.
+const STATUS_THREE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-three-vouchers.utf16le.xml"
+);
+/// The GST status read's narrow window: seven invoices and four Receipts.
+const STATUS_WINDOW: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml"
+);
+const STATUS_TAGS: [&str; 4] = [
+    "VCHGSTSTATUSISINCLUDED",
+    "VCHGSTSTATUSISUNCERTAIN",
+    "VCHGSTSTATUSISEXCLUDED",
+    "ISGSTOVERRIDDEN",
+];
+
+fn utf16le(bytes: &[u8]) -> String {
+    assert_eq!(bytes.len() % 2, 0, "UTF-16LE is whole code units");
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The one element `tag` of `xml`, from its open tag to its close tag.
+fn status_element<'a>(xml: &'a str, tag: &str) -> &'a str {
+    let open = format!("<{tag}");
+    let starts = xml
+        .match_indices(&open)
+        .map(|(at, _)| at)
+        .filter(|at| matches!(xml.as_bytes()[at + open.len()], b'>' | b' '))
+        .collect::<Vec<_>>();
+    assert_eq!(starts.len(), 1, "one {tag}");
+    let close = format!("</{tag}>");
+    let end = starts[0] + xml[starts[0]..].find(&close).unwrap() + close.len();
+    &xml[starts[0]..end]
+}
+
+/// The four status elements of the lab's read-back of an included invoice, as
+/// Tally wrote them.
+fn included_status_elements() -> String {
+    let xml = utf16le(STATUS_INCLUDED);
+    STATUS_TAGS
+        .iter()
+        .map(|tag| status_element(&xml, tag))
+        .collect()
+}
+
+/// `xml` with the text of its one `tag` element set to `value`.
+fn with_flag(xml: &str, tag: &str, value: &str) -> String {
+    let element = status_element(xml, tag);
+    let text_at = element.find('>').unwrap() + 1;
+    let text_end = element.rfind("</").unwrap();
+    let edited = format!("{}{value}{}", &element[..text_at], &element[text_end..]);
+    xml.replacen(element, &edited, 1)
+}
+
+/// `xml` without its one `tag` element.
+fn without(xml: &str, tag: &str) -> String {
+    let element = status_element(xml, tag).to_string();
+    xml.replacen(&element, "", 1)
+}
+
+fn codes_of(fields: &BTreeMap<String, String>) -> Vec<&'static str> {
+    gst_status_differences(fields)
+        .into_iter()
+        .map(GstStatusDifference::code)
+        .collect()
+}
+
+/// The status codes of the one voucher a read-back answer holds.
+fn status_codes(xml: &str) -> Vec<&'static str> {
+    match wire::parse_invoice_readback(xml).unwrap() {
+        wire::Readback::One(read) => codes_of(&read.fields),
+        other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// Each voucher's number and status codes, each voucher's fields read as the
+/// read-back reads its one voucher's.
+fn status_codes_by_number(xml: &str) -> Vec<(String, Vec<&'static str>)> {
+    wire::rows(xml, "VOUCHER")
+        .unwrap()
+        .iter()
+        .map(|row| {
+            let fields = wire::readback_fields(row).unwrap();
+            (fields["VOUCHERNUMBER"].clone(), codes_of(&fields))
+        })
+        .collect()
+}
+
+/// Every state the lab's answers show, each read by the read-back's own parse
+/// and the GST status read's readings: included (twice, one after a re-save),
+/// uncertain, accepted as it stands and not in the return. Only included and not
+/// accepted is clean.
+#[test]
+fn each_gstr_1_status_the_lab_answered_reads_as_its_own_code() {
+    assert_eq!(status_codes(&utf16le(STATUS_INCLUDED)), Vec::<&str>::new());
+    assert_eq!(
+        status_codes(&utf16le(STATUS_UNCERTAIN)),
+        ["gst_status_uncertain"]
+    );
+    // The ledger's HSN/SAC alone left it uncertain; saving the voucher again
+    // (AlterID 34 to 35) made it included.
+    assert_eq!(status_codes(&utf16le(STATUS_RESAVED)), Vec::<&str>::new());
+    let number_and_alter_id = |bytes: &[u8]| match wire::parse_invoice_readback(&utf16le(bytes)) {
+        Ok(wire::Readback::One(read)) => (
+            read.fields["VOUCHERNUMBER"].clone(),
+            read.fields["ALTERID"].clone(),
+        ),
+        other => panic!("one voucher expected, got {other:?}"),
+    };
+    assert_eq!(
+        number_and_alter_id(STATUS_UNCERTAIN),
+        ("BP/26-27/0021".to_string(), "34".to_string())
+    );
+    assert_eq!(
+        number_and_alter_id(STATUS_RESAVED),
+        ("BP/26-27/0021".to_string(), "35".to_string())
+    );
+    assert_eq!(
+        status_codes_by_number(&utf16le(STATUS_THREE)),
+        [
+            ("BP/26-27/0002".to_string(), vec!["gst_status_uncertain"]),
+            ("BP/26-27/0010".to_string(), vec![]),
+            ("BP/26-27/0016".to_string(), vec!["gst_status_overridden"]),
+        ]
+    );
+    let window = status_codes_by_number(&utf16le(STATUS_WINDOW));
+    let receipts =
+        ["1", "2", "3", "4"].map(|number| (number.to_string(), vec!["gst_status_not_in_return"]));
+    assert_eq!(window[7..], receipts);
+    assert_eq!(
+        window[..7]
+            .iter()
+            .map(|(number, codes)| (number.as_str(), codes.clone()))
+            .collect::<Vec<_>>(),
+        [
+            ("BP/26-27/0012", vec![]),
+            ("BP/26-27/0013", vec![]),
+            ("BP/26-27/0014", vec![]),
+            ("BP/26-27/0015", vec![]),
+            ("BP/26-27/0016", vec!["gst_status_overridden"]),
+            ("Z1/0001", vec![]),
+            ("BP/26-27/0019", vec![]),
+        ]
+    );
+    // The same codes reach the invoice's differences after its own fields.
+    let v = observed_voucher();
+    let uncertain = utf16le(STATUS_UNCERTAIN);
+    let mut flagged = readback_xml(&v);
+    for tag in STATUS_TAGS {
+        flagged = flagged.replacen(
+            status_element(&readback_xml(&v), tag),
+            status_element(&uncertain, tag),
+            1,
+        );
+    }
+    assert_eq!(differences(&v, &flagged), vec!["gst_status_uncertain"]);
+}
+
+/// An answer that carries no status field is one difference, never a pass and
+/// never two: the read-back the invoice round took before the fields were asked
+/// for says `gst_status_not_reported` once, although both of the status read's
+/// readings (the three flags and the override flag) report it.
+#[test]
+fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
+    let not_asked = utf16le(STATUS_NOT_ASKED);
+    assert!(STATUS_TAGS.iter().all(|tag| !not_asked.contains(tag)));
+    assert_eq!(status_codes(&not_asked), ["gst_status_not_reported"]);
+    // Edited in one place each, from the included answer: no capture lacks a
+    // single field.
+    let included = utf16le(STATUS_INCLUDED);
+    assert_eq!(
+        status_codes(&without(&included, "ISGSTOVERRIDDEN")),
+        ["gst_status_not_reported"]
+    );
+    assert_eq!(
+        status_codes(&without(&included, "VCHGSTSTATUSISUNCERTAIN")),
+        ["gst_status_unreadable"]
+    );
+    assert_eq!(
+        status_codes(&without(
+            &without(&included, "VCHGSTSTATUSISUNCERTAIN"),
+            "ISGSTOVERRIDDEN"
+        )),
+        ["gst_status_unreadable", "gst_status_not_reported"]
+    );
+    // An empty flag came back as nothing, so it is read as one not reported.
+    assert_eq!(
+        status_codes(&with_flag(&included, "ISGSTOVERRIDDEN", "")),
+        ["gst_status_not_reported"]
+    );
+}
+
+/// The states no capture shows, each from a captured answer edited in one
+/// place (the flag's text): excluded (never observed), uncertain and accepted
+/// together, two flags Yes, and a value that is neither Yes nor No.
+#[test]
+fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place() {
+    let included = utf16le(STATUS_INCLUDED);
+    let excluded = with_flag(
+        &with_flag(&included, "VCHGSTSTATUSISINCLUDED", "No"),
+        "VCHGSTSTATUSISEXCLUDED",
+        "Yes",
+    );
+    assert_eq!(status_codes(&excluded), ["gst_status_excluded"]);
+    assert_eq!(
+        status_codes(&with_flag(
+            &utf16le(STATUS_UNCERTAIN),
+            "ISGSTOVERRIDDEN",
+            "Yes"
+        )),
+        ["gst_status_uncertain", "gst_status_overridden"]
+    );
+    assert_eq!(
+        status_codes(&with_flag(&included, "VCHGSTSTATUSISUNCERTAIN", "Yes")),
+        ["gst_status_unreadable"]
+    );
+    assert_eq!(
+        status_codes(&with_flag(&included, "ISGSTOVERRIDDEN", "Unknown")),
+        ["gst_status_unreadable"]
     );
 }

@@ -5451,7 +5451,9 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
 // L compliance listing, Q the same listing with each ledger's GST rate and
 // rounding (10 Oct 2026), P paired listing, g groups, T voucher types, N number
 // read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, R
-// invoice read-back, Z Tally's answer to the import.
+// invoice read-back (the request with the GSTR-1 status fields, answered on
+// 10 Oct 2026 for the voucher unchanged since the post: AlterID 17), Z Tally's
+// answer to the import.
 const PILOT_ORDER: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeT",
     "sTseeNsNseeCsCseemsmseekskseewswseseseesesemsmseewswseewswse",
@@ -5486,7 +5488,7 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'C' => "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38", // r16-tax-units.xml
-        'R' => "dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7", // r12-invoice-readback.xml
+        'R' => "352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1", // w8-readback-status-single.xml
         'Z' => "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e", // r14-invoice-post.xml
         other => panic!("no request for kind {other}"),
     }
@@ -5518,7 +5520,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
-        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"),
+        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"),
         'Z' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     };
@@ -5757,6 +5759,8 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     assert_eq!(marks_after.0, 17);
     assert_eq!(marks_after.1, 223);
     assert_eq!(marks_after.1, marks_before.1);
+    // A verified invoice stops nothing.
+    assert_eq!(server.import_invoice_stop(PILOT_GUID), Ok(None));
 }
 
 /// The walk-in ledger's row is spelled `BRIDGE Walk-in` in the pilot lab's
@@ -5806,4 +5810,135 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     assert_eq!(result["refusals"].as_array().unwrap().len(), 1);
     assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+/// The one `tag` element of `xml`, from its open tag to its close tag.
+fn pilot_element<'a>(xml: &'a str, tag: &str) -> &'a str {
+    let open = format!("<{tag}");
+    let starts = xml
+        .match_indices(&open)
+        .map(|(at, _)| at)
+        .filter(|at| matches!(xml.as_bytes()[at + open.len()], b'>' | b' '))
+        .collect::<Vec<_>>();
+    assert_eq!(starts.len(), 1, "one {tag}");
+    let close = format!("</{tag}>");
+    let end = starts[0] + xml[starts[0]..].find(&close).unwrap() + close.len();
+    &xml[starts[0]..end]
+}
+
+/// The lab's read-back of `BP/26-27/0010` carrying the GSTR-1 flags of an
+/// invoice Tally lists as uncertain. No capture shows 0010 uncertain: the three
+/// flag elements are copied, as Tally wrote them, from the lab's read-back of
+/// `BP/26-27/0021` while its GSTR-1 listed it as uncertain, and nothing else
+/// changes.
+fn pilot_readback_uncertain() -> String {
+    let included = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+    ));
+    let uncertain = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-uncertain.utf16le.xml"
+    ));
+    let mut answer = included.clone();
+    for tag in [
+        "VCHGSTSTATUSISINCLUDED",
+        "VCHGSTSTATUSISUNCERTAIN",
+        "VCHGSTSTATUSISEXCLUDED",
+    ] {
+        answer = answer.replacen(
+            pilot_element(&included, tag),
+            pilot_element(&uncertain, tag),
+            1,
+        );
+    }
+    assert_ne!(answer, included);
+    answer
+}
+
+/// #691: an invoice posted on the pilot lab's answers whose read-back Tally's
+/// GSTR-1 lists as uncertain ends `posted_divergent` with that code alone, and
+/// stops the company: the next invoice build is refused, naming the batch,
+/// before its admission reads Tally.
+#[tokio::test]
+async fn an_invoice_the_gstr_1_lists_as_uncertain_ends_divergent_and_stops_the_next_invoice() {
+    let readback = pilot_readback_uncertain();
+    // The post as on the verified replay, then the reads a second build makes
+    // before its admission, as many as the build refused on the walk-in
+    // ledger's earlier spelling makes: the admission itself reads nothing.
+    let order = format!(
+        "{PILOT_ORDER}{}",
+        &PILOT_ORDER[..PILOT_ORDER.find('k').unwrap() + 5]
+    );
+    let simulator = SequenceSimulator::spawn(with_sentinel(
+        order
+            .chars()
+            .map(|letter| match letter {
+                'R' => ScenarioPlan::new(Fixture::SyntheticXml(readback.clone()))
+                    .with_encoding(WireEncoding::Utf16LeNoBom)
+                    .with_framing(ResponseFraming::ContentLength),
+                other => pilot_plan(other),
+            })
+            .collect(),
+    ))
+    .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let remote_id = Uuid::parse_str("00000000-0000-4000-8000-000000000777").unwrap();
+    let (response, again, batch_id) = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(PILOT_QUALIFIED, async {
+            let built = built_or_panic(
+                server
+                    .build_import_xml(&pilot_args("BRIDGE Walk-in", "25.02", "1051.00"))
+                    .await,
+            );
+            let batch_id = built.payload["result"]["batch_id"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            let response = SCRIPTED_REMOTE_IDS
+                .scope(
+                    vec![remote_id],
+                    SCRIPTED_APPROVAL.scope(
+                        ScriptedApproval::approving(),
+                        server.call_tool(
+                            "post_import",
+                            json!({"company_guid":PILOT_GUID,"batch_id":batch_id}),
+                        ),
+                    ),
+                )
+                .await;
+            // Judged after the post's own result, below.
+            let again = server
+                .build_import_xml(&pilot_args("BRIDGE Walk-in", "25.02", "1051.00"))
+                .await;
+            (response, again, batch_id)
+        })
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    let voucher = &result["vouchers"][0];
+    assert_eq!(voucher["status"], "posted_divergent", "{response}");
+    assert_eq!(
+        voucher["diffs"],
+        json!([{"invoice_fields": ["gst_status_uncertain"]}])
+    );
+    assert_eq!(
+        voucher["next_step"],
+        crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP
+    );
+    assert_eq!(result["counts"]["posted_divergent"], 1);
+    assert_eq!(result["counts"]["posted_verified"], 0);
+    // The company is stopped by that batch, and the next invoice is refused.
+    assert_eq!(
+        server.import_invoice_stop(PILOT_GUID),
+        Ok(Some(batch_id.clone()))
+    );
+    let again = built_or_panic(again);
+    let refused = &again.payload["result"];
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert_eq!(refused["refusals"][0]["code"], "invoice_company_stopped");
+    assert_eq!(refused["refusals"][0]["detail"], batch_id.as_str());
+    assert_eq!(refused["refusals"].as_array().unwrap().len(), 1);
+    // Every answer was asked for and none more: the second build's admission
+    // sent Tally nothing.
+    assert_eq!(observed.len(), order.len());
 }

@@ -11,13 +11,6 @@ use bridge_tally_primitives::TallyDate;
 use sha2::{Digest, Sha256};
 
 use crate::encode_tally_xml_request_utf16le;
-#[cfg(feature = "voucher-scan")]
-use crate::outstandings::{
-    render_empty_partition_witness_template, render_ledger_opening_coverage,
-    render_outstandings_template, render_outstandings_vouchers, AlterIdRange, NarrowDateWindow,
-};
-#[cfg(feature = "voucher-scan")]
-use crate::outstandings_shared::PinnedCompany;
 use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
 use crate::xml_text::escape_text as xml_escape;
 
@@ -31,10 +24,6 @@ const TEMPLATE_TO: &str = "20000102";
 fn template_date(value: &'static str) -> TallyDate {
     TallyDate::parse(value).expect("template dates are fixed valid YYYYMMDD constants")
 }
-#[cfg(feature = "voucher-scan")]
-const TEMPLATE_ALTER_ID_START: u64 = 0;
-#[cfg(feature = "voucher-scan")]
-const TEMPLATE_ALTER_ID_END: u64 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadProfileValidationError {
@@ -124,17 +113,11 @@ pub enum ReadOnlyProfileId {
     CompanyListV2,
     CompanyBookExtentV1,
     CompanyBookExtentV2,
-    #[cfg(feature = "voucher-scan")]
-    LedgerOpeningCoverageV1,
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
     StandardLedgerCatalogV2,
     LedgersV1,
     VouchersV2,
-    #[cfg(feature = "voucher-scan")]
-    VoucherOutstandingsV1,
-    #[cfg(feature = "voucher-scan")]
-    VoucherEmptyPartitionWitnessV1,
     AuditCompanyObjectV1,
     AuditLedgersV1,
     AuditVouchersV1,
@@ -148,17 +131,11 @@ impl ReadOnlyProfileId {
             Self::CompanyListV2 => "company_list_v2",
             Self::CompanyBookExtentV1 => "company_book_extent_v1",
             Self::CompanyBookExtentV2 => "company_book_extent_v2",
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 => "ledger_opening_coverage_v1",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
             Self::StandardLedgerCatalogV2 => "standard_ledger_catalog_v2",
             Self::LedgersV1 => "ledgers_v1",
             Self::VouchersV2 => "vouchers_v2",
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 => "voucher_outstandings_v1",
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 => "voucher_empty_partition_witness_v1",
             Self::AuditCompanyObjectV1 => "audit_company_object_v1",
             Self::AuditLedgersV1 => "audit_ledgers_v1",
             Self::AuditVouchersV1 => "audit_vouchers_v1",
@@ -195,27 +172,11 @@ impl ReadOnlyProfileId {
             Self::CompanyListV2 => render_company_list_v2(),
             Self::CompanyBookExtentV1 => render_company_book_extent(TEMPLATE_COMPANY),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 => render_ledger_opening_coverage(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
             Self::VouchersV2 => render_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 => render_outstandings_template(
-                TEMPLATE_COMPANY,
-                TEMPLATE_FROM,
-                TEMPLATE_TO,
-                TEMPLATE_ALTER_ID_START,
-                TEMPLATE_ALTER_ID_END,
-            ),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 => render_empty_partition_witness_template(
-                TEMPLATE_COMPANY,
-                TEMPLATE_FROM,
-                TEMPLATE_TO,
-            ),
             Self::AuditCompanyObjectV1 => render_audit_company_object(TEMPLATE_COMPANY),
             Self::AuditLedgersV1 => {
                 render_audit_ledgers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
@@ -288,10 +249,6 @@ pub enum ReadOnlyProfile<'a> {
     /// so it can satisfy the trust check instead of being parsed as an
     /// unverified direct report.
     CompanyListV2,
-    #[cfg(feature = "voucher-scan")]
-    LedgerOpeningCoverageV1 {
-        company: &'a ValidatedCompanyName,
-    },
     CompanyBookExtentV1 {
         company: &'a ValidatedCompanyName,
     },
@@ -327,17 +284,6 @@ pub enum ReadOnlyProfile<'a> {
         company: &'a ValidatedCompanyName,
         range: &'a ValidatedDateRange,
     },
-    #[cfg(feature = "voucher-scan")]
-    VoucherOutstandingsV1 {
-        company: &'a PinnedCompany,
-        window: &'a NarrowDateWindow,
-        alter_id_range: AlterIdRange,
-    },
-    #[cfg(feature = "voucher-scan")]
-    VoucherEmptyPartitionWitnessV1 {
-        company: &'a PinnedCompany,
-        window: &'a NarrowDateWindow,
-    },
     /// The `company` part of a tally-read v1 read: a single-object export of
     /// the one named company. See [`AUDIT_COMPANY_FETCH`].
     AuditCompanyObjectV1 {
@@ -367,19 +313,11 @@ impl ReadOnlyProfile<'_> {
             Self::CompanyListV2 => ReadOnlyProfileId::CompanyListV2,
             Self::CompanyBookExtentV1 { .. } => ReadOnlyProfileId::CompanyBookExtentV1,
             Self::CompanyBookExtentV2 { .. } => ReadOnlyProfileId::CompanyBookExtentV2,
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 { .. } => ReadOnlyProfileId::LedgerOpeningCoverageV1,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
             Self::StandardLedgerCatalogV2 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV2,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
             Self::VouchersV2 { .. } => ReadOnlyProfileId::VouchersV2,
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 { .. } => ReadOnlyProfileId::VoucherOutstandingsV1,
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 { .. } => {
-                ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1
-            }
             Self::AuditCompanyObjectV1 { .. } => ReadOnlyProfileId::AuditCompanyObjectV1,
             Self::AuditLedgersV1 { .. } => ReadOnlyProfileId::AuditLedgersV1,
             Self::AuditVouchersV1 { .. } => ReadOnlyProfileId::AuditVouchersV1,
@@ -399,10 +337,6 @@ impl ReadOnlyProfile<'_> {
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
             }
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 { company } => {
-                render_ledger_opening_coverage(company.as_str())
-            }
             Self::StandardLedgerIdentityV1 { company } => {
                 render_standard_ledger_identity(company.as_str())
             }
@@ -415,17 +349,6 @@ impl ReadOnlyProfile<'_> {
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
             Self::VouchersV2 { company, range } => {
                 render_vouchers(company.as_str(), range.from_yyyymmdd(), range.to_yyyymmdd())
-            }
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 {
-                company,
-                window,
-                alter_id_range,
-            } => render_outstandings_vouchers(company, window, alter_id_range),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 { company, window } => {
-                crate::outstandings::voucher_empty_partition_witness_request(company, window)
-                    .into_xml()
             }
             Self::AuditCompanyObjectV1 { company } => render_audit_company_object(company.as_str()),
             Self::AuditLedgersV1 { company, period } => render_audit_ledgers(

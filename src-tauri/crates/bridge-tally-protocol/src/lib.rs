@@ -43,6 +43,9 @@ pub mod jsonex;
 #[cfg(feature = "jsonex-request-builder")]
 pub mod jsonex_request;
 pub mod ledger_census;
+/// One ledger `Create` message. Its one caller today is the lab rebuild;
+/// this crate runs its goldens in every build.
+pub mod ledger_create;
 pub mod native_cash_flow;
 pub mod native_company_features;
 pub mod native_funds_flow;
@@ -54,19 +57,8 @@ pub mod native_statement_reports;
 pub mod native_stock_summary;
 pub mod native_trial_balance;
 pub mod native_voucher_type_numbering;
-/// The legacy voucher-scan outstandings path: date/AlterID-partitioned
-/// wildcard voucher fetch, segment/witness completeness proofs, and bill
-/// computation from voucher allocations. Superseded by `native_outstandings`,
-/// which is always compiled. Gated because it cannot execute in a shipped
-/// build: the only non-test constructor for its width calibration is behind
-/// `live-calibration-harness`, which implies this feature.
-#[cfg(feature = "voucher-scan")]
-pub mod outstandings;
 /// The outstandings report contract and the company-identity/book-extent
-/// read shared by `outstandings` and `native_outstandings`. Deliberately
-/// ungated: `native_outstandings` depends on it, so gating it with
-/// `outstandings` would break the always-on native path. See the module docs
-/// for why this is scoped the way it is.
+/// read `native_outstandings` pins against. See the module docs.
 pub mod outstandings_shared;
 pub mod parent_partition;
 mod standard_ledger_catalog;

@@ -600,9 +600,10 @@ fn a_voucher_number_decides_nothing_under_unknown_numbering() {
 /// This asserted the opposite until a review asked what measured it.
 ///
 /// A voucher number used the master-name key, so `aa-0118` matched `AA-0118`
-/// and settled `Present`. The fold that key applies is not arbitrary -- §3.3b
-/// measured Tally's own master-name matching and the key follows it -- but
-/// nothing measured it for *numbers*, and borrowing the conclusion without the
+/// and settled `Present`. The fold that key applies is not arbitrary --
+/// `IMPLEMENTATION_GUIDE.md` §3.3b measured Tally's own master-name matching
+/// and the key follows it -- but nothing measured it for *numbers*, and
+/// borrowing the conclusion without the
 /// measurement is how an assumption acquires a citation.
 ///
 /// It also fails in the wrong direction. Folding produces more matches, a
@@ -3210,7 +3211,8 @@ fn a_large_number_collision_reports_its_true_size_without_listing_it() {
 /// differently on purpose.
 ///
 /// `comparison_key` lowercases and unifies dash and quote variants because
-/// §3.3b measured Tally doing that to master *names*. Nothing measured it for
+/// `IMPLEMENTATION_GUIDE.md` §3.3b measured Tally doing that to master
+/// *names*. Nothing measured it for
 /// numbers, and the fold fails in the silent direction: it produces more
 /// matches, a wrong number match is a `Present`, and `Present` tells a caller
 /// an invoice is already filed. Two distinct invoices differing only in case

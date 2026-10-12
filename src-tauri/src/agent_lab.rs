@@ -594,7 +594,7 @@ fn lab_master_json(kind: LabMasterKind, row: &BTreeMap<String, String>) -> Value
             // GST/HSN fields as returned, unclassified -- no signed
             // compatibility evidence exists for these on any Tally
             // release/mode yet (unlike the ledger GST duty-head vocabulary,
-            // which §4.3 confirms is live-capture backed).
+            // which protocol reference §8.3 confirms is live-capture backed).
             "gst_applicable": optional_field(row, "GSTAPPLICABLE"),
             "gst_type_of_supply": optional_field(row, "GSTTYPEOFSUPPLY"),
             "hsn_code": optional_field(row, "HSNCODE"),

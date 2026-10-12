@@ -35,6 +35,9 @@ async fn uncertain_build_retains_xml_journal_and_exact_recovery_error() {
         fn sync(&mut self) -> std::io::Result<()> {
             self.writer.sync_data()
         }
+        fn sync_entry(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
         fn truncate(&mut self, length: u64) -> std::io::Result<()> {
             self.reader.set_len(length)
         }
@@ -684,4 +687,225 @@ fn ledger_permissions_failure_precedes_all_appends() {
             0o600
         );
     }
+}
+
+fn injected() -> std::io::Result<()> {
+    Err(std::io::Error::other("injected directory sync failure"))
+}
+
+/// A directory sync that records the directories it was asked to sync.
+fn recording(
+    calls: &std::cell::RefCell<Vec<PathBuf>>,
+    result: std::io::Result<()>,
+) -> impl FnOnce(&Path) -> std::io::Result<()> + '_ {
+    move |directory: &Path| {
+        calls.borrow_mut().push(directory.to_path_buf());
+        result
+    }
+}
+
+#[test]
+fn a_journal_created_by_an_append_is_refused_when_its_directory_cannot_be_synced() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("ledger.jsonl");
+    let calls = std::cell::RefCell::new(Vec::new());
+    let refused = append_private_import_ledger_syncing(
+        &path,
+        b"first\n",
+        set_private_file,
+        recording(&calls, injected()),
+    );
+    assert_eq!(refused, Err("import_ledger_unavailable".to_string()));
+    assert_eq!(*calls.borrow(), [directory.path().to_path_buf()]);
+    // No half state: the record is cut back out, and the file is empty.
+    assert_eq!(fs::read(&path).unwrap(), b"");
+    // The file now exists and is empty; the next append syncs again.
+    append_private_import_ledger_syncing(
+        &path,
+        b"first\n",
+        set_private_file,
+        recording(&calls, Ok(())),
+    )
+    .unwrap();
+    assert_eq!(calls.borrow().len(), 2);
+    assert_eq!(fs::read(&path).unwrap(), b"first\n");
+}
+
+#[test]
+fn only_an_append_to_an_empty_or_new_journal_syncs_the_directory() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("ledger.jsonl");
+    let calls = std::cell::RefCell::new(Vec::new());
+    let append = |bytes: &[u8]| {
+        append_private_import_ledger_syncing(
+            &path,
+            bytes,
+            set_private_file,
+            recording(&calls, Ok(())),
+        )
+    };
+    // A new file syncs.
+    append(b"one\n").unwrap();
+    assert_eq!(calls.borrow().len(), 1);
+    // A non-empty journal does not, once or twice.
+    append(b"two\n").unwrap();
+    append(b"three\n").unwrap();
+    assert_eq!(calls.borrow().len(), 1);
+    // An existing file that is empty does.
+    let empty = directory.path().join("empty.jsonl");
+    fs::write(&empty, b"").unwrap();
+    append_private_import_ledger_syncing(
+        &empty,
+        b"one\n",
+        set_private_file,
+        recording(&calls, Ok(())),
+    )
+    .unwrap();
+    assert_eq!(calls.borrow().len(), 2);
+    assert_eq!(fs::read(&path).unwrap(), b"one\ntwo\nthree\n");
+}
+
+#[test]
+fn a_failed_directory_sync_whose_rollback_fails_is_reported_as_such() {
+    struct Writer {
+        bytes: Vec<u8>,
+    }
+    impl ImportLedgerWriter for Writer {
+        fn length(&mut self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+        fn append(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+            self.bytes.extend_from_slice(bytes);
+            Ok(())
+        }
+        fn sync(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+        fn sync_entry(&mut self) -> std::io::Result<()> {
+            injected()
+        }
+        fn truncate(&mut self, _: u64) -> std::io::Result<()> {
+            Err(std::io::Error::other("cannot truncate"))
+        }
+    }
+    let mut writer = Writer { bytes: Vec::new() };
+    assert_eq!(
+        append_import_ledger_bytes(&mut writer, b"x\n"),
+        Err("import_ledger_rollback_failed".to_string())
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_directory_that_cannot_be_opened_reports_its_error() {
+    let directory = tempfile::tempdir().unwrap();
+    assert!(sync_directory(directory.path()).is_ok());
+    assert!(sync_directory(&directory.path().join("absent")).is_err());
+}
+
+#[test]
+fn a_record_placed_whole_but_not_known_durable_reports_failure_and_a_retry_finds_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("record.json");
+    assert_eq!(
+        write_record_once_syncing(&path, b"whole", |_: &Path| injected()),
+        Err(RecordOnce::Failed)
+    );
+    assert_eq!(fs::read(&path).unwrap(), b"whole");
+    assert_eq!(write_record_once(&path, b"whole"), Err(RecordOnce::Exists));
+    // Nothing is left staged beside it.
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn a_proof_pair_whose_directory_cannot_be_synced_is_refused_before_any_record_names_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let imports = directory.path();
+    let appended = std::cell::Cell::new(false);
+    let result = publish_proofs_syncing(
+        imports,
+        &line(),
+        b"{}",
+        b"markdown",
+        |_| {
+            appended.set(true);
+            Ok(())
+        },
+        |_| Ok(()),
+        |_: &Path| injected(),
+    );
+    assert_eq!(result, Err("import_file_write_failed".to_string()));
+    assert!(!appended.get());
+    assert!(!imports.join(TRANSACTION).exists());
+}
+
+/// A directory the process can write to and enter but not open for reading, so
+/// `File::open(dir)` (what a directory sync does) is refused. The mode is
+/// restored on drop so the temporary directory can be removed.
+#[cfg(unix)]
+struct WriteOnlyDirectory(PathBuf);
+
+#[cfg(unix)]
+impl WriteOnlyDirectory {
+    fn new(path: &Path) -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o300)).unwrap();
+        assert!(
+            fs::File::open(path).is_err(),
+            "the directory must refuse a read open (a process with root rights cannot run this test)"
+        );
+        Self(path.to_path_buf())
+    }
+}
+
+#[cfg(unix)]
+impl Drop for WriteOnlyDirectory {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o700));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn the_real_journal_append_refuses_when_its_directory_cannot_be_synced() {
+    let directory = tempfile::tempdir().unwrap();
+    let _guard = WriteOnlyDirectory::new(directory.path());
+    let path = directory.path().join("ledger.jsonl");
+    assert_eq!(
+        append_private_import_ledger(&path, b"first\n", set_private_file),
+        Err("import_ledger_unavailable".to_string())
+    );
+    assert_eq!(fs::read(&path).unwrap(), b"");
+}
+
+#[cfg(unix)]
+#[test]
+fn the_real_proof_publication_refuses_when_its_directory_cannot_be_synced() {
+    let directory = tempfile::tempdir().unwrap();
+    let _guard = WriteOnlyDirectory::new(directory.path());
+    let appended = std::cell::Cell::new(false);
+    let result = publish_proofs(
+        directory.path(),
+        &line(),
+        b"{}",
+        b"markdown",
+        |_| {
+            appended.set(true);
+            Ok(())
+        },
+        |_| Ok(()),
+    );
+    assert_eq!(result, Err("import_file_write_failed".to_string()));
+    assert!(!appended.get());
+}
+
+#[cfg(unix)]
+#[test]
+fn the_real_record_write_reports_failure_when_its_directory_cannot_be_synced() {
+    let directory = tempfile::tempdir().unwrap();
+    let _guard = WriteOnlyDirectory::new(directory.path());
+    let path = directory.path().join("record.json");
+    assert_eq!(write_record_once(&path, b"whole"), Err(RecordOnce::Failed));
+    assert_eq!(fs::read(&path).unwrap(), b"whole");
 }

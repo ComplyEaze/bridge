@@ -377,6 +377,10 @@ counter Tally keeps that moves when vouchers or ledgers change.
   the break as `&#13;&#10;`, and the post ended verified; the read-back is
   now the test's fixture. Not measured: how macOS draws and wraps the mark
   and the quoted name, and the review dialog against a live Tally (#626).
+- The review dialog of one voucher (`acknowledge_post_review`) now shows the
+  voucher's type quoted (`Record that you reviewed ONE "Journal" in "Books"`),
+  as it shows every other value read from Tally, so every Tally value in
+  that text is escaped (#626).
 
 **Safer or fixed**
 

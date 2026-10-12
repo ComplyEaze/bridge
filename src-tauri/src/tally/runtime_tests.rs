@@ -671,27 +671,34 @@ fn raw_empty_bill_references_preserve_each_amount_and_get_explicit_label() {
 #[test]
 fn party_master_currency_assertion_rejects_a_changed_company_extent() {
     const EXTENT: &str = include_str!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/unit_a_company_extent_live.xml"
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     );
-    let read_extent_xml = EXTENT.replacen(
-        r#"<GUID TYPE=\"String\">bb8ad19e-6aef-4239-a917-87fec0c6215e</GUID>"#,
-        r#"<GUID TYPE=\"String\">bb8ad19e-6aef-4239-a917-87fec0c6215e</GUID><ALTMSTID TYPE=\"Number\">1</ALTMSTID>"#,
-        1,
-    );
-    let changed_extent_xml = read_extent_xml.replace(
+    let read_extent_xml = EXTENT;
+    let changed_extent_xml = read_extent_xml.replacen(
         "<LASTVOUCHERDATE TYPE=\"Date\">20260401</LASTVOUCHERDATE>",
         "<LASTVOUCHERDATE TYPE=\"Date\">20260402</LASTVOUCHERDATE>",
+        1,
     );
-    let read_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent(
-        &read_extent_xml,
-        "Aarav Trading Company Demo",
-        "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+    assert_ne!(
+        changed_extent_xml, read_extent_xml,
+        "the mutation must apply"
+    );
+    let expectation =
+        bridge_tally_protocol::outstandings_shared::CompanyBookExtentExpectation::new(
+            "Aarav Trading Company Demo".to_string(),
+            "bb8ad19e-6aef-4239-a917-87fec0c6215e".to_string(),
+            "100000".to_string(),
+            "20240401".to_string(),
+        )
+        .expect("captured full tuple is a valid expectation");
+    let read_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
+        read_extent_xml,
+        &expectation,
     )
     .expect("captured extent parses");
-    let changed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent(
+    let changed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
         &changed_extent_xml,
-        "Aarav Trading Company Demo",
-        "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+        &expectation,
     )
     .expect("changed synthetic extent parses");
     let assertion = CompanyCurrencyRead {

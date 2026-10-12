@@ -567,7 +567,12 @@ fn render_review_text(
         .join("\n");
     let preview = format!(
         "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\n{narration_pointer}\n{entries}{note}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.\n{}\n{narration_text}",
-        row.voucher_type.as_deref().unwrap_or("voucher"),
+        // Quoted like every other value read from Tally, so every Tally value
+        // in this text is escaped.
+        row.voucher_type
+            .as_deref()
+            .map(quoted)
+            .unwrap_or_else(|| "voucher".into()),
         quoted(company_name),
         quoted(row.date.as_str()),
         shown(&row.voucher_number),

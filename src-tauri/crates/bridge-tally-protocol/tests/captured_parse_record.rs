@@ -45,8 +45,8 @@ use bridge_tally_protocol::native_trial_balance::{
 };
 use bridge_tally_protocol::native_voucher_type_numbering::parse_voucher_type_numbering;
 use bridge_tally_protocol::outstandings_shared::{
-    parse_company_book_extent, parse_company_book_extent_v2, parse_company_ledger_count,
-    CompanyBookExtent, CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
+    parse_company_book_extent_v2, parse_company_ledger_count, CompanyBookExtent,
+    CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
 };
 use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
@@ -276,7 +276,6 @@ const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
-const AARAV_NAME: &str = "Aarav Trading Company Demo";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
@@ -610,20 +609,8 @@ const ROWS: &[Row] = &[
         parser: "parse_company_gateway_capability_observation",
         parse: |_, text| gateway(text),
     },
-    // Company book extents: tests/outstandings_shared.rs (V1 and the split V2 tuple); the app's
+    // Company book extents: tests/outstandings_shared.rs (the split V2 tuple); the app's
     // replays for the rest, against the expectation built from the paired company list.
-    Row {
-        fixture: "tests/fixtures/unit_a_company_extent_live.xml",
-        source: Source::Captured,
-        parser: "parse_company_book_extent(Aarav)",
-        parse: |_, text| extent(parse_company_book_extent(text, AARAV_NAME, AARAV_GUID)),
-    },
-    Row {
-        fixture: "tests/fixtures/native/company_extent_9000.xml",
-        source: Source::Captured,
-        parser: "parse_company_book_extent(Aarav)",
-        parse: |_, text| extent(parse_company_book_extent(text, AARAV_NAME, AARAV_GUID)),
-    },
     Row {
         fixture: "tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml",
         source: Source::Captured,

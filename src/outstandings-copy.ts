@@ -55,39 +55,6 @@ export function outstandingsPartialReason(
   if (value === "currency_ledgers_excluded") {
     return "Tally keeps some of this company's ledgers in another currency, or shows values in another currency on some of its base-currency ledgers";
   }
-  if (value === "tally_segment_latency_trending_restart_recommended") {
-    return "comparable segments kept slowing toward the safety deadline; Tally may need a restart before another sync";
-  }
-  if (value === "tally_segment_deadline_restart_recommended") {
-    return "a segment reached the safety deadline; Tally may need a restart before another sync";
-  }
-  if (value === "segment_response_size_limit_exceeded") {
-    return "a wildcard segment exceeded ComplyEaze Bridge's response safety bound";
-  }
-  if (value === "outstandings_segment_sizing_uncalibrated") {
-    return "ComplyEaze Bridge has no approved production segment size yet; no voucher read was sent";
-  }
-  if (value === "outstandings_segment_plan_exceeds_budget") {
-    return "this book needs more read segments than ComplyEaze Bridge can safely verify in one sync; no voucher scan started";
-  }
-  if (value === "company_voucher_alter_id_high_water_missing") {
-    return "Tally did not return the voucher limit ComplyEaze Bridge needs to prove complete coverage";
-  }
-  if (value === "ledger_opening_bills_not_covered") {
-    return "ComplyEaze Bridge found bill-wise opening balances that the voucher scan cannot verify, so totals stay withheld";
-  }
-  if (value === "unallocated_direct_postings_not_covered") {
-    return "ComplyEaze Bridge cannot yet prove balances posted without a bill reference, so totals stay withheld before any voucher read";
-  }
-  if (value === "whole_book_false_empty") {
-    return "Tally reported existing vouchers but the complete tiled date scan returned no rows";
-  }
-  if (value === "empty_segment_contradicted_by_wider_read") {
-    return "a wider date check found vouchers inside a supposedly empty period";
-  }
-  if (value === "voucher_outside_requested_window") {
-    return "Tally returned a voucher outside the requested date period";
-  }
   return value.replace(/_/g, " ");
 }
 
@@ -161,30 +128,6 @@ export function outstandingsPartialState(
       title: "Tally did not confirm this as-of date",
       message: outstandingsPartialReason(reasonCode, requestedAsOf, tallyAsOf),
       retryable: true,
-      tallyReadAttempted: true,
-    };
-  }
-  if (reasonCode === "outstandings_segment_sizing_uncalibrated") {
-    return {
-      title: "Outstandings aren’t available yet",
-      message: "ComplyEaze Bridge isn’t ready to calculate this report safely. It didn’t read anything from Tally or calculate totals. Changing Tally settings won’t resolve this.",
-      retryable: false,
-      tallyReadAttempted: false,
-    };
-  }
-  if (reasonCode === "unallocated_direct_postings_not_covered") {
-    return {
-      title: "Outstandings are not available for this company",
-      message: "ComplyEaze Bridge cannot yet verify balances posted without a bill reference. It did not calculate totals. Changing Tally settings won’t resolve this.",
-      retryable: false,
-      tallyReadAttempted: false,
-    };
-  }
-  if (reasonCode === "ledger_opening_bills_not_covered") {
-    return {
-      title: "Outstandings are not available for this company",
-      message: "ComplyEaze Bridge completed a coverage check, but bill-wise opening balances fall outside the current read scope. It did not calculate totals. Repeating the same scan won't resolve this.",
-      retryable: false,
       tallyReadAttempted: true,
     };
   }

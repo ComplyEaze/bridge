@@ -227,3 +227,8 @@ those shapes in a synthetic tree and requires each to be reported. Removing the 
   `cargo test -p bridge-tally-protocol` passes 348 of 348. `cargo test -p bridge --lib`: 1445
   passed, 0 failed, 6 ignored. The merged tree carries five fewer test attributes than that master
   (1596 to 1591), counted as above.
+
+## Note (October 2026)
+
+`tests/unit_a_live.rs`, cited above as a cross-crate use, was deleted with the voucher-scan path
+(#1546). The measurement above stands as a record of that date.

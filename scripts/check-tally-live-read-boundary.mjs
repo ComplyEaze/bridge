@@ -194,7 +194,6 @@ function relativeCheckedPath(path) {
 const productionSurfaces = [
   "src-tauri/Cargo.toml",
   "src-tauri/src/sync/reconciliation.rs",
-  "src-tauri/src/tally/capability_packs.rs",
   "src-tauri/src/tally/connector.rs",
   "src-tauri/src/tally/runtime.rs",
   "src-tauri/src/tally/tdl_engine.rs",

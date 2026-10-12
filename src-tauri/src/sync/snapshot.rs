@@ -1034,8 +1034,6 @@ pub enum SnapshotError {
     Mirror(#[from] MirrorError),
     #[error("snapshot reconciliation failed")]
     Reconciliation(#[from] ReconciliationError),
-    #[error("snapshot checkpoint changed concurrently")]
-    ConcurrentCheckpoint,
     #[error("snapshot state invariant failed ({0})")]
     StateInvariant(&'static str),
     #[error("canonical state serialization failed")]
@@ -3503,7 +3501,6 @@ fn persisted_reconciled_decision(
     Ok(Some(ReconciliationDecision {
         proof,
         mirror_commit,
-        safe_mismatches: Vec::new(),
     }))
 }
 

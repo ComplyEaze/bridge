@@ -138,7 +138,7 @@ fn scoped_opening_requires_observed_mode_and_does_not_infer_unknown_as_licensed(
 
 #[tokio::test]
 async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cache() {
-    use crate::tally::TallyProduct;
+    use crate::tally::connection::TallyProduct;
     use bridge_tally_core::CapabilityProfile;
     use tokio::io::AsyncReadExt;
     for (cached, scoped) in [(false, false), (true, false), (false, true), (true, true)] {
@@ -200,7 +200,6 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
                     &identity,
                     scoped.then(|| TallyDate::parse("20260815").unwrap()),
                     false,
-                    LedgerCurrencyGate::None,
                     ReadRetryPolicy::transient_default(),
                 )
                 .await
@@ -238,6 +237,23 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
         );
         assert!(body.is_empty());
     }
+}
+
+/// A 200 response whose Tally STATUS is 0 is a refusal, not an empty ledger list.
+#[test]
+fn native_ledger_opening_admission_refuses_a_tally_status_of_zero() {
+    let error = admit_native_ledger_opening_rows(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY /></ENVELOPE>",
+        "56359347-3976-4d01-b44e-56fa0f6a422c",
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.chain().find_map(|cause| {
+            cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+        }),
+        Some(&bridge_tally_protocol::NativeCollectionError::NotSuccess),
+        "unexpected error: {error:#}"
+    );
 }
 
 #[test]
@@ -342,6 +358,9 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
     let captured_ledger = decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
     ));
+    let captured_currency = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
     let xml = |text: String| {
         ScenarioPlan::new(Fixture::SyntheticXml(text))
             .with_encoding(WireEncoding::Utf16Le)
@@ -388,6 +407,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
         let company = xml(company_xml);
         let extent = xml(extent_xml);
         let ledger = xml(captured_ledger.clone());
+        let currency = xml(captured_currency.clone());
         let mut plans = vec![
             status.clone(),
             company.clone(),
@@ -395,6 +415,11 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             extent.clone(),
             status.clone(),
             extent.clone(),
+            status.clone(),
+            // The single-INR check precedes the ledger request and the period admission.
+            currency.clone(),
+            status.clone(),
+            currency,
             status.clone(),
         ];
         if !unsafe_book_start {
@@ -419,7 +444,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
         if unsafe_book_start {
             // Education reaches the native period admission. Its invalid
             // BOOKSFROM must refuse before the ledger report is dispatched.
-            plans.truncate(7);
+            plans.truncate(11);
         }
         let expected_requests = plans.len();
         let responses = plans
@@ -428,7 +453,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             .collect::<Vec<_>>();
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let result = TallyRuntime::default()
-            .fetch_ledgers_with_evidence(
+            .fetch_ledgers_with_opening_as_of_evidence(
                 TallyConfig {
                     host: simulator.address().ip().to_string(),
                     port: simulator.address().port(),
@@ -457,7 +482,9 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
                 Some(&OpeningBoundaryObservationError::Changed)
             );
         } else {
-            let (ledgers, evidence) = result.unwrap();
+            let LedgerListing {
+                ledgers, evidence, ..
+            } = result.unwrap();
             assert!(!ledgers.is_empty());
             let join = |left: &str, right: &str| sha256_hex(format!("{left}:{right}").as_bytes());
             let request = |index: usize| observations[index].request_body_sha256.as_str();
@@ -465,20 +492,26 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             assert_eq!(
                 evidence.request_sha256,
                 join(
-                    &join(&join(request(0), request(1)), request(7)),
-                    &join(request(16), request(17))
+                    &join(
+                        &join(&join(request(0), request(1)), request(7)),
+                        request(11)
+                    ),
+                    &join(request(20), request(21))
                 )
             );
             assert_eq!(
                 evidence.response_sha256,
                 join(
-                    &join(&join(&response(0), &response(1)), &response(7)),
-                    &join(&response(16), &response(17))
+                    &join(
+                        &join(&join(&response(0), &response(1)), &response(7)),
+                        &response(11)
+                    ),
+                    &join(&response(20), &response(21))
                 )
             );
             assert_eq!(
                 evidence.bytes,
-                [0, 1, 7, 9, 16, 17]
+                [0, 1, 7, 9, 11, 13, 20, 21]
                     .iter()
                     .map(|i| responses[*i].len())
                     .sum::<usize>()

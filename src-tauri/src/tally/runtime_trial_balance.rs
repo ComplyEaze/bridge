@@ -35,7 +35,7 @@ pub struct TrialBalanceRead {
 
 /// Whether a caller can present a Trial Balance that covers only part of the
 /// book. A caller that cannot show the ledgers left out must never receive
-/// one, so the partial read is opt-in: [`TallyRuntime::fetch_trial_balance`]
+/// one, so the partial read is opt-in: [`TallyRuntime::fetch_trial_balance_with_extent`]
 /// keeps the single-INR refusal for every other reader (bridge#709).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TrialBalanceCurrencyScope {
@@ -260,26 +260,9 @@ impl TallyRuntime {
     /// Native ledger-wise Trial Balance, with the same queue and read/write
     /// barrier as other monetary reads. Paired responses and stable book extent
     /// detect observed drift; they do not establish an atomic Tally snapshot.
-    pub async fn fetch_trial_balance(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-        period: TrialBalancePeriod,
-    ) -> anyhow::Result<TrialBalanceRead> {
-        self.fetch_trial_balance_with_extent(
-            config,
-            identity,
-            period,
-            TrialBalanceCurrencyScope::SingleCurrency,
-        )
-        .await
-        .map(|(read, _)| read)
-    }
-
-    /// As [`Self::fetch_trial_balance`], also returning the book extent the
-    /// read was pinned under: its opening and closing extents were equal, or
-    /// the read refused. A caller can tell later whether the book has moved
-    /// since (#630).
+    /// Also returns the book extent the read was pinned under: its opening and
+    /// closing extents were equal, or the read refused. A caller can tell later
+    /// whether the book has moved since (#630).
     pub(crate) async fn fetch_trial_balance_with_extent(
         &self,
         config: TallyConfig,
@@ -456,7 +439,6 @@ impl TallyRuntime {
                                 CompanyCurrencyRead {
                                     currency: currency.clone(),
                                     extent: extent.clone(),
-                                    evidence: evidence.clone(),
                                 }
                                 .admit_single_inr()
                                 .map_err(TrialBalanceReadError::Currency)?,

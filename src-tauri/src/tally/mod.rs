@@ -1,6 +1,5 @@
 pub(crate) mod agent_read_request;
 pub(crate) mod approved_import;
-pub mod capability_packs;
 pub mod connection;
 pub mod connector;
 pub mod runtime;
@@ -13,19 +12,17 @@ pub mod xml_parser;
 // Crate-internal only: `tally::connector` is the sole consumer.
 mod canonical_window;
 
-pub use bridge_tally_core as core;
-pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult, TallyProduct};
+pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult};
 pub(crate) use connector::core_snapshot_start_authorized_codes;
 pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
-    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
-    OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
-    UnallocatedComposition, UnallocatedParty,
+    CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
+    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason, TallyRuntime,
+    TallySessionSnapshot, UnallocatedComposition, UnallocatedParty,
 };
-pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
+pub use xml_parser::{TallyCompany, TallyLedger};
 
 /// A complete company tuple that a fresh Company collection has matched once.
 ///

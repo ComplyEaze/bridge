@@ -523,8 +523,9 @@ export to the same instance returned `STATUS 1` promptly, with no dialog.
 
 Only `ledgers_v1` was observed. Two things are **inferred**: that the other builders using the same
 construct raise it too, and that the space in the argument is the cause. Those builders are every
-`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`:
-`vouchers_v2`/`v3`, the ledger canary and the period-balance report.
+`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`: the
+ledger canary and the period-balance report. (`vouchers_v2`, which this list once named, was
+deleted 2026-10-12, Part of #1570.)
 
 All of them are refused **before sending** once Bridge knows the endpoint is in Education, with
 `education_report_family_unsupported`. Admission is unchanged: nothing is sent, and nothing is
@@ -537,8 +538,8 @@ promoted.
 - **Selected-ledger and selected-voucher qualifiers.** Deleted with the rest of their runtime
   path (bridge#732; ADR 0015's 2026-09-26 amendment): no command or tool reached them.
 - **The live-read tool.** Takes its mode from its configuration; it does not observe it. In
-  Education, the ledger step is recorded as failed with `education_report_family_unsupported`, and
-  the voucher steps as not attempted.
+  Education, the ledger step is recorded as failed with `education_report_family_unsupported`. Its
+  two voucher steps were deleted 2026-10-12 (Part of #1570), so the run ends after the ledger step.
   - **Residual:** a run configured as `Licensed` against an endpoint that is actually in Education
     still sends `ledgers_v1`. The tool's company read (`CompanyListV1`) carries no `EDUMODE`. Moving
     it to an observed mode means changing its profile sequence, which is not done here.

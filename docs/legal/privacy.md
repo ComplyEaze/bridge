@@ -1,8 +1,8 @@
 # ComplyEaze Bridge Privacy Policy
 
-**Version:** 2026-10.2
+**Version:** 2026-10.3
 
-**Effective:** 4 October 2026
+**Effective:** [PUBLISH DATE]
 
 **Describes:** ComplyEaze Bridge builds that include or link to this version of the policy, the desktop app built from the same source, and the Bridge website at bridge.complyeaze.com.
 
@@ -10,7 +10,7 @@
 >
 > - **ComplyEaze Bridge runs on your computer.** It connects only to a Tally address on the same computer, and hands what it reads to the AI assistant you connect it to.
 > - **Bridge sends nothing to ComplyEaze.** It has no feature that uploads files or sends data to us. It has no analytics, usage tracking, crash reporting or automatic update check.
-> - **Your AI provider does receive what your assistant reads.** That can include client names, PAN, bank details and **amounts, which are never masked**. Your assistant sends it to your AI provider (for example Anthropic, for Claude) under your own account and that provider's terms. An optional setting can shorten some names or remove narrations first. This reduces what is shared, but does not make it anonymous.
+> - **Your AI provider does receive what your assistant reads.** That can include client names, PAN, bank details and amounts. Your assistant sends it to your AI provider (for example Anthropic, for Claude) under your own account and that provider's terms. An optional setting can shorten some names or remove narrations first. This reduces what is shared, but does not make it anonymous, and **it never hides amounts, PAN, GSTINs or many other details** (section 5 lists them).
 > - **Bridge keeps files on your computer.** These include a log of every request and **unmasked** copies of any vouchers it prepares or posts, with client names and amounts. Bridge never deletes them by itself, and uninstalling may not remove them. Section 7 explains how to remove or archive them.
 > - **You are responsible for your clients' data.** As a professional, you decide what to read, which AI provider to use and what to post. You need your clients' authority to do so.
 >
@@ -88,6 +88,8 @@ Bridge's job is to give your AI Assistant the Tally Data it asks for. **Anything
 - the contents of any bank-statement PDF you ask Bridge to read; and
 - the location of files Bridge saves on your computer, which usually includes your computer user name.
 
+When Bridge reads a bank statement, it returns the last four digits of the statement's account number. It also writes the account label you give it into the narration of every voucher it prepares from the statement. That label carries at least those four digits, and for some banks the whole account number. These narrations are sent whenever your assistant reads them, unless you choose `drop_narration`.
+
 **Your AI Provider's own terms and privacy policy decide** how long it keeps this information, whether it uses it to train models, and who at the provider can see it. They also decide where it is processed, which may be outside India. These depend on the provider, and on the plan and settings you choose. Your AI Assistant may also keep its own records of conversations and results on your computer. Read your AI Provider's and AI Assistant's terms before you connect Bridge to real client books.
 
 **Optional masking (the "Response redaction" setting).**
@@ -97,10 +99,10 @@ Bridge has one optional setting, **Response redaction**, that changes what it gi
 | Value | What it does | What it does **not** do |
 | --- | --- | --- |
 | `none` (the default) | Nothing is masked or removed. | Everything is shared as read. |
-| `mask_parties` | Shortens party and ledger names to their first two and last two characters. It does the same to the name on PAN, the bank account holder's name and the bank account number. Anything of four characters or fewer becomes three dots ("..."). It also removes Tally's error messages, which can repeat names. | It does **not** mask amounts, company names, narrations, references, GSTINs, PAN numbers, email addresses, phone numbers, postal addresses, IFSCs or group names. A name written inside a narration or reference is not masked. |
+| `mask_parties` | Shortens to their first two and last two characters the names of parties and ledgers, stock items, stock groups, godowns, cost centres and cost categories. It does the same to the name on PAN, and to the bank account holder's name and bank account number in a ledger's details. Anything of four characters or fewer becomes an ellipsis (…). It also removes Tally's error messages, which can repeat names. | It masks nothing else. For example, it does **not** mask amounts, dates, company names, narrations, references, voucher numbers, GSTINs, PAN numbers, MSME or Udyam numbers, email addresses, phone numbers, postal addresses, PIN codes, IFSCs, account group names, or the last four digits of a bank statement's account number. A name or account number written inside a narration or reference is not masked. |
 | `drop_narration` | Removes narration fields. It also removes Tally's error messages. | It does not mask any names, and it does not remove amounts or any other text field. |
 
-**Amounts are never masked or removed.** A shortened name can still identify a person, especially alongside other details. Masking reduces what your AI Provider receives. It does not make the data anonymous, and it does not by itself meet any legal duty you may have. It applies only to what Bridge gives your AI Assistant. The Local Files in section 7 are stored unmasked.
+**Amounts are never masked or removed, and neither are the last four digits of a bank statement's account number that Bridge returns when it reads one.** A shortened name can still identify a person, especially alongside other details. Masking reduces what your AI Provider receives. It does not make the data anonymous, and it does not by itself meet any legal duty you may have. It applies only to what Bridge gives your AI Assistant. The Local Files in section 7 are stored unmasked.
 
 ## 6. No uploads to ComplyEaze
 
@@ -124,7 +126,7 @@ On a Mac, Bridge restricts its folder to your user account through file permissi
 | `agent-egress.jsonl` (the request log) | One entry for every result Bridge returns. Each entry records the time, the tool, Tally's internal code for the company, counts, field names, sizes and the masking setting. It also records error codes, the dates of any period that failed to read, and fingerprints of the request and result.⁴ For each tool call, the entry also lists the last 32 requests Bridge sent to Tally for that call (their kind, size, outcome and timing) and counts the rest. | Designed to hold no amounts, names or narrations. Sizes can hint at the length of a name, so treat this file as confidential too |
 | `agent-import-ledger.jsonl` (the import journal) | Every voucher batch Bridge prepared or posted, with its status | **Yes**: full voucher details, unmasked |
 | `imports/` | The Tally import files and the read-back record for each batch. Also review records, which include your computer user name | **Yes**: unmasked |
-| `bank-statements/` | Voucher proposals from bank statements you asked Bridge to read, including the last four digits of the account number | **Yes**: unmasked |
+| `bank-statements/` | Voucher proposals from bank statements you asked Bridge to read, including the account label you gave, which carries at least the last four digits of the account number | **Yes**: unmasked |
 | `terms-acceptance.jsonl` | The version of the Terms of Use you accepted, the time Bridge first started with the acceptance setting on, and that it was accepted through the setting | No |
 
 If you built and used the desktop app, it keeps more files in folders named `com.complyeaze.bridge`:

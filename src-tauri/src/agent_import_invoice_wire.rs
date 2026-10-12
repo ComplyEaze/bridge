@@ -784,6 +784,24 @@ fn clean(text: &str) -> String {
         .to_string()
 }
 
+/// An element with its name and attributes, whether written with a closing
+/// tag or as an empty element.
+fn element(start: &quick_xml::events::BytesStart<'_>) -> Result<Node, &'static str> {
+    let mut node = Node {
+        name: start.name().as_ref().to_string(),
+        ..Node::default()
+    };
+    for attribute in start.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|_| "invoice_read_malformed")?;
+        let value = attribute
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+            .map_err(|_| "invoice_read_malformed")?;
+        node.attributes
+            .insert(attribute.key.as_ref().to_string(), value.into_owned());
+    }
+    Ok(node)
+}
+
 /// The answer as a tree, under the same envelope rules as `rows`: a success
 /// status, a collection that came back, numeric references to control
 /// characters marked first.
@@ -793,26 +811,9 @@ fn parse_tree(xml: &str) -> Result<Node, &'static str> {
     let mut stack: Vec<Node> = vec![Node::default()];
     loop {
         match reader.read_event().map_err(|_| "invoice_read_malformed")? {
-            Event::Start(start) => {
-                let mut node = Node {
-                    name: start.name().as_ref().to_string(),
-                    ..Node::default()
-                };
-                for attribute in start.attributes().with_checks(true) {
-                    let attribute = attribute.map_err(|_| "invoice_read_malformed")?;
-                    let value = attribute
-                        .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                        .map_err(|_| "invoice_read_malformed")?;
-                    node.attributes
-                        .insert(attribute.key.as_ref().to_string(), value.into_owned());
-                }
-                stack.push(node);
-            }
+            Event::Start(start) => stack.push(element(&start)?),
             Event::Empty(empty) => {
-                let node = Node {
-                    name: empty.name().as_ref().to_string(),
-                    ..Node::default()
-                };
+                let node = element(&empty)?;
                 stack
                     .last_mut()
                     .ok_or("invoice_read_malformed")?
@@ -889,8 +890,9 @@ pub(super) struct GstRow {
     /// of the row, of a state-wise block or of a head's rate that is not in
     /// the measured set, or a slab-rate list that is not empty).
     pub(super) unmeasured: bool,
-    /// The row holds no element and no text, as the lab's round-off ledger's
-    /// row read (`BRIDGE Round Off`, the `pilot-lab` rate listing).
+    /// The row holds no attribute, no element and no text, as the lab's
+    /// round-off ledger's row read (`BRIDGE Round Off`, the `pilot-lab` rate
+    /// listing).
     pub(super) empty: bool,
 }
 
@@ -919,9 +921,10 @@ const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALU
 
 /// The rate listing by ledger name, for the ledgers an invoice names. Every
 /// row of the answer must carry the verified company's GUID (the
-/// `BRIDGECOMPANYGUID` compute); the rows of the named ledgers are read in
-/// full, and a name two of them claim refuses the answer. A row of any other
-/// ledger is not read, so one unrelated ledger cannot fail an invoice.
+/// `BRIDGECOMPANYGUID` compute) and a name; the rows of the named ledgers are
+/// read in full, and a name two of them claim refuses the answer. The rest of
+/// any other ledger's row is not read, so one unrelated ledger's fields
+/// cannot fail an invoice.
 pub(super) fn parse_ledger_rates(
     xml: &str,
     company_guid: &str,
@@ -950,8 +953,10 @@ pub(super) fn parse_ledger_rates(
         {
             return Err("invoice_ledger_rates_company_mismatch");
         }
+        // Every row of the lab's listing was named; one that is not cannot be
+        // told apart from a ledger the invoice names, so the read failed.
         let Some(name) = ledger.attributes.get("NAME").cloned() else {
-            continue;
+            return Err("invoice_ledger_rates_row_unnamed");
         };
         if !wanted.contains(&name.as_str()) {
             continue;
@@ -996,7 +1001,9 @@ pub(super) fn parse_ledger_rates(
                 source: details.text_of("SRCOFGSTDETAILS")?,
                 states,
                 unmeasured,
-                empty: details.children.is_empty() && clean(&details.text).is_empty(),
+                empty: details.attributes.is_empty()
+                    && details.children.is_empty()
+                    && clean(&details.text).is_empty(),
             });
         }
         let row = LedgerRateRow {

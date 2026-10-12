@@ -285,6 +285,10 @@ requires a restart.
 **OWNER-RULED 2026-07-30.** The wildcard outstandings profile has one narrow response-bound
 exception because a live 1,632-voucher boundary produced approximately 33.6 MiB:
 
+(October 2026: the voucher-scan outstandings read, its `VoucherOutstandingsV1` request and its
+40 MiB cap were deleted from the code; every read now has the 32 MiB cap. This section stays as
+the rule a future scan must meet.)
+
 - the general XML response cap remains **32 MiB**;
 - only the closed `VoucherOutstandingsV1` request type may use a **40 MiB** response cap;
 - the runtime sizing target remains **28 MiB**, derived from multiple comparable completed

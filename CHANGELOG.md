@@ -32,6 +32,16 @@ These changes are in source and not yet in a published build.
   book whose report lists a group and an item under the root side by side, an item inside a stock group, a
   compound unit, other dates, other releases, macOS, and a group that carries an item's name.
 
+- `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
+  each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
+  return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
+  whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
+  type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher
+  mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered
+  buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
+  voucher has not been observed.
+
 - `company_features` reads three settings that a company's record in Tally holds today (cost centres, GST
   and batch-wise stock) and its currency symbol (part of #1231). Each setting is yes, no or
   not reported, and says what it rests on: each of the three was compared with Tally's own
@@ -331,6 +341,27 @@ counter Tally keeps that moves when vouchers or ledgers change.
   the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
   about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
   read, or a held later page (#1230).
+- The approval dialog of `post_import` now takes a voucher on a ledger whose
+  name in Tally ends in one line break; until now such a voucher could be
+  built and was refused for posting. The approval dialog, and the review
+  dialog if a doubt is recorded after the post, show such a name quoted
+  with the line break written out and the words "Line break" before the
+  quote, on every line that shows the name (`Line break  "Name\r\n"`), and
+  add one line saying what the mark means and that no other name in that
+  text has one. A line break anywhere else in a name is refused as before,
+  and no dialog shows a line break in any other value. The desktop Journal
+  screen takes no saved Journal that names such a ledger, to review or
+  post, or to reconcile once it was sent: it says so and says to use the
+  assistant for it. An approval text that carries both this line and the
+  On Account sentence holds one entry fewer. The mark takes 12 of a line's
+  100 characters and the written-out break 4: a text with a line over the
+  cap is refused, never cut, except that a batch's per-voucher lines give
+  way to a reason line.
+  Measured once on a licensed TallyPrime 7.1 Silver on Windows: one Journal
+  on such a ledger posted through the dialog, Tally read the name back with
+  the break as `&#13;&#10;`, and the post ended verified; the read-back is
+  now the test's fixture. Not measured: how macOS draws and wraps the mark
+  and the quoted name, and the review dialog against a live Tally (#626).
 
 **Safer or fixed**
 

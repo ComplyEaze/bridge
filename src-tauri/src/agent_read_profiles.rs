@@ -239,6 +239,55 @@ pub(super) fn render_gst_status_window(
     to: &TallyDate,
     type_name: &str,
 ) -> Result<String, String> {
+    render_status_window(company, from, to, type_name, StatusFetch::Flags)
+}
+
+/// The uncertain-voucher read (Accept As Is, phase 1): the status read with
+/// the party and the voucher's amount added to its field list. It is the lab's
+/// file `w19-status-window-aug-wide.xml` (12 Oct 2026) with `,ISPOSTDATED`
+/// added after `ISOPTIONAL`; that exact request has not yet been sent to a
+/// real Tally (the W19 answers were to the request without it). Asking for
+/// `AMOUNT` makes Tally return each voucher's ledger entries as well (about
+/// 3.5 to 4.8 KB a voucher on the lab's book).
+pub(super) fn render_gst_uncertain_window(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    type_name: &str,
+) -> Result<String, String> {
+    render_status_window(company, from, to, type_name, StatusFetch::FlagsPartyAmount)
+}
+
+/// The two field lists a status window read is measured with, each named by
+/// what it adds to the fields every status read fetches.
+#[derive(Clone, Copy)]
+enum StatusFetch {
+    /// The cancelled, optional and post-dated flags (W21, `gst_status`).
+    Flags,
+    /// The party, those flags and the voucher's amount (W19 without
+    /// `ISPOSTDATED`; the whole list is not yet measured).
+    FlagsPartyAmount,
+}
+
+impl StatusFetch {
+    fn tail(self) -> &'static str {
+        match self {
+            StatusFetch::Flags => ",ISCANCELLED,ISOPTIONAL,ISPOSTDATED",
+            StatusFetch::FlagsPartyAmount => ",PARTYLEDGERNAME,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,AMOUNT",
+        }
+    }
+}
+
+/// The status window read of one voucher type, with the fields of `fetch`
+/// appended to the fields every status read fetches.
+fn render_status_window(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    type_name: &str,
+    fetch: StatusFetch,
+) -> Result<String, String> {
+    let fetch_tail = fetch.tail();
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
     if !gst_status_type_name_literal_safe(type_name) {
@@ -247,7 +296,7 @@ pub(super) fn render_gst_status_window(
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN,ISCANCELLED,ISOPTIONAL,ISPOSTDATED</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN{fetch_tail}</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()),
         xml_escape(type_name)
     ))

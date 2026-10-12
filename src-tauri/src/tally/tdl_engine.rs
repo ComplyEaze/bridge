@@ -203,15 +203,12 @@ mod tests {
             // `ReadOnlyProfileId::education_refuses_report_formula`: the tools'
             // Education transport.
             "render_ledgers",
-            // The same flag.
-            "render_vouchers",
             // `RuntimeTallyConnector::read_core_period_balance_report`.
             "ledger_period_balances_request",
         ];
         assert_eq!(listed, guarded.into_iter().collect());
-        for id in [ReadOnlyProfileId::LedgersV1, ReadOnlyProfileId::VouchersV2] {
-            assert!(id.education_refuses_report_formula(), "{}", id.as_str());
-        }
+        let id = ReadOnlyProfileId::LedgersV1;
+        assert!(id.education_refuses_report_formula(), "{}", id.as_str());
         let synthetic_from = TallyDate::parse("20260401").unwrap();
         let synthetic_to = TallyDate::parse("20260430").unwrap();
         for (builder, request) in [

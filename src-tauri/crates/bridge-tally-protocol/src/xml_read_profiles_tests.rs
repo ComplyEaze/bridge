@@ -1,9 +1,6 @@
 use super::*;
 
-fn profiles<'a>(
-    company: &'a ValidatedCompanyName,
-    range: &'a ValidatedDateRange,
-) -> [ReadOnlyProfile<'a>; 8] {
+fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
     [
         ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
@@ -12,7 +9,6 @@ fn profiles<'a>(
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV2 { company },
         ReadOnlyProfile::LedgersV1 { company },
-        ReadOnlyProfile::VouchersV2 { company, range },
     ]
 }
 
@@ -53,8 +49,7 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
 #[test]
 fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     let company = ValidatedCompanyName::new("BRIDGE & <SYNTHETIC> \"BOOK\"").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
-    for profile in profiles(&company, &range) {
+    for profile in profiles(&company) {
         let request = profile.render();
         let upper = request.to_ascii_uppercase();
         assert!(upper.contains("<TALLYREQUEST>EXPORT</TALLYREQUEST>"));
@@ -153,10 +148,6 @@ fn profile_ids_and_template_hashes_are_stable() {
             "259b8159eb7c5a503c96f2760996db992127298781d5a332699a090cea90301b",
         ),
         (
-            ReadOnlyProfileId::VouchersV2,
-            "81cc3da69ab58cd857603342898a2b3142ade321d5fea38de76c425612ccf6df",
-        ),
-        (
             ReadOnlyProfileId::AuditCompanyObjectV1,
             "ff023f06940b80c8e922d8b238772cd77e18f220b2fd7a4be7af667029948acf",
         ),
@@ -188,7 +179,6 @@ fn profile_ids_and_template_hashes_are_stable() {
 #[test]
 fn compatibility_renderers_preserve_validated_profile_bytes() {
     let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
     assert_eq!(
         compatibility::company_list_request(),
         ReadOnlyProfile::CompanyListV1.render()
@@ -204,18 +194,6 @@ fn compatibility_renderers_preserve_validated_profile_bytes() {
     assert_eq!(
         compatibility::ledgers_request(company.as_str()),
         ReadOnlyProfile::LedgersV1 { company: &company }.render()
-    );
-    assert_eq!(
-        compatibility::vouchers_request(
-            company.as_str(),
-            range.from_yyyymmdd(),
-            range.to_yyyymmdd(),
-        ),
-        ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        }
-        .render()
     );
 }
 
@@ -577,7 +555,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::StandardLedgerCatalogV1
             | ReadOnlyProfileId::StandardLedgerCatalogV2
             | ReadOnlyProfileId::LedgersV1
-            | ReadOnlyProfileId::VouchersV2
             | ReadOnlyProfileId::AuditCompanyObjectV1
             | ReadOnlyProfileId::AuditLedgersV1
             | ReadOnlyProfileId::AuditVouchersV1
@@ -592,7 +569,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::StandardLedgerCatalogV1,
         ReadOnlyProfileId::StandardLedgerCatalogV2,
         ReadOnlyProfileId::LedgersV1,
-        ReadOnlyProfileId::VouchersV2,
         ReadOnlyProfileId::AuditCompanyObjectV1,
         ReadOnlyProfileId::AuditLedgersV1,
         ReadOnlyProfileId::AuditVouchersV1,
@@ -616,11 +592,7 @@ fn education_refuses_exactly_the_profiles_that_render_a_spaced_function_argument
         refused.extend(hazard.map(|h| (id.as_str(), h)));
     }
     let ledgers = spaced("NumItems", "BRIDGE Ledger Collection V1");
-    let vouchers = spaced("NumItems", "BRIDGE Voucher Collection V1");
-    assert_eq!(
-        refused,
-        [("ledgers_v1", ledgers), ("vouchers_v2", vouchers)]
-    );
+    assert_eq!(refused, [("ledgers_v1", ledgers)]);
 }
 
 /// `$$name:argument`, assembled at run time: a literal would itself be a hit

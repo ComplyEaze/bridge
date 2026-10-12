@@ -595,10 +595,7 @@ fn contra_legs(
     let [first, second] = voucher.entries.as_slice() else {
         return Ok(None);
     };
-    if voucher.kind != VoucherType::Contra
-        || first.side == second.side
-        || first.ledger == second.ledger
-    {
+    if voucher.kind != VoucherType::Contra || first.side == second.side {
         return Ok(None);
     }
     let amount = match (
@@ -869,8 +866,7 @@ pub(super) fn build_transfer_facts(
     let mut kept = Vec::new();
     for decided in contras {
         let batch = &batches[decided.deciding];
-        let superseded = !batch.is_verified()
-            && !batch.sent
+        let superseded = !batch.sent
             && !batch.found
             && holders
                 .get(decided.txn.as_str())

@@ -2013,3 +2013,54 @@ fn a_post_span_verdict_sets_no_status_so_a_verified_contra_stays_verified() {
     let found = journal.read().unwrap();
     assert_eq!(found.contras[0].status, BatchStatus::PostedVerified);
 }
+
+#[test]
+fn a_contra_keyed_by_something_other_than_a_statement_id_is_still_a_statement_contra() {
+    // only skipped rows carry statement ids; a booked Contra's id is not bound to one
+    let keyed = build(190)
+        .voucher(contra("txn-contra-1", N2, N1, "100.00"))
+        .facts(facts(B2).contra("txn-contra-1", None))
+        .status("posted_verified");
+    let found = Journal::default().batch(&keyed).read().unwrap();
+    assert_eq!(found.contras.len(), 1);
+    assert_eq!(found.contras[0].key.txn, TxnId::new("txn-contra-1"));
+}
+
+#[test]
+fn a_batch_first_written_unverified_and_written_again_verified_is_found() {
+    let skipped = build(191).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let first = build(192).voucher(payment(&st(6), "500.00"));
+    let again = build(192)
+        .voucher(payment(&st(6), "500.00"))
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&first)
+        .batch(&again)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 1);
+}
+
+#[test]
+fn facts_on_a_build_with_no_endpoint_are_an_error_even_when_nothing_uses_it() {
+    // its only row is decided by a later build that has an endpoint, and it
+    // carries no skipped row or window that would need one
+    let blind = build(193)
+        .endpoint(None)
+        .voucher(contra(&st(93), N2, N1, "1.00"))
+        .facts(facts(B2).contra(&st(93), None));
+    let amendment = build(194)
+        .amends(193)
+        .voucher(contra(&st(93), N2, N1, "2.00"));
+    assert_eq!(
+        Journal::default()
+            .batch(&blind)
+            .batch(&amendment)
+            .read()
+            .unwrap_err(),
+        TransferFactsError::MissingEndpoint {
+            source_id: batch_id(193)
+        }
+    );
+}

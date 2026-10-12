@@ -24,6 +24,9 @@ fn a_shape_no_row_produces_is_refused() {
         // a UPI or IMPS value is exactly twelve digits
         "60000000001",
         "6000000000011",
+        // twelve characters that are not all digits
+        "60000000000a",
+        "600000-00001",
         // all-zero placeholders, at both admitted shapes
         "000000000000",
         "0000000000000000",

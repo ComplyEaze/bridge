@@ -26,7 +26,7 @@ async fn agent_pair_failures_retain_each_completed_source_body_and_transport_cau
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        company.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&company.guid.clone().unwrap()),
         company.company_number.clone().unwrap(),
         company.books_from.clone().unwrap(),
         &companies,

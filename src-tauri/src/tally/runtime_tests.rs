@@ -36,7 +36,7 @@ fn captured_aarav_company_list_and_identity() -> (String, VerifiedCompanyIdentit
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        row.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&row.guid.clone().unwrap()),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &rows,
@@ -1021,7 +1021,7 @@ async fn the_outstandings_read_refuses_a_non_loopback_endpoint() {
         host: "not-a-loopback-endpoint".to_string(),
         port: 9000,
     };
-    let identity = verified_identity("Synthetic Company", "synthetic-guid");
+    let identity = verified_identity("Synthetic Company", "9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27");
     let as_of = TallyDate::parse("20260731").unwrap();
     let error = runtime
         .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)

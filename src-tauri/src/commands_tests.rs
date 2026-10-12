@@ -91,10 +91,13 @@ async fn empty_label_migration_plan_never_opens_the_mirror() {
 
 #[test]
 fn same_guid_case_or_whitespace_sibling_is_not_a_safe_scope() {
-    let identity = VerifiedCompanyIdentity::test_fixture("Client Book", "same-guid");
+    let identity = VerifiedCompanyIdentity::test_fixture(
+        "Client Book",
+        "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94",
+    );
     let sibling = TallyCompany {
         name: " client book ".to_string(),
-        guid: Some("SAME-GUID".to_string()),
+        guid: Some("5A3E1C70-9B2D-4F48-8A6C-0D7E2F1B3C94".to_string()),
         company_number: Some("2".to_string()),
         books_from: Some("20270401".to_string()),
     };
@@ -107,7 +110,7 @@ fn same_guid_case_or_whitespace_sibling_is_not_a_safe_scope() {
 fn setup_rejects_presentation_equivalent_guid_siblings() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
@@ -116,13 +119,13 @@ fn setup_rejects_presentation_equivalent_guid_siblings() {
         vec![
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("1".to_string()),
                 books_from: Some("20260401".to_string()),
             },
             TallyCompany {
                 name: " client book ".to_string(),
-                guid: Some("SAME-GUID".to_string()),
+                guid: Some("5A3E1C70-9B2D-4F48-8A6C-0D7E2F1B3C94".to_string()),
                 company_number: Some("2".to_string()),
                 books_from: Some("20270401".to_string()),
             },
@@ -137,7 +140,7 @@ fn setup_rejects_presentation_equivalent_guid_siblings() {
 fn setup_rejects_identical_name_same_guid_different_book() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
@@ -146,13 +149,13 @@ fn setup_rejects_identical_name_same_guid_different_book() {
         vec![
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("1".to_string()),
                 books_from: Some("20260401".to_string()),
             },
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("2".to_string()),
                 books_from: Some("20270401".to_string()),
             },
@@ -164,16 +167,60 @@ fn setup_rejects_identical_name_same_guid_different_book() {
 }
 
 #[test]
+fn setup_refuses_a_company_guid_that_is_not_strict_shaped_and_does_not_say_probe_again() {
+    for guid in [
+        "not-a-company-guid".to_string(),
+        "5a3e1c709b2d4f488a6c0d7e2f1b3c94".to_string(),
+        "{5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94}".to_string(),
+        "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c9".to_string(),
+    ] {
+        let selected = SelectedCompanyIdentity {
+            display_name: "Client Book".to_string(),
+            company_guid: guid.clone(),
+            company_number: "1".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+        };
+        // The company list holds exactly the selected tuple, so only the
+        // GUID's own shape can refuse it.
+        let listed = TallyCompany {
+            name: "Client Book".to_string(),
+            guid: Some(guid.clone()),
+            company_number: Some("1".to_string()),
+            books_from: Some("20260401".to_string()),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, vec![listed])
+            .expect_err("a GUID not in Tally's form must not become an identity");
+
+        assert_eq!(error.code, "company_selection_invalid", "{guid:?}");
+        assert!(
+            error.message.contains("not in the expected form"),
+            "{guid:?}: {}",
+            error.message
+        );
+        assert_eq!(error.retry, "not_recommended", "{guid:?}");
+        assert_eq!(
+            error.remediation,
+            "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
+            "{guid:?}"
+        );
+        assert!(
+            !error.message.contains("Probe again") && !error.remediation.contains("Probe again"),
+            "probing again returns the same company: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn setup_reports_duplicate_complete_tuple_separately() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
     let duplicate = TallyCompany {
         name: "Client Book".to_string(),
-        guid: Some("same-guid".to_string()),
+        guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
         company_number: Some("1".to_string()),
         books_from: Some("20260401".to_string()),
     };

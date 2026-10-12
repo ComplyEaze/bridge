@@ -35,7 +35,7 @@ fn identity_for_guid(xml: &str, guid: &str) -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        guid.into(),
+        crate::tally::test_company_guid(guid),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &companies,

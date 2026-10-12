@@ -1,0 +1,13 @@
+ITEM 4c - audit read's company part, one live read (synthetic BRIDGE BATCH LAB, port 9001), 12 Oct 2026
+Identity recorded first (tally_status 2026-10-12T03:44:13.546Z): NAME "BRIDGE BATCH LAB", GUID a30f23c3-4819-4334-96ab-ffa6fba70976, BOOKSFROM 20260401; the only company loaded.
+Request 4c-request.utf16le.xml: FF FE + UTF-16LE of the pinned line, 896 B, SHA-256 55b145be1d140f86b0f312f41d055ef7697cf9daa41c897ad4f384cac6a2803f (UTF-8 text 447 B, f63907cebb4ad969889ca6c73a7dbfd8c442a63a96e6d86829ed9a892be2bef0) - both as pinned.
+Sent once with curl.exe (no client timeout): 2026-10-12T03:50:56.298Z -> 03:50:56.542Z, exit code 0, printed "200 4216".
+Headers: HTTP/1.1 200 OK; Unicode: Yes; CONTENT-TYPE: text/xml; charset=utf-16; RESPSTATUS: 1; CONNECTION: KEEP-ALIVE; CONTENT-LENGTH: 4216.
+Response 4c-response.xml: 4,216 B, SHA-256 960d98d4908eb72b512ceddc912b37e4e1c55efe243b13ac2da7f73de4fe94fe, UTF-16LE without BOM (first bytes 3C 00 45 00; Content-Type charset=utf-16).
+Structural checks (check_4c.py, ElementTree parse):
+(1) HEADER/STATUS = "1"; after </ENVELOPE> only CR LF (whitespace, no content) -> YES
+(2) exactly one BODY/DATA/TALLYMESSAGE, with exactly one child COMPANY -> YES
+(3) that COMPANY has NAME="BRIDGE BATCH LAB" (also RESERVEDNAME="", REQNAME="BRIDGE BATCH LAB"); GUID once, BOOKSFROM once -> YES
+(4) GUID a30f23c3-4819-4334-96ab-ffa6fba70976 and BOOKSFROM 20260401 equal the recorded values -> YES
+(5) the only other COMPANY element is BODY/DESC/CMPINFO/COMPANY with text "2" and no children; it carries no GUID or BOOKSFROM -> YES
+Measured: the COMPANY has 7 child elements: BOOKSFROM (Date) 20260401, NAME (String), GUID (String), ISINTEGRATED (Logical) "No", ISDEEMEDPOSITIVE (Logical, empty), CANDELETE (Logical) "No", MASTERID (Number) " 29". ISINTEGRATED = No.

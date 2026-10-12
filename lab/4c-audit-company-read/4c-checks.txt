@@ -1,0 +1,8 @@
+encoding utf-16-le chars 2108
+(1) HEADER/STATUS = '1' ; after </ENVELOPE>: '\r\n' -> YES
+(2) DATA/TALLYMESSAGE count = 1 ; children per message = [['COMPANY']] -> YES
+(3) COMPANY NAME attribute = 'BRIDGE BATCH LAB' ; GUID count = 1 ; BOOKSFROM count = 1 -> YES
+(4) GUID = 'a30f23c3-4819-4334-96ab-ffa6fba70976' ; BOOKSFROM = '20260401' -> YES
+(5) other COMPANY elements = 1 [(None, 0)] ; carrying GUID/BOOKSFROM = [] -> YES
+MEASURED: COMPANY child elements = 7 ; tags = ['BOOKSFROM', 'NAME', 'GUID', 'ISINTEGRATED', 'ISDEEMEDPOSITIVE', 'CANDELETE', 'MASTERID']
+MEASURED: ISINTEGRATED = ['No'] ; NAME children = ['BRIDGE BATCH LAB']

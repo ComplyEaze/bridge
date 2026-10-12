@@ -1402,10 +1402,7 @@ fn an_intent_takes_its_items_and_keys_from_its_batch() {
 }
 
 #[test]
-fn names_decide_an_overlap_and_recorded_keys_do_not() {
-    // Names that may be one master overlap whatever keys the lines record.
-    let rent = single("Synthetic Rent");
-    let spaced = single("synthetic   RENT");
+fn an_open_dispatch_overlaps_on_matching_names_or_on_an_equal_recorded_key() {
     let records = |a: &MasterBatch, a_keys: (&str, &str), b: &MasterBatch, b_keys: (&str, &str)| {
         journal_text(&[
             MasterRecord::Batch(a.clone()),
@@ -1414,6 +1411,9 @@ fn names_decide_an_overlap_and_recorded_keys_do_not() {
             MasterRecord::DispatchIntent(keyed_intent(b, b_keys.0, b_keys.1)),
         ])
     };
+    let rent = single("Synthetic Rent");
+    // Names that may be one master overlap whatever keys the lines record.
+    let spaced = single("synthetic   RENT");
     assert_eq!(
         read(&records(
             &rent,
@@ -1424,38 +1424,55 @@ fn names_decide_an_overlap_and_recorded_keys_do_not() {
         .unwrap_err(),
         MasterLedgerError::OpenDispatchOverlaps
     );
-    // Names that are not one master do not overlap, even with equal recorded keys.
+    // A key recorded on disk can only add a refusal: either one equal refuses
+    // names that no fold relates (a fold narrowed later cannot release them).
     let other = single("Synthetic Water");
-    for keys in [("same", "absent-a"), ("key-a", "same"), ("same", "same")] {
-        let shared = (keys.0, keys.1);
-        assert!(
-            read(&records(&rent, ("same", "same"), &other, shared)).is_ok(),
+    for keys in [("key-a", "absent-b"), ("key-b", "absent-a")] {
+        assert_eq!(
+            read(&records(&rent, ("key-a", "absent-a"), &other, keys)).unwrap_err(),
+            MasterLedgerError::OpenDispatchOverlaps,
             "{keys:?}"
         );
     }
+    assert!(read(&records(
+        &rent,
+        ("key-a", "absent-a"),
+        &other,
+        ("key-b", "absent-b")
+    ))
+    .is_ok());
 }
 
 #[test]
-fn a_batch_or_an_overlap_refuses_a_pair_matching_on_one_index_key() {
-    // `J` + caron and `j` + caron share the canonical key, not the absence key;
-    // NFC and NFD share the absence key, not the canonical key.
-    for (a, b) in [
-        ("J\u{30c}ournal", "j\u{30c}ournal"),
-        ("Caf\u{e9} Traders", "Cafe\u{301} Traders"),
-    ] {
-        assert!(names_may_be_one_master(a, b), "{a:?} {b:?}");
-        assert!(names_may_be_one_master(b, a), "{a:?} {b:?}");
+fn a_pair_agreeing_on_the_canonical_key_only_or_a_twin_fold_only_may_be_one_master() {
+    let one = |a: &str, b: &str| NameKeys::of(a).may_be_one_master(&NameKeys::of(b));
+    let shares_a_twin_key = |a: &str, b: &str| {
+        let b_keys = twin_fold_keys(b);
+        twin_fold_keys(a).iter().any(|key| b_keys.contains(key))
+    };
+    // Capital iota with diaeresis and acute has no precomposed form, the small
+    // one does (U+0390): lowercasing first gives one canonical key, while NFC
+    // first leaves the twin folds apart in every position.
+    let capital = "\u{399}\u{308}\u{301}ta";
+    let small = "\u{3b9}\u{308}\u{301}ta";
+    assert_eq!(canonical_master_key(capital), canonical_master_key(small));
+    assert!(!shares_a_twin_key(capital, small));
+    // NFC against NFD: the twin folds agree, the canonical key does not.
+    let (nfc, nfd) = ("Caf\u{e9} Traders", "Cafe\u{301} Traders");
+    assert_ne!(canonical_master_key(nfc), canonical_master_key(nfd));
+    assert!(shares_a_twin_key(nfc, nfd));
+    for (a, b) in [(capital, small), (nfc, nfd)] {
+        assert!(one(a, b), "{a:?} {b:?}");
+        assert!(one(b, a), "{a:?} {b:?}");
         let (_, first) = dispatched_batch(a);
         let (_, second) = dispatched_batch(b);
         assert_eq!(
             read(&journal_text(&[first, second].concat())).unwrap_err(),
-            MasterLedgerError::OpenDispatchOverlaps
+            MasterLedgerError::OpenDispatchOverlaps,
+            "{a:?} {b:?}"
         );
     }
-    assert!(!names_may_be_one_master(
-        "Synthetic Rent",
-        "Synthetic Water"
-    ));
+    assert!(!one("Synthetic Rent", "Synthetic Water"));
 }
 
 #[test]
@@ -1555,6 +1572,7 @@ fn names_that_fold_together_cannot_share_a_batch() {
         &["Rent/A", "Rent A"][..],
         &["Alpha", "Beta", "RENT\tA", "Rent A"][..],
         &["J\u{30c}ournal", "j\u{30c}ournal"][..],
+        &["\u{399}\u{308}\u{301}ta", "\u{3b9}\u{308}\u{301}ta"][..],
         &["Caf\u{e9}", "Cafe\u{301}"][..],
         &["Cafe\u{301}/A", "Caf\u{e9} a"][..],
     ] {

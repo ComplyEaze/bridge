@@ -27,12 +27,13 @@
 //! What a caller relies on:
 //!
 //! - An intent's items are its batch's names, and this module derives each
-//!   item's `canonical_key` and `absence_key` from the name with the master
-//!   name index's two keys; a caller cannot supply them. Nothing decides on a
-//!   recorded key: whether two names may be one master (inside a batch, and
-//!   against an open dispatch) is computed from the names every time, by
-//!   [`names_may_be_one_master`], so a journal written before a fold widened is
-//!   still judged by the wider fold.
+//!   item's `canonical_key` and `absence_key` with the master name index's two
+//!   key functions; a caller building an intent cannot supply them. Whether two
+//!   names may be one master, inside a batch and against an open dispatch, is
+//!   computed from the names every time ([`NameKeys::may_be_one_master`]), so a
+//!   journal written before a fold widened is judged by the wider fold. Against
+//!   an open dispatch an equal recorded key also refuses, so a fold narrowed by
+//!   a later build cannot release one: a key on disk can only add a refusal.
 //! - An intent with no terminal verdict blocks every overlapping batch for good.
 //!   The read-back-absent terminal state and the rules for it belong to the
 //!   dispatch slice; until then, recovering such a batch is an operator decision.
@@ -181,8 +182,9 @@ pub(super) struct MasterBatch {
 }
 
 /// What the intent records of one item, so a later read can look for it again.
-/// Built only from a batch name ([`IntentItem::of`]); the keys are the record's,
-/// and no refusal reads them back (see the module notes).
+/// Built only from a batch name ([`IntentItem::of`]). A key read back from disk
+/// is not checked against the name; it is used only to add an overlap refusal
+/// (see the module notes), so no accessor hands it out.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct IntentItem {
@@ -202,14 +204,6 @@ impl IntentItem {
 
     pub(super) fn name(&self) -> &str {
         &self.name
-    }
-
-    pub(super) fn canonical_key(&self) -> &str {
-        &self.canonical_key
-    }
-
-    pub(super) fn absence_key(&self) -> &str {
-        &self.absence_key
     }
 }
 
@@ -611,14 +605,14 @@ impl MasterBatch {
             return Err(Invalid::EmptyItems);
         }
         // Two names Tally might take for one master cannot go in one POST.
-        for (position, item) in self.items.iter().enumerate() {
+        let mut seen: Vec<NameKeys> = Vec::with_capacity(self.items.len());
+        for item in &self.items {
             item.validate()?;
-            if self.items[..position]
-                .iter()
-                .any(|earlier| names_may_be_one_master(&earlier.name, &item.name))
-            {
+            let keys = NameKeys::of(&item.name);
+            if seen.iter().any(|earlier| earlier.may_be_one_master(&keys)) {
                 return Err(Invalid::DuplicateName);
             }
+            seen.push(keys);
         }
         match self.class {
             MasterClass::LedgerCreate => Ok(()),
@@ -802,19 +796,26 @@ impl MasterJournal {
     }
 
     /// Whether another batch was dispatched, has no terminal verdict, and names
-    /// a ledger that may be one master with a ledger `intent` names.
+    /// a ledger that may be one master with a ledger `intent` names, or that
+    /// recorded an equal key.
     fn overlaps_open_dispatch(&self, intent: &MasterDispatchIntent) -> bool {
+        let new_items: Vec<(&IntentItem, NameKeys)> = intent
+            .items
+            .iter()
+            .map(|item| (item, NameKeys::of(&item.name)))
+            .collect();
         self.batches
             .values()
             .filter(|state| !state.is_settled())
             .filter_map(|state| state.intent.as_ref())
             .filter(|open| open.batch_id != intent.batch_id)
-            .any(|open| {
-                open.items.iter().any(|held| {
-                    intent
-                        .items
-                        .iter()
-                        .any(|new| names_may_be_one_master(&new.name, &held.name))
+            .flat_map(|open| open.items.iter())
+            .any(|held| {
+                let held_keys = NameKeys::of(&held.name);
+                new_items.iter().any(|(new, new_keys)| {
+                    new.canonical_key == held.canonical_key
+                        || new.absence_key == held.absence_key
+                        || new_keys.may_be_one_master(&held_keys)
                 })
             })
     }
@@ -928,18 +929,29 @@ fn read_error(code: String) -> MasterLedgerError {
     }
 }
 
-/// Whether Tally might take two names for one master: they agree on either key
-/// the master name index matches on (`canonical_master_key`, `absence_key`), or
-/// on any `twin_fold_keys` fold in any position. The index's keys are the rule
-/// the dispatch checks the books with; the twin folds keep this journal from
-/// ever being narrower than it was. Computed from the names, never from a
-/// recorded key.
-fn names_may_be_one_master(a: &str, b: &str) -> bool {
-    if canonical_master_key(a) == canonical_master_key(b) || absence_key(a) == absence_key(b) {
-        return true;
+/// The keys of one name for deciding whether Tally might take two names for one
+/// master, computed once per name.
+struct NameKeys {
+    canonical: String,
+    twin: [String; 3],
+}
+
+impl NameKeys {
+    fn of(name: &str) -> Self {
+        Self {
+            canonical: canonical_master_key(name),
+            twin: twin_fold_keys(name),
+        }
     }
-    let b_keys = twin_fold_keys(b);
-    twin_fold_keys(a).iter().any(|key| b_keys.contains(key))
+
+    /// Two names may be one master when they agree on either key the master name
+    /// index matches on, or on any `twin_fold_keys` fold in any position. The
+    /// index's `absence_key` is twin key 2, so the twin comparison covers it;
+    /// the canonical key is compared on its own, because lowercasing and NFC do
+    /// not commute and a name can agree on it and on no twin key.
+    fn may_be_one_master(&self, other: &Self) -> bool {
+        self.canonical == other.canonical || self.twin.iter().any(|key| other.twin.contains(key))
+    }
 }
 
 fn journal_path(data_dir: &Path) -> PathBuf {

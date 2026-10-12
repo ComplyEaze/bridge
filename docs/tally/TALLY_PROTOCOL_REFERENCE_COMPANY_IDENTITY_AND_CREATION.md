@@ -125,12 +125,15 @@ pin by guessing fields from a current listing: re-observe and review the full tu
 is implemented by the composite-identity migration and `snapshot_source_pin`.
 
 **Shape of the GUID.** **VERIFIED on the captured releases; UNVERIFIED for other releases.**
-Every company `GUID` in the repository's captured fixtures (214 `COMPANY`/`GUID` elements,
-27 distinct GUIDs, in 47 files) is a lowercase 36-character `8-4-4-4-12` hexadecimal UUID.
-Bridge therefore accepts only that shape (either case, stored lowercase, never trimmed) when
-it builds a verified company identity, and refuses any other spelling at the point a company
-is selected or verified. A release that writes a different spelling is not covered by this
-capture and would be refused there until it is observed.
+The captured releases are those named in each fixture's provenance file. Parsing every XML file
+under `src-tauri` that git tracks and reading each `COMPANY` element's `GUID` child gives 211
+elements and 28 distinct GUIDs in 46 files, all in the lowercase `8-4-4-4-12` hexadecimal form;
+some of those files are synthetic. Bridge therefore accepts only that shape (either case,
+stored lowercase) when it builds a verified company identity, and refuses any other spelling at
+the point a company is selected or verified. The type's parse never trims, but company
+discovery and the desktop selection trim surrounding whitespace before it. A release that
+writes a different spelling is not covered by this capture and would be refused there until it
+is observed.
 
 ### 9.11c Extent reads must retain the verified company tuple — **VERIFIED on one endpoint**
 

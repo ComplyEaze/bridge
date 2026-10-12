@@ -1,0 +1,19 @@
+1050-B restore plan (written before each backup). Windows lab, 12 Oct 2026.
+
+Company: BRIDGE IDENTITY LAB, company number 100056 (created 12-Oct-2026 ~10:09Z; books from 1-Apr-2026; no GST, no inventory, automatic numbering).
+Tally data folder (Company Data Path / Restore Data Path): <tally-data-folder>   -> company folder ...\data\100056
+Only BRIDGE IDENTITY LAB is loaded at every step.
+
+I0 (before N1): backup folder C:\bridge-lab\1050-B\backups\I0\  file TDBK1800_100056.001 (Tally names it)
+   Holds: 3 ledgers (Synthetic Bank Ledger, Party A, Lab Seed Income) + seed Receipt No.1 1-Jul-2026.
+   Used by step 7: restore I0 over BRIDGE IDENTITY LAB (100056), Restore Data Path <tally-data-folder>;
+   expected prompts: "Accept ?" -> Yes; "Company data folder (100056) already exists ... Replace / Skip" -> Replace.
+
+I1 (after N1, before reads A): backup folder C:\bridge-lab\1050-B\backups\I1\  file TDBK1800_100056.001
+   Holds: I0 contents + N1 (Receipt No.2, 10-Jul-2026, Dr Synthetic Bank Ledger 301.00 / Cr Party A 301.00, 'Lab identity probe 1', GUID ...-00000002).
+   Used by step 6: restore I1 over BRIDGE IDENTITY LAB (100056) itself; shut the company first; Restore Data Path <tally-data-folder>;
+   expected prompts: "Accept ?" -> Yes; "Company data folder (100056) already exists ... Replace / Skip" -> Replace. Then load it alone.
+
+I2 (after K, end of run): backup folder C:\bridge-lab\1050-B\backups\I2\  file TDBK1800_100056.001
+   Holds: I0 contents + hand-keyed K (Receipt No.2, 10-Jul-2026, To Party A 301.00 / By Synthetic Bank Ledger 301.00, bank allocation Cheque/DD 301.00 as Tally showed, 'Lab identity probe 1').
+   Not restored in this run.

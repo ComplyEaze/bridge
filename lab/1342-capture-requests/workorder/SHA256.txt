@@ -60,3 +60,6 @@ c40e88e5bf3a9eb7554d1555c2bff2d2434729a2ee632bbdcb65c98b0304c1f1  w12-status-000
 4c49777491c18712dba7a8f881b993cde6b39649da8bba54d925f46340baf45c  w12-full-0003.xml
 00d87a1a99fd650b1cf7b2368ca0797d29f32a401ea691c40f7c24f5a72a0385  w12-status-0006.xml
 f1ed50752865e0d901136d3bdb85da79bf7abdbfe6ad8079ab0975af4ffee3fd  w12-full-0006.xml
+# W13 (what the GSTR-1 JSON export holds for uncertain, accepted and included vouchers; steps in W13-README.md)
+f363e3e749669b3030f27c87c34ab3a42c45fa4e718e40cc6180a58e235f7097  w13-status-window-aug.xml
+eeb8f9ba2bf789da4be46f2115012c1db26794ca3c5dcbeda48982f3e6e13a3a  w13-status-0005.xml

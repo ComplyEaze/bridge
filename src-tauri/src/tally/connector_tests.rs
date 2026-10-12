@@ -68,7 +68,7 @@ fn observed_identity(
 ) -> VerifiedCompanyIdentity {
     VerifiedCompanyIdentity::from_observed_companies(
         name.to_owned(),
-        guid.to_owned(),
+        crate::tally::test_company_guid(guid),
         number.to_owned(),
         books_from.to_owned(),
         &[TallyCompany {
@@ -621,7 +621,7 @@ fn failed_or_unobserved_canary_cannot_authorize_snapshot_start() {
 #[tokio::test]
 async fn presentation_equivalent_company_snapshot_probe_stops_before_core_exports() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     // `TallyClient::probe` requests the trusted `Company` collection
     // (`CompanyListV2`) first, so the presentation-equivalent same-GUID
     // rows this test exercises are expressed in that shape rather than the legacy
@@ -674,7 +674,7 @@ async fn presentation_equivalent_company_snapshot_probe_stops_before_core_export
 #[tokio::test]
 async fn failed_source_read_preserves_its_error_after_a_failed_closing_identity_request() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     let company_collection = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
@@ -1161,6 +1161,65 @@ async fn core_window_rejects_a_malformed_extent_response_at_the_transport_seam()
     assert_eq!(methods, ["POST"]);
 }
 
+/// The source-identity match lowercases the GUID but accepts any spelling, so
+/// a pin built from an un-hyphenated GUID still matches the company that
+/// reports the same spelling. Only the strict parse that follows refuses it,
+/// with its own typed code rather than "not found".
+#[test]
+fn snapshot_identity_refuses_a_matching_company_whose_guid_is_not_strict_shaped() {
+    let lineage = "tally_xml_http:http://127.0.0.1:9000";
+    let unhyphenated = "4C42A771ABCD4DEF8ABC001122AABBCC";
+    let company = CompanyRef {
+        identity: company_source_identity(
+            lineage,
+            unhyphenated,
+            "100001",
+            "Synthetic Company",
+            "20260401",
+        ),
+        display_name: "Synthetic Company".to_string(),
+    };
+    let context = RequestContext {
+        run_id: "run-non-strict-company-guid".to_string(),
+        company: company.clone(),
+        pack: CapabilityPackId::CoreAccounting,
+        schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+        window: ReadWindow {
+            from_yyyymmdd: "20260701".to_string(),
+            to_yyyymmdd: "20260701".to_string(),
+        },
+        query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+        filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+    };
+    let connector = RuntimeTallyConnector::new(
+        TallyRuntime::default(),
+        TallyConfig {
+            host: "127.0.0.1".to_string(),
+            port: 9000,
+        },
+        company,
+        context,
+    )
+    .unwrap();
+    let companies = [TallyCompany {
+        name: "Synthetic Company".to_string(),
+        guid: Some(unhyphenated.to_string()),
+        company_number: Some("100001".to_string()),
+        books_from: Some("20260401".to_string()),
+    }];
+
+    let error = connector
+        .verify_snapshot_identity_from_companies(&companies)
+        .expect_err("a GUID that is not 8-4-4-4-12 must not become a verified identity");
+    assert!(
+        matches!(
+            &error,
+            TallyError::Protocol { code } if code == "company_identity_invalid"
+        ),
+        "unexpected error: {error:?}"
+    );
+}
+
 #[tokio::test]
 async fn direct_company_snapshot_probe_rejects_identity_without_company_collection_tuple() {
     let _simulator_guard = simulator_test_lock().lock().await;
@@ -1239,7 +1298,7 @@ async fn direct_company_snapshot_probe_rejects_identity_without_company_collecti
 #[tokio::test]
 async fn snapshot_start_uses_its_fresh_education_profile_before_ledger_export() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "education-mid-month-guid";
+    let company_guid = "3f9b6e04-d1a7-4c58-9e20-b84a6c7d1f35";
     let company_collection = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Education Mid-month"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20240115</BOOKSFROM><PRODUCTNAME TYPE="String">TallyPrime</PRODUCTNAME><EDUMODE>Yes</EDUMODE><SILVER>No</SILVER><GOLD>No</GOLD></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
@@ -1327,7 +1386,7 @@ async fn snapshot_start_uses_its_fresh_education_profile_before_ledger_export() 
 #[tokio::test]
 async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_freshly() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     // `TallyClient::probe` requests the trusted `Company` collection
     // (`CompanyListV2`) first; this shape is what every `probe`/`probe_fresh`
     // POST below answers with, so the trusted path resolves the company in
@@ -1472,7 +1531,7 @@ async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_
 #[tokio::test]
 async fn same_context_snapshot_read_does_not_reuse_pre_run_canary_rows() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     let identity = observed_identity("Synthetic Company", company_guid, "100001", "20240101");
     let empty_native_groups = native_groups(company_guid, &[]);
     let second_group = native_groups(company_guid, &[("Post-start Assets", "&#4; Primary")]);

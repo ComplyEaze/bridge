@@ -46,9 +46,10 @@ use super::{
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
     reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
     verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
-    OutstandingsRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
-    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
+    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
 };
+use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
 // path cannot be constructed portably. The import must carry the same gate as
 // the test, or Windows fails on an unused import under `-D warnings`.
@@ -91,10 +92,13 @@ async fn empty_label_migration_plan_never_opens_the_mirror() {
 
 #[test]
 fn same_guid_case_or_whitespace_sibling_is_not_a_safe_scope() {
-    let identity = VerifiedCompanyIdentity::test_fixture("Client Book", "same-guid");
+    let identity = VerifiedCompanyIdentity::test_fixture(
+        "Client Book",
+        "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94",
+    );
     let sibling = TallyCompany {
         name: " client book ".to_string(),
-        guid: Some("SAME-GUID".to_string()),
+        guid: Some("5A3E1C70-9B2D-4F48-8A6C-0D7E2F1B3C94".to_string()),
         company_number: Some("2".to_string()),
         books_from: Some("20270401".to_string()),
     };
@@ -107,7 +111,7 @@ fn same_guid_case_or_whitespace_sibling_is_not_a_safe_scope() {
 fn setup_rejects_presentation_equivalent_guid_siblings() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
@@ -116,13 +120,13 @@ fn setup_rejects_presentation_equivalent_guid_siblings() {
         vec![
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("1".to_string()),
                 books_from: Some("20260401".to_string()),
             },
             TallyCompany {
                 name: " client book ".to_string(),
-                guid: Some("SAME-GUID".to_string()),
+                guid: Some("5A3E1C70-9B2D-4F48-8A6C-0D7E2F1B3C94".to_string()),
                 company_number: Some("2".to_string()),
                 books_from: Some("20270401".to_string()),
             },
@@ -137,7 +141,7 @@ fn setup_rejects_presentation_equivalent_guid_siblings() {
 fn setup_rejects_identical_name_same_guid_different_book() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
@@ -146,13 +150,13 @@ fn setup_rejects_identical_name_same_guid_different_book() {
         vec![
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("1".to_string()),
                 books_from: Some("20260401".to_string()),
             },
             TallyCompany {
                 name: "Client Book".to_string(),
-                guid: Some("same-guid".to_string()),
+                guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
                 company_number: Some("2".to_string()),
                 books_from: Some("20270401".to_string()),
             },
@@ -164,16 +168,60 @@ fn setup_rejects_identical_name_same_guid_different_book() {
 }
 
 #[test]
+fn setup_refuses_a_company_guid_that_is_not_strict_shaped_and_does_not_say_probe_again() {
+    for guid in [
+        "not-a-company-guid".to_string(),
+        "5a3e1c709b2d4f488a6c0d7e2f1b3c94".to_string(),
+        "{5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94}".to_string(),
+        "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c9".to_string(),
+    ] {
+        let selected = SelectedCompanyIdentity {
+            display_name: "Client Book".to_string(),
+            company_guid: guid.clone(),
+            company_number: "1".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+        };
+        // The company list holds exactly the selected tuple, so only the
+        // GUID's own shape can refuse it.
+        let listed = TallyCompany {
+            name: "Client Book".to_string(),
+            guid: Some(guid.clone()),
+            company_number: Some("1".to_string()),
+            books_from: Some("20260401".to_string()),
+        };
+        let error = verify_observed_company_tuple_from_companies(&selected, vec![listed])
+            .expect_err("a GUID not in Tally's form must not become an identity");
+
+        assert_eq!(error.code, "company_selection_invalid", "{guid:?}");
+        assert!(
+            error.message.contains("not in the expected form"),
+            "{guid:?}: {}",
+            error.message
+        );
+        assert_eq!(error.retry, "not_recommended", "{guid:?}");
+        assert_eq!(
+            error.remediation,
+            "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
+            "{guid:?}"
+        );
+        assert!(
+            !error.message.contains("Probe again") && !error.remediation.contains("Probe again"),
+            "probing again returns the same company: {error:?}"
+        );
+    }
+}
+
+#[test]
 fn setup_reports_duplicate_complete_tuple_separately() {
     let selected = SelectedCompanyIdentity {
         display_name: "Client Book".to_string(),
-        company_guid: "same-guid".to_string(),
+        company_guid: "5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string(),
         company_number: "1".to_string(),
         books_from_yyyymmdd: "20260401".to_string(),
     };
     let duplicate = TallyCompany {
         name: "Client Book".to_string(),
-        guid: Some("same-guid".to_string()),
+        guid: Some("5a3e1c70-9b2d-4f48-8a6c-0d7e2f1b3c94".to_string()),
         company_number: Some("1".to_string()),
         books_from: Some("20260401".to_string()),
     };
@@ -492,6 +540,83 @@ fn drifted_party_master_read_is_response_validation_not_endpoint_failure() {
     assert_eq!(error.code, "response_validation_failed");
     assert_eq!(error.category, "Response validation");
     assert_ne!(error.code, "endpoint_unreachable");
+}
+
+#[test]
+fn a_chosen_date_before_the_books_is_named_in_band_through_retained_evidence() {
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    let refusal = anyhow::Error::new(
+        crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+    );
+    for error in [
+        refusal,
+        with_read_evidence(
+            anyhow::Error::new(
+                crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+            ),
+            RuntimeReadEvidence::empty(),
+        ),
+    ] {
+        let mapped = party_ledger_master_runtime_command_error(error);
+        assert_eq!(mapped.code, "as_of_precedes_books_from");
+        assert_eq!(mapped.retry, "after_change");
+        assert!(!mapped.local_state_changed);
+    }
+}
+
+#[test]
+fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_boundary() {
+    let request = |as_of: Option<&str>| {
+        let mut value = serde_json::json!({
+            "config": { "host": "127.0.0.1", "port": 9000 },
+            "selected_company": {
+                "display_name": "Synthetic Accounts",
+                "company_guid": "00000000-0000-0000-0000-000000000000",
+                "company_number": "100001",
+                "books_from_yyyymmdd": "20260401",
+            },
+        });
+        if let Some(as_of) = as_of {
+            value["as_of_yyyymmdd"] = serde_json::json!(as_of);
+        }
+        serde_json::from_value::<PartyLedgerMasterRequest>(value)
+    };
+    assert_eq!(request(None).unwrap().as_of_yyyymmdd, None);
+    assert_eq!(
+        request(Some("20260731")).unwrap().as_of_yyyymmdd,
+        Some(TallyDate::parse("20260731").unwrap())
+    );
+    for malformed in ["2026-07-31", "20260230", "", "2026073"] {
+        assert!(request(Some(malformed)).is_err(), "{malformed}");
+    }
+}
+
+#[test]
+fn the_export_response_is_the_path_and_the_typed_notes_the_app_reads() {
+    use crate::reports::party_ledger_master::{SourceNote, SourceNoteKind};
+    let response = PartyLedgerMasterExport {
+        path: "/exports/party-ledger-master-synthetic-20260831.xlsx".to_string(),
+        notes: vec![
+            SourceNote {
+                kind: SourceNoteKind::DateMoved,
+                text: "moved".to_string(),
+            },
+            SourceNote {
+                kind: SourceNoteKind::LaterDatedVoucher,
+                text: "later".to_string(),
+            },
+        ],
+    };
+    assert_eq!(
+        serde_json::to_value(&response).unwrap(),
+        serde_json::json!({
+            "path": "/exports/party-ledger-master-synthetic-20260831.xlsx",
+            "notes": [
+                { "kind": "date_moved", "text": "moved" },
+                { "kind": "later_dated_voucher", "text": "later" },
+            ],
+        })
+    );
 }
 
 #[test]

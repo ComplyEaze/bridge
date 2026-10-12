@@ -389,9 +389,11 @@ impl RuntimeTallyConnector {
         ) else {
             return Err(protocol_error("company_identity_not_found"));
         };
+        let guid = bridge_tally_core::company_guid::CompanyGuid::parse(guid)
+            .map_err(|_| protocol_error("company_identity_invalid"))?;
         VerifiedCompanyIdentity::from_observed_companies(
             company.name.clone(),
-            guid.to_string(),
+            guid,
             company_number.to_string(),
             books_from.to_string(),
             companies,

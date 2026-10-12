@@ -43,6 +43,15 @@ These changes are in source and not yet in a published build.
   book whose report lists a group and an item under the root side by side, an item inside a stock group, a
   compound unit, other dates, other releases, macOS, and a group that carries an item's name.
 
+- `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says whether the bank ledger in
+  Tally stands where the statement says it stood at the start and at the end of the statement's dates, as three
+  gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
+  after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
+  dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
+  parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
+  proved against a live book: one run on two synthetic companies by an outside contributor is only partly recorded (see
+  the pull request).
+
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
   return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
@@ -76,6 +85,16 @@ These changes are in source and not yet in a published build.
   account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
 
 **Changed**
+
+- **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
+  differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
+  every other compared field matched and it read `posted_verified`, and a divergent voucher never
+  listed a narration difference. A narration edited in Tally after the post therefore leaves the
+  batch unsettled until the narration in Tally matches the approved text again. The read-back, the post's span binding and the amendment
+  check now share one comparison: the text as written (trimmed, with its `[BRIDGE:…]` tag for a
+  file imported by hand) against the text read, byte for byte; a narration Tally holds none of
+  equals only an empty one written. Whether Tally changes trailing spaces or line breaks on import
+  is unmeasured; the first live run will show it (#1608).
 
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
   Administrators, or that anyone but you, SYSTEM and Administrators can read or change

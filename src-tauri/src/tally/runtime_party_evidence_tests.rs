@@ -152,7 +152,7 @@ async fn refusal(
             &identity,
             DateBoundaryProfile::ModeAgnostic,
             assertion,
-            &TallyDate::parse("20990101").unwrap(),
+            &BalanceDateBasis::HostToday(TallyDate::parse("20990101").unwrap()),
             crate::tally::connection::ComplianceRead::Standard,
         ),
     )

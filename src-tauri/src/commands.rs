@@ -15,7 +15,9 @@ use crate::reports::outstandings_working_paper_store::{
     WorkingPaperExportStoreError,
 };
 use crate::reports::outstandings_working_paper_xlsx::render_outstandings_working_paper_xlsx;
-use crate::reports::party_ledger_master::build_party_ledger_master_workbook;
+use crate::reports::party_ledger_master::{
+    build_party_ledger_master_workbook, BalanceDateBasis, SourceNote,
+};
 use crate::reports::party_ledger_master_xlsx::render_party_ledger_master_xlsx;
 use crate::reports::party_statement::{
     build_party_statement_with_ageing_anchor, PartyStatementError,
@@ -321,6 +323,23 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
 /// Adds report context only after the shared runtime mapper has removed
 /// transport and internal details from the operator-facing text.
 fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
+    // The date the CA chose is before the books begin (#903): refused from the
+    // opening extent, before any ledger master, balance or group request.
+    if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
+            Some(PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom)
+        )
+    }) {
+        return tally_command_error(
+            "as_of_precedes_books_from",
+            "Operation",
+            "ComplyEaze Bridge withheld the party/ledger master: the As of date is before this company's books begin. No ledger master was requested.",
+            "after_change",
+            false,
+            "Choose an As of date on or after the start of the books, then export again.",
+        );
+    }
     // Sized before any ledger request was sent (#637, #679): not a validation
     // failure, and retrying the unchanged export cannot help.
     if error.chain().any(|cause| {
@@ -1685,10 +1704,23 @@ pub async fn bootstrap_direct_tally_company(
     persisted_tally_probe_result(review_id, canonical_origin, observed_at_unix_ms, probe)
 }
 
+/// The ledger-master export's request. `as_of_yyyymmdd` is the date the CA
+/// chose on the Outstandings screen (#903); without it the balances end by the
+/// Bridge host's date, as before. A malformed date fails to deserialise: the
+/// screen refuses one before the call, so this is only a backstop.
 #[derive(Debug, Deserialize)]
-pub struct CompanyRequest {
+pub struct PartyLedgerMasterRequest {
     pub config: TallyConfig,
     pub selected_company: SelectedCompanyIdentity,
+    #[serde(default)]
+    pub as_of_yyyymmdd: Option<TallyDate>,
+}
+
+/// The saved workbook and what it says about its date, for the app to show.
+#[derive(Debug, Serialize)]
+pub struct PartyLedgerMasterExport {
+    pub path: String,
+    pub notes: Vec<SourceNote>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1857,18 +1889,18 @@ fn verify_observed_company_tuple_from_companies(
 #[tauri::command]
 pub async fn export_party_ledger_master(
     app: tauri::AppHandle,
-    request: CompanyRequest,
+    request: PartyLedgerMasterRequest,
     runtime: State<'_, TallyRuntime>,
-) -> Result<String, TallyCommandError> {
+) -> Result<PartyLedgerMasterExport, TallyCommandError> {
     // One wire-lock wait budget for the whole command (#697).
     with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
 }
 
 async fn export_party_ledger_master_once(
     app: tauri::AppHandle,
-    request: CompanyRequest,
+    request: PartyLedgerMasterRequest,
     runtime: State<'_, TallyRuntime>,
-) -> Result<String, TallyCommandError> {
+) -> Result<PartyLedgerMasterExport, TallyCommandError> {
     let identity =
         verify_observed_company_tuple(&runtime, &request.config, &request.selected_company).await?;
     // The classified read admits a book with several Currency masters when
@@ -1880,13 +1912,16 @@ async fn export_party_ledger_master_once(
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
-    let today = host_today()?;
+    let basis = match request.as_of_yyyymmdd {
+        Some(requested) => BalanceDateBasis::Requested(requested),
+        None => BalanceDateBasis::HostToday(host_today()?),
+    };
     let source = runtime
         .fetch_party_ledger_master_source(
             request.config,
             &identity,
             currency_assertion,
-            today,
+            basis,
             crate::tally::connection::ComplianceRead::Standard,
         )
         .await
@@ -1912,7 +1947,7 @@ async fn export_party_ledger_master_once(
     })?;
     let mut slug = statement_filename_slug(workbook.source().company.as_str());
     slug.truncate(150);
-    save_report_download_bytes(
+    let path = save_report_download_bytes(
         &app,
         &format!(
             "party-ledger-master-{slug}-{}.xlsx",
@@ -1926,6 +1961,10 @@ async fn export_party_ledger_master_once(
             "ComplyEaze Bridge could not save the party/ledger master workbook.",
             "Verify local Downloads-folder access, then retry the export.",
         )
+    })?;
+    Ok(PartyLedgerMasterExport {
+        path,
+        notes: workbook.source().notes(),
     })
 }
 

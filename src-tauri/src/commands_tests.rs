@@ -46,9 +46,10 @@ use super::{
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
     reviewed_probe_commitment_sha256, tally_command_error, tally_runtime_command_error,
     verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
-    OutstandingsRequest, PersistedTallyCompany, SavedTallySetup, SelectedCompanyIdentity,
-    VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
+    SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
 };
+use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
 // path cannot be constructed portably. The import must carry the same gate as
 // the test, or Windows fails on an unused import under `-D warnings`.
@@ -539,6 +540,83 @@ fn drifted_party_master_read_is_response_validation_not_endpoint_failure() {
     assert_eq!(error.code, "response_validation_failed");
     assert_eq!(error.category, "Response validation");
     assert_ne!(error.code, "endpoint_unreachable");
+}
+
+#[test]
+fn a_chosen_date_before_the_books_is_named_in_band_through_retained_evidence() {
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    let refusal = anyhow::Error::new(
+        crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+    );
+    for error in [
+        refusal,
+        with_read_evidence(
+            anyhow::Error::new(
+                crate::tally::connection::PartyLedgerMasterSourceValidationError::AsOfPrecedesBooksFrom,
+            ),
+            RuntimeReadEvidence::empty(),
+        ),
+    ] {
+        let mapped = party_ledger_master_runtime_command_error(error);
+        assert_eq!(mapped.code, "as_of_precedes_books_from");
+        assert_eq!(mapped.retry, "after_change");
+        assert!(!mapped.local_state_changed);
+    }
+}
+
+#[test]
+fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_boundary() {
+    let request = |as_of: Option<&str>| {
+        let mut value = serde_json::json!({
+            "config": { "host": "127.0.0.1", "port": 9000 },
+            "selected_company": {
+                "display_name": "Synthetic Accounts",
+                "company_guid": "00000000-0000-0000-0000-000000000000",
+                "company_number": "100001",
+                "books_from_yyyymmdd": "20260401",
+            },
+        });
+        if let Some(as_of) = as_of {
+            value["as_of_yyyymmdd"] = serde_json::json!(as_of);
+        }
+        serde_json::from_value::<PartyLedgerMasterRequest>(value)
+    };
+    assert_eq!(request(None).unwrap().as_of_yyyymmdd, None);
+    assert_eq!(
+        request(Some("20260731")).unwrap().as_of_yyyymmdd,
+        Some(TallyDate::parse("20260731").unwrap())
+    );
+    for malformed in ["2026-07-31", "20260230", "", "2026073"] {
+        assert!(request(Some(malformed)).is_err(), "{malformed}");
+    }
+}
+
+#[test]
+fn the_export_response_is_the_path_and_the_typed_notes_the_app_reads() {
+    use crate::reports::party_ledger_master::{SourceNote, SourceNoteKind};
+    let response = PartyLedgerMasterExport {
+        path: "/exports/party-ledger-master-synthetic-20260831.xlsx".to_string(),
+        notes: vec![
+            SourceNote {
+                kind: SourceNoteKind::DateMoved,
+                text: "moved".to_string(),
+            },
+            SourceNote {
+                kind: SourceNoteKind::LaterDatedVoucher,
+                text: "later".to_string(),
+            },
+        ],
+    };
+    assert_eq!(
+        serde_json::to_value(&response).unwrap(),
+        serde_json::json!({
+            "path": "/exports/party-ledger-master-synthetic-20260831.xlsx",
+            "notes": [
+                { "kind": "date_moved", "text": "moved" },
+                { "kind": "later_dated_voucher", "text": "later" },
+            ],
+        })
+    );
 }
 
 #[test]

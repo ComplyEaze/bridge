@@ -1,6 +1,9 @@
 use bridge_tally_primitives::TallyDate;
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, native_outstandings::parse_native_bill_rows,
+    decode_tally_xml_response_bytes_limited,
+    native_outstandings::{
+        parse_native_bill_rows, parse_native_ledger_snapshot_for_company, NativeOutstandingsError,
+    },
     ExpectedTallyTextEncoding, TallyTextDecodeError, TallyTextEncoding,
 };
 use sha2::{Digest, Sha256};
@@ -108,6 +111,25 @@ fn missing_charset_defers_to_expected_encoding_while_invalid_content_types_fail_
 
 #[test]
 fn utf8_without_charset_cannot_reach_the_xml_parser_under_a_utf16_expectation() {
+    // The shipped native ledger parser, as the company-bound read calls it. This
+    // capture is a ledger probe that carries `CLOSINGBALANCE` but no
+    // `OPENINGBALANCE`, so even correctly decoded it is refused, and only at that
+    // missing field: the envelope, `STATUS 1`, `DATA/COLLECTION` and the first
+    // `LEDGER` row have all been read by then.
+    let company_guid = "00000000-0000-4000-8000-000000000001";
+    let correctly_decoded = decode_tally_xml_response_bytes_limited(
+        LED_ASCII,
+        "text/xml",
+        ExpectedTallyTextEncoding::Utf8,
+        LED_ASCII.len(),
+    )
+    .expect("the capture decodes as the UTF-8 it is");
+    assert_eq!(
+        parse_native_ledger_snapshot_for_company(&correctly_decoded.text, company_guid)
+            .expect_err("the capture has no OPENINGBALANCE"),
+        NativeOutstandingsError::InvalidResponse("ledger_opening_balance_missing"),
+    );
+
     let decoded = decode_tally_xml_response_bytes_limited(
         LED_ASCII,
         "text/xml",
@@ -116,9 +138,12 @@ fn utf8_without_charset_cannot_reach_the_xml_parser_under_a_utf16_expectation() 
     )
     .expect("the even-length UTF-8 capture is byte-valid as UTF-16LE code units");
     assert_eq!(decoded.encoding, TallyTextEncoding::Utf16Le);
-    assert!(
-        bridge_tally_protocol::parse_ledgers(&decoded.text).is_err(),
-        "UTF-8 bytes decoded under a UTF-16LE expectation must not become valid ledger XML",
+    // Not even an envelope is left to read, which is a different refusal from
+    // the one the correct decoding reaches.
+    assert_eq!(
+        parse_native_ledger_snapshot_for_company(&decoded.text, company_guid)
+            .expect_err("UTF-8 bytes decoded under a UTF-16LE expectation must not become XML"),
+        NativeOutstandingsError::InvalidResponse("ledger_envelope_missing"),
     );
 }
 

@@ -3,7 +3,7 @@
 //! A port of the parsing half of `scripts/bank_statement_import.py`. The
 //! pipeline, every stage of which fails closed:
 //!
-//! 1. [`pdf::extract_pages`] — word boxes of the text the PDF draws, through
+//! 1. [`pdf::extract_pages`] — word boxes of the text not in render mode 3, through
 //!    PDFium; [`pipeline::prepare_text`] runs stages 2-5 over them.
 //! 2. [`parse::parse_statement`] — rows, by column geometry and the wrap
 //!    heuristic, or one line per row for a [`bank::Layout::SingleLine`] layout.

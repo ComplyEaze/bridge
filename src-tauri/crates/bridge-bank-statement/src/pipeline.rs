@@ -49,12 +49,13 @@ pub struct ParsedStatement {
 /// [`prepare`] over the words read from a statement PDF.
 ///
 /// A refusal is reported as `no_readable_text` when most of the PDF's own text
-/// was hidden (a scan's OCR layer, which is not read) and the text it draws
-/// yields no statement row (its parse finds none, or refuses): a scan that also draws a stamp or page numbers gets
-/// the right next step, a text PDF, instead of a name that points at the
-/// layout. A PDF whose drawn text has rows keeps its refusal, so a request
-/// fault on a statement with a scanned page appended is named as itself; and a
-/// statement that prepares is never refused here.
+/// is in render mode 3 (a scan's OCR layer, which is not read) and the rest of
+/// its text yields no statement row (its parse finds none, or refuses): a scan
+/// that also draws a stamp or page numbers gets the right next step, a text
+/// PDF, instead of a name that points at the layout. A PDF whose text that is
+/// read has rows keeps its refusal, so a request fault on a statement with a
+/// scanned page appended is named as itself; and a statement that prepares is
+/// never refused here.
 pub fn prepare_text(
     text: &StatementText,
     request: &StatementRequest<'_>,

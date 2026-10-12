@@ -37,14 +37,13 @@
 //!   in the date column; the same line's dates entering the narration went
 //!   unseen. Embedded fonts were not measured.
 //!
-//! Only text the PDF draws is read. A character in render mode 3 (`Invisible`,
-//! what a scanner app writes as the OCR layer under a page image) is left out,
-//! as a character that draws nothing is; PDFium's own generated spaces and line
+//! Text in render mode 3 (`Invisible`), which a scanner app writes as its OCR
+//! layer under the page image, is not read: such a character is left out, as a
+//! character that draws nothing is. PDFium's own generated spaces and line
 //! breaks are kept, and their render mode is never asked (they have no text
 //! object). Mode 7 (`InvisibleClipping`) is read as before: content painted
-//! afterwards can show through its glyph shapes. Other hidden text (a zero
-//! alpha fill, a soft mask, an optional-content layer that is off, text under
-//! an opaque box, or text drawn under the page image) is still read.
+//! afterwards can show through its glyph shapes. Only render mode 3 is treated
+//! as hidden; no other way of hiding text is detected.
 //!
 //! Coordinates are converted to the top-left page space of `pdftotext`,
 //! relative to the crop box (or the media box when a page has no crop box).
@@ -207,7 +206,7 @@ fn unreadable(message: &str) -> Refusal {
 enum Origin {
     /// A space or line break PDFium inserted; it splits words.
     Generated,
-    /// Text the page draws.
+    /// Text in any render mode but 3.
     Drawn,
     /// Text in render mode 3, which draws nothing.
     Hidden,
@@ -396,8 +395,8 @@ fn require_readable_text(pages: &[Page]) -> Result<(), Refusal> {
 pub(crate) fn no_readable_text() -> Refusal {
     Refusal::new(
         "no_readable_text",
-        "no figures could be read from the text the PDF draws: a scan, a printed copy or an \
-         image has none, and a scan's hidden OCR layer is not read",
+        "no figures could be read from the PDF: a scan, a printed copy or an image has none, \
+         and a scan's OCR layer in render mode 3 is not read",
     )
 }
 

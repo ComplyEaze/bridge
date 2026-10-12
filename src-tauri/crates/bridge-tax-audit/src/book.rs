@@ -225,6 +225,9 @@ pub struct Book {
     pub currency_read: bool,
     /// The opening stock a ledger-wise trial balance leaves out (POP-3), read once here.
     pub opening_stock: OpeningStock,
+    /// The closing stock a ledger-wise trial balance leaves out (`financial_statements`), read
+    /// once here from the Stock Summary dated the trial balance's last day.
+    pub closing_stock: ClosingStock,
 }
 
 /// Opening stock as of the trial balance's first day. Tally holds it on the stock items, never
@@ -294,6 +297,95 @@ fn opening_stock(
                 .sum(),
         ),
         Err(_) => OpeningStock::Unknown(OpeningStockUnknown::Unreadable),
+    }
+}
+
+/// Closing stock as of the trial balance's last day. Tally holds it on the stock items, never on
+/// a ledger, so a book with integrated inventory shows it in no ledger of the trial balance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ClosingStock {
+    /// Not a read, or the company does not keep inventory integrated with its accounts.
+    #[default]
+    NotApplicable,
+    /// The sum of the closing values of the Stock Summary part dated the trial balance's last
+    /// day, in paise, debit positive. An item with no closing value is not counted, as in
+    /// `stock_summary`; a part that lists no item at all is not zero but unknown
+    /// ([`ClosingStockUnknown::NoStockItems`]). On the lab's inventory book that summary, read for 31 March, equalled the
+    /// closing stock on Tally's own Profit and Loss screen [partial: one book]. Whether the
+    /// values follow the request's window, a costing method that changes value, and a window
+    /// across years are not measured.
+    Valued(i64),
+    /// Integrated inventory, but the amount is not known; see [`ClosingStockUnknown`].
+    Unknown(ClosingStockUnknown),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClosingStockUnknown {
+    /// The read has no Stock Summary part at all.
+    NotRead,
+    /// The read records no trial-balance window, or has no Stock Summary dated that window's last
+    /// day. The stock items' own closing values are not taken in its place: the part carries no
+    /// date (#1505).
+    NoSummaryAtPeriodEnd,
+    /// The Stock Summary part dated that day did not parse.
+    Unreadable,
+    /// The read has more than one Stock Summary dated that window's last day, so none is taken.
+    SeveralSummariesAtPeriodEnd,
+    /// The Stock Summary part dated that day parsed and lists no stock item. An empty list is not
+    /// a closing stock of zero: whether Tally lists items that hold no stock is not measured.
+    NoStockItems,
+}
+
+impl ClosingStockUnknown {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NotRead => "not read",
+            Self::NoSummaryAtPeriodEnd => {
+                "not taken: the read has no Stock Summary dated the trial balance's last day"
+            }
+            Self::Unreadable => "unreadable",
+            Self::SeveralSummariesAtPeriodEnd => {
+                "not taken: the read has more than one Stock Summary dated the trial balance's last day"
+            }
+            Self::NoStockItems => {
+                "not taken: the Stock Summary dated the trial balance's last day lists no stock items"
+            }
+        }
+    }
+}
+
+/// [`ClosingStock`] from a read's integration flag, Stock Summary parts and trial-balance window.
+fn closing_stock(
+    is_integrated: Option<bool>,
+    summaries: &[Part],
+    tb_to: Option<&TallyDate>,
+) -> ClosingStock {
+    if is_integrated != Some(true) {
+        return ClosingStock::NotApplicable;
+    }
+    if summaries.is_empty() {
+        return ClosingStock::Unknown(ClosingStockUnknown::NotRead);
+    }
+    let Some(to) = tb_to else {
+        return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd);
+    };
+    let mut at_end = summaries.iter().filter(|p| p.as_of.as_ref() == Some(to));
+    let part = match (at_end.next(), at_end.next()) {
+        (Some(part), None) => part,
+        (Some(_), Some(_)) => {
+            return ClosingStock::Unknown(ClosingStockUnknown::SeveralSummariesAtPeriodEnd)
+        }
+        (None, _) => return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd),
+    };
+    match crate::stock_read::stock_snapshot(part, to.clone()) {
+        Ok(snapshot) if snapshot.rows.is_empty() => {
+            ClosingStock::Unknown(ClosingStockUnknown::NoStockItems)
+        }
+        Ok(snapshot) => match snapshot.total_value_paise() {
+            Ok(total) => ClosingStock::Valued(total),
+            Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),
+        },
+        Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),
     }
 }
 
@@ -1170,6 +1262,8 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         tp.window.as_ref().map(|w| &w.from),
         read.books_from.as_ref(),
     );
+    let summaries: Vec<Part> = read.of_kind("stock_summary").cloned().collect();
+    let closing_stock = closing_stock(is_integrated, &summaries, tp.window.as_ref().map(|w| &w.to));
     Ok(Book {
         company_name: company_name.to_string(),
         company_guid: guid.to_string(),
@@ -1182,10 +1276,11 @@ pub fn load_book(read: &Read, company_name: &str) -> Result<Book> {
         currency_read: false,
         stock: Some(StockReadParts {
             items: items.cloned(),
-            summaries: read.of_kind("stock_summary").cloned().collect(),
+            summaries,
             is_integrated,
         }),
         opening_stock,
+        closing_stock,
     })
 }
 
@@ -1941,6 +2036,122 @@ mod tests {
             )
             .into_bytes(),
         }
+    }
+
+    fn stock_summary_part(as_of: &str, body: &str) -> Part {
+        Part {
+            id: format!("stock-summary-{as_of}"),
+            kind: "stock_summary".to_string(),
+            name: "stock-summary.xml".to_string(),
+            window: None,
+            as_of: Some(TallyDate::parse(as_of).unwrap()),
+            rows: None,
+            alter_id_max: None,
+            scope: None,
+            stored_name: "stock-summary.xml".to_string(),
+            response_sha256: String::new(),
+            content: format!(
+                "<ENVELOPE><BODY><DATA><COLLECTION>{body}</COLLECTION></DATA></BODY></ENVELOPE>"
+            )
+            .into_bytes(),
+        }
+    }
+
+    /// #1505: the closing stock `financial_statements` adds is the Stock Summary's closing values,
+    /// debit positive, from the one part dated the trial balance's last day, for integrated
+    /// inventory only; every other case says why it is not known, or that it does not apply.
+    #[test]
+    fn closing_stock_is_taken_only_from_the_summary_dated_the_trial_balance_last_day() {
+        let to = TallyDate::parse("20260331").unwrap();
+        let summary = stock_summary_part(
+            "20260331",
+            "<STOCKITEM NAME=\"Hinge\"><CLOSINGVALUE>-900.00</CLOSINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Latch\"><CLOSINGVALUE>-100.50</CLOSINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Short\"><CLOSINGVALUE>20.00</CLOSINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"Hook\"></STOCKITEM>",
+        );
+        let half = stock_summary_part(
+            "20250930",
+            "<STOCKITEM NAME=\"Hinge\"><CLOSINGVALUE>-1.00</CLOSINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            closing_stock(Some(true), std::slice::from_ref(&summary), Some(&to)),
+            ClosingStock::Valued(98_050)
+        );
+        // Another date's summary beside it is not mixed in, whatever the order.
+        assert_eq!(
+            closing_stock(Some(true), &[half.clone(), summary.clone()], Some(&to)),
+            ClosingStock::Valued(98_050)
+        );
+        assert_eq!(
+            closing_stock(Some(false), std::slice::from_ref(&summary), Some(&to)),
+            ClosingStock::NotApplicable
+        );
+        assert_eq!(
+            closing_stock(None, std::slice::from_ref(&summary), Some(&to)),
+            ClosingStock::NotApplicable
+        );
+        assert_eq!(
+            closing_stock(Some(true), &[], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::NotRead)
+        );
+        assert_eq!(
+            closing_stock(Some(true), std::slice::from_ref(&half), Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)
+        );
+        assert_eq!(
+            closing_stock(Some(true), std::slice::from_ref(&summary), None),
+            ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)
+        );
+        assert_eq!(
+            closing_stock(Some(true), &[summary.clone(), summary.clone()], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::SeveralSummariesAtPeriodEnd)
+        );
+        let broken = stock_summary_part(
+            "20260331",
+            "<STOCKITEM NAME=\"Hinge\"><CLOSINGVALUE>nine</CLOSINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            closing_stock(Some(true), &[broken], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::Unreadable)
+        );
+        // A total that does not fit in paise is unreadable, never a wrapped or zero figure.
+        let huge = stock_summary_part(
+            "20260331",
+            "<STOCKITEM NAME=\"A\"><CLOSINGVALUE>-92233720368547758.07</CLOSINGVALUE></STOCKITEM>\
+             <STOCKITEM NAME=\"B\"><CLOSINGVALUE>-1.00</CLOSINGVALUE></STOCKITEM>",
+        );
+        assert_eq!(
+            closing_stock(Some(true), &[huge], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::Unreadable)
+        );
+        // A part that lists no stock item is not a closing stock of zero. A part that lists items
+        // with no closing value is still counted as nothing, as `stock_summary` counts it.
+        let empty = stock_summary_part("20260331", "");
+        assert_eq!(
+            closing_stock(Some(true), &[empty], Some(&to)),
+            ClosingStock::Unknown(ClosingStockUnknown::NoStockItems)
+        );
+        let nil = stock_summary_part("20260331", "<STOCKITEM NAME=\"Hook\"></STOCKITEM>");
+        assert_eq!(
+            closing_stock(Some(true), &[nil], Some(&to)),
+            ClosingStock::Valued(0)
+        );
+        // Each reason's text is what the finding's limit prints.
+        assert_eq!(ClosingStockUnknown::NotRead.as_str(), "not read");
+        assert_eq!(
+            ClosingStockUnknown::NoSummaryAtPeriodEnd.as_str(),
+            "not taken: the read has no Stock Summary dated the trial balance's last day"
+        );
+        assert_eq!(ClosingStockUnknown::Unreadable.as_str(), "unreadable");
+        assert_eq!(
+            ClosingStockUnknown::SeveralSummariesAtPeriodEnd.as_str(),
+            "not taken: the read has more than one Stock Summary dated the trial balance's last day"
+        );
+        assert_eq!(
+            ClosingStockUnknown::NoStockItems.as_str(),
+            "not taken: the Stock Summary dated the trial balance's last day lists no stock items"
+        );
     }
 
     /// #1486: the opening stock POP-3 adds is the stock items' opening values, debit positive,

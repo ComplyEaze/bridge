@@ -26,10 +26,20 @@ fn ledger(name: &str) -> LedgerGuid {
     LedgerGuid::new(name)
 }
 
+fn view_of(
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    k_days: u32,
+) -> TransferView {
+    transfer_pairing_view(skips, contras, coverage, k_days).expect("no duplicate keys")
+}
+
 fn skip_key(row: &str) -> SkipKey {
     SkipKey {
         company: CompanyGuid::new("co"),
         bank_ledger: ledger("b2"),
+        endpoint_origin: EndpointOrigin::new("ep"),
         row: StatementRowId::new(row),
     }
 }
@@ -50,7 +60,6 @@ fn skip(row: &str) -> SkipFact {
         direction: Direction::Outflow,
         other_ledger: ledger("b1"),
         reference: None,
-        endpoint_origin: EndpointOrigin::new("ep"),
         lineage: LineageId::new("lineage-b2"),
     }
 }
@@ -132,7 +141,7 @@ fn ambiguous(candidates: &[(&str, &str)]) -> SkipState {
 #[test]
 fn transfer_pairing_direction_must_match_on_the_skips_own_bank() {
     // b2 -> b1 pairs with the Contra that credits b2
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[contra("batch-1", "t1")],
         &january_covered(),
@@ -154,17 +163,17 @@ fn transfer_pairing_direction_must_match_on_the_skips_own_bank() {
             side: Side::Debit,
         },
     ];
-    let view = transfer_pairing_view(&[skip("st-1")], &[returned.clone()], &january_covered(), 0);
+    let view = view_of(&[skip("st-1")], &[returned.clone()], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
     // an inflow skip is the mirror: it pairs only with the Contra that debits its bank
     let mut inflow = skip("st-1");
     inflow.direction = Direction::Inflow;
-    let view = transfer_pairing_view(&[inflow.clone()], &[returned], &january_covered(), 0);
+    let view = view_of(&[inflow.clone()], &[returned], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         paired(PairRound::NoReference, "batch-1", "t1")
     );
-    let view = transfer_pairing_view(&[inflow], &[contra("batch-1", "t1")], &january_covered(), 0);
+    let view = view_of(&[inflow], &[contra("batch-1", "t1")], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
 }
 
@@ -179,17 +188,17 @@ fn transfer_pairing_a_contra_needs_exactly_the_two_ledgers_on_opposite_sides() {
     one_ledger_twice.legs[0].ledger = ledger("b2");
     one_ledger_twice.legs[0].side = Side::Debit;
     for wrong in [third_ledger, one_side, one_ledger_twice] {
-        let view = transfer_pairing_view(&[skip("st-1")], &[wrong], &covered, 0);
+        let view = view_of(&[skip("st-1")], &[wrong], &covered, 0);
         assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
     }
     // a different amount, even by a cent, is no edge; a scale difference is
     let mut other_amount = contra("batch-1", "t1");
     other_amount.amount = ExactDecimal::parse("500.01").unwrap();
-    let view = transfer_pairing_view(&[skip("st-1")], &[other_amount], &covered, 0);
+    let view = view_of(&[skip("st-1")], &[other_amount], &covered, 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
     let mut other_scale = contra("batch-1", "t1");
     other_scale.amount = ExactDecimal::parse("500").unwrap();
-    let view = transfer_pairing_view(&[skip("st-1")], &[other_scale], &covered, 0);
+    let view = view_of(&[skip("st-1")], &[other_scale], &covered, 0);
     assert_eq!(
         state_of(&view, "st-1"),
         paired(PairRound::NoReference, "batch-1", "t1")
@@ -200,7 +209,7 @@ fn transfer_pairing_a_contra_needs_exactly_the_two_ledgers_on_opposite_sides() {
 fn transfer_pairing_a_contra_in_the_skips_own_lineage_is_no_edge() {
     let mut same_lineage = contra("batch-1", "t1");
     same_lineage.lineage = skip("st-1").lineage;
-    let view = transfer_pairing_view(&[skip("st-1")], &[same_lineage], &january_covered(), 0);
+    let view = view_of(&[skip("st-1")], &[same_lineage], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
 }
 
@@ -211,7 +220,7 @@ fn transfer_pairing_equal_references_pair_in_round_one_whatever_the_date() {
     let mut c = contra("batch-1", "t1");
     c.reference = Some(reference("600000000001"));
     c.date = date("20260109");
-    let view = transfer_pairing_view(&[s], &[c], &january_covered(), 0);
+    let view = view_of(&[s], &[c], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         paired(PairRound::Reference, "batch-1", "t1")
@@ -225,7 +234,7 @@ fn transfer_pairing_references_that_differ_never_pair() {
     s.reference = Some(reference("600000000001"));
     let mut c = contra("batch-1", "t1");
     c.reference = Some(reference("600000000002"));
-    let view = transfer_pairing_view(&[s], &[c], &january_covered(), 0);
+    let view = view_of(&[s], &[c], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
 }
 
@@ -233,7 +242,7 @@ fn transfer_pairing_references_that_differ_never_pair() {
 fn transfer_pairing_a_reference_on_one_side_only_is_a_round_two_edge() {
     let mut s = skip("st-1");
     s.reference = Some(reference("600000000001"));
-    let view = transfer_pairing_view(&[s], &[contra("batch-1", "t1")], &january_covered(), 0);
+    let view = view_of(&[s], &[contra("batch-1", "t1")], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         paired(PairRound::NoReference, "batch-1", "t1")
@@ -248,7 +257,7 @@ fn transfer_pairing_round_one_needs_one_edge_at_each_end() {
     second.reference = Some(reference("600000000001"));
     let mut c = contra("batch-1", "t1");
     c.reference = Some(reference("600000000001"));
-    let view = transfer_pairing_view(&[first, second], &[c], &january_covered(), 0);
+    let view = view_of(&[first, second], &[c], &january_covered(), 0);
     for row in ["st-1", "st-2"] {
         assert_eq!(state_of(&view, row), ambiguous(&[("batch-1", "t1")]));
     }
@@ -259,7 +268,7 @@ fn transfer_pairing_round_one_needs_one_edge_at_each_end() {
     c1.reference = Some(reference("600000000001"));
     let mut c2 = contra("batch-2", "t2");
     c2.reference = Some(reference("600000000001"));
-    let view = transfer_pairing_view(&[s], &[c1, c2], &january_covered(), 0);
+    let view = view_of(&[s], &[c1, c2], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         ambiguous(&[("batch-1", "t1"), ("batch-2", "t2")])
@@ -277,7 +286,7 @@ fn transfer_pairing_a_row_contested_in_round_one_does_not_pair_in_round_two() {
     let mut c2 = contra("batch-2", "t2");
     c2.reference = Some(reference("600000000001"));
     let c3 = contra("batch-3", "t3");
-    let view = transfer_pairing_view(&[s], &[c1, c2, c3], &january_covered(), 0);
+    let view = view_of(&[s], &[c1, c2, c3], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         ambiguous(&[("batch-1", "t1"), ("batch-2", "t2")])
@@ -286,7 +295,7 @@ fn transfer_pairing_a_row_contested_in_round_one_does_not_pair_in_round_two() {
 
 #[test]
 fn transfer_pairing_without_a_reference_one_candidate_each_way_pairs() {
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[contra("batch-1", "t1")],
         &january_covered(),
@@ -300,7 +309,7 @@ fn transfer_pairing_without_a_reference_one_candidate_each_way_pairs() {
 
 #[test]
 fn transfer_pairing_a_second_skip_makes_both_ambiguous() {
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1"), skip("st-2")],
         &[contra("batch-1", "t1")],
         &january_covered(),
@@ -314,7 +323,7 @@ fn transfer_pairing_a_second_skip_makes_both_ambiguous() {
 #[test]
 fn transfer_pairing_a_second_contra_makes_the_skip_ambiguous_with_both_listed() {
     // listed in key order whatever the input order
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[contra("batch-2", "t2"), contra("batch-1", "t1")],
         &january_covered(),
@@ -335,7 +344,7 @@ fn transfer_pairing_round_one_takes_only_the_other_banks_statement() {
     let mut own_statement = contra("batch-1", "t1");
     own_statement.reference = Some(reference("600000000001"));
     own_statement.statement_bank_ledger = ledger("b2");
-    let view = transfer_pairing_view(&[s], &[own_statement], &january_covered(), 0);
+    let view = view_of(&[s], &[own_statement], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
 }
 
@@ -344,7 +353,7 @@ fn transfer_pairing_round_two_takes_only_the_other_banks_statement() {
     // a Contra built from b2's own statement is not the other side of a b2 skip
     let mut own_statement = contra("batch-1", "t1");
     own_statement.statement_bank_ledger = ledger("b2");
-    let view = transfer_pairing_view(&[skip("st-1")], &[own_statement], &january_covered(), 0);
+    let view = view_of(&[skip("st-1")], &[own_statement], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
 }
 
@@ -356,10 +365,10 @@ fn transfer_pairing_round_two_dates_must_be_within_k_days() {
     two_days.date = date("20260107");
     let paired_next = paired(PairRound::NoReference, "batch-1", "t1");
     // k = 0: the next day is no candidate
-    let view = transfer_pairing_view(&[skip("st-1")], &[next_day.clone()], &january_covered(), 0);
+    let view = view_of(&[skip("st-1")], &[next_day.clone()], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
     // k = 1: it is, and two days away still is not
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[next_day.clone(), two_days.clone()],
         &january_covered(),
@@ -367,7 +376,7 @@ fn transfer_pairing_round_two_dates_must_be_within_k_days() {
     );
     assert_eq!(state_of(&view, "st-1"), paired_next);
     // k = 2: both are candidates
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[next_day, two_days],
         &january_covered(),
@@ -380,7 +389,7 @@ fn transfer_pairing_round_two_dates_must_be_within_k_days() {
     // the day before counts too
     let mut before = contra("batch-1", "t1");
     before.date = date("20260104");
-    let view = transfer_pairing_view(&[skip("st-1")], &[before], &january_covered(), 1);
+    let view = view_of(&[skip("st-1")], &[before], &january_covered(), 1);
     assert_eq!(
         state_of(&view, "st-1"),
         paired(PairRound::NoReference, "batch-1", "t1")
@@ -393,7 +402,7 @@ fn transfer_pairing_a_candidate_in_another_company_or_endpoint_never_pairs() {
     other_company.company = CompanyGuid::new("co-2");
     let mut other_endpoint = contra("batch-2", "t2");
     other_endpoint.endpoint_origin = EndpointOrigin::new("ep-2");
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[other_company, other_endpoint],
         &january_covered(),
@@ -402,25 +411,25 @@ fn transfer_pairing_a_candidate_in_another_company_or_endpoint_never_pairs() {
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
     // a skip of another endpoint does not see this endpoint's Contra either
     let mut elsewhere = skip("st-1");
-    elsewhere.endpoint_origin = EndpointOrigin::new("ep-2");
-    let view = transfer_pairing_view(
-        &[elsewhere],
+    elsewhere.key.endpoint_origin = EndpointOrigin::new("ep-2");
+    let view = view_of(
+        &[elsewhere.clone()],
         &[contra("batch-1", "t1")],
         &Coverage::default(),
         0,
     );
-    assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
+    assert_eq!(view.skips[&elsewhere.key], SkipState::NotEstablished);
 }
 
 #[test]
 fn transfer_pairing_without_coverage_an_absent_contra_is_not_established() {
     let none = Coverage::default();
-    let view = transfer_pairing_view(&[skip("st-1")], &[], &none, 0);
+    let view = view_of(&[skip("st-1")], &[], &none, 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
-    let view = transfer_pairing_view(&[skip("st-1")], &[], &january_covered(), 0);
+    let view = view_of(&[skip("st-1")], &[], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
     // a skip that paired needs no coverage
-    let view = transfer_pairing_view(&[skip("st-1")], &[contra("batch-1", "t1")], &none, 0);
+    let view = view_of(&[skip("st-1")], &[contra("batch-1", "t1")], &none, 0);
     assert_eq!(
         state_of(&view, "st-1"),
         paired(PairRound::NoReference, "batch-1", "t1")
@@ -440,10 +449,7 @@ fn transfer_pairing_coverage_must_hold_the_whole_interval() {
                 window(from, to),
             );
         }
-        state_of(
-            &transfer_pairing_view(&skip_on_the_fifth, &[], &coverage, k),
-            "st-1",
-        )
+        state_of(&view_of(&skip_on_the_fifth, &[], &coverage, k), "st-1")
     };
     // exactly the interval [4th, 6th] for k = 1
     assert_eq!(
@@ -503,13 +509,13 @@ fn transfer_pairing_coverage_of_another_ledger_company_or_endpoint_does_not_coun
         ledger("b1"),
         window,
     );
-    let view = transfer_pairing_view(&[skip("st-1")], &[], &coverage, 0);
+    let view = view_of(&[skip("st-1")], &[], &coverage, 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
 }
 
 #[test]
 fn transfer_pairing_an_unverified_contra_never_pairs() {
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[unverified(contra("batch-1", "t1"))],
         &january_covered(),
@@ -526,7 +532,7 @@ fn transfer_pairing_an_unverified_contra_never_pairs() {
     s.reference = Some(reference("600000000001"));
     let mut c = unverified(contra("batch-1", "t1"));
     c.reference = Some(reference("600000000001"));
-    let view = transfer_pairing_view(&[s], &[c], &Coverage::default(), 0);
+    let view = view_of(&[s], &[c], &Coverage::default(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         SkipState::OtherSideUnverified {
@@ -541,7 +547,7 @@ fn transfer_pairing_an_unverified_batch_names_itself_and_not_the_view_batch() {
     c.status = BatchStatus::NotVerified {
         batch: BatchId::new("batch-9"),
     };
-    let view = transfer_pairing_view(&[skip("st-1")], &[c], &january_covered(), 0);
+    let view = view_of(&[skip("st-1")], &[c], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         SkipState::OtherSideUnverified {
@@ -552,7 +558,7 @@ fn transfer_pairing_an_unverified_batch_names_itself_and_not_the_view_batch() {
 
 #[test]
 fn transfer_pairing_a_verified_and_an_unverified_candidate_are_ambiguous() {
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[contra("batch-1", "t1"), unverified(contra("batch-2", "t2"))],
         &january_covered(),
@@ -566,7 +572,7 @@ fn transfer_pairing_a_verified_and_an_unverified_candidate_are_ambiguous() {
 
 #[test]
 fn transfer_pairing_candidates_all_in_unverified_batches_of_two_are_ambiguous() {
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[
             unverified(contra("batch-1", "t1")),
@@ -585,7 +591,7 @@ fn transfer_pairing_candidates_all_in_unverified_batches_of_two_are_ambiguous() 
 fn transfer_pairing_an_unverified_candidate_outranks_missing_coverage() {
     // the other bank's batch exists but is not verified, so no verified window
     // covers it; the open state must still say where the Contra is
-    let view = transfer_pairing_view(
+    let view = view_of(
         &[skip("st-1")],
         &[unverified(contra("batch-1", "t1"))],
         &Coverage::default(),
@@ -603,16 +609,16 @@ fn transfer_pairing_an_unverified_candidate_outranks_missing_coverage() {
 fn transfer_pairing_removing_the_verified_batch_reopens_the_skip() {
     let skips = [skip("st-1")];
     let covered = january_covered();
-    let with = transfer_pairing_view(&skips, &[contra("batch-1", "t1")], &covered, 0);
+    let with = view_of(&skips, &[contra("batch-1", "t1")], &covered, 0);
     assert_eq!(
         state_of(&with, "st-1"),
         paired(PairRound::NoReference, "batch-1", "t1")
     );
     // rolled back or amended away: its Contra is not among the facts
-    let without = transfer_pairing_view(&skips, &[], &covered, 0);
+    let without = view_of(&skips, &[], &covered, 0);
     assert_eq!(state_of(&without, "st-1"), SkipState::NotFound);
     // failing verification: the same Contra, no longer verified
-    let failed = transfer_pairing_view(&skips, &[unverified(contra("batch-1", "t1"))], &covered, 0);
+    let failed = view_of(&skips, &[unverified(contra("batch-1", "t1"))], &covered, 0);
     assert_eq!(
         state_of(&failed, "st-1"),
         SkipState::OtherSideUnverified {
@@ -627,7 +633,7 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
     for removed in 0..contras.len() {
         let mut kept = contras.clone();
         let gone = kept.remove(removed).key;
-        let view = transfer_pairing_view(&skips, &kept, &coverage, 1);
+        let view = view_of(&skips, &kept, &coverage, 1);
         for state in view.skips.values() {
             match state {
                 SkipState::Paired { contra, .. } => assert_ne!(contra, &gone),
@@ -643,7 +649,7 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
 }
 
 fn double_booked_pair(first: &ContraFact, second: &ContraFact) -> Vec<DoubleBooked> {
-    transfer_pairing_view(
+    view_of(
         &[],
         &[first.clone(), second.clone()],
         &Coverage::default(),
@@ -831,7 +837,7 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
         }
         coverage
     };
-    let baseline = transfer_pairing_view(&skips, &contras, &covered(&halves), 1);
+    let baseline = view_of(&skips, &contras, &covered(&halves), 1);
     // the book really holds every state, so the equality below is not vacuous
     let has = |wanted: fn(&SkipState) -> bool| baseline.skips.values().any(wanted);
     assert!(has(|state| matches!(
@@ -862,12 +868,125 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
         } else {
             [halves[1].clone(), halves[0].clone()]
         };
-        let view = transfer_pairing_view(
+        let view = view_of(
             &shuffled(&skips, seed),
             &shuffled(&contras, seed + 1_000),
             &covered(&windows),
             1,
         );
         assert_eq!(view, baseline, "seed {seed}");
+    }
+}
+
+#[test]
+fn transfer_pairing_a_contra_from_a_third_banks_statement_is_no_edge() {
+    // only the other ledger's own statement carries the other side of the skip
+    let mut third = contra("batch-1", "t1");
+    third.statement_bank_ledger = ledger("b3");
+    let view = view_of(&[skip("st-1")], &[third], &january_covered(), 0);
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+}
+
+#[test]
+fn transfer_pairing_two_skips_with_one_key_fail_loudly() {
+    let mut again = skip("st-1");
+    again.date = date("20260106");
+    let duplicate = Err(PairingInputError::DuplicateSkip {
+        key: skip_key("st-1"),
+    });
+    assert_eq!(
+        transfer_pairing_view(&[skip("st-1"), again], &[], &january_covered(), 0),
+        duplicate
+    );
+    // an identical fact twice is still two facts for one key
+    assert_eq!(
+        transfer_pairing_view(&[skip("st-1"), skip("st-1")], &[], &january_covered(), 0),
+        duplicate
+    );
+}
+
+#[test]
+fn transfer_pairing_two_contras_with_one_key_fail_loudly() {
+    assert_eq!(
+        transfer_pairing_view(
+            &[skip("st-1")],
+            &[contra("batch-1", "t1"), contra("batch-1", "t1")],
+            &january_covered(),
+            0
+        ),
+        Err(PairingInputError::DuplicateContra {
+            key: contra_key("batch-1", "t1")
+        })
+    );
+}
+
+#[test]
+fn transfer_pairing_one_statement_on_two_endpoints_is_two_skips() {
+    let first = skip("st-1");
+    let mut second = skip("st-1");
+    second.key.endpoint_origin = EndpointOrigin::new("ep-2");
+    let mut second_contra = contra("batch-2", "t2");
+    second_contra.endpoint_origin = EndpointOrigin::new("ep-2");
+    let mut coverage = january_covered();
+    for bank in ["b1", "b2"] {
+        coverage.add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep-2"),
+            ledger(bank),
+            window("20260101", "20260131"),
+        );
+    }
+    let view = view_of(
+        &[first.clone(), second.clone()],
+        &[contra("batch-1", "t1"), second_contra],
+        &coverage,
+        0,
+    );
+    assert_eq!(view.skips.len(), 2);
+    assert_eq!(
+        view.skips[&first.key],
+        paired(PairRound::NoReference, "batch-1", "t1")
+    );
+    assert_eq!(
+        view.skips[&second.key],
+        paired(PairRound::NoReference, "batch-2", "t2")
+    );
+}
+
+#[test]
+fn transfer_pairing_duplicates_fail_the_same_way_in_any_input_order() {
+    let (mut skips, mut contras, coverage) = busy_book();
+    // two duplicated keys: the smaller is the one named, whatever the order
+    skips.push(skips[3].clone());
+    skips.push(skips[1].clone());
+    let named = skips[1].key.clone();
+    for seed in 0..100 {
+        assert_eq!(
+            transfer_pairing_view(
+                &shuffled(&skips, seed),
+                &shuffled(&contras, seed + 500),
+                &coverage,
+                1
+            ),
+            Err(PairingInputError::DuplicateSkip { key: named.clone() }),
+            "seed {seed}"
+        );
+    }
+    // and with only a duplicated Contra
+    skips.truncate(7);
+    contras.push(contras[2].clone());
+    contras.push(contras[0].clone());
+    let named = contras[0].key.clone();
+    for seed in 0..100 {
+        assert_eq!(
+            transfer_pairing_view(
+                &shuffled(&skips, seed),
+                &shuffled(&contras, seed + 500),
+                &coverage,
+                1
+            ),
+            Err(PairingInputError::DuplicateContra { key: named.clone() }),
+            "seed {seed}"
+        );
     }
 }

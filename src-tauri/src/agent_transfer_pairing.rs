@@ -33,8 +33,8 @@
 //! verified parse windows cover its whole date +/- k interval; otherwise the
 //! absence proves nothing and it is `NotEstablished`.
 //!
-//! Key uniqueness is the caller's precondition: two skips with one `SkipKey`, or
-//! two Contras with one `ContraKey`, are one fact read twice.
+//! Two skips with one `SkipKey`, or two Contras with one `ContraKey`, are refused
+//! with a typed error naming the smallest such key, whatever the input order.
 
 use bridge_bank_statement::bank::BankReference;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
@@ -88,6 +88,8 @@ text_id!(
 pub(crate) struct SkipKey {
     pub(crate) company: CompanyGuid,
     pub(crate) bank_ledger: LedgerGuid,
+    /// One statement read through two endpoints is two skips.
+    pub(crate) endpoint_origin: EndpointOrigin,
     pub(crate) row: StatementRowId,
 }
 
@@ -129,7 +131,6 @@ pub(crate) struct SkipFact {
     pub(crate) direction: Direction,
     pub(crate) other_ledger: LedgerGuid,
     pub(crate) reference: Option<BankReference>,
-    pub(crate) endpoint_origin: EndpointOrigin,
     pub(crate) lineage: LineageId,
 }
 
@@ -223,18 +224,35 @@ pub(crate) struct TransferView {
     pub(crate) double_booked: Vec<DoubleBooked>,
 }
 
+/// Facts that cannot be paired because the caller gave two for one key.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum PairingInputError {
+    #[error("two skipped rows share one key")]
+    DuplicateSkip { key: SkipKey },
+    #[error("two Contras share one key")]
+    DuplicateContra { key: ContraKey },
+}
+
 pub(crate) fn transfer_pairing_view(
     skips: &[SkipFact],
     contras: &[ContraFact],
     coverage: &Coverage,
     k_days: u32,
-) -> TransferView {
+) -> Result<TransferView, PairingInputError> {
     let mut skips: Vec<&SkipFact> = skips.iter().collect();
     skips.sort_by(|left, right| left.key.cmp(&right.key));
-    skips.dedup_by(|left, right| left.key == right.key);
+    if let Some(pair) = skips.windows(2).find(|pair| pair[0].key == pair[1].key) {
+        return Err(PairingInputError::DuplicateSkip {
+            key: pair[0].key.clone(),
+        });
+    }
     let mut contras: Vec<&ContraFact> = contras.iter().collect();
     contras.sort_by(|left, right| left.key.cmp(&right.key));
-    contras.dedup_by(|left, right| left.key == right.key);
+    if let Some(pair) = contras.windows(2).find(|pair| pair[0].key == pair[1].key) {
+        return Err(PairingInputError::DuplicateContra {
+            key: pair[0].key.clone(),
+        });
+    }
 
     // Contras bucketed by (company, endpoint, ledger pair), so a skip looks only
     // at the transfers between its own two ledgers.
@@ -338,10 +356,10 @@ pub(crate) fn transfer_pairing_view(
         })
         .collect();
 
-    TransferView {
+    Ok(TransferView {
         skips: states,
         double_booked: double_booked(&contras, &buckets, k_days),
-    }
+    })
 }
 
 /// Company, endpoint and the two ledgers, in a fixed order.
@@ -366,7 +384,7 @@ fn bucket(
 fn skip_bucket(skip: &SkipFact) -> Option<Bucket> {
     bucket(
         &skip.key.company,
-        &skip.endpoint_origin,
+        &skip.key.endpoint_origin,
         &skip.key.bank_ledger,
         &skip.other_ledger,
     )
@@ -404,7 +422,7 @@ fn is_edge(skip: &SkipFact, contra: &ContraFact) -> bool {
     side_on(contra, &skip.key.bank_ledger) == Some(&skip.direction.contra_side())
         && skip.amount.numeric_eq(&contra.amount)
         && skip.lineage != contra.lineage
-        && contra.statement_bank_ledger != skip.key.bank_ledger
+        && contra.statement_bank_ledger == skip.other_ledger
 }
 
 fn is_loose_edge(skip: &SkipFact, contra: &ContraFact, k_days: u32) -> bool {
@@ -465,7 +483,7 @@ fn open_state(
 fn covers(coverage: &Coverage, skip: &SkipFact, k_days: u32) -> bool {
     let Some(windows) = coverage.0.get(&(
         skip.key.company.clone(),
-        skip.endpoint_origin.clone(),
+        skip.key.endpoint_origin.clone(),
         skip.other_ledger.clone(),
     )) else {
         return false;

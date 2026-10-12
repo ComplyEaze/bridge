@@ -1,0 +1,86 @@
+W16 rates ledgers: 18 ['BRIDGE CGST 2.5%', 'BRIDGE CGST 9%', 'BRIDGE Goods 18%', 'BRIDGE Output CGST XML', 'BRIDGE Purchase Svc 5%', 'BRIDGE Round Off', 'BRIDGE SGST 2.5%', 'BRIDGE SGST 9%', 'BRIDGE Supplier RJ', 'BRIDGE Svc 4D 5%', 'BRIDGE Svc 998313 5%', 'BRIDGE Svc 998314 5%', 'BRIDGE Svc 998315 5%', 'BRIDGE Svc INH 5%', 'BRIDGE Svc INH2 5%', 'BRIDGE Walk-in', 'Cash', 'Profit & Loss A/c']
+aw18-ledgers-compliance.xml: 18 LEDGER rows; missing vs W16 rates: []; extra: []
+aw18-ledgers-paired.xml: 18 LEDGER rows; missing vs W16 rates: []; extra: []
+aw18-ledger-catalogue-v2.xml: 18 LEDGER rows; missing vs W16 rates: []; extra: []
+aw18-ledger-rates-hsn.xml: 18 LEDGER rows; missing vs W16 rates: []; extra: []
+groups: 29 BRIDGE Sales Sub present: True
+4D row W18 == W16: True len 3027 3027
+  4D HSNCODE ['9983']
+  4D HSN ['\n      ', '9983', 'Other professional, technical and business services']
+  4D APPLICABLEFROM ['20260401', '20260401']
+  4D SRCOFGSTDETAILS ['Specify Details Here']
+  4D GSTTYPEOFSUPPLY ['Services']
+company object vs aw16-company-object-0.xml byte-identical: False 98afd2f9 ab9b1f51
+  element/text differences: 11
+    +LASTVOUCHERDATE=20260915
+    -DESTINATION=C:\Users\Public\TallyPrimeEditLog\data\100033
+    -CMPNUMSTR=100033
+    +CLOSINGPROFIT=11306.96
+    +CLOSINGGROSSPROFIT=11306.80
+    +OPENINGSTOCK=
+    +CLOSINGSTOCK=
+    +OPENINGINWARDTRACK=
+    +OPENINGOUTWARDTRACK=
+    +CLOSINGINWARDTRACK=
+    +CLOSINGOUTWARDTRACK=
+company object vs aw14-company-object-0.xml byte-identical: False 98afd2f9 96416059
+  element/text differences: 41
+    -LEDGER=86
+    +LEDGER=0
+    -CURRENCY=12
+    +CURRENCY=0
+    -TAXUNIT=21
+    +TAXUNIT=0
+    -VOUCHERNUMBERSERIES=30
+    -VOUCHER=28
+    +VOUCHERNUMBERSERIES=0
+    +VOUCHER=0
+    +LASTVOUCHERDATE=20260915
+    -NUMUNITS=0
+    -NUMEXCISETAXUNIT=0
+    -NUMSTTAXUNIT=0
+    -NUMEXCISEANDSTTAXUNIT=0
+    -ALTVCHID=57
+    +ALTVCHID=60
+    -EXCHANGEACTIVITYMASTERID=2
+    -EXCHANGEACTIVITYALTERID=6
+    +EXCHANGEACTIVITYMASTERID=3
+    +EXCHANGEACTIVITYALTERID=9
+    +TOTALOPENINGCREDITS=
+    +TOTALOPENINGDEBITS=
+    +OPENINGPROFIT=
+    +OPENINGPROFIT=
+    +CLOSINGPROFIT=11910.06
+    +CLOSINGPROFIT=11306.96
+    +CLOSINGGROSSPROFIT=11909.90
+    +CLOSINGGROSSPROFIT=11306.80
+    +OPENINGSTOCK=
+    +OPENINGSTOCK=
+    +CLOSINGSTOCK=
+    +CLOSINGSTOCK=
+    +OPENINGINWARDTRACK=
+    +OPENINGINWARDTRACK=
+    +OPENINGOUTWARDTRACK=
+    +OPENINGOUTWARDTRACK=
+    +CLOSINGINWARDTRACK=
+    +CLOSINGINWARDTRACK=
+    +CLOSINGOUTWARDTRACK=
+--- (e) detail
+DESTINATION {'W14': [], 'W16': ['C:\\Users\\Public\\TallyPrimeEditLog\\data\\100033'], 'W18': []}
+CMPNUMSTR {'W14': [], 'W16': ['100033'], 'W18': []}
+LASTVOUCHERDATE {'W14': [], 'W16': [], 'W18': ['20260915']}
+HSNCODE {'W14': ['', '998341'], 'W16': ['', '998341'], 'W18': ['', '998341']}
+HSN {'W14': ['', 'Geological and geophysical consulting services'], 'W16': ['', 'Geological and geophysical consulting services'], 'W18': ['', 'Geological and geophysical consulting services']}
+HSNDESCRIPTION {'W14': [], 'W16': [], 'W18': []}
+SRCOFGSTDETAILS {'W14': ['&#4; Not Defined'], 'W16': ['&#4; Not Defined'], 'W18': ['&#4; Not Defined']}
+GSTTYPEOFSUPPLY {'W14': [], 'W16': [], 'W18': []}
+APPLICABLEFROM {'W14': ['20260401', '20260401', '20260401'], 'W16': ['20260401', '20260401', '20260401'], 'W18': ['20260401', '20260401', '20260401']}
+GSTREGISTRATIONTYPE {'W14': [''], 'W16': [''], 'W18': ['']}
+STATENAME {'W14': ['Rajasthan', '&#4; Any'], 'W16': ['Rajasthan', '&#4; Any'], 'W18': ['Rajasthan', '&#4; Any']}
+GSTIN {'W14': [], 'W16': [], 'W18': []}
+TAXUNITNAME {'W14': [], 'W16': [], 'W18': []}
+ISGSTON {'W14': ['Yes'], 'W16': ['Yes'], 'W18': ['Yes']}
+GSTAPPLICABLE {'W14': [], 'W16': [], 'W18': []}
+W14 HSNDETAILS.LIST blocks 1 ['<HSNDETAILS.LIST> <APPLICABLEFROM TYPE="Date">20260401</APPLICABLEFROM> <HSNCODE TYPE="String">998341</HSNCODE> <HSN TYPE="String">Geological and geophysical consulting services</HSN> <HSNCLASSIFICATIONNAME TYPE="String"></HSNCLASSIFICATIONNAME> <SRCOFHSNDETAILS TYPE="String">Specify Details Here</S']
+W16 HSNDETAILS.LIST blocks 1 ['<HSNDETAILS.LIST> <APPLICABLEFROM TYPE="Date">20260401</APPLICABLEFROM> <HSNCODE TYPE="String">998341</HSNCODE> <HSN TYPE="String">Geological and geophysical consulting services</HSN> <HSNCLASSIFICATIONNAME TYPE="String"></HSNCLASSIFICATIONNAME> <SRCOFHSNDETAILS TYPE="String">Specify Details Here</S']
+W18 HSNDETAILS.LIST blocks 1 ['<HSNDETAILS.LIST> <APPLICABLEFROM TYPE="Date">20260401</APPLICABLEFROM> <HSNCODE TYPE="String">998341</HSNCODE> <HSN TYPE="String">Geological and geophysical consulting services</HSN> <HSNCLASSIFICATIONNAME TYPE="String"></HSNCLASSIFICATIONNAME> <SRCOFHSNDETAILS TYPE="String">Specify Details Here</S']

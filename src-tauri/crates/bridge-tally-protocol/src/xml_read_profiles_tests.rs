@@ -100,47 +100,6 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     assert_eq!(extent_v2_request.matches("<TALLYREQUEST>").count(), 1);
     assert!(!extent_v2_request.contains("<TALLYREQUEST>IMPORT"));
     assert!(extent_v2_request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
-
-    #[cfg(feature = "voucher-scan")]
-    {
-        let pinned = PinnedCompany::verified(injection.clone(), "synthetic-guid".to_string())
-            .expect("verified test identity");
-        let window = crate::outstandings::DateWindow::parse(
-            crate::outstandings::DateBoundaryProfile::EducationRestricted,
-            "20260401",
-            "20260402",
-        )
-        .unwrap()
-        .narrow_partitions()
-        .unwrap()
-        .remove(0);
-        for request in [
-            ReadOnlyProfile::VoucherOutstandingsV1 {
-                company: &pinned,
-                window: &window,
-                alter_id_range: AlterIdRange::new(0, 1).unwrap(),
-            }
-            .render(),
-            ReadOnlyProfile::VoucherEmptyPartitionWitnessV1 {
-                company: &pinned,
-                window: &window,
-            }
-            .render(),
-        ] {
-            assert_eq!(request.matches("<TALLYREQUEST>").count(), 1);
-            assert!(!request.contains("<TALLYREQUEST>IMPORT"));
-            assert!(request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
-        }
-        let witness = ReadOnlyProfile::VoucherEmptyPartitionWitnessV1 {
-            company: &pinned,
-            window: &window,
-        };
-        assert_eq!(
-            witness.id(),
-            ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1
-        );
-        assert!(witness.template_sha256().len() == 64);
-    }
 }
 
 /// `CompanyListV2` is a native Tally `Company` collection, not the
@@ -172,8 +131,7 @@ fn company_list_v2_is_a_native_collection_scoped_to_no_single_company() {
 
 #[test]
 fn profile_ids_and_template_hashes_are_stable() {
-    #[cfg_attr(not(feature = "voucher-scan"), allow(unused_mut))]
-    let mut expected: Vec<(ReadOnlyProfileId, &str)> = vec![
+    let expected: Vec<(ReadOnlyProfileId, &str)> = vec![
         (
             ReadOnlyProfileId::CompanyListV1,
             "8905c041a75929f157be704ca9dd076a37995dc7936e0ad71c9361406a8fb694",
@@ -227,21 +185,6 @@ fn profile_ids_and_template_hashes_are_stable() {
             "18f8280794a476fd3b44f55c63a9f3060b7a523da82331744fe4fc0b0a151337",
         ),
     ];
-    #[cfg(feature = "voucher-scan")]
-    expected.extend([
-        (
-            ReadOnlyProfileId::LedgerOpeningCoverageV1,
-            "ae607d1d0ae4347f30e03ae3f7ee6c9a48b936be1cf71bb63ea1966727871efb",
-        ),
-        (
-            ReadOnlyProfileId::VoucherOutstandingsV1,
-            "165b40352eda40491a189d58ac81777b307bb709c65afb1f3555f19f0df0edd9",
-        ),
-        (
-            ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1,
-            "7e9d3befbb8ef32503e0fe960c78aedcbf8a8075c056a8de1ad40846e6d109bc",
-        ),
-    ]);
     let observed = expected
         .iter()
         .map(|(profile, _)| (profile.as_str(), profile.template_sha256()))
@@ -652,14 +595,9 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
             | ReadOnlyProfileId::AuditLedgersV1
             | ReadOnlyProfileId::AuditVouchersV1
             | ReadOnlyProfileId::AuditStockItemsV1 => {}
-            #[cfg(feature = "voucher-scan")]
-            ReadOnlyProfileId::LedgerOpeningCoverageV1
-            | ReadOnlyProfileId::VoucherOutstandingsV1
-            | ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1 => {}
         }
     }
-    #[cfg_attr(not(feature = "voucher-scan"), allow(unused_mut))]
-    let mut ids = vec![
+    let ids = vec![
         ReadOnlyProfileId::CompanyListV1,
         ReadOnlyProfileId::CompanyListV2,
         ReadOnlyProfileId::CompanyBookExtentV1,
@@ -674,12 +612,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         ReadOnlyProfileId::AuditVouchersV1,
         ReadOnlyProfileId::AuditStockItemsV1,
     ];
-    #[cfg(feature = "voucher-scan")]
-    ids.extend([
-        ReadOnlyProfileId::LedgerOpeningCoverageV1,
-        ReadOnlyProfileId::VoucherOutstandingsV1,
-        ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1,
-    ]);
     ids.iter().copied().for_each(listed);
     ids
 }

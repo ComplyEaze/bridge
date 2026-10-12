@@ -1,12 +1,5 @@
 //! Safety-property tests for `outstandings_shared`: the company-identity and
-//! book-extent read shared by the native (always compiled) and voucher-scan
-//! (feature-gated) outstandings paths.
-//!
-//! These moved out of `tests/outstandings.rs` -- which is gated behind
-//! `voucher-scan` because it otherwise exercises only scan machinery -- so
-//! that `parse_company_book_extent`'s identity-verification properties stay
-//! covered in the default build too, where the native path is what actually
-//! calls it.
+//! book-extent read the native outstandings path pins against.
 
 use bridge_tally_protocol::outstandings_shared::{
     parse_company_book_extent, parse_company_book_extent_v2, CompanyBookExtentExpectation,

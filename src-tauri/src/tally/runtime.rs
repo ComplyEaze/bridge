@@ -75,9 +75,7 @@ pub(crate) use trial_balance::{
     base_currency_ledgers_only_label, TrialBalanceCurrencyScope, TrialBalanceReadError,
     BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
 };
-pub use trial_balance::{
-    StatementsRead, TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead,
-};
+pub use trial_balance::{TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead};
 
 #[cfg(test)]
 #[path = "runtime_trial_balance_tests.rs"]
@@ -1235,17 +1233,6 @@ impl ClassifiedCompanyCurrencyRead {
     }
 }
 
-/// Whether a ledger export must first prove the book keeps exactly one
-/// Currency master, and that it is INR. Its opening balances carry no
-/// currency of their own, so the `ledger_masters` basic read (bridge#714)
-/// and `ledger_movement` (bridge#716) ask for it. The ungated
-/// `fetch_ledgers` path has no production caller; only tests use it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LedgerCurrencyGate {
-    None,
-    SingleInrMaster,
-}
-
 /// `CompanyCurrencyRead::admit_inr` refused to label this company's figures
 /// as INR. The code is one of that function's static reasons, never data.
 #[derive(Debug, thiserror::Error)]
@@ -1297,15 +1284,9 @@ pub(crate) struct PartyLedgerMasterListing {
 pub(crate) struct CompanyCurrencyRead {
     currency: CompanyCurrency,
     extent: CompanyBookExtent,
-    evidence: RuntimeReadEvidence,
 }
 
 impl CompanyCurrencyRead {
-    #[cfg(test)]
-    pub(crate) fn evidence(&self) -> RuntimeReadEvidence {
-        self.evidence.clone()
-    }
-
     pub(crate) fn admit_inr(self) -> Result<PartyLedgerMasterCurrencyAssertion, &'static str> {
         match (self.currency_count(), self.is_inr()) {
             (1, true) => {
@@ -1429,16 +1410,6 @@ impl CurrencyExclusions {
     /// book and the result is complete.
     pub fn new(foreign: Vec<ForeignCurrencyLedger>, mixed: Vec<String>) -> Option<Self> {
         (!foreign.is_empty() || !mixed.is_empty()).then_some(Self { foreign, mixed })
-    }
-
-    /// Ledgers kept in another currency, in read order.
-    pub fn foreign(&self) -> &[ForeignCurrencyLedger] {
-        &self.foreign
-    }
-
-    /// Base-currency ledgers with a composite value, in read order.
-    pub fn mixed(&self) -> &[String] {
-        &self.mixed
     }
 
     /// What was set aside, each code present exactly when its list is
@@ -2312,10 +2283,6 @@ impl CachedProbeReservation {
         &self.result
     }
 
-    pub fn review_id(&self) -> &str {
-        &self.review_id
-    }
-
     pub fn release(&mut self) -> anyhow::Result<bool> {
         self.finish(false)
     }
@@ -2724,12 +2691,6 @@ impl TallyRuntime {
         Ok((chrono::Utc::now().timestamp_millis(), result))
     }
 
-    pub async fn probe(&self, config: TallyConfig) -> anyhow::Result<TallyProbeResult> {
-        self.probe_with_observation(config)
-            .await
-            .map(|(_, _, result)| result)
-    }
-
     pub async fn fetch_companies(&self, config: TallyConfig) -> anyhow::Result<Vec<TallyCompany>> {
         let _lease = self.begin_ordinary_read(&config)?;
         self.execute(
@@ -2790,39 +2751,9 @@ impl TallyRuntime {
         .await
     }
 
-    pub async fn fetch_ledgers(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        self.fetch_ledgers_with_evidence(config, identity)
-            .await
-            .map(|(ledgers, _)| ledgers)
-    }
-
     /// Reads the BOOKSFROM-pinned ledger export and retains the paired wire
-    /// evidence used by agent-visible ledger responses.
-    pub async fn fetch_ledgers_with_evidence(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<(Vec<TallyLedger>, RuntimeReadEvidence)> {
-        self.fetch_ledger_opening_with_evidence(
-            config,
-            identity,
-            None,
-            false,
-            LedgerCurrencyGate::None,
-            // Left retrying: no agent tool calls this read, only tests, so the
-            // single-attempt rule for agent catalogue reads does not reach it (#937).
-            ReadRetryPolicy::transient_default(),
-        )
-        .await
-        .map(|read| (read.listing.ledgers, read.listing.evidence))
-    }
-
-    /// As `fetch_ledgers_with_evidence`, also returning the `SVFROMDATE` the
-    /// export was pinned to (the admitted BOOKSFROM). Each ledger's
+    /// evidence used by agent-visible ledger responses, also returning the
+    /// `SVFROMDATE` the export was pinned to (the admitted BOOKSFROM). Each ledger's
     /// `OPENINGBALANCE` is the opening at that date (TALLY_PROTOCOL_REFERENCE
     /// §5.5), which on a multi-year book is not the current year's opening.
     ///
@@ -2838,7 +2769,6 @@ impl TallyRuntime {
             identity,
             None,
             false,
-            LedgerCurrencyGate::SingleInrMaster,
             // Sent once, as the movement catalogue is: a catalogue that outlived
             // its deadline is abandoned, and sending it again queues more work
             // behind a gateway still building the response (#485, #937).
@@ -2864,7 +2794,6 @@ impl TallyRuntime {
                 identity,
                 None,
                 true,
-                LedgerCurrencyGate::SingleInrMaster,
                 // Sent once, as above (#485, #937).
                 ReadRetryPolicy::SINGLE_ATTEMPT,
             )
@@ -2895,7 +2824,6 @@ impl TallyRuntime {
             identity,
             Some(from),
             false,
-            LedgerCurrencyGate::SingleInrMaster,
             // Sent once. A catalogue that outlived its deadline is abandoned, and
             // sending it again queues more work behind a gateway still building
             // the response: agent voucher reads take the same rule (#485, #937).
@@ -2911,7 +2839,6 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         opening_date: Option<TallyDate>,
         read_groups: bool,
-        currency_gate: LedgerCurrencyGate,
         retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
@@ -2934,36 +2861,34 @@ impl TallyRuntime {
                         evidence = opening_evidence;
                         bracket_verified_company_identity(&client, &identity).await?;
                         let opening_extent = client.fetch_company_book_extent(&identity).await?;
-                        if currency_gate == LedgerCurrencyGate::SingleInrMaster {
-                            // A bare opening balance names no currency, so a
-                            // book with several Currency masters is refused
-                            // before any ledger request (bridge#714). A foreign
-                            // ledger's non-zero bare opening is UNOBSERVED; the
-                            // captured book's dollar openings are 0.00.
-                            let request = render_company_currency_request(identity.display_name());
-                            let (body, encoded_bytes, encoded_sha256) = client
-                                .fetch_native_report_paired(request.clone())
-                                .await?
-                                .require_stable(PairedReadValidationError::CurrencyMaster)?;
-                            evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                                &request,
-                                encoded_sha256,
-                                encoded_bytes,
-                            ));
-                            // A single master that is not INR is refused too: its
-                            // figures would come back as bare numbers with nothing
-                            // naming the currency (bridge#716), as `admit_inr`
-                            // refuses for the other monetary reads.
-                            let currency = parse_company_currency(&body)?;
-                            let refusal = match (currency.currency_count, currency.is_inr) {
-                                (1, true) => None,
-                                (0, _) => Some("company_currency_probe_failed"),
-                                (1, false) => Some("company_base_currency_not_inr"),
-                                _ => Some("company_several_currency_masters"),
-                            };
-                            if let Some(code) = refusal {
-                                return Err(anyhow::Error::new(CurrencyAdmissionRefusal(code)));
-                            }
+                        // A bare opening balance names no currency, so a
+                        // book with several Currency masters is refused
+                        // before any ledger request (bridge#714). A foreign
+                        // ledger's non-zero bare opening is UNOBSERVED; the
+                        // captured book's dollar openings are 0.00.
+                        let request = render_company_currency_request(identity.display_name());
+                        let (body, encoded_bytes, encoded_sha256) = client
+                            .fetch_native_report_paired(request.clone())
+                            .await?
+                            .require_stable(PairedReadValidationError::CurrencyMaster)?;
+                        evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+                            &request,
+                            encoded_sha256,
+                            encoded_bytes,
+                        ));
+                        // A single master that is not INR is refused too: its
+                        // figures would come back as bare numbers with nothing
+                        // naming the currency (bridge#716), as `admit_inr`
+                        // refuses for the other monetary reads.
+                        let currency = parse_company_currency(&body)?;
+                        let refusal = match (currency.currency_count, currency.is_inr) {
+                            (1, true) => None,
+                            (0, _) => Some("company_currency_probe_failed"),
+                            (1, false) => Some("company_base_currency_not_inr"),
+                            _ => Some("company_several_currency_masters"),
+                        };
+                        if let Some(code) = refusal {
+                            return Err(anyhow::Error::new(CurrencyAdmissionRefusal(code)));
                         }
                         let period = ledger_opening_period(
                             boundary_profile,
@@ -3228,39 +3153,6 @@ impl TallyRuntime {
                 .saturating_add(source.group_response_bytes)
                 .saturating_mul(2),
         })
-    }
-
-    /// Fetches the limited, documented standard collection response used for
-    /// compatibility diagnostics. This is intentionally separate from the
-    /// Bridge ledger export: it returns only ledger names and parents and is
-    /// never eligible for qualification or synchronization.
-    pub async fn fetch_standard_ledger_catalog(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::MasterExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                async move {
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    let ledgers = client
-                        .fetch_standard_ledger_catalog(
-                            identity.display_name(),
-                            identity.company_guid(),
-                        )
-                        .await?;
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    Ok(ledgers)
-                }
-            },
-        )
-        .await
     }
 
     /// Dispatches a read-only adapter request through the same serialized,
@@ -4339,19 +4231,6 @@ impl TallyRuntime {
             .currency)
     }
 
-    /// Reads the base-currency assertion together with the exact paired wire
-    /// evidence that established it for an agent-visible monetary result.
-    pub async fn detect_base_currency_with_evidence(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<(CompanyCurrency, RuntimeReadEvidence)> {
-        let read = self
-            .detect_base_currency_with_extent(config, identity)
-            .await?;
-        Ok((read.currency, read.evidence))
-    }
-
     /// Runs the existing currency probe while retaining its stable company
     /// extent for the party/ledger master document boundary.
     pub(crate) async fn detect_base_currency_with_extent(
@@ -4390,7 +4269,6 @@ impl TallyRuntime {
                         Ok(CompanyCurrencyRead {
                             currency: parse_company_currency(&body)?,
                             extent,
-                            evidence: evidence.clone(),
                         })
                     }
                     .await;
@@ -4524,6 +4402,9 @@ impl TallyRuntime {
         Ok(snapshots)
     }
 
+    /// The review cache's current probe for `config`'s endpoint, if any. Only tests look
+    /// at it: a production caller reserves it by review id instead.
+    #[cfg(test)]
     pub fn cached_probe(&self, config: &TallyConfig) -> anyhow::Result<Option<TallyProbeResult>> {
         let endpoint = EndpointKey::from_config(config)?;
         let sessions = self

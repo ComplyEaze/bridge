@@ -211,33 +211,12 @@ struct StatementManifest<'a> {
     failures: &'a [StatementFailure],
 }
 
-/// Produces a separate file for every party represented in the complete rows.
+/// Produces a separate file for every party represented in the complete rows,
+/// retaining the selected ageing basis in every file.
 ///
 /// Per-party failures are retained and reported after every remaining party is
 /// attempted. That makes a partially completed batch explicit, while still
 /// giving the operator usable files for parties whose statements rendered.
-pub fn write_bulk_party_statements(
-    destination: &ApprovedPartyStatementDestination,
-    company: &str,
-    as_of_yyyymmdd: &str,
-    format: &str,
-    open_bills: &[OpenBillRow],
-    unallocated_by_party: &[UnallocatedParty],
-    render: impl Fn(&PartyStatement) -> Result<Vec<u8>, String>,
-) -> Result<BulkPartyStatementResult, String> {
-    write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
-        destination,
-        company,
-        as_of_yyyymmdd,
-        format,
-        open_bills,
-        unallocated_by_party,
-        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
-        render,
-    })
-}
-
-/// Writes statements while retaining the selected ageing basis in every file.
 pub fn write_bulk_party_statements_with_ageing_anchor<Render>(
     request: BulkPartyStatementRequest<'_, Render>,
 ) -> Result<BulkPartyStatementResult, String>

@@ -807,9 +807,6 @@
       "path": "src-tauri/src/tally/canonical_window.rs"
     },
     {
-      "path": "src-tauri/src/tally/capability_packs.rs"
-    },
-    {
       "path": "src-tauri/src/tally/connection.rs"
     },
     {

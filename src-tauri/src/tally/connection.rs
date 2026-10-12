@@ -7,7 +7,6 @@ use std::sync::{
     Arc,
 };
 
-use super::xml_parser::TallyLedger;
 use super::{
     standard_ledger_catalog::{
         parse_standard_ledger_catalog_response, render_standard_ledger_catalog_request,
@@ -34,11 +33,10 @@ use bridge_tally_protocol::{
     native_outstandings::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
-        render_native_ledger_export_request, render_native_ledger_snapshot_request,
-        render_native_ledger_snapshot_request_for_parents, render_party_ledger_master_request,
-        render_party_ledger_master_request_for_parents, BaseCurrencyName, ForeignCurrencyLedger,
-        LedgerSnapshotEntry, NativeLedgerExportPeriod, NativeLedgerSnapshotPeriod,
-        NativeOutstandingsError,
+        render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
+        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+        BaseCurrencyName, ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
+        NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
     outstandings_shared::{
         parse_company_book_extent_v2, parse_company_ledger_count,
@@ -47,10 +45,8 @@ use bridge_tally_protocol::{
     },
     parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
     parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_ledger_census_slice, parse_native_ledger_source_records_with_evidence,
-    parse_native_party_ledger_master_records_leaving_unparsed,
-    parse_native_party_ledger_master_structure, parse_standard_ledger_catalog,
-    parse_standard_ledger_identity_observation,
+    parse_ledger_census_slice, parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_native_party_ledger_master_structure, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
     TallyTextEncoding, MAX_STANDARD_LEDGER_IDENTITY_ROWS,
@@ -985,7 +981,6 @@ impl GatewayProductModeEvidence {
 
 #[derive(Clone)]
 pub struct TallyClient {
-    config: TallyConfig,
     http: TallyHttpTransport,
     observed_body_bytes: Arc<AtomicU64>,
     observed_encoding: Arc<AtomicU8>,
@@ -1002,6 +997,7 @@ const ENCODING_UTF16_BE_BOM: u8 = 5;
 impl TallyClient {
     /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
     /// shared per-user coordination root.
+    #[cfg(test)]
     pub fn new(config: TallyConfig) -> anyhow::Result<Self> {
         Self::with_wire(config, &WireGateConfig::default())
     }
@@ -1012,7 +1008,6 @@ impl TallyClient {
             .with_wire_gate(wire.gate_for(&config), wire.retry())
             .with_send_observer(crate::request_trail::observer());
         Ok(Self {
-            config,
             http,
             observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1046,10 +1041,6 @@ impl TallyClient {
         }
     }
 
-    pub fn canonical_origin(&self) -> anyhow::Result<String> {
-        canonical_loopback_origin(&self.config)
-    }
-
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
@@ -1062,7 +1053,6 @@ impl TallyClient {
         .with_wire_gate(wire.gate_for(&config), wire.retry())
         .with_send_observer(crate::request_trail::observer());
         Self {
-            config,
             http,
             observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1080,7 +1070,6 @@ impl TallyClient {
                 .with_wire_gate(wire.gate_for(&config), wire.retry())
                 .with_send_observer(crate::request_trail::observer());
         Ok(Self {
-            config,
             http,
             observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1617,45 +1606,6 @@ impl TallyClient {
             company_number: Some(company_number),
             books_from: Some(books_from),
         })
-    }
-
-    pub async fn fetch_ledgers(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        boundary_profile: DateBoundaryProfile,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        let opening_extent = self.fetch_company_book_extent(identity).await?;
-        let period = NativeLedgerExportPeriod::new(
-            boundary_profile,
-            opening_extent.books_from().clone(),
-            opening_extent.last_voucher_date().clone(),
-        )
-        .map_err(|_| {
-            anyhow::anyhow!(
-                "Tally master ledger export period is not supported by the endpoint compatibility profile"
-            )
-        })?;
-        let paired = self
-            .fetch_native_report_paired(render_native_ledger_export_request(
-                identity.display_name(),
-                &period,
-            ))
-            .await?;
-        let (body, _, _) =
-            paired.require_stable(PairedReadValidationError::NativeLedgerCollection)?;
-        let parsed =
-            parse_native_ledger_source_records_with_evidence(&body, identity.company_guid())?;
-        let closing_extent = self.fetch_company_book_extent(identity).await?;
-        if closing_extent != opening_extent {
-            return Err(anyhow::Error::new(
-                PairedReadValidationError::NativeLedgerExtent,
-            ));
-        }
-        Ok(parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect())
     }
 
     /// Reads the identity-bearing ledger master and the existing period-bound
@@ -2206,24 +2156,6 @@ impl TallyClient {
             balance_response_sha256,
             balance_response_bytes,
         })
-    }
-
-    /// Reads the documented standard ledger collection as an explicitly limited
-    /// compatibility catalog. It is not a fallback for Bridge's custom export
-    /// and cannot establish snapshot, voucher, or write capability.
-    pub async fn fetch_standard_ledger_catalog(
-        &self,
-        company: &str,
-        expected_company_guid: &str,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        let xml = self
-            .post_xml(tdl_engine::standard_ledger_catalog_request(company))
-            .await?;
-        Ok(parse_standard_ledger_catalog(
-            &xml,
-            company,
-            expected_company_guid,
-        )?)
     }
 
     pub async fn fetch_company_book_extent(

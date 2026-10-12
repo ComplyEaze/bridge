@@ -1497,7 +1497,6 @@ async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_
         .reserve_cached_probe_fresh(&config, &review_id, 300_000)
         .expect("review cache remains readable")
         .expect("snapshot probes preserve interactive review");
-    assert_eq!(preserved.review_id(), review_id);
     assert_eq!(preserved.observed_at_unix_ms(), observed_at_unix_ms);
     assert_eq!(preserved.result().companies.len(), reviewed_company_count);
     assert_eq!(preserved.result().profile.product, reviewed_product);

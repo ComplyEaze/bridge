@@ -4,7 +4,8 @@
 )]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
-use crate::tally::{ConnectionStatus, TallyProduct};
+use crate::tally::connection::TallyProduct;
+use crate::tally::ConnectionStatus;
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
@@ -704,7 +705,6 @@ fn party_master_currency_assertion_rejects_a_changed_company_extent() {
             names: Vec::new(),
         },
         extent: read_extent.clone(),
-        evidence: RuntimeReadEvidence::empty(),
     }
     .bind_party_ledger_master_assertion(OutstandingsCurrencyAssertion::Inr);
 
@@ -895,12 +895,13 @@ fn future_due_bill_from_raw_native_bytes_reaches_the_statement_source() {
     );
     assert_eq!(statement_rows[0].amount.as_str(), "100.00");
     assert_eq!(statement_rows[0].age_days, None);
-    let statement = crate::reports::party_statement::build_party_statement(
+    let statement = crate::reports::party_statement::build_party_statement_with_ageing_anchor(
         "Synthetic Company",
         as_of.as_str(),
         "Synthetic Party",
         &statement_rows,
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .expect("the future-due bill must build a party statement");
     assert_eq!(statement.bills.len(), 1);
@@ -918,19 +919,25 @@ fn future_due_bill_from_raw_native_bytes_reaches_the_statement_source() {
     let approved_destination = approvals
         .consume(&approval_id, destination.path())
         .expect("consume synthetic approval");
-    let bulk = crate::reports::bulk_party_statement::write_bulk_party_statements(
-        &approved_destination,
-        "Synthetic Company",
-        as_of.as_str(),
-        "xlsx",
-        &statement_rows,
-        &[],
-        |party_statement| {
-            crate::reports::party_statement_xlsx::render_party_statement_xlsx(party_statement)
-                .map_err(|error| error.to_string())
-        },
-    )
-    .expect("a bulk run must write the future-due party statement");
+    let bulk =
+        crate::reports::bulk_party_statement::write_bulk_party_statements_with_ageing_anchor(
+            crate::reports::bulk_party_statement::BulkPartyStatementRequest {
+                destination: &approved_destination,
+                company: "Synthetic Company",
+                as_of_yyyymmdd: as_of.as_str(),
+                format: "xlsx",
+                open_bills: &statement_rows,
+                unallocated_by_party: &[],
+                ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+                render: |party_statement: &crate::reports::party_statement::PartyStatement| {
+                    crate::reports::party_statement_xlsx::render_party_statement_xlsx(
+                        party_statement,
+                    )
+                    .map_err(|error| error.to_string())
+                },
+            },
+        )
+        .expect("a bulk run must write the future-due party statement");
     assert_eq!(bulk.written.len(), 1);
     let workbook = std::fs::File::open(destination.path().join(&bulk.written[0].file_name))
         .expect("the bulk statement file exists");

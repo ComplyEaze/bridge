@@ -564,11 +564,11 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
 
 /// The Journal build sequence, with the preflight read answered by `book`.
 fn build_plans_reading(book: Option<String>) -> Vec<ScenarioPlan> {
-    let mut plans = qualified_import_cycle_plans()[..32].to_vec();
+    let mut plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
     if let Some(book) = book {
-        // probe (2) + first cycle (16) + repeated catalogue (6), then the
-        // preflight read whose responses sit at offsets 1 and 3.
-        for index in [25, 27] {
+        // probe (2) + first cycle (16) + numbering read + repeated catalogue
+        // (6), then the preflight read whose responses sit at offsets 1 and 3.
+        for index in [25 + BUILD_NUMBERING_PLANS, 27 + BUILD_NUMBERING_PLANS] {
             plans[index].fixture = Fixture::SyntheticXml(book.clone());
             plans[index].encoding = WireEncoding::Utf16Le;
         }
@@ -652,7 +652,7 @@ async fn an_amendment_built_against_an_unchanged_book_reuses_the_original_remote
         .build_import_xml(&amendment_payload(&original, "15.00"))
         .await
         .unwrap();
-    assert_eq!(simulator.finish().unwrap().len(), 32);
+    assert_eq!(simulator.finish().unwrap().len(), QUALIFIED_BUILD_REQUESTS);
     let result = &built.payload["result"];
     let batch_id = result["batch_id"].as_str().unwrap();
     assert_ne!(batch_id, original, "an amendment is its own build");
@@ -718,7 +718,8 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
     // Someone changed 12.50 to 13.00 in Tally after Bridge built it. The
     // refusal follows the preflight read, before the closing mode probe.
     let simulator = SequenceSimulator::spawn(
-        build_plans_reading(Some(book_holding(&tag, "13.00")))[..30].to_vec(),
+        build_plans_reading(Some(book_holding(&tag, "13.00")))[..30 + BUILD_NUMBERING_PLANS]
+            .to_vec(),
     )
     .unwrap();
     let server = simulated_server(directory.path(), simulator.address().port());
@@ -739,7 +740,10 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
     );
     assert_eq!(std::fs::read_dir(&imports).unwrap().count(), files_before);
     assert_eq!(server.import_ledger().unwrap().len(), batches_before);
-    assert_eq!(simulator.finish().unwrap().len(), 30);
+    assert_eq!(
+        simulator.finish().unwrap().len(),
+        30 + BUILD_NUMBERING_PLANS
+    );
 }
 
 #[test]
@@ -840,7 +844,8 @@ async fn an_amendment_of_a_voucher_altered_or_never_verified_writes_nothing() {
         let original = ORIGINAL.to_string();
         let tag = import_identity(&original, "txn-001").to_string();
         let simulator = SequenceSimulator::spawn(
-            build_plans_reading(Some(book_holding(&tag, "12.50")))[..30].to_vec(),
+            build_plans_reading(Some(book_holding(&tag, "12.50")))[..30 + BUILD_NUMBERING_PLANS]
+                .to_vec(),
         )
         .unwrap();
         let server = simulated_server(directory.path(), simulator.address().port());
@@ -865,7 +870,10 @@ async fn an_amendment_of_a_voucher_altered_or_never_verified_writes_nothing() {
             .unwrap()
             .contains("Correct the voucher in Tally directly"));
         assert_eq!(std::fs::read_dir(&imports).unwrap().count(), files_before);
-        assert_eq!(simulator.finish().unwrap().len(), 30);
+        assert_eq!(
+            simulator.finish().unwrap().len(),
+            30 + BUILD_NUMBERING_PLANS
+        );
     }
 }
 

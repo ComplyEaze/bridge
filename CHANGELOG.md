@@ -104,6 +104,23 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- `post_import` and `build_import_xml` now refuse a voucher sent without a voucher number into a voucher type whose
+  voucher numbering does not read Automatic, as `import_voucher_numbering_not_automatic`, naming each such voucher
+  type and what was read in `refused_types` (part of #724). Under Manual voucher numbering, a second voucher sent
+  without a number was seen to take a number already used, or to be refused whole. An amendment, which resends its
+  vouchers without numbers, is checked the same way; a voucher that carries its own number (a Journal built for
+  Tally's Import menu) is not. Automatic is admitted whatever its setting for insertion and deletion, which is not
+  read: only "Retain Original Voucher No." was measured, and a batch, Gold and a series not named Default were not.
+- Before approval a post now reads the company's master mark and then the voucher numbering, and compares the mark
+  again just before the post is sent: any master saved in that span, while the person decides included (a ledger
+  created, a voucher type changed), refuses the post as `post_masters_moved` and withdraws the approval; post again.
+  That a voucher type saved on Tally's screen moves the mark was measured once (Automatic to Manual). A voucher type
+  saved during the read itself refuses as `masters_bound_premise_violated` (cause
+  `masters_alter_id_above_master_mark`). A book in Education mode is now refused, as
+  `masters_education_unqualified`, for a post and for a build of any voucher without a number. Each pass of a post
+  sends 20 more requests to Tally before the approval (12 of them POSTs), so a held approval redeemed in a later call
+  sends them again; a build of vouchers without numbers sends 14 more (8 POSTs), under its admission lock.
+
 - **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
   every other compared field matched and it read `posted_verified`, and a divergent voucher never

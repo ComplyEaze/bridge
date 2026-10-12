@@ -242,7 +242,12 @@ or an owner decision to amend the requirement instead:
    gateway changes were measured (§11c.4). Not yet measured: a regroup, an edit made in Tally's own
    screens (the likelier concurrent writer), and whether posting a voucher moves `ALTMSTID` (if it
    does, a busy book refuses more often; it fails closed). A change that does not move the mark is
-   not caught. Any change that does refuses, including unrelated ones; the operator re-runs. During the approval wait, a ledger renamed and a new one created under
+   not caught. Any change that does refuses, including unrelated ones; the operator re-runs.
+   Since bridge#724 the span starts earlier: before approval the post reads the target's master
+   mark, then every voucher type's voucher numbering, and admits only voucher types that read
+   Automatic; the queue then compares that mark with the one its binding reads begin with, so any
+   master saved during the approval wait, a voucher type included, refuses as `post_masters_moved`
+   (a voucher type saved on Tally's screen moving the mark is measured once, Automatic to Manual). During the approval wait, a ledger renamed and a new one created under
    its old name is refused by the catalogue binding's (name, GUID) check (`import_masters_changed`).
    Between build and post, which can be days apart, the build now records each named ledger with
    the GUID its catalogue read bound it to. Before approval, a post refuses any ledger that now

@@ -1915,9 +1915,17 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `import_multi_currency_unsupported` if the company defines more than one
    currency: Bridge does not post into multi-currency books yet. This is checked
    before approval and again inside the queue. A Currency read that names no
-   usable master refuses with `import_base_currency_undetermined`. Inside the
-   queue, a change to the company's masters from just before the catalogue
-   re-read to the last read before the post refuses with `post_masters_moved`
+   usable master refuses with `import_base_currency_undetermined`. A native
+   post sends no voucher number, so before approval ComplyEaze Bridge reads the
+   company's master mark and then each voucher type's voucher numbering
+   (bridge#724): a voucher type that does not read Automatic refuses with
+   `import_voucher_numbering_not_automatic`, naming it in `refused_types`, and
+   `build_import_xml` refuses the same for a voucher without a number. A voucher
+   type saved during that read refuses it with `masters_bound_premise_violated`
+   (cause `masters_alter_id_above_master_mark`): run the call again. A book in
+   Education mode is refused with `masters_education_unqualified`. Inside the
+   queue, a change to the company's masters from that numbering read to the
+   last read before the post refuses with `post_masters_moved`
    (`post_masters_unconfirmed` if it cannot be checked); re-run the post. This
    sees only changes that move the company's master AlterID (`ALTMSTID`):
    measured for ledger renames and creates made through the gateway. A regroup,

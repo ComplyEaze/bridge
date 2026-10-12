@@ -198,6 +198,110 @@ pub(crate) fn check_numbering_premise(
     Ok(())
 }
 
+/// One native collection read as a pair against the master mark `mark`: sized
+/// by the mark first where its kind is, then held to the premise its size was
+/// admitted on. A refusal before or during the request, or an answer Bridge
+/// cannot read, is the outer error; a broken premise is returned inside, so a
+/// caller that reads a closing extent can report a moved book first.
+async fn read_native_rows(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    native: NativeMasterKind,
+    mark: u64,
+    evidence: &mut RuntimeReadEvidence,
+) -> anyhow::Result<Result<NativeMasters, MastersReadError>> {
+    let estimate = sized_before_the_read(native)
+        .then(|| admit_masters_size(native, mark))
+        .transpose()?;
+    let limit = limit_for(native, estimate);
+    let request = render_native_masters_request(native, identity.display_name());
+    let (xml, bytes, hash) = client
+        .fetch_native_report_paired(request.clone())
+        .await?
+        .require_stable(PairedReadValidationError::MastersCollection)?;
+    *evidence = evidence
+        .clone()
+        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+    let masters = parse_native_masters(native, &xml, identity.company_guid())?;
+    Ok(check_masters_premise(&masters.rows, mark, bytes, limit).map(|()| masters))
+}
+
+/// The series-level numbering of the voucher types `rows`, read as a second
+/// pair against the same mark and joined to them: one result per row, in the
+/// rows' order. Errors split as [`read_native_rows`] splits them.
+async fn read_series_numbering(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    mark: u64,
+    rows: Vec<NativeMasterRow>,
+    evidence: &mut RuntimeReadEvidence,
+) -> anyhow::Result<Result<Vec<(NativeMasterRow, VoucherTypeNumbering)>, MastersReadError>> {
+    let request = render_voucher_type_numbering_request(identity.display_name());
+    let (xml, bytes, hash) = client
+        .fetch_native_report_paired(request.clone())
+        .await?
+        .require_stable(PairedReadValidationError::MastersNumberingCollection)?;
+    *evidence = evidence
+        .clone()
+        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+    let numbering = parse_voucher_type_numbering(&xml)?;
+    Ok(
+        check_numbering_premise(&numbering, mark, bytes, budget_bytes())
+            .and_then(|()| {
+                join_series_numbering(&rows, &numbering).map_err(MastersReadError::NumberingJoin)
+            })
+            // The join returns one result for each masters row.
+            .map(|joined| rows.into_iter().zip(joined).collect()),
+    )
+}
+
+/// Each voucher type's series-level numbering, read after the company's
+/// master mark, its masters rows bounded by it (bridge#724). Built only by
+/// [`TallyRuntime::fetch_voucher_type_numbering`], so a value of this type is
+/// always a completed read.
+#[derive(Debug)]
+pub(crate) struct VoucherNumberingRead {
+    company_guid: String,
+    master_mark: u64,
+    types: Vec<(String, VoucherTypeNumbering)>,
+    evidence: RuntimeReadEvidence,
+}
+
+impl VoucherNumberingRead {
+    pub(crate) fn company_guid(&self) -> &str {
+        &self.company_guid
+    }
+
+    /// The company's `ALTMSTID` the read was bounded by, read before it.
+    pub(crate) const fn master_mark(&self) -> u64 {
+        self.master_mark
+    }
+
+    /// Each voucher type's name with its numbering, in the masters order.
+    pub(crate) fn types(&self) -> &[(String, VoucherTypeNumbering)] {
+        &self.types
+    }
+
+    pub(crate) fn evidence(&self) -> &RuntimeReadEvidence {
+        &self.evidence
+    }
+
+    /// A read as a test states it, with no Tally behind it.
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        company_guid: &str,
+        master_mark: u64,
+        types: Vec<(String, VoucherTypeNumbering)>,
+    ) -> Self {
+        Self {
+            company_guid: company_guid.to_string(),
+            master_mark,
+            types,
+            evidence: RuntimeReadEvidence::empty(),
+        }
+    }
+}
+
 impl TallyRuntime {
     /// One kind of master, with the same queue, mode and identity brackets as
     /// the Trial Balance and its book-extent pair: the extent before and after
@@ -234,53 +338,25 @@ impl TallyRuntime {
                                 .master_alter_id_high_water()
                                 .ok_or(OutstandingsError::MasterWitnessAbsent)?
                                 .get();
-                            let estimate = sized_before_the_read(native)
-                                .then(|| admit_masters_size(native, mark))
-                                .transpose()?;
-                            let limit = limit_for(native, estimate);
-                            let request =
-                                render_native_masters_request(native, identity.display_name());
-                            let (xml, bytes, hash) = client
-                                .fetch_native_report_paired(request.clone())
+                            match read_native_rows(&client, &identity, native, mark, &mut evidence)
                                 .await?
-                                .require_stable(PairedReadValidationError::MastersCollection)?;
-                            evidence = evidence
-                                .clone()
-                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                            let masters =
-                                parse_native_masters(native, &xml, identity.company_guid())?;
-                            match check_masters_premise(&masters.rows, mark, bytes, limit) {
+                            {
                                 Err(violated) => Err(violated),
                                 // Voucher types only: the series-level numbering is
                                 // a second collection, read and compared the same
                                 // way, inside the same opening and closing extents.
-                                Ok(()) if native == NativeMasterKind::VoucherTypes => {
-                                    let request = render_voucher_type_numbering_request(
-                                        identity.display_name(),
-                                    );
-                                    let (xml, bytes, hash) = client
-                                        .fetch_native_report_paired(request.clone())
-                                        .await?
-                                        .require_stable(
-                                            PairedReadValidationError::MastersNumberingCollection,
-                                        )?;
-                                    evidence = evidence.clone().combine(
-                                        RuntimeReadEvidence::paired(&request, hash, bytes),
-                                    );
-                                    let numbering = parse_voucher_type_numbering(&xml)?;
-                                    check_numbering_premise(&numbering, mark, bytes, budget_bytes())
-                                        .and_then(|()| {
-                                            join_series_numbering(&masters.rows, &numbering)
-                                                .map_err(MastersReadError::NumberingJoin)
-                                        })
-                                        // The join returns one result for each masters row.
-                                        .map(|joined| {
-                                            MastersRows::VoucherTypes(
-                                                masters.rows.into_iter().zip(joined).collect(),
-                                            )
-                                        })
+                                Ok(masters) if native == NativeMasterKind::VoucherTypes => {
+                                    read_series_numbering(
+                                        &client,
+                                        &identity,
+                                        mark,
+                                        masters.rows,
+                                        &mut evidence,
+                                    )
+                                    .await?
+                                    .map(MastersRows::VoucherTypes)
                                 }
-                                Ok(()) => Ok(MastersRows::Native(masters)),
+                                Ok(masters) => Ok(MastersRows::Native(masters)),
                             }
                         }
                         // The group snapshot as the statements read it: no
@@ -317,6 +393,74 @@ impl TallyRuntime {
                         },
                         extent,
                     ))
+                }
+                .await;
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
+        .await
+    }
+
+    /// The voucher types and their series-level numbering, read as the masters
+    /// tool reads them but bounded by `master_mark`, the company's `ALTMSTID`
+    /// the caller read before this call (bridge#724). A type saved after that
+    /// mark and before the masters pair carries an AlterID above it and
+    /// refuses the read (`masters_bound_premise_violated`, cause
+    /// `masters_alter_id_above_master_mark`). The numbering rows carry no
+    /// AlterID, so a type saved between the masters pair and the numbering
+    /// pair is not seen here; a post sees it as the moved mark it compares
+    /// just before sending. No book-extent pair: its equality also covers
+    /// vouchers, so a voucher entered during the read would refuse it.
+    /// Education is refused, as the masters tool refuses it: the read is not
+    /// measured there.
+    pub(crate) async fn fetch_voucher_type_numbering(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        master_mark: u64,
+    ) -> anyhow::Result<VoucherNumberingRead> {
+        let _lease = self.begin_ordinary_read(&config)?;
+        let identity = identity.clone();
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    let (profile, mode_evidence) = observe_read_boundary(&client).await?;
+                    evidence = mode_evidence;
+                    if profile == DateBoundaryProfile::EducationRestricted {
+                        return Err(MastersReadError::EducationUnqualified.into());
+                    }
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let masters = read_native_rows(
+                        &client,
+                        &identity,
+                        NativeMasterKind::VoucherTypes,
+                        master_mark,
+                        &mut evidence,
+                    )
+                    .await??;
+                    let joined = read_series_numbering(
+                        &client,
+                        &identity,
+                        master_mark,
+                        masters.rows,
+                        &mut evidence,
+                    )
+                    .await??;
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    evidence = evidence
+                        .clone()
+                        .combine(confirm_read_boundary(&client, profile).await?);
+                    Ok(VoucherNumberingRead {
+                        company_guid: identity.company_guid().to_string(),
+                        master_mark,
+                        types: joined
+                            .into_iter()
+                            .map(|(row, numbering)| (row.name, numbering))
+                            .collect(),
+                        evidence: evidence.clone(),
+                    })
                 }
                 .await;
                 result.map_err(|error| with_read_evidence(error, evidence))

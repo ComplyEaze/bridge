@@ -517,6 +517,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
         cycle[..10].to_vec(),
         group_read_plans(),
         cycle[10..16].to_vec(),
+        build_numbering_plans(&[]),
         cycle[4..10].to_vec(),
         group_read_plans(),
         build_preflight_plans(),
@@ -633,7 +634,10 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
         .contains("call verify_import right away"));
     // A cash/bank payload reads the group collection twice, exactly as it reads
     // the catalogue twice, and the whole sequence is consumed.
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 /// bridge#466 through the tool call, not the builder: a three-entry Receipt
@@ -703,7 +707,10 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
     .expect("written import file");
     assert_eq!(xml.matches("<ALLLEDGERENTRIES.LIST>").count(), 3, "{xml}");
     assert!(xml.contains("<PARTYLEDGERNAME>Bridge Nested Debtor WR4</PARTYLEDGERNAME>"));
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 fn demo_batch(voucher_type: &str, dr: &str, cr: &str) -> ImportPayload {
@@ -1307,15 +1314,20 @@ async fn a_contra_leg_outside_cash_and_bank_is_refused_without_writing_a_file() 
 async fn a_journal_only_batch_reads_no_group_collection() {
     // The Journal path keeps the exact request sequence its own qualification
     // was measured on; nothing here widened it.
-    let simulator =
-        SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec()).expect("simulator");
+    let simulator = SequenceSimulator::spawn(
+        qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec(),
+    )
+    .expect("simulator");
     let directory = tempfile::tempdir().unwrap();
     let server = bank_server(directory.path(), simulator.address().port());
     server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
         .await
         .unwrap();
-    assert_eq!(simulator.finish().expect("requests").len(), 32);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        QUALIFIED_BUILD_REQUESTS
+    );
 }
 
 #[tokio::test]
@@ -1505,8 +1517,14 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         json!({"count": 0, "purpose_not_confirmed": 0, "unidentified": 0})
     );
     // the same request sequence was consumed, so the same admission ran
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
-    assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
+    assert_eq!(
+        inline_simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     let read = |directory: &std::path::Path, result: &Value| {
         std::fs::read_to_string(
@@ -2183,7 +2201,10 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
         xml.contains("UPI 612345678901 from NORTHWIND TRADERS"),
         "{xml}"
     );
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 #[test]
@@ -3103,7 +3124,10 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         .join("imports")
         .join(format!("{}.xml", result["batch_id"].as_str().unwrap()))
         .exists());
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     // The suspense ledger under Suspense A/c: the same build, no such warning.
     let simulator = SequenceSimulator::spawn({
@@ -3136,5 +3160,8 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         "{response}"
     );
     assert!(codes_of(&response).is_empty(), "{response}");
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }

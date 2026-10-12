@@ -2274,7 +2274,10 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
         .exists());
         // 50 before the pre-flight volume bound, plus the six legs of the one
         // high-water read verify_import now makes (protocol reference §11c).
-        assert_eq!(simulator.finish().expect("requests").len(), 56);
+        assert_eq!(
+            simulator.finish().expect("requests").len(),
+            56 + BUILD_NUMBERING_PLANS
+        );
     }
 }
 
@@ -2977,8 +2980,8 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         (true, 1, true, false),
         (false, 1, false, false),
     ] {
-        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec())
-            .expect("captured build plan");
+        let simulator =
+            SequenceSimulator::spawn(build_plans_numbered(numbered)).expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(crate::agent::Settings {
             endpoint: TallyEndpointConfig {
@@ -3066,7 +3069,10 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
                 .any(|warning| warning.contains("measured on licensed TallyPrime 7.1 Gold only")),
             "release-evidence warning leaked into a Journal-only batch: {warnings:?}"
         );
-        assert_eq!(simulator.finish().unwrap().len(), 32);
+        assert_eq!(
+            simulator.finish().unwrap().len(),
+            build_plans_numbered(numbered).len()
+        );
     }
 }
 
@@ -3094,8 +3100,15 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         ),
     ];
     for (batch_post_enabled, voucher_count, edit, refusal) in cases {
-        let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec())
-            .expect("captured build plan");
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(voucher_count);
+        edit(&mut input);
+        let numbered = input
+            .vouchers
+            .iter()
+            .all(|voucher| voucher.voucher_number.is_some());
+        let simulator =
+            SequenceSimulator::spawn(build_plans_numbered(numbered)).expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(crate::agent::Settings {
             endpoint: TallyEndpointConfig {
@@ -3110,9 +3123,6 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             writes_enabled: true,
             batch_post_enabled,
         });
-        let mut input = captured_catalogue_payload();
-        input.vouchers.truncate(voucher_count);
-        edit(&mut input);
         let built = server
             .build_import_xml(&serde_json::to_value(input).unwrap())
             .await
@@ -3163,7 +3173,10 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
                 response.value
             );
         }
-        assert_eq!(simulator.finish().unwrap().len(), 32);
+        assert_eq!(
+            simulator.finish().unwrap().len(),
+            build_plans_numbered(numbered).len()
+        );
     }
 }
 
@@ -3255,6 +3268,7 @@ fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
     [
         probe.clone(),
         cycle[..16].to_vec(),
+        build_numbering_plans(&[]),
         cycle[4..10].to_vec(),
         build_preflight_plans(),
         probe.clone(),
@@ -3262,6 +3276,84 @@ fn qualified_import_cycle_plans() -> Vec<ScenarioPlan> {
         cycle[16..].to_vec(),
     ]
     .concat()
+}
+
+/// How many requests the voucher numbering read of a build sends.
+pub(super) const BUILD_NUMBERING_PLANS: usize = 14;
+
+/// The requests of a whole build in [`qualified_import_cycle_plans`]: the
+/// mode probe, the identity and catalogue, the mark, the numbering read, the
+/// catalogue repeat, the preflight and the closing probe.
+pub(super) const QUALIFIED_BUILD_REQUESTS: usize = 32 + BUILD_NUMBERING_PLANS;
+
+/// The voucher numbering read a build makes after its mark (bridge#724): the
+/// mode probe and identity, the voucher-type masters pair, the numbering pair,
+/// and identity and mode again. The types in `manual` read Manual, the rest
+/// Automatic.
+pub(super) fn build_numbering_plans(manual: &[&str]) -> Vec<ScenarioPlan> {
+    build_numbering_plans_probed(manual, &mode_tests::licensed_import_probe())
+}
+
+/// [`build_numbering_plans`], its mode probes answered by `probe`.
+pub(super) fn build_numbering_plans_probed(
+    manual: &[&str],
+    probe: &[ScenarioPlan],
+) -> Vec<ScenarioPlan> {
+    let cycle = import_cycle_plans();
+    let (company, status) = (cycle[0].clone(), cycle[1].clone());
+    let (masters, numbering) = super::numbering_fixtures::numbering_answers(CAPTURED_GUID, manual);
+    let answer = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let mut plans = probe.to_vec();
+    plans.push(company.clone());
+    for body in [masters, numbering] {
+        plans.extend([
+            answer(body.clone()),
+            status.clone(),
+            answer(body),
+            status.clone(),
+        ]);
+    }
+    plans.push(company);
+    plans.extend(probe.iter().cloned());
+    assert_eq!(plans.len(), BUILD_NUMBERING_PLANS);
+    plans
+}
+
+/// The evidence link a build's numbering read starting at `at` folds into the
+/// build's chain: its own chain of the mode probe, the masters pair, the
+/// numbering pair and the closing probe. Returns the request and response
+/// hashes and the bytes counted.
+pub(super) fn numbering_evidence_link(
+    observed: &[tally_protocol_simulator::ObservedRequest],
+    responses: &[Vec<u8>],
+    at: usize,
+) -> (String, String, usize) {
+    let join = |a: &str, b: &str| sha256_hex(format!("{a}:{b}").as_bytes());
+    let request = |i: usize| observed[i].request_body_sha256.clone();
+    let response = |i: usize| sha256_hex(&responses[i]);
+    let probe_request = |i: usize| join(&request(i), &request(i + 1));
+    let probe_response = |i: usize| join(&response(i), &response(i + 1));
+    let chain = |probe: &dyn Fn(usize) -> String, one: &dyn Fn(usize) -> String| {
+        join(
+            &join(&join(&probe(at), &one(at + 3)), &one(at + 7)),
+            &probe(at + 12),
+        )
+    };
+    let bytes = responses[at].len()
+        + responses[at + 1].len()
+        + 2 * responses[at + 3].len()
+        + 2 * responses[at + 7].len()
+        + responses[at + 12].len()
+        + responses[at + 13].len();
+    (
+        chain(&probe_request, &request),
+        chain(&probe_response, &response),
+        bytes,
+    )
 }
 
 fn build_preflight_plans() -> Vec<ScenarioPlan> {
@@ -3783,7 +3875,7 @@ async fn verify_saved_batch_after_dispatch(
     // Six more than before the pre-flight bound: verify_import's high-water read.
     assert_eq!(
         simulator.finish().expect("captured plan requests").len(),
-        56
+        56 + BUILD_NUMBERING_PLANS
     );
     let markdown = fs::read_to_string(&server.current_proof_paths(&batch_id)[1]).unwrap();
     (response, snapshot, markdown)
@@ -3874,7 +3966,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
     // Six more than before the pre-flight bound: verify_import's high-water read.
     assert_eq!(
         simulator.finish().expect("captured plan requests").len(),
-        56
+        56 + BUILD_NUMBERING_PLANS
     );
 }
 
@@ -3909,14 +4001,22 @@ fn master_match_byte_cap_retains_narrow_fold_candidate() {
 /// large and read again as its two days, then replayed day by day.
 fn verify_split_after_refusal_plans() -> Vec<ScenarioPlan> {
     let cycle = qualified_import_cycle_plans();
-    // Legs 0..44 build the batch and open verify_import through its marks.
-    let (company, status, premark) = (cycle[44].clone(), cycle[46].clone(), cycle[39].clone());
-    let readback = cycle[45].fixture.body().into_owned();
+    // Legs 0..44, and the numbering read, build the batch and open
+    // verify_import through its marks.
+    let (company, status, premark) = (
+        cycle[44 + BUILD_NUMBERING_PLANS].clone(),
+        cycle[46 + BUILD_NUMBERING_PLANS].clone(),
+        cycle[39 + BUILD_NUMBERING_PLANS].clone(),
+    );
+    let readback = cycle[45 + BUILD_NUMBERING_PLANS]
+        .fixture
+        .body()
+        .into_owned();
     let first = readback.find("<VOUCHER ").unwrap();
     let second = readback.rfind("<VOUCHER ").unwrap();
     let end = readback.rfind("</COLLECTION>").unwrap();
     let day = |voucher: &str| {
-        let mut plan = cycle[45].clone();
+        let mut plan = cycle[45 + BUILD_NUMBERING_PLANS].clone();
         plan.fixture = Fixture::SyntheticXml(format!(
             "{}{voucher}{}",
             &readback[..first],
@@ -3935,16 +4035,14 @@ fn verify_split_after_refusal_plans() -> Vec<ScenarioPlan> {
             company.clone(),
         ]
     };
-    let mut plans = cycle[..44].to_vec();
+    let mut plans = cycle[..44 + BUILD_NUMBERING_PLANS].to_vec();
     // The whole window, refused as over the transport cap.
     plans.push(company.clone());
-    plans.push(
-        cycle[45]
-            .clone()
-            .with_framing(ResponseFraming::DeclaredContentLength {
-                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
-            }),
-    );
+    plans.push(cycle[45 + BUILD_NUMBERING_PLANS].clone().with_framing(
+        ResponseFraming::DeclaredContentLength {
+            bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+        },
+    ));
     for body in [&day_one, &day_two, &premark, &day_one, &day_two, &premark] {
         plans.extend(paired(body));
     }
@@ -3997,7 +4095,10 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
                 2
             );
         }
-        assert_eq!(simulator.finish().expect("requests").len(), 82);
+        assert_eq!(
+            simulator.finish().expect("requests").len(),
+            82 + BUILD_NUMBERING_PLANS
+        );
     }
 }
 
@@ -4008,7 +4109,10 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
 /// Such a read is not replayed: nothing follows the closing marks.
 fn verify_counted_split_plans() -> Vec<ScenarioPlan> {
     let cycle = qualified_import_cycle_plans();
-    let (company, status) = (cycle[44].clone(), cycle[46].clone());
+    let (company, status) = (
+        cycle[44 + BUILD_NUMBERING_PLANS].clone(),
+        cycle[46 + BUILD_NUMBERING_PLANS].clone(),
+    );
     let counted = |plan: &ScenarioPlan| {
         let mut plan = plan.clone();
         let body = plan.fixture.body().into_owned();
@@ -4018,13 +4122,16 @@ fn verify_counted_split_plans() -> Vec<ScenarioPlan> {
         );
         plan
     };
-    let premark = counted(&cycle[39]);
-    let readback = cycle[45].fixture.body().into_owned();
+    let premark = counted(&cycle[39 + BUILD_NUMBERING_PLANS]);
+    let readback = cycle[45 + BUILD_NUMBERING_PLANS]
+        .fixture
+        .body()
+        .into_owned();
     let first = readback.find("<VOUCHER ").unwrap();
     let second = readback.rfind("<VOUCHER ").unwrap();
     let end = readback.rfind("</COLLECTION>").unwrap();
     let day = |voucher: &str| {
-        let mut plan = cycle[45].clone();
+        let mut plan = cycle[45 + BUILD_NUMBERING_PLANS].clone();
         plan.fixture = Fixture::SyntheticXml(format!(
             "{}{voucher}{}",
             &readback[..first],
@@ -4043,20 +4150,18 @@ fn verify_counted_split_plans() -> Vec<ScenarioPlan> {
             company.clone(),
         ]
     };
-    let mut plans = cycle[..44].to_vec();
+    let mut plans = cycle[..44 + BUILD_NUMBERING_PLANS].to_vec();
     // verify_import's own marks read: the book is counted from here.
-    plans[39] = counted(&cycle[39]);
-    plans[41] = counted(&cycle[41]);
+    plans[39 + BUILD_NUMBERING_PLANS] = counted(&cycle[39 + BUILD_NUMBERING_PLANS]);
+    plans[41 + BUILD_NUMBERING_PLANS] = counted(&cycle[41 + BUILD_NUMBERING_PLANS]);
     // The census of the window, then the whole window, refused as over the cap.
-    plans.extend(paired(&cycle[45]));
+    plans.extend(paired(&cycle[45 + BUILD_NUMBERING_PLANS]));
     plans.push(company.clone());
-    plans.push(
-        cycle[45]
-            .clone()
-            .with_framing(ResponseFraming::DeclaredContentLength {
-                bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
-            }),
-    );
+    plans.push(cycle[45 + BUILD_NUMBERING_PLANS].clone().with_framing(
+        ResponseFraming::DeclaredContentLength {
+            bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+        },
+    ));
     for body in [&day_one, &day_two, &premark] {
         plans.extend(paired(body));
     }
@@ -4110,7 +4215,10 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         persisted["evidence"]["voucher_read_corroboration"],
         json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
     );
-    assert_eq!(simulator.finish().expect("requests").len(), 44 + 6 + 2 + 18);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS + 6 + 2 + 18
+    );
 }
 
 // bridge#626: a ledger whose stored name ends in CR LF. The catalogue carries
@@ -4818,4 +4926,185 @@ fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
         read_masters_record(&path),
         Some(json!({"state": MASTERS_CHECK_PENDING}))
     );
+}
+
+// bridge#724: a voucher written without a number is numbered by its voucher
+// type, so the build reads each such voucher's type after its mark and writes
+// nothing unless every one reads Automatic.
+
+/// The requests a build sends up to and including its numbering read.
+fn through_build_numbering(manual: &[&str]) -> Vec<ScenarioPlan> {
+    let cycle = import_family_cycle_plans();
+    [
+        mode_tests::licensed_import_probe(),
+        cycle[..16].to_vec(),
+        build_numbering_plans(manual),
+    ]
+    .concat()
+}
+
+/// A whole build's requests: with no numbering read when every voucher carries
+/// its own number.
+fn build_plans_numbered(numbered: bool) -> Vec<ScenarioPlan> {
+    if numbered {
+        build_without_numbering()
+    } else {
+        qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec()
+    }
+}
+
+/// A whole build with no numbering read: the requests of a batch whose every
+/// voucher carries its own number.
+fn build_without_numbering() -> Vec<ScenarioPlan> {
+    let cycle = import_family_cycle_plans();
+    let probe = mode_tests::licensed_import_probe();
+    [
+        probe.clone(),
+        cycle[..16].to_vec(),
+        cycle[4..10].to_vec(),
+        build_preflight_plans(),
+        probe,
+    ]
+    .concat()
+}
+
+fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
+    Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port,
+        },
+        data_dir: directory.into(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: false,
+    })
+}
+
+fn written_files(directory: &std::path::Path) -> usize {
+    fs::read_dir(directory.join("imports"))
+        .map(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "xml"))
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+#[tokio::test]
+async fn a_numberless_journal_into_a_manual_journal_type_is_refused_and_no_file_is_written() {
+    let plans = through_build_numbering(&["Journal"]);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    let built = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+        .unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(result["reason"], "import_voucher_numbering_not_automatic");
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"not_prevented"}}])
+    );
+    assert!(result["next_step"]
+        .as_str()
+        .unwrap()
+        .starts_with("No file was written."));
+    assert_eq!(simulator.finish().unwrap().len(), expected);
+    assert_eq!(written_files(directory.path()), 0);
+}
+
+#[tokio::test]
+async fn a_journal_carrying_its_own_number_is_built_without_the_numbering_read() {
+    let simulator = SequenceSimulator::spawn(build_without_numbering()).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    input.vouchers[0].voucher_number = Some("TEST-1".into());
+    let built = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        built.payload["result"]["voucher_count"], 1,
+        "{}",
+        built.payload
+    );
+    simulator.finish().unwrap();
+}
+
+#[tokio::test]
+async fn a_numbered_journal_beside_a_numberless_one_still_reads_the_numbering() {
+    let plans = through_build_numbering(&["Journal"]);
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(2);
+    input.vouchers[0].voucher_number = Some("TEST-1".into());
+    let built = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        built.payload["result"]["reason"], "import_voucher_numbering_not_automatic",
+        "{}",
+        built.payload
+    );
+    assert_eq!(written_files(directory.path()), 0);
+}
+
+#[tokio::test]
+async fn a_build_in_education_mode_is_refused_by_the_numbering_read() {
+    // The numbering read's own mode probe reads the book in Education.
+    let mut plans = through_build_numbering(&[]);
+    let at = plans.len() - BUILD_NUMBERING_PLANS;
+    plans.truncate(at);
+    plans.extend(mode_tests::import_profile_probe("education"));
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    let Err(failure) = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+    else {
+        panic!("a build in Education is refused")
+    };
+    assert_eq!(failure.code, "masters_education_unqualified");
+    assert_eq!(written_files(directory.path()), 0);
+}
+
+#[tokio::test]
+async fn a_blank_voucher_number_counts_as_none_for_the_numbering_check() {
+    let plans = through_build_numbering(&["Journal"]);
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    input.vouchers[0].voucher_number = Some("  ".into());
+    let Ok(built) = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+    else {
+        panic!("the build reaches the numbering read")
+    };
+    assert_eq!(
+        built.payload["result"]["reason"], "import_voucher_numbering_not_automatic",
+        "{}",
+        built.payload
+    );
+    assert_eq!(written_files(directory.path()), 0);
 }

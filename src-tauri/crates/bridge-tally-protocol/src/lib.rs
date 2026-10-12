@@ -2360,7 +2360,6 @@ fn is_primary_export_row(name: &[u8]) -> bool {
         b"VOUCHERTYPE".as_slice(),
         b"LEDGER".as_slice(),
         b"VOUCHER".as_slice(),
-        b"LEDGERPERIODBALANCE".as_slice(),
     ]
     .into_iter()
     .any(|candidate| name.eq_ignore_ascii_case(candidate))
@@ -2835,13 +2834,13 @@ fn validate_only_attributes(
 ) -> anyhow::Result<()> {
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|_| anyhow::anyhow!("Tally period report attributes were malformed"))?;
+        let attribute =
+            attribute.map_err(|_| anyhow::anyhow!("Tally record attributes were malformed"))?;
         if !allowed
             .iter()
             .any(|key| attribute.key.as_ref().as_bytes().eq_ignore_ascii_case(key))
         {
-            anyhow::bail!("Tally period report contained an unexpected attribute");
+            anyhow::bail!("Tally record contained an unexpected attribute");
         }
         if !seen.insert(attribute.key.as_ref().as_bytes().to_ascii_lowercase()) {
             anyhow::bail!("Tally response repeated a case-insensitive attribute");

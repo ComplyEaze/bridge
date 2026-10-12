@@ -434,9 +434,9 @@ pub(super) struct BuildEntry {
     pub(super) side: EntrySide,
 }
 
-/// A full batch record, cut down to what the facts need: its Contras and its
-/// statement rows. Narrations and every other voucher are left behind, since
-/// the journal can hold years of batches.
+/// A full batch record, cut down to what the facts need: its Contras, its
+/// Journals and its statement rows. Narrations and every other voucher are left
+/// behind, since the journal can hold years of batches.
 #[derive(Clone, Debug)]
 pub(super) struct BuildLine {
     pub(super) batch_id: String,
@@ -467,13 +467,17 @@ impl BuildLine {
 }
 
 impl BuildVoucher {
-    /// The vouchers a transfer can be made of: Contras and statement rows.
+    /// The vouchers a transfer can be made of: Contras, Journals (Tally
+    /// accepted a Journal between two bank ledgers at its default settings,
+    /// measured on one synthetic book) and statement rows.
     pub(super) fn of_vouchers(vouchers: &[ImportVoucher]) -> Vec<Self> {
         vouchers
             .iter()
             .filter(|voucher| {
-                voucher.voucher_type == VoucherType::Contra
-                    || is_statement_txn_id(&voucher.bridge_txn_id)
+                matches!(
+                    voucher.voucher_type,
+                    VoucherType::Contra | VoucherType::Journal
+                ) || is_statement_txn_id(&voucher.bridge_txn_id)
             })
             .map(|voucher| Self {
                 txn_id: voucher.bridge_txn_id.clone(),
@@ -953,12 +957,22 @@ fn lineage_facts(
                 found.without_facts += 1;
                 uncertain.insert(txn);
                 unseen.insert(txn);
+            } else if voucher.kind == VoucherType::Journal {
+                // No facts entry ever records a Journal, and one can move money
+                // between two banks. A lineage Bridge built cannot reach this
+                // (the statement parser writes no Journal, and an amendment adds
+                // no row and changes no type); it guards a journal written
+                // otherwise.
+                unseen.insert(txn);
             }
             continue;
         };
         let Some((legs, amount)) = contra_legs(batch, voucher, bank_ledger)? else {
+            // its ledgers need not include the statement's bank: they are
+            // unseen like a Contra without an entry
             found.left_out += 1;
             uncertain.insert(txn);
+            unseen.insert(txn);
             continue;
         };
         found.contras.push(DecidedContra {
@@ -1004,19 +1018,70 @@ fn lineage_facts(
 /// The days no window may vouch for, by endpoint and bank ledger; `None` is any.
 type Blocked = BTreeMap<(Option<EndpointOrigin>, Option<LedgerGuid>), BTreeSet<TallyDate>>;
 
+/// The ledgers some statement of the company was read for. A window covers
+/// only such a ledger, and a skipped row is on such a ledger, so a voucher
+/// moving a skipped row's money to a bank whose window could vouch for its
+/// absence names two of them.
+fn statement_banks<'a>(
+    batches: &[Batch],
+    skip_records: impl Iterator<Item = &'a SkipOnlyRecord>,
+) -> BTreeSet<LedgerGuid> {
+    let mut banks: BTreeSet<LedgerGuid> = batches
+        .iter()
+        .filter_map(|batch| batch.facts.as_ref())
+        .map(|(facts, _)| facts.bank_ledger.clone())
+        .collect();
+    banks.extend(
+        skip_records.map(|record| LedgerGuid::new(record.statement.bank_ledger_guid.as_str())),
+    );
+    banks
+}
+
 /// A batch of a lineage that holds no facts (built inline, or by a release
 /// before them) can still book a transfer: a withdrawn skip posted as a
-/// Contra, a Contra keyed by hand. Each Contra and statement row it holds is
-/// one the facts cannot see, so its date, and for a statement row the date its
-/// id carries, are not cover for any ledger it names; where the endpoint or a
+/// Contra, a Contra keyed by hand, a Journal between two banks. Each Contra and
+/// statement row it holds, and each Journal that may be a transfer, is one the
+/// facts cannot see, so its date, and for a statement row the date its id
+/// carries, are not cover for any ledger it names; where the endpoint or a
 /// ledger is not bound, for any.
-fn block_unseen(batch: &Batch, blocked: &mut Blocked) {
+fn block_unseen(batch: &Batch, banks: &BTreeSet<LedgerGuid>, blocked: &mut Blocked) {
     for voucher in &batch.line.vouchers {
-        block_voucher(batch, voucher, blocked);
+        block_voucher(batch, voucher, banks, blocked);
     }
 }
 
-fn block_voucher(batch: &Batch, voucher: &BuildVoucher, blocked: &mut Blocked) {
+fn block_voucher(
+    batch: &Batch,
+    voucher: &BuildVoucher,
+    banks: &BTreeSet<LedgerGuid>,
+    blocked: &mut Blocked,
+) {
+    let ledgers: Vec<Option<LedgerGuid>> = voucher
+        .entries
+        .iter()
+        .map(|entry| {
+            batch
+                .line
+                .ledger_identities
+                .iter()
+                .flatten()
+                .find(|bound| bound.name == entry.ledger)
+                .map(|bound| LedgerGuid::new(bound.guid.as_str()))
+        })
+        .collect();
+    // A Journal with one bank leg (charges, interest, TDS) is no transfer: it
+    // blocks only when it names two statement banks, or a ledger not bound,
+    // which may be one.
+    if voucher.kind == VoucherType::Journal {
+        let named: BTreeSet<&LedgerGuid> = ledgers
+            .iter()
+            .flatten()
+            .filter(|ledger| banks.contains(*ledger))
+            .collect();
+        if named.len() < 2 && ledgers.iter().all(Option::is_some) {
+            return;
+        }
+    }
     let endpoint = batch
         .line
         .endpoint_origin
@@ -1028,14 +1093,7 @@ fn block_voucher(batch: &Batch, voucher: &BuildVoucher, blocked: &mut Blocked) {
         // digits that are not a date add nothing: the voucher's date blocks.
         days.extend(TallyDate::parse(voucher.txn_id[3..11].to_string()).ok());
     }
-    for entry in &voucher.entries {
-        let ledger = batch
-            .line
-            .ledger_identities
-            .iter()
-            .flatten()
-            .find(|bound| bound.name == entry.ledger)
-            .map(|bound| LedgerGuid::new(bound.guid.as_str()));
+    for ledger in ledgers {
         blocked
             .entry((endpoint.clone(), ledger))
             .or_default()
@@ -1080,10 +1138,16 @@ pub(super) fn build_transfer_facts(
     let mut contras_not_two_leg = 0;
     let mut contras_without_facts = 0;
     let mut blocked = Blocked::new();
+    let banks = statement_banks(
+        &batches,
+        skip_records
+            .iter()
+            .filter(|record| record.company_guid.eq_ignore_ascii_case(company_guid)),
+    );
     for members in lineages.values() {
         if members.iter().all(|&at| batches[at].facts.is_none()) {
             for &at in members {
-                block_unseen(&batches[at], &mut blocked);
+                block_unseen(&batches[at], &banks, &mut blocked);
             }
             continue;
         }
@@ -1092,6 +1156,7 @@ pub(super) fn build_transfer_facts(
             block_voucher(
                 &batches[at],
                 &batches[at].line.vouchers[position],
+                &banks,
                 &mut blocked,
             );
         }

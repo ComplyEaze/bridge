@@ -1180,6 +1180,174 @@ fn a_contra_the_facts_cannot_see_in_a_lineage_that_holds_facts_blocks_the_ledger
     assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
 }
 
+/// A Journal between two bank ledgers, which Tally accepts at its default
+/// settings, under an id no statement gave.
+fn bank_journal(to: &str, from: &str) -> Value {
+    voucher(
+        "txn-1",
+        "Journal",
+        &[(to, "500.00", "Dr"), (from, "500.00", "Cr")],
+        "20260901",
+    )
+}
+
+#[test]
+fn a_journal_between_two_banks_in_a_batch_without_facts_blocks_the_day_it_names() {
+    for status in ["built", "posted_verified"] {
+        let inline = build(152).voucher(bank_journal(N2, N1)).status(status);
+        assert_eq!(
+            beside_bank_two(inline),
+            SkipState::NotEstablished,
+            "{status}"
+        );
+    }
+}
+
+#[test]
+fn a_journal_in_a_lineage_that_holds_facts_blocks_the_ledgers_it_names() {
+    // the Journal's batch, amended by a statement build of Bank Three whose
+    // facts do not name it: the lineage now holds facts. Bridge builds neither
+    // (a batch mixing a Journal with bank vouchers is refused); a journal
+    // written otherwise can hold them
+    let inline = build(153)
+        .voucher(contra(&st(8), N3, N1, "9.00"))
+        .voucher(bank_journal(N2, N1));
+    let amendment = build(154)
+        .amends(153)
+        .voucher(contra(&st(8), N3, N1, "9.00"))
+        .voucher(bank_journal(N2, N1))
+        .facts(facts(B3).contra(&st(8), None));
+    let verified = bank_two_statement(155, "posted_verified");
+    let journal = Journal::default()
+        .batch(&verified)
+        .batch(&inline)
+        .batch(&amendment);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+}
+
+#[test]
+fn a_journal_naming_one_statement_bank_blocks_nothing() {
+    // Bank Three is a bank, but no statement of it was read
+    let other_bank = build(156).voucher(bank_journal(N2, N3));
+    assert_eq!(beside_bank_two(other_bank), SkipState::NotFound);
+}
+
+/// A Journal with one bank leg: charges on `bank`, against an expense.
+fn charges_journal(bank: &str) -> Value {
+    voucher(
+        "txn-1",
+        "Journal",
+        &[("Bank Charges", "10.00", "Dr"), (bank, "10.00", "Cr")],
+        "20260901",
+    )
+}
+
+/// `build`, with the expense of [`charges_journal`] bound as well.
+fn charges_bound(build: Build) -> Build {
+    build.identities(Some(vec![
+        (N1, B1),
+        (N2, B2),
+        (N3, B3),
+        ("Bank Charges", "guid-bank-charges"),
+    ]))
+}
+
+#[test]
+fn a_journal_with_one_bank_leg_leaves_a_covering_window_whole() {
+    // bank charges on the bank whose window the skip relies on
+    let charges = charges_bound(build(157).voucher(charges_journal(N2)));
+    assert_eq!(beside_bank_two(charges), SkipState::NotFound);
+}
+
+#[test]
+fn a_journal_naming_a_ledger_its_build_did_not_bind_blocks_every_ledger() {
+    // the expense is not bound, so it may be a bank; Bank Three has no statement
+    let charges = build(158).voucher(charges_journal(N3));
+    assert_eq!(beside_bank_two(charges), SkipState::NotEstablished);
+}
+
+#[test]
+fn a_bank_whose_only_statement_is_a_skip_only_record_counts_for_a_journal() {
+    // Bank Two's window comes from a skip-only record alone
+    let record = skip_record(
+        2,
+        ENDPOINT,
+        "2026-09-01T11:00:00Z",
+        facts(B2)
+            .window("20260901", "20260930")
+            .skip(skip_row(&st(9), "1.00", B3, None)),
+    );
+    let journal = Journal::default().batch(&build(159).voucher(bank_journal(N2, N1)));
+    assert_eq!(
+        state_given(journal, &skip_file(&[record])),
+        SkipState::NotEstablished
+    );
+}
+
+#[test]
+fn a_journal_amended_off_a_bank_still_blocks_the_banks_it_named() {
+    // without facts: the amendment moves the Journal to one bank leg
+    let first = build(160).voucher(bank_journal(N2, N1));
+    let amendment = charges_bound(build(161).amends(160).voucher(charges_journal(N1)));
+    let verified = bank_two_statement(162, "posted_verified");
+    let journal = Journal::default()
+        .batch(&verified)
+        .batch(&first)
+        .batch(&amendment);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+    // in a lineage that holds facts, the deciding build names one bank only
+    let first = build(163)
+        .voucher(contra(&st(8), N3, N1, "9.00"))
+        .voucher(bank_journal(N2, N1));
+    let amendment = charges_bound(
+        build(164)
+            .amends(163)
+            .voucher(contra(&st(8), N3, N1, "9.00"))
+            .voucher(charges_journal(N1))
+            .facts(facts(B3).contra(&st(8), None)),
+    );
+    let verified = bank_two_statement(165, "posted_verified");
+    let journal = Journal::default()
+        .batch(&verified)
+        .batch(&first)
+        .batch(&amendment);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+}
+
+#[test]
+fn a_contra_amended_into_a_journal_blocks_the_ledgers_the_journal_names() {
+    // Bridge refuses an amendment that changes a type; a journal written
+    // otherwise can hold one. Row 11 keeps its facts entry from the original.
+    let first = build(166)
+        .voucher(contra(&st(8), N3, N1, "9.00"))
+        .voucher(contra(&st(11), N3, N1, "9.00"))
+        .facts(facts(B3).contra(&st(8), None).contra(&st(11), None));
+    let amendment = build(167).amends(166).voucher(voucher(
+        &st(11),
+        "Journal",
+        &[(N2, "500.00", "Dr"), (N1, "500.00", "Cr")],
+        "20260901",
+    ));
+    let verified = bank_two_statement(168, "posted_verified");
+    let journal = Journal::default()
+        .batch(&verified)
+        .batch(&first)
+        .batch(&amendment);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+}
+
+#[test]
+fn a_contra_left_out_of_its_statement_blocks_the_ledgers_it_names() {
+    // a Contra of Bank Three's statement that names neither leg of it
+    let third_bank = build(169)
+        .voucher(contra(&st(12), N2, N1, "500.00"))
+        .facts(facts(B3).contra(&st(12), None))
+        .status("posted_verified");
+    let verified = bank_two_statement(170, "posted_verified");
+    let journal = Journal::default().batch(&verified).batch(&third_bank);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+}
+
 #[test]
 fn a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names() {
     let other_ledgers = build(145).voucher(contra(&st(9), N3, N1, "500.00"));

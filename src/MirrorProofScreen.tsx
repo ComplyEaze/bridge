@@ -597,7 +597,7 @@ export function MirrorProofScreen({
                     <td>{formatIdentifier(proof.outcome)} · {formatIdentifier(proof.verification_state)} · Local hash check: {proof.integrity_state === "entry_hash_valid" ? "passed" : formatIdentifier(proof.integrity_state)}</td>
                     <td>{proof.accepted_records} / {proof.rejected_records}</td>
                     <td><code title="Local consistency commitment; not authenticity">{proof.proof_sha256.slice(0, 12)}...</code> <CopyTokenButton value={proof.proof_sha256} label="local proof hash" /></td>
-                    <td>{proof.gap_codes.length ? proof.gap_codes.map(formatIdentifier).join(", ") : "None declared"}</td>
+                    <td>{proof.gap_codes.length ? proof.gap_codes.map((code) => guidanceForGap(code).title).join(", ") : "None declared"}</td>
                     <td>{proof.warning_codes.length ? proof.warning_codes.map(formatIdentifier).join(", ") : "None declared"}</td>
                     <td><button className="secondary-action" disabled={proofPreviewSelection?.proofId === proof.selection_token} onClick={() => void previewRedactedProof(proof)}>{proofPreviewSelection?.proofId === proof.selection_token ? "Loading/selected" : "Preview"}</button></td>
                   </tr>

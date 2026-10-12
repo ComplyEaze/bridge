@@ -241,3 +241,45 @@ test("a probe whose core read stopped names the refusal by its title in Pack rea
   await act(async () => root.unmount());
   host.remove();
 });
+
+test("the proof ledger's Gaps column names each gap by its Gap Map title", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const fixture = props(async () => []);
+  fixture.result.snapshotStartOutcomeUnknown = false;
+  fixture.result.syncEvidence = {
+    latest_proofs: [{
+      integrity_state: "entry_hash_valid",
+      run_id: "run",
+      selection_token: "token",
+      proof_sha256: "0".repeat(64),
+      pack_id: "core_accounting",
+      outcome: "failed",
+      verification_state: "unverified",
+      started_at_unix_ms: 1,
+      completed_at_unix_ms: 2,
+      accepted_records: 0,
+      rejected_records: 0,
+      provenance_unavailable_records: 0,
+      gap_codes: ["company_book_extent_drifted", "some_unlisted_code"],
+      warning_codes: [],
+    }],
+    latest_reconciliation_mismatches: [],
+    incremental: {
+      execution_enabled: false,
+      affirmative_exact_capability_receipts: 0,
+      establishment_receipts: 0,
+      active_checkpoint_heads: 0,
+      state: "execution_not_enabled",
+      fallback_warning_code: "none",
+    },
+    core_accounting_freshness: { state: "never_verified", checkpoint_present: false, proof_present: true },
+  };
+  fixture.result.latestProof = fixture.result.syncEvidence.latest_proofs[0];
+  await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
+  const cells = [...host.querySelectorAll("td")].map((cell) => cell.textContent);
+  expect(cells).toContain("Tally gave two different answers to the same read, Some unlisted code");
+  await act(async () => root.unmount());
+  host.remove();
+});

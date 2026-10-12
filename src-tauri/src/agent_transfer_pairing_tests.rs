@@ -327,6 +327,19 @@ fn transfer_pairing_a_second_contra_makes_the_skip_ambiguous_with_both_listed() 
 }
 
 #[test]
+fn transfer_pairing_round_one_takes_only_the_other_banks_statement() {
+    // a Contra from b2's own statement carrying the same reference is that
+    // statement's own row, never the other side of a b2 skip
+    let mut s = skip("st-1");
+    s.reference = Some(reference("600000000001"));
+    let mut own_statement = contra("batch-1", "t1");
+    own_statement.reference = Some(reference("600000000001"));
+    own_statement.statement_bank_ledger = ledger("b2");
+    let view = transfer_pairing_view(&[s], &[own_statement], &january_covered(), 0);
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+}
+
+#[test]
 fn transfer_pairing_round_two_takes_only_the_other_banks_statement() {
     // a Contra built from b2's own statement is not the other side of a b2 skip
     let mut own_statement = contra("batch-1", "t1");

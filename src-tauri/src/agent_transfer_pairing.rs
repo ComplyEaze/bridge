@@ -14,13 +14,14 @@
 //!   exactly the skip's own bank ledger and its other ledger on opposite sides,
 //!   the same direction on the skip's own bank ledger (a withdrawal skipped from
 //!   its bank is a Contra that credits that bank, so a return transfer never
-//!   matches), equal amounts, and a Contra from outside the skip's lineage.
+//!   matches), equal amounts, and a Contra from outside the skip's lineage and
+//!   built from the OTHER bank's statement (one from the skip's own statement
+//!   is that statement's own row).
 //! * Round 1, by reference: both rows carry a reference and they are equal.
 //!   A pair forms only where the skip and the Contra each have exactly one such
 //!   edge.
 //! * Round 2, without a reference: on what round 1 left, one side has no
-//!   reference, the Contra comes from the OTHER bank's statement, and the dates
-//!   are within k days. A pair forms only where both ends have exactly one such
+//!   reference, and the dates are within k days. A pair forms only where both ends have exactly one such
 //!   edge. A row that took part in round 1 without pairing does not pair here,
 //!   although it still counts against the rows that could.
 //!
@@ -287,8 +288,8 @@ pub(crate) fn transfer_pairing_view(
         }
     }
 
-    // Round 2: on what round 1 left, one side without a reference, the other
-    // bank's statement, the dates within k. Rows that round 1 contested count
+    // Round 2: on what round 1 left, one side without a reference, the dates
+    // within k. Rows that round 1 contested count
     // against the others here but cannot pair themselves.
     let mut loose_edges: Vec<Vec<usize>> = vec![Vec::new(); skips.len()];
     let mut contra_loose_edges: Vec<Vec<usize>> = vec![Vec::new(); contras.len()];
@@ -396,16 +397,18 @@ fn side_on<'a>(contra: &'a ContraFact, ledger: &LedgerGuid) -> Option<&'a Side> 
 
 /// The structural edge: the same bucket (checked by the caller's lookup), the
 /// Contra's side on the skip's own bank ledger the one its direction needs,
-/// equal amounts, and another lineage.
+/// equal amounts, another lineage, and a Contra built from the OTHER bank's
+/// statement: one from the skip's own statement is that statement's own row,
+/// whatever reference it carries.
 fn is_edge(skip: &SkipFact, contra: &ContraFact) -> bool {
     side_on(contra, &skip.key.bank_ledger) == Some(&skip.direction.contra_side())
         && skip.amount.numeric_eq(&contra.amount)
         && skip.lineage != contra.lineage
+        && contra.statement_bank_ledger != skip.key.bank_ledger
 }
 
 fn is_loose_edge(skip: &SkipFact, contra: &ContraFact, k_days: u32) -> bool {
     (skip.reference.is_none() || contra.reference.is_none())
-        && contra.statement_bank_ledger != skip.key.bank_ledger
         && within(&skip.date, &contra.date, k_days)
 }
 

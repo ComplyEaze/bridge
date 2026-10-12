@@ -145,6 +145,31 @@ All GUIDs share the company prefix f107e523-3d6b-4516-bd24-5b1a14498fa6. Every c
 - **NAME attributes after the restart:** since Tally's restart, R-V3 and R-PARTY carry the phase-3 spellings in the NAME attribute too (for example "MLAB CASE TARGET", "MLab  Space Target"). So the stale attribute seen within the phase-3 session was session state, not stored data.
 - R-V3 rows went 10 → 18. phase4-parse.txt holds the per-write parse.
 
+## Phase 5: L-NP (new sitting after GO; run sheet @ 47aed0a8f149476b803378ef631d529a199d8b42; 5 writes, 18 reads, 14:59:56Z-15:02:05Z)
+- **Setup:**
+  - The run sheet at 47aed0a8 only adds Q-0, Q-r, Q-a, Q-c0, Q-c, phase 5 of the README and 5 SHA256 lines. 26/26 hashes match, and the 21 earlier files are byte-identical.
+  - tally_status at 14:59:56Z showed BRIDGE MASTERS LAB ALONE.
+  - The preconditions held (m1-M1-DUTY-CESS-after R-V3): Fresh Party on Sundry Creditors / Yes; Exact Target on Sundry Creditors / Yes; Alias Target on Sundry Debtors / No with 2 aliases; no Probe ledger.
+- **The run:**
+  - Each request was sent once in the run sheet's order, with q-before before Q-a. Every send returned curl exit 0 and HTTP 200.
+  - No dialog. R-MARKS returned 1 COMPANY row every time.
+
+| Case | Create name (parent, bill-wise) | Counters | ALTMSTID | R-V3 before → after (GUID, ALTERID, PARENT, ISBILLWISEON, NAME attribute, NAME.LIST) |
+|---|---|---|---|---|
+| Q-0 | MLab Exact Target (Sundry Debtors, No) | ALTERED 1 (control OK) | 231 → 232 | …ce: 218, Sundry Creditors, Yes → 232, Sundry Debtors, No; attribute "MLab Exact Target"; [MLab Exact Target] |
+| Q-r | MLab Alias Target with REMOTEID "MLAB-Q-R-REMOTEID-0001" (Sundry Creditors, Yes) | ALTERED 1, no LINEERROR | 232 → 233 | …cf: 211, Sundry Debtors, No → 233, Sundry Creditors, Yes; attribute "MLab Alias Target"; [MLab Alias Target, MLab Alias Name, MLab Alias Two] (aliases kept) |
+| Q-a | MLab FreshParty (Sundry Debtors, No) | ALTERED 1 | 233 → 234 | …d5: 217, Sundry Creditors, Yes → 234, Sundry Debtors, No; attribute "MLab Fresh Party"; NAME.LIST now [MLab FreshParty] |
+| Q-c0 | MLab Probe Pvt. Ltd. (Sundry Creditors, Yes) | CREATED 1 (control OK) | 234 → 235 | none → new …df: 235, Sundry Creditors, Yes; [MLab Probe Pvt. Ltd.] |
+| Q-c | MLab Probe Pvt Ltd (Sundry Debtors, No) | ALTERED 1 | 235 → 236 | …df: 235 → 236, Sundry Debtors, No; attribute "MLab Probe Pvt. Ltd."; NAME.LIST now [MLab Probe Pvt Ltd] |
+
+- **A removed space folds (Q-a).** "MLab FreshParty" altered "MLab Fresh Party".
+- **Removed full stops fold (Q-c).** "MLab Probe Pvt Ltd" altered "MLab Probe Pvt. Ltd.".
+  - In both cases the GUID was kept, and the parent and bill-wise were overwritten.
+  - The NAME.LIST took the incoming spelling, while the row's NAME attribute kept the old one within this session (as in phase 3).
+- **An unknown REMOTEID does not stop the name match (Q-r).** The Create altered the existing ledger found by name, with no error, and the aliases were kept.
+  - Whether Tally stored the REMOTEID is **not established**. R-V3 does not fetch REMOTEID, and the row shows none. No other read was in the grant.
+- R-V3 rows went 18 → 19 (Q-c0). phase5-parse.txt holds the per-case parse.
+
 ## Masking
 The run sheet's synthetic GSTINs (company, party and M1 party) are written as the same-length mask ZZZZZZZZZZZZZZZ.
 - **Text:** the mask is used in log.txt, the phase parse files and this report. The published log.txt also drops one scheduling note from its first line.

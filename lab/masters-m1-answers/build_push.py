@@ -39,13 +39,14 @@ def text(n, extra=None, drop=None):
 k_log = text('log.txt', drop=r' \(item [^)]*\)')
 k_p3 = text('phase3-parse.txt')
 k_p4 = text('phase4-parse.txt') if os.path.exists(os.path.join(SRC, 'phase4-parse.txt')) else 0
+k_p5 = text('phase5-parse.txt') if os.path.exists(os.path.join(SRC, 'phase5-parse.txt')) else 0
 for n in ('phase2-parse.txt', 'phase2-parse.py', 'phase3-parse.py', 'send-read.sh'):
     shutil.copyfile(os.path.join(SRC, n), os.path.join(dst, n))
 shutil.copyfile(__file__, os.path.join(dst, 'build_push.py'))
 with open(os.path.join(dst, 'SHA256-evidence.txt'), 'w', encoding='utf-8', newline='\n') as f:
     f.write('# lab-file-sha256  published-copy-sha256  file  bytes  gstin-masks\n')
     f.write('\n'.join(rows) + '\n')
-    for n in [x for x in ('log.txt', 'phase3-parse.txt', 'phase4-parse.txt') if os.path.exists(os.path.join(SRC, x))]:
+    for n in [x for x in ('log.txt', 'phase3-parse.txt', 'phase4-parse.txt', 'phase5-parse.txt') if os.path.exists(os.path.join(SRC, x))]:
         f.write('%s  %s  %s\n' % (sha(os.path.join(SRC, n)), sha(os.path.join(dst, n)), n))
 shots = sorted(n for n in os.listdir(SRC + '/screenshots') if n.endswith('.jpg'))
 with open(os.path.join(dst, 'SHA256-screenshots.txt'), 'w', encoding='utf-8', newline='\n') as f:

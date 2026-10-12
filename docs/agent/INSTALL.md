@@ -88,14 +88,16 @@ version, check the setting: an earlier default may still be saved as on.
 Native posting through the extension accepts one Journal, Payment, Receipt or
 Contra per approval, with existing ledgers and no supplied voucher number. A
 command-line installation can also post a saved batch of 2 to 50 such vouchers
-after one approval of a summary (per-ledger totals, not each voucher's date or
-narration), when `BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting.
+after one approval of a summary (per-ledger totals, with a line for each voucher
+only for 10 or fewer and only when those lines fit), when `BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting.
 That setting is off by default. From the next build the extension offers it as
 its own setting, "Allow posting a batch of up to 50 vouchers under one approval",
 also off by default and used only with posting on (bridge#712, bridge#1090).
 Batch posting through Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was
-raised, and verified; it is not proven on a multi-user book (bridge#725). A Payment, Receipt or Contra is
+raised, and verified; through the extension's setting, batches of 10 and 50 and a
+bank statement in two windows of 7 posted and verified on 2026-10-12; it is not
+proven on a multi-user book (bridge#725). A Payment, Receipt or Contra is
 refused if any of its ledgers, or their groups, moved since the file was built
 so that a bank or cash leg no longer classifies as it did. Tally assigns the number. Bridge uses a private request identity
 for the native attempt; the selected XML file stays unchanged. Do not manually

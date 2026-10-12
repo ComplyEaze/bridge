@@ -1053,6 +1053,10 @@ fn the_batch_setting_keeps_each_known_limit() {
             "per-voucher lines appear only for small batches",
         ),
         (
+            "and those lines fit",
+            "per-voucher lines that do not fit leave the totals only, so 10 or fewer is a ceiling",
+        ),
+        (
             "Leave it off unless you accept these known limits",
             "turning it on accepts the limits that follow",
         ),

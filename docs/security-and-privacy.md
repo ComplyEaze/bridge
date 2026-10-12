@@ -54,8 +54,9 @@ It writes to Tally only if you turn posting on. In the published extension
 Contra it prepared and saved), after you approve that voucher in a separate
 ComplyEaze Bridge window; from the next build, a second setting, off by default,
 also lets one approval post a saved batch of 2 to 50 Journals, or of 2 to 50
-Payments, Receipts and Contras (a batch never mixes Journals with the others),
-after you approve its summary. No ComplyEaze Bridge tool can approve either.
+Payments, Receipts and Contras (a batch mixing Journals with the others cannot
+be built), after you approve its summary. No ComplyEaze Bridge tool can approve
+either.
 
 Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
 accepted in the extension settings. In 0.5.0 the setting was marked required, and

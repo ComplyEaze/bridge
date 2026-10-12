@@ -1147,11 +1147,14 @@ async fn a_verification_at_a_small_cap_cuts_the_open_rows_and_keeps_its_verdict(
     assert_eq!(page["counts"], proof["counts"]);
 }
 
+/// The facts hold a row by its id, which already hashes the account, so a live
+/// skip of the row through another endpoint still refuses the posting: the
+/// posting would otherwise retire that skip without the other account's word.
 #[tokio::test]
-async fn a_skip_read_through_another_endpoint_is_not_this_builds_skip() {
+async fn a_live_skip_of_the_row_through_another_endpoint_refuses_the_posting() {
     let directory = tempfile::tempdir().unwrap();
-    // the skip is recorded through one endpoint, and then a build through
-    // another posts the same row
+    // the skip is recorded through one endpoint, and a build through another
+    // posts the same row
     run(
         directory.path(),
         skip_only_plans(),
@@ -1159,69 +1162,86 @@ async fn a_skip_read_through_another_endpoint_is_not_this_builds_skip() {
     )
     .await;
     let posting = contra_statement(directory.path(), BANK_A, SKIPPED, None);
-    let built = run(directory.path(), two_bank_plans(), posting).await;
-    assert_eq!(built["voucher_count"], 1, "{built}");
-    // and a withdrawal of it is for a skip this build does not have
-    let mut withdrawn = contra_statement(directory.path(), BANK_A, OTHER_BOOKED, None);
+    let refused = run(directory.path(), admission_plans(), posting).await;
+    assert_eq!(refused["reason"], "skip_row_paired_elsewhere", "{refused}");
+    assert_eq!(refused["skipped_rows"], json!([SKIPPED]));
+    // and a withdrawal of it, named by the person, is for a live skip
+    let mut withdrawn = contra_statement(directory.path(), BANK_A, SKIPPED, None);
     withdrawn["withdraw_skips"] = json!([SKIPPED]);
-    let refused = run(directory.path(), admission_plans(), withdrawn).await;
-    assert_eq!(refused["reason"], "withdraw_skip_invalid", "{refused}");
-    assert_eq!(refused["invalid_rows"], json!([SKIPPED]));
+    let built = run(directory.path(), two_bank_plans(), withdrawn).await;
+    assert_eq!(built["voucher_count"], 1, "{built}");
 }
 
+/// The step is chosen from every carried row, not only from the rows listed.
 #[tokio::test]
-async fn a_skip_of_another_bank_ledger_is_not_this_builds_skip() {
+async fn the_step_for_carried_rows_counts_the_rows_the_list_leaves_out() {
+    let skipped = |n: u32| format!("st-20260901-{:016x}", 0x1000 + n);
+    let booked = |n: u32| format!("st-20260901-{:016x}", 0x2000 + n);
+    let reference = |n: u32| format!("6000{:08}", n + 1);
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
-        [skip_only_plans(), two_bank_plans()].concat(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            two_bank_plans(),
+            admission_plans(),
+        ]
+        .concat(),
     );
-    // bank B's statement skipped the row; bank A's statement now posts it
-    rig.build(statement_v2(
-        directory.path(),
-        BANK_B,
-        window(),
-        json!([]),
-        json!([skip_record(BANK_B, SKIPPED, None)]),
-    ))
-    .await;
-    let built = rig
-        .build(contra_statement(directory.path(), BANK_A, SKIPPED, None))
-        .await;
-    rig.finish();
-    assert_eq!(built["voucher_count"], 1, "{built}");
-}
-
-#[tokio::test]
-async fn a_skip_another_endpoint_carries_does_not_stop_a_withdrawal_on_this_one() {
-    let directory = tempfile::tempdir().unwrap();
-    // through one endpoint the row is skipped and carried by a verified Contra
-    let first = Rig::new(
-        directory.path(),
-        [skip_only_plans(), two_bank_plans()].concat(),
-    );
-    first
-        .build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-        .await;
-    let carrying = first
-        .build(contra_statement(
+    // 53 rows skipped, each with its own reference
+    let ids: Vec<String> = (0..53).map(skipped).collect();
+    let refs: Vec<String> = (0..53).map(reference).collect();
+    let rows: Vec<(&str, Option<&str>)> = ids
+        .iter()
+        .zip(&refs)
+        .map(|(id, reference)| (id.as_str(), Some(reference.as_str())))
+        .collect();
+    rig.build(a_skips(directory.path(), &rows)).await;
+    // the first 52 are carried by a batch found posted, the last by one not yet
+    // verified, which the list of the first 50 does not reach
+    let contras = |range: std::ops::Range<u32>| {
+        statement_v2(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(REFERENCE),
-        ))
-        .await;
-    first.finish();
-    mark_found(directory.path(), carrying["batch_id"].as_str().unwrap());
-    // through another it is skipped again, and nothing there carries it
-    let second = Rig::new(
+            window(),
+            range
+                .clone()
+                .map(|n| contra_voucher(&booked(n)))
+                .collect::<Vec<_>>()
+                .into(),
+            range
+                .map(|n| contra_record(&booked(n), Some(&reference(n))))
+                .collect::<Vec<_>>()
+                .into(),
+        )
+    };
+    let found = rig.build(contras(0..52)).await;
+    mark_found(directory.path(), found["batch_id"].as_str().unwrap());
+    rig.build(contras(52..53)).await;
+    let mut posting = statement_v2(
         directory.path(),
-        [skip_only_plans(), two_bank_plans()].concat(),
+        BANK_A,
+        window(),
+        ids.iter()
+            .map(|id| contra_voucher(id))
+            .collect::<Vec<_>>()
+            .into(),
+        ids.iter()
+            .map(|id| contra_record(id, None))
+            .collect::<Vec<_>>()
+            .into(),
     );
-    second
-        .build(a_skips(directory.path(), &[(SKIPPED, None)]))
-        .await;
-    let built = second.build(withdrawing(directory.path())).await;
-    second.finish();
-    assert_eq!(built["voucher_count"], 1, "{built}");
+    posting["withdraw_skips"] = json!(ids);
+    let refused = rig.build(posting).await;
+    rig.finish();
+    assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
+    let listed = refused["paired_rows"].as_array().unwrap();
+    assert_eq!(listed.len(), 50);
+    assert!(listed.iter().all(|row| row["state"] == "paired"));
+    assert_eq!(refused["paired_rows_omitted"], 3);
+    // all listed rows are paired, yet the step covers the row not listed
+    let step = refused["next_step"].as_str().unwrap();
+    assert!(step.contains("state other_side_unverified"), "{step}");
+    assert!(step.contains("state paired"), "{step}");
 }

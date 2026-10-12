@@ -11,7 +11,7 @@
 //! leaves this module.
 use super::*;
 use crate::agent::transfer_pairing::{
-    transfer_pairing_view, DoubleBookedClass, SkipKey, SkipState, TransferView,
+    transfer_pairing_view, DoubleBookedClass, SkipState, TransferView,
 };
 use statement_facts::{Candidate, TransferFacts, TransferFactsError};
 
@@ -327,23 +327,9 @@ pub(super) struct TransferInput {
     pub(super) own_lineage: Option<String>,
     /// The build carries a statement's facts.
     pub(super) carries_statement: bool,
-    /// The endpoint the build reads, which a skip must share to be this
-    /// build's skip: one statement read through two endpoints is two skips.
-    pub(super) endpoint: String,
-    /// The bank ledger the build's statement is of, when it is of one.
-    pub(super) bank_ledger: Option<String>,
 }
 
 impl TransferInput {
-    /// A skip of the endpoint and bank this build reads.
-    fn is_ours(&self, key: &SkipKey) -> bool {
-        key.endpoint_origin.as_str() == self.endpoint
-            && self
-                .bank_ledger
-                .as_deref()
-                .is_none_or(|bank| key.bank_ledger.as_str() == bank)
-    }
-
     pub(super) fn candidate_build(&self) -> Option<&str> {
         match &self.candidate {
             Candidate::Build(line) => Some(line.batch_id.as_str()),
@@ -507,7 +493,6 @@ impl Server {
         let live: BTreeSet<&str> = before
             .live_skips
             .iter()
-            .filter(|key| input.is_ours(key))
             .map(|key| key.row.as_str())
             .collect();
         let invalid: Vec<String> = input
@@ -532,7 +517,7 @@ impl Server {
             .iter()
             .filter_map(|row| {
                 before_view.skips.iter().find_map(|(key, state)| {
-                    if key.row.as_str() != row || !input.is_ours(key) {
+                    if key.row.as_str() != row {
                         return None;
                     }
                     let (batch, label) = match state {

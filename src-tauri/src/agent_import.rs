@@ -1021,11 +1021,6 @@ impl Server {
             let transfers = match self.admit_transfers_while_admitted(transfers::TransferInput {
                 company_guid: company_guid.clone(),
                 carries_statement: statement_record.is_some(),
-                endpoint: origin.clone(),
-                bank_ledger: statement_record
-                    .as_ref()
-                    .and_then(|record| record["bank_ledger_guid"].as_str())
-                    .map(str::to_string),
                 skip_rows: resolved
                     .statement
                     .iter()
@@ -1444,8 +1439,6 @@ impl Server {
                 withdraw,
                 own_lineage: None,
                 carries_statement: true,
-                endpoint: record.endpoint_origin.clone(),
-                bank_ledger: Some(record.statement.bank_ledger_guid.clone()),
             })
             .map_err(fail)?
         {

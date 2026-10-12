@@ -826,7 +826,10 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
         for state in view.skips.values() {
             match state {
                 SkipState::Paired { contra, .. } => assert_ne!(contra, &gone),
-                SkipState::Ambiguous { candidates } => assert!(!candidates.contains(&gone)),
+                SkipState::Ambiguous { candidates }
+                | SkipState::ReversedSameDay { candidates } => {
+                    assert!(!candidates.contains(&gone));
+                }
                 SkipState::OtherSideUnverified { batch } => assert_ne!(batch, &gone.batch),
                 SkipState::NotFound | SkipState::NotEstablished => {}
             }
@@ -989,6 +992,20 @@ fn busy_book() -> (Vec<SkipFact>, Vec<ContraFact>, Coverage) {
     let mut c = contra_from_b2("batch-5", "t6");
     c.amount = ExactDecimal::parse("800.00").unwrap();
     contras.push(c);
+    // a reversed skip, and a reversed Contra beside a plain one
+    let mut s = skip("st-8");
+    s.amount = ExactDecimal::parse("900.00").unwrap();
+    s.reversed_same_day = true;
+    skips.push(s);
+    let mut s = skip("st-9");
+    s.amount = ExactDecimal::parse("950.00").unwrap();
+    skips.push(s);
+    for (txn, reversed) in [("t7", true), ("t8", false)] {
+        let mut c = contra("batch-6", txn);
+        c.amount = ExactDecimal::parse("950.00").unwrap();
+        c.reversed_same_day = reversed;
+        contras.push(c);
+    }
     (skips, contras, january_covered())
 }
 
@@ -1052,6 +1069,14 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
     )));
     assert!(has(|state| *state == SkipState::NotFound));
     assert!(has(|state| *state == SkipState::NotEstablished));
+    assert!(has(|state| matches!(
+        state,
+        SkipState::ReversedSameDay { candidates } if candidates.is_empty()
+    )));
+    assert!(has(|state| matches!(
+        state,
+        SkipState::ReversedSameDay { candidates } if candidates.len() == 2
+    )));
     assert_eq!(baseline.double_booked.len(), 1);
     for seed in 0..300 {
         let windows = if seed % 2 == 0 {
@@ -1443,4 +1468,146 @@ fn transfer_pairing_duplicates_fail_the_same_way_in_any_input_order() {
             "seed {seed}"
         );
     }
+}
+
+// ---- a line reversed the same day is not a transfer ------------------------------
+
+fn reversed_skip(row: &str, direction: Direction) -> SkipFact {
+    let mut fact = skip(row);
+    fact.direction = direction;
+    fact.reversed_same_day = true;
+    fact
+}
+
+fn reversed_state(candidates: &[(&str, &str)]) -> SkipState {
+    SkipState::ReversedSameDay {
+        candidates: candidates
+            .iter()
+            .map(|(batch, txn)| contra_key(batch, txn))
+            .collect(),
+    }
+}
+
+/// A payment from b2 to b1 failed and came straight back on b2's statement
+/// (out and in, the same day, the same amount), and the transfer was made again
+/// from b1: b1's statement shows one withdrawal. By amount and date alone b2's
+/// returned line matches b1's withdrawal. It is not a transfer.
+#[test]
+fn transfer_pairing_a_payment_failed_and_retried_from_the_other_account_pairs_nothing() {
+    // b1's one withdrawal debits b2 and credits b1
+    let mut withdrawal = contra("batch-1", "t1");
+    withdrawal.legs = [
+        ContraLeg {
+            ledger: ledger("b1"),
+            side: Side::Credit,
+        },
+        ContraLeg {
+            ledger: ledger("b2"),
+            side: Side::Debit,
+        },
+    ];
+    let out = reversed_skip("st-out", Direction::Outflow);
+    let back = reversed_skip("st-back", Direction::Inflow);
+    let view = view_of(
+        &[out, back.clone()],
+        &[withdrawal.clone()],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(state_of(&view, "st-out"), reversed_state(&[]));
+    assert_eq!(
+        state_of(&view, "st-back"),
+        reversed_state(&[("batch-1", "t1")])
+    );
+    assert!(!view
+        .skips
+        .values()
+        .any(|state| matches!(state, SkipState::Paired { .. })));
+    // without the flag the returned line pairs with b1's withdrawal, which is
+    // the false pair the flag exists to stop
+    let mut plain = back;
+    plain.reversed_same_day = false;
+    let view = view_of(&[plain], &[withdrawal], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-back"),
+        paired(PairRound::NoReference, "batch-1", "t1")
+    );
+}
+
+#[test]
+fn transfer_pairing_a_reversed_contra_beside_a_plain_one_pairs_with_neither() {
+    let mut flagged = contra("batch-1", "t1");
+    flagged.reversed_same_day = true;
+    let plain = contra("batch-2", "t2");
+    let view = view_of(
+        &[skip("st-1")],
+        &[flagged.clone(), plain],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reversed_state(&[("batch-1", "t1"), ("batch-2", "t2")])
+    );
+    // alone, the reversed Contra is still no pair
+    let view = view_of(&[skip("st-1")], &[flagged], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reversed_state(&[("batch-1", "t1")])
+    );
+}
+
+#[test]
+fn transfer_pairing_a_reversed_contra_with_an_equal_reference_does_not_pair() {
+    let mut flagged = contra("batch-1", "t1");
+    flagged.reversed_same_day = true;
+    flagged.reference = Some(reference("600000000001"));
+    let mut referenced = skip("st-1");
+    referenced.reference = Some(reference("600000000001"));
+    let view = view_of(
+        &[referenced.clone()],
+        &[flagged.clone()],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reversed_state(&[("batch-1", "t1")])
+    );
+    flagged.reversed_same_day = false;
+    let view = view_of(&[referenced], &[flagged], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        paired(PairRound::Reference, "batch-1", "t1")
+    );
+}
+
+/// A reversed row still counts against the rows that could pair, so a plain
+/// skip is not paired to a Contra a reversed skip also matches.
+#[test]
+fn transfer_pairing_a_reversed_skip_still_counts_against_the_others() {
+    let mut flagged = skip("st-1");
+    flagged.reversed_same_day = true;
+    let view = view_of(
+        &[flagged, skip("st-2")],
+        &[contra("batch-1", "t1")],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reversed_state(&[("batch-1", "t1")])
+    );
+    assert_eq!(state_of(&view, "st-2"), ambiguous(&[("batch-1", "t1")]));
+}
+
+#[test]
+fn transfer_pairing_a_reversed_row_outranks_an_unverified_candidate() {
+    let mut flagged = unverified(contra("batch-1", "t1"));
+    flagged.reversed_same_day = true;
+    let view = view_of(&[skip("st-1")], &[flagged], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reversed_state(&[("batch-1", "t1")])
+    );
 }

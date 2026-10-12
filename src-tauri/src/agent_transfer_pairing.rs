@@ -28,6 +28,11 @@
 //!   Contra's: a pair by date claims that nothing else exists. A row that took
 //!   part in round 1 without pairing does not pair here, although it still
 //!   counts against the rows that could.
+//! * A row reversed the same day on its own statement (`reversed_same_day`) is
+//!   not a transfer: it pairs in neither round, but it still counts against the
+//!   rows that could pair. A skip that is flagged, or any of whose candidates
+//!   is, is `ReversedSameDay` with those candidates instead of a pair or
+//!   `Ambiguous`.
 //! * A Contra that is double-booked (also booked from a second statement) pairs
 //!   in neither round; a skip whose candidate it is stays `Ambiguous`.
 //!
@@ -157,8 +162,6 @@ pub(crate) struct SkipFact {
     pub(crate) lineage: LineageId,
     /// The statement holds another row on the same date, of an equal amount,
     /// the other way: a line that came straight back is not a transfer.
-    // Not yet read by the view (a later change makes it refuse to pair).
-    #[allow(dead_code)]
     pub(crate) reversed_same_day: bool,
 }
 
@@ -189,8 +192,6 @@ pub(crate) struct ContraFact {
     pub(crate) status: BatchStatus,
     /// The statement holds another row on the same date, of an equal amount,
     /// the other way: a line that came straight back is not a transfer.
-    // Not yet read by the view (a later change makes it refuse to pair).
-    #[allow(dead_code)]
     pub(crate) reversed_same_day: bool,
 }
 
@@ -237,6 +238,10 @@ pub(crate) enum SkipState {
     Ambiguous { candidates: Vec<ContraKey> },
     OtherSideUnverified { batch: BatchId },
     NotEstablished,
+    /// The skipped row, or a row that could carry it, is reversed the same day
+    /// on its own statement, so it is not a transfer. Listed with the Contras
+    /// that could have carried it (none when nothing matched).
+    ReversedSameDay { candidates: Vec<ContraKey> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -458,7 +463,11 @@ pub(crate) fn transfer_pairing_view(
     let mut contra_taken = vec![false; contras.len()];
     for (s, edges) in reference_edges.iter().enumerate() {
         if let [c] = edges[..] {
-            if contra_reference_edges[c].len() == 1 && is_verified(contras[c]) && !doubled[c] {
+            if contra_reference_edges[c].len() == 1
+                && is_verified(contras[c])
+                && !doubled[c]
+                && !reversed(skips[s], contras[c])
+            {
                 pairs[s] = Some((PairRound::Reference, c));
                 contra_taken[c] = true;
             }
@@ -497,6 +506,7 @@ pub(crate) fn transfer_pairing_view(
                 && contra_loose_edges[c].len() == 1
                 && is_verified(contras[c])
                 && !doubled[c]
+                && !reversed(skips[s], contras[c])
             {
                 pairs[s] = Some((PairRound::NoReference, c));
             }
@@ -533,7 +543,17 @@ pub(crate) fn transfer_pairing_view(
                         .chain(&loose_edges[s])
                         .copied()
                         .collect();
-                    open_state(skip, &candidates, &contras, &coverage, k_days)
+                    if skip.reversed_same_day
+                        || candidates
+                            .iter()
+                            .any(|&index| contras[index].reversed_same_day)
+                    {
+                        SkipState::ReversedSameDay {
+                            candidates: sorted_keys(&candidates, &contras),
+                        }
+                    } else {
+                        open_state(skip, &candidates, &contras, &coverage, k_days)
+                    }
                 }
             };
             (skip.key.clone(), state)
@@ -614,12 +634,24 @@ fn open_state(
             };
         }
     }
+    SkipState::Ambiguous {
+        candidates: sorted_keys(candidates, contras),
+    }
+}
+
+fn sorted_keys(candidates: &[usize], contras: &[&ContraFact]) -> Vec<ContraKey> {
     let mut keys: Vec<ContraKey> = candidates
         .iter()
         .map(|&index| contras[index].key.clone())
         .collect();
     keys.sort();
-    SkipState::Ambiguous { candidates: keys }
+    keys
+}
+
+/// A row reversed the same day on its own statement is not a transfer, so a
+/// pair with it is never made. It still counts against the rows that could pair.
+fn reversed(skip: &SkipFact, contra: &ContraFact) -> bool {
+    skip.reversed_same_day || contra.reversed_same_day
 }
 
 /// The verified windows of each ledger, with those that overlap or touch merged

@@ -22,6 +22,8 @@ At the reference engine, commit `1631fe9a` (its change for #1497), under Python 
 
 The books are hand-written scenarios, not generated from any data. The maintainers generated the goldens and handed them over as files. Every edge golden already pinned regenerates byte-identical at that commit.
 
+The three `cash_book_stock_*` goldens were later regenerated at reference commit `4aa48da7` (#1504), which corrects the `opening_difference` definition for books with integrated inventory. Only `definition_text` and `definition_sha256_16` of that figure change in each; the bytes below are the regenerated files', checked against the maintainers' hand-off.
+
 ## Bytes
 
 | File | Bytes | SHA-256 | Path |
@@ -29,6 +31,6 @@ The books are hand-written scenarios, not generated from any data. The maintaine
 | `cash_book_stock_balanced.json` | 1,105 | `208111aeea8436bbc8f2c26090972e95a86a0e9d7e5d612935ff4c7040823bd9` | `edge-books/cash_book_stock_balanced.json` |
 | `cash_book_stock_difference.json` | 1,118 | `a1e9b3797594258fbfc79af9aa9a63dff92d7a6a5a6f33eb5323588f5298429f` | `edge-books/cash_book_stock_difference.json` |
 | `cash_book_stock_unknown.json` | 1,124 | `1097c0a460c6c878f5bda2cee7f7ba15c459990b33cc9a132d33f0ae1a22405d` | `edge-books/cash_book_stock_unknown.json` |
-| `edge.cash_book_stock_balanced.cash_book_integrity.json` | 5,375 | `88068750d1697069a65e6627bb2bac6e587c6808037e29c4f25c2d6b53e9defe` | `golden/edge.cash_book_stock_balanced.cash_book_integrity.json` |
-| `edge.cash_book_stock_difference.cash_book_integrity.json` | 7,142 | `14a0a13849f64aab9e0fc053373aa38c94ee20cf849f1d04a7bf885cd94fbcf3` | `golden/edge.cash_book_stock_difference.cash_book_integrity.json` |
-| `edge.cash_book_stock_unknown.cash_book_integrity.json` | 6,194 | `08718d7cd54fe8d66f560cc44f1b00adb5274c51122ac4ef0496630a14dc44f4` | `golden/edge.cash_book_stock_unknown.cash_book_integrity.json` |
+| `edge.cash_book_stock_balanced.cash_book_integrity.json` | 5,531 | `864f797da965d286abfca9cdf88daf7606b8535c4c30f171bec9066774e47e5e` | `golden/edge.cash_book_stock_balanced.cash_book_integrity.json` |
+| `edge.cash_book_stock_difference.cash_book_integrity.json` | 7,298 | `217e5ff7c86153a6309d44788c6a0c1b4184c4c9eca9fe9c9ff20590d0678bfe` | `golden/edge.cash_book_stock_difference.cash_book_integrity.json` |
+| `edge.cash_book_stock_unknown.cash_book_integrity.json` | 6,350 | `21c6053047622f1ace5708c331a04c9a4559f19bb0a882423745e1a0ad306977` | `golden/edge.cash_book_stock_unknown.cash_book_integrity.json` |

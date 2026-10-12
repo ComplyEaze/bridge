@@ -390,9 +390,9 @@ fn a_part_status_is_one_failure_or_absent_and_its_shape_is_checked() {
 
 // The live capture (protocol reference §9.11e; provenance in
 // `tests/fixtures/COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md`): the request
-// Bridge renders and the answer of a licensed TallyPrime 7.1 Silver to it, for
-// one synthetic company. The negative cases below edit nothing; they ask the
-// captured bytes a different question.
+// Bridge renders and the answer of a lab TallyPrime 7.1 to it (licence and
+// edition not recorded), for one synthetic company. The negative cases below
+// edit nothing; they ask the captured bytes a different question.
 const LIVE_REQUEST: &[u8] =
     include_bytes!("../tests/fixtures/company_audit_object_batch_lab_request.utf16le.xml");
 const LIVE_RESPONSE: &[u8] =

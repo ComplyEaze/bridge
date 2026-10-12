@@ -1,0 +1,3 @@
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs
+reviewer: lamemustafa

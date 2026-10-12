@@ -1,0 +1,8 @@
+docs/adr/0015-tally-selected-read-qualification-authority.md
+scripts/outstandings-copy.test.mjs
+src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src/OutstandingsScreen.tsx
+src/outstandings-copy.ts
+src/outstandings-provenance.ts
+reviewer: lamemustafa

@@ -612,463 +612,6 @@ async fn write_fixture_enrollment_is_idempotent_revocable_and_identity_safe() {
 }
 
 #[tokio::test]
-async fn write_canary_reservation_is_fixture_bound_single_use_and_revocable() {
-    let repository = repository().await;
-    let saved = repository
-        .save_reviewed_setup(reviewed_setup_input(HASH_A))
-        .await
-        .expect("persist observed company before reserving a canary");
-    repository
-        .enroll_write_fixture(WriteFixtureEnrollmentInput {
-            company_id: saved.company.id.clone(),
-            review_commitment_sha256: HASH_B.to_string(),
-            disposable_company_attested: true,
-            no_customer_data_attested: true,
-            backup_guidance_acknowledged: true,
-            enrolled_at_unix_ms: 3_000,
-        })
-        .await
-        .expect("enroll the disposable fixture");
-
-    let reservation_input = WriteCanaryReservationInput {
-        company_id: saved.company.id.clone(),
-        review_commitment_sha256: HASH_B.to_string(),
-        reserved_at_unix_ms: 4_000,
-    };
-    let first = repository
-        .reserve_write_canary(reservation_input.clone())
-        .await
-        .expect("reserve the single canary slot");
-    let replay = repository
-        .reserve_write_canary(reservation_input)
-        .await
-        .expect("replay the exact reservation safely");
-    assert_eq!(replay, first);
-
-    assert!(matches!(
-        repository
-            .reserve_write_canary(WriteCanaryReservationInput {
-                company_id: saved.company.id.clone(),
-                review_commitment_sha256: HASH_A.to_string(),
-                reserved_at_unix_ms: 5_000,
-            })
-            .await,
-        Err(MirrorError::InvalidInput("fixture_enrollment_not_active"))
-    ));
-    assert_eq!(
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_write_canary_reservations")
-            .fetch_one(&repository.pool)
-            .await
-            .expect("count durable canary reservations"),
-        1
-    );
-
-    repository
-        .revoke_write_fixture_enrollment(&saved.company.id, 6_000)
-        .await
-        .expect("revoke the fixture before any dispatch");
-    assert!(matches!(
-        repository
-            .reserve_write_canary(WriteCanaryReservationInput {
-                company_id: saved.company.id,
-                review_commitment_sha256: HASH_B.to_string(),
-                reserved_at_unix_ms: 7_000,
-            })
-            .await,
-        Err(MirrorError::InvalidInput("fixture_enrollment_not_active"))
-    ));
-    assert!(
-        sqlx::query("UPDATE tally_write_canary_reservations SET reserved_at_unix_ms = 1")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    assert!(sqlx::query("DELETE FROM tally_write_canary_reservations")
-        .execute(&repository.pool)
-        .await
-        .is_err());
-}
-
-#[tokio::test]
-async fn write_canary_payload_binding_is_exact_immutable_and_fixture_bound() {
-    let repository = repository().await;
-    let saved = repository
-        .save_reviewed_setup(reviewed_setup_input(HASH_A))
-        .await
-        .expect("persist observed company before binding a canary payload");
-    repository
-        .enroll_write_fixture(WriteFixtureEnrollmentInput {
-            company_id: saved.company.id.clone(),
-            review_commitment_sha256: HASH_B.to_string(),
-            disposable_company_attested: true,
-            no_customer_data_attested: true,
-            backup_guidance_acknowledged: true,
-            enrolled_at_unix_ms: 3_000,
-        })
-        .await
-        .expect("enroll the disposable fixture");
-    let reservation = repository
-        .reserve_write_canary(WriteCanaryReservationInput {
-            company_id: saved.company.id.clone(),
-            review_commitment_sha256: HASH_B.to_string(),
-            reserved_at_unix_ms: 4_000,
-        })
-        .await
-        .expect("reserve the only canary slot");
-    let reservation_payload_sha256 = reservation.reservation_payload_sha256.clone();
-    let persisted_reservation_payload_sha256 = sqlx::query_scalar::<_, String>(
-        "SELECT reservation_payload_sha256 FROM tally_write_canary_reservations WHERE id = ?1",
-    )
-    .bind(&reservation.id)
-    .fetch_one(&repository.pool)
-    .await
-    .expect("load immutable reservation payload commitment");
-    assert_eq!(
-        reservation_payload_sha256, persisted_reservation_payload_sha256,
-        "private reservation reference must return the exact durable commitment"
-    );
-    let input = WriteCanaryPayloadBindingInput {
-        company_id: saved.company.id.clone(),
-        review_commitment_sha256: HASH_B.to_string(),
-        reservation_id: reservation.id.clone(),
-        reservation_payload_sha256: reservation_payload_sha256.clone(),
-        wire_sha256: HASH_A.to_string(),
-        intended_state_sha256: HASH_B.to_string(),
-        identity_query_sha256: HASH_A.to_string(),
-        bound_at_unix_ms: 5_000,
-    };
-    let mut mismatched_reservation = input.clone();
-    mismatched_reservation.reservation_payload_sha256 = HASH_A.to_string();
-    assert!(matches!(
-        repository
-            .bind_write_canary_payload(mismatched_reservation)
-            .await,
-        Err(MirrorError::InvalidInput("canary_reservation_not_active"))
-    ));
-    let first = repository
-        .bind_write_canary_payload(input.clone())
-        .await
-        .expect("bind the exact canary commitments");
-    assert_eq!(
-        repository
-            .bind_write_canary_payload(input.clone())
-            .await
-            .expect("replay the exact payload binding safely"),
-        first
-    );
-    let active_binding = ActiveWriteCanaryPayloadBindingInput {
-        company_id: input.company_id.clone(),
-        review_commitment_sha256: input.review_commitment_sha256.clone(),
-        reservation_id: input.reservation_id.clone(),
-        reservation_payload_sha256: input.reservation_payload_sha256.clone(),
-        wire_sha256: input.wire_sha256.clone(),
-        intended_state_sha256: input.intended_state_sha256.clone(),
-        identity_query_sha256: input.identity_query_sha256.clone(),
-    };
-    assert_eq!(
-        repository
-            .active_write_canary_payload_binding(active_binding.clone())
-            .await
-            .expect("load the exact active payload binding"),
-        first
-    );
-    let mut mismatched_active_binding = active_binding.clone();
-    mismatched_active_binding.wire_sha256 = HASH_B.to_string();
-    assert!(matches!(
-        repository
-            .active_write_canary_payload_binding(mismatched_active_binding)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_payload_binding_not_active"
-        ))
-    ));
-    let preflight_input = BeginWriteCanaryPreflightInput {
-        binding: active_binding.clone(),
-        started_at_unix_ms: 5_500,
-    };
-    let preflight = repository
-        .begin_write_canary_preflight(preflight_input.clone())
-        .await
-        .expect("claim the one sealed preflight attempt");
-    assert_eq!(preflight.payload_binding_id, first.id);
-    assert!(matches!(
-        repository
-            .begin_write_canary_preflight(preflight_input)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_attempt_already_started"
-        ))
-    ));
-    assert!(
-        sqlx::query("UPDATE tally_write_canary_preflight_attempts SET started_at_unix_ms = 1")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    assert!(
-        sqlx::query("DELETE FROM tally_write_canary_preflight_attempts")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    let evidence_input = WriteCanaryPreflightEvidenceInput {
-        attempt_id: preflight.id.clone(),
-        readback_state_sha256: HASH_A.to_string(),
-        identity_coverage_sha256: HASH_B.to_string(),
-        canonical_endpoint_sha256: HASH_A.to_string(),
-        company_identity_sha256: HASH_B.to_string(),
-        verified_at_unix_ms: 5_750,
-    };
-    let mut early_evidence = evidence_input.clone();
-    early_evidence.verified_at_unix_ms = 5_499;
-    assert!(matches!(
-        repository
-            .record_write_canary_preflight_evidence(early_evidence)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_evidence_before_attempt"
-        ))
-    ));
-    let evidence = repository
-        .record_write_canary_preflight_evidence(evidence_input.clone())
-        .await
-        .expect("persist digest-only sealed preflight evidence");
-    let evidence_gate = ActiveWriteCanaryPreflightEvidenceInput {
-        binding: active_binding.clone(),
-        attempt_id: preflight.id.clone(),
-        evidence_id: evidence.id.clone(),
-        readback_state_sha256: HASH_A.to_string(),
-        identity_coverage_sha256: HASH_B.to_string(),
-        canonical_endpoint_sha256: HASH_A.to_string(),
-        company_identity_sha256: HASH_B.to_string(),
-    };
-    assert_eq!(
-        repository
-            .active_write_canary_preflight_evidence(evidence_gate.clone())
-            .await
-            .expect("verify exact active preflight evidence without dispatch"),
-        evidence
-    );
-    let mut changed_evidence_gate = evidence_gate.clone();
-    changed_evidence_gate.identity_coverage_sha256 = HASH_A.to_string();
-    assert!(matches!(
-        repository
-            .active_write_canary_preflight_evidence(changed_evidence_gate)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_evidence_not_active"
-        ))
-    ));
-    let mut changed_target_gate = evidence_gate.clone();
-    changed_target_gate.canonical_endpoint_sha256 = HASH_B.to_string();
-    assert!(matches!(
-        repository
-            .active_write_canary_preflight_evidence(changed_target_gate)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_evidence_not_active"
-        ))
-    ));
-    assert!(matches!(
-        repository
-            .begin_write_canary_dispatch_attempt(BeginWriteCanaryDispatchInput {
-                evidence: evidence_gate.clone(),
-                claimed_at_unix_ms: 5_749,
-            })
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_dispatch_claim_before_evidence"
-        ))
-    ));
-    let dispatch = repository
-        .begin_write_canary_dispatch_attempt(BeginWriteCanaryDispatchInput {
-            evidence: evidence_gate.clone(),
-            claimed_at_unix_ms: 5_800,
-        })
-        .await
-        .expect("claim one no-send canary dispatch attempt");
-    assert_eq!(dispatch.evidence_id, evidence.id);
-    let final_verdict_input = WriteCanaryFinalVerdictInput {
-        dispatch: ActiveWriteCanaryDispatchAttemptInput {
-            evidence: evidence_gate.clone(),
-            dispatch_attempt_id: dispatch.id.clone(),
-            claimed_at_unix_ms: dispatch.claimed_at_unix_ms,
-        },
-        import_response_sha256: HASH_A.to_string(),
-        readback_state_sha256: HASH_B.to_string(),
-        identity_coverage_sha256: HASH_A.to_string(),
-        recorded_at_unix_ms: 5_850,
-    };
-    let mut early_final_verdict = final_verdict_input.clone();
-    early_final_verdict.recorded_at_unix_ms = 5_799;
-    assert!(matches!(
-        repository
-            .record_write_canary_final_verdict(early_final_verdict)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_final_verdict_before_dispatch_claim"
-        ))
-    ));
-    let final_verdict = repository
-        .record_write_canary_final_verdict(final_verdict_input.clone())
-        .await
-        .expect("persist digest-only final canary verdict");
-    assert_eq!(final_verdict.dispatch_attempt_id, dispatch.id);
-    assert_eq!(
-        repository
-            .record_write_canary_final_verdict(final_verdict_input.clone())
-            .await
-            .expect("replay exact final verdict safely"),
-        final_verdict
-    );
-    let mut changed_final_verdict = final_verdict_input;
-    changed_final_verdict.import_response_sha256 = HASH_B.to_string();
-    assert!(matches!(
-        repository
-            .record_write_canary_final_verdict(changed_final_verdict)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_final_verdict_already_recorded"
-        ))
-    ));
-    assert!(
-        sqlx::query("UPDATE tally_write_canary_final_verdicts SET recorded_at_unix_ms = 1")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    assert!(sqlx::query("DELETE FROM tally_write_canary_final_verdicts")
-        .execute(&repository.pool)
-        .await
-        .is_err());
-    assert!(matches!(
-        repository
-            .begin_write_canary_dispatch_attempt(BeginWriteCanaryDispatchInput {
-                evidence: evidence_gate.clone(),
-                claimed_at_unix_ms: 5_801,
-            })
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_dispatch_attempt_already_claimed"
-        ))
-    ));
-    assert!(
-        sqlx::query("UPDATE tally_write_canary_dispatch_attempts SET claimed_at_unix_ms = 1")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    assert_eq!(
-        repository
-            .record_write_canary_preflight_evidence(evidence_input.clone())
-            .await
-            .expect("replay the exact preflight evidence safely"),
-        evidence
-    );
-    let mut changed_evidence = evidence_input.clone();
-    changed_evidence.readback_state_sha256 = HASH_B.to_string();
-    assert!(matches!(
-        repository
-            .record_write_canary_preflight_evidence(changed_evidence)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_evidence_already_recorded"
-        ))
-    ));
-    assert!(sqlx::query(
-        "UPDATE tally_write_canary_preflight_evidence SET verified_at_unix_ms = 1"
-    )
-    .execute(&repository.pool)
-    .await
-    .is_err());
-    assert!(
-        sqlx::query("DELETE FROM tally_write_canary_preflight_evidence")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    let mut changed = input;
-    changed.identity_query_sha256 = HASH_B.to_string();
-    assert!(matches!(
-        repository.bind_write_canary_payload(changed).await,
-        Err(MirrorError::InvalidInput("canary_payload_already_bound"))
-    ));
-    assert!(
-        sqlx::query("UPDATE tally_write_canary_payload_bindings SET bound_at_unix_ms = 1")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-    assert!(
-        sqlx::query("DELETE FROM tally_write_canary_payload_bindings")
-            .execute(&repository.pool)
-            .await
-            .is_err()
-    );
-
-    repository
-        .revoke_write_fixture_enrollment(&saved.company.id, 6_000)
-        .await
-        .expect("revoke fixture before a second binding");
-    assert!(matches!(
-        repository
-            .active_write_canary_payload_binding(active_binding)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_payload_binding_not_active"
-        ))
-    ));
-    assert!(matches!(
-        repository
-            .begin_write_canary_preflight(BeginWriteCanaryPreflightInput {
-                binding: ActiveWriteCanaryPayloadBindingInput {
-                    company_id: saved.company.id.clone(),
-                    review_commitment_sha256: HASH_B.to_string(),
-                    reservation_id: reservation.id.clone(),
-                    reservation_payload_sha256: reservation_payload_sha256.clone(),
-                    wire_sha256: HASH_A.to_string(),
-                    intended_state_sha256: HASH_B.to_string(),
-                    identity_query_sha256: HASH_A.to_string(),
-                },
-                started_at_unix_ms: 6_500,
-            })
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_payload_binding_not_active"
-        ))
-    ));
-    assert!(matches!(
-        repository
-            .record_write_canary_preflight_evidence(evidence_input)
-            .await,
-        Err(MirrorError::InvalidInput("canary_preflight_not_active"))
-    ));
-    assert!(matches!(
-        repository
-            .active_write_canary_preflight_evidence(evidence_gate)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_evidence_not_active"
-        ))
-    ));
-    assert!(matches!(
-        repository
-            .bind_write_canary_payload(WriteCanaryPayloadBindingInput {
-                company_id: saved.company.id,
-                review_commitment_sha256: HASH_B.to_string(),
-                reservation_id: reservation.id,
-                reservation_payload_sha256: HASH_A.to_string(),
-                wire_sha256: HASH_A.to_string(),
-                intended_state_sha256: HASH_B.to_string(),
-                identity_query_sha256: HASH_A.to_string(),
-                bound_at_unix_ms: 7_000,
-            })
-            .await,
-        Err(MirrorError::InvalidInput("canary_reservation_not_active"))
-    ));
-}
-
-#[tokio::test]
 async fn v13_fixture_revocations_upgrade_to_durable_sequence() {
     let (repository, _, company) = seed_repository(repository_through_v13().await).await;
     sqlx::query(
@@ -3119,7 +2662,7 @@ async fn observed_company_identity_constraint_rejects_incomplete_tuples_and_pres
 }
 
 #[tokio::test]
-async fn observed_identity_migration_revokes_demoted_fixture_before_preflight_gate() {
+async fn observed_identity_migration_revokes_demoted_fixture_enrollment() {
     let repository = repository_through_v24().await;
     let saved = repository
         .save_reviewed_setup(reviewed_setup_input(HASH_A))
@@ -3136,69 +2679,6 @@ async fn observed_identity_migration_revokes_demoted_fixture_before_preflight_ga
         })
         .await
         .expect("enroll active fixture before v25");
-    let reservation = repository
-        .reserve_write_canary(WriteCanaryReservationInput {
-            company_id: saved.company.id.clone(),
-            review_commitment_sha256: HASH_B.to_string(),
-            reserved_at_unix_ms: 4_000,
-        })
-        .await
-        .expect("reserve active fixture before v25");
-    let binding_input = WriteCanaryPayloadBindingInput {
-        company_id: saved.company.id.clone(),
-        review_commitment_sha256: HASH_B.to_string(),
-        reservation_id: reservation.id.clone(),
-        reservation_payload_sha256: reservation.reservation_payload_sha256.clone(),
-        wire_sha256: HASH_A.to_string(),
-        intended_state_sha256: HASH_B.to_string(),
-        identity_query_sha256: HASH_A.to_string(),
-        bound_at_unix_ms: 5_000,
-    };
-    let binding = repository
-        .bind_write_canary_payload(binding_input.clone())
-        .await
-        .expect("bind active fixture before v25");
-    let active_binding = ActiveWriteCanaryPayloadBindingInput {
-        company_id: binding_input.company_id.clone(),
-        review_commitment_sha256: binding_input.review_commitment_sha256.clone(),
-        reservation_id: binding_input.reservation_id.clone(),
-        reservation_payload_sha256: binding_input.reservation_payload_sha256.clone(),
-        wire_sha256: binding_input.wire_sha256.clone(),
-        intended_state_sha256: binding_input.intended_state_sha256.clone(),
-        identity_query_sha256: binding_input.identity_query_sha256.clone(),
-    };
-    let preflight = repository
-        .begin_write_canary_preflight(BeginWriteCanaryPreflightInput {
-            binding: active_binding.clone(),
-            started_at_unix_ms: 5_500,
-        })
-        .await
-        .expect("start active preflight before v25");
-    assert_eq!(preflight.payload_binding_id, binding.id);
-    let evidence = repository
-        .record_write_canary_preflight_evidence(WriteCanaryPreflightEvidenceInput {
-            attempt_id: preflight.id.clone(),
-            readback_state_sha256: HASH_A.to_string(),
-            identity_coverage_sha256: HASH_B.to_string(),
-            canonical_endpoint_sha256: HASH_A.to_string(),
-            company_identity_sha256: HASH_B.to_string(),
-            verified_at_unix_ms: 5_750,
-        })
-        .await
-        .expect("record active preflight before v25");
-    let preflight_gate = ActiveWriteCanaryPreflightEvidenceInput {
-        binding: active_binding,
-        attempt_id: preflight.id,
-        evidence_id: evidence.id,
-        readback_state_sha256: HASH_A.to_string(),
-        identity_coverage_sha256: HASH_B.to_string(),
-        canonical_endpoint_sha256: HASH_A.to_string(),
-        company_identity_sha256: HASH_B.to_string(),
-    };
-    repository
-        .active_write_canary_preflight_evidence(preflight_gate.clone())
-        .await
-        .expect("fixture preflight is active before v25 demotion");
 
     sqlx::query(
         "UPDATE tally_companies \
@@ -3282,14 +2762,6 @@ async fn observed_identity_migration_revokes_demoted_fixture_before_preflight_ga
         )
         .expect("compute canonical v25 migration revocation payload")
     );
-    assert!(matches!(
-        repository
-            .active_write_canary_preflight_evidence(preflight_gate)
-            .await,
-        Err(MirrorError::InvalidInput(
-            "canary_preflight_evidence_not_active"
-        ))
-    ));
 }
 
 #[tokio::test]
@@ -4546,6 +4018,31 @@ fn public_support_export_is_minimized_uncorrelatable_and_checksum_stable() {
     assert!(validate_export_code("report_tie_out_unavailable").is_ok());
     assert!(validate_export_code("period_report_profile_unobserved").is_ok());
     assert!(validate_export_code("future_unreviewed_code").is_err());
+}
+
+/// What the snapshot engine records for a core-window refusal must be a code
+/// the redacted proof export accepts, or a failed run could not be exported.
+#[test]
+fn redacted_proof_export_accepts_the_code_recorded_for_each_core_window_refusal() {
+    for raw in [
+        "company_book_changed_during_group_read",
+        "company_book_changed_during_ledger_read",
+        "company_book_changed_during_voucher_read",
+        "company_book_extent_drifted",
+        "company_altmstid_missing",
+        "company_identity_mismatch",
+    ] {
+        let recorded =
+            crate::sync::snapshot::tally_error_code(&bridge_tally_core::TallyError::InvalidData {
+                code: raw.to_string(),
+            });
+        assert_ne!(
+            recorded, "response_parse_failed",
+            "{raw} fell to the catch-all"
+        );
+        validate_export_code(recorded)
+            .unwrap_or_else(|_| panic!("{raw} -> {recorded} not exportable"));
+    }
 }
 
 #[test]

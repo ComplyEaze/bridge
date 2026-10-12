@@ -184,14 +184,15 @@ impl Lineage {
                 let recorded = canonical_import_voucher(recorded)?;
                 let entries_match =
                     expected_entry_fingerprint(&recorded) == actual_entry_fingerprint(&row);
-                let mut diffs = voucher_diffs(&recorded, &row, entries_match);
-                // The import rewrites the narration too, so an edit to it in
-                // Tally is a change the amendment would overwrite.
-                if row.narration.as_deref().map(str::trim)
-                    != Some(expected_narration(&recorded, &tag).as_str())
-                {
-                    diffs.push(json!("narration"));
-                }
+                // The narration is compared too (#1608): the import rewrites it,
+                // so an edit to it in Tally is a change the amendment would
+                // overwrite.
+                let diffs = voucher_diffs(
+                    &recorded,
+                    &row,
+                    entries_match,
+                    WrittenNarration::Tagged(&tag),
+                );
                 if diffs.is_empty() {
                     matching.push(batch_id);
                 }
@@ -256,16 +257,6 @@ impl Lineage {
             Err(refused)
         })
     }
-}
-
-/// The narration `render_voucher_xml` writes for this voucher under `tag`.
-fn expected_narration(voucher: &ImportVoucher, tag: &str) -> String {
-    format!(
-        "{} [BRIDGE:{tag}]",
-        super::posted_narration(voucher).unwrap_or("")
-    )
-    .trim()
-    .to_string()
 }
 
 fn canonical_import_voucher(voucher: &ImportVoucher) -> Result<ImportVoucher, String> {

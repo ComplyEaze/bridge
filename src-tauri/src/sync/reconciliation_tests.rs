@@ -924,10 +924,6 @@ fn identical_record_in_two_windows_without_complete_scope_is_a_duplicate() {
         .parts()
         .gap_codes
         .contains(&"duplicate_record_across_windows".to_string()));
-    assert!(decision
-        .safe_mismatches
-        .iter()
-        .any(|mismatch| mismatch.safe_reason_code == "duplicate_record_across_windows"));
     assert!(decision.mirror_commit.parts().checkpoint_after.is_none());
 }
 

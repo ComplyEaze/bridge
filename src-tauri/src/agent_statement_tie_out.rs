@@ -7,7 +7,9 @@
 //! whole calendar months. See `docs/agent/README.md` ("Statement tie-out").
 use super::*;
 use bridge_bank_statement::date::Date;
-use bridge_bank_statement::proposals::{format_amount, TieOutWindowRefusal};
+use bridge_bank_statement::proposals::{
+    format_amount, is_whole_calendar_months, TieOutWindowRefusal,
+};
 use bridge_tally_core::{ExactDecimal, TallyDate};
 
 /// Whether this file's own vouchers are counted into the closing figure.
@@ -62,9 +64,9 @@ impl NotEstablished {
         match self {
             Self::WindowNotRecorded => "this proposals file was written before it recorded the statement's dates; parse the statement again",
             Self::WindowNarrowerThanStatement => "this file leaves out part of the statement and was written before parse_bank_statement recorded a window's own balances; parse the statement again",
-            Self::WindowNotWholeCalendarMonths => "this file was parsed with a from or to date that leaves out part of the statement and is not a whole calendar month (from the 1st to a month's last day), and only whole months are compared; parse the statement again with whole months, or without from and to",
+            Self::WindowNotWholeCalendarMonths => "this file was parsed with a from or to date that leaves out part of the statement and is not a whole calendar month (from the 1st to a month's last day), and only whole months are compared; parse the statement again with whole months within its dates, or without from and to (a month the statement covers only in part is compared only as part of the whole statement)",
             Self::WindowBeyondStatementRows => "the from or to date lies before the statement's first row or after its last, so the statement does not show its balance on that day; parse the statement again with months inside its own dates",
-            Self::WindowPrecedesBooksFrom => "the statement starts before the company's books begin",
+            Self::WindowPrecedesBooksFrom => "the window starts before the company's books begin",
             Self::BankLedgerNotInBook => "the file's bank ledger is not in the book under that exact name",
             Self::BookChangedDuringRead => "the bank ledger changed while it was being read; read again",
             Self::RowsWithoutVoucher => "some rows of the statement have no voucher in this file, so what the book would hold once it is imported is not known; use stage after_post once what is wanted is in the book",
@@ -305,20 +307,31 @@ fn recorded_window(document: &Value) -> Result<Result<Edges, NotEstablished>, St
                 day(tie_out.get("first_date"))?,
                 day(tie_out.get("last_date"))?,
             );
-            // Inside the statement's own rows, and the rows' own dates when
-            // the window is the whole statement.
-            if first > last
-                || first < first_row
-                || last > last_row
-                || (whole && (first, last) != (first_row, last_row))
-            {
+            let (opening, closing) = (
+                balance(tie_out.get("opening_balance"))?,
+                balance(tie_out.get("closing_balance"))?,
+            );
+            // Inside the statement's own rows. The whole statement is its own
+            // row dates at the balances it was parsed with; anything narrower
+            // is whole calendar months, checked here as well as at the parse.
+            let admitted = first <= last
+                && first >= first_row
+                && last <= last_row
+                && if whole {
+                    (first, last) == (first_row, last_row)
+                        && opening == balance(document["controls"].get("opening_balance"))?
+                        && closing == balance(document["controls"].get("closing_balance"))?
+                } else {
+                    is_whole_calendar_months(first, last)
+                };
+            if !admitted {
                 return Err(invalid());
             }
             Ok(Ok(Edges {
                 first,
                 last,
-                opening: balance(tie_out.get("opening_balance"))?,
-                closing: balance(tie_out.get("closing_balance"))?,
+                opening,
+                closing,
                 from_rows: true,
             }))
         }

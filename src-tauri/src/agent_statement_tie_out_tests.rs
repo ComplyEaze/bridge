@@ -544,7 +544,7 @@ fn a_tie_out_window_that_is_half_present_or_inconsistent_is_refused() {
         StatementFile::read(&with_window(carried(), window)).err()
     };
     type Change<'a> = &'a dyn Fn(&mut Value);
-    let cases: [(&str, Change); 13] = [
+    let cases: [(&str, Change); 16] = [
         ("no closing", &|w| {
             w["tie_out"]
                 .as_object_mut()
@@ -575,6 +575,24 @@ fn a_tie_out_window_that_is_half_present_or_inconsistent_is_refused() {
         }),
         ("whole, but not the row dates", &|w| {
             w["whole_statement"] = json!(true)
+        }),
+        // Written by hand: the parse records no balance for such a window.
+        ("one day, not whole months", &|w| {
+            w["tie_out"]["first_date"] = json!("2026-08-05");
+            w["tie_out"]["last_date"] = json!("2026-08-05");
+        }),
+        // Both keep the vouchers' net, so only the controls can refuse them.
+        ("whole, but not the closing it was parsed with", &|w| {
+            w["whole_statement"] = json!(true);
+            w["first_row_date"] = json!("2026-08-01");
+            w["last_row_date"] = json!("2026-08-31");
+        }),
+        ("whole, but not the opening it was parsed with", &|w| {
+            w["whole_statement"] = json!(true);
+            w["first_row_date"] = json!("2026-08-01");
+            w["last_row_date"] = json!("2026-08-31");
+            w["tie_out"]["opening_balance"] = json!("1970.50");
+            w["tie_out"]["closing_balance"] = json!("2150.00");
         }),
         ("a reason it does not know", &|w| {
             w["tie_out"] =
@@ -915,6 +933,8 @@ fn the_text_never_says_what_it_must_not() {
         gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap(),
         all(NotEstablished::WindowNotRecorded),
         all(NotEstablished::WindowNarrowerThanStatement),
+        all(NotEstablished::WindowNotWholeCalendarMonths),
+        all(NotEstablished::WindowBeyondStatementRows),
         all(NotEstablished::WindowPrecedesBooksFrom),
         all(NotEstablished::BankLedgerNotInBook),
         all(NotEstablished::BookChangedDuringRead),
@@ -1378,6 +1398,48 @@ async fn a_month_of_a_longer_statement_is_read_and_compared_at_the_months_edges(
             amount("differs", "-25.00")
         ]
     );
+}
+
+/// A file the parse wrote for August of a longer statement, read through the
+/// tool: the vouchers account for the month's movement, and the book is read
+/// at the month's own edges.
+#[tokio::test]
+async fn a_month_the_parse_wrote_ties_at_the_months_edges() {
+    let run = |bank: [Bank; 3], stage: &'static str| async move {
+        let mut plans = company_check();
+        for state in bank {
+            plans.extend(ledger_read(&catalogue(state)));
+        }
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let file = super::super::bank_statement::tests::persisted_august_of_a_longer_statement(
+            directory.path(),
+            BANK,
+        );
+        let response = tie_out(
+            &server(directory.path(), Some(simulator.address())),
+            &file,
+            stage,
+        )
+        .await;
+        (response, simulator.finish().unwrap())
+    };
+    let tied = [
+        amount("tied", "0.00"),
+        amount("tied", "0.00"),
+        amount("tied", "0.00"),
+    ];
+    let (after, requests) = run(book("-990.00", "-970.00", "-990.00"), "after_post").await;
+    assert_eq!(after["isError"], false, "{after}");
+    assert_eq!(figures(&after), tied);
+    assert_eq!(
+        ledger_read_dates(&requests),
+        ["20260801", "20260901", "20260801"]
+    );
+    // Before the build: the book has not moved, and the file's two payments
+    // would take it to the statement's 970.00.
+    let (before, _) = run(book("-990.00", "-990.00", "-990.00"), "before_build").await;
+    assert_eq!(figures(&before), tied);
 }
 
 #[tokio::test]

@@ -1742,10 +1742,12 @@ deadlocks.
   net of the rows dated before the window, and the closing the supplied closing
   less the net of the rows dated after it. These are sums by transaction date,
   so the order the bank printed the rows in cannot move them, and every row's
-  amount is proved by the running-balance check before they are taken. When
-  every row in the window has a voucher in the file, the vouchers must move the
-  bank ledger by exactly the closing less the opening, or the file is refused
-  (`proposals_file_invalid`). A file with no `window` is `not_established`
+  amount is proved by the running-balance check before they are taken. The
+  tie-out checks the month rule again when it reads the file. For a file that
+  carries `tie_out`, when every row in the window has a voucher in the file, the
+  vouchers must move the bank ledger by exactly the closing less the opening, or
+  the file is refused (`proposals_file_invalid`); an older whole-statement file
+  is not checked this way. A file with no `window` is `not_established`
   (`window_not_recorded`), and so is a narrowed file written before the parse
   recorded `tie_out` (`window_narrower_than_statement`), answered from the file
   once the company is verified.
@@ -1778,7 +1780,11 @@ deadlocks.
   movement gives the statement's net over those months. That is why a narrowed
   window must be whole calendar months within the statement's rows: what can be
   learnt this way is the statement's balance at month ends and its net per
-  month, never one row's amount. The result also carries the company block, the
+  month, never a part of a month. A month in which every other row's amount is
+  already known still gives that row's amount: a month of one row, or one row
+  beside open cash lines, whose amounts `cash_questions` returns. The parse
+  result already ties such a row to its party and direction through
+  `rows_in_window` and `counterparties`. The result also carries the company block, the
   stage, the window's two dates (`first_date`, `last_date`) and the reading.
 - **The sign is a type** (`BankSide`): Tally holds a debit balance as a negative
   number, a statement prints money in the account as positive, and

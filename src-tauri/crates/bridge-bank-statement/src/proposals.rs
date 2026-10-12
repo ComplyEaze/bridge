@@ -211,8 +211,9 @@ pub struct Build {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TieOutWindowRefusal {
     /// A window that leaves rows out must run from the 1st of a month to the
-    /// last day of a month, so a tie-out can only ever show the statement's
-    /// totals per calendar month, never one row's amount.
+    /// last day of a month, so a tie-out shows the statement's totals per
+    /// calendar month and never a part of a month (a month in which every
+    /// other row's amount is already known still shows that row's amount).
     NotWholeCalendarMonths,
     /// The window starts before the statement's first row or ends after its
     /// last: the statement does not prove its balance on those days.
@@ -279,8 +280,7 @@ pub fn tie_out_window(
     }
     let first = date_from.unwrap_or(first_row);
     let last = date_to.unwrap_or(last_row);
-    let last_of_month = Date::new(last.year, last.month, last.day + 1).is_none();
-    if first.day != 1 || !last_of_month {
+    if !is_whole_calendar_months(first, last) {
         return Some(Ok(Err(TieOutWindowRefusal::NotWholeCalendarMonths)));
     }
     if first < first_row || last > last_row {
@@ -302,6 +302,11 @@ pub fn tie_out_window(
             closing,
         })
     }))
+}
+
+/// From the 1st of a month to the last day of a month (the same or a later one).
+pub fn is_whole_calendar_months(first: Date, last: Date) -> bool {
+    first.day == 1 && first <= last && Date::new(last.year, last.month, last.day + 1).is_none()
 }
 
 fn out_of_range(error: impl std::fmt::Debug) -> Refusal {

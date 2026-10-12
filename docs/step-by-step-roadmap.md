@@ -199,7 +199,7 @@ item 5 to defer destination activation. It establishes no runtime, support, or
 qualification claim and sets no activation schedule. The summary below is
 non-exhaustive; the linked plans and ADR remain the authoritative gates.
 
-**2026-10-12 amendment.** `transport_qualification`, the third of these
+**2026-10-12 amendment.** `transport_qualification`, the second of these
 foundations, was deleted rather than retained ([#1574](https://github.com/ComplyEaze/bridge/pull/1574)), together with the JSONEX parser
 and request builder it was built beside. Two foundations remain below.
 

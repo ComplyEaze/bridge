@@ -1,0 +1,10 @@
+# screenshots and the backup stay on the lab PC: sha256  file  bytes
+62c0a3b0b254f7eb0925dccbdbb75d63b3367f7115e5f06be15ee4a68cb21b57  shots/step10-after-restore-loaded.jpg  31191
+a9a4f1c38c7d1bf1857a5551fdec5834191bc7492fcd112dfc06364bb1b7ad7c  shots/step10-error-company-open.jpg  25277
+8860c06fe41e8bf2e1d9e4225af62889054396b2449d5d037b0342352ff2526a  shots/step10-replace-prompt.jpg  82917
+334733a5d02549951ac8bf911828c641733f124ba381045567c458e0b4128b74  shots/step4-0045-post-dated-before-save.jpg  108508
+59bf7308e7306ce5c4eb991b5f6517fb29966685d206d3e795ba8345fd692f92  shots/step4-after-save-no-dialog.jpg  97297
+4cb152d1297873d88591505cb376852fa6e4a14f6304fdd8e48338320536e6d7  shots/step6-f11-features-no-edit-log-option.jpg  123670
+6de7f0cb0e2d2b9fa2d8f02d20f9f22652056d92c629081cb7619d2696e68027  shots/step7-daybook-after-delete.jpg  29019
+20d1d60cd85786f413e9df4f873625ce66b8ef3331b6b06e80c3a8bbf64d457c  shots/step7-delete-prompt.jpg  83190
+4a50474e3bef708f2d6774221fbb32505faa097e577797a81f0a6fe5ad66cfde  backups/W21B/TDBK1800_100033.001  90051

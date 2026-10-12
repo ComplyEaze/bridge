@@ -1,0 +1,3 @@
+aw21b-b: 33 vouchers; new vs aw21b-a: ['BP/26-27/0045']; gone: []; others changed: []
+    BP/26-27/0045 GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d {'DATE': ['20260825'], 'VOUCHERTYPENAME': ['BRIDGE Sales'], 'VOUCHERNUMBER': ['BP/26-27/0045'], 'ALTERID': ['69'], 'MASTERID': ['45'], 'VCHGSTSTATUSISINCLUDED': ['Yes'], 'VCHGSTSTATUSISUNCERTAIN': ['No'], 'VCHGSTSTATUSISEXCLUDED': ['No'], 'ISGSTOVERRIDDEN': ['No'], 'ISCANCELLED': ['No'], 'ISOPTIONAL': ['No'], 'ISPOSTDATED': ['Yes'], 'ISDELETED': ['No'], 'ISDELETEDVCHRETAINED': ['No']}
+aw21b-c: 32 vouchers; new vs aw21b-a: []; gone: []; others changed: []

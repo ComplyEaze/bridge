@@ -1434,7 +1434,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              customer's GSTIN, state, registration type or bill-wise setting, the voucher \
              type, or the state of the company's GST registration. Nothing was posted. Build the invoice again, so it \
              is checked against the book as it is now, and show the user the new approval \
-             text.",
+             text. When the cause is listing_date, nothing in Tally changed: the day turned \
+             between the last check and the post, so call post_import again.",
         ),
         "invoice_company_registration_absent"
         | "invoice_company_registration_not_yet_in_force"

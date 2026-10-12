@@ -1097,10 +1097,13 @@ pub(super) fn queued_invoice_for<'a>(
 /// Whether the plan the queue sent is the one this invoice calls for. Every
 /// part of it is a function of the invoice and the clock alone (the company,
 /// the date the listing is read as of, and each request, the ledger count's
-/// among them) apart from the number's control, which is the journal's: a plan
-/// that differs in any other part is a wiring fault, and a control that moved
-/// since the plan is a change. The precheck is the invoice module's own
-/// function; the judge decides again whatever it answered.
+/// among them) apart from the number's control, which is the journal's. A plan
+/// that differs in the company or in any request is a wiring fault. A listing
+/// date that is not the queue's day is not a fault but a clock that moved
+/// since the plan (a post whose approval spans midnight), and a control that
+/// moved since the plan is a change: each is named by its own cause. The
+/// precheck is the invoice module's own function; the judge decides again
+/// whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
     carried: &InvoiceReadPlan,
@@ -1117,7 +1120,6 @@ pub(super) fn fit_plan(
         registration,
     } = wanted;
     if *company_name != carried.company_name
-        || *listing_as_of != carried.listing_as_of
         || *ledger_count != carried.ledger_count
         || *rates != carried.rates
         || *voucher_types != carried.voucher_types
@@ -1125,6 +1127,11 @@ pub(super) fn fit_plan(
         || *registration != carried.registration
     {
         return Err(ApprovedImportAdmissionError::AdmissionInconsistent);
+    }
+    if *listing_as_of != carried.listing_as_of {
+        return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
+            field: "listing_date",
+        });
     }
     if *number_control != carried.number_control {
         return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {

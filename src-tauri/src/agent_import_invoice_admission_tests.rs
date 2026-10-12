@@ -678,21 +678,31 @@ fn a_plan_that_is_not_the_invoices_does_not_fit_it() {
             "{other:?}"
         );
     }
-    // The company, the day the listing is read as of and the ledger count's
-    // request are each held to the invoice too.
+    // The company and the ledger count's request are each held to the invoice
+    // too.
     let mut other_company = plan.clone();
     other_company.company_name = "ANOTHER LAB".to_string();
-    let mut later = plan.clone();
-    later.listing_as_of = bridge_tally_core::TallyDate::parse("20261011".to_string()).unwrap();
     let mut other_count = plan.clone();
     other_count.ledger_count = plan.rates.clone();
-    for carried in [other_company, later, other_count] {
+    for carried in [other_company, other_count] {
         assert_eq!(
             invoice::fit_plan(&plan, &carried),
             Err(AdmissionInconsistent),
             "{carried:?}"
         );
     }
+    // The day the listing is read as of is held too, but a plan made on another
+    // day is a clock that moved, not a fault: it is named as such.
+    let mut later = plan.clone();
+    later.listing_as_of = bridge_tally_core::TallyDate::parse("20261011".to_string()).unwrap();
+    assert_eq!(
+        invoice::fit_plan(&plan, &later),
+        Err(
+            crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged {
+                field: "listing_date"
+            }
+        )
+    );
 }
 
 /// The journal's control moved between the plan and the queue (another invoice
@@ -855,6 +865,16 @@ fn the_queue_refuses_a_plan_that_does_not_fit_before_judging_any_answer() {
     assert_eq!(
         admit(&plan_of(&other, &never), &never),
         Err(AdmissionInconsistent)
+    );
+    // A plan made on another day (an approval that spans midnight) is named by
+    // its date, not taken for a wiring fault, whatever the answers say.
+    let mut yesterdays = plan_of(&voucher, &never);
+    yesterdays.listing_as_of = bridge_tally_core::TallyDate::parse("20261009".to_string()).unwrap();
+    assert_eq!(
+        admit(&yesterdays, &never),
+        Err(InvoiceMastersChanged {
+            field: "listing_date"
+        })
     );
     // A control that moved either way since the plan is a named change.
     for (carried, now) in [(&never, &known), (&known, &never)] {

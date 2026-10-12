@@ -1456,6 +1456,13 @@ impl Server {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
                 }
+                // The code's next step, under the same rule, and only when the
+                // journal shows nothing was sent (#1573).
+                if let Some(nothing_sent) = NothingSent::observed(attempted) {
+                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                        attach_next_step(&mut outcome.payload, cause, nothing_sent);
+                    }
+                }
                 // Name the earlier batch to verify. Both refusal paths land
                 // here; the journal only grows, so a later read finds one unless a later
                 // record of that batch replaced its row set, or the lock or the read failed
@@ -1683,6 +1690,48 @@ fn reconciliation_failure_payload(
         }
     }
     payload
+}
+
+/// That a refused post sent nothing to Tally: the batch's journal, re-read by
+/// [`Server::post_failure_attempt_observation`] under the dispatch
+/// observation lease, records no dispatch of it (#1573). A next step is
+/// attached only with one, so no refusal after a send, or after a send that
+/// could not be ruled out, is ever told what to try next.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct NothingSent(());
+
+impl NothingSent {
+    /// One only from the observation's `Some(false)`; a send (`Some(true)`)
+    /// or an unknown (`None`) gives none.
+    pub(super) fn observed(attempted: Option<bool>) -> Option<Self> {
+        (attempted == Some(false)).then_some(Self(()))
+    }
+}
+
+/// Adds the general next step, the code's else its cause's (as every other
+/// tool's refusal is given), as `error.next_step` to a post refusal that sent
+/// nothing, unless the post already set its own (a busy port, a row
+/// another batch posted) or its message already is the step (a saved text that
+/// cannot be posted, #1055). Before #1573 a code raised inside the post had a
+/// next step no caller was ever shown.
+pub(super) fn attach_next_step(
+    payload: &mut Value,
+    cause: Option<&str>,
+    _nothing_sent: NothingSent,
+) {
+    let error = &mut payload["result"]["error"];
+    if error.get("next_step").is_some() {
+        return;
+    }
+    let Some(code) = error["code"].as_str() else {
+        return;
+    };
+    if code == "voucher_text_invalid" {
+        return;
+    }
+    if let Some(step) = crate::agent::remediation_for(code, cause) {
+        error["next_step"] = json!(step);
+    }
 }
 
 fn mark_reconciliation_required(payload: &mut Value) {
@@ -2665,6 +2714,11 @@ pub(super) const BATCH_REVIEW_MAX_VOUCHER_LINES: usize = 10;
 /// cut. Characters, not graphemes: a cut can split a Devanagari conjunct, and
 /// the marker says so rather than hiding it (#1063).
 pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
+/// The same for a Journal's line, which names a ledger on each side.
+pub(super) const BATCH_REVIEW_JOURNAL_NARRATION_CHARS: usize = 20;
+/// The fewest narration characters a Journal's line shows when its cut moves
+/// down to fit the line: fewer would identify nothing.
+pub(super) const BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS: usize = 10;
 
 /// The line above a small batch's voucher lines.
 pub(super) const VOUCHER_LINES_HEADING: &str =
@@ -2677,7 +2731,7 @@ pub(super) const VOUCHER_LINES_HEADING_MARKED: &str =
 /// dialog wraps long lines, so a narration's tail can begin a row of its own
 /// (#1063 follow-up).
 pub(super) const VOUCHER_LINES_NARRATION_HEADING: &str =
-    "Each line ends with its narration, quoted exactly as it will be posted.";
+    "Each line ends with its narration, quoted; a cut one is marked … (+N characters).";
 /// What a voucher's line shows in place of a narration that reads like a line
 /// of this dialog. It echoes none of the narration.
 pub(super) const NARRATION_WITHHELD: &str = "(narration withheld: it reads like a dialog line)";
@@ -2765,9 +2819,14 @@ pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
 
 /// One line per voucher of a small batch (#1063): its type and date, its
 /// value (the sum of its debits), the ledger a statement row names (a
-/// Receipt's first credit, any other type's first debit, in the batch file's
-/// order, with "+N" for the rest of that side) and its narration as posted,
-/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked, or
+/// Receipt's first credit, a Payment's or Contra's first debit, in the batch
+/// file's order, with "+N more" for the rest of that side, never a bare
+/// "+N" that could read as an amount; a Journal's first debit and first
+/// credit, each so, as `Dr … Cr …`) and its narration as posted,
+/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` (a Journal's at
+/// `BATCH_REVIEW_JOURNAL_NARRATION_CHARS`, or lower, down to
+/// `BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS`, when that makes its line
+/// fit) with the cut marked, or
 /// `NARRATION_WITHHELD` when it reads like a line of this dialog; the On
 /// Account legend counts as one only when this dialog carries it (`legend`).
 /// `None` when a narration or reference holds a character the dialog cannot
@@ -2801,54 +2860,83 @@ fn voucher_review_lines(
                 .checked_add(&amount)
                 .map_err(|_| "voucher_amount_overflow".to_string())?;
         }
-        let side = if voucher.voucher_type == VoucherType::Receipt {
-            EntrySide::Cr
-        } else {
-            EntrySide::Dr
-        };
-        let named: Vec<&str> = voucher
-            .entries
-            .iter()
-            .filter(|entry| entry.side == side)
-            .map(|entry| entry.ledger.as_str())
-            .collect();
         let shown = |name: &str| {
             ReviewLedgerName::parse(name)
                 .map(ReviewLedgerName::shown)
                 .map_err(ReviewTextRefusal::import_code)
         };
-        let ledger = match named.as_slice() {
-            [] => "(none)".to_string(),
-            [only] => shown(only)?,
-            [first, rest @ ..] => format!("{} +{}", shown(first)?, rest.len()),
+        let side_named = |side: EntrySide| -> Result<String, String> {
+            let named: Vec<&str> = voucher
+                .entries
+                .iter()
+                .filter(|entry| entry.side == side)
+                .map(|entry| entry.ledger.as_str())
+                .collect();
+            Ok(match named.as_slice() {
+                [] => "(none)".to_string(),
+                [only] => shown(only)?,
+                [first, rest @ ..] => format!("{} +{} more", shown(first)?, rest.len()),
+            })
         };
-        let narration = match super::posted_narration(voucher) {
-            None => "(none)".to_string(),
+        // A Journal has no bank side fixed by its type, so its line names
+        // the first ledger of each side; its narration gets fewer characters.
+        let journal = voucher.voucher_type == VoucherType::Journal;
+        let ledger = if journal {
+            format!(
+                "Dr {}  Cr {}",
+                side_named(EntrySide::Dr)?,
+                side_named(EntrySide::Cr)?
+            )
+        } else if voucher.voucher_type == VoucherType::Receipt {
+            side_named(EntrySide::Cr)?
+        } else {
+            side_named(EntrySide::Dr)?
+        };
+        // Whether the narration is shown at all is decided once, on its whole
+        // text: `Err` holds what stands in its place at every cut.
+        let posted = match super::posted_narration(voucher) {
+            None => Err("(none)"),
             Some(text)
                 if reads_like_a_dialog_line(text) || (legend && reads_like_the_legend(text)) =>
             {
-                NARRATION_WITHHELD.to_string()
+                Err(NARRATION_WITHHELD)
             }
-            Some(text) => {
+            Some(text) => Ok(text),
+        };
+        let narration = |cut: usize| match posted {
+            Err(shown) => shown.to_string(),
+            Ok(text) => {
                 let length = text.chars().count();
-                if length > BATCH_REVIEW_NARRATION_CHARS {
-                    let kept: String = text.chars().take(BATCH_REVIEW_NARRATION_CHARS).collect();
-                    format!(
-                        "{}… (+{} characters)",
-                        quoted(&kept),
-                        length - BATCH_REVIEW_NARRATION_CHARS
-                    )
+                if length > cut {
+                    let kept: String = text.chars().take(cut).collect();
+                    format!("{}… (+{} characters)", quoted(&kept), length - cut)
                 } else {
                     quoted(text)
                 }
             }
         };
-        lines.push(format!(
-            "{} {}  {}  {ledger}  {narration}",
-            voucher.voucher_type.as_str(),
-            voucher.date.as_str(),
-            value.as_str(),
-        ));
+        let line_with = |narration: String| {
+            format!(
+                "{} {}  {}  {ledger}  {narration}",
+                voucher.voucher_type.as_str(),
+                voucher.date.as_str(),
+                value.as_str(),
+            )
+        };
+        // A Journal's narration gives way first: when its line would be wider
+        // than a line may be, the cut moves down, never below
+        // `BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS`, until the line fits. A
+        // line that fits at no such cut is kept at the usual cut, so the batch
+        // leaves the totals as before.
+        lines.push(if journal {
+            (BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS..=BATCH_REVIEW_JOURNAL_NARRATION_CHARS)
+                .rev()
+                .map(|cut| line_with(narration(cut)))
+                .find(|line| line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS)
+                .unwrap_or_else(|| line_with(narration(BATCH_REVIEW_JOURNAL_NARRATION_CHARS)))
+        } else {
+            line_with(narration(BATCH_REVIEW_NARRATION_CHARS))
+        });
     }
     Ok(Some(lines))
 }

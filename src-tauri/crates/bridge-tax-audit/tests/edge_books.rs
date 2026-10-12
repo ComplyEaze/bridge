@@ -17,7 +17,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 use bridge_tax_audit::book::{
-    Book, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher, VoucherStatus,
+    Book, ClosingStock, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher,
+    VoucherStatus,
 };
 use bridge_tax_audit::canonical::canonical_test_result;
 use bridge_tax_audit::compare::compare;
@@ -32,11 +33,11 @@ use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register,
-    knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees, partners_40b_194t,
-    party_identity, party_monthly, questionnaire_cl13, read_scope, related_parties_cl23,
-    specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
-    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements,
+    high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
+    partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
+    related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
+    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
     RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
@@ -213,6 +214,32 @@ fn opening_stock(s: &Value) -> OpeningStock {
     .unwrap_or_default()
 }
 
+/// `closing_stock`: integer paise, or one of the reasons it is unknown; absent means none applies.
+fn closing_stock(s: &Value) -> ClosingStock {
+    use bridge_tax_audit::book::ClosingStockUnknown as U;
+    typed(
+        s,
+        "closing_stock",
+        false,
+        "integer paise or a reason",
+        |v| {
+            v.as_i64().map(ClosingStock::Valued).or_else(|| {
+                [
+                    U::NotRead,
+                    U::NoSummaryAtPeriodEnd,
+                    U::Unreadable,
+                    U::NoStockItems,
+                    U::SeveralSummariesAtPeriodEnd,
+                ]
+                .into_iter()
+                .find(|u| v.as_str() == Some(u.as_str()))
+                .map(ClosingStock::Unknown)
+            })
+        },
+    )
+    .unwrap_or_default()
+}
+
 fn build(s: &Value) -> Book {
     let groups = s["groups"]
         .as_object()
@@ -322,6 +349,7 @@ fn build(s: &Value) -> Book {
         currency_read: typed(s, "currency_read", false, "true or false", Value::as_bool)
             .unwrap_or(false),
         opening_stock: opening_stock(s),
+        closing_stock: closing_stock(s),
         ..Default::default()
     }
 }
@@ -841,6 +869,13 @@ fn check(name: &str) {
                 let c = cash_book_integrity::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
+            "financial_statements" => {
+                // As `parity/edge_golden.py` runs it: no partners' interest ledgers and no report
+                // totals.
+                let r = financial_statements::run(&book, &rules, &BTreeSet::new(), None).unwrap();
+                let c = financial_statements::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
             "cash_payments_40a3" => {
                 // As `parity/edge_golden.py` runs it: the configured loan ledgers and the
                 // round-off ledgers as given. The reference module has no `check_invariants`.
@@ -1269,7 +1304,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 30] = [
+const EDGE_TESTS: [&str; 31] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1282,6 +1317,7 @@ const EDGE_TESTS: [&str; 30] = [
     "creditor_ageing_43bh",
     "depreciation",
     "entity_269st_gap",
+    "financial_statements",
     "high_value_register",
     "knock_off_candidates",
     "ledger_scrutiny",

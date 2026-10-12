@@ -1,6 +1,5 @@
 pub(crate) mod agent_read_request;
 pub(crate) mod approved_import;
-pub mod capability_packs;
 pub mod connection;
 pub mod connector;
 pub mod runtime;
@@ -13,19 +12,17 @@ pub mod xml_parser;
 // Crate-internal only: `tally::connector` is the sole consumer.
 mod canonical_window;
 
-pub use bridge_tally_core as core;
-pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult, TallyProduct};
+pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult};
 pub(crate) use connector::core_snapshot_start_authorized_codes;
 pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
-    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
-    OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
-    UnallocatedComposition, UnallocatedParty,
+    CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
+    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason, TallyRuntime,
+    TallySessionSnapshot, UnallocatedComposition, UnallocatedParty,
 };
-pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
+pub use xml_parser::{TallyCompany, TallyLedger};
 
 /// A complete company tuple that a fresh Company collection has matched once.
 ///
@@ -34,7 +31,7 @@ pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedCompanyIdentity {
     display_name: String,
-    company_guid: String,
+    company_guid: bridge_tally_core::company_guid::CompanyGuid,
     company_number: ObservedCompanyNumber,
     books_from_yyyymmdd: bridge_tally_core::TallyDate,
 }
@@ -72,7 +69,7 @@ impl VerifiedCompanyIdentity {
     /// its display scope; callers cannot turn a bare GUID into a capability.
     pub fn from_observed_companies(
         display_name: String,
-        company_guid: String,
+        company_guid: bridge_tally_core::company_guid::CompanyGuid,
         company_number: String,
         books_from_yyyymmdd: String,
         companies: &[TallyCompany],
@@ -80,12 +77,13 @@ impl VerifiedCompanyIdentity {
         let company_number = ObservedCompanyNumber::parse(company_number)?;
         let books_from_yyyymmdd = bridge_tally_core::TallyDate::parse(books_from_yyyymmdd)
             .map_err(|_| VerifiedCompanyIdentityError::InvalidBooksFrom)?;
+        // The GUID arrives already parsed by the caller at its own boundary.
+        // `CompanyGuid` stores the lowercase form, so derived equality keeps
+        // the ASCII-insensitive contract that company-list and extent
+        // comparisons use across a read bracket.
         let identity = Self {
             display_name,
-            // All company-list and extent comparisons use ASCII-insensitive
-            // GUID semantics. Keep the stored value canonical so derived
-            // equality preserves that same contract across a read bracket.
-            company_guid: company_guid.to_ascii_lowercase(),
+            company_guid,
             company_number,
             books_from_yyyymmdd,
         };
@@ -113,7 +111,7 @@ impl VerifiedCompanyIdentity {
     ) -> Self {
         Self {
             display_name: display_name.into(),
-            company_guid: company_guid.into().to_ascii_lowercase(),
+            company_guid: test_company_guid(&company_guid.into()),
             company_number: ObservedCompanyNumber::parse("1".to_string())
                 .expect("fixed fixture company number is valid"),
             books_from_yyyymmdd: bridge_tally_core::TallyDate::parse("20260401")
@@ -126,7 +124,7 @@ impl VerifiedCompanyIdentity {
     }
 
     pub(crate) fn company_guid(&self) -> &str {
-        &self.company_guid
+        self.company_guid.as_str()
     }
 
     pub(crate) fn company_number(&self) -> &str {
@@ -145,7 +143,7 @@ impl VerifiedCompanyIdentity {
     > {
         bridge_tally_protocol::outstandings_shared::CompanyBookExtentExpectation::new(
             self.display_name.clone(),
-            self.company_guid.clone(),
+            self.company_guid.as_str().to_owned(),
             self.company_number.as_str().to_owned(),
             self.books_from_yyyymmdd.as_str().to_owned(),
         )
@@ -156,7 +154,7 @@ impl VerifiedCompanyIdentity {
             && company
                 .guid
                 .as_deref()
-                .is_some_and(|guid| guid.eq_ignore_ascii_case(&self.company_guid))
+                .is_some_and(|guid| self.company_guid.matches_observed(guid))
             && company.company_number.as_deref() == Some(self.company_number.as_str())
             && company.books_from.as_deref() == Some(self.books_from_yyyymmdd.as_str())
     }
@@ -165,13 +163,25 @@ impl VerifiedCompanyIdentity {
         company
             .guid
             .as_deref()
-            .is_some_and(|guid| guid.eq_ignore_ascii_case(&self.company_guid))
+            .is_some_and(|guid| self.company_guid.matches_observed(guid))
             && company
                 .name
                 .trim()
                 .eq_ignore_ascii_case(self.display_name.trim())
             && !self.matches_observed_company(company)
     }
+}
+
+/// Test-only: the strict parse every production boundary applies, so a test
+/// cannot hold a GUID that the product could not.
+#[cfg(test)]
+pub(crate) fn test_company_guid(value: &str) -> bridge_tally_core::company_guid::CompanyGuid {
+    bridge_tally_core::company_guid::CompanyGuid::parse(value).unwrap_or_else(|error| {
+        panic!(
+            "test company GUID {value:?} is not the strict 8-4-4-4-12 spelling \
+             the product accepts: {error}"
+        )
+    })
 }
 
 #[cfg(test)]

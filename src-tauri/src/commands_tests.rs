@@ -40,7 +40,7 @@ use super::all_clients::migration::{
     ClientGroupLabelMigrationPreparationError,
 };
 use super::{
-    company_sweep_result, first_calendar_day_canary_window,
+    company_sweep_result, first_calendar_day_canary_window, party_ledger_master_balance_basis,
     party_ledger_master_currency_admission_error, party_ledger_master_foreign_currency_error,
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
@@ -542,6 +542,35 @@ fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_bou
     for malformed in ["2026-07-31", "20260230", "", "2026073"] {
         assert!(request(Some(malformed)).is_err(), "{malformed}");
     }
+}
+
+#[test]
+fn a_chosen_date_becomes_the_requested_basis_and_none_asks_for_the_host_date() {
+    use crate::reports::party_ledger_master::BalanceDateBasis;
+    let chosen = TallyDate::parse("20260731").unwrap();
+    let host = TallyDate::parse("20261012").unwrap();
+    // A chosen date is the basis, and the clock is not read for it.
+    let basis = party_ledger_master_balance_basis(Some(chosen.clone()), || {
+        panic!("a chosen date must not read the host's date")
+    })
+    .unwrap();
+    assert_eq!(basis, BalanceDateBasis::Requested(chosen));
+    // With none chosen the basis is the host's date, as the export has always used.
+    let basis = party_ledger_master_balance_basis(None, || Ok(host.clone())).unwrap();
+    assert_eq!(basis, BalanceDateBasis::HostToday(host));
+    // A clock that cannot be read is the host-date error, not a made-up date.
+    let refused = party_ledger_master_balance_basis(None, || {
+        Err(tally_command_error(
+            "current_date_invalid",
+            "ComplyEaze Bridge application",
+            "synthetic",
+            "after_change",
+            false,
+            "synthetic",
+        ))
+    })
+    .unwrap_err();
+    assert_eq!(refused.code, "current_date_invalid");
 }
 
 #[test]

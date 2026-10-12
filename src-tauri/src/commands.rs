@@ -1905,10 +1905,7 @@ async fn export_party_ledger_master_once(
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
-    let basis = match request.as_of_yyyymmdd {
-        Some(requested) => BalanceDateBasis::Requested(requested),
-        None => BalanceDateBasis::HostToday(host_today()?),
-    };
+    let basis = party_ledger_master_balance_basis(request.as_of_yyyymmdd, host_today)?;
     let source = runtime
         .fetch_party_ledger_master_source(request.config, &identity, currency_assertion, basis)
         .await
@@ -2021,6 +2018,19 @@ async fn fetch_selected_ledger_entries_once(
             },
         )
     })
+}
+
+/// What ends the ledger-master export's balances: the date the CA chose, else
+/// the Bridge host's (#903). The host's date is asked for only when none was
+/// chosen, so a chosen date never reads the clock.
+fn party_ledger_master_balance_basis(
+    chosen: Option<TallyDate>,
+    host_today: impl FnOnce() -> Result<TallyDate, TallyCommandError>,
+) -> Result<BalanceDateBasis, TallyCommandError> {
+    match chosen {
+        Some(requested) => Ok(BalanceDateBasis::Requested(requested)),
+        None => host_today().map(BalanceDateBasis::HostToday),
+    }
 }
 
 fn requested_outstandings_as_of(

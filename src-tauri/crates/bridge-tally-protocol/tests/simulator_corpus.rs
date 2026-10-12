@@ -1,15 +1,13 @@
 use bridge_tally_protocol::{
     decode_xml_bytes, decode_xml_bytes_limited, export_status, parse_companies,
     parse_companies_for_interactive_discovery, parse_companies_from_collection,
-    parse_companies_with_evidence, parse_group_source_records_with_evidence, parse_import_result,
-    parse_ledger_source_records_with_evidence, parse_ledgers, parse_ledgers_with_evidence,
-    parse_native_ledger_source_records_with_evidence, parse_standard_ledger_catalog,
-    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    parse_voucher_source_records_with_evidence, parse_voucher_type_source_records_with_evidence,
-    parse_vouchers, parse_vouchers_with_evidence, verify_company_context, ParsedSourceIdentityKind,
-    PartyLedgerMasterFieldObservation, StandardLedgerCatalogError, TallyExportStatus,
-    BRIDGE_GROUP_EXPORT_SCHEMA, BRIDGE_LEDGER_EXPORT_SCHEMA, BRIDGE_VOUCHER_EXPORT_SCHEMA,
-    BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
+    parse_companies_with_evidence, parse_import_result, parse_ledger_source_records_with_evidence,
+    parse_ledgers, parse_ledgers_with_evidence, parse_native_ledger_source_records_with_evidence,
+    parse_standard_ledger_catalog, parse_standard_ledger_catalog_with_identities,
+    parse_standard_ledger_identity_observation, parse_voucher_source_records_with_evidence,
+    verify_company_context, ParsedSourceIdentityKind, PartyLedgerMasterFieldObservation,
+    StandardLedgerCatalogError, TallyExportStatus, BRIDGE_LEDGER_EXPORT_SCHEMA,
+    BRIDGE_VOUCHER_EXPORT_SCHEMA, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
 };
 use quick_xml::{events::Event, Reader};
 use tally_protocol_simulator::{encode, Fixture, ScenarioPlan, WireEncoding};
@@ -94,12 +92,6 @@ fn primary_rows_and_company_context_must_use_supported_export_parents() {
         BRIDGE_LEDGER_EXPORT_SCHEMA
     );
     assert!(parse_ledger_source_records_with_evidence(&nested_ledger).is_err());
-
-    let nested_group = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="GROUP" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><UNEXPECTED><GROUP NAME="BRIDGE GROUP" GUID="group-guid"><PARENT>Primary</PARENT></GROUP></UNEXPECTED></BODY></ENVELOPE>"#,
-        BRIDGE_GROUP_EXPORT_SCHEMA
-    );
-    assert!(parse_group_source_records_with_evidence(&nested_group).is_err());
 
     let nested_voucher = format!(
         r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><UNEXPECTED><VOUCHER GUID="voucher-guid"><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER></UNEXPECTED></BODY></ENVELOPE>"#,
@@ -381,31 +373,17 @@ fn source_record_parsers_preserve_identity_kind_and_exact_fragment_hash() {
 }
 
 #[test]
-fn full_core_master_and_nested_entry_contracts_are_strict() {
-    let group_xml = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="GROUP" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><GROUP NAME="BRIDGE GROUP" GUID="group-guid" REMOTEID="group-remote" MASTERID="7" ALTERID="11"><PARENT>Primary</PARENT></GROUP></BODY></ENVELOPE>"#,
-        BRIDGE_GROUP_EXPORT_SCHEMA
-    );
-    let groups = parse_group_source_records_with_evidence(&group_xml).unwrap();
-    assert_eq!(groups.records[0].source_id.as_deref(), Some("group-guid"));
-    assert_eq!(groups.records[0].identities.master_id.as_deref(), Some("7"));
-    assert_eq!(groups.records[0].alter_id.as_deref(), Some("11"));
-
-    let voucher_type_xml = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHERTYPE" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><VOUCHERTYPE NAME="Receipt" MASTERID="9" ALTERID="12"><PARENT>Receipt</PARENT></VOUCHERTYPE></BODY></ENVELOPE>"#,
-        BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA
-    );
-    let voucher_types = parse_voucher_type_source_records_with_evidence(&voucher_type_xml).unwrap();
-    assert_eq!(
-        voucher_types.records[0].identity_kind,
-        Some(ParsedSourceIdentityKind::MasterId)
-    );
-
+fn nested_voucher_entry_contracts_are_strict() {
     let voucher_xml = format!(
         r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><VOUCHER GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="10" ALTERID="13"><DATE>20260701</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>BRIDGE-1</VOUCHERNUMBER><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>2</LEDGERENTRYCOUNT><LEDGERENTRIES><LEDGERENTRY><ENTRYINDEX>1</ENTRYINDEX><LEDGERNAME>Cash</LEDGERNAME><AMOUNT>-100.00</AMOUNT><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE></LEDGERENTRY><LEDGERENTRY><ENTRYINDEX>2</ENTRYINDEX><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>100.00</AMOUNT><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE></LEDGERENTRY></LEDGERENTRIES></VOUCHER></BODY></ENVELOPE>"#,
         BRIDGE_VOUCHER_EXPORT_SCHEMA
     );
     let vouchers = parse_voucher_source_records_with_evidence(&voucher_xml).unwrap();
+    assert_eq!(
+        vouchers.records[0].identities.master_id.as_deref(),
+        Some("10")
+    );
+    assert_eq!(vouchers.records[0].alter_id.as_deref(), Some("13"));
     assert_eq!(vouchers.records[0].record.ledger_entries.len(), 2);
     assert_eq!(vouchers.records[0].record.ledger_entries[0].entry_index, 1);
     assert_eq!(
@@ -432,6 +410,63 @@ fn full_core_master_and_nested_entry_contracts_are_strict() {
         "<ISDEEMEDPOSITIVE>Maybe</ISDEEMEDPOSITIVE>",
     );
     assert!(parse_voucher_source_records_with_evidence(&invalid_polarity).is_err());
+}
+
+#[test]
+fn a_record_is_identified_by_guid_then_remote_id_then_master_id() {
+    let export = |identity_attributes: &str| {
+        format!(
+            r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><VOUCHER {identity_attributes}><DATE>20260701</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>BRIDGE-001</VOUCHERNUMBER><PARTYLEDGERNAME>BRIDGE SYNTHETIC LEDGER</PARTYLEDGERNAME><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER></BODY></ENVELOPE>"#,
+            BRIDGE_VOUCHER_EXPORT_SCHEMA
+        )
+    };
+
+    let all_three = parse_voucher_source_records_with_evidence(&export(
+        r#"GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="7" ALTERID="11""#,
+    ))
+    .unwrap();
+    assert_eq!(
+        all_three.records[0].identity_kind,
+        Some(ParsedSourceIdentityKind::Guid)
+    );
+    assert_eq!(
+        all_three.records[0].source_id.as_deref(),
+        Some("voucher-guid")
+    );
+    assert_eq!(all_three.records[0].alter_id.as_deref(), Some("11"));
+
+    let remote_only = parse_voucher_source_records_with_evidence(&export(
+        r#"REMOTEID="bridge-synthetic-voucher-001""#,
+    ))
+    .unwrap();
+    let record = &remote_only.records[0];
+    assert_eq!(
+        record.identity_kind,
+        Some(ParsedSourceIdentityKind::RemoteId)
+    );
+    assert_eq!(
+        record.source_id.as_deref(),
+        Some("bridge-synthetic-voucher-001")
+    );
+    assert_eq!(
+        record.record.id.as_deref(),
+        Some("bridge-synthetic-voucher-001")
+    );
+    assert_eq!(record.record.date.as_deref(), Some("20260701"));
+    assert_eq!(record.record.cancelled, Some(false));
+    assert_eq!(record.record.ledger_entry_count, Some(0));
+
+    let master_only =
+        parse_voucher_source_records_with_evidence(&export(r#"MASTERID="9" ALTERID="12""#))
+            .unwrap();
+    let record = &master_only.records[0];
+    assert_eq!(
+        record.identity_kind,
+        Some(ParsedSourceIdentityKind::MasterId)
+    );
+    assert_eq!(record.source_id.as_deref(), Some("9"));
+    assert_eq!(record.identities.master_id.as_deref(), Some("9"));
+    assert_eq!(record.alter_id.as_deref(), Some("12"));
 }
 
 #[test]
@@ -469,7 +504,8 @@ fn child_and_attribute_metadata_shapes_are_strictly_equivalent() {
     );
     assert_eq!(child.evidence.source_record_count, Some(1));
 
-    let attributes = parse_vouchers_with_evidence(&Fixture::VoucherExport.body()).unwrap();
+    let attributes =
+        parse_voucher_source_records_with_evidence(&Fixture::VoucherExport.body()).unwrap();
     assert_eq!(attributes.records.len(), 1);
     assert_eq!(
         attributes.evidence.schema.as_deref(),
@@ -478,7 +514,7 @@ fn child_and_attribute_metadata_shapes_are_strictly_equivalent() {
     assert_eq!(attributes.evidence.object_type.as_deref(), Some("VOUCHER"));
     assert_eq!(attributes.evidence.source_record_count, Some(1));
     assert_eq!(
-        attributes.records[0].id.as_deref(),
+        attributes.records[0].record.id.as_deref(),
         Some("00000000-0000-4000-8000-000000000201")
     );
 }
@@ -638,25 +674,13 @@ fn application_failure_errors_do_not_echo_line_error_payloads() {
 }
 
 #[test]
-fn legacy_company_and_voucher_api_shapes_are_preserved() {
+fn legacy_company_api_shape_is_preserved() {
     let companies = parse_companies(
         r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000001</COMPANYGUIDFIELD></COMPANYINFO></BODY></ENVELOPE>"#,
     )
     .unwrap();
     assert_eq!(companies.len(), 1);
     assert_eq!(companies[0].name, "BRIDGE SYNTHETIC BOOK");
-
-    let vouchers = parse_vouchers(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="bridge.tally.vouchers/2" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="guid-company" RECORDCOUNT="1" /><VOUCHER REMOTEID="bridge-synthetic-voucher-001"><DATE>20260701</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>BRIDGE-001</VOUCHERNUMBER><PARTYLEDGERNAME>BRIDGE SYNTHETIC LEDGER</PARTYLEDGERNAME><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER></BODY></ENVELOPE>"#,
-    )
-    .unwrap();
-    assert_eq!(vouchers.len(), 1);
-    assert_eq!(
-        vouchers[0].id.as_deref(),
-        Some("bridge-synthetic-voucher-001")
-    );
-    assert_eq!(vouchers[0].date.as_deref(), Some("20260701"));
-    assert_eq!(vouchers[0].cancelled, Some(false));
 }
 
 #[test]

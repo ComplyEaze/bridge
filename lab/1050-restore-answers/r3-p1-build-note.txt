@@ -1,0 +1,3 @@
+r3-p1-build.json: warnings array shortened to a placeholder (8 standard build warnings); every other field as returned. A first build call at 08:42:56Z was refused voucher_schema_invalid (side given as debit/credit instead of Dr/Cr); nothing was saved by it.
+Note: r3-p1-build.json and r4-p2-build.json path backslashes re-escaped after a shell heredoc collapsed them (values as returned).
+Note: in r3-p1-build.json and r4-p2-build.json the path value's backslashes were re-escaped (JSON) after a shell heredoc collapsed them; the values are as returned.

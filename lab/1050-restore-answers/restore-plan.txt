@@ -1,0 +1,8 @@
+1050-R restore plan, written 2026-10-12T08:42:03Z BEFORE taking R0.
+Backup folder: C:\bridge-lab\1050-R\backups\R0
+Backup file: TDBK1800_100054.001 (Tally names backups TDBK1800_<company number>.001)
+Company being restored: BRIDGE RESTORE LAB, company number 100054 (as Tally's company list / restore screen shows; the only company selected)
+Restore Data Path: C:\Users\Public\TallyPrimeEditLog\data (BRIDGE RESTORE LAB's existing data folder)
+Expected prompts: "Accept ?" and "Company data folder (100054) already exists ... Replace / Skip" -> Replace. STOP before confirming on anything else (repair, rewrite, migrate, another company).
+R0 taken: TDBK1800_100054.001 25107 B sha256 7fd6132455b2cd6be0494b419198c99582e22976915c6a08125c188a08b86be8 at 2026-10-12T08:42:49Z (file mtime 2026-10-12 14:12:41.607454400 +0530)
+Restore R0 done 2026-10-12T08:48:54Z. Screens matched the plan (Restore Data Path C:\Users\Public\TallyPrimeEditLog\data; source C:\bridge-lab\1050-R\backups\R0; only BRIDGE RESTORE LAB 100054, backup 12-Oct-26 2:12 pm). Prompts verbatim: 'Accept ?' [Yes or No] -> Yes; 'Company data folder (100054) already exists. / Selecting Skip will cancel the Restore process for this company. / Selecting Replace will overwrite the existing folder.' [R: Replace / S: Skip] -> Replace. No repair/rewrite/migrate offer.

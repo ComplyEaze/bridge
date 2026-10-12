@@ -1264,6 +1264,65 @@ async fn core_window_rejects_a_malformed_extent_response_at_the_transport_seam()
     assert_eq!(methods, ["POST"]);
 }
 
+/// The source-identity match lowercases the GUID but accepts any spelling, so
+/// a pin built from an un-hyphenated GUID still matches the company that
+/// reports the same spelling. Only the strict parse that follows refuses it,
+/// with its own typed code rather than "not found".
+#[test]
+fn snapshot_identity_refuses_a_matching_company_whose_guid_is_not_strict_shaped() {
+    let lineage = "tally_xml_http:http://127.0.0.1:9000";
+    let unhyphenated = "4C42A771ABCD4DEF8ABC001122AABBCC";
+    let company = CompanyRef {
+        identity: company_source_identity(
+            lineage,
+            unhyphenated,
+            "100001",
+            "Synthetic Company",
+            "20260401",
+        ),
+        display_name: "Synthetic Company".to_string(),
+    };
+    let context = RequestContext {
+        run_id: "run-non-strict-company-guid".to_string(),
+        company: company.clone(),
+        pack: CapabilityPackId::CoreAccounting,
+        schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+        window: ReadWindow {
+            from_yyyymmdd: "20260701".to_string(),
+            to_yyyymmdd: "20260701".to_string(),
+        },
+        query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+        filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+    };
+    let connector = RuntimeTallyConnector::new(
+        TallyRuntime::default(),
+        TallyConfig {
+            host: "127.0.0.1".to_string(),
+            port: 9000,
+        },
+        company,
+        context,
+    )
+    .unwrap();
+    let companies = [TallyCompany {
+        name: "Synthetic Company".to_string(),
+        guid: Some(unhyphenated.to_string()),
+        company_number: Some("100001".to_string()),
+        books_from: Some("20260401".to_string()),
+    }];
+
+    let error = connector
+        .verify_snapshot_identity_from_companies(&companies)
+        .expect_err("a GUID that is not 8-4-4-4-12 must not become a verified identity");
+    assert!(
+        matches!(
+            &error,
+            TallyError::Protocol { code } if code == "company_identity_invalid"
+        ),
+        "unexpected error: {error:?}"
+    );
+}
+
 #[tokio::test]
 async fn direct_company_snapshot_probe_rejects_identity_without_company_collection_tuple() {
     let _simulator_guard = simulator_test_lock().lock().await;

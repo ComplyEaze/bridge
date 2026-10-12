@@ -355,12 +355,12 @@ fn fit_response(
         &mut encoded_len,
     )?;
     if best.is_none() && section.is_some() {
-        // not even one page row fits beside the counts: a note takes less room
+        // not even one page row fits beside the counts: a note takes less room.
+        // A result with a page is a batch's or a verification's, never a
+        // statement of only skipped rows, so the note is the batch's.
         let mut noted = original.clone();
-        let recorded = noted.pointer(&format!("{structured_path}/result/state"))
-            == Some(&json!("skips_recorded"));
         if let Some(slot) = noted.pointer_mut(&format!("{structured_path}/result/transfers")) {
-            *slot = check_not_run_section(recorded);
+            *slot = check_not_run_section(false);
         }
         best = trim_page(
             &noted,

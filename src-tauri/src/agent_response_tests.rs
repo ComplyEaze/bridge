@@ -696,7 +696,7 @@ fn verify_page(items: usize, section: Value) -> Value {
         "verification_status": "posted_verified", "counts": {"posted_verified": items},
         "offset": 0,
         "items": (0..items)
-            .map(|id| json!({"id": id, "padding": "x".repeat(300)}))
+            .map(|id| json!({"id": id, "padding": "x".repeat(1_500)}))
             .collect::<Vec<_>>(),
         "transfers": section,
     }})
@@ -707,15 +707,16 @@ fn verify_page(items: usize, section: Value) -> Value {
 #[test]
 fn a_page_cut_to_the_cap_leaves_its_computed_section_as_wide_as_the_room_allows() {
     let section = transfers_section(40);
+    // room for five page rows beside the counts, and for some open rows, not for a sixth page row
+    let mut five = verify_page(30, counts_only_section(&section));
+    retain_page_width(&mut five, PageShape::Rows("items"), 5).unwrap();
+    let cap = len_of(&five) + 700;
     let mut response = verify_page(30, section.clone());
-    let cap = 4_000;
     assert!(len_of(&response) > cap);
-    assert!(len_of(&verify_page(30, counts_only_section(&section))) > cap);
     assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
     assert!(len_of(&response) <= cap);
-    // the page is cut, its verdict is not
-    let kept = response["result"]["items"].as_array().unwrap().len();
-    assert!(kept >= 1 && kept < 30, "{kept}");
+    // the page is cut to the rows that fit beside the counts, its verdict is not
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 5);
     assert_eq!(response["result"]["verification_status"], "posted_verified");
     assert_eq!(response["result"]["counts"], json!({"posted_verified": 30}));
     // the check ran: the section is computed, with every open row kept or counted
@@ -723,11 +724,12 @@ fn a_page_cut_to_the_cap_leaves_its_computed_section_as_wide_as_the_room_allows(
     assert_eq!(shown["state"], "computed");
     assert_eq!(shown["skips_open"], 40);
     let rows = shown["open"].as_array().unwrap().len();
+    assert!(rows > 0 && rows < 40, "{rows}");
     assert_eq!(shown["open_omitted"], 40 - rows);
     // and it is as wide as the trimmed page leaves room for
     let mut wider = response.clone();
     wider["result"]["transfers"] = trim_section(&section, rows + 1);
-    assert!(rows == 40 || len_of(&wider) > cap, "{rows}");
+    assert!(len_of(&wider) > cap);
 }
 
 #[test]

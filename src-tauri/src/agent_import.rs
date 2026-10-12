@@ -1352,10 +1352,10 @@ impl Server {
             // Computed before the append, with this build in it: nothing after
             // the append can turn a written build into a refusal.
             let essential = payload.to_string().len();
-            payload["result"]["transfers"] = transfers.render(
-                transfers::transfers_budget(self.settings.max_bytes, essential),
-                false,
-            );
+            payload["result"]["transfers"] = transfers.render(transfers::transfers_budget(
+                self.settings.max_bytes,
+                essential,
+            ));
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),
@@ -1462,10 +1462,10 @@ impl Server {
             "skipped_rows": record.statement.skip_rows.len(),
         }});
         let essential = payload.to_string().len();
-        payload["result"]["transfers"] = transfers.render(
-            transfers::transfers_budget(self.settings.max_bytes, essential),
-            true,
-        );
+        payload["result"]["transfers"] = transfers.render(transfers::transfers_budget(
+            self.settings.max_bytes,
+            essential,
+        ));
         Ok(ToolOutcome {
             payload,
             evidence: accumulated,

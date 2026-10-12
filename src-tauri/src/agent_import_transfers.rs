@@ -150,7 +150,7 @@ impl TransferSummary {
     /// The section, with as many open rows as `available` bytes hold once its
     /// frame is paid for. The rows that do not fit are counted, and the step for
     /// that says how to see them.
-    pub(super) fn render(&self, available: usize, recorded: bool) -> Value {
+    pub(super) fn render(&self, available: usize) -> Value {
         let Self::Computed {
             paired,
             skips_open,
@@ -158,14 +158,7 @@ impl TransferSummary {
             open,
         } = self
         else {
-            return json!({
-                "state": "not_established",
-                "next_steps": {"check_not_run": if recorded {
-                    CHECK_NOT_RUN_RECORDED_STEP
-                } else {
-                    CHECK_NOT_RUN_STEP
-                }},
-            });
+            return check_not_run_section(false);
         };
         let mut next_steps = serde_json::Map::new();
         for row in open {
@@ -251,7 +244,14 @@ pub(in crate::agent) fn counts_only_section(section: &Value) -> Value {
 /// What a section says when nothing of it fits: that the check is to be run
 /// again. It claims no count.
 pub(in crate::agent) fn check_not_run_section(recorded: bool) -> Value {
-    TransferSummary::NotEstablished.render(0, recorded)
+    json!({
+        "state": "not_established",
+        "next_steps": {"check_not_run": if recorded {
+            CHECK_NOT_RUN_RECORDED_STEP
+        } else {
+            CHECK_NOT_RUN_STEP
+        }},
+    })
 }
 
 /// What to do about an open row of each state, for the assistant to follow.
@@ -612,10 +612,7 @@ impl Server {
                     TransferSummary::of(&facts, &view)
                 })
         };
-        summary.render(
-            transfers_budget(self.settings.max_bytes, essential_len),
-            false,
-        )
+        summary.render(transfers_budget(self.settings.max_bytes, essential_len))
     }
 }
 

@@ -68,7 +68,6 @@ mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
 mod statement_facts;
 pub(super) use approval::PostApprovals;
-use statement_facts::StatementFacts;
 #[path = "agent_import_verification.rs"]
 mod verification;
 use std::path::{Path, PathBuf};
@@ -387,12 +386,15 @@ pub(super) struct ImportLedgerLine {
     on_account_approved: Option<Vec<bill_wise::OnAccountApproved>>,
     /// What a bank-statement build recorded for the transfer pairing view: its
     /// skipped rows, its Contras and the dates it read in full. Absent on every
-    /// build that is not a statement build, and on all older records. A release
-    /// older than this field does not read it (this struct does not deny
-    /// unknown fields); the binding's written name keeps those releases from
-    /// posting the batch (see `ledger_identities`).
+    /// build that is not a statement build, and on all older records. Held as
+    /// the JSON it was written as, built by `statement_facts::statement_record`
+    /// and parsed only by the fact builder, so a statement this release cannot
+    /// read (one a later release wrote) never makes the journal unreadable. A
+    /// release older than this field does not read it (this struct does not
+    /// deny unknown fields); the binding's written name keeps those releases
+    /// from posting the batch (see `ledger_identities`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    statement: Option<StatementFacts>,
+    statement: Option<Value>,
 }
 
 /// A ledger a bank cash answer named as cash in hand, and the voucher built

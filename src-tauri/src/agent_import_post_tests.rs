@@ -4,7 +4,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::super::statement_facts::{
-    ContraRow, RowDirection, SkipRow, StatementFacts, StatementWindow,
+    statement_record, ContraRow, RowDirection, SkipRow, StatementFacts, StatementWindow,
 };
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;
@@ -2560,13 +2560,15 @@ fn a_saved_batch_holds_exactly_these_records() {
                 party_digest: _,
             } = approved;
         }
-        if let Some(StatementFacts {
-            bank_ledger_guid: _,
-            coverage,
-            contra_rows,
-            skip_rows,
-        }) = statement
-        {
+        // the line holds the statement as the JSON it was written as; the
+        // journal reader does not parse it, the fact builder does
+        if let Some(recorded) = statement {
+            let StatementFacts {
+                bank_ledger_guid: _,
+                coverage,
+                contra_rows,
+                skip_rows,
+            } = serde_json::from_value(recorded.clone()).unwrap();
             if let Some(StatementWindow { from: _, to: _ }) = coverage {}
             for ContraRow {
                 bridge_txn_id: _,
@@ -2595,7 +2597,7 @@ fn a_saved_batch_holds_exactly_these_records() {
         serde_json::from_value(json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]))
             .unwrap();
     line.vouchers[0].voucher_number = Some("7".into());
-    line.statement = Some(StatementFacts {
+    line.statement = Some(statement_record(&StatementFacts {
         bank_ledger_guid: "g".into(),
         coverage: Some(StatementWindow {
             from: TallyDate::parse("20260901").unwrap(),
@@ -2615,7 +2617,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             reference: Some("600000000002".into()),
             instrument: Some("000418".into()),
         }],
-    });
+    }));
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();

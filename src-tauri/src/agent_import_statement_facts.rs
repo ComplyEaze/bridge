@@ -87,6 +87,13 @@ pub(super) struct StatementFacts {
     pub(super) skip_rows: Vec<SkipRow>,
 }
 
+/// The value a saved batch holds as its `statement`. The batch keeps the JSON,
+/// not the type, so a statement a later release wrote cannot make the journal
+/// unreadable: only the fact builder parses it. Writers build it here.
+pub(super) fn statement_record(facts: &StatementFacts) -> Value {
+    json!(facts)
+}
+
 /// The facts of a build that posts nothing.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -138,6 +145,8 @@ pub(super) enum FactsError {
     SkipIsVoucher { txn: String },
     #[error("the statement's bank ledger is not bound by the batch")]
     BankLedgerUnbound,
+    #[error("a batch's statement is not facts this release reads")]
+    Unparsable,
     #[error("a skip-only record's id is not `skips-` and a version 4 UUID")]
     BadRecordId,
     #[error("a skip-only record must hold skipped rows and no Contra row")]
@@ -347,7 +356,7 @@ pub(super) struct BuildLine {
     pub(super) status: String,
     pub(super) vouchers: Vec<BuildVoucher>,
     pub(super) ledger_identities: Option<Vec<BoundLedger>>,
-    pub(super) statement: Option<StatementFacts>,
+    pub(super) statement: Option<Value>,
 }
 
 impl BuildLine {
@@ -439,6 +448,9 @@ pub(super) struct TransferFacts {
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
     pub(super) contras_not_two_leg: usize,
+    /// Contras of a lineage that holds statement facts, with no facts entry in
+    /// any of its builds: not seen, and the days they sit on are not cover.
+    pub(super) contras_without_facts: usize,
     /// Contras of a build never sent and never found, whose row a sent or found
     /// batch of another lineage holds.
     pub(super) contras_superseded: usize,
@@ -447,9 +459,8 @@ pub(super) struct TransferFacts {
 /// A batch as the journal leaves it.
 struct Batch {
     line: BuildLine,
-    facts: Option<ValidFacts>,
-    /// Set for a batch that holds facts.
-    built: Option<DateTime<FixedOffset>>,
+    /// The checked facts of a batch that holds them, and when it was built.
+    facts: Option<(ValidFacts, DateTime<FixedOffset>)>,
     status: String,
     sent: bool,
     found: bool,
@@ -476,6 +487,39 @@ fn built_instant(source_id: &str, text: &str) -> Result<DateTime<FixedOffset>, T
     })
 }
 
+/// The facts a batch's record holds, checked against that record, and the
+/// instant it was built.
+fn admit_facts(
+    line: &BuildLine,
+) -> Result<Option<(ValidFacts, DateTime<FixedOffset>)>, TransferFactsError> {
+    let Some(recorded) = &line.statement else {
+        return Ok(None);
+    };
+    if line.endpoint_origin.is_none() {
+        return Err(TransferFactsError::MissingEndpoint {
+            source_id: line.batch_id.clone(),
+        });
+    }
+    let refused = |error| TransferFactsError::Facts {
+        source_id: line.batch_id.clone(),
+        error,
+    };
+    let statement: StatementFacts =
+        serde_json::from_value(recorded.clone()).map_err(|_| refused(FactsError::Unparsable))?;
+    let facts = validate_statement_facts(
+        &statement,
+        Some(LineShape {
+            vouchers: &line.vouchers,
+            ledger_identities: line.ledger_identities.as_deref(),
+        }),
+    )
+    .map_err(refused)?;
+    Ok(Some((
+        facts,
+        built_instant(&line.batch_id, &line.built_at)?,
+    )))
+}
+
 /// The company's batches in the order of their first journal record, each
 /// holding its latest full record and its status as `read_snapshot` folds it.
 fn fold_batches(
@@ -497,44 +541,21 @@ fn fold_batches(
                                 batch_id: line.batch_id,
                             });
                         }
+                        // the batch keeps its place, and its content is the latest record's
                         batch.found |= line.status == POSTED_VERIFIED;
-                        batch.status = line.status;
+                        batch.status = line.status.clone();
+                        batch.facts = admit_facts(&line)?;
+                        batch.line = *line;
                     }
                     None => {
                         let line = *line;
-                        let (facts, built) =
-                            match &line.statement {
-                                Some(statement) => {
-                                    if line.endpoint_origin.is_none() {
-                                        return Err(TransferFactsError::MissingEndpoint {
-                                            source_id: line.batch_id,
-                                        });
-                                    }
-                                    let facts = validate_statement_facts(
-                                        statement,
-                                        Some(LineShape {
-                                            vouchers: &line.vouchers,
-                                            ledger_identities: line.ledger_identities.as_deref(),
-                                        }),
-                                    )
-                                    .map_err(|error| TransferFactsError::Facts {
-                                        source_id: line.batch_id.clone(),
-                                        error,
-                                    })?;
-                                    (
-                                        Some(facts),
-                                        Some(built_instant(&line.batch_id, &line.built_at)?),
-                                    )
-                                }
-                                None => (None, None),
-                            };
+                        let facts = admit_facts(&line)?;
                         index.insert(line.batch_id.clone(), batches.len());
                         batches.push(Batch {
                             status: line.status.clone(),
                             found: line.status == POSTED_VERIFIED,
                             line,
                             facts,
-                            built,
                             sent: false,
                         });
                     }
@@ -556,6 +577,12 @@ fn fold_batches(
         }
     }
     Ok(batches)
+}
+
+/// The batches that hold one row as a voucher, in journal order.
+struct Held {
+    latest: usize,
+    batches: Vec<usize>,
 }
 
 /// A skip as one source recorded it, with what orders it against the others.
@@ -580,8 +607,16 @@ struct LineageFacts {
     contras: Vec<DecidedContra>,
     skips: BTreeMap<SkipKey, SkipMention>,
     left_out: usize,
+    /// Contras with no facts entry in a lineage that holds facts.
+    without_facts: usize,
     /// Every build that decides one of the lineage's voucher rows is verified.
     all_verified: bool,
+    /// The days of every row the facts cannot vouch for: decided by a build
+    /// not verified, a Contra left out, or a Contra with no facts entry. A row
+    /// counts on every day any build of the lineage gave it.
+    blocked: BTreeSet<TallyDate>,
+    /// The endpoint and bank ledger of each statement the lineage holds.
+    ledgers: BTreeSet<(EndpointOrigin, LedgerGuid)>,
 }
 
 /// The legs of a Contra that is two ledgers, one Dr and one Cr, with equal
@@ -634,12 +669,16 @@ fn contra_legs(
     )
 }
 
-/// One lineage: its builds in journal order, at least one holding facts.
+/// One lineage: its builds in journal order. A lineage with no facts
+/// contributes nothing.
 fn lineage_facts(
     batches: &[Batch],
     members: &[usize],
     company: &CompanyGuid,
 ) -> Result<LineageFacts, TransferFactsError> {
+    if members.iter().all(|&at| batches[at].facts.is_none()) {
+        return Ok(LineageFacts::default());
+    }
     let lineage_text = batches[members[0]].line.lineage.clone();
     let lineage = LineageId::new(lineage_text.as_str());
     // the newest build to mention a row as a voucher decides its content
@@ -652,11 +691,16 @@ fn lineage_facts(
     // the newest facts entry for a Contra row gives its reference and bank
     let mut entries: BTreeMap<&str, (&LedgerGuid, &Option<BankReference>)> = BTreeMap::new();
     let mut skips: BTreeMap<SkipKey, SkipMention> = BTreeMap::new();
+    let mut ledgers = BTreeSet::new();
     for &at in members {
         let batch = &batches[at];
-        let (Some(facts), Some(built)) = (&batch.facts, batch.built) else {
+        let Some((facts, built)) = &batch.facts else {
             continue;
         };
+        ledgers.insert((
+            EndpointOrigin::new(batch.endpoint()?),
+            facts.bank_ledger.clone(),
+        ));
         for (txn, reference) in &facts.contras {
             entries.insert(txn.as_str(), (&facts.bank_ledger, reference));
         }
@@ -686,25 +730,37 @@ fn lineage_facts(
                         lineage: lineage.clone(),
                     },
                     row: skip.txn.clone(),
-                    built,
+                    built: *built,
                     source_id: batch.line.batch_id.clone(),
                 },
             );
         }
     }
+    let mut uncertain: BTreeSet<&str> = deciding
+        .iter()
+        .filter(|(_, (at, _))| !batches[*at].is_verified())
+        .map(|(&txn, _)| txn)
+        .collect();
     let mut found = LineageFacts {
         skips,
-        all_verified: deciding.values().all(|(at, _)| batches[*at].is_verified()),
+        all_verified: uncertain.is_empty(),
+        ledgers,
         ..LineageFacts::default()
     };
     for (&txn, &(decider, voucher)) in &deciding {
-        // a Contra with no facts entry in any build is not a statement Contra
+        let batch = &batches[decider];
+        // a Contra with no facts entry in any build is not a statement Contra,
+        // in a lineage that holds facts it is one the facts do not see
         let Some(&(bank_ledger, reference)) = entries.get(txn) else {
+            if voucher.kind == VoucherType::Contra {
+                found.without_facts += 1;
+                uncertain.insert(txn);
+            }
             continue;
         };
-        let batch = &batches[decider];
         let Some((legs, amount)) = contra_legs(batch, voucher, bank_ledger)? else {
             found.left_out += 1;
+            uncertain.insert(txn);
             continue;
         };
         found.contras.push(DecidedContra {
@@ -733,6 +789,13 @@ fn lineage_facts(
             deciding: decider,
         });
     }
+    for &at in members {
+        for voucher in &batches[at].line.vouchers {
+            if uncertain.contains(voucher.txn_id.as_str()) {
+                found.blocked.insert(voucher.date.clone());
+            }
+        }
+    }
     Ok(found)
 }
 
@@ -753,10 +816,17 @@ pub(super) fn build_transfer_facts(
             .push(at);
     }
     // every batch holding a row as a voucher, whatever its lineage
-    let mut holders: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    let mut holders: BTreeMap<&str, Held> = BTreeMap::new();
     for (at, batch) in batches.iter().enumerate() {
         for voucher in &batch.line.vouchers {
-            holders.entry(voucher.txn_id.as_str()).or_default().push(at);
+            let held = holders
+                .entry(voucher.txn_id.as_str())
+                .or_insert_with(|| Held {
+                    latest: at,
+                    batches: Vec::new(),
+                });
+            held.latest = at;
+            held.batches.push(at);
         }
     }
 
@@ -764,22 +834,32 @@ pub(super) fn build_transfer_facts(
     let mut mentions: BTreeMap<SkipKey, SkipMention> = BTreeMap::new();
     let mut windows: Vec<(EndpointOrigin, LedgerGuid, ParseWindow)> = Vec::new();
     let mut contras_not_two_leg = 0;
+    let mut contras_without_facts = 0;
+    let mut blocked: BTreeMap<(EndpointOrigin, LedgerGuid), BTreeSet<TallyDate>> = BTreeMap::new();
     let newer = |new: &SkipMention, old: &SkipMention| {
         (&new.built, &new.source_id) > (&old.built, &old.source_id)
     };
     for members in lineages.values() {
         let found = lineage_facts(&batches, members, &company)?;
         contras_not_two_leg += found.left_out;
-        if found.all_verified && found.left_out == 0 {
+        contras_without_facts += found.without_facts;
+        for ledger in &found.ledgers {
+            blocked
+                .entry(ledger.clone())
+                .or_default()
+                .extend(found.blocked.iter().cloned());
+        }
+        if found.all_verified && found.left_out == 0 && found.without_facts == 0 {
             for &at in members {
                 let batch = &batches[at];
-                if let Some(window) = batch.facts.as_ref().and_then(|facts| {
-                    facts
-                        .window
-                        .clone()
-                        .map(|window| (facts.bank_ledger.clone(), window))
-                }) {
-                    windows.push((EndpointOrigin::new(batch.endpoint()?), window.0, window.1));
+                if let Some((facts, _)) = &batch.facts {
+                    if let Some(window) = &facts.window {
+                        windows.push((
+                            EndpointOrigin::new(batch.endpoint()?),
+                            facts.bank_ledger.clone(),
+                            window.clone(),
+                        ));
+                    }
                 }
             }
         }
@@ -850,13 +930,11 @@ pub(super) fn build_transfer_facts(
     for (key, mention) in mentions {
         match holders.get(mention.row.as_str()) {
             None => skips.push(mention.fact),
-            Some(held) if held.iter().any(|&at| batches[at].found) => retired_skips += 1,
-            Some(held) => {
-                if let Some(&latest) = held.iter().max() {
-                    held_elsewhere
-                        .push((key, BatchId::new(batches[latest].line.batch_id.as_str())));
-                }
-            }
+            Some(held) if held.batches.iter().any(|&at| batches[at].found) => retired_skips += 1,
+            Some(held) => held_elsewhere.push((
+                key,
+                BatchId::new(batches[held.latest].line.batch_id.as_str()),
+            )),
         }
     }
 
@@ -868,10 +946,11 @@ pub(super) fn build_transfer_facts(
         let batch = &batches[decided.deciding];
         let superseded = !batch.sent
             && !batch.found
+            && is_statement_txn_id(&decided.txn)
             && holders
                 .get(decided.txn.as_str())
                 .into_iter()
-                .flatten()
+                .flat_map(|held| &held.batches)
                 .any(|&at| {
                     batches[at].line.lineage != batch.line.lineage
                         && (batches[at].sent || batches[at].found)
@@ -886,7 +965,17 @@ pub(super) fn build_transfer_facts(
 
     let mut coverage = Coverage::default();
     for (endpoint, bank_ledger, window) in windows {
-        coverage.add(company.clone(), endpoint, bank_ledger, window)?;
+        // a window over a day some row cannot be vouched for says nothing of that day
+        let blocked_inside = blocked
+            .get(&(endpoint.clone(), bank_ledger.clone()))
+            .is_some_and(|days| {
+                days.range(window.from.clone()..=window.to.clone())
+                    .next()
+                    .is_some()
+            });
+        if !blocked_inside {
+            coverage.add(company.clone(), endpoint, bank_ledger, window)?;
+        }
     }
     Ok(TransferFacts {
         skips,
@@ -895,6 +984,7 @@ pub(super) fn build_transfer_facts(
         retired_skips,
         held_elsewhere,
         contras_not_two_leg,
+        contras_without_facts,
         contras_superseded,
     })
 }

@@ -3,6 +3,7 @@ import { CircleHelp, Database, FileText, Play, RefreshCw } from "lucide-react";
 import { formatIdentifier, formatRuntimeTime } from "./display-format";
 import { type OperatorError, TallyErrorNotice } from "./tally-command-error";
 import { type CapabilityProfile, CapabilityRows, PACK_LABELS } from "./tally-capability-evidence";
+import { CORE_READ_REFUSAL_TITLES } from "./core-read-refusals";
 import {
   type ConnectionStatus,
   type MirrorExplorerPage,
@@ -154,6 +155,21 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
     action: "Run again during a controlled quiet period. A stable reread still does not prove atomic isolation.",
     retry: "after_change",
   },
+  company_book_extent_drifted: {
+    title: CORE_READ_REFUSAL_TITLES.company_book_extent_drifted,
+    action: "Two back-to-back reads of the company's book did not match, so the run stopped. Run again when nobody is entering vouchers or masters in this company.",
+    retry: "after_change",
+  },
+  company_altmstid_missing: {
+    title: CORE_READ_REFUSAL_TITLES.company_altmstid_missing,
+    action: "Without that marker ComplyEaze Bridge cannot tell whether masters changed during the read, so the run stopped. Close and reopen the company in TallyPrime, then start a new run. If it stops the same way, update TallyPrime to its latest release before trying again.",
+    retry: "after_change",
+  },
+  company_identity_mismatch: {
+    title: CORE_READ_REFUSAL_TITLES.company_identity_mismatch,
+    action: "Tally did not report the selected company for this run. Check which company is open in Tally, select it again, and start a new run.",
+    retry: "after_change",
+  },
   minimum_window_response_too_large: {
     title: "One Tally day exceeds the bounded response limit",
     action: "ComplyEaze Bridge cannot split below one calendar day. Reduce that day's source density or use a future qualified collection filter before starting a new run; retrying unchanged will fail again.",
@@ -166,8 +182,8 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
 };
 
-function guidanceForGap(code: string): GapGuidance {
-  return GAP_GUIDANCE[code] ?? {
+export function guidanceForGap(code: string): GapGuidance {
+  return (Object.prototype.hasOwnProperty.call(GAP_GUIDANCE, code) ? GAP_GUIDANCE[code] : undefined) ?? {
     title: formatIdentifier(code),
     action: "Inspect the local Proof of Sync and support artifact. Do not retry unchanged until this gap's cause is understood.",
     retry: "not_useful",
@@ -417,7 +433,7 @@ export function MirrorProofScreen({
           <span>Phase: {formatIdentifier(snapshotJob.phase)}</span>
           <span>Completed executable windows: {snapshotJob.completed_windows}/{snapshotJob.total_windows}</span>
           <span>{snapshotJob.verification ? `Result: ${formatIdentifier(snapshotJob.verification)}` : "No verification claim yet"}</span>
-          {snapshotJob.failure_code && <span>Failure: {formatIdentifier(snapshotJob.failure_code)}</span>}
+          {snapshotJob.failure_code && <span>Failure: {guidanceForGap(snapshotJob.failure_code).title}</span>}
           {snapshotJob.requires_resume && (
             <span>{snapshotJob.resume_available ? "Worker detached: explicit resume required" : "Detached legacy state: inspect only"}</span>
           )}
@@ -581,7 +597,7 @@ export function MirrorProofScreen({
                     <td>{formatIdentifier(proof.outcome)} · {formatIdentifier(proof.verification_state)} · Local hash check: {proof.integrity_state === "entry_hash_valid" ? "passed" : formatIdentifier(proof.integrity_state)}</td>
                     <td>{proof.accepted_records} / {proof.rejected_records}</td>
                     <td><code title="Local consistency commitment; not authenticity">{proof.proof_sha256.slice(0, 12)}...</code> <CopyTokenButton value={proof.proof_sha256} label="local proof hash" /></td>
-                    <td>{proof.gap_codes.length ? proof.gap_codes.map(formatIdentifier).join(", ") : "None declared"}</td>
+                    <td>{proof.gap_codes.length ? proof.gap_codes.map((code) => guidanceForGap(code).title).join(", ") : "None declared"}</td>
                     <td>{proof.warning_codes.length ? proof.warning_codes.map(formatIdentifier).join(", ") : "None declared"}</td>
                     <td><button className="secondary-action" disabled={proofPreviewSelection?.proofId === proof.selection_token} onClick={() => void previewRedactedProof(proof)}>{proofPreviewSelection?.proofId === proof.selection_token ? "Loading/selected" : "Preview"}</button></td>
                   </tr>

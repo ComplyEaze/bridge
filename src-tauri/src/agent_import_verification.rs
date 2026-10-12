@@ -333,6 +333,7 @@ pub(super) fn verify_batch(
                             matched,
                             "post_span_binding",
                             expected_key.2 == observed_fingerprints[*index].2,
+                            WrittenNarration::Untagged,
                             &mut counts,
                         )?;
                         if value["status"] == "posted_verified" {
@@ -394,10 +395,18 @@ pub(super) fn verify_batch(
             }
             let matched = &observed[matched_index];
             let effective_date_unobserved = effective_date_not_observed(expected, matched);
+            // A row found by its tag, or any row of a batch tags attribute,
+            // was written with the tag; a native post's row was not.
+            let written = if !fingerprint_fallback || tags_attribute {
+                WrittenNarration::Tagged(marker_identity.as_str())
+            } else {
+                WrittenNarration::Untagged
+            };
             let diffs = voucher_diffs(
                 expected,
                 matched,
                 expected_key.2 == observed_fingerprints[matched_index].2,
+                written,
             );
             let mut matched_value = if !fingerprint_fallback {
                 let value = attributed_status(
@@ -405,6 +414,7 @@ pub(super) fn verify_batch(
                     matched,
                     marker,
                     expected_key.2 == observed_fingerprints[matched_index].2,
+                    written,
                     &mut counts,
                 )?;
                 if value["status"] == "posted_verified" {
@@ -500,9 +510,10 @@ fn attributed_status(
     matched: &ReadVoucher,
     marker: &str,
     entries_match: bool,
+    narration: WrittenNarration<'_>,
     counts: &mut BTreeMap<&'static str, u64>,
 ) -> Result<Value, String> {
-    let diffs = voucher_diffs(expected, matched, entries_match);
+    let diffs = voucher_diffs(expected, matched, entries_match, narration);
     let mut count = |key: &'static str| {
         counts.entry(key).and_modify(|count| *count += 1);
     };
@@ -519,7 +530,7 @@ fn attributed_status(
         // cannot see a cancelled row whose entries were dropped:
         // with no entries, no build's fingerprint matches.
         count("posted_not_effective");
-        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true, narration),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
     } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
         count("posted_verified");
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
@@ -864,10 +875,44 @@ fn effective_date_not_observed(expected: &ImportVoucher, actual: &ReadVoucher) -
     expected.voucher_type != VoucherType::Journal && actual.effective_date.is_none()
 }
 
+/// How Bridge wrote a voucher's narration into Tally (`render_voucher_xml`):
+/// with the batch's `[BRIDGE:…]` tag, for a file a person imports and for a
+/// native post made before posts went untagged, or untagged, for a native post
+/// attributed by its own AlterID span.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum WrittenNarration<'a> {
+    Tagged(&'a str),
+    Untagged,
+}
+
+/// Whether the narration Tally holds differs from the one Bridge wrote for
+/// `expected` (#1608): the one comparison the read-back, the span binding and
+/// the amendment check share. The written side is the posted text (trimmed,
+/// as sent), with the tag when it carried one; the read side is compared byte
+/// for byte, as the span binding always did, so nothing Tally changes is
+/// hidden. A narration Tally holds none of equals only an empty one written:
+/// an absent narration is never taken for written text.
+pub(super) fn narration_differs(
+    expected: &ImportVoucher,
+    written: WrittenNarration<'_>,
+    read: Option<&str>,
+) -> bool {
+    let text = super::posted_narration(expected).unwrap_or("");
+    let written = match written {
+        WrittenNarration::Tagged(tag) => format!("{text} [BRIDGE:{tag}]").trim().to_string(),
+        WrittenNarration::Untagged => text.to_string(),
+    };
+    match read {
+        None => !written.is_empty(),
+        Some(read) => read != written,
+    }
+}
+
 pub(super) fn voucher_diffs(
     expected: &ImportVoucher,
     actual: &ReadVoucher,
     entries_match: bool,
+    narration: WrittenNarration<'_>,
 ) -> Vec<Value> {
     let mut diffs = Vec::new();
     let expected_date = expected.date.as_str();
@@ -893,6 +938,9 @@ pub(super) fn voucher_diffs(
         && actual.voucher_number.as_deref() != expected.voucher_number.as_deref()
     {
         diffs.push(json!("voucher_number"));
+    }
+    if narration_differs(expected, narration, actual.narration.as_deref()) {
+        diffs.push(json!("narration"));
     }
     if !entries_match {
         let expected_entries = expected

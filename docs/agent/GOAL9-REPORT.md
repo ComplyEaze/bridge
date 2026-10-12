@@ -11,7 +11,7 @@ so Goal 3B did not authorize or require a reseal. Nothing was pushed.
 | `src-tauri/src/agent.rs:1015` | Missing ledger openings could become fabricated zero openings after BOOKSFROM. | `a8e5a75` | `ledger_movement_marks_an_unobserved_post_books_opening_partial` | The typed movement row preserves `opening` and `closing` as null and marks both row and tool evidence partial with `opening_balance_not_observed`. |
 | `src-tauri/src/agent.rs:2280` | Missing or non-string `params.name` could exit the stdio server. | `4ff0356` | `malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_request` | The stdio loop now converts the malformed tool call to JSON-RPC `-32602` and serves the next request in that same session. |
 | `src-tauri/src/agent.rs:910` | `direction` only filtered open bills, leaving other outstandings views combined. | `031451a` | `payable_outstandings_views_exclude_mixed_receivable_rows` | Decision: recompute selected-side totals, ageing buckets, ranking, bills, and unallocated aggregate from typed bill/residual directions; bill ages are available, so `ageing_buckets` remains meaningful rather than omitted. |
-| `src-tauri/src/agent.rs:1582` | Empty voucher windows lacked a meaningful corroboration control. | `8077b5d` | `empty_voucher_window_corroboration_handles_all_three_control_branches` | A widened control outside the original window completes; a row inside it returns `window_contradicted`; a second empty read consults high-water and distinguishes no vouchers from an uncorroborated partial. |
+| `src-tauri/src/agent.rs:1582` | Empty voucher windows lacked a meaningful corroboration control. | `8077b5d` | `empty_voucher_window_corroboration_handles_all_three_control_branches` | A widened control outside the original window did not promote the window after #294 (it leaves it `partial`; corrected 2026-10-12); a row inside it returns `window_contradicted`; a second empty read consults high-water and distinguishes no vouchers from an uncorroborated partial. |
 
 ## Thread replies
 
@@ -25,7 +25,7 @@ so Goal 3B did not authorize or require a reseal. Nothing was pushed.
 
 5. Direction now applies consistently to every outstandings view. The implementation filters typed bill and residual rows first, then recalculates totals, party ranking, bills, unallocated count/amount, and ageing buckets from the selected side. Because bill ages are present at this boundary, the documented decision is to provide direction-specific ageing buckets rather than emit the not-available fallback.
 
-6. Empty voucher windows now require a discriminating control. A widened response may corroborate the original empty window only when it has rows exclusively outside that window; any in-window row contradicts it. If the widened control is also empty, the company high-water separates a genuinely voucherless company (`company_has_no_vouchers`) from a partial `empty_uncorroborated` result.
+6. Empty voucher windows now require a discriminating control. A widened response no longer promotes the original empty window (since #294, corrected 2026-10-12; this item first said it did): rows exclusively outside that window leave it `partial` with `empty_window_wider_read_nonempty`, and any in-window row contradicts it (`window_contradicted`). If the widened control is empty, the company high-water separates a genuinely voucherless company (`company_has_no_vouchers`) from a partial `empty_uncorroborated` result.
 
 ## Final verification
 

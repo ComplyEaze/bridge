@@ -60,8 +60,9 @@ node scripts/check-surface-ack.mjs --mode pull_request --pr <N> --base origin/ma
 ```
 
 The fourth runs `cargo metadata --no-deps`, not a build, and fetches no crates.
-The fifth needs the pull request's number, so run it once the PR is open. The
-acknowledgement file is named for that number
+The fifth needs the pull request's number, so run it once the PR is open. It
+reads commits, not the working tree, so commit your changes and the
+acknowledgement file first. The file is named for the PR number
 (`docs/tally/compatibility/acks/pr-<N>.txt`), and a pinned-path change needs it.
 The local run approximates CI, which stays the authority.
 

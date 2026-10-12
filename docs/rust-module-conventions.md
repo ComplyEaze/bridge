@@ -118,6 +118,12 @@ non-idiomatic Rust. Treat them as questions only.
     Use a `syn`-based item graph, [`cargo-modules`](https://github.com/regexident/cargo-modules)
     (`structure`, `dependencies`), or rust-analyzer's SCIP index. Add change coupling from git
     history when a static seam looks clean.
+13. **Pair every `compile_fail` doctest with one that must compile.** Stable rustdoc does not check
+    the error code after `compile_fail` (measured on 1.96.0: a block marked `compile_fail,E0603`
+    passes on an E0451 error), so the block passes on any error, including a path that a move or
+    a narrower visibility made unreachable. Beside it, add a doctest that names the same item by
+    the same path and must compile. #1561 adds the first pair, on
+    `ApprovedPartyStatementDestination`.
 
 ## Decision checklist
 

@@ -943,6 +943,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              fields=compliance returns. Pass fields=compliance, or drop `as_of`: a basic \
              read's opening balance is dated by `opening_balance_as_of`, not by `as_of`.",
         ),
+        "ledger_masters_gst_details_requires_compliance" => Some(
+            "`include_gst_details` adds each ledger's dated GST rate details, which only \
+             fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
+        ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
             "A ledger in this company holds its opening balance in a foreign currency, which \
@@ -2731,6 +2735,15 @@ fn optional_string(args: &Value, key: &str) -> Result<Option<String>, String> {
     match args.get(key) {
         None => Ok(None),
         Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("argument_invalid:{key}")),
+    }
+}
+/// An optional argument that must be a real JSON boolean: a string or a number
+/// is `argument_invalid:<key>`, never read as true or false.
+fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
+    match args.get(key) {
+        None => Ok(None),
+        Some(Value::Bool(value)) => Ok(Some(*value)),
         Some(_) => Err(format!("argument_invalid:{key}")),
     }
 }

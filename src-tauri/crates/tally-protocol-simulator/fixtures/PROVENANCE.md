@@ -28,7 +28,6 @@ bytes only.
 | `empty_export.xml` | `RECORDCOUNT` 0 |
 | `duplicate_identity.xml` | two ledgers sharing one GUID |
 | `wrong_company.xml` | a response for a different synthetic company |
-| `voucher_export.xml` | one Receipt voucher carrying `REMOTEID` |
 | `record_count_mismatch.xml` | declares two records, contains one |
 | `malformed_export_metadata.xml` | `RECORDCOUNT` -1 |
 | `duplicate_export_metadata.xml` | `COMPANYCONTEXT` given both as attribute and as child elements |
@@ -57,7 +56,6 @@ repeats only what this note says above.
 | `empty_export.xml` | 317 | `30205d47a04c0c75a0b02fed5ce9e2c0ac571fd5c3a090686f89d6f2067d6456` | not a capture: authored, as above |
 | `duplicate_identity.xml` | 560 | `5b2f9b82e9d16821d542c8a116066f322e375506f51e29f8ee85adf6fa89f85d` | not a capture: authored, as above |
 | `wrong_company.xml` | 323 | `bcce68996fdedddb31ef799dc8ecb949860ed069922eb89f9376b8ad25b8d475` | not a capture: authored, as above |
-| `voucher_export.xml` | 626 | `621c185473bb9fa8e059cb6932117ba0670264820ed41a7999166eb200bb964d` | not a capture: authored, as above |
 | `record_count_mismatch.xml` | 449 | `44da2028856326617f3bc596b508768711b1481adcf21d6d7339e3282c1a6bc0` | not a capture: authored, as above |
 | `malformed_export_metadata.xml` | 320 | `41406e5029ff136132a6649af7b9443968a956129b076279aa923b6e86c5db4b` | not a capture: authored, as above |
 | `duplicate_export_metadata.xml` | 351 | `eaa617c9ec831e3416dec7a16eca1c91b92b7ab0ccac06ac1cbecfeb9a282734` | not a capture: authored, as above |

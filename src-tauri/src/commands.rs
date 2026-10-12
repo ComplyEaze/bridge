@@ -1904,7 +1904,13 @@ async fn export_party_ledger_master_once(
         None => BalanceDateBasis::HostToday(host_today()?),
     };
     let source = runtime
-        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion, basis)
+        .fetch_party_ledger_master_source(
+            request.config,
+            &identity,
+            currency_assertion,
+            basis,
+            crate::tally::connection::ComplianceRead::Standard,
+        )
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(

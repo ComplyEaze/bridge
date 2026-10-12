@@ -3,8 +3,6 @@ pub(crate) mod approved_import;
 pub mod capability_packs;
 pub mod connection;
 pub mod connector;
-#[cfg(feature = "voucher-scan")]
-pub(crate) mod outstandings_runtime;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.
@@ -25,7 +23,7 @@ pub use runtime::{
     CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
     OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
     OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
-    TallyTelemetryPreviewExport, UnallocatedComposition, UnallocatedParty,
+    UnallocatedComposition, UnallocatedParty,
 };
 pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
 
@@ -121,28 +119,6 @@ impl VerifiedCompanyIdentity {
             books_from_yyyymmdd: bridge_tally_core::TallyDate::parse("20260401")
                 .expect("fixed fixture date is valid"),
         }
-    }
-
-    #[cfg(feature = "live-calibration-harness")]
-    pub fn live_calibration_harness_identity(
-        display_name: impl Into<String>,
-        company_guid: impl Into<String>,
-    ) -> Self {
-        let display_name = display_name.into();
-        let company_guid = company_guid.into();
-        Self::from_observed_companies(
-            display_name.clone(),
-            company_guid.clone(),
-            "1".to_string(),
-            "20260401".to_string(),
-            &[TallyCompany {
-                name: display_name,
-                guid: Some(company_guid),
-                company_number: Some("1".to_string()),
-                books_from: Some("20260401".to_string()),
-            }],
-        )
-        .expect("the fixed calibration fixture is one complete company tuple")
     }
 
     pub(crate) fn display_name(&self) -> &str {

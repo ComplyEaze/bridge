@@ -131,7 +131,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
 
     let app = builder
         .invoke_handler(tauri::generate_handler![
-            commands::check_tally_connection,
             commands::probe_tally,
             commands::bootstrap_direct_tally_company,
             commands::save_tally_setup,
@@ -170,7 +169,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::cancel_tally_snapshot,
             commands::cancel_tally_request,
             commands::tally_runtime_snapshots,
-            commands::tally_telemetry_preview,
             commands::fetch_tally_companies,
             commands::fetch_tally_outstandings,
             commands::fetch_selected_ledger_entries,

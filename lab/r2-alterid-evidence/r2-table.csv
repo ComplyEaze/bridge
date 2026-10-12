@@ -1,0 +1,42 @@
+kind,name,alter_id,master_id
+cost_categories,Primary Cost Category,99,98
+godowns,Lab Godown A,240,208
+godowns,Lab Godown B,239,209
+godowns,Main Location,100,99
+ledgers,Cash,,
+ledgers,Lab Customer One,,
+ledgers,Lab Output CGST,,
+ledgers,Lab Output SGST,,
+ledgers,Lab Purchases,,
+ledgers,Lab Sales,,
+ledgers,Lab Supplier One,,
+ledgers,Profit & Loss A/c,,
+stock_groups,Lab Group B,224,222
+stock_groups,Lab Group C,229,227
+stock_groups,Lab Raw Materials,241,210
+units,Kgs,209,207
+units,U.,208,206
+voucher_types,Attendance,80,78
+voucher_types,Contra,34,32
+voucher_types,Credit Note,42,40
+voucher_types,Debit Note,44,42
+voucher_types,Delivery Note,50,48
+voucher_types,Job Work In Order,84,82
+voucher_types,Job Work Out Order,86,84
+voucher_types,Journal,40,38
+voucher_types,Material In,90,88
+voucher_types,Material Out,88,86
+voucher_types,Memorandum,62,60
+voucher_types,Payment,36,34
+voucher_types,Payroll,82,80
+voucher_types,Physical Stock,58,56
+voucher_types,Purchase,48,46
+voucher_types,Purchase Order,68,66
+voucher_types,Receipt,38,36
+voucher_types,Receipt Note,52,50
+voucher_types,Rejections In,56,54
+voucher_types,Rejections Out,54,52
+voucher_types,Reversing Journal,64,62
+voucher_types,Sales,46,44
+voucher_types,Sales Order,66,64
+voucher_types,Stock Journal,60,58

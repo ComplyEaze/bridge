@@ -1,0 +1,26 @@
+R2 (<lane>, e484e78b) - AlterIDs across master kinds - Windows lab, 12 Oct 2026
+Build: bridge_mcp.exe 411f7cca... (0.5.1 / #1516). tally_status 07:00:42Z: TallyPrime 7.1 Silver, not Education.
+Book: BRIDGE STOCK LAB (100027, GUID 1edb9b05-8d35-4c0c-9959-dce655730463), loaded alone. BRIDGE PILOT LAB was rejected first (masters units: 0 rows).
+Backup before step 4: C:\tieout\TDBK1800_100027.001, 44,314 B, written 12:34:27 IST, sha256 0fd281e55f6ecfbdf109b0e9d002f864355d599f4bb11da8015da081b0260db5 (copy in ..\backup-pre\).
+
+STEP 1 - NOT RUN [finding]: this build exposes no changed_since tool (not a refusal, not zero rows). No feed pages, no feed marks.
+STEP 2 - masters for voucher_types, units, godowns, stock_groups, cost_centres, cost_categories (each one page, next_offset null) and ledger_masters fields=basic (one page). All snapshot master_alter_id 288, voucher_alter_id 4.
+  Book gap: cost_centres total 0 (STOCK LAB has none) - so "at least one cost centre" is NOT met.
+  FINDING: ledger_masters (basic) returns NO alter_id (and no master_id/guid) per ledger; masters kind=groups carries no alter_id by design. So ledger and group AlterIDs are NOT observable with this build's tools.
+STEP 3 (parsed, r2-table.csv):
+  3a rows per kind: voucher_types 24, godowns 3, stock_groups 3, units 2, cost_categories 1, cost_centres 0, ledgers 8 (no alter_id) [verified]
+  3b duplicate alter_id across the kinds that expose one: NONE (32 AlterIDs, all distinct) [verified for those kinds; ledgers/groups unverified]
+  3c largest alter_id per kind vs master mark 288: stock_groups 241, godowns 240, units 209, cost_categories 99, voucher_types 90 (all < 288) [verified]
+  3d not measurable (no step 1 feed) [unverified]
+  Side observation: master_id is one sequence across kinds too (units 206-207, godowns 208-209, stock group 210 ...).
+STEP 4 (on screen, order and times IST; mark read via masters units after each):
+  before: mark 288
+  12:35:10 ledger "Lab Sales": alias R2LEDGER added, saved -> mark 289 => ledger AlterID 289 [inferred]
+  12:35:50 group "Sales Accounts": alias R2GROUP added, saved -> mark 290 => group AlterID 290 [inferred]
+  12:36:20 unit "Kgs": formal name R2UNIT -> Ctrl+A REFUSED: Tally Error box "Oops!" / "BAD ORIGINAL NAME"; quit without saving -> mark 290, Kgs alter_id 209 unchanged
+  12:37:15 unit "U.": same change -> same "BAD ORIGINAL NAME"; quit without saving -> mark unchanged
+  => unit AlterID after edit: NOT OBTAINED (both unit alterations refused by Tally) [finding]
+  Consecutive/strictly increasing: ledger 289 then group 290 = +1 each, in edit order [inferred from mark]; master mark equals the largest [inferred].
+RESTORE: 12:37:50 ledger alias removed (mark 291), 12:38:20 group alias removed (mark 292); units never changed. Final mark 292 at 07:08:35Z. All three objects as before (ledger/group aliases empty; units untouched).
+Step 5: no duplicate found -> nothing to save.
+Evidence notes: r2-*.json files written from the tool output; the U+FFFD in parent names is written as the JSON escape \ufffd (same value, not byte-identical). Step-4 mark reads are recorded here by their snapshot master_alter_id and response_sha256: 289 f057d379..., 290 2b2f4f11..., 290 2b2f4f11... (after Kgs quit), 292 0318a5b6....

@@ -205,7 +205,7 @@ const NOT_ESTABLISHED_STEP: &str = "Whether the other account's Contra exists is
 /// The whole check could not run, which says nothing of any one row. A batch
 /// that was written, or a verification, is checked again by verifying it.
 const CHECK_NOT_RUN_STEP: &str =
-    "The transfer check could not run this time; run verify_import on this batch again.";
+    "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES.";
 /// A statement of only skipped rows has no batch to verify.
 const CHECK_NOT_RUN_RECORDED_STEP: &str = "The skipped rows are recorded; the transfer check will show on the next build or verification for this company.";
 const OPEN_OMITTED_STEP: &str =
@@ -241,8 +241,9 @@ pub(in crate::agent) fn counts_only_section(section: &Value) -> Value {
     counts
 }
 
-/// What a section says when nothing of it fits: that the check is to be run
-/// again. It claims no count.
+/// What a section says when the check could not run, or when not even its
+/// counts fit beside the page: run the verification again, with a larger cap
+/// if the note comes back. It claims no count.
 pub(in crate::agent) fn check_not_run_section(recorded: bool) -> Value {
     json!({
         "state": "not_established",

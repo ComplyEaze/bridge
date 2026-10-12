@@ -787,7 +787,7 @@ fn the_note_that_the_check_did_not_run_names_the_call_that_made_it() {
     let batch = check_not_run_section(false);
     assert_eq!(
         batch["next_steps"]["check_not_run"],
-        "The transfer check could not run this time; run verify_import on this batch again."
+        "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES."
     );
     let recorded = check_not_run_section(true);
     assert_eq!(

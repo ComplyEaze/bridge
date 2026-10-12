@@ -735,7 +735,7 @@ async fn a_build_that_is_not_about_transfers_goes_on_when_the_view_cannot_be_rea
     assert!(section.get("open").is_none());
     assert_eq!(
         section["next_steps"]["check_not_run"].as_str().unwrap(),
-        "The transfer check could not run this time; run verify_import on this batch again."
+        "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES."
     );
 }
 

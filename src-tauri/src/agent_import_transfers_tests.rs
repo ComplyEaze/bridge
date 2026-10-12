@@ -300,7 +300,7 @@ fn a_section_that_cannot_be_computed_says_so_and_claims_nothing() {
     }
     assert_eq!(
         section["next_steps"],
-        json!({"check_not_run": "The transfer check could not run this time; run verify_import on this batch again."})
+        json!({"check_not_run": "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES."})
     );
 }
 
@@ -536,7 +536,7 @@ fn a_section_that_did_not_run_names_the_call_that_made_it() {
     assert_eq!(batch["state"], "not_established");
     assert_eq!(
         batch["next_steps"]["check_not_run"],
-        "The transfer check could not run this time; run verify_import on this batch again."
+        "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES."
     );
     assert_eq!(TransferSummary::NotEstablished.render(0), batch);
     let recorded = check_not_run_section(true);

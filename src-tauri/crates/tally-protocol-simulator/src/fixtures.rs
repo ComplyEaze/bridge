@@ -19,7 +19,6 @@ pub enum Fixture {
     DuplicateIdentity,
     WrongCompany,
     VoucherExport,
-    InconsistentDateFilter,
     RecordCountMismatch,
     MalformedExportMetadata,
     DuplicateExportMetadata,
@@ -72,9 +71,6 @@ impl Fixture {
             }
             Self::WrongCompany => Cow::Borrowed(include_str!("../fixtures/wrong_company.xml")),
             Self::VoucherExport => Cow::Borrowed(include_str!("../fixtures/voucher_export.xml")),
-            Self::InconsistentDateFilter => Cow::Borrowed(include_str!(
-                "../fixtures/inconsistent_date_filter.xml"
-            )),
             Self::RecordCountMismatch => {
                 Cow::Borrowed(include_str!("../fixtures/record_count_mismatch.xml"))
             }

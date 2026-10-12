@@ -949,7 +949,10 @@ do not parse; a company list with no `EDUMODE` field keeps ordinary boundaries, 
 side is held to the same rule without a live measurement in these shapes, so an Education
 whole-month read ending on the 30th is refused.
 A genuinely empty voucher response uses the same wider-window
-corroboration as `vouchers` before zero movement can be reported. Cancelled and
+corroboration as `vouchers` before zero movement can be reported; when the
+corroboration cannot confirm it, the refusal's code is its reason
+(`empty_uncorroborated` or `empty_window_wider_read_nonempty`, explained under
+`vouchers` in the protocol and migration notes). Cancelled and
 optional rows establish response presence while contributing no accounting movement.
 
 Capability profile version 4 adds the observed licence tier alongside the release.
@@ -1019,10 +1022,14 @@ or vouchers.
   `voucher_presence` use (#985, #1031): a non-empty window is `complete` only when
   every voucher read was checked against a separate count of the window (a census,
   which ComplyEaze Bridge sends for every book that has held a voucher, however
-  few), and an empty window when its
-  corroboration read confirmed it. Otherwise it is `partial` with `reason`
-  `nonempty_window_unqualified` (or the corroboration's own reason for an empty
-  window), and the rows are still returned. Before #1031 the registers called a
+  few), and an empty window only when its corroboration read confirmed it: the
+  read widened by a day on each side was also empty and the company has no
+  vouchers. Otherwise it is `partial` with `reason`
+  `nonempty_window_unqualified`, or, for an empty window, the corroboration's own
+  reason: `empty_uncorroborated` (the widened read was also empty, but the company
+  has vouchers) or `empty_window_wider_read_nonempty` (the widened read found rows
+  on the neighbouring days, which cannot count the window), and the rows are still
+  returned. Before #1031 the registers called a
   window nothing had counted `complete` on the company marks and the ledger
   masters alone. Those marks and masters reading the same before and after the
   window still decide whether the read stands at all (a drift refuses it). The one
@@ -1087,7 +1094,9 @@ rate or return section, and matches nothing against any portal.
   tests, against the ledger masters of the purchase register's lab book.
 - **What `state` means.** The same rule as `purchase_register` (see its
   section): `complete` only when the window was counted (or an empty window its
-  corroboration confirmed), otherwise `partial` with `nonempty_window_unqualified`.
+  corroboration confirmed), otherwise `partial` with `nonempty_window_unqualified`
+  (an empty window it could not confirm carries `empty_uncorroborated` or
+  `empty_window_wider_read_nonempty`, as there).
   A row's `status` is separate.
 - **A Credit Note keeps Tally's signs.** It is returned as a row with its signs
   reversed as Tally sends them: the tool neither nets nor flips, so a caller that
@@ -2687,7 +2696,16 @@ byte cap retain partial source commitments in the in-process evidence store.
 window by one rule (#985, #1031): `complete`
 only when its rows were admitted voucher for voucher against the census that
 sized the read (protocol reference §11c.3), or it was empty and corroborated;
-otherwise `partial` with reason `nonempty_window_unqualified`. A book that has
+otherwise `partial` with reason `nonempty_window_unqualified`. An empty window is
+corroborated by a second read widened by a day on each side, and is `complete`
+only when that read is also empty and the company has no vouchers (reason
+`company_has_no_vouchers`). It is `partial` with `empty_uncorroborated` when the
+widened read is also empty but the company has vouchers, and `partial` with
+`empty_window_wider_read_nonempty` when the widened read found rows on the
+neighbouring days, none inside the window (a row inside it refuses the read as
+`window_contradicted`). That last case means the window's own read found nothing
+and the neighbouring days' rows could not count it, so a genuinely empty window
+next to a busy day cannot reach `complete` today. A book that has
 held a voucher is counted however small, so a few vouchers can be `complete` (#1029);
 only a book that has never held one sends no census (Tally omits its mark), and a nonempty window read without one is `partial`. Voucher selectors are applied
 after the window is labelled, so a nonempty counted source with no matching

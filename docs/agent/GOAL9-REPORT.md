@@ -25,7 +25,7 @@ so Goal 3B did not authorize or require a reseal. Nothing was pushed.
 
 5. Direction now applies consistently to every outstandings view. The implementation filters typed bill and residual rows first, then recalculates totals, party ranking, bills, unallocated count/amount, and ageing buckets from the selected side. Because bill ages are present at this boundary, the documented decision is to provide direction-specific ageing buckets rather than emit the not-available fallback.
 
-6. Empty voucher windows now require a discriminating control. A widened response may corroborate the original empty window only when it has rows exclusively outside that window; any in-window row contradicts it. If the widened control is also empty, the company high-water separates a genuinely voucherless company (`company_has_no_vouchers`) from a partial `empty_uncorroborated` result.
+6. Empty voucher windows now require a discriminating control. A widened response no longer promotes the original empty window (since #294, corrected 2026-10-12; this item first said it did): rows exclusively outside that window leave it `partial` with `empty_window_wider_read_nonempty`, and any in-window row contradicts it (`window_contradicted`). If the widened control is empty, the company high-water separates a genuinely voucherless company (`company_has_no_vouchers`) from a partial `empty_uncorroborated` result.
 
 ## Final verification
 

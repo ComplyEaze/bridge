@@ -134,6 +134,15 @@ These changes are in source and not yet in a published build.
   as it shows every other value read from Tally, so every Tally value in
   that text is escaped (#626).
 
+- **An empty window whose neighbouring days hold vouchers now says so in its reason.** When the read of a
+  window returns nothing and the read widened by a day on each side finds rows, none inside the window,
+  `vouchers`, `voucher_presence`, `purchase_register`, `sales_register` and `ledger_movement` now give
+  `empty_window_wider_read_nonempty` where they gave `nonempty_uncorroborated`, which read as if the window
+  itself held rows. Only the name changes: the state stays `partial` (a refusal, for `ledger_movement`),
+  and an empty window next to a busy day still cannot reach `complete`. The other reasons
+  (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the tool
+  descriptions and the agent guide now list all three outcomes of an empty window.
+
 ## [0.5.1] - 2026-10-09
 
 ### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (9 Oct 2026)

@@ -471,10 +471,10 @@ book's path (from the code); a larger book's census cost was not measured here.
 - The `vouchers` call on the census book sent the same requests as a build without #1020, in the
   same order, with the same request hashes and response sizes.
 - On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
-  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
-  code, not the run: that reason is returned when the read widened by a day on each side finds
-  rows, none inside the window, so it names the neighbouring days, not the window, which returned
-  no row; the wording is a separate matter.
+  `empty_uncorroborated` on the census book, and, on the other, the reason now named
+  `empty_window_wider_read_nonempty`. From the code, not the run: that reason is returned when
+  the read widened by a day on each side finds rows, none inside the window, so it names the
+  neighbouring days, not the window, which returned no row; the name says so.
 
 **The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
 `post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so

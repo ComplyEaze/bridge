@@ -3389,6 +3389,86 @@ async fn a_licensed_endpoint_still_reads_a_window_starting_on_any_day() {
     assert_eq!(result["reason"], "empty_uncorroborated");
 }
 
+/// An empty window whose widened read finds rows only on the neighbouring days
+/// stays `partial`, and says so by name (`empty_window_wider_read_nonempty`):
+/// the window's own read found nothing, and the neighbouring days' rows give no
+/// independent count of it. The widened answer is the captured three-voucher
+/// response unchanged: its three vouchers are all dated 1 August 2026, outside
+/// the window of 2 August and inside the widened read of 1 to 3 August. The
+/// window's own answers are the captured empty collection.
+#[tokio::test]
+async fn an_empty_window_beside_a_busy_day_is_partial_by_the_wider_reads_rows() {
+    let empty = xml_plan(empty_collection());
+    let neighbouring_day = xml_plan(three_vouchers());
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(3)));
+    // The census of the window (#1029), the window read, and the widened read.
+    // The widened read holds rows, so no closing marks read follows it.
+    plans.extend(paired(&empty));
+    plans.extend(paired(&empty));
+    plans.extend(paired(&neighbouring_day));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260802", "to": "20260802"}),
+        )
+        .await;
+    simulator.cancel();
+    let observed = simulator.finish().unwrap();
+    // 4 prelude legs, then four paired reads of six legs: marks, census,
+    // window, widened window.
+    assert_eq!(observed.len(), 28);
+    let census = render_agent_voucher_census(
+        &company(),
+        &tally_date("20260802"),
+        &tally_date("20260802"),
+        None,
+    )
+    .unwrap();
+    let window = render_agent_vouchers(
+        &company(),
+        &tally_date("20260802"),
+        &tally_date("20260802"),
+        None,
+    )
+    .unwrap();
+    let wider = render_agent_vouchers(
+        &company(),
+        &tally_date("20260801"),
+        &tally_date("20260803"),
+        None,
+    )
+    .unwrap();
+    assert_requests(
+        &observed,
+        &[5, 11, 13, 17, 19, 23, 25],
+        &[
+            render_agent_company_high_water(&company()),
+            census.clone(),
+            census,
+            window.clone(),
+            window,
+            wider.clone(),
+            wider,
+        ],
+    );
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(response["isError"], false, "{response}");
+    assert_eq!(result["state"], "partial", "{response}");
+    assert_eq!(result["reason"], "empty_window_wider_read_nonempty");
+    assert_eq!(result["items"], json!([]));
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+    assert_eq!(
+        response["structuredContent"]["evidence"]["reason_code"],
+        "empty_window_wider_read_nonempty"
+    );
+}
+
 /// A divided plan is refused whole, before its first part (bridge#581). The
 /// census counts one voucher on each of the 1st, 2nd and 10th and one voucher
 /// fits a read, so the plan is 1st, 2nd to 9th, 10th to 31st. Its first part

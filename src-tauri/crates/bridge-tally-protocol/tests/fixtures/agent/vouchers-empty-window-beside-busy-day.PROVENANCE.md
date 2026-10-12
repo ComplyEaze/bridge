@@ -34,7 +34,8 @@ answered `partial` with total 0, an empty `items` list and the window's one part
 0 rows; the answer carries one census request and one marks request, and no cost block.
 `evidence.state` repeats `partial`. It is the shape that
 `an_empty_window_beside_a_busy_day_is_partial_by_the_wider_reads_rows` compares its own result
-with: the same keys and value kinds at every level, and the state, total and items values.
+with: the same keys and value kinds at every level (an array's elements are compared with the live array's
+first element; counts are not compared), and the same state, total and items values.
 
 ## What it does not establish
 

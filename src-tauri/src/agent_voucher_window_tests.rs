@@ -3527,7 +3527,7 @@ async fn an_empty_window_beside_a_busy_day_is_partial_by_the_wider_reads_rows() 
         "empty_window_wider_read_nonempty"
     );
     // The live answer for the same shape (an empty window beside a busy day),
-    // kept as the tool returned it by a build that still named the reason
+    // kept as the lab recorded the tool's answer, from a build that still named the reason
     // `nonempty_uncorroborated`: our result has the same keys and value kinds
     // at every level (an array's elements are compared with the live array's
     // first element; counts are not compared), and the same state, total and

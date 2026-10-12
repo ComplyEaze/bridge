@@ -107,12 +107,14 @@ fn window(from: &str, to: &str) -> ParseWindow {
 fn january_covered() -> Coverage {
     let mut coverage = Coverage::default();
     for bank in ["b1", "b2"] {
-        coverage.add(
-            CompanyGuid::new("co"),
-            EndpointOrigin::new("ep"),
-            ledger(bank),
-            window("20260101", "20260131"),
-        );
+        coverage
+            .add(
+                CompanyGuid::new("co"),
+                EndpointOrigin::new("ep"),
+                ledger(bank),
+                window("20260101", "20260131"),
+            )
+            .unwrap();
     }
     coverage
 }
@@ -280,7 +282,8 @@ fn transfer_pairing_round_one_needs_one_edge_at_each_end() {
 #[test]
 fn transfer_pairing_a_row_contested_in_round_one_does_not_pair_in_round_two() {
     // st-1's reference matches two Contras, and a third carries none; the
-    // referenceless one is not a way out of the reference ambiguity
+    // referenceless one is not a way out of the reference ambiguity, but it
+    // is a candidate and is listed with the others
     let mut s = skip("st-1");
     s.reference = Some(reference("600000000001"));
     let mut c1 = contra("batch-1", "t1");
@@ -289,6 +292,22 @@ fn transfer_pairing_a_row_contested_in_round_one_does_not_pair_in_round_two() {
     c2.reference = Some(reference("600000000001"));
     let c3 = contra("batch-3", "t3");
     let view = view_of(&[s], &[c1, c2, c3], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        ambiguous(&[("batch-1", "t1"), ("batch-2", "t2"), ("batch-3", "t3")])
+    );
+}
+
+#[test]
+fn transfer_pairing_a_verified_loose_candidate_is_not_hidden_behind_an_unverified_reference() {
+    // st-1's reference matches a Contra in a batch not yet verified, and a
+    // verified Contra carries no reference at all: both are candidates
+    let mut s = skip("st-1");
+    s.reference = Some(reference("600000000001"));
+    let mut by_reference = unverified(contra("batch-1", "t1"));
+    by_reference.reference = Some(reference("600000000001"));
+    let by_date = contra("batch-2", "t2");
+    let view = view_of(&[s], &[by_reference, by_date], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
         ambiguous(&[("batch-1", "t1"), ("batch-2", "t2")])
@@ -448,12 +467,14 @@ fn transfer_pairing_without_coverage_an_absent_contra_is_not_established() {
 fn covering(windows: &[(&str, &str, &str)]) -> Coverage {
     let mut coverage = Coverage::default();
     for (bank, from, to) in windows {
-        coverage.add(
-            CompanyGuid::new("co"),
-            EndpointOrigin::new("ep"),
-            ledger(bank),
-            window(from, to),
-        );
+        coverage
+            .add(
+                CompanyGuid::new("co"),
+                EndpointOrigin::new("ep"),
+                ledger(bank),
+                window(from, to),
+            )
+            .unwrap();
     }
     coverage
 }
@@ -506,8 +527,8 @@ fn transfer_pairing_a_date_pair_needs_both_ledgers_windows_around_its_dates() {
 #[test]
 fn transfer_pairing_a_double_booked_contra_never_pairs() {
     // b1's statement posted the Contra, and b2's statement posted one too
-    let mut other_lineage = skip("st-1");
-    other_lineage.lineage = LineageId::new("lineage-b2");
+    let skipped = skip("st-1");
+    // b2's own Contra comes from another lineage than the skipped row's
     let b2_contra = |batch: &str, txn: &str| {
         let mut fact = contra_from_b2(batch, txn);
         fact.lineage = LineageId::new("lineage-b2-amended");
@@ -515,7 +536,7 @@ fn transfer_pairing_a_double_booked_contra_never_pairs() {
     };
     // no reference: listed, and the only candidate no longer pairs
     let view = view_of(
-        &[other_lineage.clone()],
+        &[skipped.clone()],
         &[contra("batch-1", "t1"), b2_contra("batch-2", "t2")],
         &january_covered(),
         0,
@@ -523,13 +544,14 @@ fn transfer_pairing_a_double_booked_contra_never_pairs() {
     assert_eq!(view.double_booked.len(), 1);
     assert_eq!(state_of(&view, "st-1"), ambiguous(&[("batch-1", "t1")]));
     // equal references: the pair by reference is refused for the same reason
-    let mut referenced = other_lineage;
+    let mut referenced = skipped;
     referenced.reference = Some(reference("600000000001"));
     let mut first = contra("batch-1", "t1");
     first.reference = Some(reference("600000000001"));
     let mut second = b2_contra("batch-2", "t2");
     second.reference = Some(reference("600000000001"));
     let view = view_of(&[referenced], &[first, second], &january_covered(), 0);
+    assert_eq!(view.double_booked.len(), 1);
     assert_eq!(
         view.double_booked[0].class,
         DoubleBookedClass::RefuseAtBuild
@@ -599,12 +621,14 @@ fn transfer_pairing_coverage_must_hold_the_whole_interval() {
     let covered_by = |windows: &[(&str, &str)], k: u32| {
         let mut coverage = Coverage::default();
         for (from, to) in windows {
-            coverage.add(
-                CompanyGuid::new("co"),
-                EndpointOrigin::new("ep"),
-                ledger("b1"),
-                window(from, to),
-            );
+            coverage
+                .add(
+                    CompanyGuid::new("co"),
+                    EndpointOrigin::new("ep"),
+                    ledger("b1"),
+                    window(from, to),
+                )
+                .unwrap();
         }
         state_of(&view_of(&skip_on_the_fifth, &[], &coverage, k), "st-1")
     };
@@ -648,24 +672,30 @@ fn transfer_pairing_coverage_of_another_ledger_company_or_endpoint_does_not_coun
     let mut coverage = Coverage::default();
     let window = window("20260101", "20260131");
     // the skip's own bank ledger is not the ledger that must hold the Contra
-    coverage.add(
-        CompanyGuid::new("co"),
-        EndpointOrigin::new("ep"),
-        ledger("b2"),
-        window.clone(),
-    );
-    coverage.add(
-        CompanyGuid::new("co-2"),
-        EndpointOrigin::new("ep"),
-        ledger("b1"),
-        window.clone(),
-    );
-    coverage.add(
-        CompanyGuid::new("co"),
-        EndpointOrigin::new("ep-2"),
-        ledger("b1"),
-        window,
-    );
+    coverage
+        .add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep"),
+            ledger("b2"),
+            window.clone(),
+        )
+        .unwrap();
+    coverage
+        .add(
+            CompanyGuid::new("co-2"),
+            EndpointOrigin::new("ep"),
+            ledger("b1"),
+            window.clone(),
+        )
+        .unwrap();
+    coverage
+        .add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep-2"),
+            ledger("b1"),
+            window,
+        )
+        .unwrap();
     let view = view_of(&[skip("st-1")], &[], &coverage, 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
 }
@@ -985,12 +1015,14 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
     let covered = |halves: &[ParseWindow]| {
         let mut coverage = covering(&[("b2", "20260101", "20260131")]);
         for half in halves {
-            coverage.add(
-                CompanyGuid::new("co"),
-                EndpointOrigin::new("ep"),
-                ledger("b1"),
-                half.clone(),
-            );
+            coverage
+                .add(
+                    CompanyGuid::new("co"),
+                    EndpointOrigin::new("ep"),
+                    ledger("b1"),
+                    half.clone(),
+                )
+                .unwrap();
         }
         coverage
     };
@@ -1032,6 +1064,130 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
             1,
         );
         assert_eq!(view, baseline, "seed {seed}");
+    }
+}
+
+fn refused(skips: &[SkipFact], contras: &[ContraFact]) -> PairingInputError {
+    transfer_pairing_view(skips, contras, &january_covered(), 0).expect_err("a bad fact")
+}
+
+#[test]
+fn transfer_pairing_a_skip_amount_that_is_not_positive_is_refused() {
+    for amount in ["0", "0.00", "-0", "-500.00"] {
+        let mut bad = skip("st-1");
+        bad.amount = ExactDecimal::parse(amount).unwrap();
+        assert_eq!(
+            refused(&[bad], &[]),
+            PairingInputError::NonPositiveSkipAmount {
+                key: skip_key("st-1")
+            },
+            "{amount}"
+        );
+    }
+}
+
+#[test]
+fn transfer_pairing_a_contra_amount_that_is_not_positive_is_refused() {
+    for amount in ["0", "0.00", "-0", "-500.00"] {
+        let mut bad = contra("batch-1", "t1");
+        bad.amount = ExactDecimal::parse(amount).unwrap();
+        assert_eq!(
+            refused(&[skip("st-1")], &[bad]),
+            PairingInputError::NonPositiveContraAmount {
+                key: contra_key("batch-1", "t1")
+            },
+            "{amount}"
+        );
+    }
+}
+
+#[test]
+fn transfer_pairing_a_skip_whose_two_ledgers_are_one_is_refused() {
+    let mut bad = skip("st-1");
+    bad.other_ledger = ledger("b2");
+    assert_eq!(
+        refused(&[bad], &[]),
+        PairingInputError::SkipLedgersEqual {
+            key: skip_key("st-1")
+        }
+    );
+}
+
+#[test]
+fn transfer_pairing_a_window_that_ends_before_it_starts_is_refused() {
+    let mut coverage = Coverage::default();
+    assert_eq!(
+        coverage.add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep"),
+            ledger("b1"),
+            window("20260110", "20260109")
+        ),
+        Err(PairingInputError::InvertedWindow {
+            bank_ledger: ledger("b1")
+        })
+    );
+    // a one-day window is fine
+    assert_eq!(
+        coverage.add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep"),
+            ledger("b1"),
+            window("20260110", "20260110")
+        ),
+        Ok(())
+    );
+}
+
+#[test]
+fn transfer_pairing_bad_facts_are_refused_the_same_way_in_any_input_order() {
+    let (mut skips, mut contras, coverage) = busy_book();
+    // two bad skips (the smaller key is named: amount, then ledgers) and a bad Contra
+    skips[4].other_ledger = ledger("b2");
+    skips[2].amount = ExactDecimal::parse("0").unwrap();
+    contras[3].amount = ExactDecimal::parse("-1").unwrap();
+    let named = [
+        (
+            skips.clone(),
+            contras.clone(),
+            PairingInputError::NonPositiveSkipAmount {
+                key: skips[2].key.clone(),
+            },
+        ),
+        (
+            {
+                skips[2].amount = ExactDecimal::parse("300.00").unwrap();
+                skips.clone()
+            },
+            contras.clone(),
+            PairingInputError::SkipLedgersEqual {
+                key: skips[4].key.clone(),
+            },
+        ),
+        (
+            {
+                skips[4].other_ledger = ledger("b1");
+                skips.clone()
+            },
+            contras.clone(),
+            PairingInputError::NonPositiveContraAmount {
+                key: contras[3].key.clone(),
+            },
+        ),
+    ];
+    for (skips, contras, expected) in named {
+        for seed in 0..100 {
+            assert_eq!(
+                transfer_pairing_view(
+                    &shuffled(&skips, seed),
+                    &shuffled(&contras, seed + 500),
+                    &coverage,
+                    1
+                ),
+                Err(expected.clone()),
+                "seed {seed}"
+            );
+        }
     }
 }
 
@@ -1164,16 +1320,6 @@ fn transfer_pairing_equal_amounts_match_whatever_their_spelling() {
             "{spelling}"
         );
     }
-    // zero has one spelling too, whatever its sign
-    let mut zero = skip("st-1");
-    zero.amount = ExactDecimal::parse("0.00").unwrap();
-    let mut negative_zero = contra("batch-1", "t1");
-    negative_zero.amount = ExactDecimal::parse("-0").unwrap();
-    let view = view_of(&[zero], &[negative_zero], &january_covered(), 0);
-    assert_eq!(
-        state_of(&view, "st-1"),
-        paired(PairRound::NoReference, "batch-1", "t1")
-    );
     for other in ["50", "5000", "500.5", "0.5"] {
         let mut spelled = contra("batch-1", "t1");
         spelled.amount = ExactDecimal::parse(other).unwrap();
@@ -1233,12 +1379,14 @@ fn transfer_pairing_one_statement_on_two_endpoints_is_two_skips() {
     second_contra.endpoint_origin = EndpointOrigin::new("ep-2");
     let mut coverage = january_covered();
     for bank in ["b1", "b2"] {
-        coverage.add(
-            CompanyGuid::new("co"),
-            EndpointOrigin::new("ep-2"),
-            ledger(bank),
-            window("20260101", "20260131"),
-        );
+        coverage
+            .add(
+                CompanyGuid::new("co"),
+                EndpointOrigin::new("ep-2"),
+                ledger(bank),
+                window("20260101", "20260131"),
+            )
+            .unwrap();
     }
     let view = view_of(
         &[first.clone(), second.clone()],

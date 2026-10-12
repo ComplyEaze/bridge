@@ -31,9 +31,13 @@
 //! * A Contra that is double-booked (also booked from a second statement) pairs
 //!   in neither round; a skip whose candidate it is stays `Ambiguous`.
 //!
-//! Contras are grouped once by (ledger pair, side on each, canonical amount), so
-//! a skip reads only the same-amount, same-direction Contras, by reference or
-//! as a date range.
+//! Contras are grouped once by (company, endpoint, ledger pair, side on each,
+//! canonical amount), so a skip reads only the same-amount, same-direction
+//! Contras, by reference or as a date range.
+//!
+//! Facts the view cannot reason about are refused at the boundary with a typed
+//! `PairingInputError`: duplicate keys, an amount that is not positive, a skip
+//! whose two ledgers are one, and a parse window that ends before it starts.
 //!
 //! Unverified Contras count as candidates (a second possible match must make a
 //! skip ambiguous, not paired) but never pair: a skip whose candidates are all
@@ -198,11 +202,15 @@ impl Coverage {
         endpoint_origin: EndpointOrigin,
         bank_ledger: LedgerGuid,
         window: ParseWindow,
-    ) {
+    ) -> Result<(), PairingInputError> {
+        if window.from > window.to {
+            return Err(PairingInputError::InvertedWindow { bank_ledger });
+        }
         self.0
             .entry((company, endpoint_origin, bank_ledger))
             .or_default()
             .push(window);
+        Ok(())
     }
 }
 
@@ -250,6 +258,14 @@ pub(crate) enum PairingInputError {
     DuplicateSkip { key: SkipKey },
     #[error("two Contras share one key")]
     DuplicateContra { key: ContraKey },
+    #[error("a skipped row's amount is not positive")]
+    NonPositiveSkipAmount { key: SkipKey },
+    #[error("a Contra's amount is not positive")]
+    NonPositiveContraAmount { key: ContraKey },
+    #[error("a skipped row's own bank ledger is its other ledger")]
+    SkipLedgersEqual { key: SkipKey },
+    #[error("a verified parse window ends before it starts")]
+    InvertedWindow { bank_ledger: LedgerGuid },
 }
 
 /// What one transfer shares, so that a skip looks up only the Contras it can
@@ -273,23 +289,15 @@ struct Group<'a> {
     by_reference: BTreeMap<&'a BankReference, Vec<usize>>,
 }
 
-/// The amount without sign or scale artefacts, so equal values are equal text:
-/// `500`, `500.00` and `0500.0` are one amount. Done once per fact.
+/// The amount without scale artefacts, so equal values are equal text: `500`,
+/// `500.00` and `0500.0` are one amount. Done once per fact, on an amount the
+/// view has already checked is positive.
 fn canonical_amount(amount: &ExactDecimal) -> String {
     let text = amount.as_str();
-    let (negative, unsigned) = text
-        .strip_prefix('-')
-        .map_or((false, text), |rest| (true, rest));
-    let (whole, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
     let whole = whole.trim_start_matches('0');
     let fraction = fraction.trim_end_matches('0');
     let mut canonical = String::new();
-    if whole.is_empty() && fraction.is_empty() {
-        return "0".to_string();
-    }
-    if negative {
-        canonical.push('-');
-    }
     canonical.push_str(if whole.is_empty() { "0" } else { whole });
     if !fraction.is_empty() {
         canonical.push('.');
@@ -369,6 +377,27 @@ pub(crate) fn transfer_pairing_view(
         return Err(PairingInputError::DuplicateContra {
             key: pair[0].key.clone(),
         });
+    }
+    // Bad facts are refused whole, in key order (skips, then Contras), so the
+    // error does not depend on the order the facts came in.
+    for skip in &skips {
+        if skip.amount.is_zero() || skip.amount.is_negative() {
+            return Err(PairingInputError::NonPositiveSkipAmount {
+                key: skip.key.clone(),
+            });
+        }
+        if skip.key.bank_ledger == skip.other_ledger {
+            return Err(PairingInputError::SkipLedgersEqual {
+                key: skip.key.clone(),
+            });
+        }
+    }
+    for contra in &contras {
+        if contra.amount.is_zero() || contra.amount.is_negative() {
+            return Err(PairingInputError::NonPositiveContraAmount {
+                key: contra.key.clone(),
+            });
+        }
     }
     let coverage = MergedCoverage::new(coverage);
 
@@ -487,12 +516,14 @@ pub(crate) fn transfer_pairing_view(
                     contra: contras[c].key.clone(),
                 },
                 None => {
-                    let candidates = if reference_edges[s].is_empty() {
-                        &loose_edges[s]
-                    } else {
-                        &reference_edges[s]
-                    };
-                    open_state(skip, candidates, &contras, &coverage, k_days)
+                    // every way the skip could still match, so a verified
+                    // Contra is not hidden behind an unverified one
+                    let candidates: Vec<usize> = reference_edges[s]
+                        .iter()
+                        .chain(&loose_edges[s])
+                        .copied()
+                        .collect();
+                    open_state(skip, &candidates, &contras, &coverage, k_days)
                 }
             };
             (skip.key.clone(), state)
@@ -593,10 +624,7 @@ impl MergedCoverage {
             .0
             .iter()
             .map(|(key, windows)| {
-                let mut windows: Vec<&ParseWindow> = windows
-                    .iter()
-                    .filter(|window| window.from <= window.to)
-                    .collect();
+                let mut windows: Vec<&ParseWindow> = windows.iter().collect();
                 windows.sort_by(|left, right| left.from.cmp(&right.from));
                 let mut merged: Vec<(TallyDate, TallyDate)> = Vec::new();
                 for window in windows {

@@ -346,10 +346,15 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
 /// ledgers, a lab book) measured 2,138 to 2,704 bytes for a ledger with an
 /// empty list and 5,248 to 5,394 with one dated entry (UTF-16 bytes per
-/// `<LEDGER>` row); 8,000 is a margin above the larger figure for a second
-/// state row, not a bound. The shared
-/// [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is for reads without the
-/// details.
+/// `<LEDGER>` row). 8,000 is sized above the largest ledger of that one
+/// capture. It is NOT shown to cover a second dated entry: by the capture's own
+/// sizes a ledger with two dated entries could take about 8,300 bytes, and a
+/// party ledger with two about 9,100. The admission uses the mean over a read
+/// (the estimated count times this figure against the budget), so a book in
+/// which most ledgers hold two or more entries could exceed the 16 MB response
+/// budget while still admitted. UNVERIFIED until measured on more books; it is
+/// not a bound. The shared [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is
+/// for reads without the details.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
 
 /// What a compliance master read asks Tally for. [`Self::Standard`] is the
@@ -474,12 +479,16 @@ const fn ledger_census_mark_limit() -> u64 {
 const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 
 /// The ceiling on one parent group is the whole-read bound: a group with more
-/// ledgers than one part may carry (4,266) is refused as `parent_over_budget`,
-/// never split, because a group cannot be read in pieces by `$Parent`.
+/// ledgers than one part may carry is refused as `parent_over_budget`, never
+/// split, because a group cannot be read in pieces by `$Parent`. That figure is
+/// the budget over the read's per-ledger constant, not a measurement: 4,266
+/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
+/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
+/// far past what the mark bound admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
 /// Most bytes of `NOT` formula text the complement part's request may carry
@@ -491,7 +500,7 @@ const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
 /// The limits a book's parent parts must fit (#679): each part's estimated
 /// master response is inside the same budget a whole read is admitted by, so
 /// the per-part ledger bound is the whole-read bound.
-fn parent_partition_limits(read: ComplianceRead) -> PartitionLimits {
+pub(crate) fn parent_partition_limits(read: ComplianceRead) -> PartitionLimits {
     PartitionLimits {
         max_ledgers_per_part: compliance_master_ledgers_per_read(read),
         max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,

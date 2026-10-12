@@ -477,10 +477,35 @@ fn the_gst_details_request_differs_from_the_production_compliance_request_only_b
 #[test]
 fn the_gst_details_parent_part_request_differs_from_the_production_part_request_only_by_the_suffix()
 {
+    use crate::parent_partition::{ParentObservation, ParentPartition, PartitionLimits};
     let period = gst_details_period();
+    // The complement part is a part kind the read sends too (ledgers under a
+    // parent whose name a formula cannot carry): two named parents in chunks
+    // of one, so it holds two `NOT` formulas.
+    let complement = ParentPartition::plan(
+        [
+            ("l0", "g0", ParentObservation::Named("A")),
+            ("l1", "g1", ParentObservation::Named("B & C")),
+            ("l2", "g2", ParentObservation::Unsupported),
+        ],
+        PartitionLimits {
+            max_ledgers_per_part: 100,
+            max_parents_per_part: 1,
+            max_parts: 4,
+            max_complement_formula_bytes: 10_000,
+        },
+    )
+    .unwrap()
+    .parts()
+    .last()
+    .unwrap()
+    .clone();
+    assert!(complement.is_complement());
+    assert_eq!(complement.formulas().len(), 2);
     for part in [
         one_part(&["Sundry Debtors"]),
         one_part(&["Sundry Debtors", "Duties & Taxes"]),
+        complement,
     ] {
         let production = render_party_ledger_master_request_for_parents("Co", &period, &part);
         let with_details =
@@ -498,6 +523,14 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         assert!(whole.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
         assert!(with_details.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
         assert_eq!(with_details.matches("<FILTERS>").count(), 1);
-        assert_eq!(with_details.matches("<SYSTEM ").count(), 1);
+        assert_eq!(
+            with_details.matches("<SYSTEM ").count(),
+            part.formulas().len(),
+            "one formula per part formula, as in the production request"
+        );
+        assert_eq!(
+            production.matches("<SYSTEM ").count(),
+            with_details.matches("<SYSTEM ").count()
+        );
     }
 }

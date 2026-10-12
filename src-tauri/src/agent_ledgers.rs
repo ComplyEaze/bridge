@@ -367,7 +367,7 @@ const GST_DETAILS_LIMITATIONS: [&str; 5] = [
     "HSN/SAC and type of supply are not returned because no capture shows them; the place of supply is in the registration history (compliance.gst_registrations), not here; slab rates are only flagged (slab_rates_present), not read; other_content_skipped says an entry held content that was not read.",
     "A state_name or valuation_type that starts with U+FFFD and #4; is a Tally reserved value (written &#4; on the wire), kept as the parser returned it.",
     "Measured on one 14-ledger lab book of TallyPrime 7.1 Silver; this was not yet run through this tool on a live Tally.",
-    "The response is about twice as large per ledger, so a large book may be read in more parts or refused as too large.",
+    "The read is admitted at 8,000 bytes a ledger instead of 3,750, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394), not a measured ratio; a large book may be read in more parts or refused as too large.",
 ];
 
 /// The frame with the GST details' limitations added when the rows hold them,
@@ -407,7 +407,8 @@ pub(super) const LISTING_SNAPSHOT_MAX_BYTES: usize = 64 * 1024 * 1024;
 /// trial balance is keyed by its period; a masters listing by its kind; a
 /// stock summary by its date; a compliance listing by the date its rows'
 /// `party_gstin` was read as of (#653), since that date is rendered into the
-/// rows it holds.
+/// rows it holds, and by whether the rows hold each ledger's GST details
+/// (`include_gst_details`), which a read without them cannot serve.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ListingKind {
     Basic,

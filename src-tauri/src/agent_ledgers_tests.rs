@@ -4648,14 +4648,16 @@ mod through_the_tool {
     /// generated books.
     mod gst_details {
         use super::*;
-        use crate::tally::connection::{compliance_master_ledgers_per_read, ComplianceRead};
+        use crate::tally::connection::{
+            compliance_master_ledgers_per_read, parent_partition_limits, ComplianceRead,
+        };
         use bridge_tally_protocol::native_outstandings::{
             render_party_ledger_master_request_for_parents,
             render_party_ledger_master_request_for_parents_with_gst_details,
             render_party_ledger_master_request_with_gst_details,
         };
         use bridge_tally_protocol::parent_partition::{
-            ParentObservation, ParentPart, ParentPartition, PartitionLimits,
+            ParentObservation, ParentPart, ParentPartition,
         };
         use tally_protocol_simulator::ObservedRequest;
 
@@ -4997,7 +4999,8 @@ mod through_the_tool {
                 "slab rates are only flagged",
                 "14-ledger lab book of TallyPrime 7.1 Silver",
                 "not yet run through this tool on a live Tally",
-                "about twice as large per ledger",
+                "admitted at 8,000 bytes a ledger instead of 3,750",
+                "not a measured ratio",
             ] {
                 assert!(limitations.contains(words), "{words}: {limitations}");
             }
@@ -5153,6 +5156,80 @@ mod through_the_tool {
             assert_eq!(one.requests(), total);
         }
 
+        /// The other direction: a listing held for a read without the flag is
+        /// not served to a later page that asks for the details, which reads
+        /// afresh and carries `gst_details` and the limitations.
+        #[tokio::test]
+        async fn a_snapshot_without_the_details_is_not_served_to_a_page_that_asks_for_them() {
+            let mut plans = compliance_plans(masters(), balances());
+            plans.extend(continuation_plans(extent_with_master_mark(219)));
+            plans.extend(
+                compliance_plans(masters(), balances())
+                    .into_iter()
+                    .skip(identity_plans().len()),
+            );
+            let total = plans.len();
+            let one = OneServer::spawn(plans);
+            let first = one
+                .call(json!({"company_guid":GUID,"fields":"compliance","limit":1}))
+                .await;
+            assert!(!items(&first).is_empty());
+            for row in items(&first) {
+                assert!(row["compliance"].get("gst_details").is_none(), "{row}");
+            }
+            let id = snapshot_id(&first);
+            let other = one
+                .call(json!({"company_guid":GUID,"fields":"compliance","include_gst_details":true,"offset":1,"limit":1}))
+                .await;
+            assert_eq!(snapshot_of(&other)["reused"], false);
+            assert_ne!(snapshot_of(&other)["id"], id.as_str());
+            assert!(!items(&other).is_empty());
+            for row in items(&other) {
+                assert!(row["compliance"]["gst_details"].is_object(), "{row}");
+            }
+            assert!(
+                other["structuredContent"]["result"]["limitations"].is_array(),
+                "{other}"
+            );
+            assert_eq!(one.requests(), total);
+        }
+
+        /// A second page of the same mode, naming its snapshot, is served from
+        /// the held read, and its rows carry `gst_details` and the result
+        /// carries the limitations, as the first page's do.
+        #[tokio::test]
+        async fn a_second_page_of_the_same_details_mode_is_served_from_the_held_listing() {
+            let mut plans = compliance_plans(masters(), balances());
+            plans.extend(continuation_plans(extent_with_master_mark(219)));
+            let total = plans.len();
+            let one = OneServer::spawn(plans);
+            let args = |offset: usize, snapshot: Option<&str>| {
+                let mut args = json!({"company_guid":GUID,"fields":"compliance","include_gst_details":true,"offset":offset,"limit":1});
+                if let Some(snapshot) = snapshot {
+                    args["snapshot_id"] = json!(snapshot);
+                }
+                args
+            };
+            let first = one.call(args(0, None)).await;
+            let id = snapshot_id(&first);
+            assert_eq!(snapshot_of(&first)["reused"], false);
+            let second = one.call(args(1, Some(&id))).await;
+            assert_eq!(snapshot_of(&second)["reused"], true);
+            assert_eq!(snapshot_of(&second)["id"], id.as_str());
+            for page in [&first, &second] {
+                assert!(!items(page).is_empty());
+                for row in items(page) {
+                    assert!(row["compliance"]["gst_details"].is_object(), "{row}");
+                }
+                let limitations = page["structuredContent"]["result"]["limitations"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("no limitations: {page}"));
+                assert_eq!(limitations.len(), 5, "{page}");
+            }
+            assert_ne!(items(&first)[0]["name"], items(&second)[0]["name"]);
+            assert_eq!(one.requests(), total, "the second page reads no ledger");
+        }
+
         /// A masking redaction marks the ledger names, and nothing else in the
         /// details changes: they hold rates, dates, heads and a state name, no
         /// party text, so `mask_parties` leaves them exactly as they are.
@@ -5219,14 +5296,7 @@ mod through_the_tool {
                         ParentObservation::Named(row.parent),
                     )
                 }),
-                PartitionLimits {
-                    max_ledgers_per_part: compliance_master_ledgers_per_read(
-                        ComplianceRead::WithGstDetails,
-                    ),
-                    max_parents_per_part: 200,
-                    max_parts: 12,
-                    max_complement_formula_bytes: 262_144,
-                },
+                parent_partition_limits(ComplianceRead::WithGstDetails),
             )
             .unwrap()
             .parts()

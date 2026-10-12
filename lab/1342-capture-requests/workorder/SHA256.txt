@@ -75,3 +75,6 @@ f30857f4c17609f32e12136e3ca0d8a36f12761d81cd4b945ca4ed140883244b  make-w15-reque
 03de8fa7e3e3477a527e2a1ecf4c0c69a2bf2d190fa76b5c8def9e595eb94c5e  w16-ledger-rates-hsn.xml
 237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02  w16-groups-hsn.xml
 e92e7ceb6e4923f9d5796a48c8c7afc476cdcd05718ae20a5589e6c22af5ce12  W16-README.md
+# W18 (every read a Sales invoice build sends, in one sitting; steps in W18-README.md; w18-number-0040.xml is ../r09-number-new-invoice.xml with the number changed only)
+84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8  w18-number-0040.xml
+c24bcc93cec788af7844c47ad57112c68312da41843d433b1ea0d3f206c29129  W18-README.md

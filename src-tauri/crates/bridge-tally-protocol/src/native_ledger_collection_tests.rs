@@ -375,6 +375,14 @@ fn a_response_cut_inside_any_ledger_field_is_malformed() {
             "<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM></LEDGSTREGDETAILS.LIST>",
             "<LEDGSTREGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM>",
         ),
+        (
+            "<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM></LEDMAILINGDETAILS.LIST>",
+            "<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20250401</APPLICABLEFROM>",
+        ),
+        (
+            "<LEDMAILINGDETAILS.LIST><ADDRESS.LIST><ADDRESS>1 Test Street</ADDRESS></ADDRESS.LIST></LEDMAILINGDETAILS.LIST>",
+            "<LEDMAILINGDETAILS.LIST><ADDRESS.LIST><ADDRESS>1 Test Street</ADDRESS>",
+        ),
     ] {
         let xml = master_response_with_extra(Some(EXPECTED_COMPANY_GUID), extra);
         let cut = &xml[..xml.find(cut_after).expect("the field") + cut_after.len()];
@@ -435,5 +443,111 @@ fn a_ledger_collection_refused_as_a_whole_is_typed_by_class() {
         )
         .is_ok(),
         "the control binds"
+    );
+}
+
+/// The mailing history `parse_native_party_ledger_master_records_with_evidence` reads
+/// from `extra`, spliced into one ledger row.
+fn mailing_history_of(extra: &str) -> crate::mailing_details::MailingDetailsHistory {
+    let xml = master_response_with_extra(Some(EXPECTED_COMPANY_GUID), extra);
+    parse_native_party_ledger_master_records_with_evidence(&xml, EXPECTED_COMPANY_GUID)
+        .expect("the response parses")
+        .records
+        .remove(0)
+        .record
+        .fields
+        .mailing_details
+}
+
+#[test]
+fn an_empty_or_absent_mailing_element_is_told_apart() {
+    use crate::mailing_details::MailingDetailsHistory;
+    assert_eq!(mailing_history_of(""), MailingDetailsHistory::NotObserved);
+    for placeholder in [
+        "<LEDMAILINGDETAILS.LIST/>",
+        "<LEDMAILINGDETAILS.LIST>     </LEDMAILINGDETAILS.LIST>",
+    ] {
+        assert_eq!(
+            mailing_history_of(placeholder),
+            MailingDetailsHistory::Entries { entries: vec![] },
+            "{placeholder}"
+        );
+    }
+}
+
+#[test]
+fn only_an_element_that_held_nothing_is_a_mailing_placeholder() {
+    use crate::mailing_details::{MailingDetailsDefect, MailingDetailsHistory};
+    let without_date = MailingDetailsHistory::Unreadable {
+        defect: MailingDetailsDefect::EntryWithoutDate,
+    };
+    for content in [
+        "<LEDMAILINGDETAILS.LIST><PINCODE></PINCODE></LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST><PINCODE/></LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST><ADDRESS.LIST/></LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST><SOMETHINGNEW>x</SOMETHINGNEW></LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST><SOMETHINGNEW/></LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST>stray text</LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST>&amp;</LEDMAILINGDETAILS.LIST>",
+        "<LEDMAILINGDETAILS.LIST><![CDATA[x]]></LEDMAILINGDETAILS.LIST>",
+    ] {
+        assert_eq!(mailing_history_of(content), without_date, "{content}");
+    }
+}
+
+#[test]
+fn a_repeated_mailing_field_is_a_defect_whether_or_not_it_carried_text() {
+    use crate::mailing_details::{MailingDetailsDefect, MailingDetailsHistory};
+    let repeated = MailingDetailsHistory::Unreadable {
+        defect: MailingDetailsDefect::EntryRepeatsAField,
+    };
+    let dated = "<APPLICABLEFROM>20260401</APPLICABLEFROM>";
+    for content in [
+        "<PINCODE>1</PINCODE><PINCODE>2</PINCODE>",
+        "<PINCODE>1</PINCODE><PINCODE/>",
+        "<PINCODE/><PINCODE>1</PINCODE>",
+        "<PINCODE/><PINCODE/>",
+        "<ADDRESS.LIST><ADDRESS>a</ADDRESS></ADDRESS.LIST><ADDRESS.LIST/>",
+        "<ADDRESS.LIST/><ADDRESS.LIST><ADDRESS>a</ADDRESS></ADDRESS.LIST>",
+        "<ADDRESS.LIST/><ADDRESS.LIST/>",
+    ] {
+        let element = format!("<LEDMAILINGDETAILS.LIST>{dated}{content}</LEDMAILINGDETAILS.LIST>");
+        assert_eq!(mailing_history_of(&element), repeated, "{content}");
+    }
+}
+
+#[test]
+fn mailing_fields_are_read_as_siblings_are_and_address_lines_keep_their_order() {
+    use crate::mailing_details::{MailingDetailsEntry, MailingDetailsHistory};
+    let element = "<LEDMAILINGDETAILS.LIST>\
+        <ADDRESS.LIST><ADDRESS> Line B </ADDRESS><ADDRESS></ADDRESS><ADDRESS/>\
+        <ADDRESS>Line A</ADDRESS><OTHER>x</OTHER></ADDRESS.LIST>\
+        <APPLICABLEFROM>20260401</APPLICABLEFROM><PINCODE>  </PINCODE>\
+        <MAILINGNAME>Name &amp; Co</MAILINGNAME><STATE>Karnataka</STATE><COUNTRY/>\
+        <UNREAD>x</UNREAD></LEDMAILINGDETAILS.LIST>";
+    assert_eq!(
+        mailing_history_of(element),
+        MailingDetailsHistory::Entries {
+            entries: vec![MailingDetailsEntry {
+                applicable_from: "20260401".to_string(),
+                mailing_name: Some("Name & Co".to_string()),
+                address_lines: vec!["Line B".to_string(), "Line A".to_string()],
+                state: Some("Karnataka".to_string()),
+                country: None,
+                pin_code: None,
+            }]
+        }
+    );
+}
+
+#[test]
+fn the_mailing_element_is_ignored_by_a_read_that_retains_no_master_fields() {
+    let xml = master_response_with_extra(
+        Some(EXPECTED_COMPANY_GUID),
+        "<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20260401</APPLICABLEFROM></LEDMAILINGDETAILS.LIST><LEDMAILINGDETAILS.LIST/>",
+    );
+    assert!(
+        parse_native_ledger_source_records_with_evidence(&xml, EXPECTED_COMPANY_GUID).is_ok(),
+        "the ordinary ledger read consumes and drops it"
     );
 }

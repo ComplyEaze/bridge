@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- A party's mailing address, PIN code, state and country are now read from Tally's dated mailing details
+  (`LEDMAILINGDETAILS.LIST`), which the party-master request now names (#1490). On the measured book (one
+  synthetic company, TallyPrime 7.1 Silver) the flat address, PIN code and state fields came back empty or absent
+  for a party that held an address, so the workbook showed them as empty or not observed. `ledger_masters
+  fields=compliance` rows carry the dated entries as `compliance.mailing_details` (the flat fields are unchanged),
+  and the party/ledger master workbook gains five columns at its end: the mailing address, PIN code and state in
+  force on the Balances-as-of date, the date they apply from, and a status that says why they are blank (no
+  mailing details, none in force on that date, not observed, or unreadable). A second mailing entry with a later
+  date, a party with two mailing rows and other releases are not measured. The request is longer by one element
+  and the per-ledger size estimate was not re-measured.
+
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
   carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,

@@ -204,6 +204,16 @@ fn mark_compliance_party_names(mut compliance: Value) -> Value {
     for field in ["name_on_pan", "bank_account_holder_name", "bank_details"] {
         mark_party_field(&mut compliance, field);
     }
+    // A mailing entry's `mailing_name` is the party's name as Tally prints it on its
+    // address block (#1490): masked like the row's own name, or it would carry it out.
+    if let Some(entries) = compliance
+        .pointer_mut("/mailing_details/entries")
+        .and_then(Value::as_array_mut)
+    {
+        for entry in entries {
+            mark_party_field(entry, "mailing_name");
+        }
+    }
     compliance
 }
 

@@ -223,6 +223,14 @@ estimated past `limit_bytes`; a response past the transport's cap is cut off mid
 company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
+Each `fields=compliance` row's `compliance` object also carries the dated mailing details
+(`compliance.mailing_details`, #1490): `observation` is `not_observed` (the response held no such list),
+`entries` (each dated entry with `applicable_from`, `address_lines`, `pin_code`, `state`, `country` and
+`mailing_name`; an empty list is a ledger with no mailing details) or `unreadable` (a `defect`, for that
+ledger only). The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state` fields are the legacy
+elements: TallyPrime 7.1 returned them empty or absent for a party that held an address in the measured
+book. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
+releases are not measured.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
 and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every

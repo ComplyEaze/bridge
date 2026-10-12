@@ -273,7 +273,9 @@ const GST_DETAILS_FETCH_SUFFIX: &str =
 /// `FETCH`: the request whose answer is the fixture
 /// `ledger_gst_details_live.utf16le.xml`. Sent only when the caller asks for the
 /// details; the production compliance request
-/// ([`render_party_ledger_master_request`]) is unchanged.
+/// ([`render_party_ledger_master_request`]) differs only by lacking the suffix.
+/// The captured request named no `LEDMAILINGDETAILS.LIST`; this one does, as
+/// every compliance request now does.
 pub fn render_party_ledger_master_request_with_gst_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
@@ -310,7 +312,7 @@ fn render_party_ledger_master(
     fetch_suffix: &str,
 ) -> String {
     let fetch = format!(
-        "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST{fetch_suffix}"
+        "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST{fetch_suffix}"
     );
     render_native_ledger_collection_request(company, period, &fetch, true, part)
 }

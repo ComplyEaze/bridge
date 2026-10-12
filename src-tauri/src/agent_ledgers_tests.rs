@@ -65,7 +65,7 @@ fn party_ledger_master_request_fetches_tax_type_and_gst_duty_head() {
 
     let request = render_party_ledger_master_request("BRIDGE GST RECON LAB", &period);
     assert!(request.contains("TAXTYPE, GSTDUTYHEAD"));
-    assert!(request.contains(", LEDGSTREGDETAILS.LIST</FETCH>"));
+    assert!(request.contains(", LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>"));
 }
 
 #[test]
@@ -312,9 +312,9 @@ fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
     )
     .unwrap();
     assert_eq!(
-        sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
+        sha256_hex(without_mailing_details_word(&render_party_ledger_master_request("BRIDGE GST RECON LAB", &period)).as_bytes()),
         "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
-        "the fixture answers exactly the request ledger_masters sends"
+        "the fixture answers the request ledger_masters sends, less the mailing details element added since"
     );
     let parsed = parse_native_party_ledger_master_records_with_evidence(
         &captured_live_ledger_masters_with_sgst_utgst(),
@@ -411,9 +411,9 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     )
     .unwrap();
     assert_eq!(
-        sha256_hex(render_party_ledger_master_request("BRIDGE READS LAB", &period).as_bytes()),
+        sha256_hex(without_mailing_details_word(&render_party_ledger_master_request("BRIDGE READS LAB", &period)).as_bytes()),
         "c2f9f8e9fefab44077b222402254a2be3dfd9a9690d4e577efbae99d531c819c",
-        "the fixture answers exactly the request ledger_masters sends"
+        "the fixture answers the request ledger_masters sends, less the mailing details element added since"
     );
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-gst-registrations.utf16le.xml"
@@ -492,6 +492,30 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     );
 }
 
+/// A party-master request as it was before it named the dated mailing details:
+/// the captures these tests pin were answered to that request, and the request
+/// sent now differs from it by that one `FETCH` element (bridge#1490).
+fn without_mailing_details_word(request: &str) -> String {
+    let word = ", LEDMAILINGDETAILS.LIST";
+    assert_eq!(request.matches(word).count(), 1);
+    request.replacen(word, "", 1)
+}
+
+/// A `compliance` object without its `mailing_details` key. The goldens below were
+/// produced before that key existed (bridge#1490) and are not regenerated: they
+/// hold every other key byte for byte. The key itself is asserted on its own:
+/// each object names it, and a response that did not name the list says
+/// `not_observed`.
+fn without_mailing_details(mut compliance: Value) -> Value {
+    let object = compliance.as_object_mut().expect("a compliance object");
+    assert_eq!(
+        object.remove("mailing_details"),
+        Some(json!({"observation": "not_observed"})),
+        "these captures' requests did not name LEDMAILINGDETAILS.LIST"
+    );
+    compliance
+}
+
 /// bridge#1520, over populated values: the live registration-history capture,
 /// whose rows hold dated registrations, serialised through the helper equals
 /// the golden that the expression the row used before `gst_details` existed
@@ -519,6 +543,7 @@ fn populated_compliance_objects_are_byte_for_byte_the_ones_built_before_gst_deta
         .records
         .into_iter()
         .map(|row| compliance_json(row.record.fields, false))
+        .map(without_mailing_details)
         .collect::<Vec<_>>();
     assert!(!compliance.is_empty());
     assert!(compliance.iter().all(|value| value.is_object()));
@@ -969,6 +994,53 @@ mod through_the_tool {
         captured(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters.utf16le.xml"
         ))
+    }
+
+    /// The captured answer to the compliance read that names the dated mailing
+    /// details, moved to this harness's company: its company GUID (the
+    /// `BRIDGECOMPANYGUID` of every row and the prefix of every ledger GUID) is
+    /// replaced with the one the identity read here returns. No other byte of
+    /// the capture is changed.
+    fn mailing_masters() -> String {
+        let capture = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml"
+        ));
+        let captured_guid = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
+        assert_eq!(captured_guid.len(), GUID.len());
+        assert!(capture.contains(captured_guid));
+        capture.replace(captured_guid, GUID)
+    }
+
+    /// A stand-in for the balance read of the mailing capture's company: the
+    /// captured balance answer's envelope with one all-zero row per ledger of
+    /// `masters`, in the same order, with the same name, reserved name and
+    /// parent. It is not evidence of anything Tally sent; the tool joins the
+    /// balance read to the masters, and no balance answer was captured for that
+    /// company.
+    fn balances_matching(masters: &str) -> String {
+        let template = balances();
+        let start = template.find("<LEDGER NAME=").expect("a captured row");
+        let end = template
+            .rfind("</COLLECTION>")
+            .expect("the collection's end");
+        let mut rows = String::new();
+        for part in masters.split("<LEDGER NAME=\"").skip(1) {
+            let name = part.split('"').next().unwrap();
+            let reserved = part
+                .split("RESERVEDNAME=\"")
+                .nth(1)
+                .and_then(|rest| rest.split('"').next())
+                .unwrap();
+            let parent = part
+                .split("<PARENT TYPE=\"String\">")
+                .nth(1)
+                .and_then(|rest| rest.split("</PARENT>").next())
+                .unwrap();
+            rows.push_str(&format!(
+                "    <LEDGER NAME=\"{name}\" RESERVEDNAME=\"{reserved}\">\n     <PARENT TYPE=\"String\">{parent}</PARENT>\n     <ISBILLWISEON TYPE=\"Logical\">No</ISBILLWISEON>\n     <CLOSINGBALANCE TYPE=\"Amount\">0.00</CLOSINGBALANCE>\n     <OPENINGBALANCE TYPE=\"Amount\">0.00</OPENINGBALANCE>\n     <BRIDGECOMPANYGUID TYPE=\"String\">{GUID}</BRIDGECOMPANYGUID>\n    </LEDGER>\n"
+            ));
+        }
+        format!("{}{}{}", &template[..start], rows, &template[end..])
     }
 
     fn balances() -> String {
@@ -3062,7 +3134,7 @@ mod through_the_tool {
         .await;
         let compliance = items(&response)
             .iter()
-            .map(|row| &row["compliance"])
+            .map(|row| without_mailing_details(row["compliance"].clone()))
             .collect::<Vec<_>>();
         assert!(!compliance.is_empty());
         assert!(compliance.iter().all(|value| value.is_object()));
@@ -3105,6 +3177,87 @@ mod through_the_tool {
             );
         }
         assert!(!response.to_string().contains("gst_details"));
+    }
+
+    /// bridge#1490, over the live answer to the request this tool sends: each
+    /// row's `compliance.mailing_details` carries the dated mailing entry the
+    /// flat address fields leave empty. The probe party's entry is the one
+    /// measured; a ledger with no address is an observed empty list.
+    #[tokio::test]
+    async fn compliance_rows_carry_the_dated_mailing_details() {
+        let masters = mailing_masters();
+        let balances = balances_matching(&masters);
+        let (response, _) = call(
+            compliance_plans(masters, balances),
+            json!({"company_guid":GUID,"fields":"compliance"}),
+        )
+        .await;
+        let rows = items(&response);
+        assert_eq!(rows.len(), 8);
+        assert_eq!(
+            row(rows, "Lab Party Duplicate Probe")["compliance"]["mailing_details"],
+            json!({
+                "observation": "entries",
+                "entries": [{
+                    "applicable_from": "20260401",
+                    "mailing_name": "Lab Party Duplicate Probe",
+                    "address_lines": ["1 Test Street", "Test Area"],
+                    "state": "Karnataka",
+                    "country": "India",
+                    "pin_code": "560001"
+                }]
+            })
+        );
+        for other in rows
+            .iter()
+            .filter(|r| r["name"] != "Lab Party Duplicate Probe")
+        {
+            assert_eq!(
+                other["compliance"]["mailing_details"],
+                json!({"observation": "entries", "entries": []}),
+                "{other}"
+            );
+        }
+    }
+
+    /// bridge#1490: a mailing entry's `mailing_name` is the party's name, so
+    /// `mask_parties` masks it as it masks the row's own `name`; nothing else of
+    /// the entry is a party name.
+    #[test]
+    fn the_mailing_name_is_masked_like_the_party_name_it_is() {
+        let name = "Lab Party Duplicate Probe";
+        let fields = bridge_tally_protocol::PartyLedgerMasterFields {
+            mailing_details:
+                bridge_tally_protocol::mailing_details::MailingDetailsHistory::Entries {
+                    entries: vec![
+                        bridge_tally_protocol::mailing_details::MailingDetailsEntry {
+                            applicable_from: "20260401".to_string(),
+                            mailing_name: Some(name.to_string()),
+                            address_lines: vec!["1 Test Street".to_string()],
+                            state: Some("Karnataka".to_string()),
+                            country: Some("India".to_string()),
+                            pin_code: Some("560001".to_string()),
+                        },
+                    ],
+                },
+            ..bridge_tally_protocol::PartyLedgerMasterFields::default()
+        };
+        let compliance = compliance_json(fields, false);
+        let entry = |value: &Value| value["mailing_details"]["entries"][0].clone();
+        assert_eq!(
+            entry(&compliance)["mailing_name"],
+            json!({crate::agent::PARTY_NAME_MARKER: name})
+        );
+        let masked =
+            crate::agent::redact_value(compliance.clone(), crate::agent::Redaction::MaskParties);
+        assert_eq!(
+            entry(&masked)["mailing_name"],
+            json!(crate::agent::mask(name))
+        );
+        assert_ne!(entry(&masked)["mailing_name"], json!(name));
+        assert_eq!(entry(&masked)["pin_code"], json!("560001"));
+        let unmasked = crate::agent::redact_value(compliance, crate::agent::Redaction::None);
+        assert_eq!(entry(&unmasked)["mailing_name"], json!(name));
     }
 
     /// bridge#653: `as_of` sets the date every row's `party_gstin` is read as

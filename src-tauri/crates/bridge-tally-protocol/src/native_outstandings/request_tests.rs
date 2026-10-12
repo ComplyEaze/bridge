@@ -439,13 +439,19 @@ fn gst_details_period() -> NativeLedgerExportPeriod {
     .expect("mode-agnostic profile accepts valid calendar dates")
 }
 
+/// The request sent live named no mailing details: the production `FETCH` has
+/// since gained `LEDMAILINGDETAILS.LIST`, so the live bytes are what is rendered
+/// with that one element taken out, and the element sits where the production
+/// request puts it, before the GST details suffix.
 #[test]
 fn the_gst_details_request_is_byte_for_byte_the_one_sent_live() {
+    let rendered = render_party_ledger_master_request_with_gst_details(
+        "BRIDGE PILOT LAB",
+        &gst_details_period(),
+    );
+    assert!(rendered.contains("LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST, GSTDETAILS.LIST,"));
     assert_eq!(
-        render_party_ledger_master_request_with_gst_details(
-            "BRIDGE PILOT LAB",
-            &gst_details_period()
-        ),
+        rendered.replacen(", LEDMAILINGDETAILS.LIST", "", 1),
         crate::text_encoding::decode_xml_bytes(GST_DETAILS_REQUEST).unwrap()
     );
 }
@@ -460,14 +466,14 @@ fn the_gst_details_request_differs_from_the_production_compliance_request_only_b
     let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
     assert_eq!(
         production.replacen(
-            "LEDGSTREGDETAILS.LIST</FETCH>",
-            &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"),
+            "LEDMAILINGDETAILS.LIST</FETCH>",
+            &format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>"),
             1
         ),
         with_details
     );
-    // The production request is pinned by its own bytes: the fetch it has always sent.
-    assert!(production.contains("<FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST</FETCH>"));
+    // The production request is pinned by its own bytes.
+    assert!(production.contains("<FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>"));
     assert!(!production.contains("GSTDETAILS.LIST,"));
 }
 
@@ -511,17 +517,21 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         let with_details =
             render_party_ledger_master_request_for_parents_with_gst_details("Co", &period, &part);
         let suffix = ", GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT";
-        let marker = "LEDGSTREGDETAILS.LIST</FETCH>";
+        let marker = "LEDMAILINGDETAILS.LIST</FETCH>";
         assert_eq!(production.matches(marker).count(), 1);
         assert_eq!(
-            production.replacen(marker, &format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>"), 1),
+            production.replacen(
+                marker,
+                &format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>"),
+                1
+            ),
             with_details
         );
         assert_ne!(production, with_details);
         // The suffix is the whole-book variant's, byte for byte.
         let whole = render_party_ledger_master_request_with_gst_details("Co", &period);
-        assert!(whole.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
-        assert!(with_details.contains(&format!("LEDGSTREGDETAILS.LIST{suffix}</FETCH>")));
+        assert!(whole.contains(&format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>")));
+        assert!(with_details.contains(&format!("LEDMAILINGDETAILS.LIST{suffix}</FETCH>")));
         assert_eq!(with_details.matches("<FILTERS>").count(), 1);
         assert_eq!(
             with_details.matches("<SYSTEM ").count(),
@@ -533,4 +543,25 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
             with_details.matches("<SYSTEM ").count()
         );
     }
+}
+
+const MAILING_DETAILS_REQUEST: &[u8] = include_bytes!(
+    "../../tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml"
+);
+
+/// The production party-master request is the one sent live when the mailing
+/// details were first read (bridge#1490): its `FETCH` ends with
+/// `LEDMAILINGDETAILS.LIST`, and nothing else differs from the request before.
+#[test]
+fn the_party_master_request_is_byte_for_byte_the_one_sent_live_for_the_mailing_details() {
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse("20260831").unwrap(),
+    )
+    .expect("mode-agnostic profile accepts valid calendar dates");
+    assert_eq!(
+        render_party_ledger_master_request("Bridge Lab Win 0.5.1", &period),
+        crate::text_encoding::decode_xml_bytes(MAILING_DETAILS_REQUEST).unwrap()
+    );
 }

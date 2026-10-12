@@ -1,0 +1,7 @@
+aw21-a: 32 vouchers; same keys as aw20-b: True; vouchers with a (b)-field difference: 0
+   flag occurrences per voucher (flag, values) -> vouchers: {('ISDELETED', ('No',)): 32, ('ISDELETEDVCHRETAINED', ('No',)): 32, ('ISPOSTDATED', ()): 32}
+aw21-b: 32 vouchers; same keys as aw20-b: True; vouchers with a (b)-field difference: 0
+   flag occurrences per voucher (flag, values) -> vouchers: {('ISDELETED', ('No',)): 32, ('ISDELETEDVCHRETAINED', ('No',)): 32, ('ISPOSTDATED', ('No',)): 32}
+aw21-c: 32 vouchers; same keys as aw20-b: True; vouchers with a (b)-field difference: 0
+   flag occurrences per voucher (flag, values) -> vouchers: {('ISDELETED', ('No',)): 32, ('ISDELETEDVCHRETAINED', ('No',)): 32, ('ISPOSTDATED', ('No',)): 32}
+aw20-b flag occurrences: {('ISDELETED', ('No',)): 32, ('ISDELETEDVCHRETAINED', ('No',)): 32, ('ISPOSTDATED', ()): 32}

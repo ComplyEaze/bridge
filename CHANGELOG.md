@@ -37,11 +37,9 @@ These changes are in source and not yet in a published build.
   gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
   after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
   dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
-  parse's proposals file now also records the statement's first and last dates (part of #1211). Run once by an
-  outside contributor on a live TallyPrime 7.1 Silver with two synthetic books (partial: the import summary was
-  not captured, and no raw answers were kept): a differing and a tied opening before an import, tied after a hand
-  import, and after a hand-keyed duplicate payment a closing gap of minus its amount (the book showing that much
-  less money). Not measured: Gold, a real statement, macOS.
+  parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
+  proved against a live book: one run on a synthetic book by an outside contributor is only partly recorded (see
+  the pull request).
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the

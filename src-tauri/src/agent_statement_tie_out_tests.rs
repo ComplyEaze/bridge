@@ -1167,6 +1167,24 @@ async fn a_statement_whose_first_row_is_the_books_first_day_is_read_not_refused(
     );
 }
 
+/// A statement file whose voucher date cannot be read is refused as invalid
+/// before the journal check, never read as some other date.
+#[tokio::test]
+async fn a_file_with_an_unreadable_voucher_date_is_refused_as_invalid() {
+    let simulator = SequenceSimulator::spawn(company_check()).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server(directory.path(), Some(simulator.address()));
+    let mut document = proposals(BANK, Some(whole("2026-08-01", "2026-08-07")));
+    document["vouchers"][0]["date"] = json!("2026-02-30");
+    let file = publish(directory.path(), &document);
+    let refused = tie_out(&server, &file, "before_build").await;
+    assert_eq!(refused["isError"], true, "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["result"]["error"]["code"],
+        "proposals_file_invalid"
+    );
+}
+
 /// The journal check before a build takes the shared import-admission lock; a
 /// build or post holding it exclusively makes the tie-out refuse as busy,
 /// before any ledger is read (the simulator holds only the company check).

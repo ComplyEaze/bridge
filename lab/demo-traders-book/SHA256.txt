@@ -1,0 +1,15 @@
+ccb6ce1aa7d68d1c32b6676f20f74d1ee58883a751b54edf238aa6e0d46f58c4  import/00-masters.xml
+c7630f1c04b14b74e0a387de8ff277b8ba6a6e3b230c1b10fabf3fb61e79adbc  import/10-sales-1-first-voucher-only.xml
+fe0c25dfa0801943414fcfd1c695b344dc1759e1f4c6b3f18a8753614c68f7b3  import/10-sales-2-rest.xml
+3e85eec72129b3d6ab85a7f46babafbf6048adde45182b17557b71a6f07057c7  import/20-purchases-1-first-voucher-only.xml
+2e50c6c2bef53ce5eb27a8cf3de912db5daad8aa9547ec1f52e3251210769447  import/20-purchases-2-rest.xml
+bf2b54bcb96f8124475783648d57469d3b043d578c6698cedaf40e12bd6b454f  import/30-capital-and-other-receipts-1-first-voucher-only.xml
+6148a74bc24c05d6952e0dec52843d8937b5ddc9be2aecd28940846c60767e43  import/40-contra-1-first-voucher-only.xml
+8e93f202bf08190b9953969520a455768857d4890a071d1558720f124cc83f6e  import/40-contra-2-rest.xml
+7dc39ac44745d8268f09935f423725fb04772771de2eaca8461a3746e2578d8d  import/50-receipts-against-bills-1-first-voucher-only.xml
+42cd7dcee39c04a4be6babb681f0bbdf60f6dc560adfba2ac0c74eb33515befd  import/50-receipts-against-bills-2-rest.xml
+61ea0914125b88c4d627599ed1de03de256820a727e028b48b12d9dc2a82bff3  import/60-supplier-payments-1-first-voucher-only.xml
+7c3ebe8d859be68dde6f7349aab990844213f732aeaf5d31c472c0d11226109e  import/60-supplier-payments-2-rest.xml
+d015fe1eb0d32cf5397d9eb66fb2f936a5bc41c955e0130bd5dcc81a2c18feac  import/70-expense-payments-1-first-voucher-only.xml
+c92493e5c4fcf27ddefe5ef00b373b52860f295f1db3fc21fee75c5adcfbd8e1  import/70-expense-payments-2-rest.xml
+0c2e04d59a9c2f5e44ef27ddbe53e047ae388eacf4cf8d6715ff5dbf4daedad4  README.md

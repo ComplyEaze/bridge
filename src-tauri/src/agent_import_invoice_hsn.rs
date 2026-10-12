@@ -171,7 +171,8 @@ fn level_answer(rows: &HsnRows, as_of: &str, placeholder_measured: bool) -> Leve
     let code = row.code.as_deref().unwrap_or_default();
     match row.source.as_deref() {
         Some(SPECIFIED) if !code.is_empty() => LevelAnswer::Code(code.to_string()),
-        Some(INHERITED) if code.is_empty() => LevelAnswer::NoCode,
+        // Deferring was measured only on a master whose one row defers.
+        Some(INHERITED) if code.is_empty() && rows.len() == 1 => LevelAnswer::NoCode,
         _ => LevelAnswer::NotMeasured,
     }
 }
@@ -244,7 +245,9 @@ pub(in crate::agent::agent_import) fn resolve_hsn(
         }
     }
     // A company row cannot defer to anything above it: only its own code or
-    // the placeholder is read.
+    // the placeholder is read. The company object of a company with no code
+    // was not captured; the placeholder a group with no code carried is what
+    // is expected, and anything else is refused as not measured.
     match level_answer(&company.rows, as_of, true) {
         LevelAnswer::Code(code) => found(code, HsnLevel::Company),
         LevelAnswer::NoCode if company.rows.iter().flatten().all(|row| row.empty) => {

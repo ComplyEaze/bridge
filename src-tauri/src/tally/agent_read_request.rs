@@ -104,9 +104,10 @@ impl AgentReadRequest {
     /// exactly the verified company, rendered from the pinned
     /// `AuditCompanyObjectV1` template.
     ///
-    /// This is the only way an Object export reaches dispatch. [`Self::parse`]
-    /// stays Collection-only and refuses every `TYPE=Object` envelope, so no
-    /// XML from anywhere else can use this shape: the company name is the only
+    /// This and [`Self::invoice_company_hsn`] are the only ways an Object
+    /// export reaches dispatch. [`Self::parse`] stays Collection-only and
+    /// refuses every `TYPE=Object` envelope, so no XML from anywhere else can
+    /// use this shape: the company name is the only
     /// variable, it comes from a verified identity, and it is validated and
     /// escaped. The response still has to be admitted by GUID, because Tally
     /// resolves the `ID` by name.

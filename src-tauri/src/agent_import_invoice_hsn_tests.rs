@@ -3,6 +3,10 @@ use super::*;
 /// The synthetic company's GUID in the lab's answers.
 const LAB_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 
+const GROUPS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"
+);
+
 const COMPANY_OBJECT: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"
 );
@@ -208,10 +212,19 @@ fn the_row_in_force_is_the_latest_not_after_the_date() {
         resolved("998344", HsnLevel::Ledger)
     );
     assert_eq!(step(rows, "20260901"), resolved("998345", HsnLevel::Ledger));
-    // A code from 1 Sep does not cover a 7 Aug invoice.
+    // A code from 1 Sep does not cover a 7 Aug invoice. A deferring row in
+    // force beside other rows was not measured (deferring was seen only on a
+    // master with one row).
     assert_eq!(
         step(vec![defer("20260401"), own("20260901", "998345")], DATE),
-        HsnStep::NeedsGroups
+        HsnStep::Refused(NOT_MEASURED)
+    );
+    // A row with no date beside a dated one.
+    let mut undated = own("20260401", "998344");
+    undated.applicable_from = None;
+    assert_eq!(
+        step(vec![own("20260401", "998344"), undated], DATE),
+        HsnStep::Refused(NOT_MEASURED)
     );
     assert_eq!(
         step(vec![own("20260901", "998345")], DATE),
@@ -306,6 +319,18 @@ fn a_code_shorter_than_the_company_minimum_is_refused() {
     );
     assert_eq!(
         step(vec![defer("20260401")], &firm),
+        HsnStep::Refused(NOT_MEASURED)
+    );
+    // At a group too.
+    let short_group = chart(vec![], vec![own("20260401", "998")]);
+    assert_eq!(
+        resolve_hsn(
+            &ledger(vec![defer("20260401")]),
+            Some(&chain),
+            Some(&short_group),
+            &firm,
+            DATE
+        ),
         HsnStep::Refused(NOT_MEASURED)
     );
     firm.settings[0].code_length = Some("6".to_string());
@@ -436,4 +461,68 @@ fn the_company_settings_gate_every_level() {
     let mut absent = base;
     absent.rows = None;
     assert_eq!(company_code(&absent), not_measured);
+}
+
+/// The group parser on the captured group listing (the answered request
+/// without `HSNDETAILS.LIST`): every group by name, none with HSN/SAC rows,
+/// bound to the company; edits of that answer (marked as edits) cover the
+/// listing with no group and a name twice.
+#[test]
+fn the_group_parser_binds_names_and_refuses_a_listing_it_cannot_trust() {
+    let answer = utf16(GROUPS);
+    let groups = parse_group_hsn(&answer, LAB_GUID).unwrap();
+    assert_eq!(groups.len(), 28);
+    assert_eq!(groups.get("Sales Accounts"), Some(&None));
+    assert!(groups.values().all(Option::is_none));
+    assert_eq!(
+        parse_group_hsn(&answer, "00000000-0000-0000-0000-000000000000"),
+        Err("invoice_group_hsn_company_mismatch")
+    );
+    // Edit: the listing with every group removed.
+    let first = answer.find("<GROUP NAME=").unwrap();
+    let last = answer.rfind("</GROUP>").unwrap() + "</GROUP>".len();
+    let empty = format!("{}{}", &answer[..first], &answer[last..]);
+    assert_eq!(
+        parse_group_hsn(&empty, LAB_GUID),
+        Err("invoice_group_hsn_listing_empty")
+    );
+    // Edit: the first group twice.
+    let end = first + answer[first..].find("</GROUP>").unwrap() + "</GROUP>".len();
+    let twice = format!("{}{}", &answer[..end], &answer[first..]);
+    assert_eq!(
+        parse_group_hsn(&twice, LAB_GUID),
+        Err("invoice_group_hsn_name_repeated")
+    );
+}
+
+/// The row flags, on edits of the captured company object (marked as edits):
+/// an element the lab's rows did not carry marks the row unmeasured, and a
+/// row emptied to the placeholder reads as the company having no code.
+#[test]
+fn a_row_with_an_unknown_element_or_no_content_is_flagged_so() {
+    let answer = utf16(COMPANY_OBJECT);
+    let start = answer.find("<HSNDETAILS.LIST>").unwrap() + "<HSNDETAILS.LIST>".len();
+    let end = answer.find("</HSNDETAILS.LIST>").unwrap();
+    // Edit: one more element in the row.
+    let extra = format!(
+        "{}<HSNEXTRA>1</HSNEXTRA>{}",
+        &answer[..start],
+        &answer[start..]
+    );
+    let firm = parse_company_hsn(&extra, LAB_GUID).unwrap();
+    let rows = firm.rows.as_ref().unwrap();
+    assert!(rows[0].unmeasured && !rows[0].empty);
+    // Edit: the row emptied.
+    let emptied = format!("{} {}", &answer[..start], &answer[end..]);
+    let firm = parse_company_hsn(&emptied, LAB_GUID).unwrap();
+    let rows = firm.rows.as_ref().unwrap();
+    assert!(rows[0].empty && !rows[0].unmeasured);
+    let deferring = resolve_hsn(
+        &ledger(vec![defer("20260401")]),
+        Some(&top_chain()),
+        Some(&chart(vec![], vec![placeholder()])),
+        &firm,
+        DATE,
+    );
+    assert_eq!(deferring, HsnStep::Refused(UNRESOLVED));
 }

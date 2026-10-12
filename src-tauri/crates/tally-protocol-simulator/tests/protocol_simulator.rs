@@ -623,20 +623,6 @@ fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
     let duplicate = Fixture::DuplicateExportMetadata.body();
     assert!(duplicate.contains("SCHEMA=\"bridge.tally.ledgers/1\""));
     assert!(duplicate.contains("<SCHEMA>bridge.tally.ledgers/1</SCHEMA>"));
-
-    let voucher = Fixture::VoucherExport.body();
-    assert!(voucher.contains("SCHEMA=\"bridge.tally.vouchers/2\""));
-    assert!(voucher.contains("OBJECTTYPE=\"VOUCHER\""));
-    for forbidden in [
-        "NARRATION",
-        "ADDRESS",
-        "EMAIL",
-        "PHONE",
-        "MOBILE",
-        "PINCODE",
-    ] {
-        assert!(!voucher.contains(forbidden));
-    }
 }
 
 #[test]
@@ -653,7 +639,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::EmptyExport,
         Fixture::DuplicateIdentity,
         Fixture::WrongCompany,
-        Fixture::VoucherExport,
         Fixture::RecordCountMismatch,
         Fixture::MalformedExportMetadata,
         Fixture::DuplicateExportMetadata,

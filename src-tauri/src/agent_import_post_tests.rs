@@ -3199,8 +3199,8 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
 /// A Journal's line names its first debit and first credit ledger, each with
 /// "+N more" for the rest of its side, so the person sees what each Journal
 /// credits; its narration is cut at 20 characters, marked. A Journal line too
-/// wide for the window leaves the totals and the reason line instead, never a
-/// cut ledger name.
+/// wide at every cut down to 10 characters leaves the totals and the reason
+/// line instead, never a cut ledger name.
 #[test]
 fn a_journal_line_names_a_ledger_on_each_side() {
     let (mut line, endpoint) = batch_of_every_type();
@@ -3222,6 +3222,40 @@ fn a_journal_line_names_a_ledger_on_each_side() {
     line.vouchers[0].entries = serde_json::from_value(json!([
         {"ledger":format!("Expense {}", "E".repeat(40)),"amount":"12.50","side":"Dr"},
         {"ledger":format!("Cash {}", "C".repeat(40)),"amount":"12.50","side":"Cr"}]))
+    .unwrap();
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(preview.contains(VOUCHER_LINES_DO_NOT_FIT), "{preview}");
+    assert!(
+        !preview
+            .lines()
+            .any(|shown| shown.starts_with("Journal 2026")),
+        "{preview}"
+    );
+}
+
+/// A Journal whose line would be too wide at the usual 20-character cut
+/// cuts its narration shorter, down to 10 characters, until the line fits,
+/// so the voucher lines stay; one that fits only below 10 leaves the totals.
+#[test]
+fn a_journal_line_cuts_its_narration_shorter_to_fit() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Depreciation","amount":"300.00","side":"Dr"},
+        {"ledger":"Furniture","amount":"200.00","side":"Cr"},
+        {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[0].narration = Some("Depreciation for September".into());
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let journal = "Journal 20260901  300  Dr \"Depreciation\"  Cr \"Furniture\" +1 more  \"Depreciation f\"… (+12 characters)";
+    assert_eq!(journal.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS);
+    assert_eq!(voucher_block(&preview)[2], journal, "{preview}");
+    // A debit ledger of seventeen characters fits only at a 9-character cut.
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Depreciation 2026","amount":"300.00","side":"Dr"},
+        {"ledger":"Furniture","amount":"200.00","side":"Cr"},
+        {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
     .unwrap();
     refresh_batch_sha256(&mut line);
     let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
@@ -4900,4 +4934,70 @@ fn a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer
         agent_review_preview(&voucher(5, true), &endpoint).unwrap_err(),
         "import_review_too_large"
     );
+}
+
+/// #1573: a post refusal that sent nothing carries the general next step of its
+/// code; one after a send, or after a send that could not be ruled out, carries
+/// none, so no refusal after a send is told what to try next. The codes are
+/// those a post raises whose step no caller was shown before.
+#[test]
+fn only_a_post_refusal_that_sent_nothing_carries_its_codes_next_step() {
+    const RAISED_IN_A_POST: [&str; 7] = [
+        "import_post_window_not_bounded",
+        "voucher_entry_invalid",
+        "voucher_type_shapes_mixed",
+        "empty_book_first_import",
+        "part_census_mismatch",
+        "voucher_window_book_too_large",
+        "tally_date_overflow",
+    ];
+    let nothing_sent = NothingSent::observed(Some(false)).unwrap();
+    for code in RAISED_IN_A_POST {
+        let step = crate::agent::refusal_remediation(code)
+            .unwrap_or_else(|| panic!("{code} has no next step"));
+        let mut payload = reconciliation_failure_payload("batch", Some(false), None, code);
+        attach_next_step(&mut payload, None, nothing_sent);
+        assert_eq!(
+            payload["result"]["error"]["next_step"],
+            json!(step),
+            "{code}"
+        );
+        for attempted in [Some(true), None] {
+            assert!(NothingSent::observed(attempted).is_none(), "{attempted:?}");
+            let payload = reconciliation_failure_payload("batch", attempted, None, code);
+            assert!(
+                payload["result"]["error"].get("next_step").is_none(),
+                "{code} {attempted:?}"
+            );
+        }
+    }
+    // A cause's step when the code has none.
+    let mut payload = reconciliation_failure_payload(
+        "batch",
+        Some(false),
+        None,
+        "voucher_window_part_not_admitted",
+    );
+    attach_next_step(&mut payload, Some("part_census_mismatch"), nothing_sent);
+    assert_eq!(
+        payload["result"]["error"]["next_step"],
+        json!(crate::agent::refusal_remediation("part_census_mismatch").unwrap())
+    );
+    // A step the post set itself is kept, and a refused saved text keeps its
+    // message as its only step.
+    for (code, own) in [
+        ("tally_endpoint_busy", json!(BUSY_BEFORE_ATTEMPT_NEXT_STEP)),
+        (
+            "import_txn_already_posted",
+            json!(TXN_ALREADY_POSTED_NEXT_STEP),
+        ),
+    ] {
+        let mut payload = reconciliation_failure_payload("batch", Some(false), None, code);
+        attach_next_step(&mut payload, None, nothing_sent);
+        assert_eq!(payload["result"]["error"]["next_step"], own, "{code}");
+    }
+    let mut payload =
+        reconciliation_failure_payload("batch", Some(false), None, "voucher_text_invalid");
+    attach_next_step(&mut payload, None, nothing_sent);
+    assert!(payload["result"]["error"].get("next_step").is_none());
 }

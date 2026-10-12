@@ -1,0 +1,14 @@
+docs/adr/0015-tally-selected-read-qualification-authority.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_ENVIRONMENT_AND_REQUESTS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+docs/tally/compatibility/fixtures/education-small-v1.json
+scripts/check-tally-request-builder-hazards.mjs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/crates/tally-protocol-simulator/src/fixtures.rs
+src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs
+src-tauri/src/tally/tdl_engine.rs
+tools/bridge-tally-compatibility/src/lib.rs
+tools/bridge-tally-live-read/src/lib.rs
+reviewer: lamemustafa

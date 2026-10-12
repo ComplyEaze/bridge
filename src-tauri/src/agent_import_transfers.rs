@@ -320,6 +320,7 @@ fn without_facts(needs_the_view: bool, error: &TransferFactsError) -> Admission 
 const SKIP_ROW_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was recorded. This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. Do not skip the rows listed in skipped_rows. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with those rows not skipped (a row that batch holds is then refused as import_txn_already_posted) and build again.";
 const SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP: &str = "No file was written and nothing was recorded. This build posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Do not post these rows. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf.";
 const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing was recorded. Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch sent to Tally or found posted, or in a statement of only skipped rows) and a voucher of this build. Build again with withdraw_skips naming only rows that are both, or without it.";
+const WITHDRAW_SKIP_PAIRED_NEXT_STEP: &str = "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.";
 const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing was recorded. A Contra in this build carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Posting both books it twice. Do not build this Contra: run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger) and build again.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and nothing was recorded. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this build books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this can come only from a defect in it: report it with the error named here, and do not build this statement again until it is fixed.";
 
@@ -331,6 +332,14 @@ fn rows_listed(rows: impl IntoIterator<Item = String>) -> (Vec<String>, usize) {
     let listed: Vec<String> = all.iter().take(REFUSAL_ROWS_LISTED).cloned().collect();
     let omitted = all.len() - listed.len();
     (listed, omitted)
+}
+
+fn rows_listed_json(rows: Vec<Value>) -> (Vec<Value>, usize) {
+    let omitted = rows.len().saturating_sub(REFUSAL_ROWS_LISTED);
+    (
+        rows.into_iter().take(REFUSAL_ROWS_LISTED).collect(),
+        omitted,
+    )
 }
 
 /// The batch holding the other Contra of a double booking that refuses the
@@ -415,10 +424,11 @@ impl Server {
             }
         }
         // C5a: the skips there are before this build.
-        let (before, _) = match self.transfer_view_while_admitted(&input.company_guid, None) {
-            Ok(view) => view,
-            Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
-        };
+        let (before, before_view) =
+            match self.transfer_view_while_admitted(&input.company_guid, None) {
+                Ok(view) => view,
+                Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
+            };
         let live: BTreeSet<&str> = before
             .live_skips
             .iter()
@@ -436,6 +446,32 @@ impl Server {
                 reason: "withdraw_skip_invalid",
                 detail: json!({"invalid_rows": listed, "invalid_rows_omitted": omitted}),
                 next_step: WITHDRAW_SKIP_INVALID_NEXT_STEP,
+            }));
+        }
+        // A skip the other statement already carries, or may carry once it is
+        // verified, is not one to withdraw. Ambiguous, not found, not
+        // established and reversed the same day are.
+        let carried: Vec<Value> = input
+            .withdraw
+            .iter()
+            .filter_map(|row| {
+                before_view.skips.iter().find_map(|(key, state)| {
+                    let batch = match state {
+                        SkipState::Paired { contra, .. } => &contra.batch,
+                        SkipState::OtherSideUnverified { batch } => batch,
+                        _ => return None,
+                    };
+                    (key.row.as_str() == row)
+                        .then(|| json!({"bridge_txn_id": row, "batch_id": batch.as_str()}))
+                })
+            })
+            .collect();
+        if !carried.is_empty() {
+            let (listed, omitted) = rows_listed_json(carried);
+            return Ok(Admission::Refused(TransferRefusal {
+                reason: "withdraw_skip_paired",
+                detail: json!({"paired_rows": listed, "paired_rows_omitted": omitted}),
+                next_step: WITHDRAW_SKIP_PAIRED_NEXT_STEP,
             }));
         }
         let paired_elsewhere: Vec<String> = input

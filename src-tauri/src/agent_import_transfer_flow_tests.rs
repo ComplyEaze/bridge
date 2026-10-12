@@ -916,3 +916,88 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
     assert!(result["dispatch"]["state"].is_string(), "{result}");
     assert!(result.get("transfers").is_none(), "{result}");
 }
+
+// ---- a skip the view already pairs is not withdrawn --------------------------------
+
+fn withdrawing(directory: &Path) -> Value {
+    let mut args = contra_statement(directory, BANK_A, SKIPPED, None);
+    args["withdraw_skips"] = json!([SKIPPED]);
+    args
+}
+
+#[tokio::test]
+async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
+    for found in [true, false] {
+        let directory = tempfile::tempdir().unwrap();
+        let rig = Rig::new(
+            directory.path(),
+            [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
+        );
+        rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+            .await;
+        let built = rig
+            .build(contra_statement(
+                directory.path(),
+                BANK_B,
+                BOOKED,
+                Some(REFERENCE),
+            ))
+            .await;
+        let carrying = built["batch_id"].as_str().unwrap().to_string();
+        if found {
+            // Paired
+            mark_found(directory.path(), &carrying);
+        }
+        // else OtherSideUnverified
+        let refused = rig.build(withdrawing(directory.path())).await;
+        rig.finish();
+        assert_eq!(refused["state"], "refused", "{found}: {refused}");
+        assert_eq!(refused["reason"], "withdraw_skip_paired", "{found}");
+        assert_eq!(
+            refused["paired_rows"],
+            json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying}])
+        );
+        let step = refused["next_step"].as_str().unwrap();
+        assert!(
+            step.contains("already carries this row as a Contra in the batch named"),
+            "{step}"
+        );
+        assert!(step.contains("do not post this row"), "{step}");
+        // only the skip and the carrying batch are in the journal
+        assert_eq!(
+            fs::read_to_string(directory.path().join("agent-import-ledger.jsonl"))
+                .unwrap()
+                .lines()
+                .count(),
+            if found { 2 } else { 1 }
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_skip_two_contras_could_carry_can_be_withdrawn() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    // bank B's statement books two equal Contras, both verified
+    let built = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([contra_voucher(BOOKED), contra_voucher(OTHER_BOOKED)]),
+            json!([
+                contra_record(BOOKED, None),
+                contra_record(OTHER_BOOKED, None)
+            ]),
+        ))
+        .await;
+    mark_found(directory.path(), built["batch_id"].as_str().unwrap());
+    let built = rig.build(withdrawing(directory.path())).await;
+    rig.finish();
+    assert_eq!(built["voucher_count"], 1, "{built}");
+}

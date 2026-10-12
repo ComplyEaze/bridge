@@ -848,8 +848,13 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
 - **VERIFIED: the flags were read as No, Yes, No on an uncertain voucher (the tax figure of §9.17 that differed),
   and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The uncertain voucher is dated 1-Aug-2026,
   outside the narrow two-day window, so it was shown by the wider voucher read-back (the `three-vouchers` fixture),
-  not by the narrow request; the narrow request has **not** been seen to answer an uncertain voucher. The Accept As Is
-  voucher was read by both.
+  not by the narrow request. The Accept As Is voucher was read by both.
+- **VERIFIED: the narrow request answers uncertain vouchers, and shows an accept between two reads** (lab set W13,
+  12 Oct 2026, the same company, evidence on `lab/1342-w13-answers`, answers `aw13-status-window-0` and `-1`, the
+  request for 1 to 31 August 2026 and type `BRIDGE Sales`, byte for byte what the code renders). Of the 28 vouchers
+  each read returned, six read No, Yes, No in the first. `BP/26-27/0005` was then accepted as it stands on Tally's
+  screen, alone, and in the second read it was the only voucher that differed: included, not uncertain,
+  `ISGSTOVERRIDDEN` Yes, with a higher `ALTERID`.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;

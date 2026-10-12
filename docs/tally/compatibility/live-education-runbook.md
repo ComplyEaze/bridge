@@ -54,9 +54,7 @@ disposable company whose name exactly matches the reviewed `company_marker` in
 [`fixtures/education-small-v1.json`](./fixtures/education-small-v1.json). Add at
 least one synthetic ledger. Exactly one ledger must use the reviewed
 `ledger_sentinel`. Keep the ledger count within the reviewed minimum and maximum
-bounds. The controller performs reads only and adds no workaround. (Until
-2026-10-12 the fixture also named a voucher sentinel and two date ranges; the
-voucher reads they served were deleted, Part of #1570.)
+bounds. The controller performs reads only and adds no workaround.
 
 From Tally's About page, read the exact Application and Release. Confirm the
 visible operating mode, ODBC state, and locale. Do not infer the release from

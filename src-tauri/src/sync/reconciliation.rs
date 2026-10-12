@@ -13,8 +13,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::db::tally_mirror::{
-    Confidence, ObservationStatus, ObservedRecordInput, RunOutcome, SourceIdentityInput,
-    VerificationState,
+    Confidence, ObservedRecordInput, RunOutcome, SourceIdentityInput, VerificationState,
 };
 use crate::warning_codes::WarningCode;
 
@@ -190,15 +189,13 @@ impl CanonicalObservation {
             identity,
             observed_at_unix_ms,
             raw_source_sha256: provenance.raw_source_sha256.as_str().to_string(),
-            canonical_sha256: Some(self.canonical_sha256.clone()),
-            canonical_payload: Some(self.canonical_payload.clone()),
+            canonical_sha256: self.canonical_sha256.clone(),
+            canonical_payload: self.canonical_payload.clone(),
             exact_decimals: self.exact_decimals.clone(),
             observed_alter_id: provenance
                 .alter_id
                 .as_ref()
                 .map(|alter_id| alter_id.as_str().to_string()),
-            status: ObservationStatus::Accepted,
-            safe_rejection_code: None,
         })
     }
 }

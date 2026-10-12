@@ -1,0 +1,3 @@
+# backups stay on the lab PC: sha256  file  bytes
+7a58b4f58cf76a42ad9c3db1b1ebd1d167bd8171035281ca482743ddc9d07a43  backups/W18B-NOW/TDBK1800_100033.001  90051
+d4d6e20044da22cd8be8b6807c03ee158cddcd42deb075a45242334456b85052  backups/W19-C/TDBK1800_100033.001 (restored in step 2)  85468

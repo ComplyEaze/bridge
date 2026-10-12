@@ -5613,6 +5613,8 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
                 .as_str()
                 .unwrap()
                 .to_string();
+            // Both codes are six digits on services ledgers: nothing to check.
+            assert_eq!(built.payload["result"]["hsn_warnings"], json!([]));
             SCRIPTED_REMOTE_IDS
                 .scope(
                     vec![remote_id],
@@ -5644,6 +5646,7 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
         pilot_invoice_lines(),
         "{response}"
     );
+    assert!(result.get("hsn_warnings").is_none(), "{response}");
     assert_eq!(
         result["dispatch"]["response"]["request_sha256"],
         PILOT_REQUEST_SHA256

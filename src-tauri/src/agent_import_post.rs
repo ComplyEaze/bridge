@@ -2802,6 +2802,16 @@ fn review_text(
 /// the dialog, so it is no longer than the one it replaced (the window's cap).
 const INVOICE_CHECKED_LINE: &str =
     "Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.";
+/// The same line for an invoice with an HSN/SAC warning (never a refusal),
+/// with the number of sales ledgers warned about. It takes the place of the
+/// line above and is no longer while that number has one digit; ten ledgers
+/// need thirteen entries, more than the window's lines, so a warning cannot
+/// push a window that fits past its caps.
+pub(super) fn invoice_checked_hsn_line(ledgers: usize) -> String {
+    format!(
+        "Checked: customer, Sales Accounts ledgers, CGST and state tax per line. HSN/SAC: {ledgers} to check."
+    )
+}
 
 /// The approval text of one Sales invoice: what a person must see to say yes to
 /// a GST document. The party with its GSTIN and registration, the place of
@@ -2902,7 +2912,18 @@ fn invoice_review_preview(
     } else {
         format!("{legend}\n")
     };
-    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{INVOICE_CHECKED_LINE}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let warned = observed
+        .hsn_warnings
+        .iter()
+        .map(|warning| warning.ledger.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let checked = if warned == 0 {
+        INVOICE_CHECKED_LINE.to_string()
+    } else {
+        invoice_checked_hsn_line(warned)
+    };
+    let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
         quoted(&detail.voucher_type_name), voucher.date.as_str(), quoted(number),
         quoted(party), detail.place_of_supply, entries, line.batch_id);

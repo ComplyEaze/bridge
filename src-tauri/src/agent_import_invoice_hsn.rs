@@ -16,6 +16,7 @@
 //! code.
 
 use super::{clean, parse_tree, Node};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// The source text of a row that carries its own code.
@@ -85,7 +86,8 @@ pub(in crate::agent::agent_import) struct CompanyHsn {
 }
 
 /// Where a resolved code came from.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub(in crate::agent::agent_import) enum HsnLevel {
     Ledger,
     Group(String),
@@ -255,6 +257,119 @@ pub(in crate::agent::agent_import) fn resolve_hsn(
         }
         _ => HsnStep::Refused(NOT_MEASURED),
     }
+}
+
+/// A sales ledger's type of supply (`GSTTYPEOFSUPPLY`), for the warnings only.
+/// Anything but the two values the lab's sales ledgers carried, an absent or
+/// repeated element included, is not judged: it never fails a read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::agent::agent_import) enum SupplyType {
+    Goods,
+    Services,
+    NotJudged,
+}
+
+impl SupplyType {
+    pub(super) fn of(master: &Node) -> Self {
+        match master.text_of("GSTTYPEOFSUPPLY").ok().flatten().as_deref() {
+            Some("Goods") => Self::Goods,
+            Some("Services") => Self::Services,
+            _ => Self::NotJudged,
+        }
+    }
+}
+
+/// What looks unusual about a code that resolved: a warning naming the
+/// ledger, never a block. ComplyEaze Bridge ships no list of codes: these are
+/// the prefix and length rules only.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub(in crate::agent::agent_import) enum HsnWarningCode {
+    /// A character other than a digit; no other rule is judged then.
+    #[serde(rename = "hsn_warning_not_digits")]
+    NotDigits,
+    /// Not six digits: six are preferred, whatever minimum Tally takes.
+    #[serde(rename = "hsn_warning_not_six_digits")]
+    NotSixDigits,
+    /// A services ledger whose code does not start 99, the SAC chapter.
+    #[serde(rename = "hsn_warning_not_a_sac_for_services")]
+    NotASacForServices,
+    /// A goods ledger whose code starts 99.
+    #[serde(rename = "hsn_warning_sac_for_goods")]
+    SacForGoods,
+    /// The ledger's type of supply did not read as Goods or Services, so the
+    /// two rules above were not judged.
+    #[serde(rename = "hsn_warning_type_of_supply_not_judged")]
+    TypeOfSupplyNotJudged,
+}
+
+impl HsnWarningCode {
+    pub(in crate::agent::agent_import) fn as_str(self) -> &'static str {
+        match self {
+            Self::NotDigits => "hsn_warning_not_digits",
+            Self::NotSixDigits => "hsn_warning_not_six_digits",
+            Self::NotASacForServices => "hsn_warning_not_a_sac_for_services",
+            Self::SacForGoods => "hsn_warning_sac_for_goods",
+            Self::TypeOfSupplyNotJudged => "hsn_warning_type_of_supply_not_judged",
+        }
+    }
+}
+
+/// One warning on one sales ledger, as the build saves it: what the approval
+/// says and the post re-checks, so a master change that alters a warning
+/// between the build and the post is a changed master. The code itself is
+/// not kept: a change that leaves every warning as it was changes nothing the
+/// person approved.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(in crate::agent::agent_import) struct HsnWarning {
+    pub(in crate::agent::agent_import) code: HsnWarningCode,
+    pub(in crate::agent::agent_import) ledger: String,
+    /// The master the code came from: a company-level code warns on every
+    /// sales ledger that defers to it, and is corrected once, there.
+    pub(in crate::agent::agent_import) level: HsnLevel,
+    /// The code's length in characters.
+    pub(in crate::agent::agent_import) characters: usize,
+}
+
+/// The warnings on the code `code` that the sales ledger `ledger` resolved to.
+pub(in crate::agent::agent_import) fn hsn_warnings(
+    ledger: &str,
+    code: &str,
+    level: &HsnLevel,
+    supply: SupplyType,
+) -> Vec<HsnWarning> {
+    let codes = if !code.bytes().all(|byte| byte.is_ascii_digit()) {
+        vec![HsnWarningCode::NotDigits]
+    } else {
+        let sac = code.starts_with("99");
+        [
+            (code.len() != 6, HsnWarningCode::NotSixDigits),
+            (
+                supply == SupplyType::Services && !sac,
+                HsnWarningCode::NotASacForServices,
+            ),
+            (
+                supply == SupplyType::Goods && sac,
+                HsnWarningCode::SacForGoods,
+            ),
+            (
+                supply == SupplyType::NotJudged,
+                HsnWarningCode::TypeOfSupplyNotJudged,
+            ),
+        ]
+        .into_iter()
+        .filter_map(|(applies, code)| applies.then_some(code))
+        .collect()
+    };
+    codes
+        .into_iter()
+        .map(|warning| HsnWarning {
+            code: warning,
+            ledger: ledger.to_string(),
+            level: level.clone(),
+            characters: code.chars().count(),
+        })
+        .collect()
 }
 
 /// The `HSNDETAILS.LIST` children of a master, or `None` when there are none.

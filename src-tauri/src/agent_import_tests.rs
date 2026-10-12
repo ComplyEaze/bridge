@@ -4566,7 +4566,9 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
         "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
             "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
                 "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
-                "company_state":"Rajasthan","sales_ledgers":["BRIDGE Svc 998313 5%"]}},
+                "company_state":"Rajasthan","sales_ledgers":["BRIDGE Svc 998313 5%"],
+                "hsn_warnings":[{"code":"hsn_warning_not_six_digits","ledger":"BRIDGE Svc 998313 5%",
+                    "level":{"group":"Private Group"},"characters":4}]}},
         "entries":[{"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"}]
     }))
     .unwrap();
@@ -4577,6 +4579,7 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
         .unwrap()
         .push(json!({"bridge_txn_id":"invoice-1","status":"posted_verified"}));
     verification::mark_invoice_readback(&mut result, "invoice-1", &[], &lines);
+    result["hsn_warnings"] = json!(super::invoice::hsn_warnings_json(&invoice));
     let mut marked = std::collections::BTreeSet::new();
     marked_paths(&result, "", &mut marked);
     assert!(!marked.is_empty(), "the verifier marks its names");
@@ -4869,4 +4872,60 @@ fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
         read_masters_record(&path),
         Some(json!({"state": MASTERS_CHECK_PENDING}))
     );
+}
+
+/// A saved invoice's HSN/SAC warnings are listed with the ledger and the group
+/// marked as party names, and the plain warning goes last, after the warnings
+/// the invoice and amendment guidance rewrite; an invoice with none adds
+/// nothing.
+#[test]
+fn a_saved_invoices_hsn_warnings_are_listed_and_the_plain_warning_goes_last() {
+    let invoice = |warnings: Value| -> ImportVoucher {
+        serde_json::from_value(json!({
+            "bridge_txn_id":"invoice-1","date":"20260801","voucher_type":"Sales",
+            "voucher_number":"BP/26-27/0010",
+            "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
+                "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
+                    "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
+                    "company_state":"Rajasthan","sales_ledgers":["Sales A","Sales B"],
+                    "hsn_warnings":warnings}},
+            "entries":[{"ledger":"Walk-in","amount":"1051.00","side":"Dr"}]
+        }))
+        .unwrap()
+    };
+    let marked = |name: &str| json!({ super::super::PARTY_NAME_MARKER: name });
+    let mut warnings = json!(["first", "second"]);
+    let listed = hsn_warnings_of(
+        &[invoice(json!([
+            {"code":"hsn_warning_not_six_digits","ledger":"Sales A","level":{"group":"Sub"},"characters":4},
+            {"code":"hsn_warning_sac_for_goods","ledger":"Sales B","level":"company","characters":6}
+        ]))],
+        &mut warnings,
+    );
+    assert_eq!(
+        serde_json::to_value(&listed).unwrap(),
+        json!([
+            {"code":"hsn_warning_not_six_digits","ledger":marked("Sales A"),"source":"group",
+             "group":marked("Sub"),"characters":4},
+            {"code":"hsn_warning_sac_for_goods","ledger":marked("Sales B"),"source":"company",
+             "group":null,"characters":6}
+        ])
+    );
+    assert_eq!(warnings, json!(["first", "second", INVOICE_HSN_WARNING]));
+    let mut untouched = json!(["first"]);
+    assert!(hsn_warnings_of(&[invoice(json!([]))], &mut untouched).is_empty());
+    assert_eq!(untouched, json!(["first"]));
+    // A verification result carries the same list, and no key without one.
+    let warned = invoice(json!([
+        {"code":"hsn_warning_sac_for_goods","ledger":"Sales B","level":"company","characters":6}
+    ]));
+    let mut proof = json!({"counts":{}});
+    with_hsn_warnings(&mut proof, std::slice::from_ref(&warned));
+    assert_eq!(
+        serde_json::to_value(&proof["hsn_warnings"]).unwrap(),
+        serde_json::to_value(super::invoice::hsn_warnings_json(&warned)).unwrap()
+    );
+    let mut plain = json!({"counts":{}});
+    with_hsn_warnings(&mut plain, &[invoice(json!([]))]);
+    assert_eq!(plain, json!({"counts":{}}));
 }

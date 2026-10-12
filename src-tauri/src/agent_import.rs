@@ -1375,6 +1375,9 @@ impl Server {
                 }
                 None => next_step,
             };
+            // Appended last, so neither rewrite of the first warning above
+            // can replace it.
+            let hsn_warnings = hsn_warnings_of(&line.vouchers, &mut warnings);
             Ok(ToolOutcome {
                 payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                     "batch_id": batch_id, "path": path, "sha256": sha256,
@@ -1405,6 +1408,7 @@ impl Server {
                     "endpoint_origin": line.endpoint_origin,
                     "observed_profile": opening_profile.observed_profile,
                     "warnings": warnings,
+                    "hsn_warnings": hsn_warnings,
                     "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
                 }}),
@@ -1838,6 +1842,9 @@ impl Server {
                 None => None,
             };
             let mut proof = proof;
+            // What the person approving was told to check, from the saved
+            // batch, whatever the verdict.
+            with_hsn_warnings(&mut proof, &line.vouchers);
             if let Some(masters) = &masters_after_post {
                 proof["masters_after_post"] =
                     served_masters_verdict(masters.clone(), &line.vouchers);
@@ -2772,6 +2779,39 @@ fn invoice_route_refusal(code: String) -> String {
 }
 
 const INVOICE_POST_ONLY_WARNING: &str = "No import XML was sent to Tally. This invoice is posted by post_import, which needs a separate native approval, and in no other way. Do not import the written file in Tally by hand: a hand import skips the stop on an unverified invoice, the duplicate checks, the reads on either side of the approval and the readback of the invoice.";
+
+/// The warning of an invoice whose sales ledgers' HSN/SAC look unusual: a
+/// warning, never a block. Tally stamps the code on the voucher when it
+/// is saved, and a master corrected later does not change a saved voucher
+/// (TALLY_PROTOCOL_REFERENCE section 9.16).
+const INVOICE_HSN_WARNING: &str = "HSN/SAC to check. This is a warning only: the invoice can still be posted. hsn_warnings names each sales ledger whose code looks unusual and where the code comes from (the ledger, a group or the company): a code that is not digits only; one that is not six digits (six are preferred); a services ledger's code that does not start 99; a goods ledger's code that starts 99. hsn_warning_type_of_supply_not_judged means the ledger's type of supply is not Goods or Services, so those last two checks were not made. Tell the user before posting. To correct a code, change it in Tally and build again: an invoice posted with a code keeps it until it is opened and saved again in Tally.";
+
+/// A verification result names the HSN/SAC warnings its batch was approved
+/// with, when there are any.
+fn with_hsn_warnings(proof: &mut Value, vouchers: &[ImportVoucher]) {
+    let listed = vouchers
+        .iter()
+        .flat_map(invoice::hsn_warnings_json)
+        .collect::<Vec<_>>();
+    if !listed.is_empty() {
+        proof["hsn_warnings"] = json!(listed);
+    }
+}
+
+/// The HSN/SAC warnings of a saved batch's invoices, and the plain warning
+/// added to `warnings` when there is one.
+fn hsn_warnings_of(vouchers: &[ImportVoucher], warnings: &mut Value) -> Vec<Value> {
+    let listed = vouchers
+        .iter()
+        .flat_map(invoice::hsn_warnings_json)
+        .collect::<Vec<_>>();
+    if !listed.is_empty() {
+        if let Some(list) = warnings.as_array_mut() {
+            list.push(json!(INVOICE_HSN_WARNING));
+        }
+    }
+    listed
+}
 
 const INVOICE_POST_NEXT_STEP: &str = "Call post_import with this company_guid and batch_id; the local user must review and approve it before one posting attempt.";
 

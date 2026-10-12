@@ -94,7 +94,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   and bank account numbers to their first two and last two characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
-  MSME or Udyam registration numbers, contact details or references, and a
+  MSME or Udyam registration numbers, contact details or references, or the last
+  four digits of a bank statement's account number (`account_last4`), and a
   shortened name can still be identified, not least from the GSTIN or PAN sent
   beside it. The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the

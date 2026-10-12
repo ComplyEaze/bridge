@@ -98,7 +98,8 @@ whose ledger now points to a different master.
   shorten party and ledger names and bank account numbers to their first two and
   last two characters (four or fewer become “…”), or drop narrations. Neither
   hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
-  numbers, contact details or references, and a shortened name can still be
+  numbers, contact details or references, or the last four digits of a bank
+  statement's account number, and a shortened name can still be
   identified, not least from the GSTIN or PAN sent beside it. See *Before you
   use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
@@ -365,8 +366,8 @@ ComplyEaze Bridge can, before sending, shorten party and ledger names and bank
 account numbers to their first two and last two characters (four or fewer become
 “…”), or drop narrations (`BRIDGE_AGENT_REDACTION` takes one value, not both).
 **Neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam
-registration numbers, contact details or references, and a shortened name can
-still be identified, not least from the GSTIN or PAN sent beside it** — figures
+registration numbers, contact details or references, or the last four digits of
+a bank statement's account number, and a shortened name can still be identified, not least from the GSTIN or PAN sent beside it** — figures
 always go with the answer. Decide this deliberately for client data.
 
 ## What it costs

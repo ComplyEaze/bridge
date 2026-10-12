@@ -308,8 +308,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
-  kept in ComplyEaze Bridge's per-user folder) that keeps two copies of the
-  program from sending to Tally at the same time, and a small record written
+  kept in ComplyEaze Bridge's per-user folder and, on Windows, also in
+  `.complyeaze-bridge\coordination` under your user profile) that keeps two
+  copies of the program from sending to Tally at the same time, and a small record written
   when you record a review of a posted voucher, including your
   operating-system account name.
 

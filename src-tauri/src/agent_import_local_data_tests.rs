@@ -62,7 +62,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     write(&root.join("native-dispatch-leases/k.lock"), b"");
     write(&root.join("misc/whatever.bin"), b"123456789012345");
     write(&root.join("imports/.proof-publication/update.json"), b"{}");
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert_eq!(report.root, Root::Present);
     let expect = |name: &str, files: u64, bytes: u64| {
         assert_eq!(*class(&report, name), Class { files, bytes }, "{name}");
@@ -93,11 +93,16 @@ fn a_lock_folder_outside_the_data_folder_is_counted_too_and_not_twice() {
     let coordination = directory.path().join("shared");
     write(&root.join("native-dispatch-leases/a.lock"), b"");
     write(&coordination.join("native-dispatch-leases/b.lock"), b"");
-    let separate = build(&root, Some(&coordination));
+    let separate = build(&root, &[coordination.as_path()]);
     assert_eq!(class(&separate, "locks").files, 2, "both lock folders");
     // The default: the shared folder is the data folder itself.
-    let same = build(&root, Some(&root));
+    let same = build(&root, &[root.as_path()]);
     assert_eq!(class(&same, "locks").files, 1, "one folder, counted once");
+    // Windows takes each lock under two coordination folders: both are counted
+    let profile = directory.path().join("profile");
+    write(&profile.join("native-dispatch-leases/c.lock"), b"");
+    let both = build(&root, &[coordination.as_path(), profile.as_path()]);
+    assert_eq!(class(&both, "locks").files, 3, "every lock folder");
 }
 
 #[cfg(unix)]
@@ -114,7 +119,7 @@ fn a_symlink_is_counted_and_never_followed() {
     )
     .unwrap();
     std::os::unix::fs::symlink(outside.path(), root.join("bank-statements")).unwrap();
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert_eq!(
         report.links, 2,
         "the symlinked file and the symlinked directory"
@@ -140,7 +145,7 @@ fn a_symlinked_data_folder_itself_is_followed() {
     write(&real.join("agent-egress.jsonl"), b"abcd");
     let link = directory.path().join("Bridge");
     std::os::unix::fs::symlink(&real, &link).unwrap();
-    let report = build(&link, None);
+    let report = build(&link, &[]);
     assert_eq!(report.root, Root::Present);
     assert_eq!(*class(&report, "egress_log"), Class { files: 1, bytes: 4 });
 }
@@ -149,10 +154,10 @@ fn a_symlinked_data_folder_itself_is_followed() {
 fn a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one() {
     let directory = tempfile::tempdir().unwrap();
     assert_eq!(
-        build(&directory.path().join("nope"), None).root,
+        build(&directory.path().join("nope"), &[]).root,
         Root::Missing
     );
-    let empty = build(directory.path(), None);
+    let empty = build(directory.path(), &[]);
     assert_eq!(empty.root, Root::Present);
     assert!(empty
         .classes
@@ -165,7 +170,7 @@ fn a_missing_folder_is_not_an_empty_one_and_not_an_unreadable_one() {
         let locked = directory.path().join("locked");
         fs::create_dir(&locked).unwrap();
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
-        let unreadable = build(&locked, None);
+        let unreadable = build(&locked, &[]);
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o700)).unwrap();
         // Running as root would read it; the distinction only exists for a user.
         if unreadable.root != Root::Present {
@@ -210,7 +215,7 @@ fn the_report_changes_nothing_and_takes_no_lock() {
         .open(root.join("agent-import-admission.lock"))
         .unwrap();
     holder.lock().unwrap();
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
     drop(holder);
     let second = fs::OpenOptions::new()
@@ -231,15 +236,15 @@ fn the_report_changes_nothing_and_takes_no_lock() {
 fn the_journal_is_absent_unreadable_or_counted() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("agent-import-ledger.jsonl");
-    assert_eq!(build(directory.path(), None).journal, Journal::Absent);
+    assert_eq!(build(directory.path(), &[]).journal, Journal::Absent);
     write(&path, b"not json\n");
     assert_eq!(
-        build(directory.path(), None).journal,
+        build(directory.path(), &[]).journal,
         Journal::NotRead(JOURNAL_INVALID)
     );
     write(&path, &journal(true));
     assert_eq!(
-        build(directory.path(), None).journal,
+        build(directory.path(), &[]).journal,
         Journal::Read(super::super::ledger::Settlement {
             batches: 1,
             sent_or_found: 1,
@@ -251,7 +256,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
     );
     write(&path, &journal(false));
     assert_eq!(
-        build(directory.path(), None).journal,
+        build(directory.path(), &[]).journal,
         Journal::Read(super::super::ledger::Settlement {
             batches: 1,
             sent_or_found: 0,
@@ -268,7 +273,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
 #[test]
 fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
     let directory = tempfile::tempdir().unwrap();
-    let mut report = build(directory.path(), None);
+    let mut report = build(directory.path(), &[]);
     report.journal = Journal::Read(super::super::ledger::Settlement {
         batches: 4,
         sent_or_found: 4,
@@ -318,16 +323,21 @@ fn no_path_is_in_the_json_unless_asked() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     write(&root.join("imports/b.xml"), b"<x/>");
-    let report = build(root, None);
+    let report = build(root, &[]);
     let plain = to_json(&report, SystemTime::now(), None).to_string();
     assert!(!names_the_path(&plain, root), "{plain}");
     assert!(!plain.contains("path"), "{plain}");
     // The value, not the serialized text: on Windows the text doubles every
     // backslash of the path, so a substring check on it proves nothing.
-    let shown = to_json(&report, SystemTime::now(), Some((root, Some(root))));
+    let shown = to_json(&report, SystemTime::now(), Some((root, &[root])));
     let path = root.display().to_string();
     assert_eq!(shown["folder_path"], path, "{shown}");
     assert_eq!(shown["lock_folder_path"], path, "{shown}");
+    assert_eq!(
+        shown["lock_folder_paths"],
+        serde_json::json!([path]),
+        "{shown}"
+    );
     assert!(names_the_path(&shown.to_string(), root), "{shown}");
 }
 
@@ -441,7 +451,7 @@ fn a_journal_that_cannot_be_opened_is_unreadable_and_not_absent() {
     write(&real, &journal(true));
     std::os::unix::fs::symlink(&real, directory.path().join("agent-import-ledger.jsonl")).unwrap();
     assert_eq!(
-        build(directory.path(), None).journal,
+        build(directory.path(), &[]).journal,
         Journal::NotRead(JOURNAL_UNREADABLE)
     );
 }
@@ -482,7 +492,7 @@ fn a_folder_that_cannot_be_listed_is_named_and_not_read_as_empty() {
     let root = directory.path();
     write(&root.join("imports"), b"not a folder");
     write(&root.join("bank-statements/s.json"), b"12345");
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert_eq!(report.folders_not_read, ["imports"]);
     assert_eq!(class(&report, "bank_statements").files, 1);
     let json = to_json(&report, SystemTime::now(), None);
@@ -503,7 +513,7 @@ fn an_unlistable_data_folder_does_not_read_as_an_absent_journal() {
     let directory = tempfile::tempdir().unwrap();
     let not_a_folder = directory.path().join("Bridge");
     fs::write(&not_a_folder, b"x").unwrap();
-    let report = build(&not_a_folder, None);
+    let report = build(&not_a_folder, &[]);
     assert_eq!(report.root, Root::Unreadable);
     assert_eq!(report.journal, Journal::NotRead(DATA_FOLDER_UNREADABLE));
     let json = to_json(&report, SystemTime::now(), None);
@@ -530,7 +540,7 @@ fn a_journal_that_cannot_be_read_as_text_is_read_again_and_reported() {
 #[test]
 fn a_complete_report_has_no_reason_and_each_gap_has_its_own() {
     let directory = tempfile::tempdir().unwrap();
-    let mut report = build(directory.path(), None);
+    let mut report = build(directory.path(), &[]);
     assert_eq!(report.incomplete_reason(), None);
     assert!(to_json(&report, SystemTime::now(), None)["incomplete_reason"].is_null());
     report.entry_cap_reached = true;
@@ -556,7 +566,7 @@ fn a_socket_is_not_a_symlink_and_is_not_a_file() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path();
     let _listener = std::os::unix::net::UnixListener::bind(root.join("s.sock")).unwrap();
-    let report = build(root, None);
+    let report = build(root, &[]);
     assert_eq!(report.special_files, 1);
     assert_eq!(report.links, 0);
     assert_eq!(*class(&report, "other"), Class::default());
@@ -566,7 +576,7 @@ fn a_socket_is_not_a_symlink_and_is_not_a_file() {
 #[test]
 fn the_exit_status_is_zero_only_for_a_complete_report() {
     let directory = tempfile::tempdir().unwrap();
-    let mut report = build(directory.path(), None);
+    let mut report = build(directory.path(), &[]);
     assert_eq!(exit_status(&report, true), 0);
     assert_eq!(exit_status(&report, false), 1);
     report.journal = Journal::NotRead(JOURNAL_UNREADABLE);
@@ -595,10 +605,10 @@ fn a_folder_past_the_entry_cap_is_reported_as_capped() {
     for name in ["a", "b", "c"] {
         write(&directory.path().join("lab").join(name), b"1");
     }
-    let mut report = build(directory.path(), None);
+    let mut report = build(directory.path(), &[]);
     assert!(!report.entry_cap_reached);
     assert_eq!(class(&report, "lab").files, 3);
-    report = build(&directory.path().join("absent"), None);
+    report = build(&directory.path().join("absent"), &[]);
     scan_directory(
         &mut report,
         "lab",
@@ -643,7 +653,7 @@ fn a_linked_lock_folder_is_named_as_not_listed() {
     let root = directory.path();
     write(&outside.path().join("a.lock"), b"");
     std::os::unix::fs::symlink(outside.path(), root.join("native-dispatch-leases")).unwrap();
-    let report = build(root, Some(root));
+    let report = build(root, &[root]);
     assert_eq!(report.folders_not_read, ["lock_folder"]);
     assert_eq!(class(&report, "locks").files, 0, "the link is not followed");
     assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
@@ -657,7 +667,7 @@ fn a_dangling_data_folder_link_is_unreadable_and_not_missing() {
     let directory = tempfile::tempdir().unwrap();
     let link = directory.path().join("Bridge");
     std::os::unix::fs::symlink(directory.path().join("gone"), &link).unwrap();
-    let report = build(&link, None);
+    let report = build(&link, &[]);
     assert_eq!(report.root, Root::Unreadable);
     assert_eq!(report.journal, Journal::NotRead(DATA_FOLDER_UNREADABLE));
     assert_eq!(exit_status(&report, true), 2);
@@ -672,14 +682,14 @@ fn the_lock_folder_is_counted_when_the_data_folder_is_missing() {
     let coordination = directory.path().join("shared");
     write(&coordination.join("native-dispatch-leases/a.lock"), b"");
     let missing = directory.path().join("nope");
-    let report = build(&missing, Some(&coordination));
+    let report = build(&missing, &[coordination.as_path()]);
     assert_eq!(report.root, Root::Missing);
     assert_eq!(class(&report, "locks").files, 1);
     assert_eq!(report.incomplete_reason(), None);
 
     let dangling = directory.path().join("dangling");
     std::os::unix::fs::symlink(directory.path().join("gone"), &dangling).unwrap();
-    let report = build(&missing, Some(&dangling));
+    let report = build(&missing, &[dangling.as_path()]);
     assert_eq!(report.folders_not_read, ["lock_folder"]);
     assert_eq!(report.incomplete_reason(), Some("folder_not_listed"));
 }

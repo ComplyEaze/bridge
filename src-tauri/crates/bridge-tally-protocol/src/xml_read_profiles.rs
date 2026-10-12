@@ -788,7 +788,8 @@ fn render_vouchers(company: &str, from: &str, to: &str) -> String {
 /// `GUID` and `BOOKSFROM` (both engines), `ISINTEGRATED` (the Python stock
 /// test), and `NAME`, which no engine reads but which evidences which company
 /// Tally resolved the `ID` to. Each was present in the `FETCH *` captures of
-/// the audit books. An explicit `FETCHLIST` does narrow an Object export, but
+/// the audit books. On the one Company object export measured with this list,
+/// the answer was far narrower than a `FETCH *` answer from another book, but
 /// Tally also sent three children the list does not name (protocol reference
 /// §9.11e, measured 2026-10-12), so admission checks the fields the consumers
 /// need, not the absence of the rest.

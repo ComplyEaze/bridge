@@ -453,7 +453,7 @@ fn the_captured_answer_is_admitted_for_the_verified_identity() {
 }
 
 #[test]
-fn the_captured_answer_is_refused_for_any_other_identity() {
+fn the_captured_answer_is_refused_for_another_guid_or_books_from() {
     let text = live_response();
     // The same bytes, a different book: the refusals are typed, so a decode or
     // parse failure cannot pass for them.

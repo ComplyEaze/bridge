@@ -4,7 +4,8 @@ A live capture of the tally-read v1 company part: one single-object `Company` ex
 
 ## Provenance
 
-- **Host / gateway:** TallyPrime **Silver (licensed)**, 7.1, a lab instance.
+- **Host / gateway:** TallyPrime 7.1 (`PRODMAJORREL`/`PRODMINORREL` in the answer), a lab instance. Its licence and edition are not recorded in this capture.
+- **Source:** lab evidence commit `2af546bce1f7` on branch `lab/4c-audit-company-read`. The request bytes were sent with curl, not Bridge's transport.
 - **Date:** 2026-10-12. One request.
 - **Book:** `BRIDGE BATCH LAB`, a synthetic lab company. The company name and GUID are synthetic.
 - **Request:** the exact bytes tabled below, UTF-16LE with a BOM. A test asserts that `ReadOnlyProfile::AuditCompanyObjectV1`, rendered for this company and encoded by `encode_tally_xml_request_utf16le`, produces them (`the_request_is_byte_for_byte_the_one_sent_live` in `audit_company_part_tests.rs`).
@@ -14,8 +15,8 @@ A live capture of the tally-read v1 company part: one single-object `Company` ex
   - Exactly one `DATA/TALLYMESSAGE`, holding one `COMPANY` child. Its `NAME` attribute is `BRIDGE BATCH LAB`.
   - `GUID` (`a30f23c3-4819-4334-96ab-ffa6fba70976`) and `BOOKSFROM` (`20260401`) occur once each in the whole document.
   - The only other `COMPANY` is `DESC/CMPINFO/COMPANY`, which reads `2` and has no children.
-  - The `COMPANY` has seven children: `BOOKSFROM`, `NAME`, `GUID`, `ISINTEGRATED` (`No`), `ISDEEMEDPOSITIVE` (empty), `CANDELETE` (`No`) and `MASTERID` (`29`). A `FETCH *` export of a different book had 565 distinct tags (§9.11a).
-- **Not established:** that the request is byte-stable across two sends; an `ID` that does not resolve; a name with `&`, quotes or non-ASCII text; a book that is a year-split sibling; a book changing during the read; other releases, editions and hosts.
+  - The `COMPANY` has seven children: `BOOKSFROM`, `NAME`, `GUID`, `ISINTEGRATED` (`No`), `ISDEEMEDPOSITIVE` (empty), `CANDELETE` (`No`) and `MASTERID` (`29`). The answer has 56 distinct tags; a `FETCH *` answer from a different book had 565 (§9.11a), and no same-book `FETCH *` was sent.
+- **Not established:** that the answer is byte-stable across two sends (the `CMPINFO` counters could differ); Bridge's own transport and a live admission call; an `ID` that does not resolve; a name with `&`, quotes or non-ASCII text; a book that is a year-split sibling; a book changing during the read; other releases, editions and hosts.
 
 | file | bytes | sha256 | content |
 |---|---|---|---|

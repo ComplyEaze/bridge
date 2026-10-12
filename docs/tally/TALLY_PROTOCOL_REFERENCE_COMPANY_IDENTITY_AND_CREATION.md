@@ -191,20 +191,22 @@ never through `parse`:
     name comparison could refuse the right company. The GUID and `BOOKSFROM` already bind
     the part.
 
-**Measured 2026-10-12 (VERIFIED for the shape, on one book).** The request above was sent
-once to a licensed TallyPrime 7.1 Silver for a synthetic company, `BRIDGE BATCH LAB`, and the
-admission held on the answer: HTTP 200, 4,216 bytes of BOM-less UTF-16LE, `STATUS` `1`, only
-CRLF after `</ENVELOPE>`. The bytes of the request (896, with a BOM) and the answer are
-committed with their hashes in
-[`COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md`](../../src-tauri/crates/bridge-tally-protocol/tests/fixtures/COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md),
-and the answer is admitted by a test for the verified GUID and `BOOKSFROM`
-(`audit_company_part_tests.rs`).
+**Measured 2026-10-12 (VERIFIED for the shape, on one book).** The request above, as Bridge
+renders and encodes it, was sent once with curl (not Bridge's transport) to a lab TallyPrime
+7.1 (`PRODMAJORREL`/`PRODMINORREL` in the answer) for a synthetic company, `BRIDGE BATCH LAB`:
+HTTP 200, 4,216 bytes of BOM-less UTF-16LE, `STATUS` `1`, only CRLF after `</ENVELOPE>`. The
+bytes of the request (896, with a BOM) and the answer are committed with their hashes in
+[`COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md`](../../src-tauri/crates/bridge-tally-protocol/tests/fixtures/COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md).
+One test proves the profile renders and encodes to those request bytes; another admits the
+answer for the verified GUID and `BOOKSFROM` (`audit_company_part_tests.rs`). Bridge's own
+HTTP framing and admission on a live dispatch were not exercised.
 
 - There is one `DATA/TALLYMESSAGE` with one `COMPANY` child, whose `NAME` attribute is the
   company name. `GUID` and `BOOKSFROM` occur once each in the whole document.
-- **An explicit `FETCHLIST` narrows a single-object Company export.** The `COMPANY` has 7
-  children, against the 565 distinct tags of the `FETCH *` export in §9.11a (a different
-  book). The four named fields came back (`BOOKSFROM`, `NAME`, `GUID`, `ISINTEGRATED` = `No`)
+- **An explicit `FETCHLIST` narrowed this single-object Company export (inferred: the control
+  is another book).** The answer has 56 distinct tags and the `COMPANY` 7 children, against
+  the 565 distinct tags of the `FETCH *` answer in §9.11a, which was a different book; no
+  same-book `FETCH *` was sent. The four named fields came back (`BOOKSFROM`, `NAME`, `GUID`, `ISINTEGRATED` = `No`)
   with three that the list does not name: `ISDEEMEDPOSITIVE` (empty), `CANDELETE` (`No`) and
   `MASTERID` (`29`). So the answer is not limited to the list, and admission still checks
   the fields the consumers need, not the absence of the rest.
@@ -224,7 +226,7 @@ and the answer is admitted by a test for the verified GUID and `BOOKSFROM`
   allowing several users, so a book changing during a read is the normal case there. The read's
   company high-water bracket, not this part, is what refuses a moved book.
 
-The first live use was one request on a synthetic company on the licensed lab (above). Any
+The first live use was one request on a synthetic company on the lab (above). Any
 further request that can fail in Tally's UI, such as an `ID` that does not resolve, is sent
 one at a time with an operator watching the Tally screen (§1.2), stopping on the first
 silence.

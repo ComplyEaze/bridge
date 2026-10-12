@@ -1717,7 +1717,7 @@ const ROWS: &[Row] = &[
         parse: |_, text| party_masters(text, "6b43e498-430c-4d5c-bfef-d32e2ab93c85"),
     },
     // Group snapshots: tests/native_outstandings_live_fixtures.rs, tests/native_core_regressions.rs,
-    // tests/decoder_convergence.rs, src/native_outstandings/wire_group_tests.rs; the app's replays
+    // src/native_outstandings/wire_group_tests.rs; the app's replays
     // (src/reports/statements_tests.rs, src/agent_register_tests.rs, src/agent_import_bank_tests.rs,
     // src/agent_voucher_groups_tests.rs, src/tally/runtime_*_tests.rs) for the rest.
     Row {

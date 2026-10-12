@@ -545,8 +545,8 @@ promoted.
 - **The native-outstandings qualification.** Accepts only an Education configuration, and its
   identity brackets read through `ledgers_v1`. It therefore refuses on load, so the tool **cannot
   run** until Phase 2 Unit A.
-- **`groups_request`.** Has no production caller, and compiles only for tests.
-  Deleted 2026-10-12 together with the Bridge-schema group and voucher-type parsers that read its
+- **`groups_request`.** Had no production caller and compiled only for tests. Deleted 2026-10-12
+  together with the Bridge-schema group and voucher-type parsers that read its
   answer; core groups come from the native group collection.
 
 Reading ledgers and vouchers in Education waits for the Collection-based profiles (Phase 2 Unit A,

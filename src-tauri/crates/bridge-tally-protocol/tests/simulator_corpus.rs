@@ -379,6 +379,11 @@ fn nested_voucher_entry_contracts_are_strict() {
         BRIDGE_VOUCHER_EXPORT_SCHEMA
     );
     let vouchers = parse_voucher_source_records_with_evidence(&voucher_xml).unwrap();
+    assert_eq!(
+        vouchers.records[0].identities.master_id.as_deref(),
+        Some("10")
+    );
+    assert_eq!(vouchers.records[0].alter_id.as_deref(), Some("13"));
     assert_eq!(vouchers.records[0].record.ledger_entries.len(), 2);
     assert_eq!(vouchers.records[0].record.ledger_entries[0].entry_index, 1);
     assert_eq!(
@@ -405,6 +410,63 @@ fn nested_voucher_entry_contracts_are_strict() {
         "<ISDEEMEDPOSITIVE>Maybe</ISDEEMEDPOSITIVE>",
     );
     assert!(parse_voucher_source_records_with_evidence(&invalid_polarity).is_err());
+}
+
+#[test]
+fn a_record_is_identified_by_guid_then_remote_id_then_master_id() {
+    let export = |identity_attributes: &str| {
+        format!(
+            r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><VOUCHER {identity_attributes}><DATE>20260701</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>BRIDGE-001</VOUCHERNUMBER><PARTYLEDGERNAME>BRIDGE SYNTHETIC LEDGER</PARTYLEDGERNAME><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER></BODY></ENVELOPE>"#,
+            BRIDGE_VOUCHER_EXPORT_SCHEMA
+        )
+    };
+
+    let all_three = parse_voucher_source_records_with_evidence(&export(
+        r#"GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="7" ALTERID="11""#,
+    ))
+    .unwrap();
+    assert_eq!(
+        all_three.records[0].identity_kind,
+        Some(ParsedSourceIdentityKind::Guid)
+    );
+    assert_eq!(
+        all_three.records[0].source_id.as_deref(),
+        Some("voucher-guid")
+    );
+    assert_eq!(all_three.records[0].alter_id.as_deref(), Some("11"));
+
+    let remote_only = parse_voucher_source_records_with_evidence(&export(
+        r#"REMOTEID="bridge-synthetic-voucher-001""#,
+    ))
+    .unwrap();
+    let record = &remote_only.records[0];
+    assert_eq!(
+        record.identity_kind,
+        Some(ParsedSourceIdentityKind::RemoteId)
+    );
+    assert_eq!(
+        record.source_id.as_deref(),
+        Some("bridge-synthetic-voucher-001")
+    );
+    assert_eq!(
+        record.record.id.as_deref(),
+        Some("bridge-synthetic-voucher-001")
+    );
+    assert_eq!(record.record.date.as_deref(), Some("20260701"));
+    assert_eq!(record.record.cancelled, Some(false));
+    assert_eq!(record.record.ledger_entry_count, Some(0));
+
+    let master_only =
+        parse_voucher_source_records_with_evidence(&export(r#"MASTERID="9" ALTERID="12""#))
+            .unwrap();
+    let record = &master_only.records[0];
+    assert_eq!(
+        record.identity_kind,
+        Some(ParsedSourceIdentityKind::MasterId)
+    );
+    assert_eq!(record.source_id.as_deref(), Some("9"));
+    assert_eq!(record.identities.master_id.as_deref(), Some("9"));
+    assert_eq!(record.alter_id.as_deref(), Some("12"));
 }
 
 #[test]

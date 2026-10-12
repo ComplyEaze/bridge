@@ -1965,6 +1965,30 @@ pub fn absence_key(value: &str) -> String {
     verified_fold(&master_identity_key(value))
 }
 
+/// A collision-only key: the name's letters and digits, each lowercased by
+/// Unicode rules, and nothing else, so every space, separator and symbol is
+/// dropped. A ledger Create that Tally resolved to an existing ledger, and so
+/// altered it, was measured for case, a doubled space, `-` and `/` read as a
+/// space, a removed space and removed full stops (one synthetic book,
+/// `bridge-tally-protocol/tests/fixtures/agent/masters-lab.PROVENANCE.md`), so the
+/// narrower keys alone would call a Tally match absent. Every other symbol it
+/// drops is unmeasured and refused conservatively, including the two the
+/// voucher path saw Tally refuse (an underscore or en dash for a space, §9.4d):
+/// the cost is a false refusal, never an overwrite. It applies no NFC, so it
+/// does not replace [`absence_key`]. Each character is upper-cased before it is
+/// lower-cased, so `ı` and `ſ` meet `i` and `s`. It decides nothing about a
+/// binding; a caller uses it only to refuse.
+pub fn letters_and_digits_key(value: &str) -> String {
+    // Upper case first, then lower: a letter that lower-casing leaves alone
+    // but upper-casing maps (dotless i, long s) meets its ASCII spelling.
+    value
+        .chars()
+        .filter(|character| character.is_alphanumeric())
+        .flat_map(char::to_uppercase)
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
 /// The composed fold §9.4d measured on licensed TallyPrime 7.1: `-` and `/`
 /// treated as a space, any Unicode whitespace run collapsed to one space,
 /// surrounding whitespace trimmed, and each character lowercased by Unicode

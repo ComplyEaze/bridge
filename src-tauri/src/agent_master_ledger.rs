@@ -27,8 +27,8 @@
 //! What a caller relies on:
 //!
 //! - An intent's items are its batch's names, and this module derives each
-//!   item's `canonical_key` and `absence_key` with the master name index's two
-//!   key functions; a caller building an intent cannot supply them. Whether two
+//!   item's `canonical_key` and `absence_key` with two of the master name
+//!   index's key functions; a caller building an intent cannot supply them. Whether two
 //!   names may be one master, inside a batch and against an open dispatch, is
 //!   computed from the names every time ([`NameKeys::may_be_one_master`]), so a
 //!   journal written before a fold widened is judged by the wider fold. Against
@@ -64,7 +64,9 @@ use super::ledger::{self, MAX_RECORD_BYTES};
 use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
-use bridge_tally_core::master_binding::{absence_key, canonical_master_key, twin_fold_keys};
+use bridge_tally_core::master_binding::{
+    absence_key, canonical_master_key, letters_and_digits_key, twin_fold_keys,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Read};
@@ -1001,6 +1003,7 @@ fn read_error(code: String) -> MasterLedgerError {
 struct NameKeys {
     canonical: String,
     twin: [String; 3],
+    letters_and_digits: String,
 }
 
 impl NameKeys {
@@ -1008,6 +1011,7 @@ impl NameKeys {
         Self {
             canonical: canonical_master_key(name),
             twin: twin_fold_keys(name),
+            letters_and_digits: letters_and_digits_key(name),
         }
     }
 
@@ -1015,9 +1019,13 @@ impl NameKeys {
     /// index matches on, or on any `twin_fold_keys` fold in any position. The
     /// index's `absence_key` is twin key 2, so the twin comparison covers it;
     /// the canonical key is compared on its own, because lowercasing and NFC do
-    /// not commute and a name can agree on it and on no twin key.
+    /// not commute and a name can agree on it and on no twin key. The index's
+    /// letters-and-digits key is compared too, so two names in one batch that
+    /// differ only by a space or a symbol are refused as the book check would.
     fn may_be_one_master(&self, other: &Self) -> bool {
-        self.canonical == other.canonical || self.twin.iter().any(|key| other.twin.contains(key))
+        self.canonical == other.canonical
+            || self.letters_and_digits == other.letters_and_digits
+            || self.twin.iter().any(|key| other.twin.contains(key))
     }
 }
 

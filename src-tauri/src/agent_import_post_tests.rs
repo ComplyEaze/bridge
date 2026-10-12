@@ -4445,7 +4445,9 @@ fn each_master_refusal_reaches_the_caller_under_its_own_code() {
             "master_name_taken",
         ),
         (
-            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable,
+            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable {
+                cause: "ledger_catalogue_malformed_response",
+            },
             "master_ledger_index_unavailable",
         ),
     ] {

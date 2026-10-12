@@ -2,10 +2,11 @@
 //! protocol simulator, the approval answered by the test-only seam. No real
 //! Tally is involved.
 //!
-//! No V3 ledger answer has been captured, so the ledger-name parser still
-//! refuses (`master_ledger_index_unavailable`). A test that must get past it
-//! scopes the ledgers the book holds into `TEST_LEDGER_INDEX`; the group answer
-//! is a committed live capture. The queue's request sequence is the one
+//! The ledger answer here is an empty envelope, which the ledger-name parser
+//! refuses (`master_ledger_index_unavailable`): the committed V3 captures are of
+//! another company than the group and company captures these tests read. A test
+//! that must get past it scopes the ledgers the book holds into
+//! `TEST_LEDGER_INDEX`; the group answer is a committed live capture. The queue's request sequence is the one
 //! `agent_master_post_tests::queue` documents.
 use super::super::master_ledger::{read_pre_image, MasterVerdictState};
 use super::super::master_post::{TEST_LEDGER_INDEX, TEST_LEDGER_INDEX_AFTER_POST};
@@ -275,7 +276,8 @@ fn item(name: &str) -> LedgerCreateItem {
     LedgerCreateItem::new(MasterName::new(name).unwrap(), AdmittedLedgerKind::Suspense)
 }
 
-/// The ledgers the book holds, standing in for the missing parser.
+/// The ledgers the book holds, standing in for a captured answer of this
+/// company.
 fn book() -> Vec<IndexedMaster> {
     vec![IndexedMaster {
         kind: MasterKind::Ledger,
@@ -763,7 +765,7 @@ fn a_stored_batch_that_is_not_one_admitted_ledger_is_refused() {
 // --- prepare ---------------------------------------------------------------
 
 #[tokio::test]
-async fn prepare_refuses_for_want_of_a_ledger_index_and_saves_nothing() {
+async fn prepare_refuses_an_unreadable_ledger_index_and_saves_nothing() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -2384,9 +2386,9 @@ fn every_verdict_state_has_its_code_and_only_the_loud_ones_carry_an_alert() {
 
 // --- the test seam ---------------------------------------------------------
 
-/// The one seam the missing ledger parser needs is compiled under bare
-/// `cfg(test)`, as the approval seam is: no feature or flag compiles it into a
-/// shipped build.
+/// The seam the tool tests use until they read one company's captured answers
+/// end to end is compiled under bare `cfg(test)`, as the approval seam is: no
+/// feature or flag compiles it into a shipped build.
 #[test]
 fn the_ledger_index_seams_are_under_bare_cfg_test() {
     let source = include_str!("agent_master_post.rs");

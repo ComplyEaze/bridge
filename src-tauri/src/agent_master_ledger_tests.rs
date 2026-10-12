@@ -1800,3 +1800,13 @@ fn a_sidecar_is_removed_checked() {
     assert_eq!(error, PreImageError::RemoveFailed);
     assert_eq!(error.code(), "master_pre_image_remove_failed");
 }
+
+#[test]
+fn two_names_differing_only_by_spaces_or_symbols_may_be_one_master() {
+    let one = |a: &str, b: &str| NameKeys::of(a).may_be_one_master(&NameKeys::of(b));
+    let (dotted, plain) = ("Synthetic Probe Pvt. Ltd.", "Synthetic Probe Pvt Ltd");
+    assert_ne!(canonical_master_key(dotted), canonical_master_key(plain));
+    assert!(one(dotted, plain));
+    assert!(one("Synthetic Fresh Party", "Synthetic FreshParty"));
+    assert!(!one("Synthetic Probe Pvt Ltd", "Synthetic Probe Pvt Ltd 2"));
+}

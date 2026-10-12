@@ -1713,7 +1713,7 @@ pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
     } else if error.chain().any(|cause| {
         matches!(
             cause.downcast_ref::<ApprovedImportAdmissionError>(),
-            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable)
+            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable { .. })
         )
     }) {
         "master_ledger_index_unavailable"

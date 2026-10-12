@@ -202,7 +202,7 @@ impl TransferSummary {
     }
 }
 
-const NOT_ESTABLISHED_STEP: &str = "Whether the other account's Contra exists is not established. Verify any batch of the other account's statement for this date first; build that statement only if no batch of it exists.";
+const NOT_ESTABLISHED_STEP: &str = "Whether the other account's Contra exists is not established: the other account's statement for this date is not built and verified through ComplyEaze Bridge, or a batch without statement records (inline vouchers, or a release before them) names that bank on this date. Verify any batch of the other account's statement for this date first; build that statement only if no batch of it exists. If a batch without statement records already carries this transfer, keep the skip.";
 /// The whole check could not run, which says nothing of any one row. A batch
 /// that was written, or a verification, is checked again by verifying it.
 const CHECK_NOT_RUN_STEP: &str =
@@ -261,7 +261,7 @@ pub(super) fn next_step(state: &str) -> &'static str {
     match state {
         "other_side_unverified" => "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on that batch. Do not build or post either statement again for this row.",
         "not_found" => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day; a Contra dated another day is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
-        "ambiguous" => "More than one Contra could carry this row. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer.",
+        "ambiguous" => "More than one Contra could carry this row. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
         "reversed_same_day" => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
         "held_elsewhere" => "The batch named posts this row, which a statement skipped. Verify that batch; once it is found posted the skip is retired.",
         "double_booked" => "Two statements each booked this transfer as a Contra. Check both in Tally and keep one.",
@@ -366,8 +366,8 @@ const SKIP_ROW_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing
 const SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP: &str = "No file was written and nothing was recorded. This build posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Do not post these rows. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf.";
 const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing was recorded. Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch sent to Tally or found posted, or in a statement of only skipped rows) and a voucher of this build. Build again with withdraw_skips naming only rows that are both, or without it.";
 const WITHDRAW_SKIP_PAIRED_NEXT_STEP: &str = "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.";
-const WITHDRAW_SKIP_UNVERIFIED_NEXT_STEP: &str = "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row.";
-const WITHDRAW_SKIP_BOTH_NEXT_STEP: &str = "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first. Do not post these rows.";
+const WITHDRAW_SKIP_UNVERIFIED_NEXT_STEP: &str = "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.";
+const WITHDRAW_SKIP_BOTH_NEXT_STEP: &str = "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. Do not post these rows.";
 const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing was recorded. A Contra in this build carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Posting both books it twice. Do not build this Contra: run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger) and build again.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and nothing was recorded. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this build books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, build with that release; otherwise report it with the error named here, and do not build this statement again until it is fixed.";
 
@@ -516,6 +516,8 @@ impl Server {
         // holds, so any candidate not yet verified refuses, whatever the state:
         // each of their batches is named. Not found, not established, and
         // ambiguous or reversed the same day among verified Contras only, are.
+        // One row can be skipped under several keys (two endpoints, two bank
+        // ledgers): every one of them is read.
         let verified: BTreeSet<&ContraKey> = before
             .contras
             .iter()
@@ -526,28 +528,24 @@ impl Server {
             .withdraw
             .iter()
             .flat_map(|row| {
-                let carriers: BTreeSet<(&BatchId, &str)> = match before_view
+                let carriers: BTreeSet<(&BatchId, &str)> = before_view
                     .skips
                     .iter()
-                    .find(|(key, _)| key.row.as_str() == row)
-                    .map(|(_, state)| state)
-                {
-                    Some(SkipState::Paired { contra, .. }) => {
-                        BTreeSet::from([(&contra.batch, "paired")])
-                    }
-                    Some(SkipState::OtherSideUnverified { batch }) => {
-                        BTreeSet::from([(batch, "other_side_unverified")])
-                    }
-                    Some(
+                    .filter(|(key, _)| key.row.as_str() == row)
+                    .flat_map(|(_, state)| match state {
+                        SkipState::Paired { contra, .. } => vec![(&contra.batch, "paired")],
+                        SkipState::OtherSideUnverified { batch } => {
+                            vec![(batch, "other_side_unverified")]
+                        }
                         SkipState::Ambiguous { candidates }
-                        | SkipState::ReversedSameDay { candidates },
-                    ) => candidates
-                        .iter()
-                        .filter(|candidate| !verified.contains(candidate))
-                        .map(|candidate| (&candidate.batch, "other_side_unverified"))
-                        .collect(),
-                    _ => BTreeSet::new(),
-                };
+                        | SkipState::ReversedSameDay { candidates } => candidates
+                            .iter()
+                            .filter(|candidate| !verified.contains(candidate))
+                            .map(|candidate| (&candidate.batch, "other_side_unverified"))
+                            .collect(),
+                        _ => Vec::new(),
+                    })
+                    .collect();
                 carriers.into_iter().map(move |(batch, label)| {
                     json!({"bridge_txn_id": row, "batch_id": batch.as_str(), "state": label})
                 })

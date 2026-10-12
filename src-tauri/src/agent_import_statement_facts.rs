@@ -795,6 +795,9 @@ struct LineageFacts {
     left_out: usize,
     /// Contras with no facts entry in a lineage that holds facts.
     without_facts: usize,
+    /// Each build's voucher of such a Contra, by batch and voucher position:
+    /// it blocks every ledger it names, as a batch without facts does.
+    unseen: Vec<(usize, usize)>,
     /// Every build that decides one of the lineage's voucher rows is verified.
     all_verified: bool,
     /// The days of every row the facts cannot vouch for: decided by a build
@@ -934,6 +937,7 @@ fn lineage_facts(
         .filter(|(_, (at, _))| !batches[*at].is_verified())
         .map(|(&txn, _)| txn)
         .collect();
+    let mut unseen: BTreeSet<&str> = BTreeSet::new();
     let mut found = LineageFacts {
         skips,
         all_verified: uncertain.is_empty(),
@@ -948,6 +952,7 @@ fn lineage_facts(
             if voucher.kind == VoucherType::Contra {
                 found.without_facts += 1;
                 uncertain.insert(txn);
+                unseen.insert(txn);
             }
             continue;
         };
@@ -984,9 +989,12 @@ fn lineage_facts(
         });
     }
     for &at in members {
-        for voucher in &batches[at].line.vouchers {
+        for (position, voucher) in batches[at].line.vouchers.iter().enumerate() {
             if uncertain.contains(voucher.txn_id.as_str()) {
                 found.blocked.insert(voucher.date.clone());
+            }
+            if unseen.contains(voucher.txn_id.as_str()) {
+                found.unseen.push((at, position));
             }
         }
     }
@@ -1003,30 +1011,35 @@ type Blocked = BTreeMap<(Option<EndpointOrigin>, Option<LedgerGuid>), BTreeSet<T
 /// id carries, are not cover for any ledger it names; where the endpoint or a
 /// ledger is not bound, for any.
 fn block_unseen(batch: &Batch, blocked: &mut Blocked) {
+    for voucher in &batch.line.vouchers {
+        block_voucher(batch, voucher, blocked);
+    }
+}
+
+fn block_voucher(batch: &Batch, voucher: &BuildVoucher, blocked: &mut Blocked) {
     let endpoint = batch
         .line
         .endpoint_origin
         .as_deref()
         .map(EndpointOrigin::new);
-    for voucher in &batch.line.vouchers {
-        let mut days = vec![voucher.date.clone()];
-        if is_statement_txn_id(&voucher.txn_id) {
-            // the id was checked to be `st-`, eight digits and the rest
-            days.extend(TallyDate::parse(voucher.txn_id[3..11].to_string()).ok());
-        }
-        for entry in &voucher.entries {
-            let ledger = batch
-                .line
-                .ledger_identities
-                .iter()
-                .flatten()
-                .find(|bound| bound.name == entry.ledger)
-                .map(|bound| LedgerGuid::new(bound.guid.as_str()));
-            blocked
-                .entry((endpoint.clone(), ledger))
-                .or_default()
-                .extend(days.iter().cloned());
-        }
+    let mut days = vec![voucher.date.clone()];
+    if is_statement_txn_id(&voucher.txn_id) {
+        // The id was checked to be `st-`, eight digits and the rest. Eight
+        // digits that are not a date add nothing: the voucher's date blocks.
+        days.extend(TallyDate::parse(voucher.txn_id[3..11].to_string()).ok());
+    }
+    for entry in &voucher.entries {
+        let ledger = batch
+            .line
+            .ledger_identities
+            .iter()
+            .flatten()
+            .find(|bound| bound.name == entry.ledger)
+            .map(|bound| LedgerGuid::new(bound.guid.as_str()));
+        blocked
+            .entry((endpoint.clone(), ledger))
+            .or_default()
+            .extend(days.iter().cloned());
     }
 }
 
@@ -1075,6 +1088,13 @@ pub(super) fn build_transfer_facts(
             continue;
         }
         let found = lineage_facts(&batches, members, &company)?;
+        for &(at, position) in &found.unseen {
+            block_voucher(
+                &batches[at],
+                &batches[at].line.vouchers[position],
+                &mut blocked,
+            );
+        }
         contras_not_two_leg += found.left_out;
         contras_without_facts += found.without_facts;
         for (endpoint, ledger) in &found.ledgers {

@@ -1160,6 +1160,23 @@ fn a_ledger_or_endpoint_a_batch_did_not_bind_blocks_every_ledger() {
 }
 
 #[test]
+fn a_contra_the_facts_cannot_see_in_a_lineage_that_holds_facts_blocks_the_ledgers_it_names() {
+    // an inline batch booking the transfer, then amended by a statement build
+    // of Bank Three that does not name it: the lineage now holds facts
+    let inline = build(149).voucher(contra(&st(9), N2, N1, "500.00"));
+    let amendment = build(150)
+        .amends(149)
+        .voucher(contra(&st(10), N3, N1, "9.00"))
+        .facts(facts(B3).contra(&st(10), None));
+    let verified = bank_two_statement(151, "posted_verified");
+    let journal = Journal::default()
+        .batch(&verified)
+        .batch(&inline)
+        .batch(&amendment);
+    assert_eq!(state_given(journal, ""), SkipState::NotEstablished);
+}
+
+#[test]
 fn a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names() {
     let other_ledgers = build(145).voucher(contra(&st(9), N3, N1, "500.00"));
     assert_eq!(beside_bank_two(other_ledgers), SkipState::NotFound);

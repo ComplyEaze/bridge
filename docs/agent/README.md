@@ -1723,7 +1723,10 @@ refused as `proposals_legacy` (parse the statement again).
   transfer. Each Contra and statement row it holds makes the days it names (its
   date, and the date in its `st-` id) give no coverage for the ledgers it names,
   so a skip pairing on such a day is `not_established`, never `not_found`. A
-  blocked day removes the whole window it falls in. Such a batch blocks its
+  blocked day removes the whole window it falls in. A record with no endpoint
+  or no ledger binding (from an early release) blocks those days for every
+  ledger, so it can turn every skip across its days `not_established`. A Contra
+  with no statement record inside a statement's own builds blocks the same way. Such a batch blocks its
   days whatever its status; a statement build blocks the days of its rows until
   it is verified, so one abandoned unsent keeps them `not_established`.
 - **Refused before anything is written:** `skip_row_already_posted`,
@@ -1732,10 +1735,13 @@ refused as `proposals_legacy` (parse the statement again).
   `next_step`.
 - **`withdraw_skips`.** Names skipped rows a build posts anyway, only when the
   person confirms the other account's statement does not carry them. It is
-  refused (`withdraw_skip_paired`) when the row is paired, or when any Contra
-  that could carry it is in a batch not yet verified, whatever the row's state:
-  the person can confirm only what Tally holds, so each such batch is named to
-  verify first.
+  refused (`withdraw_skip_paired`) when the row is paired, or when a Contra it
+  could pair with (an equal reference, or the same date and amount) waits in a
+  batch not yet verified, whatever the row's state: the person can confirm only
+  what Tally holds, so each such batch is named to verify first. A Contra dated
+  another day, or with a third leg, is not one it could pair with and does not
+  refuse: verify every batch of the other account's statement before naming a
+  row.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
   build that needs the view (`transfer_view_not_established`); builds that do

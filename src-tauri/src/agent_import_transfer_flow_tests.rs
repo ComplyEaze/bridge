@@ -997,7 +997,7 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         } else {
             assert_eq!(
                 step,
-                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row.",
+                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
                 "{case}"
             );
         }
@@ -1048,6 +1048,41 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
         .any(|row| row["bridge_txn_id"] == SKIPPED && row["state"] == "held_elsewhere"));
 }
 
+#[tokio::test]
+async fn every_key_a_withdrawn_row_is_skipped_under_is_read() {
+    // the same row skipped again through another endpoint, whose key sorts
+    // first and reads not_established: the key that pairs still refuses
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    let recorded = fs::read_to_string(skip_file(directory.path())).unwrap();
+    let mut again: Value = serde_json::from_str(recorded.lines().next().unwrap()).unwrap();
+    again["endpoint_origin"] = json!("http://127.0.0.1:1");
+    again["record_id"] = json!(format!("skips-{}", uuid::Uuid::new_v4()));
+    fs::write(skip_file(directory.path()), format!("{recorded}{again}\n")).unwrap();
+    let built = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(REFERENCE),
+        ))
+        .await;
+    let carrying = built["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrying);
+    let refused = rig.build(withdrawing(directory.path())).await;
+    rig.finish();
+    assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
+    assert_eq!(
+        refused["paired_rows"],
+        json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying, "state": "paired"}])
+    );
+}
+
 /// Bank B's statement building `rows` as Contras, none with a reference.
 fn b_contras(directory: &Path, rows: &[&str]) -> Value {
     statement_v2(
@@ -1068,9 +1103,9 @@ fn b_contras(directory: &Path, rows: &[&str]) -> Value {
 #[tokio::test]
 async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state() {
     // ambiguous between two unsent builds of one statement; ambiguous between a
-    // Contra found posted and one not; reversed the same day with its only
-    // candidate unsent. In each the person cannot confirm in Tally what is not
-    // there yet.
+    // Contra found posted and one not; reversed the same day with a Contra found
+    // posted and one not. In each the person cannot confirm in Tally what is
+    // not there yet.
     for case in ["two unsent", "one found, one not", "reversed"] {
         let directory = tempfile::tempdir().unwrap();
         let rig = Rig::new(
@@ -1117,7 +1152,7 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
         assert_eq!(refused["paired_rows"], json!(expected), "{case}");
         assert_eq!(
             refused["next_step"],
-            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row.",
+            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
             "{case}"
         );
     }

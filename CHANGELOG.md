@@ -107,6 +107,15 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A batch approval's Journal lines now name a ledger on each side, and the window no longer
+  says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
+  its first debit ledger, so the person could not see what each Journal credited; it now shows
+  `Dr "<first debit>" +N  Cr "<first credit>" +M`, with up to 20 characters of its narration
+  (other types keep 40). A Journal line that does not fit leaves the totals and the reason
+  line, as any line that does not fit does. The line above the voucher lines said each
+  narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
+  it now says a cut narration is marked. Payment, Receipt and Contra lines are unchanged.
+
 ## [0.5.1] - 2026-10-09
 
 ### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (9 Oct 2026)

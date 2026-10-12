@@ -1797,7 +1797,7 @@ fn verify_observed_company_tuple_from_companies(
                 "The identity Tally gave this company is not in the expected form, so ComplyEaze Bridge cannot select it.",
                 "not_recommended",
                 false,
-                "Contact ComplyEaze support and tell them this company's name.",
+                "Do not use this company here. Write to contact@complyeaze.com with this company's name.",
             )
         })?;
     VerifiedCompanyIdentity::from_observed_companies(

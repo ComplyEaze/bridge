@@ -17,6 +17,12 @@ and `PROMPT_PLAYBOOK.md` Phase 4 step 4. Their prescriptions are separate from t
 
 ### 9.8 Voucher numbering method changes everything — **use Manual**
 
+**Scope: "use Manual" applies when ComplyEaze Bridge supplies the voucher number.** A numberless
+native post is the opposite case: under Manual numbering its second voucher was given a repeated
+number or refused, and under Automatic with "Retain Original Voucher No." it was numbered in
+sequence; see "A numberless native post under Manual and Automatic numbering" at the end of this
+section.
+
 **VERIFIED.** The voucher type's numbering method silently determines both whether your
 voucher number survives and how a failed Alter behaves.
 
@@ -200,6 +206,33 @@ observation.**
     post follows from it.
 - Evidence: the never-merged branch `lab/1c-numbering-evidence` (`s1c-RESULT.md`,
   `s1c-pre-payment-numbers.txt`, `s1c-after-manual-payment-numbers.txt`).
+
+**A numberless native post under Manual and Automatic numbering: verified 2026-10-12, one post per
+setting (PARTIAL; VERIFIED applies to each bullet as marked).** The rule above is about a flow that supplies the voucher number. A native post
+supplies none: it refuses a supplied `VOUCHERNUMBER` (see "Native mutation selector" above), so Tally
+numbers every voucher it creates.
+- Setup: licensed TallyPrime 7.1 Silver on Windows, new synthetic companies, each loaded alone; one
+  ComplyEaze Bridge build, `bridge_mcp` SHA-256 `411f7cca…`; single native posts with no voucher
+  number. Each type's setting was set or read on Tally's own screen.
+- **VERIFIED:** the first numberless voucher of a type is created and numbered `1`, with Manual
+  numbering and duplicates prevented (a Payment and a Journal) or allowed (a Payment).
+- **VERIFIED, Manual with duplicates allowed (Payment):** the second numberless voucher was created
+  and numbered `1` again. Both read `posted_verified`, because a post's readback compares the number
+  only when the batch supplied one.
+- **VERIFIED, Manual with duplicates prevented (Journal):** the second numberless voucher was refused
+  whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`. Tally's 538-byte answer
+  has the same SHA-256 (`09a713e2…`) as earlier whole refusals of zero-value vouchers
+  (`lab/1342-capture-answers`), so it names no cause; that the cause is the repeated number is
+  inferred.
+- **VERIFIED, Automatic with "Retain Original Voucher No." on insertion and deletion (Journal):** a
+  second numberless voucher was numbered `2`, and a third dated before both was numbered `3`. The
+  first two kept their numbers and AlterIDs, and a later read-back still read them `posted_verified`.
+- Not established: Receipt and Contra under Manual numbering; a batch; Automatic (Manual Override);
+  Multi-user Auto; Automatic set to renumber on insertion; Gold; a file imported through Tally's
+  Import menu.
+- Evidence: the never-merged branches `lab/724-m-manual-numbering-answers` (`2fd954f9`),
+  `lab/724-m3-second-voucher-answers` (`6ab6a667`) and `lab/724-m4-m5-numbering-answers`
+  (`3684c58c`, under `m5/`); bridge#724.
 
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 

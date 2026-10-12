@@ -18,7 +18,8 @@ pub enum Treatment {
     /// Both legs are bank or cash ledgers: an own-account or ATM transfer.
     Contra,
     /// Emit no voucher: a transfer between two accounts that are BOTH being
-    /// imported, already carried by the other statement's Contra.
+    /// imported, already carried by the other statement's Contra. The mapping
+    /// row names the other account's ledger, so that Contra can be found.
     Skip,
 }
 
@@ -89,6 +90,15 @@ impl Mapping {
                     "contra_without_ledger",
                     format!(
                         "{}: marked contra with no ledger. A Contra's other leg must be a bank or cash ledger; defaulting it to suspense would misclassify the transaction.",
+                        row.origin
+                    ),
+                ));
+            }
+            if treatment == Treatment::Skip && ledger.is_empty() {
+                return Err(Refusal::new(
+                    "skip_without_ledger",
+                    format!(
+                        "{}: marked skip with no ledger. A skipped transfer must name the other bank account's ledger, so its Contra can be found; a transfer with no other side to find cannot be skipped.",
                         row.origin
                     ),
                 ));

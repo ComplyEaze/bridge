@@ -646,9 +646,6 @@
       "path": "src-tauri/src/db/tally_mirror.rs"
     },
     {
-      "path": "src-tauri/src/db/tally_write_store.rs"
-    },
-    {
       "path": "src-tauri/src/endpoint_coordination.rs"
     },
     {

@@ -99,8 +99,8 @@ pending consented synthetic live qualification.
    `Verified`.
 7. JSONEX has no implementation in the repository. The portable parser, the
    request builder and the semantic-shadowing comparator built for it were
-   deleted on 2026-10-12: they were exercised only against synthetic fixtures
-   and no shipped build used them. XML remains the sole runtime transport; no
+   deleted on 2026-10-12 in [#1574](https://github.com/ComplyEaze/bridge/pull/1574): they were exercised only against synthetic
+   fixtures and no shipped build used them. XML remains the sole runtime transport; no
    JSONEX HTTP dispatch, canonical adapter, runtime selection, mirror,
    checkpoint, proof, or write path exists. A JSONEX path needs a new design,
    gated on exact TallyPrime 7.0+ release/mode, Education-profile, encoding,
@@ -200,7 +200,7 @@ qualification claim and sets no activation schedule. The summary below is
 non-exhaustive; the linked plans and ADR remain the authoritative gates.
 
 **2026-10-12 amendment.** `transport_qualification`, the third of these
-foundations, was deleted rather than retained, together with the JSONEX parser
+foundations, was deleted rather than retained ([#1574](https://github.com/ComplyEaze/bridge/pull/1574)), together with the JSONEX parser
 and request builder it was built beside. Two foundations remain below.
 
 - `bills_reconciliation` retains the item 15 fail-closed, exact-arithmetic

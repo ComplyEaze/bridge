@@ -212,8 +212,10 @@ pub struct Build {
 pub enum TieOutWindowRefusal {
     /// A window that leaves rows out must run from the 1st of a month to the
     /// last day of a month, so a tie-out shows the statement's totals per
-    /// calendar month and never a part of a month (a month in which every
-    /// other row's amount is already known still shows that row's amount).
+    /// calendar month and never a part of a month, except the part-months at
+    /// the statement's own start and end (a month edge's balance with the
+    /// supplied opening or closing gives their net); a month in which every
+    /// other row's amount is already known still shows that row's amount.
     NotWholeCalendarMonths,
     /// The window starts before the statement's first row or ends after its
     /// last: the statement does not prove its balance on those days.

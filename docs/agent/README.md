@@ -1780,7 +1780,9 @@ deadlocks.
   movement gives the statement's net over those months. That is why a narrowed
   window must be whole calendar months within the statement's rows: what can be
   learnt this way is the statement's balance at month ends and its net per
-  month, never a part of a month. A month in which every other row's amount is
+  month, never a part of a month except the part-months at the statement's own
+  start and end, whose net a month edge's balance gives together with the
+  opening and closing supplied to the parse. A month in which every other row's amount is
   already known still gives that row's amount: a month of one row, or one row
   beside open cash lines, whose amounts `cash_questions` returns. The parse
   result already ties such a row to its party and direction through

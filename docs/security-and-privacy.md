@@ -130,8 +130,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - A bank-statement check over whole calendar months (`statement_tie_out`, in
     source and not yet in a published build) can show, with the book's figures,
     the statement's balance at the month ends and its net over those months,
-    under every setting: never a part of a month, but a month in which every
-    other row's amount is already known (a single row, or one row beside open
+    under every setting: never a part of a month except the part-months at the
+    statement's own start and end (whose net a month-end balance gives together
+    with the opening and closing supplied to the parse), but a month in which
+    every other row's amount is already known (a single row, or one row beside open
     cash lines, whose amounts the parse returns) gives that row's amount.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.

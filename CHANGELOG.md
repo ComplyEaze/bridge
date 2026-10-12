@@ -45,7 +45,8 @@ These changes are in source and not yet in a published build.
   book at those dates, against the statement's balance there as worked out from its own rows. Any other narrowed
   window is `not_established` (`window_not_whole_calendar_months`, `window_beyond_statement_rows`). With the book's
   figures, the gaps then give the statement's balance at those month ends and its net over those months: never a
-  part of a month, though a month in which every other row's amount is already known (one row alone, or one row
+  part of a month except the part-months at the statement's own start and end (whose net a month-end balance gives
+  together with the opening and closing supplied to the parse), though a month in which every other row's amount is already known (one row alone, or one row
   beside open cash lines, whose amounts the parse returns) gives that row's amount (part of #1211). No month window
   has been run against a live book.
 

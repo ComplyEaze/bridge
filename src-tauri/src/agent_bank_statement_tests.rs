@@ -537,6 +537,17 @@ async fn refusals_name_a_category_and_a_row_never_the_statement() {
         .call_tool("parse_bank_statement", arguments(&scan, &scan_password))
         .await;
     assert_eq!(error_code(&scanned), Some("statement_no_readable_text"));
+    // so does a scan whose stamp draws a date over a hidden OCR layer, though its
+    // parse stops on the missing account-number line
+    let (stamped, stamped_password) =
+        statement_files(scan_directory.path(), "scan-ocr-with-stamp.pdf", PASSWORD);
+    let stamped = server
+        .call_tool(
+            "parse_bank_statement",
+            arguments(&stamped, &stamped_password),
+        )
+        .await;
+    assert_eq!(error_code(&stamped), Some("statement_no_readable_text"));
     for (key, value, expected) in [
         (
             "account_label",

@@ -227,10 +227,10 @@ per-iteration locals, so cutting between them would trade one long function for 
 ones. That is the "deep module over shallow modules" judgement applied to a function. Revisit it
 only if the locals can become one named per-iteration state type.
 
-### `src/db/tally_mirror.rs` (~5,900 lines, pinned)
+### `src/db/tally_mirror.rs` (~5,100 lines, pinned)
 
-**Shape.** About 3,660 lines are one `impl TallyMirrorRepository`, plus about 1,170 lines of free
-helpers and 800 lines of types.
+**Shape.** About 3,000 lines are one `impl TallyMirrorRepository`, plus about 1,150 lines of standalone
+helpers and 660 lines of types.
 
 **Families.** Grouping the repository's methods by name gives this rough split. It is keyword-based
 and indicative only, so read the methods before drawing a boundary:
@@ -238,7 +238,7 @@ and indicative only, so read the methods before drawing a boundary:
 | Family | Lines | Methods |
 |---|---:|---:|
 | Snapshot, commit and batch | ~1,480 | 21 |
-| Write canary and fixture enrolment (ADR 0004) | ~800 | 12 |
+| Write fixture enrolment (ADR 0004) | ~180 | 3 |
 | Proofs, explorer and reconciliation | ~490 | 7 |
 | Migrations and connection pool | ~380 | 3 |
 | Company, profile and setup | ~370 | 7 |

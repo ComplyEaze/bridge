@@ -771,9 +771,6 @@ pub(super) fn build_transfer_facts(
         (&new.built, &new.source_id) > (&old.built, &old.source_id)
     };
     for members in lineages.values() {
-        if members.iter().all(|&at| batches[at].facts.is_none()) {
-            continue;
-        }
         let found = lineage_facts(&batches, members, &company)?;
         contras_not_two_leg += found.left_out;
         if found.all_verified && found.left_out == 0 {

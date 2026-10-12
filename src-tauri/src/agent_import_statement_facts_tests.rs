@@ -1795,3 +1795,221 @@ fn facts_survive_the_journal_and_change_nothing_the_other_readers_see() {
     let history = ledger::parse_snapshots(&with_text).unwrap();
     assert_eq!(history[0].batch.statement, with.line().statement);
 }
+
+// ---- further orderings and statuses ---------------------------------------------
+
+#[test]
+fn a_batch_found_posted_stays_found_when_its_record_is_appended_again() {
+    let skipped = build(170).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let posted = build(171)
+        .voucher(payment(&st(6), "500.00"))
+        .status("posted_verified");
+    let again = build(171).voucher(payment(&st(6), "500.00"));
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .batch(&again)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 1);
+    // and its status is the later record's, as `read_snapshot` takes it
+    let contra_built = build(172)
+        .voucher(contra(&st(72), N2, N1, "1.00"))
+        .facts(facts(B2).contra(&st(72), None))
+        .status("posted_verified");
+    let contra_again = build(172)
+        .voucher(contra(&st(72), N2, N1, "1.00"))
+        .facts(facts(B2).contra(&st(72), None));
+    let found = Journal::default()
+        .batch(&contra_built)
+        .batch(&contra_again)
+        .read()
+        .unwrap();
+    assert_eq!(
+        found.contras[0].status,
+        BatchStatus::NotVerified {
+            batch: BatchId::new(batch_id(172))
+        }
+    );
+}
+
+#[test]
+fn the_newest_mention_of_a_skip_in_a_lineage_gives_its_facts() {
+    let first = build(173).facts(facts(B1).skip(skip_row(&st(8), "500.00", B2, Some(REF_A))));
+    let second =
+        build(174)
+            .amends(173)
+            .facts(facts(B1).skip(skip_row(&st(8), "500.00", B2, Some(REF_B))));
+    let found = Journal::default()
+        .batch(&first)
+        .batch(&second)
+        .read()
+        .unwrap();
+    let [skip] = &found.skips[..] else {
+        panic!("one skip");
+    };
+    assert_eq!(
+        skip.reference.as_ref().map(ToString::to_string).as_deref(),
+        Some(REF_B)
+    );
+    assert_eq!(skip.lineage, LineageId::new(batch_id(173)));
+}
+
+#[test]
+fn skips_built_at_one_instant_are_ordered_by_their_record_id() {
+    let at = "2026-09-02T10:00:00Z";
+    let small = skip_record(
+        11,
+        ENDPOINT,
+        at,
+        facts(B1).skip(skip_row(&st(18), "500.00", B2, Some(REF_A))),
+    );
+    let large = skip_record(
+        12,
+        ENDPOINT,
+        at,
+        facts(B1).skip(skip_row(&st(18), "500.00", B2, Some(REF_B))),
+    );
+    for order in [
+        [small.clone(), large.clone()],
+        [large.clone(), small.clone()],
+    ] {
+        let found = Journal::default()
+            .read_with(&skip_file(&order), COMPANY)
+            .unwrap();
+        assert_eq!(
+            found.skips[0].lineage,
+            LineageId::new(large.record_id.clone())
+        );
+    }
+    // an instant is not its text: 15:30 at +05:30 is 10:00 UTC, a tie
+    let same_instant = skip_record(
+        0,
+        ENDPOINT,
+        "2026-09-02T15:30:00+05:30",
+        facts(B1).skip(skip_row(&st(18), "500.00", B2, None)),
+    );
+    let found = Journal::default()
+        .read_with(&skip_file(&[same_instant.clone(), small.clone()]), COMPANY)
+        .unwrap();
+    assert_eq!(
+        found.skips[0].lineage,
+        LineageId::new(small.record_id.clone())
+    );
+    // one minute earlier loses to the other whatever the text says
+    let earlier = skip_record(
+        99,
+        ENDPOINT,
+        "2026-09-02T15:29:00+05:30",
+        facts(B1).skip(skip_row(&st(18), "500.00", B2, None)),
+    );
+    let found = Journal::default()
+        .read_with(&skip_file(&[earlier, small.clone()]), COMPANY)
+        .unwrap();
+    assert_eq!(found.skips[0].lineage, LineageId::new(small.record_id));
+}
+
+#[test]
+fn a_skip_held_by_two_batches_names_the_latest_in_the_journal() {
+    let skipped = build(175).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
+    let early = build(176).voucher(payment(&st(6), "500.00"));
+    let late = build(177).voucher(payment(&st(6), "500.00"));
+    // 177 is written first: the latest in the journal is 176, whatever the ids
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&late)
+        .batch(&early)
+        .read()
+        .unwrap();
+    assert_eq!(
+        found.held_elsewhere,
+        vec![(key(B1, 6), BatchId::new(batch_id(176)))]
+    );
+}
+
+#[test]
+fn a_rebuild_once_found_posted_is_not_superseded_whatever_its_status_now() {
+    let rebuilt = build(178)
+        .voucher(contra(&st(7), N2, N1, "100.00"))
+        .facts(facts(B2).contra(&st(7), None));
+    let holder = build(179).voucher(contra(&st(7), N2, N1, "100.00"));
+    let found = Journal::default()
+        .batch(&rebuilt)
+        .status(&rebuilt, "posted_verified")
+        .status(&rebuilt, "verification_incomplete")
+        .batch(&holder)
+        .sent(&holder)
+        .read()
+        .unwrap();
+    assert_eq!((found.contras.len(), found.contras_superseded), (1, 0));
+}
+
+#[test]
+fn a_contra_later_given_another_type_is_left_out() {
+    let original = build(180)
+        .voucher(contra(&st(80), N2, N1, "100.00"))
+        .facts(facts(B2).contra(&st(80), None));
+    let retyped = build(181).amends(180).voucher(voucher(
+        &st(80),
+        "Payment",
+        &[(N2, "100.00", "Dr"), (N1, "100.00", "Cr")],
+        "20260901",
+    ));
+    let found = Journal::default()
+        .batch(&original)
+        .batch(&retyped)
+        .read()
+        .unwrap();
+    assert!(found.contras.is_empty());
+    assert_eq!(found.contras_not_two_leg, 1);
+}
+
+fn captured_outcome() -> bridge_tally_protocol::TallyImportOutcome {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/post-span-import-response.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    bridge_tally_protocol::parse_import_outcome(&xml).unwrap()
+}
+
+#[test]
+fn a_post_span_verdict_sets_no_status_so_a_verified_contra_stays_verified() {
+    let sent = build(182)
+        .voucher(contra(&st(82), N2, N1, "100.00"))
+        .facts(facts(B2).contra(&st(82), None));
+    let line = sent.line();
+    let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch_native(
+        &line,
+        "c".repeat(64),
+        Uuid::new_v4(),
+    ))
+    .unwrap();
+    intent["pre_post_voucher_mark"] = json!(1795);
+    let response = ledger::StatusRecord::response(
+        &line,
+        ledger::DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: 1,
+            outcome: Some(captured_outcome()),
+        },
+    );
+    let verdict = ledger::StatusRecord::post_span_verdict(
+        &line,
+        &ledger::PostSpanVerdict::Refused("span_step_not_created".into()),
+    );
+    let journal = Journal::default()
+        .batch(&sent)
+        .push(&intent)
+        .push(&response)
+        .status(&sent, "posted_verified")
+        .push(&verdict);
+    let found = journal.read().unwrap();
+    assert_eq!(found.contras[0].status, BatchStatus::PostedVerified);
+}

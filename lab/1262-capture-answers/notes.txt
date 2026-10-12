@@ -1,0 +1,5 @@
+2026-10-12T08:12:34Z NOTE: TWIN (100053) ledger keyed as 'BRIDGE SPELL PARTY' (creation screen showed capitals, shots/step2-B-ledger-creation-caps.jpg); after save, TWIN's Chart of Accounts > Ledgers lists it as 'Bridge Spell Party' (shots/step2-B-ledger-list-shows-mixed-case.jpg) with A (100052) loaded.
+2026-10-12T08:14:03Z K3 start: Tally auto-opened 'Aarav Trading Company Demo' (e) Data exceptions exist; 9001 checked
+2026-10-12T08:14:56Z K3: shut Aarav; loaded TWIN (100053) first, then SPELL LAB (100052); no Tally message
+2026-10-12T08:17:35Z K4: start auto-opened Aarav (shut); loaded SPELL LAB (100052) first, then TWIN (100053); no Tally message
+2026-10-12T08:19:20Z K5: start auto-opened Aarav (shut); loaded SPELL LAB (100052) alone; no Tally message

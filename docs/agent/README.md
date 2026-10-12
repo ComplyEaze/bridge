@@ -1977,7 +1977,9 @@ again by the next verification),
 
 A native post that sent no tag is never attributed by one: a row carrying its
 batch's tag is a hand import of the batch's file, matched by content only. The
-binding compares narration byte for byte. A narration holding the one sequence
+binding compares narration byte for byte, and so does every verification since
+#1608: a voucher whose narration differs from the one written reads
+`posted_divergent`, with `narration` in its `diffs`. A narration holding the one sequence
 the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
 and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before

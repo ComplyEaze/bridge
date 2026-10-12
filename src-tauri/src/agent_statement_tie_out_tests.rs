@@ -16,12 +16,48 @@ fn date(year: u16, month: u8, day: u8) -> Date {
 fn file() -> StatementFile {
     StatementFile {
         bank_ledger: "Synthetic Bank Ledger".into(),
-        opening: BankSide::from_printed("1000.00").unwrap(),
-        closing: BankSide::from_printed("2150.00").unwrap(),
-        window: Ok((date(2026, 8, 1), date(2026, 8, 7))),
+        window: Ok(edges(
+            (2026, 8, 1),
+            (2026, 8, 7),
+            "1000.00",
+            "2150.00",
+            false,
+        )),
         proposals_net: BankSide::from_printed("179.50").unwrap(),
         rows_without_voucher: 0,
     }
+}
+
+fn edges(
+    (year, month, day): (u16, u8, u8),
+    last: (u16, u8, u8),
+    opening: &str,
+    closing: &str,
+    from_rows: bool,
+) -> Edges {
+    Edges {
+        first: date(year, month, day),
+        last: date(last.0, last.1, last.2),
+        opening: BankSide::from_printed(opening).unwrap(),
+        closing: BankSide::from_printed(closing).unwrap(),
+        from_rows,
+    }
+}
+
+/// The gaps of a file whose window was established.
+fn gaps_of(
+    stage: Stage,
+    file: &StatementFile,
+    reads: &[LedgerRead; 3],
+    partly_posted: bool,
+) -> Result<Gaps, String> {
+    gaps(
+        stage,
+        file.window.as_ref().unwrap(),
+        file,
+        reads,
+        partly_posted,
+    )
 }
 
 fn present(opening: &str) -> LedgerRead {
@@ -73,7 +109,7 @@ fn a_debit_balance_in_tallys_sign_is_money_in_the_statements_sign() {
 
 #[test]
 fn an_opening_of_minus_1500_against_a_statement_opening_of_1000_is_a_gap_of_plus_500() {
-    let differing = gaps(Stage::AfterPost, &file(), &observed(), false).unwrap();
+    let differing = gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap();
     assert_eq!(differing.opening.amount(), Some("500.00".to_string()));
     assert_eq!(differing.opening.state(), "differs");
 }
@@ -81,7 +117,7 @@ fn an_opening_of_minus_1500_against_a_statement_opening_of_1000_is_a_gap_of_plus
 #[test]
 fn a_gap_of_exactly_zero_is_tied_whatever_its_spelling() {
     let observed = [present("-1000"), present("-2150.000"), present("-1000.00")];
-    let tied = gaps(Stage::AfterPost, &file(), &observed, false).unwrap();
+    let tied = gaps_of(Stage::AfterPost, &file(), &observed, false).unwrap();
     assert_eq!(tied.opening.state(), "tied");
     assert_eq!(tied.closing.state(), "tied");
     assert_eq!(tied.change.state(), "tied");
@@ -105,7 +141,7 @@ fn a_figure_with_more_than_two_places_keeps_every_digit() {
 
 #[test]
 fn after_post_the_closing_gap_is_the_book_against_the_statement_and_nothing_else() {
-    let after = gaps(Stage::AfterPost, &file(), &observed(), false).unwrap();
+    let after = gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap();
     // 2000.00 - 2150.00; the proposals' 179.50 is not added.
     assert_eq!(
         amounts(&after),
@@ -119,7 +155,7 @@ fn after_post_the_closing_gap_is_the_book_against_the_statement_and_nothing_else
 
 #[test]
 fn before_build_the_closing_gap_adds_what_the_file_would_add() {
-    let before = gaps(Stage::BeforeBuild, &file(), &observed(), false).unwrap();
+    let before = gaps_of(Stage::BeforeBuild, &file(), &observed(), false).unwrap();
     // 2000.00 + 179.50 - 2150.00 = 29.50; the opening gap does not move.
     assert_eq!(
         amounts(&before),
@@ -133,7 +169,7 @@ fn before_build_the_closing_gap_adds_what_the_file_would_add() {
 
 #[test]
 fn the_change_in_the_window_is_the_closing_gap_less_the_opening_gap() {
-    let after = gaps(Stage::AfterPost, &file(), &observed(), false).unwrap();
+    let after = gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap();
     let (Figure::Gap(opening), Figure::Gap(closing), Figure::Gap(change)) =
         (after.opening, after.closing, after.change)
     else {
@@ -277,7 +313,13 @@ fn a_statement_of_one_day_is_a_whole_window_and_a_reversed_one_is_refused() {
     one_day["window"] = json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-01", "whole_statement": true});
     assert_eq!(
         StatementFile::read(&one_day).unwrap().window,
-        Ok((date(2026, 8, 1), date(2026, 8, 1)))
+        Ok(edges(
+            (2026, 8, 1),
+            (2026, 8, 1),
+            "1000.00",
+            "2150.00",
+            false
+        ))
     );
     let mut reversed = document(vec![]);
     reversed["window"] = json!({"first_row_date": "2026-08-02", "last_row_date": "2026-08-01", "whole_statement": true});
@@ -351,7 +393,16 @@ fn a_file_that_cannot_be_read_fails_closed_with_a_typed_error() {
 #[test]
 fn a_whole_statement_window_is_read_as_the_first_and_last_row_dates() {
     let file = StatementFile::read(&document(vec![])).unwrap();
-    assert_eq!(file.window, Ok((date(2026, 8, 1), date(2026, 8, 7))));
+    assert_eq!(
+        file.window,
+        Ok(edges(
+            (2026, 8, 1),
+            (2026, 8, 7),
+            "1000.00",
+            "2150.00",
+            false
+        ))
+    );
 }
 
 #[test]
@@ -408,6 +459,160 @@ fn a_window_that_is_present_but_malformed_is_refused() {
     );
 }
 
+// ---- a window the parse worked out from the statement's rows -----------------
+
+/// August of a statement that runs from 15 July to 10 September, as the parse
+/// records it: the statement's balance at the start of 1 August and at the end
+/// of 31 August, which this file's vouchers (net 179.50) account for.
+fn august(opening: &str, closing: &str) -> Value {
+    json!({
+        "first_row_date": "2026-07-15",
+        "last_row_date": "2026-09-10",
+        "whole_statement": false,
+        "tie_out": {
+            "state": "established",
+            "first_date": "2026-08-01",
+            "last_date": "2026-08-31",
+            "opening_balance": opening,
+            "closing_balance": closing,
+            "basis": "statement_rows_by_transaction_date",
+        },
+    })
+}
+
+fn with_window(document: Value, window: Value) -> Value {
+    let mut document = document;
+    document["window"] = window;
+    document
+}
+
+/// A file whose vouchers net 179.50 into the bank ledger.
+fn carried() -> Value {
+    document(vec![
+        voucher(&[
+            ("Synthetic Bank Ledger", "300.00", "Dr"),
+            ("Customer", "300.00", "Cr"),
+        ]),
+        voucher(&[
+            ("Supplier", "120.50", "Dr"),
+            ("Synthetic Bank Ledger", "120.50", "Cr"),
+        ]),
+    ])
+}
+
+#[test]
+fn a_window_of_whole_months_is_read_with_the_balances_the_parse_worked_out() {
+    let file = StatementFile::read(&with_window(carried(), august("1000.00", "1179.50"))).unwrap();
+    assert_eq!(
+        file.window,
+        Ok(edges(
+            (2026, 8, 1),
+            (2026, 8, 31),
+            "1000.00",
+            "1179.50",
+            true
+        ))
+    );
+}
+
+#[test]
+fn a_window_the_parse_could_not_tie_is_not_established_with_its_reason() {
+    for (reason, expected) in [
+        (
+            "window_not_whole_calendar_months",
+            NotEstablished::WindowNotWholeCalendarMonths,
+        ),
+        (
+            "window_beyond_statement_rows",
+            NotEstablished::WindowBeyondStatementRows,
+        ),
+    ] {
+        let mut window = august("1000.00", "1179.50");
+        window["tie_out"] = json!({"state": "not_established", "reason": reason});
+        let file = StatementFile::read(&with_window(carried(), window)).unwrap();
+        assert_eq!(file.window, Err(expected));
+        assert_eq!(expected.code(), reason);
+    }
+}
+
+#[test]
+fn a_tie_out_window_that_is_half_present_or_inconsistent_is_refused() {
+    let invalid = Some("proposals_file_invalid".to_string());
+    let refused = |change: &dyn Fn(&mut Value)| {
+        let mut window = august("1000.00", "1179.50");
+        change(&mut window);
+        StatementFile::read(&with_window(carried(), window)).err()
+    };
+    type Change<'a> = &'a dyn Fn(&mut Value);
+    let cases: [(&str, Change); 13] = [
+        ("no closing", &|w| {
+            w["tie_out"]
+                .as_object_mut()
+                .unwrap()
+                .remove("closing_balance");
+        }),
+        ("a reason beside the balances", &|w| {
+            w["tie_out"]["reason"] = json!("window_beyond_statement_rows");
+        }),
+        ("another basis", &|w| {
+            w["tie_out"]["basis"] = json!("statement_rows_in_printed_order")
+        }),
+        ("a state it does not know", &|w| {
+            w["tie_out"]["state"] = json!("tied")
+        }),
+        ("null", &|w| w["tie_out"] = Value::Null),
+        ("a balance that is a number", &|w| {
+            w["tie_out"]["opening_balance"] = json!(1000)
+        }),
+        ("first after last", &|w| {
+            w["tie_out"]["first_date"] = json!("2026-09-01")
+        }),
+        ("before the first row", &|w| {
+            w["tie_out"]["first_date"] = json!("2026-07-01")
+        }),
+        ("after the last row", &|w| {
+            w["tie_out"]["last_date"] = json!("2026-09-30")
+        }),
+        ("whole, but not the row dates", &|w| {
+            w["whole_statement"] = json!(true)
+        }),
+        ("a reason it does not know", &|w| {
+            w["tie_out"] =
+                json!({"state": "not_established", "reason": "window_narrower_than_statement"});
+        }),
+        ("a reason with balances", &|w| {
+            w["tie_out"]["state"] = json!("not_established");
+        }),
+        ("not established for a whole statement", &|w| {
+            w["whole_statement"] = json!(true);
+            w["tie_out"] =
+                json!({"state": "not_established", "reason": "window_beyond_statement_rows"});
+        }),
+    ];
+    for (case, change) in cases {
+        assert_eq!(refused(change), invalid, "{case}");
+    }
+}
+
+/// When every row in the window has its voucher, the vouchers move the bank
+/// ledger by what the statement moved between the edges; a file whose edges
+/// were changed afterwards, its digest recomputed, is refused.
+#[test]
+fn edges_that_the_files_own_vouchers_do_not_account_for_are_refused() {
+    let edited = with_window(carried(), august("1000.00", "1179.51"));
+    assert_eq!(
+        StatementFile::read(&edited).err(),
+        Some("proposals_file_invalid".to_string())
+    );
+    // With a row the file carries no voucher for, the vouchers need not add up.
+    let mut open = edited;
+    open["records"] = json!([{"disposition": "needs_answer"}]);
+    assert!(StatementFile::read(&open).is_ok());
+    // An older whole-statement file is read as it always was: its balances
+    // are the ones it was parsed with.
+    assert!(StatementFile::read(&carried()).is_ok());
+}
+
 // ---- the three reads ---------------------------------------------------------
 
 #[test]
@@ -436,19 +641,19 @@ fn a_bank_ledger_in_some_reads_and_not_others_means_the_book_changed() {
     let mut changed = observed();
     changed[2] = LedgerRead::Absent;
     assert_eq!(
-        gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
+        gaps_of(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
     let mut changed = observed();
     changed[1] = LedgerRead::Absent;
     assert_eq!(
-        gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
+        gaps_of(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
     let mut changed = observed();
     changed[0] = LedgerRead::Absent;
     assert_eq!(
-        gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
+        gaps_of(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
 }
@@ -458,14 +663,14 @@ fn an_opening_that_moved_between_the_two_reads_at_the_first_date_means_the_book_
     let mut changed = observed();
     changed[2] = present("-1500.01");
     assert_eq!(
-        gaps(Stage::AfterPost, &file(), &changed, false).unwrap(),
+        gaps_of(Stage::AfterPost, &file(), &changed, false).unwrap(),
         all(NotEstablished::BookChangedDuringRead)
     );
     // The same figure spelled with another scale is not a change.
     let mut same = observed();
     same[2] = present("-1500");
     assert_eq!(
-        amounts(&gaps(Stage::AfterPost, &file(), &same, false).unwrap())[0],
+        amounts(&gaps_of(Stage::AfterPost, &file(), &same, false).unwrap())[0],
         Some("500.00".into())
     );
 }
@@ -474,7 +679,7 @@ fn an_opening_that_moved_between_the_two_reads_at_the_first_date_means_the_book_
 fn rows_without_a_voucher_or_a_partly_posted_file_leave_only_the_figures_that_count_the_file() {
     let mut without = file();
     without.rows_without_voucher = 2;
-    let before = gaps(Stage::BeforeBuild, &without, &observed(), false).unwrap();
+    let before = gaps_of(Stage::BeforeBuild, &without, &observed(), false).unwrap();
     assert_eq!(before.opening.amount(), Some("500.00".to_string()));
     assert_eq!(
         before.closing,
@@ -485,7 +690,7 @@ fn rows_without_a_voucher_or_a_partly_posted_file_leave_only_the_figures_that_co
         Figure::NotEstablished(NotEstablished::RowsWithoutVoucher)
     );
     // The same file, after a post: the book as it stands is all that counts.
-    let after = gaps(Stage::AfterPost, &without, &observed(), false).unwrap();
+    let after = gaps_of(Stage::AfterPost, &without, &observed(), false).unwrap();
     assert_eq!(
         amounts(&after),
         [
@@ -495,7 +700,7 @@ fn rows_without_a_voucher_or_a_partly_posted_file_leave_only_the_figures_that_co
         ]
     );
 
-    let posted = gaps(Stage::BeforeBuild, &file(), &observed(), true).unwrap();
+    let posted = gaps_of(Stage::BeforeBuild, &file(), &observed(), true).unwrap();
     assert_eq!(posted.opening.amount(), Some("500.00".to_string()));
     assert_eq!(
         posted.closing,
@@ -503,12 +708,12 @@ fn rows_without_a_voucher_or_a_partly_posted_file_leave_only_the_figures_that_co
     );
     assert_eq!(posted.closing, posted.change);
     // Rows without a voucher are said first when both hold.
-    let both = gaps(Stage::BeforeBuild, &without, &observed(), true).unwrap();
+    let both = gaps_of(Stage::BeforeBuild, &without, &observed(), true).unwrap();
     assert_eq!(
         both.closing,
         Figure::NotEstablished(NotEstablished::RowsWithoutVoucher)
     );
-    let after = gaps(Stage::AfterPost, &file(), &observed(), true).unwrap();
+    let after = gaps_of(Stage::AfterPost, &file(), &observed(), true).unwrap();
     assert_eq!(after.closing.amount(), Some("-150.00".to_string()));
 }
 
@@ -564,7 +769,7 @@ fn window() -> Option<(Date, Date)> {
 
 #[test]
 fn the_fixed_sentences_are_exactly_these() {
-    let differing = gaps(Stage::AfterPost, &file(), &observed(), false).unwrap();
+    let differing = gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap();
     let text = reading(Stage::AfterPost, window(), &differing);
     assert_eq!(text["possible_causes"], CAUSES);
     assert_eq!(text["scope"], SCOPE);
@@ -581,7 +786,7 @@ fn the_fixed_sentences_are_exactly_these() {
 
 #[test]
 fn the_headline_names_every_gap_that_is_not_zero_with_its_sign() {
-    let differing = gaps(Stage::AfterPost, &file(), &observed(), false).unwrap();
+    let differing = gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap();
     let text = reading(Stage::AfterPost, window(), &differing);
     assert_eq!(
         text["headline"],
@@ -597,7 +802,7 @@ fn the_headline_leaves_out_a_figure_that_is_zero_and_says_so_when_all_are() {
         present("-2000.00"),
         present("-1000.00"),
     ];
-    let one = gaps(Stage::AfterPost, &file(), &observed, false).unwrap();
+    let one = gaps_of(Stage::AfterPost, &file(), &observed, false).unwrap();
     let text = reading(Stage::AfterPost, window(), &one);
     assert_eq!(
         text["headline"],
@@ -608,7 +813,7 @@ fn the_headline_leaves_out_a_figure_that_is_zero_and_says_so_when_all_are() {
         present("-2150.00"),
         present("-1000.00"),
     ];
-    let none = gaps(Stage::AfterPost, &file(), &tied, false).unwrap();
+    let none = gaps_of(Stage::AfterPost, &file(), &tied, false).unwrap();
     let text = reading(Stage::AfterPost, window(), &none);
     assert_eq!(
         text["headline"],
@@ -643,7 +848,7 @@ fn the_headline_lists_one_missing_figure_without_an_and() {
 fn the_headline_names_what_is_not_established_before_any_gap_that_differs() {
     let mut without = file();
     without.rows_without_voucher = 3;
-    let mixed = gaps(Stage::BeforeBuild, &without, &observed(), false).unwrap();
+    let mixed = gaps_of(Stage::BeforeBuild, &without, &observed(), false).unwrap();
     let text = reading(Stage::BeforeBuild, window(), &mixed);
     assert_eq!(
         text["headline"],
@@ -673,7 +878,7 @@ fn the_change_sentence_says_further_up_or_further_down_whichever_way_the_money_m
         let text = reading(
             Stage::AfterPost,
             window(),
-            &gaps(Stage::AfterPost, file, reads, false).unwrap(),
+            &gaps_of(Stage::AfterPost, file, reads, false).unwrap(),
         );
         text["headline"].as_str().unwrap().to_string()
     };
@@ -690,7 +895,7 @@ fn the_change_sentence_says_further_up_or_further_down_whichever_way_the_money_m
     // The book fell less, so it moved 100.00 further up, though its closing gap
     // (-200.00) is below zero.
     let mut out = file();
-    out.closing = BankSide::from_printed("800.00").unwrap();
+    out.window.as_mut().unwrap().closing = BankSide::from_printed("800.00").unwrap();
     out.proposals_net = BankSide::from_printed("0").unwrap();
     let fell = [present("-700.00"), present("-600.00"), present("-700.00")];
     let text = sentence(&out, &fell);
@@ -707,7 +912,7 @@ fn the_change_sentence_says_further_up_or_further_down_whichever_way_the_money_m
 #[test]
 fn the_text_never_says_what_it_must_not() {
     let figures = [
-        gaps(Stage::AfterPost, &file(), &observed(), false).unwrap(),
+        gaps_of(Stage::AfterPost, &file(), &observed(), false).unwrap(),
         all(NotEstablished::WindowNotRecorded),
         all(NotEstablished::WindowNarrowerThanStatement),
         all(NotEstablished::WindowPrecedesBooksFrom),
@@ -730,12 +935,12 @@ fn the_text_never_says_what_it_must_not() {
 
 #[test]
 fn the_result_carries_the_stage_the_dates_and_three_figures_and_no_balance() {
-    let differing = gaps(Stage::BeforeBuild, &file(), &observed(), false).unwrap();
+    let differing = gaps_of(Stage::BeforeBuild, &file(), &observed(), false).unwrap();
     let result = result_json(Stage::BeforeBuild, window(), 0, &differing);
     assert_eq!(result["stage"], "before_build");
     assert_eq!(
         result["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-07"})
+        json!({"first_date": "2026-08-01", "last_date": "2026-08-07"})
     );
     assert_eq!(
         result["opening_gap"],
@@ -1105,13 +1310,73 @@ async fn a_book_that_differs_gives_the_gaps_with_their_sign_and_reads_the_three_
     let result = &response["structuredContent"]["result"];
     assert_eq!(
         result["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-07"})
+        json!({"first_date": "2026-08-01", "last_date": "2026-08-07"})
     );
     assert_eq!(result["stage"], "after_post");
     // The company the answer is about is named beside it.
     assert_eq!(
         response["structuredContent"]["company"]["guid"],
         COMPANY_GUID
+    );
+}
+
+/// A month of a longer statement: the book is read at the month's own edges
+/// and compared with the statement's balance there, not with the balances of
+/// the whole statement.
+#[tokio::test]
+async fn a_month_of_a_longer_statement_is_read_and_compared_at_the_months_edges() {
+    let (response, requests) = reads_of(
+        &with_window(proposals(BANK, None), august("1000.00", "1179.50")),
+        book("-1000.00", "-1179.50", "-1000.00"),
+        "after_post",
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    assert_eq!(
+        figures(&response),
+        [
+            amount("tied", "0.00"),
+            amount("tied", "0.00"),
+            amount("tied", "0.00")
+        ]
+    );
+    assert_eq!(
+        ledger_read_dates(&requests),
+        ["20260801", "20260901", "20260801"]
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["window"],
+        json!({"first_date": "2026-08-01", "last_date": "2026-08-31"})
+    );
+    // Before the build, the book before the file plus the file's vouchers.
+    let (response, _) = reads_of(
+        &with_window(proposals(BANK, None), august("1000.00", "1179.50")),
+        book("-1000.00", "-1000.00", "-1000.00"),
+        "before_build",
+    )
+    .await;
+    assert_eq!(
+        figures(&response),
+        [
+            amount("tied", "0.00"),
+            amount("tied", "0.00"),
+            amount("tied", "0.00")
+        ]
+    );
+    // A book that is 25.00 short at the month's end.
+    let (response, _) = reads_of(
+        &with_window(proposals(BANK, None), august("1000.00", "1179.50")),
+        book("-1000.00", "-1154.50", "-1000.00"),
+        "after_post",
+    )
+    .await;
+    assert_eq!(
+        figures(&response),
+        [
+            amount("tied", "0.00"),
+            amount("differs", "-25.00"),
+            amount("differs", "-25.00")
+        ]
     );
 }
 
@@ -1342,6 +1607,20 @@ async fn a_file_without_a_whole_window_is_answered_from_the_file_after_the_compa
                 json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-07", "whole_statement": false}),
             ),
             "window_narrower_than_statement",
+        ),
+        (
+            Some(
+                json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-07", "whole_statement": false,
+                "tie_out": {"state": "not_established", "reason": "window_not_whole_calendar_months"}}),
+            ),
+            "window_not_whole_calendar_months",
+        ),
+        (
+            Some(
+                json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-07", "whole_statement": false,
+                "tie_out": {"state": "not_established", "reason": "window_beyond_statement_rows"}}),
+            ),
+            "window_beyond_statement_rows",
         ),
     ] {
         let simulator = SequenceSimulator::spawn(company_check()).unwrap();
@@ -1577,7 +1856,7 @@ async fn a_file_the_parse_writes_is_read_by_the_tie_out() {
     );
     assert_eq!(
         after["structuredContent"]["result"]["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09"})
+        json!({"first_date": "2026-08-01", "last_date": "2026-08-09"})
     );
     assert_eq!(
         ledger_read_dates(&requests),

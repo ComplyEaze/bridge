@@ -1766,9 +1766,22 @@ fn persisted_document(request: &OwnedRequest, parsed: &ParsedStatement) -> Value
 fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it() {
     let (request, parsed) = windowed_parse("Synthetic Bank Ledger", None, None);
     let document = persisted_document(&request, &parsed);
+    // The whole statement ties at its own row dates and the balances supplied.
     assert_eq!(
         document["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09", "whole_statement": true}),
+        json!({
+            "first_row_date": "2026-08-01",
+            "last_row_date": "2026-08-09",
+            "whole_statement": true,
+            "tie_out": {
+                "state": "established",
+                "first_date": "2026-08-01",
+                "last_date": "2026-08-09",
+                "opening_balance": "1000.00",
+                "closing_balance": "970.00",
+                "basis": "statement_rows_by_transaction_date",
+            },
+        }),
     );
     assert_eq!(
         document["schema"], PROPOSALS_SCHEMA,
@@ -1776,12 +1789,18 @@ fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it
     );
 
     // A window that drops a row: the span is still the statement's own, and
-    // the window is no longer the whole of it.
+    // the window is no longer the whole of it. It is not a whole calendar
+    // month, so no balance at its edges is written.
     let (request, parsed) = windowed_parse("Synthetic Bank Ledger", Date::new(2026, 8, 2), None);
     let document = persisted_document(&request, &parsed);
     assert_eq!(
         document["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09", "whole_statement": false}),
+        json!({
+            "first_row_date": "2026-08-01",
+            "last_row_date": "2026-08-09",
+            "whole_statement": false,
+            "tie_out": {"state": "not_established", "reason": "window_not_whole_calendar_months"},
+        }),
     );
 }
 

@@ -3,11 +3,11 @@
 //! dates? Read-only: it writes nothing to Tally and never posts. Its journal
 //! check takes the shared import-admission lock for a moment, so a build or post
 //! at the same time can be refused as lock-busy, and it can be refused by theirs;
-//! nothing waits, so nothing deadlocks. Whole statements only. See
-//! `docs/agent/README.md` ("Statement tie-out").
+//! nothing waits, so nothing deadlocks. A whole statement, or a window of
+//! whole calendar months. See `docs/agent/README.md` ("Statement tie-out").
 use super::*;
 use bridge_bank_statement::date::Date;
-use bridge_bank_statement::proposals::format_amount;
+use bridge_bank_statement::proposals::{format_amount, TieOutWindowRefusal};
 use bridge_tally_core::{ExactDecimal, TallyDate};
 
 /// Whether this file's own vouchers are counted into the closing figure.
@@ -25,7 +25,11 @@ enum Stage {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NotEstablished {
     WindowNotRecorded,
+    /// A narrowed file from a binary that did not record the window's own
+    /// balances.
     WindowNarrowerThanStatement,
+    WindowNotWholeCalendarMonths,
+    WindowBeyondStatementRows,
     WindowPrecedesBooksFrom,
     BankLedgerNotInBook,
     BookChangedDuringRead,
@@ -42,6 +46,10 @@ impl NotEstablished {
         match self {
             Self::WindowNotRecorded => "window_not_recorded",
             Self::WindowNarrowerThanStatement => "window_narrower_than_statement",
+            Self::WindowNotWholeCalendarMonths => {
+                TieOutWindowRefusal::NotWholeCalendarMonths.code()
+            }
+            Self::WindowBeyondStatementRows => TieOutWindowRefusal::BeyondStatementRows.code(),
             Self::WindowPrecedesBooksFrom => "window_precedes_books_from",
             Self::BankLedgerNotInBook => "bank_ledger_not_in_book",
             Self::BookChangedDuringRead => "book_changed_during_read",
@@ -53,7 +61,9 @@ impl NotEstablished {
     fn explanation(self) -> &'static str {
         match self {
             Self::WindowNotRecorded => "this proposals file was written before it recorded the statement's dates; parse the statement again",
-            Self::WindowNarrowerThanStatement => "this file was parsed with a from or to date that leaves out part of the statement, and this check ties whole statements only; parse the statement again without them",
+            Self::WindowNarrowerThanStatement => "this file leaves out part of the statement and was written before parse_bank_statement recorded a window's own balances; parse the statement again",
+            Self::WindowNotWholeCalendarMonths => "this file was parsed with a from or to date that leaves out part of the statement and is not a whole calendar month (from the 1st to a month's last day), and only whole months are compared; parse the statement again with whole months, or without from and to",
+            Self::WindowBeyondStatementRows => "the from or to date lies before the statement's first row or after its last, so the statement does not show its balance on that day; parse the statement again with months inside its own dates",
             Self::WindowPrecedesBooksFrom => "the statement starts before the company's books begin",
             Self::BankLedgerNotInBook => "the file's bank ledger is not in the book under that exact name",
             Self::BookChangedDuringRead => "the bank ledger changed while it was being read; read again",
@@ -174,15 +184,24 @@ fn all_not_established(reason: NotEstablished) -> Gaps {
     }
 }
 
+/// The dates a tie-out compares, and the statement's balance at the start of
+/// the first and at the end of the last.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Edges {
+    first: Date,
+    last: Date,
+    opening: BankSide,
+    closing: BankSide,
+    /// Worked out by the parse from the statement's rows (any file it writes
+    /// now), not taken from the balances an older file was parsed with.
+    from_rows: bool,
+}
+
 /// What the file says about the statement, read once.
 #[derive(Debug)]
 struct StatementFile {
     bank_ledger: String,
-    opening: BankSide,
-    closing: BankSide,
-    /// The statement's own first and last row dates, when the file recorded
-    /// that its window was the whole statement.
-    window: Result<(Date, Date), NotEstablished>,
+    window: Result<Edges, NotEstablished>,
     /// What this file's vouchers add to the bank ledger.
     proposals_net: BankSide,
     /// Rows of the statement with no voucher in the file: a cash line not yet
@@ -210,10 +229,20 @@ impl StatementFile {
             .iter()
             .filter(|record| record["disposition"].get("voucher").is_none())
             .count();
+        let window = recorded_window(document)?;
+        // When every row in the window has its voucher, the vouchers move the
+        // bank ledger by exactly what the statement moved between the edges;
+        // anything else is a file changed since the parse.
+        if let Ok(edges) = &window {
+            if edges.from_rows
+                && rows_without_voucher == 0
+                && edges.closing.minus(&edges.opening)? != proposals_net
+            {
+                return Err(invalid());
+            }
+        }
         Ok(Self {
-            opening: BankSide::from_printed(text(&document["controls"]["opening_balance"])?)?,
-            closing: BankSide::from_printed(text(&document["controls"]["closing_balance"])?)?,
-            window: recorded_window(document)?,
+            window,
             bank_ledger,
             proposals_net,
             rows_without_voucher,
@@ -221,35 +250,91 @@ impl StatementFile {
     }
 }
 
-/// The window the parse recorded, when it recorded the whole statement. A file
-/// that records none, or a narrower one, is a typed result; one whose window is
-/// malformed is refused.
-fn recorded_window(document: &Value) -> Result<Result<(Date, Date), NotEstablished>, String> {
+/// Where the parse said the file may be compared with the book. A file that
+/// records no window, or a window that cannot be compared, is a typed result;
+/// one whose window is malformed, or half present, is refused.
+fn recorded_window(document: &Value) -> Result<Result<Edges, NotEstablished>, String> {
     let invalid = || "proposals_file_invalid".to_string();
     let Some(window) = document.get("window") else {
         return Ok(Err(NotEstablished::WindowNotRecorded));
     };
     let window = window.as_object().ok_or_else(invalid)?;
-    let day = |key: &str| {
-        window
-            .get(key)
+    let day = |value: Option<&Value>| {
+        value
             .and_then(Value::as_str)
             .and_then(Date::parse_iso)
             .ok_or_else(invalid)
     };
-    let (first, last) = (day("first_row_date")?, day("last_row_date")?);
+    let balance = |value: Option<&Value>| {
+        BankSide::from_printed(value.and_then(Value::as_str).ok_or_else(invalid)?)
+    };
+    let (first_row, last_row) = (
+        day(window.get("first_row_date"))?,
+        day(window.get("last_row_date"))?,
+    );
     let whole = window
         .get("whole_statement")
         .and_then(Value::as_bool)
         .ok_or_else(invalid)?;
-    if first > last {
+    if first_row > last_row {
         return Err(invalid());
     }
-    Ok(if whole {
-        Ok((first, last))
-    } else {
-        Err(NotEstablished::WindowNarrowerThanStatement)
-    })
+    let Some(tie_out) = window.get("tie_out") else {
+        // An older file: the whole statement ties at the balances it was
+        // parsed with; a narrower window recorded no balances to tie.
+        return Ok(if whole {
+            Ok(Edges {
+                first: first_row,
+                last: last_row,
+                opening: balance(document["controls"].get("opening_balance"))?,
+                closing: balance(document["controls"].get("closing_balance"))?,
+                from_rows: false,
+            })
+        } else {
+            Err(NotEstablished::WindowNarrowerThanStatement)
+        });
+    };
+    let tie_out = tie_out.as_object().ok_or_else(invalid)?;
+    match tie_out.get("state").and_then(Value::as_str) {
+        Some("established")
+            if tie_out.len() == 6
+                && tie_out.get("basis").and_then(Value::as_str)
+                    == Some(bank_statement::TIE_OUT_BASIS) =>
+        {
+            let (first, last) = (
+                day(tie_out.get("first_date"))?,
+                day(tie_out.get("last_date"))?,
+            );
+            // Inside the statement's own rows, and the rows' own dates when
+            // the window is the whole statement.
+            if first > last
+                || first < first_row
+                || last > last_row
+                || (whole && (first, last) != (first_row, last_row))
+            {
+                return Err(invalid());
+            }
+            Ok(Ok(Edges {
+                first,
+                last,
+                opening: balance(tie_out.get("opening_balance"))?,
+                closing: balance(tie_out.get("closing_balance"))?,
+                from_rows: true,
+            }))
+        }
+        Some("not_established") if tie_out.len() == 2 && !whole => {
+            let reason = tie_out.get("reason").and_then(Value::as_str);
+            [
+                NotEstablished::WindowNotWholeCalendarMonths,
+                NotEstablished::WindowBeyondStatementRows,
+            ]
+            .into_iter()
+            .find(|known| Some(known.code()) == reason)
+            .map(Err)
+            .ok_or_else(invalid)
+        }
+        _ => Err(invalid()),
+    }
 }
 
 /// What the file's vouchers add to the bank ledger: a debit to it is money in,
@@ -327,6 +412,7 @@ fn read_dates(first: Date, last: Date) -> Result<[TallyDate; 3], String> {
 /// journal already holds a row of this file.
 fn gaps(
     stage: Stage,
+    edges: &Edges,
     file: &StatementFile,
     reads: &[LedgerRead; 3],
     partly_posted: bool,
@@ -344,7 +430,7 @@ fn gaps(
         // reads at the first date.
         _ => return Ok(all_not_established(NotEstablished::BookChangedDuringRead)),
     };
-    let opening = start.minus(&file.opening)?;
+    let opening = start.minus(&edges.opening)?;
     // The file's own vouchers are counted into the closing figure only when
     // the file says what the book would hold, and only once.
     let blocked = match stage {
@@ -365,7 +451,7 @@ fn gaps(
                 Stage::AfterPost => end.clone(),
                 Stage::BeforeBuild => end.plus(&file.proposals_net)?,
             };
-            let closing = book.minus(&file.closing)?;
+            let closing = book.minus(&edges.closing)?;
             let change = closing.minus(&opening)?;
             (Figure::Gap(closing), Figure::Gap(change))
         }
@@ -476,8 +562,8 @@ fn result_json(
     json!({
         "stage": stage,
         "window": window.map(|(first, last)| json!({
-            "first_row_date": first.iso(),
-            "last_row_date": last.iso(),
+            "first_date": first.iso(),
+            "last_date": last.iso(),
         })),
         "gap_basis": "book_minus_statement_in_the_statements_sign",
         "rows_without_voucher": rows_without_voucher,
@@ -502,10 +588,11 @@ impl Server {
         let file = StatementFile::read(&document)?;
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
-            let (window, gaps) = match file.window {
+            let (window, gaps) = match &file.window {
                 // The file alone answers: nothing is read to compare against.
-                Err(reason) => (None, all_not_established(reason)),
-                Ok((first, last)) => {
+                Err(reason) => (None, all_not_established(*reason)),
+                Ok(edges) => {
+                    let (first, last) = (edges.first, edges.last);
                     let books_from = normalized_date(
                         company
                             .books_from
@@ -529,7 +616,7 @@ impl Server {
                             evidence = combine_evidence(evidence.clone(), ledger_evidence);
                             *read = LedgerRead::of(&ledgers, &file.bank_ledger)?;
                         }
-                        gaps(stage, &file, &reads, partly_posted)?
+                        gaps(stage, edges, &file, &reads, partly_posted)?
                     };
                     (Some((first, last)), gaps)
                 }

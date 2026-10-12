@@ -127,6 +127,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
+  - A bank-statement check over whole calendar months (`statement_tie_out`, in
+    source and not yet in a published build) can show, with the book's figures,
+    the statement's balance at the month ends and its net over those months (not
+    any one row's amount), under every setting.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and

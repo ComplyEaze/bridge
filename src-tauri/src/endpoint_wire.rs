@@ -1,9 +1,12 @@
 //! The per-port wire lock (#697 PR A, option (1)).
 //!
 //! `<key>.wire.lock` lives beside each port's dispatch lease
-//! ([`crate::endpoint_coordination::lease_path`]), under the same shared
-//! per-user coordination root, so the desktop app and `bridge_mcp` see the same
-//! one. It is taken exclusively, with a try-lock, around each single HTTP send
+//! ([`crate::endpoint_coordination::lease_path`]), under each of the same
+//! shared per-user coordination roots, so the desktop app and `bridge_mcp` see
+//! the same one; one file per root, taken all or none (#1584). Every file is
+//! opened before any is locked, and a busy one releases those already taken,
+//! so the holder still never waits holding it. It is taken exclusively, with a
+//! try-lock, around each single HTTP send
 //! to that port, and released when the response has been read to its end or
 //! the send fails. It is a different file from the lease, so a send made under
 //! a held lease never conflicts with that lease; the lease (if any) is always
@@ -26,23 +29,22 @@
 //!   import POST is one try after its checks, so this can refuse a post whose
 //!   approval then lapses and is asked for again (#869).
 use crate::endpoint_coordination::lease_path;
-use crate::local_files::file::open_local_file;
+use crate::local_files::lock_set::{try_lock_all, HeldLocks, LockMode, LockSetError};
 #[cfg(not(test))]
-use crate::local_files::paths::default_dispatch_coordination_dir;
+use crate::local_files::paths::dispatch_coordination_roots;
 use bridge_tally_transport::{
     TallyEndpointConfig, TallyWireGate, WireLockHeld, WirePause, WireRefusal, WireRetryPolicy,
 };
-use std::fs::{File, TryLockError};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Where the wire locks live: the shared per-user coordination root in a
+/// Where the wire locks live: the shared per-user coordination roots in a
 /// build, a directory of its own for each runtime in unit tests, so a lock one
 /// test holds on a port can never refuse another test given the same port.
 #[derive(Clone)]
 pub(crate) struct WireRoot {
-    path: Option<PathBuf>,
+    paths: Option<Vec<PathBuf>>,
     #[cfg(test)]
     _isolated: Option<Arc<tempfile::TempDir>>,
 }
@@ -51,7 +53,7 @@ impl WireRoot {
     #[cfg(not(test))]
     fn shared() -> Self {
         Self {
-            path: default_dispatch_coordination_dir(),
+            paths: dispatch_coordination_roots(),
         }
     }
 
@@ -59,12 +61,12 @@ impl WireRoot {
     pub(crate) fn isolated() -> Self {
         match tempfile::tempdir() {
             Ok(directory) => Self {
-                path: Some(directory.path().to_path_buf()),
+                paths: Some(vec![directory.path().to_path_buf()]),
                 _isolated: Some(Arc::new(directory)),
             },
             // No root fails closed: every send is refused as unavailable.
             Err(_) => Self {
-                path: None,
+                paths: None,
                 _isolated: None,
             },
         }
@@ -73,7 +75,7 @@ impl WireRoot {
     #[cfg(test)]
     pub(crate) fn at(path: PathBuf) -> Self {
         Self {
-            path: Some(path),
+            paths: Some(vec![path]),
             _isolated: None,
         }
     }
@@ -179,12 +181,20 @@ impl WireGateConfig {
     }
 }
 
-/// The wire lock's path: same root, same key, same directory as the dispatch
-/// lease.
-fn lock_path(root: &WireRoot, endpoint: &TallyEndpointConfig) -> Result<PathBuf, WireRefusal> {
-    let root = root.path.as_deref().ok_or(WireRefusal::Unavailable)?;
-    let lease = lease_path(root, endpoint).map_err(|_| WireRefusal::Unavailable)?;
-    Ok(lease.with_extension("wire.lock"))
+/// The wire lock's paths: same roots, same key, same directory as the
+/// dispatch lease.
+fn lock_paths(
+    root: &WireRoot,
+    endpoint: &TallyEndpointConfig,
+) -> Result<Vec<PathBuf>, WireRefusal> {
+    let roots = root.paths.as_deref().ok_or(WireRefusal::Unavailable)?;
+    roots
+        .iter()
+        .map(|root| {
+            let lease = lease_path(root, endpoint).map_err(|_| WireRefusal::Unavailable)?;
+            Ok(lease.with_extension("wire.lock"))
+        })
+        .collect()
 }
 
 /// The file-lock gate the application injects into every Tally transport.
@@ -199,9 +209,9 @@ impl FileWireGate {
     }
 }
 
-/// Dropping the file releases the lock.
+/// Dropping it releases every lock of the set.
 struct HeldWireLock {
-    _file: File,
+    _locks: HeldLocks,
 }
 
 impl WireLockHeld for HeldWireLock {}
@@ -209,12 +219,11 @@ impl WireLockHeld for HeldWireLock {}
 impl TallyWireGate for FileWireGate {
     /// Try once, never waiting, to take the wire lock.
     fn try_acquire(&self) -> Result<Box<dyn WireLockHeld>, WireRefusal> {
-        let path = lock_path(&self.root, &self.endpoint)?;
-        let file = open_local_file(&path, true).map_err(|_| WireRefusal::Unavailable)?;
-        match file.try_lock() {
-            Ok(()) => Ok(Box::new(HeldWireLock { _file: file })),
-            Err(TryLockError::WouldBlock) => Err(WireRefusal::Busy),
-            Err(TryLockError::Error(_)) => Err(WireRefusal::Unavailable),
+        let paths = lock_paths(&self.root, &self.endpoint)?;
+        match try_lock_all(&paths, LockMode::Exclusive) {
+            Ok(locks) => Ok(Box::new(HeldWireLock { _locks: locks })),
+            Err(LockSetError::Busy) => Err(WireRefusal::Busy),
+            Err(LockSetError::Unavailable) => Err(WireRefusal::Unavailable),
         }
     }
 
@@ -235,7 +244,9 @@ pub(crate) fn wire_refusal(error: &anyhow::Error) -> Option<WireRefusal> {
 
 #[cfg(test)]
 pub(crate) fn wire_lock_path(root: &WireRoot, endpoint: &TallyEndpointConfig) -> PathBuf {
-    lock_path(root, endpoint).expect("test wire root resolves")
+    lock_paths(root, endpoint)
+        .expect("test wire root resolves")
+        .swap_remove(0)
 }
 
 #[cfg(test)]

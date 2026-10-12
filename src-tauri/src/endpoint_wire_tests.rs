@@ -6,8 +6,10 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use crate::local_files::file::open_local_file;
 use bridge_tally_transport::{TallyHttpTransport, TallyTransportError};
 use std::fs;
+use std::fs::File;
 use std::path::Path;
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -111,7 +113,7 @@ fn the_wire_lock_and_the_dispatch_lease_are_separate_files() {
 fn an_unusable_root_fails_closed() {
     let gate = FileWireGate::new(
         WireRoot {
-            path: None,
+            paths: None,
             _isolated: None,
         },
         endpoint("127.0.0.1", 9001),

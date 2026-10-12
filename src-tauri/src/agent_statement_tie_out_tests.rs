@@ -953,6 +953,17 @@ fn proposals(bank_ledger: &str, window: Option<Value>) -> Value {
     document
 }
 
+/// A statement file's vouchers as the import journal holds them once built:
+/// the same vouchers, each date in Tally's YYYYMMDD form, as a build writes it.
+fn journal_vouchers(vouchers: &Value) -> Value {
+    let mut vouchers = vouchers.clone();
+    for voucher in vouchers.as_array_mut().unwrap() {
+        let date = voucher["date"].as_str().unwrap().replace('-', "");
+        voucher["date"] = json!(date);
+    }
+    vouchers
+}
+
 fn whole(first: &str, last: &str) -> Value {
     json!({"first_row_date": first, "last_row_date": last, "whole_statement": true})
 }
@@ -1484,7 +1495,7 @@ async fn a_file_a_batch_has_already_posted_is_not_projected_again() {
                         "sha256": "a".repeat(64), "built_at": "2026-09-16T00:00:00Z",
                         "status": "posted_verified",
                         "pre_import_mark": {"kind": "company_high_water", "value": 1, "master_value": 1},
-                        "vouchers": document["vouchers"],
+                        "vouchers": journal_vouchers(&document["vouchers"]),
                     }))
                     .unwrap();
             }

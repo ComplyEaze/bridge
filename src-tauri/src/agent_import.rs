@@ -2396,8 +2396,18 @@ impl Server {
         company_guid: &str,
         vouchers: &Value,
     ) -> Result<bool, String> {
-        let vouchers: Vec<ImportVoucher> = serde_json::from_value(vouchers.clone())
+        // A statement file's vouchers carry the caller's date text, as a build
+        // receives them; each is parsed the way a build parses it.
+        let vouchers: Vec<ImportVoucher<String>> = serde_json::from_value(vouchers.clone())
             .map_err(|_| "proposals_file_invalid".to_string())?;
+        let vouchers = vouchers
+            .into_iter()
+            .map(|voucher| {
+                let date = normalized_date(&voucher.date)
+                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                Ok(voucher.dated(date))
+            })
+            .collect::<Result<Vec<ImportVoucher>, String>>()?;
         let _admission_lock = self.lock_import_admission_shared()?;
         Ok(self
             .import_vouchers_already_posted_while_admitted(

@@ -97,21 +97,15 @@ pending consented synthetic live qualification.
    report-profile validation, documented cross-request atomicity, and the
    remaining applicability/header-total gates are still required before
    `Verified`.
-7. JSONEX now has a portable, exact-scope semantic qualification contract and
-   a separately feature-gated parser for the documented TallyPrime 7.0+ Ledger
-   and Voucher collection-envelope shapes. A second disabled feature builds
-   deterministic bytes for only the exact documented Ledger and unbounded
-   `TSPLVoucherColl` example requests; every result is explicitly ineligible
-   for dispatch. Parser outputs remain unbound because the documented responses
-   do not prove company, query, range, completeness, or Core-schema identity.
-   XML remains the sole runtime transport; no JSONEX HTTP dispatch, canonical
-   adapter, runtime selection, mirror, checkpoint, proof, or write path exists.
-   Matching bracketed samples remain
-   shadow evidence, mismatches return an unenforced scope-local quarantine
-   recommendation, and XML bracket mismatch or missing completeness/provenance
-   evidence is inconclusive. Runtime enablement remains gated on exact
-   TallyPrime 7.0+ release/mode, Education-profile, encoding, nested-shape,
-   range-filter, repeated parity, and measured operational-benefit evidence.
+7. JSONEX has no implementation in the repository. The portable parser, the
+   request builder and the semantic-shadowing comparator built for it were
+   deleted on 2026-10-12 in [#1574](https://github.com/ComplyEaze/bridge/pull/1574): they were exercised only against synthetic
+   fixtures and no shipped build used them. XML remains the sole runtime transport; no
+   JSONEX HTTP dispatch, canonical adapter, runtime selection, mirror,
+   checkpoint, proof, or write path exists. A JSONEX path needs a new design,
+   gated on exact TallyPrime 7.0+ release/mode, Education-profile, encoding,
+   nested-shape, range-filter, repeated parity, and measured
+   operational-benefit evidence, each observed live.
 8. Keep controlled writes disabled. The portable ledger-only qualification
    contract now derives exact preflight/import/readback evidence and legacy
    caller-attested durable rows cannot be promoted. Runtime dispatch remains
@@ -205,6 +199,10 @@ item 5 to defer destination activation. It establishes no runtime, support, or
 qualification claim and sets no activation schedule. The summary below is
 non-exhaustive; the linked plans and ADR remain the authoritative gates.
 
+**2026-10-12 amendment.** `transport_qualification`, the second of these
+foundations, was deleted rather than retained ([#1574](https://github.com/ComplyEaze/bridge/pull/1574)), together with the JSONEX parser
+and request builder it was built beside. Two foundations remain below.
+
 - `bills_reconciliation` retains the item 15 fail-closed, exact-arithmetic
   Bills & Payments foundation governed by [ADR 0013](./adr/0013-tally-party-outstanding-confidence-authority.md)
   and the [PR16 boundary](./tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md#implemented-pr16-boundary--party-outstanding-confidence-receipt-v1).
@@ -212,12 +210,6 @@ non-exhaustive; the linked plans and ADR remain the authoritative gates.
   parser-to-canonical adapter, a separately reviewed live-qualified typed
   authority constructor, and Bills-qualified checkpoint/proof authority; a
   receipt or display wiring alone cannot promote the pack.
-- `transport_qualification` retains item 7's JSONEX semantic-shadowing
-  foundation. [PR10's full activation policy](./tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md#pr-10--jsonex-negotiated-path-with-semantic-shadowing)
-  remains controlling. In particular, any runtime promotion needs live
-  Capability Passport evidence bound to the exact endpoint, company identity,
-  and request/query profile, followed by separately reviewed promotion;
-  synthetic or caller-supplied parity remains shadowing.
 - `destination` retains a versioned destination-contract boundary for an open
   product decision. It does not commit Bridge to Tally-to-AXAL delivery or imply
   that an endpoint exists. Retention can be revisited if a product decision and

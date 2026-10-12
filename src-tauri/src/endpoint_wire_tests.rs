@@ -209,22 +209,23 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
         busy_at: None,
     });
     let _other = gate(&root, &endpoint).try_acquire().unwrap();
-    let busy = |result: anyhow::Result<crate::tally::ConnectionStatus>| {
-        wire_refusal(&result.expect_err("the wire lock is held")) == Some(WireRefusal::Busy)
-    };
+    fn busy<T>(result: anyhow::Result<T>) -> bool {
+        let error = result.err().expect("the wire lock is held");
+        wire_refusal(&error) == Some(WireRefusal::Busy)
+    }
     crate::tally::runtime::with_operation_wire_budget(async {
         let started = Instant::now();
-        assert!(busy(runtime.check_connection(endpoint.clone()).await));
+        assert!(busy(runtime.fetch_companies(endpoint.clone()).await));
         assert!(started.elapsed() >= budget);
         // The call's second operation has nothing left to wait.
         let started = Instant::now();
-        assert!(busy(runtime.check_connection(endpoint.clone()).await));
+        assert!(busy(runtime.fetch_companies(endpoint.clone()).await));
         // Nothing left to wait: well under a full budget, which a fresh one would take.
         assert!(started.elapsed() < budget);
     })
     .await;
     let started = Instant::now();
-    assert!(busy(runtime.check_connection(endpoint.clone()).await));
+    assert!(busy(runtime.fetch_companies(endpoint.clone()).await));
     assert!(started.elapsed() >= budget);
 }
 

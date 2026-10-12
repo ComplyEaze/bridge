@@ -1,23 +1,30 @@
-/// Read-only MCP server implementation, shared by the standalone binary.
-pub mod agent;
-pub mod client_group_label_migration;
-pub mod client_groups;
-pub mod commands;
-pub mod db;
+// The library's modules are crate-private on purpose. rustc's `dead_code` lint does not flag a
+// `pub` item of a library, so a `pub mod` here hid every function nothing in the crate calls.
+// What the binaries need is re-exported below, and nothing else is reachable from outside.
+pub(crate) mod agent;
+pub(crate) mod client_group_label_migration;
+pub(crate) mod client_groups;
+pub(crate) mod commands;
+pub(crate) mod db;
 pub(crate) mod endpoint_coordination;
 pub(crate) mod endpoint_wire;
 pub(crate) mod exported_files;
 pub(crate) mod local_files;
-// Crate-internal only: the previously separate `bridge-tally-observability` crate had exactly
-// one consumer inside this crate, so it does not need to be reachable from outside `bridge_lib`.
-mod observability;
-pub mod reports;
+pub(crate) mod reports;
 pub(crate) mod request_trail;
 pub(crate) mod source_draft;
 pub(crate) mod source_draft_xml;
-pub mod sync;
-pub mod tally;
-pub mod warning_codes;
+pub(crate) mod sync;
+pub(crate) mod tally;
+pub(crate) mod warning_codes;
+
+/// The standalone MCP binary's entry points, re-exported because `agent` is crate-private.
+pub use crate::agent::{run_local_data_report_from_args, run_stdio};
+
+/// Reachable from outside the crate only so that the doctests on the type can name it;
+/// hidden from the documentation, and used by no binary.
+#[doc(hidden)]
+pub use crate::reports::bulk_party_statement::ApprovedPartyStatementDestination;
 
 use std::path::PathBuf;
 use tauri::{Emitter, Manager};
@@ -131,7 +138,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
 
     let app = builder
         .invoke_handler(tauri::generate_handler![
-            commands::check_tally_connection,
             commands::probe_tally,
             commands::bootstrap_direct_tally_company,
             commands::save_tally_setup,
@@ -170,7 +176,6 @@ pub fn run(make_context: fn() -> tauri::Context<tauri::Wry>) {
             commands::cancel_tally_snapshot,
             commands::cancel_tally_request,
             commands::tally_runtime_snapshots,
-            commands::tally_telemetry_preview,
             commands::fetch_tally_companies,
             commands::fetch_tally_outstandings,
             commands::fetch_selected_ledger_entries,

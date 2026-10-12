@@ -1333,6 +1333,7 @@ mod tests {
             stock: None,
             currency_read: false,
             opening_stock: crate::book::OpeningStock::NotApplicable,
+            closing_stock: crate::book::ClosingStock::NotApplicable,
             vouchers: Vec::new(),
             tb: BTreeMap::new(),
         };
@@ -1394,6 +1395,7 @@ mod tests {
             stock: None,
             currency_read: false,
             opening_stock: crate::book::OpeningStock::NotApplicable,
+            closing_stock: crate::book::ClosingStock::NotApplicable,
             vouchers: vec![
                 voucher(
                     "g1",

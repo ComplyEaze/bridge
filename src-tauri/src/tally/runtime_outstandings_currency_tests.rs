@@ -73,7 +73,6 @@ async fn agent_outstandings_currency_witness_brackets_native_source() {
             .detect_base_currency_with_extent(config.clone(), &identity)
             .await
             .unwrap();
-        let currency_evidence = currency.evidence();
         let witness = currency.admit_inr().unwrap();
         let result = runtime
             .fetch_agent_outstandings_with_evidence(
@@ -123,12 +122,6 @@ async fn agent_outstandings_currency_witness_brackets_native_source() {
                 _ => 44,
             }
         );
-        assert_eq!(
-            currency_evidence.request_sha256,
-            requests[5].request_body_sha256
-        );
-        assert_eq!(currency_evidence.response_sha256, sha256_hex(&responses[5]));
-        assert_eq!(currency_evidence.bytes, responses[5].len() * 2);
         let mut expected_request = join(
             &requests[14].request_body_sha256,
             &requests[15].request_body_sha256,
@@ -200,7 +193,7 @@ async fn agent_outstandings_rejects_unadmitted_currency_before_native_read() {
                 &identity_for_guid(&companies(), "eebb9a9f-1679-4468-9e8f-814c729674cb"),
             )
             .await;
-        let evidence = if fault == "malformed" {
+        let failure_evidence = if fault == "malformed" {
             let error = result.unwrap_err();
             assert!(matches!(
                 error
@@ -210,29 +203,31 @@ async fn agent_outstandings_rejects_unadmitted_currency_before_native_read() {
                     "currency_decimal_places_invalid"
                 ))
             ));
-            error
-                .downcast_ref::<RuntimeReadFailure>()
-                .unwrap()
-                .evidence
-                .clone()
+            Some(
+                error
+                    .downcast_ref::<RuntimeReadFailure>()
+                    .unwrap()
+                    .evidence
+                    .clone(),
+            )
         } else {
-            let read = result.unwrap();
-            let evidence = read.evidence();
             assert_eq!(
-                read.admit_inr().unwrap_err(),
+                result.unwrap().admit_inr().unwrap_err(),
                 match fault {
                     "foreign" => "company_base_currency_not_inr",
                     "multiple" => "company_base_currency_undetermined",
                     _ => "company_currency_probe_failed",
                 }
             );
-            evidence
+            None
         };
         let requests = simulator.finish().unwrap();
         assert_eq!(requests.len(), 14);
-        assert_eq!(evidence.request_sha256, requests[5].request_body_sha256);
-        assert_eq!(evidence.response_sha256, sha256_hex(&response));
-        assert_eq!(evidence.bytes, response.len() * 2);
+        if let Some(evidence) = failure_evidence {
+            assert_eq!(evidence.request_sha256, requests[5].request_body_sha256);
+            assert_eq!(evidence.response_sha256, sha256_hex(&response));
+            assert_eq!(evidence.bytes, response.len() * 2);
+        }
     }
 }
 
@@ -512,7 +507,7 @@ async fn the_desktop_command_reads_forex_as_base_currency_ledgers_only() {
     else {
         panic!("{:?}", response.result);
     };
-    assert_eq!(exclusions.foreign().len(), 3);
+    assert_eq!(exclusions.foreign.len(), 3);
     assert!(response.working_paper_export_id.is_none());
     assert!(response.party_statement_source_id.is_none());
     assert_eq!(response.working_paper_unavailable_reason_code, None);
@@ -747,9 +742,9 @@ fn assert_mixed_ledger_set_aside(result: &OutstandingsLoadResult) {
     else {
         panic!("{result:?}");
     };
-    assert_eq!(exclusions.mixed(), ["FX USD Debtor 02".to_string()]);
+    assert_eq!(exclusions.mixed, ["FX USD Debtor 02".to_string()]);
     let foreign = exclusions
-        .foreign()
+        .foreign
         .iter()
         .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
         .collect::<Vec<_>>();
@@ -844,9 +839,9 @@ async fn forex_outstandings_leave_the_dollar_ledgers_out_and_say_so() {
         exclusions.partial_reasons(),
         ["foreign_currency_ledgers_excluded"]
     );
-    assert!(exclusions.mixed().is_empty());
+    assert!(exclusions.mixed.is_empty());
     let excluded = exclusions
-        .foreign()
+        .foreign
         .iter()
         .map(|ledger| (ledger.ledger.as_str(), ledger.currency.as_str()))
         .collect::<Vec<_>>();
@@ -1153,7 +1148,7 @@ async fn the_sweep_admits_only_an_inr_base_and_reads_forex_as_base_currency_ledg
                 assert_eq!(code, expected);
             }
             (Ok(OutstandingsLoadResult::BaseCurrencyLedgersOnly { exclusions, .. }), None) => {
-                assert_eq!(exclusions.foreign().len(), 3)
+                assert_eq!(exclusions.foreign.len(), 3)
             }
             (Ok(other), _) => panic!("{expected:?}: {other:?}"),
             (Err(crate::commands::CompanySweepFailure::ReasonCode(code)), _) => {

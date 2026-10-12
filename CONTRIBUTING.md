@@ -56,7 +56,7 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check   # about 4 s
 node scripts/check-unbounded-reads.mjs                            # about 1 s
 node scripts/check-conflict-markers.mjs                           # about 1 s
 node scripts/check-ci-workflow-consistency.mjs                    # about 1 s
-node scripts/check-surface-ack.mjs --mode pull_request --pr <N> --base origin/master
+node scripts/check-surface-ack.mjs --mode pull_request --pr <N> --base origin/master  # under 1 s
 ```
 
 The fourth runs `cargo metadata --no-deps`, not a build, and fetches no crates.

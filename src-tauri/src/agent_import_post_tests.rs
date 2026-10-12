@@ -3945,7 +3945,7 @@ fn an_hsn_warning_changes_the_checked_line_and_never_the_windows_size() {
         warned,
         clean.replace(
             super::INVOICE_CHECKED_LINE,
-            "Checked: customer, Sales Accounts ledgers, CGST and state tax per line. HSN/SAC: 2 to check."
+            "Checked: customer, Sales Accounts ledgers, tax per line at ledger rate. HSN/SAC: 2 to check."
         )
     );
     assert_ne!(warned, clean);

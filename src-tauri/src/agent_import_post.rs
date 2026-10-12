@@ -2803,13 +2803,14 @@ fn review_text(
 const INVOICE_CHECKED_LINE: &str =
     "Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.";
 /// The same line for an invoice with an HSN/SAC warning (never a refusal),
-/// with the number of sales ledgers warned about. It takes the place of the
+/// with the number of sales ledgers warned about. To fit, it names the tax
+/// checked as "tax" where the line above names CGST and state tax. It takes the place of the
 /// line above and is no longer while that number has one digit; ten ledgers
 /// need thirteen entries, more than the window's lines, so a warning cannot
 /// push a window that fits past its caps.
 pub(super) fn invoice_checked_hsn_line(ledgers: usize) -> String {
     format!(
-        "Checked: customer, Sales Accounts ledgers, CGST and state tax per line. HSN/SAC: {ledgers} to check."
+        "Checked: customer, Sales Accounts ledgers, tax per line at ledger rate. HSN/SAC: {ledgers} to check."
     )
 }
 

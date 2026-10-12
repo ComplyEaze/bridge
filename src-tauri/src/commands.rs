@@ -1912,10 +1912,7 @@ async fn export_party_ledger_master_once(
         .admit_inr_classified()
         .map_err(party_ledger_master_currency_admission_error)?
         .into_compliance_assertion();
-    let basis = match request.as_of_yyyymmdd {
-        Some(requested) => BalanceDateBasis::Requested(requested),
-        None => BalanceDateBasis::HostToday(host_today()?),
-    };
+    let basis = party_ledger_master_balance_basis(request.as_of_yyyymmdd, host_today)?;
     let source = runtime
         .fetch_party_ledger_master_source(
             request.config,
@@ -2034,6 +2031,15 @@ async fn fetch_selected_ledger_entries_once(
             },
         )
     })
+}
+
+/// STUB for the failing-first run: the always-host version a test must refuse.
+fn party_ledger_master_balance_basis(
+    chosen: Option<TallyDate>,
+    host_today: impl FnOnce() -> Result<TallyDate, TallyCommandError>,
+) -> Result<BalanceDateBasis, TallyCommandError> {
+    let _ = chosen;
+    host_today().map(BalanceDateBasis::HostToday)
 }
 
 fn requested_outstandings_as_of(

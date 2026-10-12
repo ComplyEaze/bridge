@@ -1,0 +1,2 @@
+# Byte-exact requests: no line-ending normalisation.
+* -text

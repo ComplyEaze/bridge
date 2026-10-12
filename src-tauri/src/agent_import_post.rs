@@ -2543,12 +2543,15 @@ pub(super) fn agent_review_preview(
 
 #[path = "agent_import_post_on_account.rs"]
 mod on_account;
+#[path = "agent_import_post_voucher_text.rs"]
+mod voucher_text;
 pub(super) use on_account::OnAccountMarks;
 #[cfg(test)]
 pub(super) use on_account::ON_ACCOUNT_LEGEND;
 use on_account::{reads_like_the_legend, ReviewText};
 #[cfg(test)]
 use on_account::{ON_ACCOUNT_MARK, ON_ACCOUNT_UNMARKED};
+pub(super) use voucher_text::{VoucherText, VoucherTextRefusal};
 
 fn review_preview_with(
     line: &ImportLedgerLine,
@@ -2582,12 +2585,6 @@ fn review_text(
     require_native_numbering(voucher)?;
     let marks = OnAccountMarks::of(line);
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
-    let optional = |value: &Option<String>| {
-        value
-            .as_deref()
-            .map(quoted)
-            .unwrap_or_else(|| "(none)".into())
-    };
     let entries = voucher
         .entries
         .iter()
@@ -2611,25 +2608,36 @@ fn review_text(
     let classification = classification_review_line(&voucher.voucher_type)
         .map(|line| format!("\n{line}"))
         .unwrap_or_default();
+    let reference = voucher_text_lines("Reference", voucher.reference.as_deref())?;
+    let narration = voucher_text_lines("Narration", super::posted_narration(voucher))?;
+    // In parts (#1535), the date line points below the dashed line, and the
+    // line above it, which ComplyEaze Bridge writes, counts the parts.
+    let parts = (reference.len() > 1 || narration.len() > 1).then(|| {
+        let count = |n: usize| format!("{n} part{}", if n == 1 { "" } else { "s" });
+        format!(
+            "Below the dashes: the reference in {}, the narration in {}.",
+            count(reference.len()),
+            count(narration.len())
+        )
+    });
+    let cue = if parts.is_some() {
+        VOUCHER_TEXT_CUE_PARTS
+    } else {
+        VOUCHER_TEXT_CUE
+    };
     // The voucher's reference and narration come last, under their heading,
     // after every line ComplyEaze Bridge writes itself, the footer included.
     // The date line says where they are.
-    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {VOUCHER_TEXT_CUE}\n\n{}\n{under}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
+    let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {cue}\n\n{}\n{under}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
         voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
         voucher.date.as_str(), voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
-        .chain([
-            VOUCHER_TEXT_HEADING.to_string(),
-            format!("Reference: {}", optional(&voucher.reference)),
-            format!(
-                "Narration: {}",
-                super::posted_narration(voucher)
-                    .map(quoted)
-                    .unwrap_or_else(|| "(none)".into())
-            ),
-        ])
+        .chain(parts)
+        .chain(std::iter::once(VOUCHER_TEXT_HEADING.to_string()))
+        .chain(reference)
+        .chain(narration)
         .collect::<Vec<_>>()
         .join("\n");
     // Native message boxes have no portable scrollable review surface. Keep this
@@ -2650,6 +2658,37 @@ pub(super) const VOUCHER_TEXT_HEADING: &str =
     "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----";
 /// What the date line of a one-voucher approval text says about them.
 pub(super) const VOUCHER_TEXT_CUE: &str = "(the voucher's own text: last two lines)";
+/// What it says when the reference or the narration is shown in parts
+/// (#1535): the line above the heading counts them.
+pub(super) const VOUCHER_TEXT_CUE_PARTS: &str = "(the voucher's own text: below the dashes)";
+/// The most characters a line of a one-voucher approval text takes.
+const REVIEW_LINE_CHARS: usize = 100;
+
+/// A reference's or narration's lines under the heading: `<label>: <quoted>`
+/// or `<label>: (none)` when it fits one line, as before #1535; else
+/// `<label> (k): <quoted part>` for each part, split only at a space. A value
+/// that cannot be shown so is refused, never cut.
+fn voucher_text_lines(label: &str, value: Option<&str>) -> Result<Vec<String>, String> {
+    let Some(text) = value else {
+        return Ok(vec![format!("{label}: (none)")]);
+    };
+    let one_line = REVIEW_LINE_CHARS - format!("{label}: ").chars().count();
+    let shown = VoucherText::of(text, one_line, |k| {
+        REVIEW_LINE_CHARS.saturating_sub(format!("{label} ({k}): ").chars().count())
+    })
+    .map_err(|refusal| match refusal {
+        VoucherTextRefusal::DoesNotFit => "import_review_too_large".to_string(),
+        VoucherTextRefusal::Layout => ReviewTextRefusal::Layout.import_code(),
+    })?;
+    Ok(match shown.parts() {
+        [only] => vec![format!("{label}: {}", voucher_text::quoted(only))],
+        parts => parts
+            .iter()
+            .enumerate()
+            .map(|(at, part)| format!("{label} ({}): {}", at + 1, voucher_text::quoted(part)))
+            .collect(),
+    })
+}
 
 /// The most a batch's approval text may take: lines, characters, characters
 /// a line, and UTF-8 bytes (under the native dialog's 8,000). A batch whose

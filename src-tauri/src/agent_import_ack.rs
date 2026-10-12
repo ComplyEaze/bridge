@@ -533,6 +533,7 @@ fn render_review_text(
     )
     .map_err(ack_text_refusal)?;
     let (doubted, entry_names) = names.split_at(doubted.len());
+    let narration_text = narration_lines(narration.as_deref(), &shown(&narration))?;
     // One per line: a changed ledger's name is as long as the book made it.
     let ledgers = doubted
         .iter()
@@ -564,19 +565,56 @@ fn render_review_text(
         .collect::<Result<Vec<_>, String>>()?
         .join("\n");
     let preview = format!(
-        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\nNarration:\n  {}\n{entries}{note}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
+        "Record that you reviewed ONE {} in {}\nComplyEaze Bridge posted it, but these ledgers no longer resolve\nto the master you approved:\n{ledgers}\n\nAs it is in Tally now:\nDate: {}  Voucher number: {}  ALTERID: {}\n{narration_text}\n{entries}{note}\nBatch: {}\n\nChoosing \"{REVIEW_BUTTON}\" records: \"I reviewed this voucher in Tally.\nIt is correct as it stands.\" ComplyEaze Bridge changes nothing in Tally,\nand the batch still reads reconciliation_required.",
         row.voucher_type.as_deref().unwrap_or("voucher"),
         quoted(company_name),
         quoted(row.date.as_str()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
-        shown(&narration),
         batch_id,
     );
     if !post::line_break_names_are_marked(&preview, names.iter().copied()) {
         return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));
     }
     Ok(preview)
+}
+
+/// The narration's lines in a one-voucher review: `Narration:` and the value
+/// quoted on the next line, or (#1535), when that line would pass the post
+/// dialog's 100 characters, `Narration, in N parts:` and each part quoted on
+/// a line of its own as `(k) "…"`, split only at a space. A narration that cannot be split is left whole, and the
+/// dialog's caps refuse it as before.
+fn narration_lines(narration: Option<&str>, whole: &str) -> Result<String, String> {
+    const INDENT: &str = "  ";
+    let one_line = 100 - INDENT.len();
+    let parts = match narration.map(|text| {
+        post::VoucherText::of(text, one_line, |k| {
+            100usize.saturating_sub(format!("{INDENT}({k}) ").len())
+        })
+    }) {
+        Some(Ok(shown)) if shown.parts().len() > 1 => shown,
+        Some(Err(post::VoucherTextRefusal::Layout)) => {
+            return Err(ack_text_refusal(post::ReviewTextRefusal::Layout))
+        }
+        _ => return Ok(format!("Narration:\n{INDENT}{whole}")),
+    };
+    let lines = parts
+        .parts()
+        .iter()
+        .enumerate()
+        .map(|(at, part)| {
+            format!(
+                "{INDENT}({}) {}",
+                at + 1,
+                serde_json::to_string(part).expect("string serialization")
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(format!(
+        "Narration, in {} parts:\n{lines}",
+        parts.parts().len()
+    ))
 }
 
 /// The code an acknowledgement dialog refuses a value with.

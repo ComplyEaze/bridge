@@ -107,6 +107,19 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A one-voucher approval now shows a long reference or narration in parts, where it refused
+  it before.** A bank-statement voucher's narration is often too long for one line of the
+  dialog, so posting it alone was refused and the file had to be imported by hand. Such a value
+  is now shown under the heading in numbered parts, each quoted on its own line and split only
+  at a space, so that the parts joined in order are the text that is posted. A line above the
+  heading counts the parts, and the date line says the voucher's own text is below the dashes.
+  It is still refused whole, never cut, when no space splits it into parts that fit, when it
+  holds a run of dashes or a number in brackets, or when the whole text passes the dialog's
+  caps. Each part past the first, and the counting line, leave one line fewer for entries. The
+  review dialog of `acknowledge_post_review` shows a long narration in parts the same way. A
+  text that fits as before is unchanged. Not yet measured: how the Windows and macOS dialogs
+  draw the parts (#1535).
+
 ## [0.5.1] - 2026-10-09
 
 ### In plain words: ComplyEaze Bridge 0.5.1, since 0.5.0 (9 Oct 2026)

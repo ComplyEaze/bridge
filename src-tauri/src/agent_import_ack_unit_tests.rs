@@ -191,6 +191,52 @@ fn a_value_with_a_line_break_or_hidden_character_is_refused() {
     }
 }
 
+/// #1535: a narration too long for one line is shown in parts, each quoted
+/// on its own line and split only at a space, under a line that counts them,
+/// so that a voucher posted with it can still be reviewed.
+#[test]
+fn a_long_narration_is_reviewed_in_quoted_parts() {
+    let narration = "Synthetic statement row: cash deposit at the branch counter 000123 | Synthetic Bank Ledger | 03-08-2026 | cash purpose not confirmed";
+    let preview = review_preview(
+        BATCH,
+        MARKER,
+        "Books",
+        &doubt(),
+        &row(2, &format!("{narration} {MARKER}")),
+    )
+    .unwrap();
+    let (_, after) = preview.split_once("Narration, in 2 parts:\n").unwrap();
+    let parts: Vec<String> = after
+        .lines()
+        .take(2)
+        .enumerate()
+        .map(|(at, shown)| {
+            let quoted = shown.strip_prefix(&format!("  ({}) ", at + 1)).unwrap();
+            serde_json::from_str(quoted).unwrap()
+        })
+        .collect();
+    assert_eq!(parts.concat(), narration, "{preview}");
+    assert!(
+        preview.lines().all(|shown| shown.chars().count() <= 100),
+        "{preview}"
+    );
+    // A short one is shown on one line as before.
+    let short = review_preview(BATCH, MARKER, "Books", &doubt(), &row(2, "Paid")).unwrap();
+    assert!(short.contains("Narration:\n  \"Paid\"\n"), "{short}");
+    // A long one holding a part label's shape is refused, never cut.
+    assert_eq!(
+        review_preview(
+            BATCH,
+            MARKER,
+            "Books",
+            &doubt(),
+            &row(2, &format!("{} (2) end", "word ".repeat(20)))
+        )
+        .unwrap_err(),
+        "ack_review_layout_text"
+    );
+}
+
 /// Only this batch's own marker at the end of the narration is left out;
 /// text after it, a second marker and another batch's marker are all shown,
 /// because the record binds the whole narration.

@@ -2303,10 +2303,11 @@ const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oc
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
      feeds it through the build, the post and the read-back and pins what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
-const PILOT_LAB_COMPANY_HSN: &str = "the company object answer of the Windows lab (12 Oct 2026), \
-     with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs) parses it, \
-     and its tests (src/agent_import_invoice_hsn_tests.rs) pin what the parse returns; \
-     pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on the Windows lab \
+     (12 Oct 2026), with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs \
+     and src/agent_import_invoice_wire.rs) parses it, and its tests \
+     (src/agent_import_invoice_hsn_tests.rs, and the replay in src/agent_import_post_e2e_tests.rs) \
+     pin what each parse returns; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_EVIDENCE: &str = "an answer of the pilot lab's invoice round (9 Oct 2026) that no \
      test reads: kept beside the answers the replay uses as the evidence for §9.16; \
      pilot-lab/PROVENANCE.md says what it is";
@@ -2367,6 +2368,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_REPLAY,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml",
+        PILOT_LAB_COMPANY_HSN,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml",
         PILOT_LAB_REPLAY,
     ),
@@ -2401,6 +2406,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml",
         PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml",
+        PILOT_LAB_COMPANY_HSN,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml",

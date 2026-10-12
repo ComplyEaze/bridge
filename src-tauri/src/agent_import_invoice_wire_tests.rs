@@ -724,7 +724,7 @@ const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/test
 /// The request the code renders is, character for character, the lab
 /// request set W16's (the file starts with a byte order mark): the request
 /// the lab answered on 10 Oct 2026 with the HSN/SAC check's three fields
-/// added to its field list and nothing else changed. W16 is not answered yet.
+/// added to its field list and nothing else changed (answered on 12 Oct 2026).
 #[test]
 fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
     let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.request.utf16le.xml"));
@@ -1090,7 +1090,7 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
 
 /// The group request is W16's: the group listing the compliance read sends
 /// (answered on 10 Oct 2026) with `HSNDETAILS.LIST` added and nothing else
-/// changed. W16 is not answered yet.
+/// changed (answered on 12 Oct 2026).
 #[test]
 fn the_group_hsn_request_is_the_answered_listing_with_the_hsn_rows() {
     let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.request.utf16le.xml"));

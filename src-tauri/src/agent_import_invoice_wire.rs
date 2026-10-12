@@ -808,10 +808,10 @@ pub(super) fn parse_company_registration(
 /// nothing else changed. Sent in UTF-16 on a licensed TallyPrime 7.1 Silver
 /// synthetic company on 10 Oct 2026, it was answered with the fields (the
 /// `pilot-lab` fixtures). The three fields of the HSN/SAC check
-/// (`HSNDETAILS.LIST`, `GSTTYPEOFSUPPLY`, `GSTAPPLICABLE`) follow them: the
-/// lab request set W16 sends this request; until its answer is a fixture, the
-/// request with them has not been answered (`GSTTYPEOFSUPPLY` and
-/// `GSTAPPLICABLE` are for the code warnings that follow). `window` is the financial year's start and the
+/// (`HSNDETAILS.LIST`, `GSTTYPEOFSUPPLY`, `GSTAPPLICABLE`) follow them, as
+/// the lab answered them on 12 Oct 2026 (lab request set W16, the
+/// `pilot-lab-ledger-rates-hsn` fixture; `GSTTYPEOFSUPPLY` and `GSTAPPLICABLE`
+/// are for the code warnings that follow). `window` is the financial year's start and the
 /// invoice date, as the request that was measured carried them (a ledger's
 /// rate rows came back whole; whether the window changes them was not tried).
 /// `None` when a date is not eight digits.
@@ -1140,9 +1140,10 @@ pub(super) use hsn::{
 
 /// The group listing the build's compliance read already sends (the
 /// `List of Groups` snapshot, bound to the company by GUID) with
-/// `HSNDETAILS.LIST` added to its field list and nothing else changed. The
-/// lab request set W16 sends it; until its answer is a fixture, it has not been
-/// answered.
+/// `HSNDETAILS.LIST` added to its field list and nothing else changed, as the
+/// lab answered it on 12 Oct 2026 (lab request set W16, the
+/// `pilot-lab-groups-hsn` fixture: one `HSNDETAILS.LIST` per group, empty on a
+/// group with no code).
 pub(in crate::agent) fn render_group_hsn_request(company: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Groups</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"List of Groups\" ISMODIFY=\"Yes\"><FETCH>NAME, PARENT, GUID, MASTERID, ALTERID, RESERVEDNAME, HSNDETAILS.LIST</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",

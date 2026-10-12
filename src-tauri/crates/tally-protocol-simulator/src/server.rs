@@ -23,9 +23,11 @@ const REQUEST_READ_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
 /// six per paired read, plus the identity and ledger legs around them. An
-/// invoice built and then posted is about 350: each read is bracketed by
-/// status probes and company lists, and the post reads the book again.
-pub const MAX_SEQUENCE_REQUESTS: usize = 384;
+/// invoice built and then posted is about 390: each read is bracketed by
+/// status probes and company lists, each of its three admissions reads the
+/// company object for the HSN/SAC check, and the post reads the book again;
+/// a replay that then starts a second build runs to about 400.
+pub const MAX_SEQUENCE_REQUESTS: usize = 448;
 
 /// The payload of the `TimedOut` error returned when no request reached a plan
 /// within the accept deadline: `plan` is its zero-based place in a sequence of

@@ -7,6 +7,14 @@ const GROUPS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"
 );
 
+const RATES_HSN: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"
+);
+
+const GROUPS_HSN: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"
+);
+
 const COMPANY_OBJECT: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"
 );
@@ -525,4 +533,73 @@ fn a_row_with_an_unknown_element_or_no_content_is_flagged_so() {
         DATE,
     );
     assert_eq!(deferring, HsnStep::Refused(UNRESOLVED));
+}
+
+/// The three answers of the lab request set W16 (one book state, 12 Oct
+/// 2026), read by the code's own parsers, resolve each sales ledger to the
+/// code and the level Tally's own GST rate setup screens showed in that run;
+/// the ledger whose row in force defers beside a later row, and a ledger
+/// carrying only the empty element (a tax ledger here), are refused as not
+/// measured.
+#[test]
+fn on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed() {
+    let names = [
+        "BRIDGE Svc 998313 5%",
+        "BRIDGE Svc 998314 5%",
+        "BRIDGE Svc 998315 5%",
+        "BRIDGE Svc 4D 5%",
+        "BRIDGE Goods 18%",
+        "BRIDGE Svc INH 5%",
+        "BRIDGE Svc INH2 5%",
+        "BRIDGE SGST 2.5%",
+    ];
+    let rates = super::super::parse_ledger_rates(&utf16(RATES_HSN), LAB_GUID, &names).unwrap();
+    assert_eq!(rates.len(), names.len());
+    let groups = parse_group_hsn(&utf16(GROUPS_HSN), LAB_GUID).unwrap();
+    assert_eq!(groups.len(), 29);
+    let placeholders = groups
+        .values()
+        .filter(|rows| matches!(rows.as_deref(), Some([row]) if row.empty))
+        .count();
+    assert_eq!(placeholders, 27);
+    let firm = parse_company_hsn(&utf16(COMPANY_OBJECT), LAB_GUID).unwrap();
+    let step = |name: &str, chain: &[String], date: &str| {
+        resolve_hsn(&rates[name].hsn, Some(chain), Some(&groups), &firm, date)
+    };
+    let (top, sub) = (top_chain(), sub_chain());
+    for (name, code) in [
+        ("BRIDGE Svc 998313 5%", "998313"),
+        ("BRIDGE Svc 998314 5%", "998314"),
+        ("BRIDGE Svc 4D 5%", "9983"),
+        ("BRIDGE Goods 18%", "847130"),
+        ("BRIDGE Svc INH 5%", "998344"),
+    ] {
+        assert_eq!(
+            step(name, &top, DATE),
+            resolved(code, HsnLevel::Ledger),
+            "{name}"
+        );
+    }
+    // A later row is used from its own date.
+    assert_eq!(
+        step("BRIDGE Svc INH 5%", &top, "20260901"),
+        resolved("998345", HsnLevel::Ledger)
+    );
+    assert_eq!(
+        step("BRIDGE Svc 998315 5%", &top, DATE),
+        resolved("998315", HsnLevel::Ledger)
+    );
+    assert_eq!(
+        step("BRIDGE Svc 998315 5%", &top, "20260801"),
+        HsnStep::Refused(NOT_MEASURED)
+    );
+    // Deferring to its sub-group, as the screen showed `(998343)` for it.
+    assert_eq!(
+        step("BRIDGE Svc INH2 5%", &sub, DATE),
+        resolved("998343", HsnLevel::Group("BRIDGE Sales Sub".to_string()))
+    );
+    assert_eq!(
+        step("BRIDGE SGST 2.5%", &top, DATE),
+        HsnStep::Refused(NOT_MEASURED)
+    );
 }

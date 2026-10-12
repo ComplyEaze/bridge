@@ -196,3 +196,23 @@ test("an inspected interrupted run can resume only while no worker is active", a
   await act(async () => root.unmount());
   host.remove();
 });
+
+test("a failed run's Failure line shows the Gap Map title, and an unlisted code its own words", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  for (const [code, line] of [
+    ["company_altmstid_missing", "Failure: Tally did not report its master-change marker"],
+    ["some_unlisted_code", "Failure: Some unlisted code"],
+  ]) {
+    const failed = { ...run("failed", "failed"), failure_code: code };
+    const fixture = props(async () => [failed]);
+    fixture.result.snapshotJob = failed;
+    fixture.result.snapshotStartOutcomeUnknown = false;
+    await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
+    const spans = [...host.querySelectorAll("span")].map((span) => span.textContent);
+    expect(spans).toContain(line);
+  }
+  await act(async () => root.unmount());
+  host.remove();
+});

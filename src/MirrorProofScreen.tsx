@@ -161,12 +161,12 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
   company_altmstid_missing: {
     title: "Tally did not report its master-change marker",
-    action: "Without that marker ComplyEaze Bridge cannot tell whether masters changed during the read, so the run stopped. Retrying unchanged will stop the same way; check the TallyPrime release and the company before a new run.",
-    retry: "not_useful",
+    action: "Without that marker ComplyEaze Bridge cannot tell whether masters changed during the read, so the run stopped. Close and reopen the company in TallyPrime, then start a new run. If it stops the same way, update TallyPrime to its latest release before trying again.",
+    retry: "after_change",
   },
   company_identity_mismatch: {
     title: "Tally answered for a different company",
-    action: "The company Tally reported is not the one selected for this run. Check which company is open in Tally, select it again, and start a new run.",
+    action: "Tally did not report the selected company for this run. Check which company is open in Tally, select it again, and start a new run.",
     retry: "after_change",
   },
   minimum_window_response_too_large: {
@@ -181,7 +181,7 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
   },
 };
 
-function guidanceForGap(code: string): GapGuidance {
+export function guidanceForGap(code: string): GapGuidance {
   return GAP_GUIDANCE[code] ?? {
     title: formatIdentifier(code),
     action: "Inspect the local Proof of Sync and support artifact. Do not retry unchanged until this gap's cause is understood.",
@@ -432,7 +432,7 @@ export function MirrorProofScreen({
           <span>Phase: {formatIdentifier(snapshotJob.phase)}</span>
           <span>Completed executable windows: {snapshotJob.completed_windows}/{snapshotJob.total_windows}</span>
           <span>{snapshotJob.verification ? `Result: ${formatIdentifier(snapshotJob.verification)}` : "No verification claim yet"}</span>
-          {snapshotJob.failure_code && <span>Failure: {formatIdentifier(snapshotJob.failure_code)}</span>}
+          {snapshotJob.failure_code && <span>Failure: {guidanceForGap(snapshotJob.failure_code).title}</span>}
           {snapshotJob.requires_resume && (
             <span>{snapshotJob.resume_available ? "Worker detached: explicit resume required" : "Detached legacy state: inspect only"}</span>
           )}

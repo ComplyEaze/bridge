@@ -1,0 +1,56 @@
+== LEDGER control rows 18 new rows 18 same names: True | LINEERROR []
+   new top-level child tags vs control: ['GSTAPPLICABLE', 'GSTTYPEOFSUPPLY', 'HSNDETAILS.LIST']
+    'BRIDGE CGST 2.5%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'SRCOFHSNDETAILS': 'As per Company/Group'}] {'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE CGST 9%' HSN rows 1 [{}] {}
+    'BRIDGE Goods 18%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '847130', 'HSN': 'Portable Automatic Data Processing Machines, Weighing Not More Than 10 Kg, Consisting Of Atleast A Central Processing Unit, A Keyboard And A Display', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Goods'}
+    'BRIDGE Output CGST XML' HSN rows 1 [{}] {}
+    'BRIDGE Purchase Svc 5%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'SRCOFHSNDETAILS': 'As per Company/Group'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Round Off' HSN rows 1 [{}] {'GSTAPPLICABLE': '¤ Not Applicable'}
+    'BRIDGE SGST 2.5%' HSN rows 1 [{}] {}
+    'BRIDGE SGST 9%' HSN rows 1 [{}] {}
+    'BRIDGE Supplier RJ' HSN rows 1 [{}] {}
+    'BRIDGE Svc 4D 5%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '9983', 'HSN': 'Other professional, technical and business services', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Svc 998313 5%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '998313', 'HSN': 'Information technology consulting and support services', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Svc 998314 5%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '998314', 'HSN': 'Information technology design and development services', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Svc 998315 5%' HSN rows 2 [{'APPLICABLEFROM': '20260401', 'SRCOFHSNDETAILS': 'As per Company/Group'}, {'APPLICABLEFROM': '20260805', 'HSNCODE': '998315', 'HSN': 'Hosting and information technology infrastructure provisioning services', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Svc INH 5%' HSN rows 2 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '998344', 'HSN': 'Surface surveying and map-making services', 'SRCOFHSNDETAILS': 'Specify Details Here'}, {'APPLICABLEFROM': '20260901', 'HSNCODE': '998345', 'HSN': 'Weather forecasting and meteorological services', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Svc INH2 5%' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'SRCOFHSNDETAILS': 'As per Company/Group'}] {'GSTAPPLICABLE': '¤ Applicable', 'GSTTYPEOFSUPPLY': 'Services'}
+    'BRIDGE Walk-in' HSN rows 1 [{}] {}
+    'Cash' HSN rows 1 [{}] {}
+    'Profit & Loss A/c' HSN rows 1 [{}] {}
+== GROUP control rows 29 new rows 29 same names: True | LINEERROR []
+   new top-level child tags vs control: ['HSNDETAILS.LIST']
+    'BRIDGE Sales Sub' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '998343', 'HSN': 'Mineral exploration and evaluation', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {}
+    'Bank Accounts' HSN rows 1 [{}] {}
+    'Bank OD A/c' HSN rows 1 [{}] {}
+    'Branch / Divisions' HSN rows 1 [{}] {}
+    'Capital Account' HSN rows 1 [{}] {}
+    'Cash-in-Hand' HSN rows 1 [{}] {}
+    'Current Assets' HSN rows 1 [{}] {}
+    'Current Liabilities' HSN rows 1 [{}] {}
+    'Deposits (Asset)' HSN rows 1 [{}] {}
+    'Direct Expenses' HSN rows 1 [{}] {}
+    'Direct Incomes' HSN rows 1 [{}] {}
+    'Duties & Taxes' HSN rows 1 [{}] {}
+    'Fixed Assets' HSN rows 1 [{}] {}
+    'Indirect Expenses' HSN rows 1 [{}] {}
+    'Indirect Incomes' HSN rows 1 [{}] {}
+    'Investments' HSN rows 1 [{}] {}
+    'Loans & Advances (Asset)' HSN rows 1 [{}] {}
+    'Loans (Liability)' HSN rows 1 [{}] {}
+    'Misc. Expenses (ASSET)' HSN rows 1 [{}] {}
+    'Provisions' HSN rows 1 [{}] {}
+    'Purchase Accounts' HSN rows 1 [{}] {}
+    'Reserves & Surplus' HSN rows 1 [{}] {}
+    'Sales Accounts' HSN rows 1 [{'APPLICABLEFROM': '20260401', 'HSNCODE': '998342', 'HSN': 'Subsurface surveying services', 'SRCOFHSNDETAILS': 'Specify Details Here'}] {}
+    'Secured Loans' HSN rows 1 [{}] {}
+    'Stock-in-Hand' HSN rows 1 [{}] {}
+    'Sundry Creditors' HSN rows 1 [{}] {}
+    'Sundry Debtors' HSN rows 1 [{}] {}
+    'Suspense A/c' HSN rows 1 [{}] {}
+    'Unsecured Loans' HSN rows 1 [{}] {}
+== company object: root ENVELOPE BODY True LINEERROR [] elements 745
+   HSNDETAILS.LIST {'APPLICABLEFROM': '20260401', 'HSNCODE': '998341', 'HSN': 'Geological and geophysical consulting services', 'HSNCLASSIFICATIONNAME': '', 'SRCOFHSNDETAILS': 'Specify Details Here'}
+   CMPGSTDETAILS.LIST {'APPLICABLEFROM': '20260401', 'GSTSOURCEPRIORITY': 'Ledger', 'HSNSOURCEPRIORITY': 'Ledger', 'BASISOFCALC': 'Stock Item/Ledger-wise', 'GSTR1HSNBASIS': '', 'IGNOREROUNDINGTYPE': 'Greater or Lesser than Computed Tax', 'HSNAPPLICABLESECTION': 'All Sections', 'USENAMEASDESCRIPTION': '', 'USECOMMONVCHNUMSERIES': '', 'THRESHOLDLIMIT': '0', 'HSNCODELENGTH': '4'}
+   CMPTAXAMOUNTTOLERENCE ['0']
+== marks [('ALTVCHID', '60'), ('ALTMSTID', '243')]

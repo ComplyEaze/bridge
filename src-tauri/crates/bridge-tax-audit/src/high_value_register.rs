@@ -33,8 +33,8 @@
 //! carry them and its own defaults otherwise. The vendored rules excerpt carries neither table, so
 //! this port reads the defaults, whose numbers equal the reference's tables (a test pins them).
 //!
-//! The row walk generalises `cash_payments_40a3`'s s.269ST walk over a money set, a direction and
-//! a grain. Each voucher is its own [`VoucherKey`] (#1243): the voucher grain, a row's per-voucher
+//! The row walk generalises the s.269ST walk over a money set, a direction and a grain;
+//! `cash_269st_rows` is its cash entry for `cash_payments_40a3` and `entity_269st_gap`. Each voucher is its own [`VoucherKey`] (#1243): the voucher grain, a row's per-voucher
 //! shares and lines and the count of vouchers with no reference are by that key, so two vouchers
 //! sharing a GUID (blank, or repeated) are two vouchers; a citation still names the GUID. A
 //! journal-transfer row id that would repeat takes its place among those sharing it as a suffix.
@@ -181,7 +181,7 @@ pub struct Row<'a> {
     pub lines: BTreeMap<VoucherKey, (i64, i64)>,
     /// The unidentified-party row only: the names its vouchers print, shown with it and never used
     /// to key or attribute.
-    names: PrintedNames,
+    pub(crate) names: PrintedNames,
 }
 
 impl<'a> Row<'a> {
@@ -220,7 +220,7 @@ enum Over {
     Yes,
 }
 
-type Rows<'a, K> = BTreeMap<(K, String), Row<'a>>;
+pub(crate) type Rows<'a, K> = BTreeMap<(K, String), Row<'a>>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -351,6 +351,33 @@ pub fn mode_rows<'a, K: Ord>(
         }
     }
     Ok(rows)
+}
+
+/// The s.269ST walk of `cash_payments_40a3` and `entity_269st_gap`: `(day, party ledger) -> row` for
+/// cash against `bank`, the cash-mode walk `mode_rows` generalises. Sales Accounts (receipt) or
+/// Purchase Accounts (payment) is never itself a party but stays in the voucher's total. Unlike this
+/// module's own cash rows it leaves out no counterparty type and no Loans (Liability) ledger: the
+/// s.269ST rows of those two modules never did.
+pub(crate) fn cash_269st_rows<'a>(
+    pop: &[&'a Voucher],
+    book: &Book,
+    cash: &BTreeSet<String>,
+    bank: &BTreeSet<String>,
+    direction: Direction,
+    round_off_ledgers: &BTreeSet<String>,
+) -> Result<Rows<'a, TallyDate>> {
+    let from_party = match direction {
+        Direction::Receipt => [SALES_ACCOUNTS_GROUP],
+        Direction::Payment => [PURCHASE_ACCOUNTS_GROUP],
+    };
+    let no_types = BTreeMap::new();
+    let x = Exclusions {
+        from_party_groups: &from_party,
+        entirely_groups: &[],
+        round_off_ledgers,
+        counterparty_types: &no_types,
+    };
+    mode_rows(pop, book, cash, bank, direction, |_, v| v.date.clone(), &x)
 }
 
 /// Limb (b): `(reference, party) -> row` for vouchers with a non-empty reference, and the count of

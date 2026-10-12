@@ -36,7 +36,7 @@ fn captured_identity(extent: &str) -> VerifiedCompanyIdentity {
         .expect("captured extent includes the party-master company");
     VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        company.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&company.guid.clone().unwrap()),
         company.company_number.clone().unwrap(),
         company.books_from.clone().unwrap(),
         &companies,
@@ -152,7 +152,7 @@ async fn refusal(
             &identity,
             DateBoundaryProfile::ModeAgnostic,
             assertion,
-            &TallyDate::parse("20990101").unwrap(),
+            &BalanceDateBasis::HostToday(TallyDate::parse("20990101").unwrap()),
             crate::tally::connection::ComplianceRead::Standard,
         ),
     )

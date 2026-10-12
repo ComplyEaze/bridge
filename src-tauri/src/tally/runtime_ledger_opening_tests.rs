@@ -151,13 +151,13 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
         let runtime = TallyRuntime::default();
         let company = TallyCompany {
             name: "Synthetic Company".into(),
-            guid: Some("synthetic-guid".into()),
+            guid: Some("9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27".into()),
             company_number: Some("100001".into()),
             books_from: Some("20260401".into()),
         };
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             company.name.clone(),
-            company.guid.clone().unwrap(),
+            crate::tally::test_company_guid(&company.guid.clone().unwrap()),
             "100001".into(),
             "20260401".into(),
             std::slice::from_ref(&company),
@@ -398,7 +398,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             .unwrap();
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             observed.name.clone(),
-            observed.guid.clone().unwrap(),
+            crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
             observed.company_number.clone().unwrap(),
             observed.books_from.clone().unwrap(),
             &companies,
@@ -556,7 +556,7 @@ async fn an_invalid_book_extent_stops_the_ledger_read_before_any_ledger_request(
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         observed.name.clone(),
-        observed.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
         observed.company_number.clone().unwrap(),
         observed.books_from.clone().unwrap(),
         &companies,

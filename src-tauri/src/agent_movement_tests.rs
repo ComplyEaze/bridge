@@ -231,7 +231,7 @@ async fn movement_read_preserves_observed_count_after_accounting_exclusions() {
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         observed.name.clone(),
-        observed.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
         observed.company_number.clone().unwrap(),
         observed.books_from.clone().unwrap(),
         &companies,

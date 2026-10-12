@@ -310,8 +310,9 @@ version, check the setting: an earlier default may still be saved as on.
 Native posting through the extension accepts one Journal, Payment, Receipt or
 Contra per approval, with existing ledgers and no supplied voucher number. A
 command-line installation can also post a saved batch of 2 to 50 such vouchers
-after one approval of a summary (per-ledger totals, not each voucher's date or
-narration), when `BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting.
+after one approval of a summary (per-ledger totals, and a line for each voucher
+when there are ten or fewer and those lines fit), when
+`BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting.
 That setting is off by default and the extension does not set it (bridge#712).
 Batch posting through ComplyEaze Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was

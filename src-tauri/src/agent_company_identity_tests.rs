@@ -296,7 +296,7 @@ async fn observed_books_from_requires_a_calendar_date_before_company_scoped_read
         );
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             selected.name.clone(),
-            GUID.into(),
+            crate::tally::test_company_guid(GUID),
             selected.company_number.clone().unwrap(),
             selected.books_from.clone().unwrap(),
             &companies,

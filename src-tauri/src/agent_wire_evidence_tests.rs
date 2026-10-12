@@ -203,7 +203,7 @@ async fn write_shaped_adapter_request_is_refused_before_any_transport() {
         bridge_tally_protocol::parse_companies_from_collection(&plans[0].fixture.body()).unwrap();
     let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
         "WR2 Unicode Lab".into(),
-        CAPTURED_GUID.into(),
+        crate::tally::test_company_guid(CAPTURED_GUID),
         "1".into(),
         "20260401".into(),
         &companies,

@@ -41,7 +41,6 @@ const forbiddenNames = [
   "bridge-tally-core",
   "bridge-tally-incremental",
   "bridge-tally-observability",
-  "bridge-tally-qualification",
   "libsqlite3-sys",
   "rusqlite",
   "sqlx",

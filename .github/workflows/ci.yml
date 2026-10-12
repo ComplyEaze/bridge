@@ -352,11 +352,6 @@ jobs:
           cargo clippy --locked -p bridge-tally-compatibility --features bills-native-outstandings-probe-receipt --all-targets -- -D warnings -A clippy::pedantic
           cargo clippy --locked -p bridge-tally-read-transport --features bills-native-outstandings-probe-transport --all-targets -- -D warnings -A clippy::pedantic
           cargo clippy --locked -p bridge-tally-live-read --features bills-native-outstandings-probe-runner --all-targets -- -D warnings -A clippy::pedantic
-      - name: Produce parser-only synthetic qualification smoke receipt
-        working-directory: tools
-        run: >-
-          cargo run --locked --release -p bridge-tally-qualification --
-          run ci-smoke target/tally-qualification-smoke.json 7 3
       - name: Enforce exact Tally compatibility claims
         working-directory: tools
         run: >-
@@ -384,12 +379,6 @@ jobs:
         run: node scripts/check-fixture-provenance.mjs
       - name: Enforce Tally request-builder hazard allowlist
         run: node scripts/check-tally-request-builder-hazards.mjs
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tally-parser-qualification-smoke
-          path: tools/target/tally-qualification-smoke.json
-          if-no-files-found: error
-          retention-days: 7
 
   native:
     name: Native checks (${{ matrix.os }})

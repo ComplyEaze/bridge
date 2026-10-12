@@ -139,5 +139,11 @@ fn rejects_non_ascii_text() {
     // Kelvin sign lowercases to ASCII 'k' under Unicode rules; it is not hex
     // either way and must not be folded into the accepted form.
     let kelvin = LOWER.replacen('a', "\u{212A}", 1);
-    assert!(CompanyGuid::parse(&kelvin).is_err());
+    // The 3-byte sign replaces a 1-byte digit, so the input is 38 bytes and
+    // the length check refuses it before any character is examined.
+    assert_eq!(kelvin.len(), 38);
+    assert_eq!(
+        CompanyGuid::parse(&kelvin),
+        Err(CompanyGuidError::WrongLength)
+    );
 }

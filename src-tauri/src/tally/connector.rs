@@ -17,7 +17,7 @@ use bridge_tally_protocol::{
     },
     outstandings_shared::{
         parse_company_book_extent_v2, require_master_witness, CompanyBookExtent,
-        DateBoundaryProfile,
+        CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
     },
     parse_companies_from_collection, parse_ledger_period_balance_report,
     parse_native_group_source_records_with_evidence,
@@ -298,18 +298,22 @@ impl RuntimeTallyConnector {
             .company_book_extent_expectation()
             .map_err(|_| invalid_data("company_identity_invalid"))?;
         let request = ReadOnlyProfile::CompanyBookExtentV2 { company: &company }.render();
+        // The transport seam admits only a well-formed response, so the one
+        // refusal left for these parses is a response for another company.
+        // Parse the first before asking again: a wrong company ends the read
+        // without a second request.
         let first_xml = self
             .post_xml_validated(request.clone(), |xml| {
-                parse_company_book_extent_v2(xml, &expectation).is_ok()
-            })
-            .await?;
-        let second_xml = self
-            .post_xml_validated(request, |xml| {
-                parse_company_book_extent_v2(xml, &expectation).is_ok()
+                extent_response_is_well_formed(xml, &expectation)
             })
             .await?;
         let first = parse_company_book_extent_v2(&first_xml, &expectation)
             .map_err(|_| invalid_data("company_identity_mismatch"))?;
+        let second_xml = self
+            .post_xml_validated(request, |xml| {
+                extent_response_is_well_formed(xml, &expectation)
+            })
+            .await?;
         let second = parse_company_book_extent_v2(&second_xml, &expectation)
             .map_err(|_| invalid_data("company_identity_mismatch"))?;
         if first != second {
@@ -812,6 +816,20 @@ fn map_transport_error(error: anyhow::Error) -> TallyError {
         };
     }
     protocol_error("unclassified_tally_error")
+}
+
+/// Whether an extent response is well formed enough to be read by the
+/// connector: it parses for the selected company, or it is a complete, valid
+/// response that names no such company. Anything malformed (truncated, not
+/// XML, not a success status, an ambiguous or incomplete company row) is
+/// rejected at the transport seam. A response for another company is left to
+/// the connector's own parse, which refuses it as `company_identity_mismatch`
+/// rather than as a generic protocol rejection.
+fn extent_response_is_well_formed(xml: &str, expectation: &CompanyBookExtentExpectation) -> bool {
+    matches!(
+        parse_company_book_extent_v2(xml, expectation),
+        Ok(_) | Err(OutstandingsError::CompanyIdentityMismatch)
+    )
 }
 
 fn classify_voucher_window_error(error: TallyError) -> TallyError {

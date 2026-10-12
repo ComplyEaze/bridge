@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
+  any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
+  carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,
+  with a rate that is `absent`, `empty`, `zero` or a `value` (the text as sent and the decimal), never merged
+  (part of #1342). HSN/SAC and type of supply are not returned because no capture shows them, the place of
+  supply stays in the registration history, and slab rates are only flagged. Without the flag the requests, the
+  sizing and the result are unchanged. With it the read is admitted at 8,000 bytes a ledger instead of 3,750, a
+  margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element),
+  not a measured ratio; a large book may be read in more parts or refused as too large. Measured on one 14-ledger lab book of TallyPrime 7.1 Silver and not yet run through this tool on a
+  live Tally.
+
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
   Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
   and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,
@@ -106,6 +117,53 @@ These changes are in source and not yet in a published build.
   single `<batch>.proof.json`, which no longer changes. After the first verification with this
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
+
+- **A batch approval's Journal lines now name a ledger on each side, and the window no longer
+  says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
+  its first debit ledger, so the person could not see what each Journal credited; it now shows
+  `Dr "<first debit>" +N more  Cr "<first credit>" +M more`, with up to 20 characters of its
+  narration (other types keep 40). A Journal line that does not fit leaves the totals and the
+  reason line, as any line that does not fit does. The line above the voucher lines said each
+  narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
+  it now says a cut narration is marked. Payment, Receipt and Contra lines still name one
+  ledger. On every line, the further entries on a side now read "+N more", never a bare "+N"
+  that could be read as an amount.
+
+- The approval dialog of `post_import` now takes a voucher on a ledger whose
+  name in Tally ends in one line break; until now such a voucher could be
+  built and was refused for posting. The approval dialog, and the review
+  dialog if a doubt is recorded after the post, show such a name quoted
+  with the line break written out and the words "Line break" before the
+  quote, on every line that shows the name (`Line break  "Name\r\n"`), and
+  add one line saying what the mark means and that no other name in that
+  text has one. A line break anywhere else in a name is refused as before,
+  and no dialog shows a line break in any other value. The desktop Journal
+  screen takes no saved Journal that names such a ledger, to review or
+  post, or to reconcile once it was sent: it says so and says to use the
+  assistant for it. An approval text that carries both this line and the
+  On Account sentence holds one entry fewer. The mark takes 12 of a line's
+  100 characters and the written-out break 4: a text with a line over the
+  cap is refused, never cut, except that a batch's per-voucher lines give
+  way to a reason line.
+  Measured once on a licensed TallyPrime 7.1 Silver on Windows: one Journal
+  on such a ledger posted through the dialog, Tally read the name back with
+  the break as `&#13;&#10;`, and the post ended verified; the read-back is
+  now the test's fixture. Not measured: how macOS draws and wraps the mark
+  and the quoted name, and the review dialog against a live Tally (#626).
+
+- The review dialog of one voucher (`acknowledge_post_review`) now shows the
+  voucher's type quoted (`Record that you reviewed ONE "Journal" in "Books"`),
+  as it shows every other value read from Tally, so every Tally value in
+  that text is escaped (#626).
+
+- **An empty window whose neighbouring days hold vouchers now says so in its reason.** When the read of a
+  window returns nothing and the read widened by a day on each side finds rows, none inside the window,
+  `vouchers`, `voucher_presence`, `purchase_register`, `sales_register` and `ledger_movement` now give
+  `empty_window_wider_read_nonempty` where they gave `nonempty_uncorroborated`, which read as if the window
+  itself held rows. Only the name changes: the state stays `partial` (a refusal, for `ledger_movement`),
+  and an empty window next to a busy day still cannot reach `complete`. The other reasons
+  (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
+  `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
 
 ## [0.5.1] - 2026-10-09
 
@@ -341,31 +399,6 @@ counter Tally keeps that moves when vouchers or ledgers change.
   the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
   about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
   read, or a held later page (#1230).
-- The approval dialog of `post_import` now takes a voucher on a ledger whose
-  name in Tally ends in one line break; until now such a voucher could be
-  built and was refused for posting. The approval dialog, and the review
-  dialog if a doubt is recorded after the post, show such a name quoted
-  with the line break written out and the words "Line break" before the
-  quote, on every line that shows the name (`Line break  "Name\r\n"`), and
-  add one line saying what the mark means and that no other name in that
-  text has one. A line break anywhere else in a name is refused as before,
-  and no dialog shows a line break in any other value. The desktop Journal
-  screen takes no saved Journal that names such a ledger, to review or
-  post, or to reconcile once it was sent: it says so and says to use the
-  assistant for it. An approval text that carries both this line and the
-  On Account sentence holds one entry fewer. The mark takes 12 of a line's
-  100 characters and the written-out break 4: a text with a line over the
-  cap is refused, never cut, except that a batch's per-voucher lines give
-  way to a reason line.
-  Measured once on a licensed TallyPrime 7.1 Silver on Windows: one Journal
-  on such a ledger posted through the dialog, Tally read the name back with
-  the break as `&#13;&#10;`, and the post ended verified; the read-back is
-  now the test's fixture. Not measured: how macOS draws and wraps the mark
-  and the quoted name, and the review dialog against a live Tally (#626).
-- The review dialog of one voucher (`acknowledge_post_review`) now shows the
-  voucher's type quoted (`Record that you reviewed ONE "Journal" in "Books"`),
-  as it shows every other value read from Tally, so every Tally value in
-  that text is escaped (#626).
 
 **Safer or fixed**
 

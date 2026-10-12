@@ -623,32 +623,6 @@ fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
     let duplicate = Fixture::DuplicateExportMetadata.body();
     assert!(duplicate.contains("SCHEMA=\"bridge.tally.ledgers/1\""));
     assert!(duplicate.contains("<SCHEMA>bridge.tally.ledgers/1</SCHEMA>"));
-
-    let voucher = Fixture::VoucherExport.body();
-    assert!(voucher.contains("SCHEMA=\"bridge.tally.vouchers/2\""));
-    assert!(voucher.contains("OBJECTTYPE=\"VOUCHER\""));
-    for forbidden in [
-        "NARRATION",
-        "ADDRESS",
-        "EMAIL",
-        "PHONE",
-        "MOBILE",
-        "PINCODE",
-    ] {
-        assert!(!voucher.contains(forbidden));
-    }
-}
-
-#[test]
-fn inconsistent_date_filter_fixture_returns_a_row_outside_its_declared_window() {
-    let xml = Fixture::InconsistentDateFilter.body();
-    assert_eq!(
-        element_values(&xml, b"DATE").unwrap(),
-        vec!["20260630".to_string()]
-    );
-    assert!(xml.contains("FROMDATE=\"20260701\""));
-    assert!(xml.contains("TODATE=\"20260731\""));
-    assert!(assert_well_formed(&xml).is_ok());
 }
 
 #[test]
@@ -665,8 +639,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::EmptyExport,
         Fixture::DuplicateIdentity,
         Fixture::WrongCompany,
-        Fixture::VoucherExport,
-        Fixture::InconsistentDateFilter,
         Fixture::RecordCountMismatch,
         Fixture::MalformedExportMetadata,
         Fixture::DuplicateExportMetadata,

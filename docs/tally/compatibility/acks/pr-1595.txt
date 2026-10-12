@@ -1,0 +1,11 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_ENVIRONMENT_AND_REQUESTS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+scripts/check-tally-request-builder-hazards.mjs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/crates/tally-protocol-simulator/README.md
+src-tauri/crates/tally-protocol-simulator/src/fixtures.rs
+src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs
+src-tauri/src/tally/tdl_engine.rs
+removed-pin: src-tauri/crates/tally-protocol-simulator/fixtures/inconsistent_date_filter.xml
+reviewer: lamemustafa

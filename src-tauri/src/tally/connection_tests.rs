@@ -684,35 +684,6 @@ async fn tally_requests_ignore_configured_proxy() {
     );
 }
 
-/// A later, smaller response must not lower the largest response body a read
-/// observed: the runtime reports that figure as the read's evidence, and a
-/// closing bracket read (a small company-extent response) comes after the
-/// large payload it brackets. This was first asserted inside the legacy
-/// voucher-scan paired-read test (a voucher payload followed by a closing
-/// extent); it holds for the shipped recorder itself.
-#[test]
-fn observed_body_bytes_keep_the_largest_response_until_reset() {
-    let client = TallyClient::new(TallyConfig {
-        host: "127.0.0.1".to_string(),
-        port: 9,
-    })
-    .expect("build Tally client");
-    assert_eq!(client.observed_body_bytes(), None);
-    client.record_observed_body_bytes(1_000);
-    client.record_observed_body_bytes(40);
-    assert_eq!(
-        client.observed_body_bytes(),
-        Some(1_000),
-        "a smaller later response must not overwrite the larger payload"
-    );
-    client.record_observed_body_bytes(2_000);
-    assert_eq!(client.observed_body_bytes(), Some(2_000));
-    client.reset_observed_body_bytes();
-    assert_eq!(client.observed_body_bytes(), None);
-    client.record_observed_body_bytes(40);
-    assert_eq!(client.observed_body_bytes(), Some(40));
-}
-
 /// The outstandings bracket (`fetch_company_book_extent`, feeding both the
 /// outstandings read and the ledger export) must fail closed with
 /// a typed error when both paired reads agree but neither carries
@@ -1344,25 +1315,28 @@ fn the_compliance_read_admits_by_mark_counts_by_catalogue_or_census_then_refuses
         (4_266, 22_857, 400_000)
     );
     assert_eq!(
-        super::admit_compliance_master_read(master_limit, None).unwrap(),
+        super::admit_compliance_master_read(master_limit, None, super::ComplianceRead::Standard)
+            .unwrap(),
         super::ComplianceAdmission::Admitted
     );
     for mark in [master_limit + 1, 10_001, 20_000, count_limit] {
         assert_eq!(
-            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::admit_compliance_master_read(mark, None, super::ComplianceRead::Standard)
+                .unwrap(),
             super::ComplianceAdmission::CountFirst,
             "mark {mark}"
         );
     }
     for mark in [count_limit + 1, 102_161, census_limit] {
         assert_eq!(
-            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::admit_compliance_master_read(mark, None, super::ComplianceRead::Standard)
+                .unwrap(),
             super::ComplianceAdmission::CensusFirst,
             "mark {mark}"
         );
     }
     for mark in [census_limit + 1, 1_000_000] {
-        match super::admit_compliance_master_read(mark, None) {
+        match super::admit_compliance_master_read(mark, None, super::ComplianceRead::Standard) {
             Err(super::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
                 estimated_bytes,
@@ -1396,15 +1370,26 @@ fn a_census_count_admits_the_read_and_bounds_the_catalogue_that_names_its_parent
         / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
     // A real book: 864 ledgers under a mark of 102,161.
     assert_eq!(
-        super::admit_compliance_master_read(102_161, Some(864)).unwrap(),
+        super::admit_compliance_master_read(102_161, Some(864), super::ComplianceRead::Standard)
+            .unwrap(),
         super::ComplianceAdmission::Admitted
     );
     assert_eq!(
-        super::admit_compliance_master_read(102_161, Some(master_limit)).unwrap(),
+        super::admit_compliance_master_read(
+            102_161,
+            Some(master_limit),
+            super::ComplianceRead::Standard
+        )
+        .unwrap(),
         super::ComplianceAdmission::Admitted
     );
     assert_eq!(
-        super::admit_compliance_master_read(102_161, Some(master_limit + 1)).unwrap(),
+        super::admit_compliance_master_read(
+            102_161,
+            Some(master_limit + 1),
+            super::ComplianceRead::Standard
+        )
+        .unwrap(),
         super::ComplianceAdmission::InParts
     );
     super::admit_counted_catalogue(count_limit).expect("a count at the catalogue limit fits");
@@ -1492,7 +1477,7 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
             < bridge_tally_transport::XML_RESPONSE_MAX_BYTES as u64
     );
     assert_eq!(
-        super::admit_compliance_master_read(20_000, None).unwrap(),
+        super::admit_compliance_master_read(20_000, None, super::ComplianceRead::Standard).unwrap(),
         super::ComplianceAdmission::CountFirst
     );
 }
@@ -1527,7 +1512,7 @@ fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
                 ParentObservation::from(parent.as_deref()),
             )
         }),
-        super::parent_partition_limits(),
+        super::parent_partition_limits(super::ComplianceRead::Standard),
     )
     .unwrap_err();
     assert_eq!(error, ParentPartitionError::TooManyParts { parts: 13 });
@@ -1562,10 +1547,10 @@ fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
                 ParentObservation::from(parent.as_deref()),
             )
         }),
-        super::parent_partition_limits(),
+        super::parent_partition_limits(super::ComplianceRead::Standard),
     )
     .unwrap();
-    let limits = super::parent_partition_limits();
+    let limits = super::parent_partition_limits(super::ComplianceRead::Standard);
     assert!(partition.parts().len() <= 8, "{}", partition.parts().len());
     let mut ledgers = 0;
     let mut parents = 0;
@@ -1586,7 +1571,7 @@ fn a_complement_at_the_ledger_limit_is_planned_and_one_more_is_refused() {
     use bridge_tally_protocol::parent_partition::{
         ParentObservation, ParentPartition, ParentPartitionError,
     };
-    let limits = super::parent_partition_limits();
+    let limits = super::parent_partition_limits(super::ComplianceRead::Standard);
     let plan = |odd: u64| {
         let mut rows = vec![("Named".to_owned(), "guid-named".to_owned(), Some("P"))];
         for index in 0..odd {
@@ -1623,7 +1608,7 @@ fn only_a_parent_parts_oversized_response_is_named_as_one() {
     use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
     let partition = ParentPartition::plan(
         [("Ledger", "guid", ParentObservation::Named("P"))],
-        super::parent_partition_limits(),
+        super::parent_partition_limits(super::ComplianceRead::Standard),
     )
     .unwrap();
     let part = partition.parts().first();
@@ -1691,11 +1676,21 @@ fn a_counted_compliance_read_is_whole_at_the_master_limit_and_in_parts_one_over(
         / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
     for mark in [9_000, 1_000_000] {
         assert_eq!(
-            super::admit_compliance_master_read(mark, Some(master_limit)).unwrap(),
+            super::admit_compliance_master_read(
+                mark,
+                Some(master_limit),
+                super::ComplianceRead::Standard
+            )
+            .unwrap(),
             super::ComplianceAdmission::Admitted
         );
         assert_eq!(
-            super::admit_compliance_master_read(mark, Some(master_limit + 1)).unwrap(),
+            super::admit_compliance_master_read(
+                mark,
+                Some(master_limit + 1),
+                super::ComplianceRead::Standard
+            )
+            .unwrap(),
             super::ComplianceAdmission::InParts
         );
     }
@@ -1734,4 +1729,143 @@ fn a_compliance_estimate_exactly_at_the_budget_fits_and_one_over_does_not() {
             fits: false
         }
     );
+}
+
+/// The GST details read carries its own per-ledger estimate, above the shared
+/// one, and both are what the budget is divided by; the limits are the
+/// constants' own quotients, so a changed constant moves them.
+#[test]
+fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
+    use super::ComplianceRead::{Standard, WithGstDetails};
+    // UNVERIFIED: decided against one capture (a margin above 5,394).
+    assert_eq!(
+        super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
+        8_000
+    );
+    assert!(
+        std::hint::black_box(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED)
+            > super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
+    );
+    let standard = super::compliance_master_ledgers_per_read(Standard);
+    let with = super::compliance_master_ledgers_per_read(WithGstDetails);
+    assert_eq!(
+        standard,
+        super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+            / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
+    );
+    assert_eq!(
+        with,
+        super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+            / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED
+    );
+    assert!(with < standard);
+    // By the mark: a mark one standard read holds is counted first when the
+    // details are asked for; a mark a details read holds is admitted by both.
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, WithGstDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(with, None, WithGstDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(with + 1, None, WithGstDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(with + 1, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    // By a count: exactly the details limit fits, one more is read in parts,
+    // and the standard read still holds that one.
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(with), WithGstDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(with + 1), WithGstDetails).unwrap(),
+        super::ComplianceAdmission::InParts
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(with + 1), Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(standard), WithGstDetails).unwrap(),
+        super::ComplianceAdmission::InParts
+    );
+    // The estimate a refusal or an admission reports is the read's own.
+    assert_eq!(
+        super::compliance_estimate_unverified(with, WithGstDetails).estimated_bytes,
+        with * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED
+    );
+    assert!(super::compliance_estimate_unverified(with, WithGstDetails).fits);
+    assert!(!super::compliance_estimate_unverified(with + 1, WithGstDetails).fits);
+}
+
+/// A book read in parts is split by the read's own ledger bound; every other
+/// limit is the shared one.
+#[test]
+fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
+    use super::ComplianceRead::{Standard, WithGstDetails};
+    use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
+    let standard = super::parent_partition_limits(Standard);
+    let with = super::parent_partition_limits(WithGstDetails);
+    assert_eq!(
+        with.max_ledgers_per_part,
+        super::compliance_master_ledgers_per_read(WithGstDetails)
+    );
+    assert!(with.max_ledgers_per_part < standard.max_ledgers_per_part);
+    assert_eq!(
+        (
+            with.max_parents_per_part,
+            with.max_parts,
+            with.max_complement_formula_bytes
+        ),
+        (
+            standard.max_parents_per_part,
+            standard.max_parts,
+            standard.max_complement_formula_bytes
+        )
+    );
+    // A book of one ledger more than a details part holds, under two
+    // parents: one part for the standard read, two for the details read.
+    let count = with.max_ledgers_per_part + 1;
+    let rows = (0..count)
+        .map(|index| {
+            (
+                format!("Ledger {index}"),
+                format!("guid-{index}"),
+                if index % 2 == 0 {
+                    "Debtors"
+                } else {
+                    "Creditors"
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    let plan = |limits| {
+        ParentPartition::plan(
+            rows.iter().map(|(name, guid, parent)| {
+                (
+                    name.as_str(),
+                    guid.as_str(),
+                    ParentObservation::Named(parent),
+                )
+            }),
+            limits,
+        )
+        .unwrap()
+    };
+    assert_eq!(plan(standard).parts().len(), 1);
+    let parts = plan(with);
+    assert_eq!(parts.parts().len(), 2);
+    for part in parts.parts() {
+        assert!(part.ledger_count() <= with.max_ledgers_per_part);
+    }
 }

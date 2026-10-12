@@ -39,13 +39,13 @@ use tokio::sync::OnceCell;
 /// opening it on every app start means paying that prompt for no reason. Initialising lazily, on
 /// first use, means the prompt is shown only to sessions that exercise a feature that truly needs
 /// the mirror (snapshot, mirror-explorer, write-fixture, proof export).
-pub struct LazyTallyMirror {
+pub(crate) struct LazyTallyMirror {
     app_data_directory: PathBuf,
     repository: OnceCell<db::tally_mirror::TallyMirrorRepository>,
 }
 
 impl LazyTallyMirror {
-    pub fn new(app_data_directory: PathBuf) -> Self {
+    pub(crate) fn new(app_data_directory: PathBuf) -> Self {
         Self {
             app_data_directory,
             repository: OnceCell::new(),
@@ -56,7 +56,7 @@ impl LazyTallyMirror {
     /// work on first call. `OnceCell::get_or_try_init` guarantees that concurrent callers racing
     /// this accessor observe exactly one initialisation attempt: the first caller runs it while
     /// later callers await the same in-flight attempt rather than starting their own.
-    pub async fn get(&self) -> anyhow::Result<&db::tally_mirror::TallyMirrorRepository> {
+    pub(crate) async fn get(&self) -> anyhow::Result<&db::tally_mirror::TallyMirrorRepository> {
         self.repository
             .get_or_try_init(|| async {
                 std::fs::create_dir_all(&self.app_data_directory)?;

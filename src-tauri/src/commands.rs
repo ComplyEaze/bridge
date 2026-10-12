@@ -1704,12 +1704,6 @@ pub async fn bootstrap_direct_tally_company(
     persisted_tally_probe_result(review_id, canonical_origin, observed_at_unix_ms, probe)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CompanyRequest {
-    pub config: TallyConfig,
-    pub selected_company: SelectedCompanyIdentity,
-}
-
 /// The ledger-master export's request. `as_of_yyyymmdd` is the date the CA
 /// chose on the Outstandings screen (#903); without it the balances end by the
 /// Bridge host's date, as before. A malformed date fails to deserialise: the

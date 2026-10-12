@@ -554,3 +554,129 @@ fn a_summary_receipt_counts_its_buckets() {
     let response = json!({"result": {"buckets": [{"group": "a"}, {"group": "b"}, {"group": "c"}]}});
     assert_eq!(response_row_count(&response), Some(3));
 }
+
+// ---- the transfers section never makes a call fail as too large -----------------
+
+fn transfers_section(rows: usize) -> Value {
+    json!({
+        "state": "computed", "skips_paired": 2, "skips_open": rows, "retired": 1,
+        "open": (0..rows)
+            .map(|n| json!({"bridge_txn_id": format!("st-20260105-{n:016x}"),
+                "date": "20260105", "state": "not_found"}))
+            .collect::<Vec<_>>(),
+        "open_omitted": 0,
+        "next_steps": {"not_found": "a step text ".repeat(25)},
+    })
+}
+
+fn len_of(response: &Value) -> usize {
+    response.to_string().len()
+}
+
+#[test]
+fn open_rows_are_cut_before_the_verified_rows_of_a_page() {
+    let items: Vec<Value> = (0..20)
+        .map(|id| json!({"id": id, "padding": "x".repeat(40)}))
+        .collect();
+    let mut response = json!({"result": {"offset": 0, "items": items,
+        "transfers": transfers_section(300)}});
+    let without = {
+        let mut bare = response.clone();
+        bare["result"]["transfers"]["open"] = json!([]);
+        len_of(&bare)
+    };
+    let cap = without + 2_000;
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    // every verified row is still there, and the section counts what it cut
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 20);
+    let section = &response["result"]["transfers"];
+    let kept = section["open"].as_array().unwrap().len();
+    assert!(kept > 0 && kept < 300, "{kept}");
+    assert_eq!(section["open_omitted"], 300 - kept);
+    assert_eq!(section["skips_open"], 300);
+    assert!(section["next_steps"]["open_omitted"]
+        .as_str()
+        .unwrap()
+        .contains("BRIDGE_AGENT_MAX_BYTES"));
+    // the rows kept are the first ones
+    assert_eq!(
+        section["open"][kept - 1]["bridge_txn_id"],
+        format!("st-20260105-{:016x}", kept - 1)
+    );
+}
+
+#[test]
+fn a_result_with_no_rows_of_its_own_still_fits_by_cutting_the_section() {
+    let mut response = json!({"result": {"batch_id": "bridge-x", "note": "y".repeat(500),
+        "transfers": transfers_section(300)}});
+    let cap = 3_000;
+    assert!(len_of(&response) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    assert_eq!(response["result"]["batch_id"], "bridge-x");
+    assert!(
+        response["result"]["transfers"]["open_omitted"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+}
+
+#[test]
+fn the_section_is_fitted_to_the_text_copy_and_its_escaping_too() {
+    let mut mcp = json!({"content": [{"type": "text", "text": ""}],
+        "structuredContent": {"result": {"batch_id": "bridge-x",
+            "transfers": transfers_section(300)}}});
+    let cap = 6_000;
+    enforce_mcp_result_byte_cap(&mut mcp, cap, "build_import_xml", 0).unwrap();
+    set_mcp_content_json(&mut mcp);
+    assert!(len_of(&mcp) <= cap, "{}", len_of(&mcp));
+    let section = &mcp["structuredContent"]["result"]["transfers"];
+    assert!(section["open_omitted"].as_u64().unwrap() > 0);
+    assert_eq!(section["skips_open"], 300);
+}
+
+#[test]
+fn a_section_that_cannot_keep_its_texts_keeps_its_counts_and_then_only_a_note() {
+    let section = transfers_section(300);
+    let with = |section: Value| json!({"result": {"batch_id": "bridge-x", "transfers": section}});
+    // room for the counts and the one step, not for the step texts
+    let cap = len_of(&with(counts_only_section(&section)));
+    assert!(len_of(&with(trim_section(&section, 0))) > cap);
+    let mut counts = with(section.clone());
+    assert!(fit_response(&mut counts, "", cap, |value| len_of(value)).unwrap());
+    let kept = &counts["result"]["transfers"];
+    assert_eq!(kept["state"], "computed");
+    assert_eq!(kept["skips_open"], 300);
+    assert_eq!(kept["open"], json!([]));
+    assert_eq!(kept["open_omitted"], 300);
+    assert_eq!(
+        kept["next_steps"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
+        ["open_omitted"]
+    );
+    // room for nothing but a note that the check is to be run again
+    let cap = len_of(&with(check_not_run_section()));
+    let mut note = with(section);
+    assert!(fit_response(&mut note, "", cap, |value| len_of(value)).unwrap());
+    let kept = &note["result"]["transfers"];
+    assert_eq!(kept["state"], "not_established");
+    assert!(kept.get("skips_open").is_none());
+    assert!(kept["next_steps"]["check_not_run"].is_string());
+}
+
+#[test]
+fn a_section_that_already_fits_or_is_not_computed_is_left_alone() {
+    let mut fits = json!({"result": {"transfers": transfers_section(3)}});
+    let before = fits.clone();
+    assert!(!fit_response(&mut fits, "", 100_000, |value| len_of(value)).unwrap());
+    assert_eq!(fits, before);
+    // a note is not cut, so a response too large for its page is the page's
+    let mut note = json!({"result": {"items": [], "padding": "x".repeat(2_000),
+        "transfers": {"state": "not_established", "next_steps": {}}}});
+    assert!(fit_response(&mut note, "", 500, |value| len_of(value)).is_err());
+}

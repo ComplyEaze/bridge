@@ -69,6 +69,7 @@ mod statement_facts;
 mod transfers;
 pub(super) use approval::PostApprovals;
 use statement_facts::{SkipOnlyRecord, StatementFacts};
+pub(super) use transfers::{check_not_run_section, counts_only_section, trim_section};
 #[path = "agent_import_verification.rs"]
 mod verification;
 use std::path::{Path, PathBuf};

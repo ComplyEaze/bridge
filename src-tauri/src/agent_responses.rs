@@ -1,4 +1,5 @@
 //! Responses for the local MCP adapter.
+use super::agent_import::{check_not_run_section, counts_only_section, trim_section};
 use super::*;
 
 #[derive(Clone, Copy)]
@@ -204,6 +205,55 @@ pub(super) fn drop_tally_line_error_text(value: &mut Value) -> bool {
     }
 }
 
+/// Cut the `transfers` section of a result to fit: as many open rows as the
+/// real encoded response holds, then the counts alone, then a section that only
+/// says the check is to be run again. The rows cut are counted in `open_omitted`.
+fn fit_transfers(
+    response: &mut Value,
+    structured_path: &str,
+    max_bytes: usize,
+    encoded_len: &mut impl FnMut(&mut Value) -> usize,
+) {
+    let pointer = format!("{structured_path}/result/transfers");
+    let Some(original) = response
+        .pointer(&pointer)
+        .filter(|section| section["state"] == "computed")
+        .cloned()
+    else {
+        return;
+    };
+    let mut place = |response: &mut Value, section: Value| {
+        if let Some(slot) = response.pointer_mut(&pointer) {
+            *slot = section;
+        }
+        encoded_len(response) <= max_bytes
+    };
+    let rows = original["open"].as_array().map_or(0, Vec::len);
+    let (mut lower, mut upper) = (0, rows);
+    let mut best = None;
+    while lower <= upper {
+        let keep = lower + (upper - lower) / 2;
+        if place(response, trim_section(&original, keep)) {
+            best = Some(keep);
+            lower = keep + 1;
+        } else if keep == 0 {
+            break;
+        } else {
+            upper = keep - 1;
+        }
+    }
+    match best {
+        Some(keep) => {
+            place(response, trim_section(&original, keep));
+        }
+        None => {
+            if !place(response, counts_only_section(&original)) {
+                place(response, check_not_run_section());
+            }
+        }
+    }
+}
+
 // Measure O(log n) prefix candidates instead of serializing once for each
 // discarded row. Each candidate retains at least one row on every active axis.
 // The caller measures the actual outer envelope, including duplicated text and
@@ -225,6 +275,12 @@ fn fit_response(
         if encoded_len(response) <= max_bytes {
             return Ok(false);
         }
+    }
+    // The transfers section is the least essential part of a result: its open
+    // rows go first, then its step texts, so that it never makes a call fail.
+    fit_transfers(response, structured_path, max_bytes, &mut encoded_len);
+    if encoded_len(response) <= max_bytes {
+        return Ok(true);
     }
     let (shape, width) = response
         .pointer(structured_path)

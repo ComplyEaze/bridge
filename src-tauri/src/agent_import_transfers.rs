@@ -211,6 +211,42 @@ const CHECK_NOT_RUN_STEP: &str =
 const OPEN_OMITTED_STEP: &str =
     "Some open rows are not listed because the response is full. Raise BRIDGE_AGENT_MAX_BYTES to list every open row.";
 
+/// The section with its first `keep` open rows, the rest counted in
+/// `open_omitted`. The response cap's fitter uses it, so a section never makes
+/// a call fail as too large.
+pub(in crate::agent) fn trim_section(section: &Value, keep: usize) -> Value {
+    let rows = section["open"].as_array().map_or(0, Vec::len);
+    let keep = keep.min(rows);
+    let mut trimmed = section.clone();
+    if let Some(open) = trimmed["open"].as_array_mut() {
+        open.truncate(keep);
+    }
+    let omitted = section["open_omitted"].as_u64().unwrap_or(0) + (rows - keep) as u64;
+    trimmed["open_omitted"] = json!(omitted);
+    if omitted > 0 {
+        trimmed["next_steps"]["open_omitted"] = json!(OPEN_OMITTED_STEP);
+    }
+    trimmed
+}
+
+/// The counts alone, with the one step that says how to see the rest: for a
+/// response so full that not even the step texts fit.
+pub(in crate::agent) fn counts_only_section(section: &Value) -> Value {
+    let mut counts = trim_section(section, 0);
+    counts["next_steps"] = if counts["open_omitted"].as_u64().unwrap_or(0) > 0 {
+        json!({"open_omitted": OPEN_OMITTED_STEP})
+    } else {
+        json!({})
+    };
+    counts
+}
+
+/// What a section says when nothing of it fits: that the check is to be run
+/// again. It claims no count.
+pub(in crate::agent) fn check_not_run_section() -> Value {
+    TransferSummary::NotEstablished.render(0)
+}
+
 /// What to do about an open row of each state, for the assistant to follow.
 pub(super) fn next_step(state: &str) -> &'static str {
     match state {

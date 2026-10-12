@@ -1134,6 +1134,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "a skip is withdrawn on the person's word, never the assistant's",
         ),
         (
+            "build_import_xml",
+            "is refused as withdraw_skip_paired, naming that batch",
+            "a skip the other account's statement carries is not withdrawn into a second booking",
+        ),
+        (
             "verify_import",
             "transfers.state not_established means it could not be computed",
             "a failed transfer view is not an empty one",

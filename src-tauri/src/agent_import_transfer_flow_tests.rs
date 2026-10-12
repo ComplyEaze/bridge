@@ -1001,3 +1001,102 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn() {
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
 }
+
+// ---- a small response cap, hundreds of open rows --------------------------------
+
+const SMALL_CAP: usize = 20_000;
+
+fn server_with_cap(directory: &Path, port: u16, max_bytes: usize) -> Server {
+    Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port,
+        },
+        data_dir: directory.to_path_buf(),
+        max_rows: 10,
+        max_bytes,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    })
+}
+
+/// A statement of only skipped rows, hundreds of them.
+async fn record_many_skips(directory: &Path, count: u32) {
+    let ids: Vec<String> = (0..count)
+        .map(|n| format!("st-20260901-{n:016x}"))
+        .collect();
+    let rows: Vec<(&str, Option<&str>)> = ids.iter().map(|id| (id.as_str(), None)).collect();
+    let result = run(directory, skip_only_plans(), a_skips(directory, &rows)).await;
+    assert_eq!(result["state"], "skips_recorded", "{result}");
+    assert_eq!(result["transfers"]["skips_open"], count, "{result}");
+}
+
+#[tokio::test]
+async fn a_build_at_a_small_cap_cuts_the_open_rows_and_is_not_too_large() {
+    let directory = tempfile::tempdir().unwrap();
+    record_many_skips(directory.path(), 400).await;
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let server = server_with_cap(directory.path(), simulator.address().port(), SMALL_CAP);
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            serde_json::to_value(captured_catalogue_payload()).unwrap(),
+        )
+        .await;
+    let value = &response.value;
+    assert_ne!(value["isError"], true, "{value}");
+    let result = &value["structuredContent"]["result"];
+    assert!(result["batch_id"].is_string(), "{value}");
+    let section = &result["transfers"];
+    assert_eq!(section["skips_open"], 400, "{value}");
+    assert!(section["open_omitted"].as_u64().unwrap() > 0, "{value}");
+    assert_eq!(
+        section["open"].as_array().unwrap().len() as u64
+            + section["open_omitted"].as_u64().unwrap(),
+        400
+    );
+    assert!(
+        section["next_steps"]["open_omitted"]
+            .as_str()
+            .unwrap()
+            .contains("BRIDGE_AGENT_MAX_BYTES"),
+        "{value}"
+    );
+    assert!(
+        value.to_string().len() <= SMALL_CAP,
+        "{}",
+        value.to_string().len()
+    );
+}
+
+#[tokio::test]
+async fn a_verification_at_a_small_cap_cuts_the_open_rows_and_keeps_its_verdict() {
+    let directory = tempfile::tempdir().unwrap();
+    record_many_skips(directory.path(), 400).await;
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let wide = server_with_cap(directory.path(), simulator.address().port(), 200_000);
+    let built = wide
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let args = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let small = server_with_cap(directory.path(), simulator.address().port(), SMALL_CAP);
+    let first = small.call_tool_response("verify_import", args).await.value;
+    assert_ne!(first["isError"], true, "{first}");
+    let page = &first["structuredContent"]["result"];
+    let section = &page["transfers"];
+    assert_eq!(section["skips_open"], 400, "{first}");
+    assert!(section["open_omitted"].as_u64().unwrap() > 0, "{first}");
+    assert!(first.to_string().len() <= SMALL_CAP);
+    // the verdict is the persisted proof's, whatever the section lost
+    let [proof_path, _] = small.current_proof_paths(&batch_id);
+    let proof: Value = serde_json::from_slice(&fs::read(proof_path).unwrap()).unwrap();
+    assert_eq!(page["verification_status"], proof["verification_status"]);
+    assert_eq!(page["counts"], proof["counts"]);
+}

@@ -224,10 +224,19 @@ impl Journal {
         self.read_with("", COMPANY)
     }
     fn read_with(&self, skips: &str, company: &str) -> Result<TransferFacts, TransferFactsError> {
+        self.read_candidate(skips, company, None)
+    }
+    fn read_candidate(
+        &self,
+        skips: &str,
+        company: &str,
+        candidate: Option<Candidate>,
+    ) -> Result<TransferFacts, TransferFactsError> {
         ledger::transfer_facts(
             Cursor::new(self.0.as_bytes()),
             Cursor::new(skips.as_bytes()),
             company,
+            candidate,
         )
     }
 }
@@ -2507,4 +2516,159 @@ fn a_statement_record_reads_back_as_the_facts_it_was_made_from() {
         serde_json::from_value::<StatementFacts>(recorded).unwrap(),
         facts
     );
+}
+
+// ---- live skips and a candidate record -------------------------------------------
+
+fn skipping(id: u32, row: u32) -> Build {
+    build(id).facts(facts(B1).skip(skip_row(&st(row), "500.00", B2, None)))
+}
+
+#[test]
+fn a_skip_is_live_once_its_batch_is_sent_or_found_and_not_before() {
+    let built = skipping(90, 9);
+    let live = |journal: Journal| journal.read().unwrap().live_skips;
+    assert!(live(Journal::default().batch(&built)).is_empty());
+    // an incomplete verification is neither a dispatch nor a find
+    assert!(live(
+        Journal::default()
+            .batch(&built)
+            .status(&built, "verification_incomplete")
+    )
+    .is_empty());
+    let wanted = BTreeSet::from([key(B1, 9)]);
+    assert_eq!(live(Journal::default().batch(&built).sent(&built)), wanted);
+    assert_eq!(
+        live(
+            Journal::default()
+                .batch(&built)
+                .status(&built, "posted_verified")
+        ),
+        wanted
+    );
+}
+
+#[test]
+fn a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built() {
+    let first = skipping(91, 9);
+    let rebuilt = build(91 + 1).amends(91).facts(facts(B1).skip(skip_row(
+        &st(9),
+        "500.00",
+        B2,
+        Some(REF_A),
+    )));
+    let found = Journal::default()
+        .batch(&first)
+        .sent(&first)
+        .batch(&rebuilt)
+        .read()
+        .unwrap();
+    assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
+    // the newest mention still gives the facts
+    assert_eq!(found.skips[0].reference.is_some(), true);
+}
+
+#[test]
+fn liveness_follows_the_row_not_the_mention_the_merge_kept() {
+    // the newer lineage was only built, the older one was sent
+    let older = skipping(92, 9);
+    let newer = skipping(93, 9);
+    let found = Journal::default()
+        .batch(&older)
+        .sent(&older)
+        .batch(&newer)
+        .read()
+        .unwrap();
+    assert_eq!(found.skips.len(), 1);
+    assert_eq!(found.skips[0].lineage, LineageId::new(batch_id(93)));
+    assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
+    // neither sent: neither live
+    let found = Journal::default()
+        .batch(&older)
+        .batch(&newer)
+        .read()
+        .unwrap();
+    assert!(found.live_skips.is_empty());
+}
+
+#[test]
+fn a_skip_only_record_is_live() {
+    let record = skip_record(
+        7,
+        ENDPOINT,
+        "2026-09-02T10:00:00Z",
+        facts(B1).skip(skip_row(&st(9), "500.00", B2, None)),
+    );
+    let found = Journal::default()
+        .read_with(&skip_file(&[record]), COMPANY)
+        .unwrap();
+    assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
+}
+
+#[test]
+fn a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not() {
+    let sent = skipping(94, 9);
+    let held = build(95).voucher(payment(&st(9), "500.00"));
+    let found = Journal::default()
+        .batch(&sent)
+        .sent(&sent)
+        .batch(&held)
+        .read()
+        .unwrap();
+    assert_eq!(found.held_elsewhere.len(), 1);
+    assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
+    // not sent: held elsewhere but not live
+    let built = skipping(96, 9);
+    let found = Journal::default()
+        .batch(&built)
+        .batch(&held)
+        .read()
+        .unwrap();
+    assert_eq!(found.held_elsewhere.len(), 1);
+    assert!(found.live_skips.is_empty());
+    // the holder found posted retires the skip, which is then no skip at all
+    let found = Journal::default()
+        .batch(&sent)
+        .sent(&sent)
+        .batch(&held)
+        .status(&held, "posted_verified")
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 1);
+    assert!(found.live_skips.is_empty());
+}
+
+#[test]
+fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_skip_file_line() {
+    let held = build(97).voucher(payment(&st(9), "500.00"));
+    let skipped = skipping(98, 9);
+    let journal = Journal::default().batch(&skipped).sent(&skipped);
+    let without = journal.read().unwrap();
+    assert_eq!(without.skips.len(), 1);
+    assert!(without.held_elsewhere.is_empty());
+    // with a candidate that posts the row, the skip is held by the candidate
+    let with = journal
+        .read_candidate(
+            "",
+            COMPANY,
+            Some(Candidate::Build(Box::new(BuildLine::of(&held.line())))),
+        )
+        .unwrap();
+    assert!(with.skips.is_empty());
+    assert_eq!(
+        with.held_elsewhere,
+        vec![(key(B1, 9), BatchId::new(batch_id(97)))]
+    );
+    // a candidate skip-only record is a skip of its own
+    let record = skip_record(
+        8,
+        ENDPOINT,
+        "2026-09-03T10:00:00Z",
+        facts(B1).skip(skip_row(&st(10), "500.00", B2, None)),
+    );
+    let with = journal
+        .read_candidate("", COMPANY, Some(Candidate::SkipOnly(record)))
+        .unwrap();
+    assert_eq!(with.skips.len(), 2);
+    assert!(with.live_skips.contains(&key(B1, 10)));
 }

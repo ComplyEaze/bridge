@@ -487,6 +487,12 @@ impl BuildLine {
     }
 }
 
+/// A record about to be written, read as the newest one.
+pub(super) enum Candidate {
+    Build(Box<BuildLine>),
+    SkipOnly(SkipOnlyRecord),
+}
+
 /// One journal record, in journal order, as far as the facts need it.
 pub(super) enum JournalEvent {
     Build(Box<BuildLine>),
@@ -545,6 +551,11 @@ pub(super) struct TransferFacts {
     /// Contras of a build never sent and never found, whose row a sent or found
     /// batch of another lineage holds.
     pub(super) contras_superseded: usize,
+    /// The skips, kept or held elsewhere, that some build of the company which
+    /// mentions them was sent or found posted, or that a skip-only record holds:
+    /// a skip a person has acted on. A skip only built is superseded by the
+    /// next build of its statement and is not live.
+    pub(super) live_skips: BTreeSet<SkipKey>,
 }
 
 /// A batch as the journal leaves it.
@@ -678,6 +689,29 @@ struct SkipMention {
     row: String,
     built: DateTime<FixedOffset>,
     source_id: String,
+    /// Some source that mentions the row was sent, found posted, or is a
+    /// skip-only record.
+    live: bool,
+}
+
+impl SkipMention {
+    /// Keep the newer of two mentions of one row. Liveness is a property of
+    /// the row, not of the mention kept: if either was acted on, it is.
+    fn merge_into(self, mentions: &mut BTreeMap<SkipKey, SkipMention>) {
+        let key = self.fact.key.clone();
+        match mentions.get_mut(&key) {
+            Some(old) => {
+                let live = old.live || self.live;
+                if (&self.built, &self.source_id) > (&old.built, &old.source_id) {
+                    *old = self;
+                }
+                old.live = live;
+            }
+            None => {
+                mentions.insert(key, self);
+            }
+        }
+    }
 }
 
 /// A statement Contra with the build that decided it.
@@ -810,9 +844,13 @@ fn lineage_facts(
                 endpoint_origin: EndpointOrigin::new(batch.endpoint()?),
                 row: StatementRowId::new(skip.txn.as_str()),
             };
+            let live = batch.sent
+                || batch.found
+                || skips.get(&key).is_some_and(|earlier| earlier.live);
             skips.insert(
                 key.clone(),
                 SkipMention {
+                    live,
                     fact: SkipFact {
                         key,
                         date: skip.date.clone(),
@@ -931,9 +969,6 @@ pub(super) fn build_transfer_facts(
     let mut contras_not_two_leg = 0;
     let mut contras_without_facts = 0;
     let mut blocked: BTreeMap<(EndpointOrigin, LedgerGuid), BTreeSet<TallyDate>> = BTreeMap::new();
-    let newer = |new: &SkipMention, old: &SkipMention| {
-        (&new.built, &new.source_id) > (&old.built, &old.source_id)
-    };
     for members in lineages.values() {
         let found = lineage_facts(&batches, members, &company)?;
         contras_not_two_leg += found.left_out;
@@ -959,10 +994,8 @@ pub(super) fn build_transfer_facts(
             }
         }
         contras.extend(found.contras);
-        for (key, mention) in found.skips {
-            if mentions.get(&key).is_none_or(|old| newer(&mention, old)) {
-                mentions.insert(key, mention);
-            }
+        for mention in found.skips.into_values() {
+            mention.merge_into(&mut mentions);
         }
     }
 
@@ -998,9 +1031,10 @@ pub(super) fn build_transfer_facts(
                 endpoint_origin: endpoint.clone(),
                 row: StatementRowId::new(skip.txn.as_str()),
             };
-            let mention = SkipMention {
+            SkipMention {
+                live: true,
                 fact: SkipFact {
-                    key: key.clone(),
+                    key,
                     date: skip.date,
                     amount: skip.amount,
                     direction: skip.direction,
@@ -1012,10 +1046,8 @@ pub(super) fn build_transfer_facts(
                 row: skip.txn,
                 built,
                 source_id: source_id(),
-            };
-            if mentions.get(&key).is_none_or(|old| newer(&mention, old)) {
-                mentions.insert(key, mention);
             }
+            .merge_into(&mut mentions);
         }
     }
 
@@ -1023,14 +1055,22 @@ pub(super) fn build_transfer_facts(
     let mut skips = Vec::new();
     let mut retired_skips = 0;
     let mut held_elsewhere = Vec::new();
+    let mut live_skips = BTreeSet::new();
     for (key, mention) in mentions {
+        let live = mention.live;
         match holders.get(mention.row.as_str()) {
             None => skips.push(mention.fact),
-            Some(held) if held.batches.iter().any(|&at| batches[at].found) => retired_skips += 1,
+            Some(held) if held.batches.iter().any(|&at| batches[at].found) => {
+                retired_skips += 1;
+                continue;
+            }
             Some(held) => held_elsewhere.push((
-                key,
+                key.clone(),
                 BatchId::new(batches[held.latest].line.batch_id.as_str()),
             )),
+        }
+        if live {
+            live_skips.insert(key);
         }
     }
 
@@ -1082,6 +1122,7 @@ pub(super) fn build_transfer_facts(
         contras_not_two_leg,
         contras_without_facts,
         contras_superseded,
+        live_skips,
     })
 }
 

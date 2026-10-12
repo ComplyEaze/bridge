@@ -730,15 +730,15 @@ pub(super) fn vouchers_already_posted(
 }
 
 /// The facts the transfer pairing view takes for one company: the journal
-/// (every record admitted, as for every other read) and the skip-only file.
-// B2's tools are the first caller.
-#[allow(dead_code)]
+/// (every record admitted, as for every other read) and the skip-only file,
+/// with a build about to be written, if any, read as the newest record.
 pub(super) fn transfer_facts(
     journal: impl BufRead,
     skips_file: impl BufRead,
     company_guid: &str,
+    candidate: Option<statement_facts::Candidate>,
 ) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
-    use statement_facts::{BuildLine, JournalEvent, TransferFactsError};
+    use statement_facts::{BuildLine, Candidate, JournalEvent, TransferFactsError};
     let mut events = Vec::new();
     scan_records(journal, |record, _| match record {
         Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
@@ -750,8 +750,13 @@ pub(super) fn transfer_facts(
         Record::Status(_) => {}
     })
     .map_err(|code| TransferFactsError::JournalUnreadable { code })?;
-    let skip_records = statement_facts::read_skip_records(skips_file)
+    let mut skip_records = statement_facts::read_skip_records(skips_file)
         .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
+    match candidate {
+        Some(Candidate::Build(line)) => events.push(JournalEvent::Build(line)),
+        Some(Candidate::SkipOnly(record)) => skip_records.push(record),
+        None => {}
+    }
     statement_facts::build_transfer_facts(events, skip_records, company_guid)
 }
 

@@ -43,6 +43,15 @@ These changes are in source and not yet in a published build.
   book whose report lists a group and an item under the root side by side, an item inside a stock group, a
   compound unit, other dates, other releases, macOS, and a group that carries an item's name.
 
+- `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says whether the bank ledger in
+  Tally stands where the statement says it stood at the start and at the end of the statement's dates, as three
+  gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
+  after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
+  dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
+  parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
+  proved against a live book: one run on two synthetic companies by an outside contributor is only partly recorded (see
+  the pull request).
+
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
   return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
@@ -87,6 +96,16 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
+  differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
+  every other compared field matched and it read `posted_verified`, and a divergent voucher never
+  listed a narration difference. A narration edited in Tally after the post therefore leaves the
+  batch unsettled until the narration in Tally matches the approved text again. The read-back, the post's span binding and the amendment
+  check now share one comparison: the text as written (trimmed, with its `[BRIDGE:…]` tag for a
+  file imported by hand) against the text read, byte for byte; a narration Tally holds none of
+  equals only an empty one written. Whether Tally changes trailing spaces or line breaks on import
+  is unmeasured; the first live run will show it (#1608).
+
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
   Administrators, or that anyone but you, SYSTEM and Administrators can read or change
   (`statement_password_file_permissions`), as a Mac already refuses one that other users can read.
@@ -128,12 +147,21 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A `post_import` refusal made before anything was sent now says what to do next.** Its
+  `error.next_step` carries the same step every other tool gives for that refusal: its code's,
+  or else its cause's. Before, a code raised inside the post, such as a date range too large to
+  check in one request, came back with no step. Only when the journal shows nothing was sent: a
+  refusal after a send, or when a send could not be ruled out, still carries no such step, and is
+  reconciled with `verify_import`. The steps the post already gave (a busy port, a row another
+  batch posted) are unchanged (#1573).
+
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
   its first debit ledger, so the person could not see what each Journal credited; it now shows
   `Dr "<first debit>" +N more  Cr "<first credit>" +M more`, with up to 20 characters of its
-  narration (other types keep 40). A Journal line that does not fit leaves the totals and the
-  reason line, as any line that does not fit does. The line above the voucher lines said each
+  narration (other types keep 40), cut shorter, never under 10, when that makes the line fit. A
+  Journal line that fits at no such cut leaves the totals and the reason line, as any line that
+  does not fit does. The line above the voucher lines said each
   narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
   it now says a cut narration is marked. Payment, Receipt and Contra lines still name one
   ledger. On every line, the further entries on a side now read "+N more", never a bare "+N"

@@ -102,6 +102,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "purchase_register",
         "read_evidence",
         "sales_register",
+        "statement_tie_out",
         "stock_summary",
         "tally_status",
         "trial_balance",
@@ -1118,6 +1119,26 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "build_import_xml",
             "A batch you imported by hand blocks nothing until verify_import records the whole batch posted",
             "an unverified hand import does not stop a duplicate",
+        ),
+        (
+            "build_import_xml",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "build_import_xml",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
         ),
         (
             "tally_status",

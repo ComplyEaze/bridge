@@ -101,6 +101,7 @@ The ordinary default tools, in name order:
 - `purchase_register`
 - `read_evidence`
 - `sales_register`
+- `statement_tie_out`
 - `stock_summary`
 - `tally_status`
 - `trial_balance`
@@ -274,6 +275,12 @@ than a company's name. Both are attached only to a refusal made before anything 
 Tally: `company_guid_invalid` also comes back after a read when Tally itself lists a company whose
 GUID is malformed, and then it carries neither. Other argument refusals carry no `expected`. A date that fits the pattern but is not a real day,
 such as `2026-02-30`, is `invalid_date`; it gets the same date guidance in `remediation`.
+
+A `post_import` refusal does not carry `remediation`. When its journal shows that nothing was sent
+(`attempt_recorded` is `false`), it carries the same next step as `error.next_step` instead, when
+one exists: its code's, or else its cause's, under the same 4,096-byte rule. A step the post sets itself, for a busy
+port or a row another batch posted, is kept. A refusal after a send, or when a send could not be ruled
+out, is given no such step: it is reconciled with `verify_import`, never retried (#1573).
 
 Like `remediation`, `expected`, `cause`, `counts`, `size`, `endpoint`, `ledger`, `bill_row`,
 `partial_reason` (and `partial_reasons`), `reads`, `unsupported_parent_ledgers`, `candidates_listing`,
@@ -1783,6 +1790,64 @@ Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 not live-Tally qualification or a claim that every Tally configuration or
 licence mode has been qualified.
 
+### Statement tie-out (`statement_tie_out`)
+
+A read-only check of the bank ledger against a statement `parse_bank_statement`
+has parsed, for use before `build_import_xml` (`stage` `before_build`) and
+after a post or an import by hand (`stage` `after_post`). It writes nothing to
+Tally and never posts. Its check of the import journal takes the shared
+import-admission lock for a moment, so a build or post at the same time can be
+refused as lock-busy, and it can be refused by theirs; nothing waits, so nothing
+deadlocks.
+
+- **Whole statements only.** The parse records the statement's own first and
+  last row dates in an optional `window` of the proposals file (`first_row_date`,
+  `last_row_date`, `whole_statement`); the schema string is unchanged, and an
+  older build still reads such a file. A file with no `window`, or a
+  `whole_statement` of `false`, is `not_established` (`window_not_recorded`,
+  `window_narrower_than_statement`), answered from the file once the company is
+  verified. A narrowed window would need the running balance at its edges, which
+  the parse result deliberately never returns.
+- **The file is not bound to a company.** It names a bank ledger, not the
+  company it was parsed for; pass the company the statement belongs to.
+- **Three reads of the ledger list**, none of vouchers: the position at the first
+  row's date, at the day after the last row's date, and at the first date again.
+  A change dated before the statement, or an edit to the ledger itself (its
+  opening balance, name or removal), made between the first and third read, is
+  `book_changed_during_read`; a voucher dated inside the statement and posted
+  during the read moves only the end figure and is not caught. No ledger is read
+  when the file alone answers (`window_not_recorded`,
+  `window_narrower_than_statement`) or the statement starts before the company's
+  books begin (`window_precedes_books_from`).
+- **Three figures**, all in the statement's sign (book less statement: positive
+  means the book shows more money in the bank), with the two dates:
+  `opening_gap`, `closing_gap` (`before_build` adds what the file's vouchers put
+  into the bank ledger) and `change_in_window`, each `tied`, `differs` or
+  `not_established` with a reason. For `before_build` the closing figures are
+  `not_established` when some rows of the statement have no voucher in the file
+  (`rows_without_voucher`, whose count the result carries) or when the import
+  journal already holds a row of the file (`file_already_partly_posted`, the same
+  check a build makes before it writes a file); `after_post` is unaffected.
+- **What the result reveals.** The book's own balances are not returned, but a
+  gap plus the statement balance the caller supplied gives the book's balance,
+  so they are derivable. The result also carries the company block, the stage
+  and the reading.
+- **The sign is a type** (`BankSide`): Tally holds a debit balance as a negative
+  number, a statement prints money in the account as positive, and
+  `BankSide::from_book` is the only conversion.
+- **No cause is given.** Uncleared cheques, deposits in transit, a missing entry,
+  a repeated entry and the wrong bank ledger look alike; the reading says so,
+  prescribes no remedy and checks the bank ledger only.
+- **Not yet proved against a live book.** The tool-level tests replay captured
+  responses with one value changed in memory, and the dated ledger read the tool
+  relies on is the one described in protocol reference section 5.5. Their
+  proposals files are written by hand, except in the round-trip test, whose file
+  is written by the code the parse uses. One run by an outside contributor on two
+  synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
+  recorded, in the pull request: the import summary was not captured and no raw
+  answers are kept. A statement whose last day is the end of a financial year is
+  still to be run.
+
 ## Approved voucher posting
 
 **Voucher posting is off by default in the MCPB extension** while four known
@@ -1892,8 +1957,15 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    genuinely different transaction that shares the fingerprint of a voucher
    that was opened and confirmed is entered in Tally by hand. Build the other
    rows again so they post; a rebuilt batch can be refused again, naming rows
-   the first answer did not list. Cut inline batches on whole days so same-day
-   rows of one amount are not split across batches. The list and step are
+   the first answer did not list. Import a bank statement in whole-day batches:
+   cut a batch only between days, at most 50 vouchers (the batch-post limit), so
+   same-day rows of one amount are not split across batches; they pass this
+   check together in one batch. A proposals file is whole days already, since
+   `from` and `to` are days. A day with more than 50 rows does not fit one
+   batch, and that case is open: ask the user. Batch posting is off by
+   default, and with it off each post takes one voucher, so same-day twins
+   post together only with batch posting on or through a hand import of the
+   built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's
@@ -2047,7 +2119,10 @@ again by the next verification),
 
 A native post that sent no tag is never attributed by one: a row carrying its
 batch's tag is a hand import of the batch's file, matched by content only. The
-binding compares narration byte for byte. A narration holding the one sequence
+binding compares narration byte for byte, and so does every verification since
+#1608: an attributed voucher whose narration differs from the one written reads
+`posted_divergent`, with `narration` in its `diffs` (a voucher matched by content
+only stays `matching_content_observed` and only lists it). A narration holding the one sequence
 the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
 and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before
@@ -2342,6 +2417,18 @@ Per tool:
   - The count requests are sent before the reads they admit but folded after
     the commitment. None of the individual master, balance or group requests
     is reported on its own.
+- `statement_tie_out` (`src-tauri/src/agent_statement_tie_out.rs`): the company
+  read, and then, when the file records no window or a narrower one, nothing
+  more (evidence `partial`, with that reason). Otherwise:
+  1. the company read;
+  2. a runtime ledger read (currency masters, ledger export) at the first row's
+     date;
+  3. the same at the day after the last row's date;
+  4. the same again at the first row's date.
+
+  Each ledger read carries its own deadline and size limits, as for
+  `ledger_movement`; none reads vouchers. The result is `partial` when any
+  figure is not established.
 - `validate_masters`: the company read, then one scoped read of the ledger
   catalogue (`src-tauri/src/agent_import.rs`). Its `catalogue_evidence_sha256`
   hashes the parsed catalogue, not a request or a response.

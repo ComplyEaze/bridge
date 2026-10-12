@@ -1,0 +1,5 @@
+d64eef4328803e5852bbd13e6119aa8e894d35a8dda709d43900d0db693e7fd3  c1-report-remoteid.xml
+63ea05e510857870e4faac1833f8e7a597b4095ee7790c9c3789cc134261eef7  c2-object-name-guid.TEMPLATE.xml
+e52b7ab15438cb297eb17e254d0d555d59a1b4c7c9dd6dcd82936e531b1c24e8  c3-object-name-sent.TEMPLATE.xml
+70ba1e9c400b58f0e7db20cb087b804abd442a02dd8969f4a3ec20081153bae9  c4-object-guid-guid.TEMPLATE.xml
+d921a3f1b1199e9fb6985a8b7f539e2f791e041025b04b935f3f1df009dca84e  c5-object-guid-sent.TEMPLATE.xml

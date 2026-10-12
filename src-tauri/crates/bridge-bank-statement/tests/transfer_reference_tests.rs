@@ -116,19 +116,16 @@ fn hdfc_admits_only_network_transfers() {
             ),
             ("IMPS-60000000003-ACME-ABCD-NOTE", "1", "IMPS", None),
             ("IMPS-000000000000-ACME-ABCD-NOTE", "1", "IMPS", None),
+            // HDFC's NEFT value is the narration's last field, which can be a
+            // remark, or the reference column, which cannot hold a long UTR:
+            // neither is admitted until a real statement shows the UTR's place.
             (
                 "NEFT DR-ABCD0001234-ACME INDUSTRIES-ZZZZZ00000000003",
                 "1",
                 "NEFT",
-                Some("ZZZZZ00000000003"),
+                None,
             ),
-            // a NEFT line that falls back to the printed reference column
-            (
-                "NEFT CR-ACME",
-                "0000ZZZZZ00000000004",
-                "NEFT",
-                Some("ZZZZZ00000000004"),
-            ),
+            ("NEFT CR-ACME", "0000ZZZZZ00000000004", "NEFT", None),
             ("NEFT CR-ACME", "123", "NEFT", None),
             ("NEFT CR-ACME", "0000000000000000", "NEFT", None),
             ("NEFT CR-ACME", "", "NEFT", None),
@@ -226,7 +223,7 @@ fn a_transfer_reference_serialises_as_its_plain_string() {
 #[test]
 fn the_instrument_is_the_printed_cheque_or_number_column() {
     let printed = |column: &str, value: &str| row(&[(column, value), ("narr", "X")]);
-    for bank in [Bank::Sbi, Bank::Hdfc, Bank::Ubi] {
+    for bank in [Bank::Hdfc, Bank::Ubi] {
         assert_eq!(
             bank.instrument(&printed("ref", "  000417 ")),
             Some("000417".to_string()),
@@ -249,4 +246,17 @@ fn the_instrument_is_the_printed_cheque_or_number_column() {
     assert_eq!(Bank::Bob.instrument(&printed("ref", "000417")), None);
     assert_eq!(Bank::Bob.instrument(&printed("chq", "")), None);
     assert_eq!(Bank::Bob.instrument(&printed("chq", "00000")), None);
+    // State Bank of India's `ref` column is narrative (an account number and a
+    // name); only a cheque number at its end is an instrument.
+    let sbi = |reference: &str| row(&[("ref", reference), ("narr", "X")]);
+    assert_eq!(
+        Bank::Sbi.instrument(&sbi("CHQ TRANSFER / 000417")),
+        Some("000417".to_string())
+    );
+    assert_eq!(Bank::Sbi.instrument(&sbi("CHQ TRANSFER / 000000")), None);
+    assert_eq!(
+        Bank::Sbi.instrument(&sbi("TRANSFER TO 12345678 ACME /")),
+        None
+    );
+    assert_eq!(Bank::Sbi.instrument(&sbi("  000417 ")), None);
 }

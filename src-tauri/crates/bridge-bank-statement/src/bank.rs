@@ -338,8 +338,9 @@ impl Bank {
 
 /// The reference a network transfer carries on both banks' statements: a UPI or
 /// IMPS reference of twelve digits, or a NEFT or RTGS UTR. It can be built only
-/// by [`Bank::transfer_reference`], so a cheque number, a bank's own transaction
-/// id or an all-zero placeholder is never mistaken for one.
+/// by [`Bank::transfer_reference`], which never takes a cheque number, a bank's
+/// own transaction id or an all-zero placeholder for one. Which banks print the
+/// same value on both statements of one transfer is not yet measured.
 ///
 /// Upper case and without whitespace by construction: a UPI or IMPS value is
 /// ASCII digits, and a NEFT or RTGS one passed [`looks_like_utr`], which
@@ -368,26 +369,36 @@ impl Bank {
                 .map_or(value.as_str(), |(head, _)| head),
             _ => value.as_str(),
         };
-        let value = remove_space(value);
-        let admitted = match mode.as_str() {
-            "UPI" | "IMPS" => value.len() == 12 && value.bytes().all(|byte| byte.is_ascii_digit()),
-            "NEFT" | "RTGS" => looks_like_utr(&value),
+        let admitted = match (self, mode.as_str()) {
+            (_, "UPI" | "IMPS") => {
+                value.len() == 12 && value.bytes().all(|byte| byte.is_ascii_digit())
+            }
+            // HDFC's NEFT value is the narration's last field, which can be a
+            // remark, or its reference column, too short for a long UTR: not
+            // admitted until a real statement shows where the UTR is printed.
+            (Self::Hdfc, "NEFT") => false,
+            (_, "NEFT" | "RTGS") => looks_like_utr(value),
             _ => false,
         };
         (admitted && !value.chars().all(|character| character == '0'))
-            .then_some(BankReference(value))
+            .then(|| BankReference(value.to_string()))
     }
 
     /// The cheque or transaction number the statement prints in its own column,
-    /// trimmed: `ref` for State Bank of India, HDFC Bank and Union Bank,
-    /// `chq` for Bank of Baroda. `None` when it is empty or all zeros.
+    /// trimmed: `ref` for HDFC Bank and Union Bank, `chq` for Bank of Baroda.
+    /// State Bank of India's `ref` column is narrative (an account number and a
+    /// name), so only the cheque number [`Bank::reference`] reads from its end
+    /// is taken. `None` when it is empty or all zeros. Recorded only.
     pub fn instrument(self, row: &Row) -> Option<String> {
-        let column = match self {
-            Self::Sbi | Self::Hdfc | Self::Ubi => "ref",
-            Self::Bob => "chq",
+        let value = match self {
+            Self::Sbi => match self.reference(row) {
+                (mode, number) if mode == "CHQ" => number,
+                _ => return None,
+            },
+            Self::Hdfc | Self::Ubi => strip(row.get("ref")).to_string(),
+            Self::Bob => strip(row.get("chq")).to_string(),
         };
-        let value = strip(row.get(column));
-        (!value.chars().all(|character| character == '0')).then(|| value.to_string())
+        (!value.chars().all(|character| character == '0')).then_some(value)
     }
 }
 

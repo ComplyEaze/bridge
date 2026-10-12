@@ -152,6 +152,11 @@ fn a_mapping_may_not_claim_the_unresolved_sentinel() {
         load("party,ledger,treatment\nun resolved,L,skip\n"),
         "mapping_claims_a_sentinel",
     );
+    // a sentinel is named as such even when the row also lacks a ledger
+    refuses(
+        load("party,ledger,treatment\nUNRESOLVED,,skip\n"),
+        "mapping_claims_a_sentinel",
+    );
     assert!(
         !load("party,ledger,treatment\nUNRESOLVED TRADING CO,L,auto\n")
             .unwrap()

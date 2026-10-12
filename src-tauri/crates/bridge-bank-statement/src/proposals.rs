@@ -519,6 +519,17 @@ pub fn build(
                             ),
                         ));
                     }
+                    // Suspense is where unidentified rows go, never another
+                    // account whose Contra could carry the transfer.
+                    if ledger_key(&ledger) == ledger_key(options.suspense_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_suspense",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is the suspense ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
                     records.push(StatementRecord {
                         row: number,
                         date: date.iso(),
@@ -761,7 +772,8 @@ pub struct CounterpartyGroup {
     /// amount decides it.
     pub party: String,
     pub also_printed_as: Vec<String>,
-    /// The ledger its non-bank leg posts to; empty when skipped.
+    /// The ledger its non-bank leg posts to; for a skipped row, the other bank
+    /// account's ledger.
     pub ledger: String,
     /// `Payment`, `Receipt`, `Contra` or `Skipped`.
     pub disposition: String,

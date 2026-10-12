@@ -632,3 +632,32 @@ fn a_skip_ledger_meets_the_same_name_rules_as_any_other_ledger() {
     );
     assert_eq!(refusal.row, Some(2));
 }
+
+#[test]
+fn a_skip_naming_the_suspense_ledger_is_refused() {
+    let rows = [
+        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
+        upi(
+            "02/08/26",
+            "OWN ACCT",
+            "222222222222",
+            "20.00",
+            "",
+            "970.00",
+        ),
+    ];
+    let mut named = options("SUSPENSE ACC");
+    named.bank_ledger = "HDFC BANK";
+    for skip_ledger in ["SUSPENSE ACC", "suspense-acc"] {
+        let refusal = refuses(
+            build(
+                &rows,
+                Bank::Hdfc,
+                &mapping(&[("OWN ACCT", skip_ledger, "skip")]),
+                &named,
+            ),
+            "skip_ledger_is_suspense",
+        );
+        assert_eq!(refusal.row, Some(2), "{skip_ledger}");
+    }
+}

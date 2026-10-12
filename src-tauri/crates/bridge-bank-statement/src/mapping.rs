@@ -94,15 +94,6 @@ impl Mapping {
                     ),
                 ));
             }
-            if treatment == Treatment::Skip && ledger.is_empty() {
-                return Err(Refusal::new(
-                    "skip_without_ledger",
-                    format!(
-                        "{}: marked skip with no ledger. A skipped transfer must name the other bank account's ledger, so its Contra can be found; a transfer with no other side to find cannot be skipped.",
-                        row.origin
-                    ),
-                ));
-            }
             let key = mapping_key(&party);
             // A cash line's entry depends on what happened to that cash, which
             // differs line by line: never one rule for every such line.
@@ -120,6 +111,17 @@ impl Mapping {
                     "mapping_claims_a_sentinel",
                     format!(
                         "{}: this is a value the parser prints when it could NOT identify a counterparty, not a counterparty name. A row for it would send unrelated transactions to one ledger, or with skip drop them all. Map the individual narrations instead.",
+                        row.origin
+                    ),
+                ));
+            }
+            // After the sentinel and cash checks, so those rows are named as
+            // such first.
+            if treatment == Treatment::Skip && ledger.is_empty() {
+                return Err(Refusal::new(
+                    "skip_without_ledger",
+                    format!(
+                        "{}: marked skip with no ledger. A skipped transfer must name the other bank account's ledger, so its Contra can be found; a transfer with no other side to find cannot be skipped.",
                         row.origin
                     ),
                 ));

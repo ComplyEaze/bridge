@@ -8,7 +8,7 @@ Book: new synthetic BRIDGE PARTIAL LAB, company number 100055, GUID 22a3e632-d0b
 - Ledgers: Synthetic Bank Ledger (Bank Accounts), Party A (Sundry Debtors, bill-by-bill No), Lab Charges (Indirect Expenses), Lab Seed Income (Indirect Incomes); Cash and P&L predefined (s1c-0-ledger-list.jpg).
 - Seed: Receipt 1, 1-Jul-2026, Cash Dr / Lab Seed Income Cr 1,000.00, "Seed voucher".
 - P0: backups/P0/TDBK1800_100055.001, 25,265 B, sha256 f0504b0c9b17d581ecaf41e3ec2dcae29cf3a981a82b49cf220b6eb4c00c7d48, 09:03:13Z.
-CLICK MODE: lane (<lane> clicked Yes in the Bridge dialog with the mouse).
+CLICK MODE: lane (the Windows lab clicked Yes in the Bridge dialog with the mouse).
 
 ## Step 0 (look only; nothing saved): s1c-step0-finding.txt
 - Payment (no Payment vouchers in the book): Automatic → Manual raised no prompt. The cursor went straight to "Prevent creating duplicate Voucher Nos." on the main screen, directly under Method: value No, editable (s1c-step0-payment-manual-prevent-field.jpg).
@@ -16,7 +16,7 @@ CLICK MODE: lane (<lane> clicked Yes in the Bridge dialog with the mouse).
 - F12 and More Details were not opened: the field was found on the main screen first.
 - [inferred] Why v1 could not reach the field on BATCH LAB (32 Payments): the existing-transactions prompt fired on leaving Method, and the cursor then skipped past the field.
 
-## The variable: <lane>
+## The variable: V-1 (the item's first variant)
 - Payment = Manual numbering, Prevent creating duplicate Voucher Nos. = Yes. Screenshot before saving: s1c-v1-payment-before-save.jpg.
 - Saved with Ctrl+A; no prompt (no existing Payment vouchers), so no "update existing vouchers" prompt to answer.
 

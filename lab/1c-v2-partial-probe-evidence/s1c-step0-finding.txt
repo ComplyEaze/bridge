@@ -3,4 +3,4 @@ Step 0 (look only, 09:03-09:05Z, BRIDGE PARTIAL LAB 100055; nothing saved, both 
 - Receipt (one voucher, the seed): Automatic -> Manual raised "Changing the method of voucher numbering will affect voucher numbers of existing transactions. Continue?" (answered No; field reverted to Automatic; quit). The "Prevent creating duplicate Voucher Nos" row is visible behind the prompt. s1c-step0-receipt-manual-prompt.jpg.
 - Not opened: F12 / More Details (the field was found on the main screen first).
 - Reading [inferred]: the field is on the main screen under Method; in v1 (BATCH LAB, 32 Payments) the existing-transactions prompt fired on leaving Method and the cursor then skipped past the field, which is why it never took focus there.
-=> <lane> runs: Payment = Manual numbering, Prevent creating duplicate Voucher Nos. = Yes.
+=> V-1 (the item's first variant) runs: Payment = Manual numbering, Prevent creating duplicate Voucher Nos. = Yes.

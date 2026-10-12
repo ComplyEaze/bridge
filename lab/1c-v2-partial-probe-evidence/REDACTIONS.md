@@ -8,9 +8,7 @@ Rules: the Windows user name becomes `<user>`, the host name `<host>`, the JSON-
 
 | File | Replaced token kinds and counts | Note |
 |---|---|---|
-| REPORT.md | lane id x2 | bytes changed from the original |
 | s1c-build.json | Windows user name x1, user profile path x1 | bytes changed from the original |
-| s1c-step0-finding.txt | lane id x1 | bytes changed from the original |
 
 Kept on the lab PC: s1c-0-ledger-list.jpg, s1c-automatic-change-prompt.jpg, s1c-automatic-update-prompt.jpg, s1c-daybook-0725.jpg, s1c-dialog.jpg, s1c-payment-back-to-automatic.jpg, s1c-step0-payment-automatic.jpg, s1c-step0-payment-manual-prevent-field.jpg, s1c-step0-receipt-manual-prompt.jpg, s1c-v1-payment-before-save.jpg, s1c-windows.log.
 

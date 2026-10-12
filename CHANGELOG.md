@@ -38,7 +38,7 @@ These changes are in source and not yet in a published build.
   after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
   dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
   parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
-  proved against a live book: one run on a synthetic book by an outside contributor is only partly recorded (see
+  proved against a live book: one run on two synthetic companies by an outside contributor is only partly recorded (see
   the pull request).
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For

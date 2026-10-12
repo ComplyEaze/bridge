@@ -49,7 +49,7 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** Release 0.5.1 installs these 23, in name order. None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** In name order; release 0.5.1 installs 23 of them, and `statement_tie_out` is in source, not yet in a published build. None of them changes your TallyPrime books, and every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |

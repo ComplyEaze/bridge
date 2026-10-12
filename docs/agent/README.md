@@ -1740,7 +1740,10 @@ deadlocks.
   A change dated before the statement, or an edit to the ledger itself (its
   opening balance, name or removal), made between the first and third read, is
   `book_changed_during_read`; a voucher dated inside the statement and posted
-  during the read moves only the end figure and is not caught.
+  during the read moves only the end figure and is not caught. No ledger is read
+  when the file alone answers (`window_not_recorded`,
+  `window_narrower_than_statement`) or the statement starts before the company's
+  books begin (`window_precedes_books_from`).
 - **Three figures**, all in the statement's sign (book less statement: positive
   means the book shows more money in the bank), with the two dates:
   `opening_gap`, `closing_gap` (`before_build` adds what the file's vouchers put
@@ -1760,13 +1763,15 @@ deadlocks.
 - **No cause is given.** Uncleared cheques, deposits in transit, a missing entry,
   a repeated entry and the wrong bank ledger look alike; the reading says so,
   prescribes no remedy and checks the bank ledger only.
-- **Not live-proven.** The tool-level tests replay captured responses with one
-  value changed in memory, and the dated ledger read the tool relies on is the
-  one described in protocol reference section 5.5. Their proposals files are
-  written by hand, except in the round-trip test, whose file is written by the
-  code the parse uses. A run against a lab book with a seeded opening and an
-  import is still to be done, and so is a statement whose last day is the end of
-  a financial year.
+- **Not yet proved against a live book.** The tool-level tests replay captured
+  responses with one value changed in memory, and the dated ledger read the tool
+  relies on is the one described in protocol reference section 5.5. Their
+  proposals files are written by hand, except in the round-trip test, whose file
+  is written by the code the parse uses. One run by an outside contributor on two
+  synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
+  recorded, in the pull request: the import summary was not captured and no raw
+  answers are kept. A statement whose last day is the end of a financial year is
+  still to be run.
 
 ## Approved voucher posting
 

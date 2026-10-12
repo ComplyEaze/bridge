@@ -1205,7 +1205,8 @@ async fn an_import_holding_the_admission_lock_makes_a_before_build_tie_out_refus
         busy["structuredContent"]["result"]["error"]["code"],
         "import_admission_busy"
     );
-    drop(simulator);
+    // Only the company check was answered: no ledger was read.
+    assert_eq!(simulator.finish().unwrap().len(), company_check().len());
 }
 
 #[tokio::test]

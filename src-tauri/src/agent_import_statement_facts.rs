@@ -495,11 +495,6 @@ fn admit_facts(
     let Some(recorded) = &line.statement else {
         return Ok(None);
     };
-    if line.endpoint_origin.is_none() {
-        return Err(TransferFactsError::MissingEndpoint {
-            source_id: line.batch_id.clone(),
-        });
-    }
     let refused = |error| TransferFactsError::Facts {
         source_id: line.batch_id.clone(),
         error,

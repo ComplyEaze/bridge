@@ -370,6 +370,7 @@ impl ToolEffect {
             "validate_masters" => Self::Read,
             "verify_import" => Self::LocalWrite(VERIFY_IMPORT_SENTENCE),
             "voucher_presence" => Self::Read,
+            "voucher_read_cost" => Self::Read,
             "voucher_schema" => Self::Read,
             "vouchers" => Self::Read,
             _ => return None,
@@ -422,6 +423,7 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "validate_masters",
     "verify_import",
     "voucher_presence",
+    "voucher_read_cost",
     "voucher_schema",
     "vouchers",
 ];
@@ -674,6 +676,10 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                             "numbering":{"type":"array","minItems":1,"maxItems":presence::MAX_PRESENCE_VOUCHER_TYPES,"items":{"type":"object","additionalProperties":false,"required":["voucher_type","numbering_method"],"properties":{"voucher_type":{"type":"string","minLength":1,"maxLength":agent_import::MAX_MASTER_NAME_CHARS,"pattern":r"\S"},"numbering_method":{"type":"string","enum":["manual","automatic","unknown"]}}}},
                             "vouchers":{"type":"array","minItems":1,"maxItems":presence::MAX_PRESENCE_VOUCHERS,"items":proposed_voucher_schema()}
                         }}),
+                    ),
+                    "voucher_read_cost" => (
+                        "Say, before a call, the most census reads one call of `vouchers`, `ledger_movement` or `verify_import` will send on this company (a read can be refused before its census ends), and the least time a call that is not refused earlier spends on the gaps between them. The census follows the company's voucher mark, not the window: this figure is for one call, a narrower window does not lower it, and reading N days in N calls pays it N times. It is as of this call's own read of the mark; the next call reads the mark again. It reads the company's identity and then its marks (one paired read with an identity check on either side), the opening every windowed call makes, and sends no census and no voucher request. The count and the floor are derived from the mark and the gate's rules, not measured on this book, and the floor leaves out every data part. No estimate is made: `measured` is constant text, whole calls recorded in the protocol reference with their census reads, data parts, host, date and confidence, each marked as not a bound. Nothing is refused on this figure; the one refusal it can state is the one the read itself makes (`voucher_window_book_too_large`).",
+                        json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1}}}),
                     ),
                     "voucher_schema" => (
                         "Return the fail-closed local voucher-file schema; no Tally request is sent.",

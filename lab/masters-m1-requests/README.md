@@ -104,26 +104,30 @@ Send `R-PARTY` (the party ledger master read; it fetches TAXTYPE, GSTDUTYHEAD an
 
 Report per write: the counters, the ALTMSTID step, and the new row's GUID, PARENT, ISBILLWISEON and names.
 
-## Phase 5: L-NP (3 writes; each is 1 write then 3 reads). A new sitting after phase 4, with its own GO and grant
+## Phase 5: L-NP (5 writes; each is 1 write then 3 reads). A new sitting after phase 4, with its own GO and grant
 It asks whether a ledger Create folds away a removed space or a removed full stop. The run sheet's name fold does neither, so either answer changes what the name check must refuse.
 
-Send it only on the company as phase 4 left it: `MLab Fresh Party` exists (created by N-0a: Sundry Creditors, bill-wise Yes, never renamed), and no ledger is named like `MLab Probe Pvt Ltd`.
+Send it only on the company as phase 4 left it: `MLab Fresh Party` exists (created by N-0a: Sundry Creditors, bill-wise Yes, never renamed), `MLab Exact Target` is on Sundry Creditors with bill-wise Yes (after N-0b), `MLab Alias Target` is on Sundry Debtors with bill-wise No and keeps its two aliases, and no ledger is named like `MLab Probe Pvt Ltd`.
 
-Order: Q-a, Q-c0, Q-c. After each write, send `R-MARKS`, `R-V3`, `R-GRP` (step id `q-<case>-after`). Before Q-a, send the same three reads once (step id `q-before`).
+Tally restarted with its application settings reset after phase 3, so Q-0 repeats phase 3's exact-name control first: an exact-name Create must still alter the existing ledger, or nothing after it is comparable with phase 3.
+
+Order: Q-0, Q-r, Q-a, Q-c0, Q-c. After each write, send `R-MARKS`, `R-V3`, `R-GRP` (step id `q-<case>-after`). Before Q-a, send the same three reads once (step id `q-before`).
 
 | Case | Create name | Target it may hit | Expected |
 |---|---|---|---|
+| Q-0 | `MLab Exact Target` (Sundry Debtors, bill-wise No) | the same name | ALTERED=1 (control) |
+| Q-r | `MLab Alias Target` with `REMOTEID="MLAB-Q-R-REMOTEID-0001"`, a REMOTEID no master holds (Sundry Creditors, bill-wise Yes) | the same name | unknown: does a Create carrying an unknown REMOTEID still alter a master found by name, or is it refused? |
 | Q-a | `MLab FreshParty` (Sundry Debtors, bill-wise No) | `MLab Fresh Party` | unknown |
 | Q-c0 | `MLab Probe Pvt. Ltd.` (Sundry Creditors, bill-wise Yes) | none | CREATED=1 (control) |
 | Q-c | `MLab Probe Pvt Ltd` (Sundry Debtors, bill-wise No) | `MLab Probe Pvt. Ltd.` | unknown |
 
-Q-a and Q-c use a parent and bill-wise unlike their target's, so an overwrite shows in the row as well as in the counters.
+Q-0, Q-r, Q-a and Q-c use a parent and bill-wise unlike their target's, so an overwrite shows in the row as well as in the counters. For Q-r, also report whether the target row carries a REMOTEID after it.
 
 Report per case: the counters and any LINEERROR text; the ALTMSTID step; from R-V3 after, every ledger row whose names include the created name or the target's names, each with GUID, ALTERID, PARENT, ISBILLWISEON, the NAME attribute and all NAME.LIST names.
 
-If Q-c0 is not CREATED=1, STOP before Q-c. The other STOP rules apply as in every phase.
+If Q-0 is not ALTERED=1, STOP before Q-r. If Q-c0 is not CREATED=1, STOP before Q-c. The other STOP rules apply as in every phase.
 
-Grant: 3 writes and 12 reads.
+Grant: 5 writes and 18 reads.
 
 ## Evidence
 - Everything goes in `C:\bridge-lab\masters-m1\evidence\`: each response and its headers, log.txt, and the screenshots.

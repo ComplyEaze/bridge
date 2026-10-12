@@ -1191,3 +1191,37 @@ async fn a_skip_of_another_bank_ledger_is_not_this_builds_skip() {
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
 }
+
+#[tokio::test]
+async fn a_skip_another_endpoint_carries_does_not_stop_a_withdrawal_on_this_one() {
+    let directory = tempfile::tempdir().unwrap();
+    // through one endpoint the row is skipped and carried by a verified Contra
+    let first = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    first
+        .build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    let carrying = first
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(REFERENCE),
+        ))
+        .await;
+    first.finish();
+    mark_found(directory.path(), carrying["batch_id"].as_str().unwrap());
+    // through another it is skipped again, and nothing there carries it
+    let second = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    second
+        .build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    let built = second.build(withdrawing(directory.path())).await;
+    second.finish();
+    assert_eq!(built["voucher_count"], 1, "{built}");
+}

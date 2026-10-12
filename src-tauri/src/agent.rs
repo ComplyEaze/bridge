@@ -294,7 +294,7 @@ struct Settings {
 
 /// Whether this server may post to Tally. One setting governs every post: one
 /// voucher per approval, or a saved batch of 2 to 50 under one approval of its
-/// summary (#1090; the owner's decision of 12 Oct 2026). Off by default.
+/// summary (#1090). Off by default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Posting {
     Off,

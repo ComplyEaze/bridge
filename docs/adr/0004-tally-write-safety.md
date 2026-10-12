@@ -636,7 +636,7 @@ its safeguards, summary approval and outcome rules are unchanged (#1090).
   voucher at a time, so a value stored for it is mapped to nothing and every upgrader starts with
   posting off, as for the Terms (`agent_terms.rs`). This covers the extension only: a hand-set
   `BRIDGE_AGENT_ENABLE_WRITES=true` on the command line now admits batches with no new prompt,
-  by the owner's decision, and the changelog says so. An absent or empty value, or the key's own
+  by design (#1090), and the changelog says so. An absent or empty value, or the key's own
   unresolved placeholder, reads as off; any other value that is not a plain boolean still refuses at
   startup. What Claude Desktop passes for a new key on an upgrade is not yet measured.
 - **The retired setting refuses in band.** While `BRIDGE_AGENT_ENABLE_BATCH_POST` is present, with

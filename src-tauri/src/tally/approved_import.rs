@@ -1,5 +1,8 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
+use super::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
+use super::VerifiedCompanyIdentity;
+use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::{
     outstandings_shared::DateBoundaryProfile, StandardLedgerCatalogBinding,
@@ -47,8 +50,36 @@ impl VoucherCount {
     }
 }
 
+/// What the person approved, and the all-company marks request every kind of
+/// post is aimed with. The kind decides which reads the queue makes and which
+/// recheck runs; it cannot be changed after construction.
 #[derive(Clone)]
 pub(crate) struct ApprovedImport {
+    pub(super) kind: ApprovedKind,
+    /// The all-company change marks, read last before the POST to confirm the
+    /// aim and again right after it to see where the post went (#574).
+    company_marks_request: AgentReadRequest,
+}
+
+/// The two requests one dispatch can carry. A voucher post and a master post
+/// share the queue, the identity brackets, the aim and the single POST; they
+/// differ only in what is read to admit them.
+#[derive(Clone)]
+pub(super) enum ApprovedKind {
+    Vouchers(VoucherAdmission),
+    #[allow(
+        dead_code,
+        reason = "staged: built only in test builds until the dialog slice"
+    )]
+    /// Boxed: a master admission carries a rendered request and two reads, and
+    /// every `ApprovedImport` moves by value through the approval path.
+    Masters(Box<MasterAdmission>),
+}
+
+/// A voucher post's admission: every field the voucher path carried before
+/// there was a second kind, moved here unchanged.
+#[derive(Clone)]
+pub(super) struct VoucherAdmission {
     xml: String,
     /// Every voucher's date, in batch order: the queue's Education recheck
     /// covers each of them.
@@ -63,65 +94,9 @@ pub(crate) struct ApprovedImport {
     /// The company's Currency masters, re-read inside the queue: a post goes
     /// only into a book with exactly one (bridge#551).
     currency_request: AgentReadRequest,
-    /// The all-company change marks, read last before the POST to confirm the
-    /// aim and again right after it to see where the voucher went (#574).
-    company_marks_request: AgentReadRequest,
 }
 
-/// What the queue read for the last admission before the POST.
-pub(crate) struct QueuedAdmission<'a> {
-    pub(crate) first: &'a str,
-    pub(crate) second: &'a str,
-    pub(crate) catalogue: &'a str,
-    pub(crate) groups: Option<&'a str>,
-    pub(crate) currencies: &'a str,
-    /// The all-company marks read as the binding reads began (#239).
-    pub(crate) company_marks_at_binding: &'a str,
-    pub(crate) company_marks: &'a str,
-    pub(crate) ledger_binding: &'a StandardLedgerCatalogBinding,
-}
-
-/// Whether the profile accepts every voucher's date, and there is at least
-/// one: an empty list approves nothing.
-fn every_date_accepted(profile: DateBoundaryProfile, voucher_dates: &[TallyDate]) -> bool {
-    !voucher_dates.is_empty()
-        && voucher_dates
-            .iter()
-            .all(|voucher_date| profile.accepts_boundary(voucher_date))
-}
-
-impl ApprovedImport {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn confirm(
-        xml: String,
-        preview: &str,
-        voucher_dates: Vec<TallyDate>,
-        verification_request: AgentReadRequest,
-        ledger_catalogue_request: AgentReadRequest,
-        ledger_binding: StandardLedgerCatalogBinding,
-        group_collection_request: Option<AgentReadRequest>,
-        currency_request: AgentReadRequest,
-        company_marks_request: AgentReadRequest,
-    ) -> Result<Self, String> {
-        let count = VoucherCount::new(voucher_dates.len())
-            .ok_or_else(|| "voucher_date_invalid".to_string())?;
-        approve(count, preview).await?;
-        Ok(Self {
-            xml,
-            voucher_dates,
-            verification_request,
-            ledger_catalogue_request,
-            ledger_binding,
-            group_collection_request,
-            currency_request,
-            company_marks_request,
-        })
-    }
-
-    pub(super) fn xml(&self) -> &str {
-        &self.xml
-    }
-
+impl VoucherAdmission {
     pub(super) fn verification_request(&self) -> AgentReadRequest {
         self.verification_request.clone()
     }
@@ -141,21 +116,171 @@ impl ApprovedImport {
     pub(super) fn currency_request(&self) -> AgentReadRequest {
         self.currency_request.clone()
     }
+}
+
+/// A master post's admission: one ledger `Create`, rendered once.
+///
+/// `rendered` is produced once, when the admission is built, and never again,
+/// so the bytes the POST sends are the bytes whose digest the dispatch intent
+/// records. The only constructor today is a test-only one in
+/// `approved_import_tests.rs`: none is compiled into a shipped build until the
+/// masters dialog exists, so no production code can hold this kind (P2).
+#[derive(Clone)]
+#[allow(
+    dead_code,
+    reason = "staged: built only in test builds until the dialog slice"
+)]
+pub(super) struct MasterAdmission {
+    item: LedgerCreateItem,
+    rendered: RenderedLedgerCreate,
+    /// The ledger name index read (the V3 catalogue request).
+    ledger_index_request: AgentReadRequest,
+    /// The group name index read (the group snapshot request).
+    group_index_request: AgentReadRequest,
+    company: VerifiedCompanyIdentity,
+}
+
+impl MasterAdmission {
+    pub(super) fn item(&self) -> &LedgerCreateItem {
+        &self.item
+    }
+
+    #[allow(dead_code, reason = "read by the dispatch slice's intent")]
+    pub(super) fn rendered(&self) -> &RenderedLedgerCreate {
+        &self.rendered
+    }
+
+    pub(super) fn ledger_index_request(&self) -> AgentReadRequest {
+        self.ledger_index_request.clone()
+    }
+
+    pub(super) fn group_index_request(&self) -> AgentReadRequest {
+        self.group_index_request.clone()
+    }
+
+    pub(super) fn company(&self) -> &VerifiedCompanyIdentity {
+        &self.company
+    }
+}
+
+/// What the queue read for the last admission before the POST, by kind.
+pub(crate) enum QueuedAdmission<'a> {
+    Vouchers {
+        first: &'a str,
+        second: &'a str,
+        catalogue: &'a str,
+        groups: Option<&'a str>,
+        currencies: &'a str,
+        /// The all-company marks read as the binding reads began (#239).
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+        ledger_binding: &'a StandardLedgerCatalogBinding,
+    },
+    /// Each index is read twice, as the voucher absence reads are: the recheck
+    /// requires the pairs byte-equal.
+    Masters {
+        /// The request being posted and the company it is for, taken from the
+        /// approved request itself, so the recheck reads the name and the
+        /// company from the bytes' own source and no caller supplies them.
+        item: &'a LedgerCreateItem,
+        company: &'a VerifiedCompanyIdentity,
+        ledgers_first: &'a str,
+        ledgers_second: &'a str,
+        groups_first: &'a str,
+        groups_second: &'a str,
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+    },
+}
+
+/// Whether the profile accepts every voucher's date, and there is at least
+/// one: an empty list approves nothing.
+fn every_date_accepted(profile: DateBoundaryProfile, voucher_dates: &[TallyDate]) -> bool {
+    !voucher_dates.is_empty()
+        && voucher_dates
+            .iter()
+            .all(|voucher_date| profile.accepts_boundary(voucher_date))
+}
+
+impl ApprovedImport {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn confirm_vouchers(
+        xml: String,
+        preview: &str,
+        voucher_dates: Vec<TallyDate>,
+        verification_request: AgentReadRequest,
+        ledger_catalogue_request: AgentReadRequest,
+        ledger_binding: StandardLedgerCatalogBinding,
+        group_collection_request: Option<AgentReadRequest>,
+        currency_request: AgentReadRequest,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, String> {
+        let count = VoucherCount::new(voucher_dates.len())
+            .ok_or_else(|| "voucher_date_invalid".to_string())?;
+        approve(count, preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Vouchers(VoucherAdmission {
+                xml,
+                voucher_dates,
+                verification_request,
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request,
+                currency_request,
+            }),
+            company_marks_request,
+        })
+    }
+
+    /// The master post's approval: not available. The masters dialog does not
+    /// exist yet, and the one dialog that does asks about vouchers, so no
+    /// answer to it can approve a master. Until that dialog and its own token
+    /// exist this refuses every time, and the only code that builds a
+    /// [`MasterAdmission`] is in the unit-test module alone, so no production
+    /// path holds an `ApprovedImport` of the masters kind (AGENTS.md P2). The
+    /// dialog slice replaces this body and the test-only constructors together.
+    #[allow(dead_code, reason = "staged: the masters dispatch has no caller yet")]
+    pub(crate) fn confirm_masters() -> Result<Self, MasterApprovalUnavailable> {
+        Err(MasterApprovalUnavailable)
+    }
+
+    /// The bytes the one POST sends, whatever the kind. For masters they are
+    /// the bytes rendered once in [`MasterAdmission::new`], whose digest the
+    /// dispatch intent records.
+    pub(super) fn xml(&self) -> &str {
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => &vouchers.xml,
+            ApprovedKind::Masters(masters) => masters.rendered.xml(),
+        }
+    }
 
     pub(super) fn company_marks_request(&self) -> AgentReadRequest {
         self.company_marks_request.clone()
     }
 
-    /// Recheck the operator-approved dates after the endpoint queue admits this
-    /// request. The observed product/mode can change while native approval waits.
+    /// Recheck the operator-approved request against the observed product and
+    /// mode after the endpoint queue admits it. The mode can change while
+    /// native approval waits. Vouchers: every date is one the mode accepts.
+    /// Masters: the mode is not Education, which this path has not measured a
+    /// master write in.
     pub(super) fn require_boundary_profile(
         &self,
         profile: DateBoundaryProfile,
     ) -> Result<(), ApprovedImportAdmissionError> {
-        if every_date_accepted(profile, &self.voucher_dates) {
-            Ok(())
-        } else {
-            Err(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => {
+                if every_date_accepted(profile, &vouchers.voucher_dates) {
+                    Ok(())
+                } else {
+                    Err(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+                }
+            }
+            ApprovedKind::Masters(_) => match profile {
+                DateBoundaryProfile::ModeAgnostic => Ok(()),
+                DateBoundaryProfile::EducationRestricted => {
+                    Err(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+                }
+            },
         }
     }
 
@@ -172,20 +297,29 @@ impl ApprovedImport {
         // bypass (bridge#583).
         std::hint::black_box(test_seam::SEAM_MARKER);
         Self {
-            xml,
-            voucher_dates: vec![voucher_date],
-            verification_request: AgentReadRequest::parse(
-                bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render(),
-            )
-            .expect("static read profile is admitted"),
-            ledger_catalogue_request,
-            ledger_binding,
-            group_collection_request: None,
-            currency_request,
+            kind: ApprovedKind::Vouchers(VoucherAdmission {
+                xml,
+                voucher_dates: vec![voucher_date],
+                verification_request: AgentReadRequest::parse(
+                    bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2
+                        .render(),
+                )
+                .expect("static read profile is admitted"),
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request: None,
+                currency_request,
+            }),
             company_marks_request,
         }
     }
 }
+
+/// The masters approval does not exist yet; see
+/// [`ApprovedImport::confirm_masters`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("master_approval_unavailable")]
+pub(crate) struct MasterApprovalUnavailable;
 
 /// How long a post dialog stays open before it approves nothing: the limit
 /// [`nonce_bound_dialog`] applies. Used only to tell a caller how much of it
@@ -214,7 +348,7 @@ impl Answered {
 }
 
 /// A post dialog left open after the MCP call that asked it returned (#725).
-/// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
+/// It is [`ApprovedImport::confirm_vouchers`] itself, unchanged, run on its own task so
 /// that the dialog's time limit and its child's exit are observed while no call
 /// is waiting. Dropping this aborts that task, which drops the dialog child:
 /// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
@@ -228,7 +362,7 @@ pub(crate) struct PendingPostApproval {
 
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
-    /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
+    /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
     /// task. Nothing else can be run there.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
@@ -245,7 +379,7 @@ impl PendingPostApproval {
         let answered = std::sync::Arc::new(std::sync::OnceLock::new());
         let stamp = std::sync::Arc::clone(&answered);
         let dialog = async move {
-            let answer = ApprovedImport::confirm(
+            let answer = ApprovedImport::confirm_vouchers(
                 xml,
                 &preview,
                 voucher_dates,
@@ -333,8 +467,15 @@ impl ApprovedImport {
     /// How many vouchers the person was asked about: the dialog's count is
     /// taken from these dates (#746), so a redeemed approval can be held to the
     /// batch it is redeemed for.
+    ///
+    /// A master post has no vouchers: it counts as none, which no voucher
+    /// binding does, so a master approval redeemed for a voucher batch is
+    /// refused as a changed binding rather than posted.
     pub(crate) fn voucher_count(&self) -> usize {
-        self.voucher_dates.len()
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => vouchers.voucher_dates.len(),
+            ApprovedKind::Masters(_) => 0,
+        }
     }
 }
 
@@ -435,6 +576,21 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free cause the refusal carries.
     #[error("post_catalogue_unreadable")]
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
+    /// A master post met an Education profile at the queue's opening or closing
+    /// observation. Raised before any index read is trusted and before the
+    /// intent; nothing was sent.
+    #[error("master_writes_need_licensed_mode")]
+    MasterWritesNeedLicensedMode,
+    /// The proposed ledger name could resolve to an existing master, through
+    /// its stored name or an alias. Carries only the colliding master's kind
+    /// and how its name matched, never another client's name.
+    #[error("master_name_taken")]
+    MasterNameTaken { kind: MasterKind, via: Via },
+    /// The ledger name index has no parser yet: no V3 ledger answer has been
+    /// captured from a real Tally (AGENTS.md P1), so a master post cannot show
+    /// a ledger name absent and is refused before the intent.
+    #[error("master_ledger_index_unavailable")]
+    MasterLedgerIndexUnavailable,
 }
 
 /// The data-free code a group snapshot refusal carries as its `cause`, for
@@ -489,6 +645,11 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// A master post reached the point where its intent is recorded, and the
+    /// master journal is not wired to it yet. Nothing was recorded and nothing
+    /// was sent: the dispatch slice replaces the closure that raises this.
+    #[error("master_dispatch_unavailable")]
+    MasterDispatchNotWired,
 }
 
 impl UnderLockRefusal {
@@ -501,6 +662,7 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::MasterDispatchNotWired => "master_dispatch_unavailable",
         }
     }
 }

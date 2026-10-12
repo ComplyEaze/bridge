@@ -1,4 +1,58 @@
 use super::*;
+
+// The only constructors of the masters kind. They live in this test module, not
+// in the shipped file, so no production path can build one (AGENTS.md P2): the
+// dialog slice adds the real constructor beside the masters dialog.
+
+impl MasterAdmission {
+    /// Renders the request once, with the two index reads for the company.
+    fn new(
+        item: LedgerCreateItem,
+        company: &VerifiedCompanyIdentity,
+    ) -> Result<Self, super::super::agent_read_request::AgentReadRequestError> {
+        use super::super::agent_read_request::AgentReadRequestError;
+        use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+        let validated =
+            ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
+        let rendered = item.render_import(company);
+        Ok(Self {
+            item,
+            rendered,
+            ledger_index_request: AgentReadRequest::parse(
+                ReadOnlyProfile::StandardLedgerCatalogV3 {
+                    company: &validated,
+                }
+                .render(),
+            )?,
+            group_index_request: AgentReadRequest::parse(
+                bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
+                    company.display_name(),
+                ),
+            )?,
+            company: company.clone(),
+        })
+    }
+}
+
+impl ApprovedImport {
+    /// The masters twin of `approved_for_test`: an approval without a dialog,
+    /// carrying the same seam marker. `pub(crate)` because the agent module's
+    /// queue tests build the approval too.
+    pub(crate) fn approved_masters_for_test(
+        item: LedgerCreateItem,
+        company: &VerifiedCompanyIdentity,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        std::hint::black_box(test_seam::SEAM_MARKER);
+        Self {
+            kind: ApprovedKind::Masters(Box::new(
+                MasterAdmission::new(item, company).expect("static read profiles are admitted"),
+            )),
+            company_marks_request,
+        }
+    }
+}
+
 #[test]
 fn import_name_scope_must_select_one_observed_company() {
     // Local identity-admission test. These are not claimed Tally responses.
@@ -156,4 +210,120 @@ fn an_input_not_in_the_parents_shape_shows_no_dialog_and_writes_nothing() {
         assert!(!approved, "{input:?}");
         assert!(output.is_empty(), "{input:?}");
     }
+}
+
+// A master post is a second kind of `ApprovedImport`. These tests build it
+// through the test-only constructor, since no production path can.
+
+const MASTERS_LAB: &str = "BRIDGE MASTERS LAB";
+const MASTERS_GUID: &str = "00000000-0000-4000-8000-000000000001";
+
+fn masters_identity() -> VerifiedCompanyIdentity {
+    VerifiedCompanyIdentity::test_fixture(MASTERS_LAB, MASTERS_GUID)
+}
+
+fn masters_item(name: &str) -> LedgerCreateItem {
+    LedgerCreateItem::new(
+        super::super::ledger_create_item::MasterName::new(name).unwrap(),
+        super::super::ledger_create_item::AdmittedLedgerKind::Suspense,
+    )
+}
+
+fn marks_request() -> AgentReadRequest {
+    AgentReadRequest::parse(
+        bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render(),
+    )
+    .unwrap()
+}
+
+fn approved_masters(name: &str) -> ApprovedImport {
+    ApprovedImport::approved_masters_for_test(
+        masters_item(name),
+        &masters_identity(),
+        marks_request(),
+    )
+}
+
+fn masters_of(approved: &ApprovedImport) -> &MasterAdmission {
+    match &approved.kind {
+        ApprovedKind::Masters(masters) => masters,
+        ApprovedKind::Vouchers(_) => panic!("expected the masters kind"),
+    }
+}
+
+/// What the POST sends is what was rendered once, and its digest is the one the
+/// intent will record.
+#[test]
+fn a_master_post_sends_the_bytes_rendered_once_whose_digest_it_records() {
+    let approved = approved_masters("Queue Test Suspense");
+    let rendered = masters_of(&approved).rendered();
+    assert_eq!(approved.xml(), rendered.xml());
+    assert_eq!(
+        bridge_tally_protocol::sha256_hex(approved.xml().as_bytes()),
+        rendered.sha256()
+    );
+    assert_eq!(
+        rendered,
+        &masters_item("Queue Test Suspense").render_import(&masters_identity()),
+        "the same item and company render the same request"
+    );
+    assert!(approved.xml().contains("Queue Test Suspense"));
+}
+
+#[test]
+fn a_master_posts_index_reads_are_the_ledger_catalogue_and_group_snapshot_for_its_company() {
+    let approved = approved_masters("Queue Test Suspense");
+    let masters = masters_of(&approved);
+    let company =
+        bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(MASTERS_LAB).unwrap();
+    assert_eq!(
+        masters.ledger_index_request().into_xml(),
+        bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV3 {
+            company: &company
+        }
+        .render()
+    );
+    assert_eq!(
+        masters.group_index_request().into_xml(),
+        bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
+            MASTERS_LAB
+        )
+    );
+    assert_ne!(
+        masters.ledger_index_request().into_xml(),
+        masters.group_index_request().into_xml()
+    );
+    assert_eq!(masters.company(), &masters_identity());
+}
+
+#[test]
+fn a_master_post_refuses_education_and_accepts_a_mode_that_is_not() {
+    let approved = approved_masters("Queue Test Suspense");
+    assert_eq!(
+        approved.require_boundary_profile(DateBoundaryProfile::EducationRestricted),
+        Err(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+    );
+    assert_eq!(
+        approved.require_boundary_profile(DateBoundaryProfile::ModeAgnostic),
+        Ok(())
+    );
+}
+
+/// A master approval redeemed against a voucher binding can never match its
+/// count: it is refused as a changed binding.
+#[test]
+fn a_master_post_counts_no_vouchers() {
+    assert_eq!(approved_masters("Queue Test Suspense").voucher_count(), 0);
+}
+
+#[test]
+fn the_masters_approval_does_not_exist_yet() {
+    assert_eq!(
+        ApprovedImport::confirm_masters().err(),
+        Some(MasterApprovalUnavailable)
+    );
+    assert_eq!(
+        MasterApprovalUnavailable.to_string(),
+        "master_approval_unavailable"
+    );
 }

@@ -5,7 +5,7 @@ use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::tally::approved_import::{
     Answered, ApprovedImport, ApprovedImportAdmissionError, BeforeDispatchError,
-    PendingPostApproval, UnderLockRefusal,
+    PendingPostApproval, QueuedAdmission, UnderLockRefusal,
 };
 use bridge_tally_protocol::native_outstandings::{parse_company_currency, BaseCurrencyName};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportApplicationStatus};
@@ -906,7 +906,7 @@ impl Server {
             let mut redemption = None;
             let (request, native) = match scope {
                 PostScope::JournalOnly => (
-                    ApprovedImport::confirm(
+                    ApprovedImport::confirm_vouchers(
                         xml,
                         &preview,
                         voucher_dates,
@@ -1002,36 +1002,13 @@ impl Server {
                     &identity,
                     request,
                     |queued| {
-                        recheck_import_admission(
+                        recheck_voucher_queue(
+                            queued,
                             &line,
                             identity.company_guid(),
                             &company.name,
-                            queued.first,
-                            queued.second,
-                            queued.catalogue,
-                            queued.groups,
-                            queued.currencies,
-                            queued.ledger_binding,
-                        )?;
-                        admit_queued_aim(
-                            queued.company_marks_at_binding,
-                            queued.company_marks,
-                            identity.company_guid(),
-                            &company.name,
-                        )?;
-                        let mark = location::parse_all_company_marks(queued.company_marks)
-                            .ok()
-                            .and_then(|rows| {
-                                location::target_voucher_mark(
-                                    &rows,
-                                    identity.company_guid(),
-                                    &company.name,
-                                )
-                            });
-                        if let Ok(mut aimed) = aimed_mark.lock() {
-                            *aimed = mark;
-                        }
-                        Ok(())
+                            &aimed_mark,
+                        )
                     },
                     || {
                         // The file lock covers only the admission+synced append. It is not
@@ -1125,153 +1102,7 @@ impl Server {
                     .chain()
                     .find_map(|cause| cause.downcast_ref::<ApprovedImportAdmissionError>())
                     .and_then(refused_cash_in_hand);
-                let code = if error.chain().any(|cause| {
-                    cause.is::<crate::tally::approved_import::AmbiguousImportCompany>()
-                }) {
-                    "import_company_scope_ambiguous"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
-                    )
-                }) {
-                    "education_voucher_date_unsupported"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::PreexistingIdentity)
-                    )
-                }) {
-                    "import_preexisting_identity"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
-                    )
-                }) {
-                    "import_masters_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BankClassificationChanged)
-                    )
-                }) {
-                    "import_bank_classification_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
-                    )
-                }) {
-                    "cash_ledger_not_cash_in_hand"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
-                    )
-                }) {
-                    CASH_LEDGERS_NOT_RECORDED
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
-                    )
-                }) {
-                    super::bill_wise::BILL_WISE_NOT_RECORDED
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BillWiseChanged)
-                    )
-                }) {
-                    "import_bill_wise_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
-                    )
-                }) {
-                    "ledger_has_folded_twin"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::AdmissionInconsistent)
-                    )
-                }) {
-                    "import_post_admission_inconsistent"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CompanyScopeChanged)
-                    )
-                }) {
-                    "post_company_scope_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
-                    )
-                }) {
-                    "post_company_scope_unconfirmed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MultiCurrencyBook { .. })
-                    )
-                }) {
-                    "import_multi_currency_unsupported"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
-                    )
-                }) {
-                    "import_base_currency_undetermined"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MastersMoved)
-                    )
-                }) {
-                    "post_masters_moved"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MastersUnconfirmed)
-                    )
-                }) {
-                    "post_masters_unconfirmed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CatalogueUnreadable(_))
-                    )
-                }) {
-                    "post_catalogue_unreadable"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
-                    )
-                }) {
-                    "group_export_invalid"
-                } else if let Some(refusal) = error
-                    .chain()
-                    .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>())
-                {
-                    // Refused under the admission lock before the intent was
-                    // appended (#711): nothing was recorded or sent.
-                    refusal.code()
-                } else if error
-                    .chain()
-                    .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>())
-                {
-                    // Refused in the queue before the intent (#656): nothing
-                    // was sent, so the outcome is known.
-                    "post_queue_read_failed"
-                } else {
-                    "import_dispatch_outcome_unknown"
-                };
+                let code = refusal_code(&error);
                 // A queue read that failed in transport has no typed cause of
                 // its own; the transport's safe code names it.
                 let transport = (code == "post_queue_read_failed")
@@ -1574,6 +1405,234 @@ impl Server {
                         || snapshot.batch.endpoint_origin.as_deref() == Some(origin.as_str()))
             })
             .map(|snapshot| snapshot.dispatched)
+    }
+}
+
+/// The queue's recheck of a voucher post: the batch's vouchers against the
+/// reads the queue made, then the aim, remembering the target's voucher mark
+/// from the aim snapshot for the intent. A master admission handed to it is a
+/// wiring fault, refused with a typed error and never posted.
+fn recheck_voucher_queue(
+    queued: QueuedAdmission<'_>,
+    line: &ImportLedgerLine,
+    company_guid: &str,
+    company_name: &str,
+    aimed_mark: &std::sync::Mutex<Option<u64>>,
+) -> anyhow::Result<()> {
+    let QueuedAdmission::Vouchers {
+        first,
+        second,
+        catalogue,
+        groups,
+        currencies,
+        company_marks_at_binding,
+        company_marks,
+        ledger_binding,
+    } = queued
+    else {
+        return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
+    };
+    recheck_import_admission(
+        line,
+        company_guid,
+        company_name,
+        first,
+        second,
+        catalogue,
+        groups,
+        currencies,
+        ledger_binding,
+    )?;
+    admit_queued_aim(
+        company_marks_at_binding,
+        company_marks,
+        company_guid,
+        company_name,
+    )?;
+    let mark = location::parse_all_company_marks(company_marks)
+        .ok()
+        .and_then(|rows| location::target_voucher_mark(&rows, company_guid, company_name));
+    if let Ok(mut aimed) = aimed_mark.lock() {
+        *aimed = mark;
+    }
+    Ok(())
+}
+
+/// The code a refused or failed approved post reports, from the typed cause
+/// in its error chain. The first cause that has a rung names it; a refusal
+/// that was made before the intent and has no rung of its own is
+/// `post_queue_read_failed`, and anything else is an unknown outcome, so a
+/// cause added without a rung here is reported as one of those two rather
+/// than as itself. Both a voucher post and a master post end here.
+pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
+    if error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::AmbiguousImportCompany>())
+    {
+        "import_company_scope_ambiguous"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+        )
+    }) {
+        "education_voucher_date_unsupported"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::PreexistingIdentity)
+        )
+    }) {
+        "import_preexisting_identity"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
+        )
+    }) {
+        "import_masters_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BankClassificationChanged)
+        )
+    }) {
+        "import_bank_classification_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
+        )
+    }) {
+        "cash_ledger_not_cash_in_hand"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
+        )
+    }) {
+        CASH_LEDGERS_NOT_RECORDED
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
+        )
+    }) {
+        super::bill_wise::BILL_WISE_NOT_RECORDED
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseChanged)
+        )
+    }) {
+        "import_bill_wise_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+        )
+    }) {
+        "ledger_has_folded_twin"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+        )
+    }) {
+        "import_post_admission_inconsistent"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeChanged)
+        )
+    }) {
+        "post_company_scope_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
+        )
+    }) {
+        "post_company_scope_unconfirmed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MultiCurrencyBook { .. })
+        )
+    }) {
+        "import_multi_currency_unsupported"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
+        )
+    }) {
+        "import_base_currency_undetermined"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersMoved)
+        )
+    }) {
+        "post_masters_moved"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+        )
+    }) {
+        "post_masters_unconfirmed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CatalogueUnreadable(_))
+        )
+    }) {
+        "post_catalogue_unreadable"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
+        )
+    }) {
+        "group_export_invalid"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+        )
+    }) {
+        "master_writes_need_licensed_mode"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterNameTaken { .. })
+        )
+    }) {
+        "master_name_taken"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable)
+        )
+    }) {
+        "master_ledger_index_unavailable"
+    } else if let Some(refusal) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>())
+    {
+        // Refused under the admission lock before the intent was
+        // appended (#711): nothing was recorded or sent.
+        refusal.code()
+    } else if error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>())
+    {
+        // Refused in the queue before the intent (#656): nothing
+        // was sent, so the outcome is known.
+        "post_queue_read_failed"
+    } else {
+        "import_dispatch_outcome_unknown"
     }
 }
 
@@ -1914,7 +1973,7 @@ fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
 /// The aim check on the snapshot the queue read last before the POST (#574).
 /// The aim check (#574), then the master mark (#239): the target's ALTMSTID in
 /// the aim snapshot must equal the one read as the queue's binding reads began.
-fn admit_queued_aim(
+pub(super) fn admit_queued_aim(
     marks_at_binding: &str,
     marks: &str,
     company_guid: &str,

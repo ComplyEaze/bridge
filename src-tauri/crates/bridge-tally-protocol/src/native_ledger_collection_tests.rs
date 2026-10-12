@@ -2,6 +2,102 @@ use super::*;
 
 const EXPECTED_COMPANY_GUID: &str = "11111111-1111-1111-1111-111111111111";
 
+fn returned(value: &str) -> PartyLedgerMasterFieldObservation {
+    PartyLedgerMasterFieldObservation::Returned(value.to_string())
+}
+
+/// The table behind the parser is the table callers see: every head, written
+/// the way Tally writes it on a GST ledger, parses back to that head.
+#[test]
+fn every_gst_duty_head_round_trips_through_its_tally_spelling() {
+    for head in GstDutyHead::ALL {
+        let spelling = head.tally_spelling();
+        assert_eq!(
+            GstDutyHeadObservation::from_observations(&returned("GST"), &returned(spelling)),
+            GstDutyHeadObservation::Recognized {
+                raw: spelling.to_string(),
+                head,
+            },
+            "{spelling}"
+        );
+    }
+}
+
+#[test]
+fn the_gst_duty_head_table_lists_six_distinct_heads_and_six_distinct_spellings() {
+    assert_eq!(GstDutyHead::ALL.len(), 6);
+    let spellings: Vec<&str> = GstDutyHead::ALL
+        .iter()
+        .map(|head| head.tally_spelling())
+        .collect();
+    assert_eq!(
+        spellings,
+        ["CGST", "IGST", "State Tax", "SGST/UTGST", "UT Tax", "Cess"]
+    );
+    let distinct_spellings: std::collections::BTreeSet<&str> = spellings.iter().copied().collect();
+    assert_eq!(distinct_spellings.len(), 6);
+    for (index, head) in GstDutyHead::ALL.iter().enumerate() {
+        assert!(
+            !GstDutyHead::ALL[..index].contains(head),
+            "{head:?} is listed twice"
+        );
+    }
+}
+
+/// One list of `variant => spelling` pairs writes both the exhaustive `match`
+/// and the array of every variant the test checks, so the two cannot differ: a
+/// head added to the enum fails to compile here until it is listed, and once
+/// listed it is checked against `ALL`.
+macro_rules! expected_gst_duty_heads {
+    ($($variant:ident => $spelling:literal),+ $(,)?) => {
+        fn expected_spelling(head: GstDutyHead) -> &'static str {
+            match head {
+                $(GstDutyHead::$variant => $spelling),+
+            }
+        }
+        fn every_listed_variant() -> Vec<GstDutyHead> {
+            vec![$(GstDutyHead::$variant),+]
+        }
+    };
+}
+expected_gst_duty_heads! {
+    Cgst => "CGST",
+    Igst => "IGST",
+    StateTax => "State Tax",
+    SgstUtgst => "SGST/UTGST",
+    UtTax => "UT Tax",
+    Cess => "Cess",
+}
+
+#[test]
+fn the_gst_duty_head_table_holds_every_variant_with_its_spelling() {
+    let listed = every_listed_variant();
+    for head in &listed {
+        assert!(GstDutyHead::ALL.contains(head), "{head:?} is not in ALL");
+    }
+    for head in GstDutyHead::ALL {
+        assert!(listed.contains(&head), "{head:?} is in ALL but not listed");
+        assert_eq!(head.tally_spelling(), expected_spelling(head), "{head:?}");
+    }
+    assert_eq!(GstDutyHead::ALL.len(), listed.len());
+}
+
+/// Anything outside the table stays unrecognised, including the spellings
+/// that differ from a measured one only by case or by Tally's other name for
+/// the state head.
+#[test]
+fn a_spelling_outside_the_gst_duty_head_table_is_not_recognised() {
+    for raw in ["SGST", "sgst/utgst", "cgst", "Cess ", "UT", "Others"] {
+        assert_eq!(
+            GstDutyHeadObservation::from_observations(&returned("GST"), &returned(raw)),
+            GstDutyHeadObservation::Unrecognized {
+                raw: raw.to_string()
+            },
+            "{raw}"
+        );
+    }
+}
+
 fn master_response(response_company_guid: Option<&str>) -> String {
     master_response_with_extra(response_company_guid, "")
 }

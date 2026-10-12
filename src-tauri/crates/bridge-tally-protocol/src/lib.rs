@@ -35,6 +35,7 @@ pub mod currency_composite;
 pub mod group_ancestry;
 pub mod gst_details;
 pub mod gst_registration;
+pub mod import_envelope;
 mod import_outcome;
 #[cfg(feature = "india-tax-observation-parser")]
 pub mod india_tax_observation;
@@ -3924,7 +3925,9 @@ fn read_required_identifier_text(
         .ok_or_else(|| anyhow::anyhow!("Tally response contained an empty required value"))
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+/// Lowercase hex SHA-256 of `bytes`. The one digest helper for callers outside
+/// this crate that hash a rendered request.
+pub fn sha256_hex(bytes: &[u8]) -> String {
     let mut encoded = String::with_capacity(64);
     for byte in Sha256::digest(bytes) {
         write!(&mut encoded, "{byte:02x}").expect("writing to a String cannot fail");

@@ -17,8 +17,9 @@
 //!
 //! Children this parser does not model are skipped; an entry that holds
 //! recognised fields and skipped children is kept and says so in
-//! `other_content_skipped`. Nothing here chooses an entry or sums a rate, and
-//! nothing calls this observation yet.
+//! `other_content_skipped`. Nothing here chooses an entry or sums a rate. The
+//! opt-in `include_gst_details` of `ledger_masters` is the one reader of this
+//! observation.
 use bridge_tally_primitives::TallyDate;
 use serde::{Deserialize, Serialize};
 

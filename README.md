@@ -49,7 +49,7 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** Release 0.5.1 installs these 23, in name order. None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** In name order; release 0.5.1 installs 23 of them, and `statement_tie_out` is in source, not yet in a published build. None of them changes your TallyPrime books, and every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -69,6 +69,7 @@ with no figures, to a log on this computer.
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
+| `statement_tie_out` | Whether the bank ledger stands where a parsed bank statement says it stood at the start and at the end of the statement's dates: three gaps and the dates; the balances themselves are not returned | Nothing |
 | `stock_summary` | The closing stock value of each item as of a 31 March, values only; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
@@ -98,7 +99,8 @@ whose ledger now points to a different master.
   shorten party and ledger names and bank account numbers to their first two and
   last two characters (four or fewer become “…”), or drop narrations. Neither
   hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
-  numbers, contact details or references, and a shortened name can still be
+  numbers, contact details or references, or the last four digits of a bank
+  statement's account number, and a shortened name can still be
   identified, not least from the GSTIN or PAN sent beside it. See *Before you
   use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
@@ -365,8 +367,8 @@ ComplyEaze Bridge can, before sending, shorten party and ledger names and bank
 account numbers to their first two and last two characters (four or fewer become
 “…”), or drop narrations (`BRIDGE_AGENT_REDACTION` takes one value, not both).
 **Neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam
-registration numbers, contact details or references, and a shortened name can
-still be identified, not least from the GSTIN or PAN sent beside it** — figures
+registration numbers, contact details or references, or the last four digits of
+a bank statement's account number, and a shortened name can still be identified, not least from the GSTIN or PAN sent beside it** — figures
 always go with the answer. Decide this deliberately for client data.
 
 ## What it costs
@@ -478,8 +480,9 @@ installations default to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties`
 or `drop_narration` (one value, not both) before launch when that better fits
 the workflow. These settings shorten party and ledger names and bank account
 numbers or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
-IFSC, MSME or Udyam registration numbers, contact details or references. The
-package installation settings expose the same choices.
+IFSC, MSME or Udyam registration numbers, contact details or references, or the
+last four digits of a bank statement's account number. The package installation
+settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed
 or Education mode are observed, then list the loaded companies. Select a

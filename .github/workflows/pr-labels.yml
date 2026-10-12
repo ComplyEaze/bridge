@@ -4,7 +4,7 @@ name: PR labels
 # the author is still on the pull request, keeps a missing label from blocking a release later.
 on:
   pull_request:
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    types: [opened, reopened, synchronize, labeled, unlabeled, milestoned, demilestoned]
   merge_group:
     types: [checks_requested]
 
@@ -42,3 +42,23 @@ jobs:
         env:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: node scripts/check-pr-type-label.mjs
+
+  milestone:
+    name: Milestone
+    # Dependabot's pull requests are planned by the maintainer who merges them.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
+      # A merge group has no milestone of its own and was admitted with one: report the same check name, pass through.
+      - name: Require a milestone
+        if: github.event_name == 'pull_request'
+        env:
+          PR_MILESTONE: ${{ toJSON(github.event.pull_request.milestone.title) }}
+        run: node scripts/check-pr-milestone.mjs

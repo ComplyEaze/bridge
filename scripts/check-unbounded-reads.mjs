@@ -11,8 +11,8 @@
 // This repo already has the fix pattern in wide use — `reader.take(N +
 // 1).read_to_end(&mut buf)`, reading one byte past a declared limit so an
 // over-limit input is detectable rather than silently truncated (see
-// src-tauri/src/agent_bank_statement.rs, agent_desktop_journal.rs, source_draft/files.rs,
-// tools/bridge-tally-qualification). This gate checks that every such call
+// src-tauri/src/agent_bank_statement.rs, agent_desktop_journal.rs, source_draft/files.rs).
+// This gate checks that every such call
 // site actually uses it, so a new call site that forgets the `.take(...)` is
 // caught mechanically instead of depending on a reviewer noticing.
 //

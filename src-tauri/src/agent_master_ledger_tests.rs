@@ -1396,8 +1396,8 @@ fn an_intent_takes_its_items_and_keys_from_its_batch() {
     let names: Vec<&str> = intent.items().iter().map(IntentItem::name).collect();
     assert_eq!(names, batch.names());
     for item in intent.items() {
-        assert_eq!(item.canonical_key(), canonical_master_key(item.name()));
-        assert_eq!(item.absence_key(), absence_key(item.name()));
+        assert_eq!(item.canonical_key, canonical_master_key(item.name()));
+        assert_eq!(item.absence_key, absence_key(item.name()));
     }
 }
 

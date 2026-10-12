@@ -1671,3 +1671,59 @@ fn transfer_pairing_a_reversed_row_outranks_an_unverified_candidate() {
         reversed_state(&[("batch-1", "t1")])
     );
 }
+
+/// A flagged row with a reference edge is open for the reason an unflagged one
+/// would be: its candidate waits in an unverified batch, or there are several.
+/// The flag decides only among candidates found by date.
+#[test]
+fn transfer_pairing_a_flag_does_not_hide_why_a_referenced_skip_is_open() {
+    let referenced = |flagged: bool| {
+        let mut fact = skip("st-1");
+        fact.reference = Some(reference("600000000001"));
+        fact.reversed_same_day = flagged;
+        fact
+    };
+    let carrying = |batch: &str, txn: &str, flagged: bool| {
+        let mut fact = unverified(contra(batch, txn));
+        fact.reference = Some(reference("600000000001"));
+        fact.reversed_same_day = flagged;
+        fact
+    };
+    for (skip_flag, contra_flag) in [(true, false), (false, true), (true, true)] {
+        let view = view_of(
+            &[referenced(skip_flag)],
+            &[carrying("batch-1", "t1", contra_flag)],
+            &january_covered(),
+            0,
+        );
+        assert_eq!(
+            state_of(&view, "st-1"),
+            SkipState::OtherSideUnverified {
+                batch: BatchId::new("batch-1")
+            },
+            "{skip_flag} {contra_flag}"
+        );
+    }
+    // two Contras print the reference: ambiguous, flag or none
+    let view = view_of(
+        &[referenced(true)],
+        &[
+            carrying("batch-1", "t1", true),
+            carrying("batch-2", "t2", false),
+        ],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        ambiguous(&[("batch-1", "t1"), ("batch-2", "t2")])
+    );
+    // with no reference edge the flag still decides, as before
+    let mut plain = carrying("batch-1", "t1", true);
+    plain.reference = None;
+    let view = view_of(&[skip("st-1")], &[plain], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reversed_state(&[("batch-1", "t1")])
+    );
+}

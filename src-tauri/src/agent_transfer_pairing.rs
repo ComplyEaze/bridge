@@ -32,10 +32,11 @@
 //!   statement (`reversed_same_day`) may be a reversal or one of two real
 //!   transfers, and the date cannot tell them apart. Equal network references
 //!   still pair it (round 1 ignores the flag). It never pairs by date (round
-//!   2), but it still counts against the rows that could. A skip that did not
-//!   pair by reference and is flagged, or any of whose candidates is, is
-//!   `ReversedSameDay` with those candidates instead of `Ambiguous`,
-//!   `NotFound` or a pair.
+//!   2), but it still counts against the rows that could. A skip with no
+//!   reference candidate that is flagged, or any of whose candidates is, is
+//!   `ReversedSameDay` with those candidates instead of `Ambiguous` or
+//!   `NotFound`. A skip with a reference candidate is open for the reason any
+//!   row would be (`OtherSideUnverified`, `Ambiguous`).
 //! * A Contra that is double-booked (also booked from a second statement) pairs
 //!   in neither round; a skip whose candidate it is stays `Ambiguous`.
 //!
@@ -558,10 +559,14 @@ pub(crate) fn transfer_pairing_view(
                         .chain(&loose_edges[s])
                         .copied()
                         .collect();
-                    if skip.reversed_same_day
-                        || candidates
-                            .iter()
-                            .any(|&index| contras[index].reversed_same_day)
+                    // A reference edge says why the skip is open as it would
+                    // for any row; the flag decides only among candidates found
+                    // by date.
+                    if reference_edges[s].is_empty()
+                        && (skip.reversed_same_day
+                            || candidates
+                                .iter()
+                                .any(|&index| contras[index].reversed_same_day))
                     {
                         SkipState::ReversedSameDay {
                             candidates: sorted_keys(&candidates, &contras),

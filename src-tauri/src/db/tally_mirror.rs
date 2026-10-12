@@ -3970,8 +3970,6 @@ fn identity_confidence(identity: &SourceIdentityInput) -> Confidence {
     )
 }
 
-/// Generic identity matching lacks the complete Company-collection tuple, so
-/// it cannot create or promote an observed company pin.
 fn license_tier_key(tier: bridge_tally_core::LicenseTier) -> &'static str {
     match tier {
         bridge_tally_core::LicenseTier::Silver => "silver",

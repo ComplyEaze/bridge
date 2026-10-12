@@ -27,8 +27,8 @@ to report `write capability: Unknown`.
 No canary payload, coordinator, dispatch path or command exists in ComplyEaze
 Bridge. The canary tables created by migrations `0015` to `0021` remain in the
 local database, with no reader or writer. Enrollment is local, explicit and
-revocable, and it gates nothing: ADR 0004 row 11 records the canary rule as not
-met.
+revocable, and no write path consults it: ADR 0004 row 11 records the canary
+rule as not met.
 
 Revocation appends a local `operator_revoked` event. It changes the local
 candidate gate only and never alters Tally. A revoked fixture requires a new

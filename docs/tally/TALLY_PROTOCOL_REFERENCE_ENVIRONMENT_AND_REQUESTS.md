@@ -142,9 +142,10 @@ other group (§8.2b). The same marker prefixes Tally's other reserved values (`&
 `&#4; Not Applicable`), which are not the root.
 
 **Parsers the rule does not cover yet.** The company-list and gateway-capability parsers,
-`export_status`, the Bridge-schema ledger, voucher and period-balance report parsers, and the
+`export_status`, the Bridge-schema ledger and period-balance report parsers, and the
 import-outcome parser still unescape a forbidden reference to its raw character. None of their
-outputs reaches a reserved-root test.
+outputs reaches a reserved-root test. (The Bridge-schema voucher parser this list once named was
+deleted 2026-10-12, Part of #1570.)
 
 ### 1.2 Request charset controls response charset
 

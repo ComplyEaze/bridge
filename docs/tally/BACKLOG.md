@@ -31,8 +31,9 @@ is met.
 ## Parked engineering ideas (unscheduled)
 
 - ODBC read-only cross-check channel for reconciliation totals.
-- JSONEX transport promotion (existing shadow-comparator machinery; needs
-  measured operational benefit per the legacy plan's PR 10 rules).
+- JSONEX transport (no code remains: the parser, request builder and
+  shadow comparator were deleted on 2026-10-12; a new design needs measured
+  operational benefit per the legacy plan's PR 10 rules).
 - Mirror data-map & key-management screen ("which machines hold which
   clients' books") — adoption-critic suggestion, revisit with multi-seat.
 - Proof-of-Post PDF localization (Hindi/Gujarati).

@@ -38,10 +38,6 @@ pub mod gst_registration;
 mod import_outcome;
 #[cfg(feature = "india-tax-observation-parser")]
 pub mod india_tax_observation;
-#[cfg(feature = "jsonex-parser")]
-pub mod jsonex;
-#[cfg(feature = "jsonex-request-builder")]
-pub mod jsonex_request;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
 /// this crate runs its goldens in every build.

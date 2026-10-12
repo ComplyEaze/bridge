@@ -321,7 +321,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo test --locked -p bridge-tally-protocol --no-fail-fast
-          --features jsonex-parser,jsonex-request-builder,india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
       - name: Test isolated native outstandings qualification path
         working-directory: tools
         run: |
@@ -344,7 +344,7 @@ jobs:
         working-directory: src-tauri
         run: >-
           cargo clippy --locked -p bridge-tally-protocol
-          --features jsonex-parser,jsonex-request-builder,india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
+          --features india-tax-observation-parser,bills-payments-observation-parser,bills-native-outstandings-probe
           --all-targets -- -D warnings -A clippy::pedantic
       - name: Lint isolated native outstandings qualification path
         working-directory: tools

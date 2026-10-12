@@ -1166,13 +1166,13 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
-            "same-day twins post together only with batch posting on or through a hand import of the built file",
-            "with batch posting off a second same-day twin is refused by the post (#865)",
+            "same-day twins post together in one batch or through a hand import of the built file",
+            "a second same-day twin in a separate post is refused by the post (#865)",
         ),
         (
             "parse_bank_statement",
-            "same-day twins post together only with batch posting on or through a hand import of the built file",
-            "with batch posting off a second same-day twin is refused by the post (#865)",
+            "same-day twins post together in one batch or through a hand import of the built file",
+            "a second same-day twin in a separate post is refused by the post (#865)",
         ),
         (
             "tally_status",

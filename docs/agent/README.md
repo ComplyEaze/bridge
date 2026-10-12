@@ -1930,10 +1930,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    same-day rows of one amount are not split across batches; they pass this
    check together in one batch. A proposals file is whole days already, since
    `from` and `to` are days. A day with more than 50 rows does not fit one
-   batch, and that case is open: ask the user. Batch posting is off by
-   default, and with it off each post takes one voucher, so same-day twins
-   post together only with batch posting on or through a hand import of the
-   built file. The list and step are
+   batch, and that case is open: ask the user. With posting on, a saved
+   batch of up to 50 posts after one approval, so same-day twins post
+   together in one batch or through a hand import of the built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's

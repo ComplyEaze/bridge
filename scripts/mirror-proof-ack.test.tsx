@@ -216,3 +216,28 @@ test("a failed run's Failure line shows the Gap Map title, and an unlisted code 
   await act(async () => root.unmount());
   host.remove();
 });
+
+test("a probe whose core read stopped names the refusal by its title in Pack readiness", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const fixture = props(async () => []);
+  fixture.result.snapshotStartOutcomeUnknown = false;
+  fixture.result.passport = {
+    profile_version: 1,
+    product: "TallyPrime",
+    transports: {},
+    features: {},
+    packs: {
+      core_accounting: { state: "unknown", confidence: "observed", safe_reason_code: "company_altmstid_missing" },
+      india_tax: { state: "unknown", confidence: "observed", safe_reason_code: "some_unlisted_code" },
+    },
+  };
+  await act(async () => root.render(<MirrorProofScreen {...fixture.result} />));
+  const text = host.textContent ?? "";
+  expect(text).toContain("Observed by this probe. The core read stopped: Tally did not report its master-change marker.");
+  expect(text).toContain("Observed by this probe. Reason: Some unlisted code.");
+  expect(text).not.toContain("Company altmstid missing");
+  await act(async () => root.unmount());
+  host.remove();
+});

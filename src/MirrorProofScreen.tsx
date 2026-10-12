@@ -3,6 +3,7 @@ import { CircleHelp, Database, FileText, Play, RefreshCw } from "lucide-react";
 import { formatIdentifier, formatRuntimeTime } from "./display-format";
 import { type OperatorError, TallyErrorNotice } from "./tally-command-error";
 import { type CapabilityProfile, CapabilityRows, PACK_LABELS } from "./tally-capability-evidence";
+import { CORE_READ_REFUSAL_TITLES } from "./core-read-refusals";
 import {
   type ConnectionStatus,
   type MirrorExplorerPage,
@@ -155,17 +156,17 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
     retry: "after_change",
   },
   company_book_extent_drifted: {
-    title: "Tally gave two different answers to the same read",
+    title: CORE_READ_REFUSAL_TITLES.company_book_extent_drifted,
     action: "Two back-to-back reads of the company's book did not match, so the run stopped. Run again when nobody is entering vouchers or masters in this company.",
     retry: "after_change",
   },
   company_altmstid_missing: {
-    title: "Tally did not report its master-change marker",
+    title: CORE_READ_REFUSAL_TITLES.company_altmstid_missing,
     action: "Without that marker ComplyEaze Bridge cannot tell whether masters changed during the read, so the run stopped. Close and reopen the company in TallyPrime, then start a new run. If it stops the same way, update TallyPrime to its latest release before trying again.",
     retry: "after_change",
   },
   company_identity_mismatch: {
-    title: "Tally answered for a different company",
+    title: CORE_READ_REFUSAL_TITLES.company_identity_mismatch,
     action: "Tally did not report the selected company for this run. Check which company is open in Tally, select it again, and start a new run.",
     retry: "after_change",
   },
@@ -182,7 +183,7 @@ const GAP_GUIDANCE: Record<string, GapGuidance> = {
 };
 
 export function guidanceForGap(code: string): GapGuidance {
-  return GAP_GUIDANCE[code] ?? {
+  return (Object.prototype.hasOwnProperty.call(GAP_GUIDANCE, code) ? GAP_GUIDANCE[code] : undefined) ?? {
     title: formatIdentifier(code),
     action: "Inspect the local Proof of Sync and support artifact. Do not retry unchanged until this gap's cause is understood.",
     retry: "not_useful",

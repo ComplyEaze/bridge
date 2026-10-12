@@ -21,6 +21,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use bridge_tally_primitives::TallyDate;
+use bridge_tally_protocol::audit_company_part::admit_audit_company_part;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
 use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
@@ -278,6 +279,7 @@ const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
@@ -1130,6 +1132,13 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_company_features(BRIDGE CORPUS FOREX)",
         parse: |_, text| company_features(text, FOREX_GUID, "BRIDGE CORPUS FOREX", "100011"),
+    },
+    // The audit read's company part: src/audit_company_part_tests.rs.
+    Row {
+        fixture: "tests/fixtures/company_audit_object_batch_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "admit_audit_company_part(BRIDGE BATCH LAB)",
+        parse: |_, text| typed(admit_audit_company_part(text, BATCH_LAB_GUID, "20260401")),
     },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production

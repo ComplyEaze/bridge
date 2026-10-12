@@ -165,6 +165,42 @@ without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PRE
   `Automatic (Manual Override)` is kept raw and never read as `Manual`
   (`native_voucher_type_numbering.rs`).
 
+**Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
+observation.**
+- Setup: a licensed TallyPrime on Windows, a synthetic company. Its Payment type, holding 32
+  Payments numbered 1 to 32, was altered from Automatic to Manual on the screen.
+- Tally asked twice before saving:
+  - "Changing the method of voucher numbering will affect voucher numbers of existing
+    transactions. Continue?"
+  - then, on saving, "Are you sure you want to update the voucher numbers of existing vouchers?
+    Y: Accept Master & Update Vouchers / N: Back".
+- **VERIFIED:** after Y, all 32 stored voucher numbers read back blank (`""`).
+  - Unchanged: every voucher's `MASTERID`, `ALTERID`, `GUID`, date, amounts and narration.
+  - The company's voucher mark (`ALTVCHID`) did not move, at 87.
+  - Only the master mark (`ALTMSTID`) moved, 224 to 226.
+  - Restoring the backup taken before the change brought the numbers back. The read after the
+    restore was byte-identical to the read before the change.
+- **VERIFIED, this sitting only:** on that type the screen showed "Prevent creating duplicate
+  Voucher Nos." as No, and the field never took focus (keyboard or mouse). So Manual with
+  duplicates prevented could not be set by hand there. The capture above shows the same field
+  set on a Payment screen elsewhere, so this is not a rule.
+- **Consequence:** a stored voucher field can change while neither the voucher's `ALTERID` nor
+  `ALTVCHID` moves.
+  - **Checked in the code, 2026-10-12:** no ComplyEaze Bridge read reuses a number across such a
+    change. The held `vouchers` pages compare both company marks, so this switch's `ALTMSTID`
+    move refuses or re-reads them; the mirror re-reads and hashes content; and the
+    `changed_since` cursor is disabled.
+  - A change that moves neither mark would still be served from held pages until they expire,
+    as already documented for them.
+  - A native post is unaffected: it supplies no voucher number, and its read-back compares the
+    number only when the batch supplied one.
+  - **Known limit:** an amendment's build-time check treats an unchanged `ALTERID` as "not
+    altered since verified", and compares the number only when the batch supplied one. So a
+    blanked number does not stop such a build. Posting an amendment natively is refused, so no
+    post follows from it.
+- Evidence: the never-merged branch `lab/1c-numbering-evidence` (`s1c-RESULT.md`,
+  `s1c-pre-payment-numbers.txt`, `s1c-after-manual-payment-numbers.txt`).
+
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
 **VERIFIED 2026-09-10 (licensed TallyPrime 7.1 Gold; five files imported by hand through

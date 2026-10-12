@@ -506,7 +506,7 @@
     },
     {
       "path": "src-tauri/src/agent_read_cost_preview.rs",
-      "reason": "The voucher_read_cost tool: states before a call how many census reads it will send and the least time on the gaps between them, from the voucher mark. A defect states a floor as an estimate, a refused read as a cost, or an unreadable mark as zero."
+      "reason": "The voucher_read_cost tool: states before a call the most census reads it will send and the least time a call not refused earlier spends on the gaps between them, from the voucher mark. A defect states a floor as an estimate, a refused read as a cost, or an unreadable mark as zero."
     },
     {
       "path": "src-tauri/src/agent_read_profiles.rs"

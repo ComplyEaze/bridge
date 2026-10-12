@@ -15,8 +15,8 @@ use tally_protocol_simulator::{
 };
 
 use crate::db::tally_mirror::{
-    CapabilityItemInput, CapabilityKind, CapabilitySnapshotInput, CompanyInput, Confidence,
-    RunOutcome, SourceIdentityInput, VerificationState,
+    CapabilityItemInput, CapabilityKind, CapabilitySnapshotInput, Confidence, ReviewedSetupInput,
+    ReviewedSetupRef, RunOutcome, SourceIdentityInput, VerificationState,
 };
 use crate::tally::{
     company_source_identity, connector::simulator_test_lock, RuntimeTallyConnector, TallyConfig,
@@ -717,40 +717,43 @@ pub(crate) async fn setup() -> (
         SqliteSnapshotStateStore::for_worker(pool.clone(), "synthetic-test-worker".to_string())
             .unwrap();
     store.migrate().await.unwrap();
-    let capability = mirror
-        .save_capability_snapshot(CapabilitySnapshotInput {
-            canonical_origin: "http://127.0.0.1:9000".to_string(),
-            observed_at_unix_ms: 1_000,
-            profile_version: 1,
-            product: "TallyPrime".to_string(),
-            release: None,
-            license_tier: None,
-            mode: Some("Education".to_string()),
-            mode_confidence: Confidence::Observed,
-            items: vec![CapabilityItemInput {
-                kind: CapabilityKind::Pack,
-                key: "core_accounting".to_string(),
-                state: crate::db::tally_mirror::CapabilityState::Supported,
-                confidence: Confidence::Observed,
-                safe_reason_code: None,
-            }],
-        })
-        .await
-        .unwrap();
     let company_identity = SourceIdentity {
         bridge_source_lineage: "lineage".to_string(),
         company_guid: "company-guid".to_string(),
         observed_fingerprint: "fingerprint".to_string(),
     };
-    let company = mirror
-        .upsert_company(CompanyInput {
-            endpoint_id: capability.endpoint_id.clone(),
-            display_name: "Synthetic Company".to_string(),
-            identity: SourceIdentityInput {
+    let ReviewedSetupRef {
+        snapshot: capability,
+        company,
+    } = mirror
+        .save_reviewed_setup(ReviewedSetupInput {
+            review_commitment_sha256: "5eed".repeat(16),
+            capability: CapabilitySnapshotInput {
+                canonical_origin: "http://127.0.0.1:9000".to_string(),
+                observed_at_unix_ms: 1_000,
+                profile_version: 1,
+                product: "TallyPrime".to_string(),
+                release: None,
+                license_tier: None,
+                mode: Some("Education".to_string()),
+                mode_confidence: Confidence::Observed,
+                items: vec![CapabilityItemInput {
+                    kind: CapabilityKind::Pack,
+                    key: "core_accounting".to_string(),
+                    state: crate::db::tally_mirror::CapabilityState::Supported,
+                    confidence: Confidence::Observed,
+                    safe_reason_code: None,
+                }],
+            },
+            company_display_name: "Synthetic Company".to_string(),
+            company_identity: SourceIdentityInput {
                 guid: Some(company_identity.company_guid.clone()),
+                confidence: Some(Confidence::Observed),
                 ..SourceIdentityInput::default()
             },
-            observed_at_unix_ms: 1_000,
+            company_number: "100001".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+            selected_read_scope: None,
         })
         .await
         .unwrap();

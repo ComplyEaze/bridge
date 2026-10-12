@@ -104,6 +104,27 @@ Send `R-PARTY` (the party ledger master read; it fetches TAXTYPE, GSTDUTYHEAD an
 
 Report per write: the counters, the ALTMSTID step, and the new row's GUID, PARENT, ISBILLWISEON and names.
 
+## Phase 5: L-NP (3 writes; each is 1 write then 3 reads). A new sitting after phase 4, with its own GO and grant
+It asks whether a ledger Create folds away a removed space or a removed full stop. The run sheet's name fold does neither, so either answer changes what the name check must refuse.
+
+Send it only on the company as phase 4 left it: `MLab Fresh Party` exists (created by N-0a: Sundry Creditors, bill-wise Yes, never renamed), and no ledger is named like `MLab Probe Pvt Ltd`.
+
+Order: Q-a, Q-c0, Q-c. After each write, send `R-MARKS`, `R-V3`, `R-GRP` (step id `q-<case>-after`). Before Q-a, send the same three reads once (step id `q-before`).
+
+| Case | Create name | Target it may hit | Expected |
+|---|---|---|---|
+| Q-a | `MLab FreshParty` (Sundry Debtors, bill-wise No) | `MLab Fresh Party` | unknown |
+| Q-c0 | `MLab Probe Pvt. Ltd.` (Sundry Creditors, bill-wise Yes) | none | CREATED=1 (control) |
+| Q-c | `MLab Probe Pvt Ltd` (Sundry Debtors, bill-wise No) | `MLab Probe Pvt. Ltd.` | unknown |
+
+Q-a and Q-c use a parent and bill-wise unlike their target's, so an overwrite shows in the row as well as in the counters.
+
+Report per case: the counters and any LINEERROR text; the ALTMSTID step; from R-V3 after, every ledger row whose names include the created name or the target's names, each with GUID, ALTERID, PARENT, ISBILLWISEON, the NAME attribute and all NAME.LIST names.
+
+If Q-c0 is not CREATED=1, STOP before Q-c. The other STOP rules apply as in every phase.
+
+Grant: 3 writes and 12 reads.
+
 ## Evidence
 - Everything goes in `C:\bridge-lab\masters-m1\evidence\`: each response and its headers, log.txt, and the screenshots.
 - Zip it with its SHA256 for the requester.

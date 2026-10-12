@@ -4,8 +4,10 @@
 //! rows that reach it: the narration, the cell the reader falls back to (the
 //! reference column, or the cheque column for Bank of Baroda), and the `(mode, value)`
 //! it returns today. The values pin what the code does now; they are not a claim that
-//! every one is a bank reference. A table asserts its own length, so a case deleted
-//! from it cannot go unseen.
+//! every one is a bank reference. A table asserts its own length, in cases and in rows,
+//! so a case or a row deleted from it cannot go unseen. A case may carry a second row
+//! with a wrapped cell (a space inside a value) or an outer space, which the readers
+//! remove or strip.
 //!
 //! Every narration and number below is synthetic.
 
@@ -22,9 +24,17 @@ struct Case {
     rows: &'static [Example],
 }
 
-/// Run every case of one bank, and fail if the table is not the length it is meant to be.
-fn check(bank: Bank, cell_column: &str, cases: &[Case], expected_cases: usize) {
+/// Run every case of one bank, and fail if the table has not the cases and rows it is meant to have.
+fn check(
+    bank: Bank,
+    cell_column: &str,
+    cases: &[Case],
+    expected_cases: usize,
+    expected_rows: usize,
+) {
     assert_eq!(cases.len(), expected_cases, "a case was added or removed");
+    let rows: usize = cases.iter().map(|case| case.rows.len()).sum();
+    assert_eq!(rows, expected_rows, "a row was added or removed");
     for case in cases {
         assert!(!case.rows.is_empty(), "{}: no rows", case.name);
         for (narration, cell, mode, value) in case.rows {
@@ -63,21 +73,38 @@ fn sbi_reference_branches() {
         },
         Case {
             name: "neft_star",
-            rows: &[(
-                "NEFT*SYNTHBANK*SYNTH0000000004*ACME INDUSTRIES*",
-                "",
-                "NEFT",
-                "SYNTH0000000004",
-            )],
+            rows: &[
+                (
+                    "NEFT*SYNTHBANK*SYNTH0000000004*ACME INDUSTRIES*",
+                    "",
+                    "NEFT",
+                    "SYNTH0000000004",
+                ),
+                (
+                    "NEFT*SYNTHBANK*SYNTH00000 00009*ACME INDUSTRIES*",
+                    "",
+                    "NEFT",
+                    "SYNTH0000000009",
+                ),
+            ],
         },
+        // the second row wraps both the reference and the VPA
         Case {
             name: "upi_with_vpa",
-            rows: &[(
-                "UPI/DR/600000000005/ACME INDUSTRIES/SYNTHBANK/acme@synthbank/Payment",
-                "",
-                "UPI",
-                "600000000005 (acme@synthbank)",
-            )],
+            rows: &[
+                (
+                    "UPI/DR/600000000005/ACME INDUSTRIES/SYNTHBANK/acme@synthbank/Payment",
+                    "",
+                    "UPI",
+                    "600000000005 (acme@synthbank)",
+                ),
+                (
+                    "UPI/DR/6000 00000010/ACME INDUSTRIES/SYNTHBANK/acme @synthbank/Payment",
+                    "",
+                    "UPI",
+                    "600000000010 (acme@synthbank)",
+                ),
+            ],
         },
         Case {
             name: "upi_without_vpa",
@@ -90,16 +117,27 @@ fn sbi_reference_branches() {
         },
         Case {
             name: "imps",
-            rows: &[(
-                "IMPS/600000000007/ACME INDUSTRIES",
-                "",
-                "IMPS",
-                "600000000007",
-            )],
+            rows: &[
+                (
+                    "IMPS/600000000007/ACME INDUSTRIES",
+                    "",
+                    "IMPS",
+                    "600000000007",
+                ),
+                (
+                    "IMPS/6000 00000011/ACME INDUSTRIES",
+                    "",
+                    "IMPS",
+                    "600000000011",
+                ),
+            ],
         },
         Case {
             name: "atm",
-            rows: &[("ATM CASH 0000123456 SYNTHBANK", "", "ATM", "0000123456")],
+            rows: &[
+                ("ATM CASH 0000123456 SYNTHBANK", "", "ATM", "0000123456"),
+                ("ATM CASH 0000 123457 SYNTHBANK", "", "ATM", "0000123457"),
+            ],
         },
         // the internet-banking reference is in the reference column, not the narration
         Case {
@@ -133,7 +171,7 @@ fn sbi_reference_branches() {
             rows: &[("SYNTHETIC SUPPLIES PAYMENT", "SYNTH 12", "TXN", "")],
         },
     ];
-    check(Bank::Sbi, "ref", CASES, 12);
+    check(Bank::Sbi, "ref", CASES, 12, 16);
 }
 
 #[test]
@@ -194,20 +232,29 @@ fn hdfc_reference_branches() {
             )],
         },
     ];
-    check(Bank::Hdfc, "ref", CASES, 7);
+    check(Bank::Hdfc, "ref", CASES, 7, 7);
 }
 
 #[test]
 fn union_bank_reference_branches() {
     const CASES: &[Case] = &[
+        // the second row has spaces outside the narration, which every reader strips first
         Case {
             name: "upi",
-            rows: &[(
-                "UPIAB/600000000201/CR/ACME INDUSTRIES/SYNT/acme@synthbank",
-                "SYNTHID001",
-                "UPI",
-                "600000000201",
-            )],
+            rows: &[
+                (
+                    "UPIAB/600000000201/CR/ACME INDUSTRIES/SYNT/acme@synthbank",
+                    "SYNTHID001",
+                    "UPI",
+                    "600000000201",
+                ),
+                (
+                    "  UPIAB/600000000206/CR/ACME INDUSTRIES/SYNT/acme@synthbank ",
+                    "SYNTHID009",
+                    "UPI",
+                    "600000000206",
+                ),
+            ],
         },
         // one pattern, `IMPSA[BR]`: both letters are pinned
         Case {
@@ -273,20 +320,29 @@ fn union_bank_reference_branches() {
             )],
         },
     ];
-    check(Bank::Ubi, "ref", CASES, 8);
+    check(Bank::Ubi, "ref", CASES, 8, 10);
 }
 
 #[test]
 fn bank_of_baroda_reference_branches() {
     const CASES: &[Case] = &[
+        // the second row has spaces outside the narration, which every reader strips first
         Case {
             name: "upi",
-            rows: &[(
-                "UPI/600000000301/10:15:30/UPI/nw@okzz/ZZZZ BANK",
-                "",
-                "UPI",
-                "600000000301",
-            )],
+            rows: &[
+                (
+                    "UPI/600000000301/10:15:30/UPI/nw@okzz/ZZZZ BANK",
+                    "",
+                    "UPI",
+                    "600000000301",
+                ),
+                (
+                    "  UPI/600000000306/10:15:30/UPI/nw@okzz/ZZZZ BANK ",
+                    "",
+                    "UPI",
+                    "600000000306",
+                ),
+            ],
         },
         Case {
             name: "imps",
@@ -343,5 +399,5 @@ fn bank_of_baroda_reference_branches() {
             )],
         },
     ];
-    check(Bank::Bob, "chq", CASES, 8);
+    check(Bank::Bob, "chq", CASES, 8, 9);
 }

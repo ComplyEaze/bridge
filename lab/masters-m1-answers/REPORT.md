@@ -68,6 +68,43 @@ No STOP condition was met: one COMPANY row, ALTERID on every R-V3 ledger row, no
 - send-read.sh: the send helper (it checks the hash, then runs the run sheet's curl line).
 - phase2-parse.py and phase2-parse.txt: the element parse.
 - SHA256-screenshots.txt and SHA256-backup.txt: hashes only.
+- Phase 3: n-*.response and n-*.headers (writes n-<case>, reads n-<case>-after, R-PARTY n-0b-party-before/-after), phase3-parse.py and phase3-parse.txt. send-read.sh is the same helper with a log label.
+
+## Phase 3: L-N (after GO; 8 writes, 26 reads, 14:22:39Z-14:27:04Z)
+tally_status at 14:22:39Z showed BRIDGE MASTERS LAB (100060) loaded alone, Silver, not Education. All 21 request hashes were re-checked. Each request was sent once, in the run sheet's order. Every send returned curl exit 0 and HTTP 200. There was no dialog in Tally after any write; a screenshot after each write stays on the PC, by hash.
+
+Every Create uses parent Sundry Creditors and bill-wise Yes. Each target was Sundry Debtors and bill-wise No before its case (nr-R-V3).
+
+| Case | Create name | Counters | ALTMSTID | R-V3 after: row hit |
+|---|---|---|---|---|
+| N-0a | MLab Fresh Party | CREATED 1 (control OK) | 216 → 217 | new row: GUID …-000000d5, ALTERID 217, Sundry Creditors, Yes, names [MLab Fresh Party] |
+| N-0b | MLab Exact Target | ALTERED 1 (control OK) | 217 → 218 | same GUID …-000000ce, ALTERID 210 → 218, now Sundry Creditors, Yes, names [MLab Exact Target] |
+| N-a | MLab Alias Name | ERRORS 1, LINEERROR "Duplicate Entry!", all others 0 | 218 → 218 | target unchanged: GUID …-000000cf, ALTERID 211, Sundry Debtors, No, names [MLab Alias Target, MLab Alias Name, MLab Alias Two] |
+| N-b | MLAB CASE TARGET | ALTERED 1 | 218 → 219 | same GUID …-000000d0, ALTERID 219, Sundry Creditors, Yes, NAME.LIST now [MLAB CASE TARGET]; the row's NAME attribute still says "MLab Case Target" |
+| N-c | MLab  Space Target (two spaces) | ALTERED 1 | 219 → 220 | same GUID …-000000d1, ALTERID 220, Sundry Creditors, Yes, NAME.LIST now [MLab  Space Target] (two spaces); attribute "MLab Space Target" |
+| N-d | MLab Dash Target | ALTERED 1 | 220 → 221 | same GUID …-000000d2, ALTERID 221, Sundry Creditors, Yes, NAME.LIST now [MLab Dash Target]; attribute "MLab Dash-Target" |
+| N-f | MLab Slash Target | ALTERED 1 | 221 → 222 | same GUID …-000000d3, ALTERID 222, Sundry Creditors, Yes, NAME.LIST now [MLab Slash Target]; attribute "MLab Slash/Target" |
+| N-e | MLab Group Target (ledger) | CREATED 1 | 222 → 223 | new ledger row: GUID …-000000d6, ALTERID 223, Sundry Creditors, Yes, names [MLab Group Target] |
+
+All GUIDs share the company prefix f107e523-3d6b-4516-bd24-5b1a14498fa6. Every count is by XML element, and every ALTMSTID comes from the single COMPANY row of R-MARKS (1 row each time). ALTVCHID was absent every time (0 vouchers).
+
+- **N-0b and R-PARTY (does a Create without a GSTIN clear it?): No.**
+  - Before: PARENT Sundry Debtors, ALTERID 210, TAXTYPE Others. One LEDGSTREGDETAILS.LIST (APPLICABLEFROM 20260401, GSTREGISTRATIONTYPE Regular, PLACEOFSUPPLY Rajasthan, GSTIN = the run sheet's party GSTIN).
+  - After: PARENT Sundry Creditors, ALTERID 218. The same LEDGSTREGDETAILS.LIST, unchanged, with the GSTIN still present.
+  - PARTYGSTIN is absent from the row both times, although FETCHed. The GSTIN is only in LEDGSTREGDETAILS.LIST.
+  - MASTERID is 206 both times.
+- **N-e, group row in R-GRP:**
+  - Before (n-f-after) and after (n-e-after) are identical: GUID …-000000d4, ALTERID 216, PARENT Sundry Debtors, names [MLab Group Target, MLab Group Alias].
+  - The group was not touched. Tally created a ledger with the group's name beside it, with no dialog.
+- **Summary of the folds:**
+  - Tally matched each tested variant to the existing ledger. The variants were: all capitals; a doubled space for a single one; a space where the target has "-"; a space where the target has "/". The Create then overwrote that ledger (ALTERED=1, same GUID): parent and bill-wise changed, and the NAME.LIST took the incoming spelling. The NAME attribute on the row kept the old spelling. Other separators and the reverse directions were not tested.
+  - A name equal to another ledger's alias is refused whole: ERRORS=1, "Duplicate Entry!", no change, no ALTMSTID step.
+  - A ledger name equal to a group's name is not a conflict: it creates.
+- **CMPINFO's `<LEDGER>` count element** (not a row count) went 6, 7, 8, 8, 9, 10, 11, 12, 13 across R-MARKS nr…n-e-after. It steps on every created or altered ledger, not on the refused write. COLLECTION rows went 8 → 9 (N-0a) → 10 (N-e).
+- phase3-parse.py and phase3-parse.txt hold the per-case element parse. Phase 4 was not run.
 
 ## Masking
-In log.txt and this report, the run sheet's two synthetic GSTINs (company and party) are written as the same-length mask ZZZZZZZZZZZZZZZ. The XML answers contain no GSTIN and are unchanged. The published log.txt also drops one scheduling note from its first line. log.txt: lab copy sha256 ab7efc4cd0e88bb32efc3e1dd9f438847b9a46c8c24b9c25b08af077914564d2, published copy sha256 a3ee4f08be2c0213e49b14d3e0946f6dcab977ed904fc634c7931526ba719a2b.
+The run sheet's two synthetic GSTINs (company and party) are written as the same-length mask ZZZZZZZZZZZZZZZ.
+- **Text:** the mask is used in log.txt, phase3-parse.txt and this report. The published log.txt also drops one scheduling note from its first line.
+- **XML answers:** the mask is used inside the two R-PARTY answers (n-0b-party-before/-after, 1 GSTIN each). It keeps their byte length and adds no markup; the answers keep Tally's own &#4; references (see the parsing note). No other answer contains a GSTIN, and they are published byte for byte.
+- **Hashes:** SHA256-evidence.txt lists the lab hash and the published hash of every file.

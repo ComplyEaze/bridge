@@ -22,3 +22,39 @@ Masters M1 sitting, 12-Oct-2026, phases 0-2 only. Run sheet lab/masters-m1-reque
 2026-10-12T14:17:35Z PHASE 2 nr R-V2: request sha256 5a31a9f828afb147f83f1a98050a354722c05f2dfebdff1b0b896c73113cc9f2 OK; sent 2026-10-12T14:17:35Z; curl exit 0; -w: 200 12910
 2026-10-12T14:17:42Z PHASE 2 nr R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:17:41Z; curl exit 0; -w: 200 13610
 2026-10-12T14:17:48Z PHASE 2 nr R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:17:48Z; curl exit 0; -w: 200 56068
+2026-10-12T14:22:39Z PHASE 3 GO received (phase 3 only; phase 4 not run). tally_status 14:22:39Z: TallyPrime 7.1 silver, education_mode false, endpoint 127.0.0.1:9001, loaded: BRIDGE MASTERS LAB (100060, books 20260401, GUID f107e523-3d6b-4516-bd24-5b1a14498fa6) only. 21/21 request hashes re-checked OK.
+2026-10-12T14:23:10Z PHASE 3 WRITE n-0a N-0a: request sha256 91134ef906b74fd880754af8214dc8aa861a0e62fb76cf3258ec96943d58fff0 OK; sent 2026-10-12T14:23:10Z; curl exit 0; -w: 200 538
+2026-10-12T14:23:26Z PHASE 3 READ n-0a-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:23:26Z; curl exit 0; -w: 200 3308
+2026-10-12T14:23:27Z PHASE 3 READ n-0a-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:23:27Z; curl exit 0; -w: 200 14914
+2026-10-12T14:23:28Z PHASE 3 READ n-0a-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:23:27Z; curl exit 0; -w: 200 56068
+2026-10-12T14:23:37Z PHASE 3 READ n-0b-party-before R-PARTY: request sha256 bdc8b8005c5c70f0bf7cf5afaf637c299d5505e5ace762e81678a4ce13e873b8 OK; sent 2026-10-12T14:23:37Z; curl exit 0; -w: 200 22470
+2026-10-12T14:23:44Z PHASE 3 WRITE n-0b N-0b: request sha256 b7ea058f6757bb30383f684a500473fad2486f3c0af82d3e056f8be69f2ac43e OK; sent 2026-10-12T14:23:44Z; curl exit 0; -w: 200 538
+2026-10-12T14:23:59Z PHASE 3 READ n-0b-party-after R-PARTY: request sha256 bdc8b8005c5c70f0bf7cf5afaf637c299d5505e5ace762e81678a4ce13e873b8 OK; sent 2026-10-12T14:23:59Z; curl exit 0; -w: 200 22474
+2026-10-12T14:24:00Z PHASE 3 READ n-0b-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:24:00Z; curl exit 0; -w: 200 3308
+2026-10-12T14:24:01Z PHASE 3 READ n-0b-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:24:00Z; curl exit 0; -w: 200 14920
+2026-10-12T14:24:01Z PHASE 3 READ n-0b-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:24:01Z; curl exit 0; -w: 200 56068
+2026-10-12T14:24:12Z PHASE 3 WRITE n-a N-a: request sha256 d661fd321d28d6d6eaef4e9e9b2a932dc1f13733997e27f79defcdbbae0d9999 OK; sent 2026-10-12T14:24:12Z; curl exit 0; -w: 200 622
+2026-10-12T14:24:29Z PHASE 3 READ n-a-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:24:28Z; curl exit 0; -w: 200 3308
+2026-10-12T14:24:29Z PHASE 3 READ n-a-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:24:29Z; curl exit 0; -w: 200 14920
+2026-10-12T14:24:30Z PHASE 3 READ n-a-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:24:30Z; curl exit 0; -w: 200 56068
+2026-10-12T14:24:42Z PHASE 3 WRITE n-b N-b: request sha256 c6715ebaad95a05925bcfa223749e57cdcf806c0f08aad7d0639b9ecdf43e50c OK; sent 2026-10-12T14:24:41Z; curl exit 0; -w: 200 538
+2026-10-12T14:24:57Z PHASE 3 READ n-b-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:24:57Z; curl exit 0; -w: 200 3308
+2026-10-12T14:24:58Z PHASE 3 READ n-b-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:24:58Z; curl exit 0; -w: 200 14926
+2026-10-12T14:24:59Z PHASE 3 READ n-b-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:24:58Z; curl exit 0; -w: 200 56068
+2026-10-12T14:25:10Z PHASE 3 WRITE n-c N-c: request sha256 7c2f608c49a38eadcef36812dacec768b14b7502a7cb7dad93d18d6dc19a5483 OK; sent 2026-10-12T14:25:10Z; curl exit 0; -w: 200 538
+2026-10-12T14:25:26Z PHASE 3 READ n-c-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:25:26Z; curl exit 0; -w: 200 3310
+2026-10-12T14:25:27Z PHASE 3 READ n-c-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:25:27Z; curl exit 0; -w: 200 14936
+2026-10-12T14:25:28Z PHASE 3 READ n-c-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:25:28Z; curl exit 0; -w: 200 56070
+2026-10-12T14:25:49Z PHASE 3 WRITE n-d N-d: request sha256 74b3734c764cc161f0c9c1fc16ae1421dad2c58a6d426aaff0fae857e6df8428 OK; sent 2026-10-12T14:25:49Z; curl exit 0; -w: 200 538
+2026-10-12T14:26:04Z PHASE 3 READ n-d-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:26:04Z; curl exit 0; -w: 200 3310
+2026-10-12T14:26:05Z PHASE 3 READ n-d-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:26:05Z; curl exit 0; -w: 200 14942
+2026-10-12T14:26:06Z PHASE 3 READ n-d-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:26:06Z; curl exit 0; -w: 200 56070
+2026-10-12T14:26:17Z PHASE 3 WRITE n-f N-f: request sha256 2a5203101ba8a7a90ac363a498b56a5e37f3650f787cf75003c2501d9599c021 OK; sent 2026-10-12T14:26:17Z; curl exit 0; -w: 200 538
+2026-10-12T14:26:33Z PHASE 3 READ n-f-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:26:32Z; curl exit 0; -w: 200 3310
+2026-10-12T14:26:33Z PHASE 3 READ n-f-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:26:33Z; curl exit 0; -w: 200 14948
+2026-10-12T14:26:34Z PHASE 3 READ n-f-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:26:34Z; curl exit 0; -w: 200 56070
+2026-10-12T14:26:45Z PHASE 3 WRITE n-e N-e: request sha256 9d7d22ebc8e94e61e0ca960f1376ee0bb82d53a27e65b2429d3575f4d7ec6f29 OK; sent 2026-10-12T14:26:44Z; curl exit 0; -w: 200 538
+2026-10-12T14:27:02Z PHASE 3 READ n-e-after R-MARKS: request sha256 cdb3feadd248b53a2dea6faa6b3386e6486b26ef9674d8816d9bac7c999bcab7 OK; sent 2026-10-12T14:27:02Z; curl exit 0; -w: 200 3310
+2026-10-12T14:27:03Z PHASE 3 READ n-e-after R-V3: request sha256 b6c6e6b4aa1c90bdc41f498e5389c6e9f9f34f65ab21ee96f1cecdc18d7d773f OK; sent 2026-10-12T14:27:03Z; curl exit 0; -w: 200 16256
+2026-10-12T14:27:04Z PHASE 3 READ n-e-after R-GRP: request sha256 d79f32c5c0519ce7dacb46839f47f15a97ef9f11180121e2b3fa57e6c9d347b0 OK; sent 2026-10-12T14:27:04Z; curl exit 0; -w: 200 56070
+2026-10-12T14:27:30Z PHASE 3 complete: 8 writes, 26 reads, each sent once, all curl exit 0 / HTTP 200. No Tally dialog after any write (screenshots p3-n-*-after-write.jpg). Controls: N-0a CREATED=1, N-0b ALTERED=1, as expected. Phase 4 not run. Tally at the Gateway with BRIDGE MASTERS LAB loaded alone.

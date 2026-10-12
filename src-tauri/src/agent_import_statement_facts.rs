@@ -459,38 +459,44 @@ impl BuildLine {
             endpoint_origin: line.endpoint_origin.clone(),
             built_at: line.built_at.clone(),
             status: line.status.clone(),
-            vouchers: line
-                .vouchers
-                .iter()
-                .filter(|voucher| {
-                    voucher.voucher_type == VoucherType::Contra
-                        || is_statement_txn_id(&voucher.bridge_txn_id)
-                })
-                .map(|voucher| BuildVoucher {
-                    txn_id: voucher.bridge_txn_id.clone(),
-                    date: voucher.date.clone(),
-                    kind: voucher.voucher_type.clone(),
-                    entries: voucher
-                        .entries
-                        .iter()
-                        .map(|entry| BuildEntry {
-                            ledger: entry.ledger.clone(),
-                            amount: entry.amount.clone(),
-                            side: entry.side.clone(),
-                        })
-                        .collect(),
-                })
-                .collect(),
+            vouchers: BuildVoucher::of_vouchers(&line.vouchers),
             ledger_identities: line.ledger_identities.clone(),
             statement: line.statement.clone(),
         }
     }
 }
 
+impl BuildVoucher {
+    /// The vouchers a transfer can be made of: Contras and statement rows.
+    pub(super) fn of_vouchers(vouchers: &[ImportVoucher]) -> Vec<Self> {
+        vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher.voucher_type == VoucherType::Contra
+                    || is_statement_txn_id(&voucher.bridge_txn_id)
+            })
+            .map(|voucher| Self {
+                txn_id: voucher.bridge_txn_id.clone(),
+                date: voucher.date.clone(),
+                kind: voucher.voucher_type.clone(),
+                entries: voucher
+                    .entries
+                    .iter()
+                    .map(|entry| BuildEntry {
+                        ledger: entry.ledger.clone(),
+                        amount: entry.amount.clone(),
+                        side: entry.side.clone(),
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+}
+
 /// A record about to be written, read as the newest one.
 pub(super) enum Candidate {
     Build(Box<BuildLine>),
-    SkipOnly(SkipOnlyRecord),
+    SkipOnly(Box<SkipOnlyRecord>),
 }
 
 /// One journal record, in journal order, as far as the facts need it.
@@ -531,6 +537,57 @@ pub(super) enum TransferFactsError {
     Pairing(#[from] PairingInputError),
 }
 
+impl TransferFactsError {
+    /// Which failure, without any value the record held.
+    pub(super) fn variant(&self) -> &'static str {
+        match self {
+            Self::JournalUnreadable { .. } => "journal_unreadable",
+            Self::SkipFileUnreadable { .. } => "skip_file_unreadable",
+            Self::Facts { .. } => "facts",
+            Self::MissingEndpoint { .. } => "missing_endpoint",
+            Self::BuiltAtUnparsable { .. } => "built_at_unparsable",
+            Self::BatchRecordChanged { .. } => "batch_record_changed",
+            Self::DuplicateSkipRecordId { .. } => "duplicate_skip_record_id",
+            Self::SkipIsVoucherInLineage { .. } => "skip_is_voucher_in_lineage",
+            Self::LegLedgerUnbound { .. } => "leg_ledger_unbound",
+            Self::Pairing(error) => match error {
+                PairingInputError::DuplicateSkip { .. } => "pairing_duplicate_skip",
+                PairingInputError::DuplicateContra { .. } => "pairing_duplicate_contra",
+                PairingInputError::NonPositiveSkipAmount { .. } => "pairing_non_positive_skip",
+                PairingInputError::NonPositiveContraAmount { .. } => "pairing_non_positive_contra",
+                PairingInputError::SkipLedgersEqual { .. } => "pairing_skip_ledgers_equal",
+                PairingInputError::InvertedWindow { .. } => "pairing_inverted_window",
+            },
+        }
+    }
+
+    /// The batch or skip-only record whose facts failed, when one did. A
+    /// journal-wide failure, or one in a ledger or a row, names none.
+    pub(super) fn record_id(&self) -> Option<&str> {
+        match self {
+            Self::Facts { source_id, .. }
+            | Self::MissingEndpoint { source_id }
+            | Self::BuiltAtUnparsable { source_id } => Some(source_id),
+            Self::BatchRecordChanged { batch_id } | Self::LegLedgerUnbound { batch_id, .. } => {
+                Some(batch_id)
+            }
+            Self::DuplicateSkipRecordId { record_id } => Some(record_id),
+            Self::SkipIsVoucherInLineage { lineage, .. } => Some(lineage),
+            Self::JournalUnreadable { .. } | Self::SkipFileUnreadable { .. } | Self::Pairing(_) => {
+                None
+            }
+        }
+    }
+
+    /// The failed check of a facts failure.
+    pub(super) fn check(&self) -> Option<&'static str> {
+        match self {
+            Self::Facts { error, .. } => Some(error.variant()),
+            _ => None,
+        }
+    }
+}
+
 /// The facts `transfer_pairing_view` takes, and what was set aside on the way.
 #[derive(Debug)]
 pub(super) struct TransferFacts {
@@ -539,17 +596,26 @@ pub(super) struct TransferFacts {
     pub(super) coverage: Coverage,
     /// Skips dropped because a batch found posted holds the row.
     pub(super) retired_skips: usize,
-    /// Skips whose row a batch not found posted holds: not established, and
-    /// the batch that holds it.
-    pub(super) held_elsewhere: Vec<(SkipKey, BatchId)>,
+    /// Skips whose row a batch not found posted holds: not established, the
+    /// batch that holds it, and the skipped row's date.
+    pub(super) held_elsewhere: Vec<(SkipKey, BatchId, TallyDate)>,
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
+    // Counted for the tests; no tool reports it, since the coverage rule already
+    // withholds `not_found` where such a Contra sits.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_not_two_leg: usize,
     /// Contras of a lineage that holds statement facts, with no facts entry in
     /// any of its builds: not seen, and the days they sit on are not cover.
+    // Counted for the tests; no tool reports it, since the coverage rule already
+    // withholds `not_found` where such a Contra sits.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_without_facts: usize,
     /// Contras of a build never sent and never found, whose row a sent or found
     /// batch of another lineage holds.
+    // Counted for the tests; no tool reports it, since the coverage rule already
+    // withholds `not_found` where such a Contra sits.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) contras_superseded: usize,
     /// The skips, kept or held elsewhere, that some build of the company which
     /// mentions them was sent or found posted, or that a skip-only record holds:
@@ -844,9 +910,8 @@ fn lineage_facts(
                 endpoint_origin: EndpointOrigin::new(batch.endpoint()?),
                 row: StatementRowId::new(skip.txn.as_str()),
             };
-            let live = batch.sent
-                || batch.found
-                || skips.get(&key).is_some_and(|earlier| earlier.live);
+            let live =
+                batch.sent || batch.found || skips.get(&key).is_some_and(|earlier| earlier.live);
             skips.insert(
                 key.clone(),
                 SkipMention {
@@ -1067,6 +1132,7 @@ pub(super) fn build_transfer_facts(
             Some(held) => held_elsewhere.push((
                 key.clone(),
                 BatchId::new(batches[held.latest].line.batch_id.as_str()),
+                mention.fact.date.clone(),
             )),
         }
         if live {

@@ -3160,7 +3160,7 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
 
 /// A version 2 proposals file for a parse of `bank_ledger`, returning
 /// build_import_xml's arguments.
-fn statement_v2(
+pub(super) fn statement_v2(
     directory: &std::path::Path,
     bank_ledger: &str,
     coverage: Value,
@@ -3189,7 +3189,7 @@ const OUTFLOW_SKIP_ROW: &str = "st-20260903-00000000000000a3";
 
 /// The captured plans with both money-bearing demo ledgers moved under Bank
 /// Accounts, for this test only, so a Contra between them is admitted.
-fn two_bank_plans() -> Vec<ScenarioPlan> {
+pub(super) fn two_bank_plans() -> Vec<ScenarioPlan> {
     bank_build_plans()
         .into_iter()
         .map(|mut plan| {
@@ -3207,7 +3207,13 @@ fn two_bank_plans() -> Vec<ScenarioPlan> {
 }
 
 /// A record the parse writes for a Contra or a skipped row.
-fn record(txn: &str, disposition: Value, ledger: &str, direction: &str, reversed: bool) -> Value {
+pub(super) fn record(
+    txn: &str,
+    disposition: Value,
+    ledger: &str,
+    direction: &str,
+    reversed: bool,
+) -> Value {
     json!({"row": 1, "date": "2026-09-01", "disposition": disposition, "amount": "12.50",
         "party": "SYNTHETIC", "ledger": ledger, "suspense": false, "bridge_txn_id": txn,
         "reference": "600000000001", "instrument": "000417",
@@ -3384,10 +3390,11 @@ async fn a_skips_other_ledger_missing_from_the_book_refuses_the_build() {
 }
 
 /// Facts that disagree with the batch's own vouchers are never written: here a
-/// Contra voucher the file's records do not name.
+/// Contra voucher the file's records do not name. The check runs under the
+/// admission lock, before the book's mark and the preflight are read.
 #[tokio::test]
 async fn facts_that_disagree_with_their_vouchers_are_refused_and_nothing_is_written() {
-    let simulator = SequenceSimulator::spawn(two_bank_plans()).expect("build plan");
+    let simulator = SequenceSimulator::spawn(two_bank_plans()[..18].to_vec()).expect("build plan");
     let directory = tempfile::tempdir().unwrap();
     let server = bank_server(directory.path(), simulator.address().port());
     let args = statement_v2(
@@ -3405,7 +3412,7 @@ async fn facts_that_disagree_with_their_vouchers_are_refused_and_nothing_is_writ
     assert_eq!(result["state"], "refused", "{response}");
     assert_eq!(result["reason"], "statement_facts_invalid", "{response}");
     assert_eq!(result["check"], "contra_voucher_not_in_facts");
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
     let imports = directory.path().join("imports");
     assert!(!imports.exists() || std::fs::read_dir(imports).unwrap().next().is_none());
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
@@ -3496,7 +3503,7 @@ async fn a_version_one_payment_file_and_an_inline_batch_write_no_facts() {
 
 /// The requests a skip-only build makes: the company identity, then the
 /// bracketed catalogue read, and no mode probe, group read or preflight.
-fn skip_only_plans() -> Vec<ScenarioPlan> {
+pub(super) fn skip_only_plans() -> Vec<ScenarioPlan> {
     import_family_cycle_plans()[..10].to_vec()
 }
 

@@ -69,6 +69,10 @@ macro_rules! text_id {
             pub(crate) fn new(value: impl Into<String>) -> Self {
                 Self(value.into())
             }
+
+            pub(crate) fn as_str(&self) -> &str {
+                &self.0
+            }
         }
     };
 }
@@ -233,15 +237,24 @@ pub(crate) enum PairRound {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SkipState {
-    Paired { round: PairRound, contra: ContraKey },
+    Paired {
+        round: PairRound,
+        contra: ContraKey,
+    },
     NotFound,
-    Ambiguous { candidates: Vec<ContraKey> },
-    OtherSideUnverified { batch: BatchId },
+    Ambiguous {
+        candidates: Vec<ContraKey>,
+    },
+    OtherSideUnverified {
+        batch: BatchId,
+    },
     NotEstablished,
     /// The skipped row, or a row that could carry it, is reversed the same day
     /// on its own statement, so it is not a transfer. Listed with the Contras
     /// that could have carried it (none when nothing matched).
-    ReversedSameDay { candidates: Vec<ContraKey> },
+    ReversedSameDay {
+        candidates: Vec<ContraKey>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

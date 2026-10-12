@@ -826,8 +826,7 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
         for state in view.skips.values() {
             match state {
                 SkipState::Paired { contra, .. } => assert_ne!(contra, &gone),
-                SkipState::Ambiguous { candidates }
-                | SkipState::ReversedSameDay { candidates } => {
+                SkipState::Ambiguous { candidates } | SkipState::ReversedSameDay { candidates } => {
                     assert!(!candidates.contains(&gone));
                 }
                 SkipState::OtherSideUnverified { batch } => assert_ne!(batch, &gone.batch),

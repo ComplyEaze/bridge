@@ -92,6 +92,11 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
                 "type":"string", "minLength":64, "maxLength":64,
                 "description":"The sha256 parse_bank_statement returned for that proposals file; the build is refused if the file no longer has it."
             },
+            super::transfers::WITHDRAW_SKIPS_KEY:{
+                "type":"array", "uniqueItems":true, "maxItems":MAX_VOUCHERS,
+                "description":"Statement rows (the bridge_txn_id of a parse_bank_statement proposal, st- followed by the row's date and hash) that a statement of this company skipped as carried by the other account's Contra, and that this build posts anyway as a voucher of any type. Without this a build that posts such a row is refused as skip_row_paired_elsewhere, because posting it books its own bank and, if the other account's Contra exists, books the transfer twice. Name a row only when the person says the other account's statement does NOT hold this transfer, or that the row is reversed the same day on its own statement; never on their behalf. Each row must be a skip ComplyEaze Bridge holds for this company (in a batch sent to Tally or found posted, or in a statement of only skipped rows) and a voucher of this build, or the build is refused as withdraw_skip_invalid. It is not saved: a withdrawn skip is held by the new batch until that batch is found posted, and is then retired.",
+                "items":{"type":"string", "pattern":crate::agent::catalog::STATEMENT_ROW_ID_PATTERN}
+            },
             super::bill_wise::APPROVALS_KEY:{
                 "type":"array", "maxItems":MAX_MASTER_NAMES,
                 "description":"One entry per bill-wise party the person agreed may receive this batch's entries On Account, copied from a bill_wise_party_unapproved refusal of the same batch: its party_digest, which alone says which party is approved (ledger may be copied beside it, and is not read: with party names masked it is a masked name). Leave it out on the first build. A digest that is not one of this batch's parties' digests, or one given twice, is refused as on_account_approval_invalid (cause digest_differs, duplicate or malformed): nothing is accepted and dropped. The digest ties an approval to this exact batch, company, endpoint and ledger; it does not prove that a person said yes.",

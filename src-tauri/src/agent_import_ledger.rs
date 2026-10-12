@@ -729,6 +729,50 @@ pub(super) fn vouchers_already_posted(
     Ok(holds_a_row.intersection(&sent_or_found).next().cloned())
 }
 
+/// The first batch, in id order, that holds as a voucher some of `rows` and
+/// either belongs to the company and was sent or found posted, whatever its
+/// lineage, or belongs to `own_lineage` at any status; with the rows of `rows`
+/// it holds. A build that skips such a row cannot take it out of Tally. It reads
+/// the journal alone: the transfer view is not consulted.
+pub(super) fn rows_held_as_vouchers(
+    reader: impl BufRead,
+    company_guid: &str,
+    own_lineage: Option<&str>,
+    rows: &BTreeSet<String>,
+) -> Result<Option<(String, BTreeSet<String>)>, String> {
+    // each batch's latest full record decides what it holds
+    let mut held: BTreeMap<String, (bool, BTreeSet<String>)> = BTreeMap::new();
+    let mut sent_or_found = BTreeSet::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(batch) => {
+            if batch.company_guid.eq_ignore_ascii_case(company_guid) {
+                let mine = batch
+                    .vouchers
+                    .iter()
+                    .filter(|voucher| rows.contains(&voucher.bridge_txn_id))
+                    .map(|voucher| voucher.bridge_txn_id.clone())
+                    .collect();
+                let own = own_lineage == Some(batch.identity_batch_id());
+                held.insert(batch.batch_id.clone(), (own, mine));
+            }
+            if batch.status == "posted_verified" {
+                sent_or_found.insert(batch.batch_id.clone());
+            }
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::DispatchIntent)
+                || update.status == "posted_verified"
+            {
+                sent_or_found.insert(update.batch_id.clone());
+            }
+        }
+    })?;
+    Ok(held
+        .into_iter()
+        .find(|(id, (own, mine))| !mine.is_empty() && (*own || sent_or_found.contains(id)))
+        .map(|(id, (_, mine))| (id, mine)))
+}
+
 /// The facts the transfer pairing view takes for one company: the journal
 /// (every record admitted, as for every other read) and the skip-only file,
 /// with a build about to be written, if any, read as the newest record.
@@ -754,7 +798,7 @@ pub(super) fn transfer_facts(
         .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
     match candidate {
         Some(Candidate::Build(line)) => events.push(JournalEvent::Build(line)),
-        Some(Candidate::SkipOnly(record)) => skip_records.push(record),
+        Some(Candidate::SkipOnly(record)) => skip_records.push(*record),
         None => {}
     }
     statement_facts::build_transfer_facts(events, skip_records, company_guid)

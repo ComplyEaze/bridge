@@ -751,7 +751,7 @@ fn a_skip_held_by_a_batch_only_built_or_only_sent_is_held_elsewhere() {
         assert_eq!(found.retired_skips, 0);
         assert_eq!(
             found.held_elsewhere,
-            vec![(key(B1, 6), BatchId::new(batch_id(65)))]
+            vec![(key(B1, 6), BatchId::new(batch_id(65)), date("20260901"))]
         );
     }
 }
@@ -2043,7 +2043,7 @@ fn a_skip_held_by_two_batches_names_the_latest_in_the_journal() {
         .unwrap();
     assert_eq!(
         found.held_elsewhere,
-        vec![(key(B1, 6), BatchId::new(batch_id(176)))]
+        vec![(key(B1, 6), BatchId::new(batch_id(176)), date("20260901"))]
     );
 }
 
@@ -2551,12 +2551,10 @@ fn a_skip_is_live_once_its_batch_is_sent_or_found_and_not_before() {
 #[test]
 fn a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built() {
     let first = skipping(91, 9);
-    let rebuilt = build(91 + 1).amends(91).facts(facts(B1).skip(skip_row(
-        &st(9),
-        "500.00",
-        B2,
-        Some(REF_A),
-    )));
+    let rebuilt =
+        build(91 + 1)
+            .amends(91)
+            .facts(facts(B1).skip(skip_row(&st(9), "500.00", B2, Some(REF_A))));
     let found = Journal::default()
         .batch(&first)
         .sent(&first)
@@ -2565,7 +2563,7 @@ fn a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built(
         .unwrap();
     assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
     // the newest mention still gives the facts
-    assert_eq!(found.skips[0].reference.is_some(), true);
+    assert!(found.skips[0].reference.is_some());
 }
 
 #[test]
@@ -2657,7 +2655,7 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
     assert!(with.skips.is_empty());
     assert_eq!(
         with.held_elsewhere,
-        vec![(key(B1, 9), BatchId::new(batch_id(97)))]
+        vec![(key(B1, 9), BatchId::new(batch_id(97)), date("20260901"))]
     );
     // a candidate skip-only record is a skip of its own
     let record = skip_record(
@@ -2667,7 +2665,7 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
         facts(B1).skip(skip_row(&st(10), "500.00", B2, None)),
     );
     let with = journal
-        .read_candidate("", COMPANY, Some(Candidate::SkipOnly(record)))
+        .read_candidate("", COMPANY, Some(Candidate::SkipOnly(Box::new(record))))
         .unwrap();
     assert_eq!(with.skips.len(), 2);
     assert!(with.live_skips.contains(&key(B1, 10)));

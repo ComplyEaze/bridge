@@ -14,6 +14,10 @@ const SHA256_HEX_PATTERN: &str = "^[0-9a-f]{64}$";
 pub(super) const BRIDGE_BATCH_ID_PATTERN: &str =
     "^bridge-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 
+/// A statement row id, as `withdraw_skips` publishes it: `st-`, the row's date
+/// as eight digits, `-` and sixteen lower-case hex digits.
+pub(super) const STATEMENT_ROW_ID_PATTERN: &str = "^st-[0-9]{8}-[0-9a-f]{16}$";
+
 pub(super) fn validate_tool_arguments(name: &str, args: &Value) -> Result<(), String> {
     let arguments = args
         .as_object()
@@ -232,6 +236,7 @@ fn published_pattern_matcher(pattern: &str) -> Option<fn(&str) -> bool> {
         DATE_WIRE_PATTERN => Some(date_wire_matches),
         // Admission applies the build's own rule, which the published pattern restates.
         BRIDGE_BATCH_ID_PATTERN => Some(agent_import::valid_batch_id),
+        STATEMENT_ROW_ID_PATTERN => Some(bridge_bank_statement::proposals::is_statement_txn_id),
         SHA256_HEX_PATTERN => Some(|text| {
             text.len() == 64
                 && text

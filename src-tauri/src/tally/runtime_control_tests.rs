@@ -428,7 +428,7 @@ async fn deterministic_runtime_sequence_retries_server_failure_then_succeeds() {
 }
 
 #[test]
-fn operation_and_retry_surface_are_read_only_and_redacted() {
+fn failure_classes_retry_policy_and_endpoint_debug_output_are_read_only_and_redacted() {
     assert!(ReadFailureClass::HttpServer.retryable());
     assert!(!ReadFailureClass::Application.retryable());
     assert!(format!("{:?}", endpoint("sensitive-loopback")).contains("[redacted]"));

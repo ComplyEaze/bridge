@@ -289,7 +289,7 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// (`agent_lab.rs`, `jsonex*.rs`, `india_tax_observation.rs`), operator filing
 /// labels (`client_groups.rs`, `client_group_label_migration.rs` and the
 /// `commands/all_clients.rs` commands over them, none of which reads Tally),
-/// dead or declaration-only modules. bridge#416 records the reasoning for the rest.
+/// and dead or declaration-only modules. bridge#416 records the reasoning for the rest.
 ///
 /// Also not pinned: the four frontend modules bridge#468 moved out of the pinned
 /// `src/main.tsx` and `src/MirrorProofScreen.tsx`, where they had been copied.

@@ -640,18 +640,6 @@ fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
 }
 
 #[test]
-fn inconsistent_date_filter_fixture_returns_a_row_outside_its_declared_window() {
-    let xml = Fixture::InconsistentDateFilter.body();
-    assert_eq!(
-        element_values(&xml, b"DATE").unwrap(),
-        vec!["20260630".to_string()]
-    );
-    assert!(xml.contains("FROMDATE=\"20260701\""));
-    assert!(xml.contains("TODATE=\"20260731\""));
-    assert!(assert_well_formed(&xml).is_ok());
-}
-
-#[test]
 fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
     let fixtures = [
         Fixture::ProductStatus(ProductStatus::TallyPrime),
@@ -666,7 +654,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::DuplicateIdentity,
         Fixture::WrongCompany,
         Fixture::VoucherExport,
-        Fixture::InconsistentDateFilter,
         Fixture::RecordCountMismatch,
         Fixture::MalformedExportMetadata,
         Fixture::DuplicateExportMetadata,

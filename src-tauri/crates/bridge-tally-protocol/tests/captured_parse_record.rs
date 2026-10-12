@@ -60,8 +60,8 @@ use bridge_tally_protocol::{
     parse_native_voucher_type_source_records_with_evidence,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    parse_voucher_source_records_with_evidence, parse_vouchers_with_evidence,
-    ExpectedTallyTextEncoding, TallyImportApplicationStatus, TallyImportResult,
+    parse_voucher_source_records_with_evidence, ExpectedTallyTextEncoding,
+    TallyImportApplicationStatus, TallyImportResult,
 };
 use sha2::{Digest, Sha256};
 
@@ -2093,8 +2093,7 @@ const ROWS: &[Row] = &[
         parse: |_, text| bills(text, "20250401", "20260923"),
     },
     // The simulator's authored corpus (../tally-protocol-simulator/fixtures/PROVENANCE.md):
-    // tests/simulator_corpus.rs. `inconsistent_date_filter.xml` has no parsing test; it is a
-    // Bridge-schema voucher export, read here as `voucher_export.xml` is.
+    // tests/simulator_corpus.rs.
     Row {
         fixture: "../tally-protocol-simulator/fixtures/export_status_1.xml",
         source: Source::Synthetic,
@@ -2182,20 +2181,8 @@ const ROWS: &[Row] = &[
     Row {
         fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
         source: Source::Synthetic,
-        parser: "parse_vouchers_with_evidence",
-        parse: |_, text| untyped(parse_vouchers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
-        source: Source::Synthetic,
         parser: "parse_voucher_source_records_with_evidence",
         parse: |_, text| untyped(parse_voucher_source_records_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/inconsistent_date_filter.xml",
-        source: Source::Synthetic,
-        parser: "parse_vouchers_with_evidence",
-        parse: |_, text| untyped(parse_vouchers_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",

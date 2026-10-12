@@ -15,10 +15,11 @@
 //! **What is reused, and what is not, and why:**
 //! - [`bridge_tally_protocol::parse_import_outcome`] parses every
 //!   `<RESPONSE>` (§9.1/§9.2) -- genuinely shared code, not duplicated.
-//! - The master-name matching predicate ([`canonical_master_key`]) is the
+//! - The master-name matching predicate ([`canonical_master_key`], defined in
+//!   `bridge_tally_core::master_binding`) is the
 //!   composed fold measured on **licensed TallyPrime 7.1** in §9.4d (space,
 //!   `-` and `/` interchangeable, internal runs collapsed, surrounding
-//!   whitespace ignored, ASCII case folded, otherwise exact codepoints; NFC/
+//!   whitespace ignored, Unicode-lowercase case folded, otherwise exact codepoints; NFC/
 //!   NFD is deliberately NOT folded -- §9.4d's own "canonical equivalence is
 //!   still refused" finding). §9.4d's measurement scope is *ledgers, one
 //!   company*; applying the same fold to every other master kind here is a
@@ -51,6 +52,7 @@
 //!   [`render_parented_xml`] and [`render_stock_item_xml`].
 
 use super::*;
+use bridge_tally_core::master_binding::canonical_master_key;
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::is_tally_reserved_root;
 use serde::Deserialize;
@@ -59,39 +61,6 @@ use uuid::Uuid;
 
 const MAX_MASTER_BATCH: usize = 200;
 const MAX_VOUCHER_BATCH: usize = 100;
-
-// ---------------------------------------------------------------------------
-// Master-name matching (§9.4d, licensed TallyPrime 7.1) -- see module doc.
-// ---------------------------------------------------------------------------
-
-/// The composed fold §9.4d measured on licensed TallyPrime 7.1: ASCII case
-/// folded, `-`/`/` treated as a space, internal whitespace runs collapsed to
-/// one, surrounding whitespace trimmed. Deliberately does **not** apply
-/// Unicode normalisation (NFC/NFD) -- §9.4d's own finding is that Tally
-/// refuses that fold.
-fn canonical_master_key(name: &str) -> String {
-    let mut out = String::with_capacity(name.len());
-    let mut last_was_space = true; // trims leading whitespace for free
-    for ch in name.chars() {
-        let mapped = match ch {
-            '-' | '/' => ' ',
-            other => other,
-        };
-        if mapped.is_whitespace() {
-            if !last_was_space {
-                out.push(' ');
-            }
-            last_was_space = true;
-        } else {
-            out.extend(mapped.to_lowercase());
-            last_was_space = false;
-        }
-    }
-    while out.ends_with(' ') {
-        out.pop();
-    }
-    out
-}
 
 /// The `company_guid` the caller supplied must be the admitted lab target's
 /// own GUID -- `admit_lab_target` already proved *a* target is loaded and
@@ -749,55 +718,30 @@ fn render_parented_xml(
 
 fn render_ledger_xml(l: &BookLedger) -> String {
     let parent = l.parent.as_deref().unwrap_or("Primary");
-    let name = xml_escape(&l.name);
-    // Explicit on every Create, defaulting the unspecified case to `No` --
-    // the proven capture never omits it.
-    let billwise = format!(
-        "<ISBILLWISEON>{}</ISBILLWISEON>",
-        if l.is_billwise_on.unwrap_or(false) {
-            "Yes"
-        } else {
-            "No"
-        }
-    );
     // Only when non-zero: the proven capture's zero-balance ledgers (e.g.
     // "Sales", "Wages and Salary") carry no `OPENINGBALANCE` element at all.
     let opening = l.opening_balance.as_deref().unwrap_or("0.00");
-    let opening_balance = if is_zero_amount(opening) {
-        String::new()
-    } else {
-        format!("<OPENINGBALANCE>{}</OPENINGBALANCE>", xml_escape(opening))
-    };
-    // GST fields are passed through exactly as observed on the source ledger
-    // (§8.3: `GSTDUTYHEAD` vocabulary is irregular, `State Tax` not `SGST`);
-    // never synthesised. §8.3: settable at Create, silently not at Alter --
-    // this renderer only ever builds a Create.
-    let gstin = l
-        .party_gstin
-        .as_deref()
-        .map(|g| format!("<PARTYGSTIN>{}</PARTYGSTIN>", xml_escape(g)))
-        .unwrap_or_default();
     // Only when the book actually carries a real GST/duty classification
     // (not empty, not Tally's own inert default "Others") AND the ledger is
     // parented under Duties & Taxes -- the 2026-09-14 rehearsal sent
     // `<TAXTYPE>Others</TAXTYPE>` on every ledger, including a bank ledger
     // and a wages ledger, neither of which is a duty head.
-    let tax_type = l
-        .tax_type
-        .as_deref()
-        .filter(|t| is_real_gst_duty_type(t) && is_duties_and_taxes_parent(parent))
-        .map(|t| format!("<TAXTYPE>{}</TAXTYPE>", xml_escape(t)))
-        .unwrap_or_default();
-    let duty_head = l
-        .gst_duty_head
-        .as_deref()
-        .map(|d| format!("<GSTDUTYHEAD>{}</GSTDUTYHEAD>", xml_escape(d)))
-        .unwrap_or_default();
-    format!(
-        "<TALLYMESSAGE><LEDGER NAME=\"{name}\" ACTION=\"Create\"><NAME>{name}</NAME>\
-<PARENT>{parent}</PARENT>{billwise}{opening_balance}{gstin}{tax_type}{duty_head}</LEDGER></TALLYMESSAGE>",
-        parent = xml_escape(parent)
-    )
+    bridge_tally_protocol::ledger_create::LedgerCreate {
+        name: &l.name,
+        parent,
+        // Explicit on every Create, defaulting the unspecified case to `No`.
+        is_billwise_on: l.is_billwise_on.unwrap_or(false),
+        opening_balance: (!is_zero_amount(opening)).then_some(opening),
+        // GST fields are passed through exactly as observed on the source
+        // ledger, never synthesised.
+        party_gstin: l.party_gstin.as_deref(),
+        tax_type: l
+            .tax_type
+            .as_deref()
+            .filter(|t| is_real_gst_duty_type(t) && is_duties_and_taxes_parent(parent)),
+        gst_duty_head: l.gst_duty_head.as_deref(),
+    }
+    .render_message()
 }
 
 fn render_stock_item_xml(s: &BookStockItem) -> String {

@@ -845,7 +845,7 @@ will not take ten times a 10K load.
 | --- | --- | --- |
 | Curated voucher payload | **3,142 B/voucher** | 6 vouchers, curated FETCH |
 | Wildcard voucher payload | **19,658 B/voucher** | same window, `ALLLEDGERENTRIES.*` |
-| Response cap | 32 MiB general; 40 MiB only for the closed wildcard outstandings request | Bridge-side limits; guide §2.5b |
+| Response cap | 32 MiB for every read (the 40 MiB exception for the wildcard outstandings request was deleted with that request, October 2026) | Bridge-side limits; guide §2.5b |
 | Segmentation ceiling | **Profile-specific; derived at runtime** | ~10,600 applies only to the older curated shape, not wildcard outstandings |
 | Independent corroboration | 10,000 vouchers/batch | `tally-database-loader` caps here to avoid hangs |
 | Whole demo book, wildcard | 2.94 MB / 150 vouchers | wide filter |
@@ -1028,15 +1028,13 @@ Tally silently discards a day count above `9999` to an **empty** credit period.
 That is not neutral: due-date ageing then uses the bill date as the due date,
 which can move the bill to a different ageing bucket. The parser therefore
 rejects day counts above the measured `9999` ceiling, but does not invent a
-matching weeks or months ceiling; those units are constrained by checked
-resulting-date arithmetic instead.
+matching weeks or months ceiling.
 
 The voucher parser accepts explicit `N Day(s)`, `N Week(s)`, and `N Month(s)` forms only. It
-does not guess a day count for an unknown unit: the voucher-scan boundary rejects it, and the
+does not guess a day count for an unknown unit: the shared parser rejects it, and the
 agent `vouchers` read carries the text as `unrecognised` instead (so `10000 Days`, above the
-ceiling, is carried, not refused). Weeks add exactly seven days each;
-months use a calendar-month operation that preserves the day of month when possible and otherwise
-clamps to the target month's last day. The same licensed-gateway evidence measured:
+ceiling, is carried, not refused). Bridge does not compute a due date from a credit period: the
+voucher scan that did was removed. The same licensed-gateway evidence measured Tally's own due dates:
 
 | bill date and period | due date |
 | --- | --- |
@@ -1045,8 +1043,7 @@ clamps to the target month's last day. The same licensed-gateway evidence measur
 | 31-Jan-26 + 1 Month | 28-Feb-26 |
 | 31-Mar-26 + 2 Months | 31-May-26 |
 
-2026 is not a leap year. The 29-Feb clamp is implemented from the Gregorian calendar rule but was
-not directly observed in this capture.
+2026 is not a leap year; the 29-Feb case was not observed in this capture.
 
 **`BILLOVERDUE` in the native report is not usable as an ageing oracle.** Its as-of is
 Tally's own period date, not the caller's, and it does **not** follow the `F6` setting:

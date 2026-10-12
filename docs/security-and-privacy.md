@@ -403,8 +403,8 @@ characters it cannot show safely, or do not fit, it refuses. A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference; from the next
 build a Journal's line names its first debit and first credit ledger and up to
-20 characters of its narration, and the line above says a narration may be
-cut) and marks the
+20 characters of its narration, fewer (never under 10) when that makes the line
+fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
 only, with a line saying why, and still asks for your approval, unless a ledger

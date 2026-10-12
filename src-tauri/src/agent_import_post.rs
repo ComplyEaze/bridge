@@ -2667,6 +2667,9 @@ pub(super) const BATCH_REVIEW_MAX_VOUCHER_LINES: usize = 10;
 pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
 /// The same for a Journal's line, which names a ledger on each side.
 pub(super) const BATCH_REVIEW_JOURNAL_NARRATION_CHARS: usize = 20;
+/// The fewest narration characters a Journal's line shows when its cut moves
+/// down to fit the line: fewer would identify nothing.
+pub(super) const BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS: usize = 10;
 
 /// The line above a small batch's voucher lines.
 pub(super) const VOUCHER_LINES_HEADING: &str =
@@ -2772,7 +2775,9 @@ pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
 /// "+N" that could read as an amount; a Journal's first debit and first
 /// credit, each so, as `Dr … Cr …`) and its narration as posted,
 /// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` (a Journal's at
-/// `BATCH_REVIEW_JOURNAL_NARRATION_CHARS`) with the cut marked, or
+/// `BATCH_REVIEW_JOURNAL_NARRATION_CHARS`, or lower, down to
+/// `BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS`, when that makes its line
+/// fit) with the cut marked, or
 /// `NARRATION_WITHHELD` when it reads like a line of this dialog; the On
 /// Account legend counts as one only when this dialog carries it (`legend`).
 /// `None` when a narration or reference holds a character the dialog cannot
@@ -2838,19 +2843,20 @@ fn voucher_review_lines(
         } else {
             side_named(EntrySide::Dr)?
         };
-        let cut = if journal {
-            BATCH_REVIEW_JOURNAL_NARRATION_CHARS
-        } else {
-            BATCH_REVIEW_NARRATION_CHARS
-        };
-        let narration = match super::posted_narration(voucher) {
-            None => "(none)".to_string(),
+        // Whether the narration is shown at all is decided once, on its whole
+        // text: `Err` holds what stands in its place at every cut.
+        let posted = match super::posted_narration(voucher) {
+            None => Err("(none)"),
             Some(text)
                 if reads_like_a_dialog_line(text) || (legend && reads_like_the_legend(text)) =>
             {
-                NARRATION_WITHHELD.to_string()
+                Err(NARRATION_WITHHELD)
             }
-            Some(text) => {
+            Some(text) => Ok(text),
+        };
+        let narration = |cut: usize| match posted {
+            Err(shown) => shown.to_string(),
+            Ok(text) => {
                 let length = text.chars().count();
                 if length > cut {
                     let kept: String = text.chars().take(cut).collect();
@@ -2860,12 +2866,28 @@ fn voucher_review_lines(
                 }
             }
         };
-        lines.push(format!(
-            "{} {}  {}  {ledger}  {narration}",
-            voucher.voucher_type.as_str(),
-            voucher.date.as_str(),
-            value.as_str(),
-        ));
+        let line_with = |narration: String| {
+            format!(
+                "{} {}  {}  {ledger}  {narration}",
+                voucher.voucher_type.as_str(),
+                voucher.date.as_str(),
+                value.as_str(),
+            )
+        };
+        // A Journal's narration gives way first: when its line would be wider
+        // than a line may be, the cut moves down, never below
+        // `BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS`, until the line fits. A
+        // line that fits at no such cut is kept at the usual cut, so the batch
+        // leaves the totals as before.
+        lines.push(if journal {
+            (BATCH_REVIEW_JOURNAL_NARRATION_MIN_CHARS..=BATCH_REVIEW_JOURNAL_NARRATION_CHARS)
+                .rev()
+                .map(|cut| line_with(narration(cut)))
+                .find(|line| line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS)
+                .unwrap_or_else(|| line_with(narration(BATCH_REVIEW_JOURNAL_NARRATION_CHARS)))
+        } else {
+            line_with(narration(BATCH_REVIEW_NARRATION_CHARS))
+        });
     }
     Ok(Some(lines))
 }

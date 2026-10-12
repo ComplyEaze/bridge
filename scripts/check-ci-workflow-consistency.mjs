@@ -217,8 +217,8 @@ if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if
 // diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
 // repository downloads or reads its outcome; a GitHub service timeout in one of them (a merge-queue
 // entry was dropped on 3 Oct 2026 by `CreateArtifact ETIMEDOUT`) is not a failure of the code under
-// test. Left out on purpose: the qualification-smoke receipt, the failed-run executable evidence and
-// the unsigned bundle upload, whose absence or failure must stay visible. Each allowed step is pinned
+// test. Left out on purpose: the failed-run executable evidence and the unsigned bundle
+// upload, whose absence or failure must stay visible. Each allowed step is pinned
 // whole (its job, its text and the upload action's SHA), so the flag cannot move to another step or
 // take an expression, and the count and exact line are checked below.
 const diagnosticUploads = [

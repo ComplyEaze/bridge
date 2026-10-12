@@ -35,7 +35,7 @@ test("the script exits 0 on a good set and 1 on a bad one, and fails closed on u
 test("the workflow runs on pull_request with the label names passed by environment, not spliced into the shell", () => {
   const flow = parseDocument(readFileSync(new URL("../.github/workflows/pr-labels.yml", import.meta.url), "utf8")).toJS();
   assert.deepEqual(Object.keys(flow.on), ["pull_request", "merge_group"], "not pull_request_target");
-  assert.deepEqual(flow.on.pull_request.types, ["opened", "reopened", "synchronize", "labeled", "unlabeled"]);
+  assert.deepEqual(flow.on.pull_request.types, ["opened", "reopened", "synchronize", "labeled", "unlabeled", "milestoned", "demilestoned"]);
   assert.deepEqual(flow.permissions, { contents: "read" });
   // No run may be cancelled: a cancelled "Type label" run stays beside the success and blocks the required check.
   assert.deepEqual(flow.concurrency, { group: "pr-labels-${{ github.event.pull_request.number || github.run_id }}", "cancel-in-progress": false, queue: "max" });

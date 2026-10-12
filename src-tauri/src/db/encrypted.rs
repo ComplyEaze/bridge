@@ -36,7 +36,6 @@ pub enum EncryptedOpenError {
 pub trait MirrorKeyStore: Send + Sync {
     fn load(&self) -> anyhow::Result<Option<Zeroizing<Vec<u8>>>>;
     fn save(&self, key: &[u8]) -> anyhow::Result<()>;
-    fn delete(&self) -> anyhow::Result<()>;
 }
 
 #[derive(Clone)]
@@ -76,13 +75,6 @@ impl MirrorKeyStore for OsMirrorKeyStore {
             .set_secret(key)
             .map_err(|_| anyhow::anyhow!("The Tally mirror key could not be stored securely"))
     }
-
-    fn delete(&self) -> anyhow::Result<()> {
-        match self.entry()?.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(_) => anyhow::bail!("The Tally mirror key could not be removed from the operating-system credential store"),
-        }
-    }
 }
 
 pub struct MirrorInitializationLock {
@@ -112,7 +104,6 @@ pub fn lock_mirror_initialization(
 
 pub struct ResolvedMirrorKey {
     pub key: Zeroizing<Vec<u8>>,
-    pub created: bool,
 }
 
 pub fn resolve_mirror_key(
@@ -121,10 +112,7 @@ pub fn resolve_mirror_key(
 ) -> anyhow::Result<ResolvedMirrorKey> {
     if let Some(key) = key_store.load()? {
         validate_key(&key)?;
-        return Ok(ResolvedMirrorKey {
-            key,
-            created: false,
-        });
+        return Ok(ResolvedMirrorKey { key });
     }
 
     if database_path.exists() {
@@ -138,7 +126,7 @@ pub fn resolve_mirror_key(
         anyhow::anyhow!("The operating system could not generate a Tally mirror key")
     })?;
     key_store.save(&key)?;
-    Ok(ResolvedMirrorKey { key, created: true })
+    Ok(ResolvedMirrorKey { key })
 }
 
 fn validate_key(key: &[u8]) -> anyhow::Result<()> {

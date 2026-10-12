@@ -1090,6 +1090,7 @@ mod tests {
             stock: None,
             currency_read: false,
             opening_stock: crate::book::OpeningStock::NotApplicable,
+            closing_stock: crate::book::ClosingStock::NotApplicable,
             vouchers,
             tb: BTreeMap::from([(
                 "Bank".to_string(),

@@ -231,10 +231,10 @@ async fn a_send_whose_future_is_dropped_is_recorded_as_abandoned() {
 }
 
 #[tokio::test]
-async fn the_undecoded_status_path_records_a_size_and_no_hash() {
+async fn the_status_path_records_a_size_and_no_hash() {
     let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
     let (transport, collect) = observed(&simulator, None);
-    let response = transport.get_status().await.unwrap();
+    let response = transport.get_status_decoded().await.unwrap();
     let records = collect.0.lock().unwrap().clone();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].kind, SendKind::Status);

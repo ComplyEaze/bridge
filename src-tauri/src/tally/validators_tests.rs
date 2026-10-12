@@ -1,6 +1,5 @@
 use super::{
-    is_valid_gstin, is_valid_pan, normalize_company_guid, normalize_company_name,
-    validate_company_name, validate_date_range, voucher_balances,
+    normalize_company_guid, normalize_company_name, validate_company_name, validate_date_range,
 };
 
 #[test]
@@ -24,22 +23,4 @@ fn validates_tally_date_ranges() {
     assert!(validate_date_range("20260229", "20260301").is_err());
     assert!(validate_date_range("20260430", "20260401").is_err());
     assert!(validate_date_range("2026-04-01", "20260430").is_err());
-}
-
-#[test]
-fn validates_gstin_shape() {
-    assert!(is_valid_gstin("27ABCDE1234F1Z5"));
-    assert!(!is_valid_gstin("ABCDE1234F"));
-}
-
-#[test]
-fn validates_pan_shape() {
-    assert!(is_valid_pan("ABCDE1234F"));
-    assert!(!is_valid_pan("27ABCDE1234F1Z5"));
-}
-
-#[test]
-fn validates_balanced_voucher() {
-    assert!(voucher_balances(10_000, 10_000));
-    assert!(!voucher_balances(10_000, 9_999));
 }

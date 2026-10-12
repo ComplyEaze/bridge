@@ -1,0 +1,14 @@
+1c-v3 restore plan (written before each backup). Windows lab, 12 Oct 2026.
+
+Company: BRIDGE PARTIAL LAB, company number 100055, GUID 22a3e632-d0b3-4715-82bb-b7b5b806e042, books from 1-Apr-2026 (from 1c v2).
+Tally data folder (Restore Data Path): the Tally data folder (<tally-data-folder>) -> company folder ...\data\100055.
+Only BRIDGE PARTIAL LAB is loaded.
+
+Q0 (before step 0 and any change): backup folder C:\bridge-lab\1c-v3\backups\Q0\  file TDBK1800_100055.001
+   Holds: 1c v2 end state (seed Receipt 1, Receipt 2 P1C-R, Payment 1 P1C-P; Payment type back to Automatic).
+   Restore only if the orchestrator asks: shut the company; Restore; source C:\bridge-lab\1c-v3\backups\Q0; Restore Data Path as above;
+   expected prompts "Accept ?" -> Yes; "Company data folder (100055) already exists ... Replace/Skip" -> Replace.
+
+Q1 (end of item, after Payment set active again): backup folder C:\bridge-lab\1c-v3\backups\Q1\  file TDBK1800_100055.001
+   Holds: Q0 + Receipt No.3 (P1C3-R) and Payment No.2 (P1C3-P), 26-Jul-2026; Payment type active (Automatic).
+   Not restored in this run.

@@ -99,6 +99,14 @@ tokio::task_local! {
     pub(super) static TEST_LEDGER_INDEX: Vec<IndexedMaster>;
 }
 
+#[cfg(test)]
+tokio::task_local! {
+    /// The ledgers a test says the book holds AFTER the POST, for the
+    /// read-back only ([`parse_readback_indexes`]). Absent, the read-back uses
+    /// [`TEST_LEDGER_INDEX`], and without that the parser's refusal.
+    pub(super) static TEST_LEDGER_INDEX_AFTER_POST: Vec<IndexedMaster>;
+}
+
 fn group_masters(rows: Vec<GroupNameRow>) -> Vec<IndexedMaster> {
     rows.into_iter()
         .map(|row| IndexedMaster {
@@ -168,21 +176,41 @@ pub(super) fn recheck_master_admission(
 
 /// Parses the two index answers of `company_guid`: the groups first, so an
 /// unusable group answer is named before the missing ledger parser is.
-fn parse_indexes(
+pub(super) fn parse_indexes(
     ledgers_xml: &str,
     groups_xml: &str,
     company_guid: &str,
 ) -> anyhow::Result<(Vec<IndexedMaster>, Vec<IndexedMaster>)> {
+    let groups = parse_groups(groups_xml, company_guid)?;
+    let ledgers =
+        parse_ledger_name_index(ledgers_xml, company_guid).map_err(|LedgerIndexNotCaptured| {
+            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable
+        })?;
+    Ok((ledgers, groups))
+}
+
+fn parse_groups(groups_xml: &str, company_guid: &str) -> anyhow::Result<Vec<IndexedMaster>> {
     let groups = parse_group_name_index(groups_xml, company_guid).map_err(|error| {
         ApprovedImportAdmissionError::GroupExportInvalid {
             cause: group_cause(&error),
         }
     })?;
-    let ledgers =
-        parse_ledger_name_index(ledgers_xml, company_guid).map_err(|LedgerIndexNotCaptured| {
-            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable
-        })?;
-    Ok((ledgers, group_masters(groups)))
+    Ok(group_masters(groups))
+}
+
+/// [`parse_indexes`] for the read-back after the POST. The same parsers; the
+/// one difference is a test seam, so a test can say the book holds the new
+/// ledger now that it did not hold before the POST.
+pub(super) fn parse_readback_indexes(
+    ledgers_xml: &str,
+    groups_xml: &str,
+    company_guid: &str,
+) -> anyhow::Result<(Vec<IndexedMaster>, Vec<IndexedMaster>)> {
+    #[cfg(test)]
+    if let Ok(injected) = TEST_LEDGER_INDEX_AFTER_POST.try_with(Clone::clone) {
+        return Ok((injected, parse_groups(groups_xml, company_guid)?));
+    }
+    parse_indexes(ledgers_xml, groups_xml, company_guid)
 }
 
 /// The check a master tool makes before it saves or asks anything: the proposed
@@ -234,7 +262,7 @@ pub(super) fn recheck_master_for_dispatch(
 /// not parse, or whose GUIDs are not distinct, cannot be recorded: the recheck
 /// has already confirmed the same text for the target, so this is a fault, not
 /// a refusal a caller can act on.
-fn aim_master_marks(company_marks: &str) -> anyhow::Result<Vec<MasterMark>> {
+pub(super) fn aim_master_marks(company_marks: &str) -> anyhow::Result<Vec<MasterMark>> {
     let rows = parse_all_company_marks(company_marks)
         .map_err(|_| ApprovedImportAdmissionError::CompanyScopeUnconfirmed)?;
     Ok(rows

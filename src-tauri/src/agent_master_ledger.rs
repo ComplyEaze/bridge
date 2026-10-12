@@ -40,9 +40,12 @@
 //!   of open intents admitted before may now match, and the whole file is then
 //!   refused, which stops every master write until the journal is repaired. That
 //!   failure is closed and loud, and a fold change has to weigh it.
-//! - An intent with no terminal verdict blocks every overlapping batch for good.
-//!   The read-back-absent terminal state and the rules for it belong to the
-//!   dispatch slice; until then, recovering such a batch is an operator decision.
+//! - An intent with no terminal verdict blocks every overlapping batch. The
+//!   terminal verdicts are `posted_verified`, `posted_into_existing_master`,
+//!   `master_write_located_elsewhere` and `confirmed_absent`; the last is
+//!   decided only by a reconcile whose paired read-back shows the ledger absent
+//!   (`agent_master_verdict.rs`), and a new batch for the same ledger then needs
+//!   a new approval: nothing is ever sent again automatically.
 //! - After a terminal verdict the same ledgers could be sent again under a new
 //!   batch id. What stops that is the dispatch slice's absence check against the
 //!   books as they are then, made in the same queue as the send. This journal does
@@ -336,6 +339,11 @@ pub(super) enum MasterVerdictState {
     PostedIntoExistingMaster,
     MastersAfterPostUnconfirmed,
     MasterWriteLocatedElsewhere,
+    /// After an outcome was unknown, a paired read-back showed the ledger
+    /// absent, no pre-image master changed and no loaded company's master mark
+    /// moved since the intent. Nothing was created; the batch is closed and is
+    /// never sent again. A new batch needs a new approval.
+    ConfirmedAbsent,
 }
 
 impl MasterVerdictState {
@@ -347,7 +355,8 @@ impl MasterVerdictState {
         match self {
             Self::PostedVerified
             | Self::PostedIntoExistingMaster
-            | Self::MasterWriteLocatedElsewhere => true,
+            | Self::MasterWriteLocatedElsewhere
+            | Self::ConfirmedAbsent => true,
             Self::ReconciliationRequired | Self::MastersAfterPostUnconfirmed => false,
         }
     }
@@ -498,6 +507,8 @@ pub(super) enum Invalid {
     ItemsMismatch,
     /// `posted_verified` for an item with no GUID.
     VerifiedWithoutGuid,
+    /// `confirmed_absent` for an item that names a GUID.
+    AbsentWithGuid,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -545,7 +556,7 @@ fn is_sha256_hex(value: &str) -> bool {
 
 /// A GUID as the journal and the sidecar record it: lower-case hex and
 /// hyphens, as Tally exports one.
-fn is_canonical_guid(value: &str) -> bool {
+pub(super) fn is_canonical_guid(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value
@@ -697,10 +708,17 @@ impl MasterVerdict {
             MasterVerdictState::ReconciliationRequired
             | MasterVerdictState::PostedIntoExistingMaster
             | MasterVerdictState::MastersAfterPostUnconfirmed
-            | MasterVerdictState::MasterWriteLocatedElsewhere => false,
+            | MasterVerdictState::MasterWriteLocatedElsewhere
+            | MasterVerdictState::ConfirmedAbsent => false,
         };
         if all_found && self.items.iter().any(|item| item.guid.is_none()) {
             return Err(Invalid::VerifiedWithoutGuid);
+        }
+        // A ledger confirmed absent has no GUID to name.
+        if self.state == MasterVerdictState::ConfirmedAbsent
+            && self.items.iter().any(|item| item.guid.is_some())
+        {
+            return Err(Invalid::AbsentWithGuid);
         }
         Ok(())
     }

@@ -17,9 +17,13 @@
 //! as a [`RecordedIntent`] that the runtime requires before it sends: a master
 //! POST is not built without an intent recorded for the very bytes it carries.
 //!
-//! After the POST this piece appends the [`MasterDispatchResponse`] and answers
-//! `posted_unverified`. It does not read the book back, so it never says the
-//! ledger is verified; the read-back and the verdict are the next piece.
+//! After the POST this piece appends the [`MasterDispatchResponse`], reads the
+//! book back and records a verdict (`agent_master_verify.rs`, which reads, and
+//! `agent_master_verdict.rs`, which decides over parsed values). A call for a
+//! batch the journal shows dispatched runs the same read-back as a reconcile:
+//! it reads and never sends. Only when the read-back cannot be made at all
+//! (the company cannot be verified, the journal cannot describe the batch)
+//! does the answer fall back to the journal's own `posted_unverified`.
 use super::approval::{ApprovalBinding, HeldRequest};
 use super::master_ledger::{
     append, append_intent, read_journal, remove_pre_image, write_pre_image, BatchState,
@@ -46,10 +50,18 @@ use crate::tally::ledger_create_item::{
 use bridge_tally_protocol::GstDutyHead;
 use std::sync::Mutex;
 
+#[path = "agent_master_verdict.rs"]
+mod verdict;
+#[path = "agent_master_verify.rs"]
+mod verify;
+use verdict::Moment;
+use verify::{settled_alert, settled_next_step};
+
 /// What a caller is told after a ledger is prepared.
 const PREPARED_NEXT_STEP: &str = "Nothing was written to Tally. To create this ledger, call post_ledger_creates with this batch_id: the local user must approve it in a native dialog first.";
 
-/// What a caller is told after the one POST. The ledger is not read back yet.
+/// What a caller is told after the one POST when the read-back could not be
+/// attempted at all: the ledger is not verified.
 const POSTED_UNVERIFIED_NOTE: &str = "Tally answered the one create and ComplyEaze Bridge recorded the answer, but has not read the ledger back: it is NOT verified. Check the ledger in Tally before relying on it. Never post this batch again.";
 
 /// What a caller is told when a batch has a recorded intent and no recorded
@@ -300,6 +312,7 @@ fn verdict_state_code(state: super::master_ledger::MasterVerdictState) -> &'stat
         MasterVerdictState::PostedIntoExistingMaster => "posted_into_existing_master",
         MasterVerdictState::MastersAfterPostUnconfirmed => "masters_after_post_unconfirmed",
         MasterVerdictState::MasterWriteLocatedElsewhere => "master_write_located_elsewhere",
+        MasterVerdictState::ConfirmedAbsent => "confirmed_absent",
     }
 }
 
@@ -535,7 +548,8 @@ impl Server {
                     "batch_already_dispatched",
                 );
                 return Ok(Step::Done(Box::new(
-                    self.reconcile_master_batch(&state, accumulated.clone()),
+                    self.reconcile_master_batch(&state, accumulated.clone())
+                        .await,
                 )));
             }
             let item = item_from_batch(&batch)?;
@@ -701,15 +715,36 @@ impl Server {
                 )
                 .map_err(|error| error.code().to_string())?;
             }
-            Ok(Step::Done(Box::new(ToolOutcome {
-                payload: json!({"result":{
+            // The book as it stands now, with the intent and the answer just
+            // recorded: read back and judged. Only a read-back that cannot be
+            // attempted at all falls back to the journal's own account.
+            let recorded = self.read_master_journal()?;
+            let payload = match recorded.state(batch_id) {
+                Some(fresh) => {
+                    self.verify_master_batch(
+                        fresh,
+                        Moment::JustPosted,
+                        &identity,
+                        call_started,
+                        &mut accumulated,
+                    )
+                    .await
+                }
+                None => Err("master_batch_not_found".to_string()),
+            };
+            let payload = payload.unwrap_or_else(|code| {
+                json!({"result":{
                     "batch_id": batch.batch_id,
                     "state": "posted_unverified",
                     "attempt_recorded": true,
                     "dispatch": {"state": "dispatched", "resent": false},
                     "counters": counters_json(response.counters.as_ref()),
+                    "verification": {"attempted": false, "error": {"code": code}},
                     "note": POSTED_UNVERIFIED_NOTE,
-                }}),
+                }})
+            });
+            Ok(Step::Done(Box::new(ToolOutcome {
+                payload,
                 evidence: accumulated.clone(),
                 company_guid: Some(guid.clone()),
                 truncated: false,
@@ -837,10 +872,88 @@ impl Server {
         })
     }
 
-    /// The answer for a batch the journal shows dispatched: read-only, from the
-    /// journal alone. Nothing is sent and nothing is read from Tally; the
-    /// reconcile that reads the book back is the next piece.
-    fn reconcile_master_batch(&self, state: &BatchState, evidence: Evidence) -> ToolOutcome {
+    /// The answer for a batch the journal shows dispatched. A batch with a
+    /// terminal verdict is reported from the journal alone. Any other is read
+    /// back and judged again (a reconcile): the same function as after the
+    /// POST, which reads and never sends. Where the read-back cannot be
+    /// attempted at all (the company cannot be verified, or no longer matches
+    /// the batch) the journal's account is given, with the reason.
+    async fn reconcile_master_batch(
+        &self,
+        state: &BatchState,
+        mut evidence: Evidence,
+    ) -> ToolOutcome {
+        if state.is_settled() {
+            return Self::journal_report(state, evidence, None);
+        }
+        let started = std::time::Instant::now();
+        // A read-back that can say "absent" must not run while another process
+        // is dispatching on this endpoint: its POST of this very batch could
+        // still be on the way to the wire. The shared observation lease an
+        // active dispatch excludes is held for the whole read-back; without it
+        // nothing is read and the outcome stays unconfirmed.
+        let _observation = match dispatch_lease::acquire_observation(&self.settings.endpoint) {
+            Ok(lease) => lease,
+            Err(code) => {
+                return match self.unconfirmed_while_dispatch_is_busy(state, &code) {
+                    Ok(payload) => ToolOutcome {
+                        payload,
+                        evidence,
+                        company_guid: Some(state.batch.company.guid.clone()),
+                        truncated: false,
+                    },
+                    Err(code) => Self::journal_report(state, evidence, Some(code)),
+                };
+            }
+        };
+        let verified = match self.verified_company(&state.batch.company.guid).await {
+            Ok((company, identity, identity_evidence)) => {
+                evidence = combine_evidence(evidence, identity_evidence);
+                if company.name != state.batch.company.name
+                    || identity.company_number() != state.batch.company.number
+                    || identity.books_from_yyyymmdd() != state.batch.company.books_from
+                    || !identity
+                        .company_guid()
+                        .eq_ignore_ascii_case(&state.batch.company.guid)
+                {
+                    Err("company_identity_mismatch".to_string())
+                } else {
+                    Ok(identity)
+                }
+            }
+            Err(failure) => Err(failure.code),
+        };
+        let payload = match verified {
+            Ok(identity) => {
+                self.verify_master_batch(
+                    state,
+                    Moment::Reconcile,
+                    &identity,
+                    started,
+                    &mut evidence,
+                )
+                .await
+            }
+            Err(code) => Err(code),
+        };
+        match payload {
+            Ok(payload) => ToolOutcome {
+                payload,
+                evidence,
+                company_guid: Some(state.batch.company.guid.clone()),
+                truncated: false,
+            },
+            Err(code) => Self::journal_report(state, evidence, Some(code)),
+        }
+    }
+
+    /// The journal's own account of a dispatched batch. `not_read_back` is the
+    /// code of the read-back that could not be attempted, when there was one.
+    fn journal_report(
+        state: &BatchState,
+        evidence: Evidence,
+        not_read_back: Option<String>,
+    ) -> ToolOutcome {
         let verdict = state.verdict.as_ref();
         let reported = if let Some(verdict) = verdict {
             verdict_state_code(verdict.state)
@@ -849,21 +962,31 @@ impl Server {
         } else {
             "reconciliation_required"
         };
+        let mut result = json!({
+            "batch_id": state.batch.batch_id,
+            "state": reported,
+            "attempt_recorded": true,
+            "dispatch": {"state": "dispatched", "resent": false},
+            "journal": {
+                "response_recorded": state.response.is_some(),
+                "counters": counters_json(
+                    state.response.as_ref().and_then(|response| response.counters.as_ref())
+                ),
+                "verdict": verdict.map(|verdict| verdict_state_code(verdict.state)),
+            },
+            "note": if state.response.is_some() { ALREADY_SENT_NOTE } else { MAY_HAVE_BEEN_SENT_NOTE },
+        });
+        if let Some(verdict) = verdict {
+            result["next_step"] = json!(settled_next_step(verdict.state));
+            if let Some(alert) = settled_alert(verdict.state) {
+                result["alert"] = json!(alert);
+            }
+        }
+        if let Some(code) = not_read_back {
+            result["verification"] = json!({"attempted": false, "error": {"code": code}});
+        }
         ToolOutcome {
-            payload: json!({"result":{
-                "batch_id": state.batch.batch_id,
-                "state": reported,
-                "attempt_recorded": true,
-                "dispatch": {"state": "dispatched", "resent": false},
-                "journal": {
-                    "response_recorded": state.response.is_some(),
-                    "counters": counters_json(
-                        state.response.as_ref().and_then(|response| response.counters.as_ref())
-                    ),
-                    "verdict": verdict.map(|verdict| verdict_state_code(verdict.state)),
-                },
-                "note": if state.response.is_some() { ALREADY_SENT_NOTE } else { MAY_HAVE_BEEN_SENT_NOTE },
-            }}),
+            payload: json!({ "result": result }),
             evidence,
             company_guid: Some(state.batch.company.guid.clone()),
             truncated: false,

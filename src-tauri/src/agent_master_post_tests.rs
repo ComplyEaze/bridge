@@ -280,6 +280,62 @@ fn the_ledger_parser_refuses_every_input_with_its_own_typed_error() {
     );
 }
 
+#[tokio::test]
+async fn the_readback_parse_has_the_same_missing_parser_unless_a_seam_scopes_it() {
+    let groups = group_capture();
+    let unavailable = |result: anyhow::Result<(Vec<IndexedMaster>, Vec<IndexedMaster>)>| {
+        refusal_code(&result.unwrap_err()).to_string()
+    };
+    // No parser: the same typed refusal as the queue's, so a shipped build
+    // reads nothing back and says so.
+    assert_eq!(
+        unavailable(parse_readback_indexes("<ENVELOPE/>", &groups, GUID)),
+        "master_ledger_index_unavailable"
+    );
+    // The queue's seam serves the read-back when no later one is scoped.
+    let before = vec![master(
+        MasterKind::Ledger,
+        "aaaaaaaa-0000-4000-8000-000000000001",
+        1,
+        &["Cash"],
+    )];
+    let (ledgers, grouped) = TEST_LEDGER_INDEX
+        .scope(before.clone(), async {
+            parse_readback_indexes("<ENVELOPE/>", &groups, GUID).unwrap()
+        })
+        .await;
+    assert_eq!(ledgers, before);
+    assert!(!grouped.is_empty());
+    // The read-back's own seam wins, for the read-back alone.
+    let after = vec![master(
+        MasterKind::Ledger,
+        "aaaaaaaa-0000-4000-8000-000000000002",
+        2,
+        &["Zeta"],
+    )];
+    let (ledgers, _) = TEST_LEDGER_INDEX
+        .scope(
+            before.clone(),
+            TEST_LEDGER_INDEX_AFTER_POST.scope(after.clone(), async {
+                parse_readback_indexes("<ENVELOPE/>", &groups, GUID).unwrap()
+            }),
+        )
+        .await;
+    assert_eq!(ledgers, after);
+    let queue = TEST_LEDGER_INDEX
+        .scope(
+            before.clone(),
+            TEST_LEDGER_INDEX_AFTER_POST.scope(after, async {
+                parse_ledger_name_index("<ENVELOPE/>", GUID).unwrap()
+            }),
+        )
+        .await;
+    assert_eq!(queue, before, "the queue's parse never sees the later seam");
+    // A group answer that does not parse is still the group refusal.
+    let bad = unavailable(parse_readback_indexes("<ENVELOPE/>", "<ENVELOPE/>", GUID));
+    assert_ne!(bad, "master_ledger_index_unavailable");
+}
+
 #[test]
 fn ledger_reads_that_differ_are_an_unreadable_catalogue() {
     let groups = group_capture();

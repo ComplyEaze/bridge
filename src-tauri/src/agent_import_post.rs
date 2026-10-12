@@ -283,7 +283,7 @@ impl Server {
     /// clean batch (#697). A busy refusal has waited that whole budget, so it
     /// is tried once more with a second, cut to what the call has left of its
     /// ceiling (#884); a refusal that survives is returned as it is.
-    async fn read_marks_after_post(
+    pub(super) async fn read_marks_after_post(
         &self,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: std::time::Instant,

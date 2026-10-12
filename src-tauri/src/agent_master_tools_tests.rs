@@ -7,8 +7,8 @@
 //! scopes the ledgers the book holds into `TEST_LEDGER_INDEX`; the group answer
 //! is a committed live capture. The queue's request sequence is the one
 //! `agent_master_post_tests::queue` documents.
-use super::super::master_ledger::read_pre_image;
-use super::super::master_post::TEST_LEDGER_INDEX;
+use super::super::master_ledger::{read_pre_image, MasterVerdictState};
+use super::super::master_post::{TEST_LEDGER_INDEX, TEST_LEDGER_INDEX_AFTER_POST};
 use super::*;
 use crate::agent::master_writes_effective;
 use crate::agent::{Redaction, Settings};
@@ -60,12 +60,93 @@ fn created_one() -> String {
 }
 
 fn company_marks(target_masters: u64) -> String {
+    company_marks_of(target_masters, 3)
+}
+
+fn company_marks_of(target_masters: u64, other_masters: u64) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
          <COMPANY NAME=\"{COMPANY}\" RESERVEDNAME=\"\"><GUID>{GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>{target_masters}</ALTMSTID></COMPANY>\
-         <COMPANY NAME=\"Synthetic Other Lab\" RESERVEDNAME=\"\"><GUID>22222222-2222-4222-8222-222222222222</GUID><ALTVCHID>50</ALTVCHID><ALTMSTID>3</ALTMSTID></COMPANY>\
+         <COMPANY NAME=\"Synthetic Other Lab\" RESERVEDNAME=\"\"><GUID>22222222-2222-4222-8222-222222222222</GUID><ALTVCHID>50</ALTVCHID><ALTMSTID>{other_masters}</ALTMSTID></COMPANY>\
          </COLLECTION></DATA></BODY></ENVELOPE>"
     )
+}
+
+const NEW_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f-000000d1";
+const CASH_GUID: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+/// Values a party-ledger master row carries that no answer or journal record
+/// may ever hold. Synthetic, none of them a real person's.
+const PRIVATE_VALUES: [&str; 8] = [
+    "SYNTHPAN01",
+    "Synthetic Pan Holder",
+    "Synthetic Bank Holder",
+    "000123456789",
+    "ZZZZ0000001",
+    "private.person@example.invalid",
+    "9999900000",
+    "1 Synthetic Private Road",
+];
+
+/// The party-ledger master answer for the parent group of the new ledger: the
+/// one row, with every sensitive field filled.
+fn party_answer(parent: &str, tax: &str, opening: &str) -> String {
+    format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <LEDGER NAME=\"{LEDGER}\"><GUID>{NEW_GUID}</GUID><BRIDGECOMPANYGUID>{GUID}</BRIDGECOMPANYGUID>\
+         <MASTERID>209</MASTERID><ALTERID>12</ALTERID><PARENT>{parent}</PARENT>\
+         <OPENINGBALANCE>{opening}</OPENINGBALANCE>{tax}\
+         <INCOMETAXNUMBER>{}</INCOMETAXNUMBER><NAMEONPAN>{}</NAMEONPAN>\
+         <BANKACCHOLDERNAME>{}</BANKACCHOLDERNAME><BANKDETAILS>{}</BANKDETAILS><IFSCODE>{}</IFSCODE>\
+         <EMAIL>{}</EMAIL><LEDGERPHONE>{}</LEDGERPHONE>\
+         <LEDADDRESS.LIST><LEDADDRESS>{}</LEDADDRESS></LEDADDRESS.LIST>\
+         </LEDGER></COLLECTION></DATA></BODY></ENVELOPE>",
+        PRIVATE_VALUES[0],
+        PRIVATE_VALUES[1],
+        PRIVATE_VALUES[2],
+        PRIVATE_VALUES[3],
+        PRIVATE_VALUES[4],
+        PRIVATE_VALUES[5],
+        PRIVATE_VALUES[6],
+        PRIVATE_VALUES[7],
+    )
+}
+
+fn suspense_answer() -> String {
+    party_answer("Suspense A/c", "", "0.00")
+}
+
+/// The ledgers the book holds once the create landed: the ones before it and
+/// the new one, with a GUID the pre-image did not hold.
+fn book_after() -> Vec<IndexedMaster> {
+    let mut book = book();
+    book.push(IndexedMaster {
+        kind: MasterKind::Ledger,
+        guid: NEW_GUID.into(),
+        alter_id: 12,
+        names: vec![LEDGER.into()],
+    });
+    book
+}
+
+/// What the read-back sends after the POST answered: the marks, the paired
+/// ledger and group indexes and, when the index shows a new ledger of the
+/// name, the paired party-ledger master (19 requests, or 13 without it).
+fn read_back(target: u64, other: u64, party: Option<String>) -> Vec<ScenarioPlan> {
+    let mut plans = vec![xml(company_marks_of(target, other))];
+    plans.extend(paired("<ENVELOPE/>".to_string()));
+    plans.extend(paired(groups()));
+    if let Some(party) = party {
+        plans.extend(paired(party));
+    }
+    plans
+}
+
+/// A reconcile's reads: the identity, then the read-back.
+fn reconcile_reads(target: u64, other: u64, party: Option<String>) -> Vec<ScenarioPlan> {
+    let mut plans = verified_company();
+    plans.extend(read_back(target, other, party));
+    plans
 }
 
 fn xml(body: String) -> ScenarioPlan {
@@ -276,11 +357,48 @@ fn saved_batch(server: &Server, name: &str) -> (MasterBatch, Value) {
     (batch, args)
 }
 
-/// Run `call` with the book holding `book()` and the approval scripted.
+/// Run `call` with the book holding `book()` and the approval scripted. The
+/// read-back after a POST sees the same book: the ledger is not there.
 async fn posting<F: std::future::Future>(scripted: &ScriptedApproval, call: F) -> F::Output {
     SCRIPTED_APPROVAL
         .scope(scripted.clone(), TEST_LEDGER_INDEX.scope(book(), call))
         .await
+}
+
+/// As [`posting`], the book holding `after` once the POST is done.
+async fn posting_then<F: std::future::Future>(
+    scripted: &ScriptedApproval,
+    after: Vec<IndexedMaster>,
+    call: F,
+) -> F::Output {
+    SCRIPTED_APPROVAL
+        .scope(
+            scripted.clone(),
+            TEST_LEDGER_INDEX.scope(book(), TEST_LEDGER_INDEX_AFTER_POST.scope(after, call)),
+        )
+        .await
+}
+
+/// A `call` with no approval to give: a reconcile, whose book is `after`.
+async fn reconciling<F: std::future::Future>(after: Vec<IndexedMaster>, call: F) -> F::Output {
+    posting_then(&ScriptedApproval::approving(), after, call).await
+}
+
+/// Whether any observed request carried the create's bytes.
+fn create_was_sent(
+    observed: &[tally_protocol_simulator::ObservedRequest],
+    request: &MasterPostRequest,
+) -> bool {
+    let sha = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+        request.xml(),
+    ));
+    observed.iter().any(|seen| seen.request_body_sha256 == sha)
+}
+
+fn assert_no_private_value(label: &str, text: &str) {
+    for private in PRIVATE_VALUES {
+        assert!(!text.contains(private), "{label} holds {private}");
+    }
 }
 
 // --- the setting -----------------------------------------------------------
@@ -733,30 +851,64 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
     let mut plans = before_approval();
     let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
     plans.extend(after_approval(xml(created_one())));
+    plans.extend(read_back(8, 3, Some(suspense_answer())));
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let (batch, args) = saved_batch(&server, LEDGER);
     let scripted = ScriptedApproval::approving();
-    let response = posting(&scripted, server.call_tool("post_ledger_creates", args)).await;
+    let response = posting_then(
+        &scripted,
+        book_after(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
     let observed = sent(simulator);
+    // The POST, then the read-back: the marks and three paired reads.
     assert_eq!(
         observed.len(),
-        post_at + 1,
-        "the POST was the last request: {response}"
+        post_at + 1 + 19,
+        "the POST was the last write: {response}"
     );
     assert_eq!(
-        result(&response)["state"],
-        "posted_unverified",
-        "{response}"
+        observed
+            .iter()
+            .filter(|seen| seen.request_body_sha256
+                == sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+                    expected_request().xml()
+                )))
+            .count(),
+        1,
+        "the create was sent once"
     );
-    assert_ne!(result(&response)["state"], "posted_verified");
+    assert_eq!(result(&response)["state"], "posted_verified", "{response}");
     assert_eq!(result(&response)["attempt_recorded"], true);
     assert_eq!(result(&response)["counters"]["created"], 1, "{response}");
-    assert!(result(&response)["note"]
-        .as_str()
-        .unwrap()
-        .contains("NOT verified"));
+    assert_eq!(result(&response)["verification"]["guid"], NEW_GUID);
+    assert_eq!(result(&response)["verification"]["settled"], true);
+    let checks = &result(&response)["verification"]["checks"];
+    for check in [
+        "name",
+        "guid_new",
+        "parent",
+        "tax_fields",
+        "party_gstin",
+        "opening_balance",
+        "counters",
+        "target_mark_moved",
+        "other_marks_unmoved",
+        "pre_image_unchanged",
+    ] {
+        assert_eq!(checks[check], "passed", "{check}: {response}");
+    }
+    assert!(result(&response).get("alert").is_none());
+    // The party read carried PAN, bank, e-mail, phone and address: none of
+    // it reaches the answer, the journal or the evidence.
+    assert_no_private_value("answer", &response.to_string());
+    assert_no_private_value(
+        "journal",
+        &String::from_utf8(journal_bytes(directory.path())).unwrap(),
+    );
 
     let request = expected_request();
     let state = state_of(directory.path(), &batch.batch_id);
@@ -814,9 +966,14 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
         [
             "master_batch",
             "master_dispatch_intent",
-            "master_dispatch_response"
+            "master_dispatch_response",
+            "master_verdict"
         ]
     );
+    let verdict = state.verdict.expect("the verdict is recorded");
+    assert_eq!(verdict.state, MasterVerdictState::PostedVerified);
+    assert_eq!(verdict.items[0].guid.as_deref(), Some(NEW_GUID));
+    assert_eq!(verdict.items[0].reason, None);
     // The approval was spent under the lock, not left to lapse unspent.
     assert!(server.post_approvals.lapse_note(&batch.batch_id).is_none());
     assert!(!server.post_approvals.holds(&batch.batch_id));
@@ -826,17 +983,19 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
 async fn an_already_dispatched_batch_is_reported_and_never_sent_again() {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
+    plans.extend(read_back(8, 3, Some(suspense_answer())));
     let total = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let (batch, args) = saved_batch(&server, LEDGER);
-    let first = posting(
+    let first = posting_then(
         &ScriptedApproval::approving(),
+        book_after(),
         server.call_tool("post_ledger_creates", args.clone()),
     )
     .await;
-    assert_eq!(result(&first)["state"], "posted_unverified", "{first}");
+    assert_eq!(result(&first)["state"], "posted_verified", "{first}");
     let journal = journal_bytes(directory.path());
     let again = ScriptedApproval::approving();
     let second = posting(&again, server.call_tool("post_ledger_creates", args)).await;
@@ -846,7 +1005,9 @@ async fn an_already_dispatched_batch_is_reported_and_never_sent_again() {
         total,
         "no request after the first call: {second}"
     );
-    assert_eq!(result(&second)["state"], "posted_unverified", "{second}");
+    // The batch is settled: the journal alone answers, with its verdict.
+    assert_eq!(result(&second)["state"], "posted_verified", "{second}");
+    assert_eq!(result(&second)["journal"]["verdict"], "posted_verified");
     assert_eq!(result(&second)["dispatch"]["resent"], false);
     assert_eq!(result(&second)["journal"]["response_recorded"], true);
     let note = result(&second)["note"].as_str().unwrap();
@@ -880,12 +1041,15 @@ async fn a_dispatched_batch_with_no_response_is_reported_for_reconciliation() {
     let before = journal_bytes(directory.path());
     let scripted = ScriptedApproval::approving();
     let response = posting(&scripted, server.call_tool("post_ledger_creates", args)).await;
-    assert_eq!(sent(simulator).len(), 0);
+    // The company cannot be verified (nothing answers), so the read-back is
+    // not attempted: the journal's own account, never a create.
+    assert!(!create_was_sent(&sent(simulator), &expected_request()));
     assert_eq!(
         result(&response)["state"],
         "reconciliation_required",
         "{response}"
     );
+    assert_eq!(result(&response)["verification"]["attempted"], false);
     assert_eq!(result(&response)["attempt_recorded"], true);
     assert_eq!(result(&response)["dispatch"]["resent"], false);
     assert!(scripted.masters().is_empty());
@@ -1184,7 +1348,7 @@ async fn a_dispatch_error_after_the_intent_is_an_unknown_outcome_never_resent() 
     assert_eq!(result(&response)["dispatch"]["resent"], false);
     assert!(state_of(directory.path(), &batch.batch_id).intent.is_some());
     assert!(first > 0);
-    // A later call reports the journal and sends nothing.
+    // A later call reports the journal and sends no create.
     let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let later = server_at(silent.address(), directory.path());
     let report = posting(
@@ -1192,7 +1356,7 @@ async fn a_dispatch_error_after_the_intent_is_an_unknown_outcome_never_resent() 
         later.call_tool("post_ledger_creates", args),
     )
     .await;
-    assert_eq!(sent(silent).len(), 0);
+    assert!(!create_was_sent(&sent(silent), &expected_request()));
     assert_eq!(
         result(&report)["state"],
         "reconciliation_required",
@@ -1207,6 +1371,7 @@ fn pending_then_posted_plans() -> (Vec<ScenarioPlan>, usize) {
     plans.extend(before_approval());
     let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
     plans.extend(after_approval(xml(created_one())));
+    plans.extend(read_back(8, 3, Some(suspense_answer())));
     (plans, post_at)
 }
 
@@ -1245,11 +1410,14 @@ async fn an_open_dialog_returns_pending_and_the_next_call_posts_the_click() {
 
     scripted.answer(true);
     until_answered(&server, &batch.batch_id).await;
-    let posted = TEST_LEDGER_INDEX
-        .scope(book(), server.call_tool("post_ledger_creates", args))
-        .await;
+    let posted = posting_then(
+        &scripted,
+        book_after(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
     let observed = sent(simulator);
-    assert_eq!(result(&posted)["state"], "posted_unverified", "{posted}");
+    assert_eq!(result(&posted)["state"], "posted_verified", "{posted}");
     assert!(observed.len() > post_at, "the POST was sent");
     assert_eq!(scripted.masters().len(), 1, "one dialog, asked once");
     assert_eq!(
@@ -1257,7 +1425,8 @@ async fn an_open_dialog_returns_pending_and_the_next_call_posts_the_click() {
         [
             "master_batch",
             "master_dispatch_intent",
-            "master_dispatch_response"
+            "master_dispatch_response",
+            "master_verdict"
         ]
     );
 }
@@ -1687,21 +1856,557 @@ async fn a_call_for_a_batch_the_masters_journal_lacks_leaves_the_approval_slot_a
     assert!(server.post_approvals.holds(&id));
 }
 
+// --- the read-back and the verdict, end to end ----------------------------
+
+/// Everything up to the POST: the reads before approval, the queue's, the POST.
+fn through_post(post: ScenarioPlan) -> Vec<ScenarioPlan> {
+    let mut plans = before_approval();
+    plans.extend(after_approval(post));
+    plans
+}
+
+fn journal_text(directory: &std::path::Path) -> String {
+    String::from_utf8(journal_bytes(directory)).unwrap()
+}
+
+/// The first key of the answer's `result`: where a loud state puts its alert.
+fn first_key(response: &Value) -> String {
+    result(response)
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap()
+        .clone()
+}
+
+#[tokio::test]
+async fn a_name_found_on_an_existing_guid_is_posted_into_existing_master_and_is_loud() {
+    let mut plans = through_post(xml(created_one()));
+    // No party read: the name resolves to a master that was already there.
+    plans.extend(read_back(8, 3, None));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let into_cash = vec![IndexedMaster {
+        kind: MasterKind::Ledger,
+        guid: CASH_GUID.into(),
+        alter_id: 9,
+        names: vec!["Cash".into(), LEDGER.into()],
+    }];
+    let response = posting_then(
+        &ScriptedApproval::approving(),
+        into_cash,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        result(&response)["state"],
+        "posted_into_existing_master",
+        "{response}"
+    );
+    assert_eq!(first_key(&response), "alert", "{response}");
+    assert!(result(&response)["alert"]
+        .as_str()
+        .unwrap()
+        .starts_with("ATTENTION"));
+    let next = result(&response)["next_step"].as_str().unwrap();
+    assert!(
+        next.contains("check") && next.contains("Do not retry"),
+        "{next}"
+    );
+    assert_eq!(result(&response)["verification"]["guid"], CASH_GUID);
+    assert_eq!(result(&response)["verification"]["settled"], true);
+    assert!(result(&response)["verification"]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason == "name_resolves_to_existing_master"));
+    let state = state_of(directory.path(), &batch.batch_id);
+    assert_eq!(
+        state.verdict.as_ref().map(|verdict| verdict.state),
+        Some(MasterVerdictState::PostedIntoExistingMaster)
+    );
+    assert!(state.is_settled());
+    // Later, from the journal alone: the same loud answer, nothing read or sent.
+    let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let later = server_at(silent.address(), directory.path());
+    let report = posting(
+        &ScriptedApproval::approving(),
+        later.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    assert_eq!(sent(silent).len(), 0);
+    assert_eq!(
+        result(&report)["state"],
+        "posted_into_existing_master",
+        "{report}"
+    );
+    assert_eq!(first_key(&report), "alert");
+    assert!(result(&report)["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("Do not retry"));
+    assert_eq!(create_count(&observed), 1);
+}
+
+fn create_count(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
+    let sha = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+        expected_request().xml(),
+    ));
+    observed
+        .iter()
+        .filter(|seen| seen.request_body_sha256 == sha)
+        .count()
+}
+
+#[tokio::test]
+async fn another_companys_mark_moving_is_located_elsewhere_and_is_loud() {
+    let mut plans = through_post(xml(created_one()));
+    plans.extend(read_back(8, 4, Some(suspense_answer())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let response = posting_then(
+        &ScriptedApproval::approving(),
+        book_after(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    sent(simulator);
+    assert_eq!(
+        result(&response)["state"],
+        "master_write_located_elsewhere",
+        "{response}"
+    );
+    assert_eq!(first_key(&response), "alert", "{response}");
+    let next = result(&response)["next_step"].as_str().unwrap();
+    assert!(
+        next.contains("Tally") && next.contains("Do not retry"),
+        "{next}"
+    );
+    assert_eq!(
+        result(&response)["verification"]["checks"]["other_marks_unmoved"],
+        "failed"
+    );
+    assert_eq!(
+        state_of(directory.path(), &batch.batch_id)
+            .verdict
+            .map(|verdict| verdict.state),
+        Some(MasterVerdictState::MasterWriteLocatedElsewhere)
+    );
+    assert_no_private_value("answer", &response.to_string());
+    assert_no_private_value("journal", &journal_text(directory.path()));
+}
+
+#[tokio::test]
+async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_absent_and_never_resent(
+) {
+    let plans = through_post(xml(created_one()).with_delivery(
+        Delivery::ResetAfterRequestProcessed {
+            delay: Duration::from_millis(0),
+        },
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let unknown = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        error_code(&unknown),
+        "import_dispatch_outcome_unknown",
+        "{unknown}"
+    );
+    assert_eq!(create_count(&sent(simulator)), 1);
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+    // The reconcile: the book is as it was and no mark moved since the intent.
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(7, 3, None))).unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let absent = reconciling(book(), later.call_tool("post_ledger_creates", args.clone())).await;
+    let observed = sent(reads);
+    assert_eq!(create_count(&observed), 0, "a reconcile sends no create");
+    assert_eq!(result(&absent)["state"], "confirmed_absent", "{absent}");
+    assert_eq!(result(&absent)["verification"]["moment"], "reconcile");
+    assert_eq!(result(&absent)["verification"]["settled"], true);
+    assert_eq!(result(&absent)["dispatch"]["resent"], false);
+    let next = result(&absent)["next_step"].as_str().unwrap();
+    assert!(
+        next.contains("prepare_ledger_creates") && next.contains("new approval"),
+        "{next}"
+    );
+    assert!(result(&absent).get("alert").is_none());
+    assert_eq!(
+        record_types(directory.path()),
+        ["master_batch", "master_dispatch_intent", "master_verdict"]
+    );
+    let journal = read_journal(directory.path()).unwrap();
+    assert!(journal.state(&batch.batch_id).unwrap().is_settled());
+    assert_eq!(journal.summary().not_settled, 0);
+    // A second post of the same batch is still refused: it reads the journal,
+    // sends and reads nothing, and writes nothing.
+    let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let third = server_at(silent.address(), directory.path());
+    let before = journal_bytes(directory.path());
+    let scripted = ScriptedApproval::approving();
+    let again = posting(&scripted, third.call_tool("post_ledger_creates", args)).await;
+    assert_eq!(sent(silent).len(), 0);
+    assert_eq!(result(&again)["state"], "confirmed_absent", "{again}");
+    assert_eq!(result(&again)["dispatch"]["resent"], false);
+    assert!(scripted.masters().is_empty(), "nobody was asked again");
+    assert_eq!(journal_bytes(directory.path()), before);
+}
+
+#[tokio::test]
+async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appeared() {
+    // The mark of the target moved since the intent: not absent, a doubt.
+    for (target, other, held, expect) in [
+        (8, 3, book(), "reconciliation_required"),
+        (7, 4, book(), "master_write_located_elsewhere"),
+        (7, 3, book_after(), "reconciliation_required"),
+    ] {
+        let plans = through_post(xml(created_one()).with_delivery(
+            Delivery::ResetAfterRequestProcessed {
+                delay: Duration::from_millis(0),
+            },
+        ));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (batch, args) = saved_batch(&server, LEDGER);
+        posting(
+            &ScriptedApproval::approving(),
+            server.call_tool("post_ledger_creates", args.clone()),
+        )
+        .await;
+        sent(simulator);
+        // A found ledger needs its party row to be described.
+        let party = held.len().gt(&book().len()).then(suspense_answer);
+        let reads =
+            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, other, party))).unwrap();
+        let later = server_at(reads.address(), directory.path());
+        let response = reconciling(held, later.call_tool("post_ledger_creates", args)).await;
+        sent(reads);
+        assert_eq!(result(&response)["state"], expect, "{response}");
+        assert_ne!(result(&response)["state"], "confirmed_absent");
+        let _ = batch;
+    }
+}
+
+#[tokio::test]
+async fn right_after_a_post_that_was_answered_a_missing_ledger_is_a_doubt_not_absence() {
+    // Tally answered CREATED=1, and the book shows no such ledger, no mark moved.
+    let mut plans = through_post(xml(created_one()));
+    plans.extend(read_back(7, 3, None));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let response = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    sent(simulator);
+    assert_eq!(
+        result(&response)["state"],
+        "reconciliation_required",
+        "{response}"
+    );
+    assert!(result(&response)["verification"]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason == "ledger_absent_after_post"));
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+}
+
+#[tokio::test]
+async fn an_answer_without_counters_is_never_verified_even_when_the_book_reads_back_clean() {
+    // Tally's answer carries no counters; the book shows exactly the new ledger.
+    let mut plans = through_post(xml(
+        "<ENVELOPE><BODY>no counters here</BODY></ENVELOPE>".to_string()
+    ));
+    plans.extend(read_back(8, 3, Some(suspense_answer())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let response = posting_then(
+        &ScriptedApproval::approving(),
+        book_after(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    sent(simulator);
+    assert_eq!(
+        result(&response)["state"],
+        "reconciliation_required",
+        "{response}"
+    );
+    let verification = &result(&response)["verification"];
+    assert!(verification["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason == "counters_unavailable"));
+    assert_eq!(verification["checks"]["counters"], "not_checked");
+    assert_eq!(verification["checks"]["name"], "passed");
+    assert!(verification["counters_note"].as_str().is_some());
+    assert_eq!(verification["settled"], false);
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+}
+
+#[tokio::test]
+async fn a_reconcile_that_cannot_take_the_observation_lease_is_unconfirmed_never_absent() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(reconcile_reads(7, 3, None))).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    record_intent_for_test(&server, &batch);
+    // Another process is dispatching on this endpoint: it holds the lease
+    // exclusively, and its POST of this batch could still be on the way.
+    let dispatching = crate::endpoint_coordination::acquire(&server.settings.endpoint).unwrap();
+    let busy = reconciling(
+        book(),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        result(&busy)["state"],
+        "masters_after_post_unconfirmed",
+        "{busy}"
+    );
+    assert_ne!(result(&busy)["state"], "confirmed_absent");
+    assert_eq!(
+        result(&busy)["verification"]["reasons"][0],
+        "endpoint_dispatch_busy"
+    );
+    assert_eq!(result(&busy)["verification"]["settled"], false);
+    assert_eq!(result(&busy)["dispatch"]["resent"], false);
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+    drop(dispatching);
+    // Nothing was read while the lease was refused.
+    let observed_busy = sent(simulator);
+    assert_eq!(
+        observed_busy.len(),
+        0,
+        "no read while another dispatch runs"
+    );
+    // With the lease released the same call reads the book back.
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(7, 3, None))).unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let released = reconciling(book(), later.call_tool("post_ledger_creates", args)).await;
+    assert!(!sent(reads).is_empty(), "{released}");
+    assert_ne!(
+        result(&released)["verification"]["reasons"][0],
+        "endpoint_dispatch_busy"
+    );
+}
+
+#[tokio::test]
+async fn a_read_back_that_is_unavailable_is_unconfirmed_and_a_later_reconcile_settles_it() {
+    // The POST answers and nothing after it does.
+    let plans = through_post(xml(created_one()));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let first = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    sent(simulator);
+    assert_eq!(
+        result(&first)["state"],
+        "masters_after_post_unconfirmed",
+        "{first}"
+    );
+    assert_eq!(result(&first)["verification"]["settled"], false);
+    assert_eq!(result(&first)["verification"]["verdict_recorded"], true);
+    assert_eq!(result(&first)["attempt_recorded"], true);
+    assert_eq!(
+        record_types(directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict"
+        ]
+    );
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+    // Unavailable again: the same words are not written twice.
+    let before = journal_bytes(directory.path());
+    let still = SequenceSimulator::spawn(with_sentinel(verified_company())).unwrap();
+    let second_server = server_at(still.address(), directory.path());
+    let second = reconciling(
+        book_after(),
+        second_server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert!(!create_was_sent(&sent(still), &expected_request()));
+    assert_eq!(
+        result(&second)["state"],
+        "masters_after_post_unconfirmed",
+        "{second}"
+    );
+    assert_eq!(result(&second)["verification"]["verdict_recorded"], true);
+    assert_eq!(result(&second)["verification"]["verdict_written"], false);
+    assert_eq!(journal_bytes(directory.path()), before);
+    // The company cannot even be verified: the journal answers, writes nothing.
+    let down = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let third_server = server_at(down.address(), directory.path());
+    let third = reconciling(
+        book_after(),
+        third_server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    sent(down);
+    assert_eq!(
+        result(&third)["verification"]["attempted"],
+        false,
+        "{third}"
+    );
+    assert_eq!(journal_bytes(directory.path()), before);
+    // The read-back works at last: the reconcile settles the batch.
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(
+        8,
+        3,
+        Some(suspense_answer()),
+    )))
+    .unwrap();
+    let fourth_server = server_at(reads.address(), directory.path());
+    let settled = reconciling(
+        book_after(),
+        fourth_server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    let observed = sent(reads);
+    assert_eq!(create_count(&observed), 0);
+    assert_eq!(result(&settled)["state"], "posted_verified", "{settled}");
+    assert_eq!(result(&settled)["verification"]["moment"], "reconcile");
+    assert_eq!(result(&settled)["verification"]["guid"], NEW_GUID);
+    let state = state_of(directory.path(), &batch.batch_id);
+    assert!(state.is_settled());
+    assert_eq!(
+        record_types(directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict",
+            "master_verdict"
+        ]
+    );
+    for text in [
+        result(&settled).to_string(),
+        result(&first).to_string(),
+        journal_text(directory.path()),
+    ] {
+        assert_no_private_value("record", &text);
+    }
+}
+
+#[tokio::test]
+async fn a_party_row_that_differs_from_what_was_sent_is_a_doubt_not_a_verified_create() {
+    // The ledger was created under another parent and with an opening balance.
+    for (parent, opening, reason) in [
+        ("Sundry Debtors", "0.00", "parent_differs_from_sent"),
+        ("Suspense A/c", "1250.00", "opening_balance_not_zero"),
+    ] {
+        let mut plans = through_post(xml(created_one()));
+        plans.extend(read_back(8, 3, Some(party_answer(parent, "", opening))));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (batch, args) = saved_batch(&server, LEDGER);
+        let response = posting_then(
+            &ScriptedApproval::approving(),
+            book_after(),
+            server.call_tool("post_ledger_creates", args),
+        )
+        .await;
+        sent(simulator);
+        assert_eq!(
+            result(&response)["state"],
+            "reconciliation_required",
+            "{response}"
+        );
+        assert!(result(&response)["verification"]["reasons"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|seen| seen == reason));
+        assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+        assert_no_private_value("answer", &response.to_string());
+        assert_no_private_value("journal", &journal_text(directory.path()));
+    }
+}
+
+#[test]
+fn every_verdict_state_has_its_code_and_only_the_loud_ones_carry_an_alert() {
+    use MasterVerdictState::{
+        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
+        PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
+    };
+    for (state, code) in [
+        (PostedVerified, "posted_verified"),
+        (PostedIntoExistingMaster, "posted_into_existing_master"),
+        (
+            MasterWriteLocatedElsewhere,
+            "master_write_located_elsewhere",
+        ),
+        (ConfirmedAbsent, "confirmed_absent"),
+        (
+            MastersAfterPostUnconfirmed,
+            "masters_after_post_unconfirmed",
+        ),
+        (ReconciliationRequired, "reconciliation_required"),
+    ] {
+        assert_eq!(verdict_state_code(state), code);
+        let loud = matches!(
+            state,
+            PostedIntoExistingMaster | MasterWriteLocatedElsewhere
+        );
+        assert_eq!(settled_alert(state).is_some(), loud, "{code}");
+        let next = settled_next_step(state);
+        assert_eq!(next.contains("Do not retry"), loud, "{code}: {next}");
+        assert!(!next.is_empty());
+    }
+}
+
 // --- the test seam ---------------------------------------------------------
 
 /// The one seam the missing ledger parser needs is compiled under bare
 /// `cfg(test)`, as the approval seam is: no feature or flag compiles it into a
 /// shipped build.
 #[test]
-fn the_ledger_index_seam_is_under_bare_cfg_test() {
+fn the_ledger_index_seams_are_under_bare_cfg_test() {
     let source = include_str!("agent_master_post.rs");
     for needle in [
         "#[cfg(test)]\n    if let Ok(injected) = TEST_LEDGER_INDEX.try_with(Clone::clone) {",
-        "#[cfg(test)]\ntokio::task_local! {",
+        "#[cfg(test)]\n    if let Ok(injected) = TEST_LEDGER_INDEX_AFTER_POST.try_with(Clone::clone) {",
     ] {
         assert_eq!(source.matches(needle).count(), 1, "{needle}");
     }
-    assert_eq!(source.matches("TEST_LEDGER_INDEX").count(), 2);
+    // Each static is declared in a bare `cfg(test)` task_local block, once.
+    assert_eq!(
+        source.matches("#[cfg(test)]\ntokio::task_local! {").count(),
+        2
+    );
+    for declaration in [
+        "static TEST_LEDGER_INDEX: Vec<IndexedMaster>;",
+        "static TEST_LEDGER_INDEX_AFTER_POST: Vec<IndexedMaster>;",
+    ] {
+        assert_eq!(source.matches(declaration).count(), 1, "{declaration}");
+    }
     for forbidden in [
         "cfg(any(test",
         "cfg(feature",

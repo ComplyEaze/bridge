@@ -414,6 +414,23 @@ pub(super) fn ledger_name_index_read(company: &str) -> anyhow::Result<ReadReques
     ))
 }
 
+/// The party/ledger master read restricted to the ledgers under one parent
+/// group: the request the compliance reader sends per parent part, used to read
+/// back the fields of one ledger a master post created. Its answer carries
+/// sensitive master values; the one caller projects each row onto the few
+/// fields it reads (`agent_master_verdict::PartyView`).
+pub(super) fn party_ledger_master_for_parent_read(
+    company: &str,
+    period: &bridge_tally_protocol::native_outstandings::NativeLedgerExportPeriod,
+    part: &bridge_tally_protocol::parent_partition::ParentPart,
+) -> ReadRequest {
+    ReadRequest(
+        bridge_tally_protocol::native_outstandings::render_party_ledger_master_request_for_parents(
+            company, period, part,
+        ),
+    )
+}
+
 pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),

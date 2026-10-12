@@ -96,7 +96,9 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
             .enumerate()
             .map(|(index, item)| VerdictItem {
                 name: item.name.clone(),
-                guid: Some(format!("0000000{index}-aaaa-bbbb-cccc-000000000000")),
+                // A ledger confirmed absent has no GUID to name.
+                guid: (state != MasterVerdictState::ConfirmedAbsent)
+                    .then(|| format!("0000000{index}-aaaa-bbbb-cccc-000000000000")),
                 reason: None,
             })
             .collect(),
@@ -1039,6 +1041,7 @@ fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
         MasterVerdictState::PostedVerified,
         MasterVerdictState::PostedIntoExistingMaster,
         MasterVerdictState::MasterWriteLocatedElsewhere,
+        MasterVerdictState::ConfirmedAbsent,
     ] {
         for later in [terminal, open[0], MasterVerdictState::PostedVerified] {
             assert_eq!(
@@ -1049,6 +1052,72 @@ fn the_first_terminal_verdict_wins_and_a_later_one_is_refused() {
     }
     assert!(!MasterVerdictState::ReconciliationRequired.is_terminal());
     assert!(!MasterVerdictState::MastersAfterPostUnconfirmed.is_terminal());
+    assert!(MasterVerdictState::ConfirmedAbsent.is_terminal());
+}
+
+/// `confirmed_absent` as a journal line: no GUID, an optional reason.
+fn absent_verdict(batch: &MasterBatch) -> MasterVerdict {
+    let mut verdict = verdict_for(batch, MasterVerdictState::ConfirmedAbsent);
+    for item in &mut verdict.items {
+        item.reason = Some("not_in_book".into());
+    }
+    verdict
+}
+
+#[test]
+fn confirmed_absent_is_a_snake_case_terminal_verdict_without_a_guid() {
+    let batch = batch(&batch_id());
+    let prefix = journal_text(&full_records(&batch)[..3]);
+    let encoded = serde_json::to_string(&MasterVerdictState::ConfirmedAbsent).unwrap();
+    assert_eq!(encoded, "\"confirmed_absent\"");
+    let text = format!(
+        "{prefix}{}",
+        line(&MasterRecord::Verdict(absent_verdict(&batch)))
+    );
+    let journal = read(&text).unwrap();
+    let state = journal.state(&batch.batch_id).unwrap();
+    assert!(state.is_settled());
+    assert_eq!(
+        state.verdict.as_ref().map(|verdict| verdict.state),
+        Some(MasterVerdictState::ConfirmedAbsent)
+    );
+    // It counts as settled in the local-data report.
+    assert_eq!(journal.summary().not_settled, 0);
+    // A GUID on an absent ledger is a contradiction the journal refuses.
+    let mut named = absent_verdict(&batch);
+    named.items[0].guid = Some("00000000-aaaa-bbbb-cccc-000000000000".into());
+    assert_eq!(
+        read(&format!("{prefix}{}", line(&MasterRecord::Verdict(named)))).unwrap_err(),
+        invalid(Invalid::AbsentWithGuid)
+    );
+    // Nothing follows it, not even a verified verdict.
+    for later in [
+        MasterVerdictState::PostedVerified,
+        MasterVerdictState::ConfirmedAbsent,
+        MasterVerdictState::ReconciliationRequired,
+    ] {
+        let text = format!(
+            "{prefix}{}{}",
+            line(&MasterRecord::Verdict(absent_verdict(&batch))),
+            line(&MasterRecord::Verdict(verdict_for(&batch, later)))
+        );
+        assert_eq!(
+            read(&text).unwrap_err(),
+            invalid(Invalid::VerdictAfterTerminal)
+        );
+    }
+}
+
+#[test]
+fn confirmed_absent_stops_blocking_a_new_batch_of_the_same_ledger() {
+    let (first, mut records) = dispatched_batch("Synthetic One");
+    let (_, again) = dispatched_batch("SYNTHETIC-ONE");
+    assert_eq!(
+        read(&journal_text(&[records.clone(), again.clone()].concat())).unwrap_err(),
+        MasterLedgerError::OpenDispatchOverlaps
+    );
+    records.push(MasterRecord::Verdict(absent_verdict(&first)));
+    assert!(read(&journal_text(&[records, again].concat())).is_ok());
 }
 
 #[test]

@@ -1765,10 +1765,19 @@ already sent is never sent again: a later call only reports what was recorded.
 With the setting off or posting off, neither tool is listed and a call to either
 is refused `master_writes_disabled`. Until a ledger-name answer captured from a
 real TallyPrime can be parsed, `prepare_ledger_creates` refuses
-`master_ledger_index_unavailable` and nothing is created. After the one send the
-answer is `posted_unverified`: Tally's answer was recorded, but ComplyEaze
-Bridge does not yet read the ledger back, so the ledger is not verified. The
-setting is a command-line setting only and is not in the MCPB extension.
+`master_ledger_index_unavailable` and nothing is created. After the one send
+ComplyEaze Bridge reads the book back (every loaded company's master mark, the
+paired ledger and group names, and the new ledger's parent, tax fields, GSTIN and
+opening balance) and answers with one state: `posted_verified` (exactly one new
+ledger as sent, nothing else changed), `posted_into_existing_master` or
+`master_write_located_elsewhere` (loud: check Tally, do not retry),
+`confirmed_absent` (a later call found nothing created and no mark moved; a new
+batch needs a new approval), `masters_after_post_unconfirmed` (the book could
+not be read back; call again, which only reads) or `reconciliation_required`
+(with reasons). A later call for a sent batch repeats the read-back and never
+sends. No PAN, bank detail, e-mail address or phone number is put in an answer
+or a record. The setting is a command-line setting only and is not in the MCPB
+extension.
 
 All four switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**

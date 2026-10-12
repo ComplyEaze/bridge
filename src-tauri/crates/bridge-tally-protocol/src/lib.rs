@@ -264,7 +264,9 @@ pub enum TallyExportStatus {
 pub struct CompanyContextEvidence {
     pub name: Option<String>,
     pub guid: Option<String>,
-    /// Echo of the exact requested identity set for scoped write readbacks.
+    /// An echoed `QUERYIDENTITYSETSHA256`, if a response carries one. No request Bridge
+    /// renders asks for it since the scoped write readback was deleted, and it is `None` in
+    /// every fixture.
     pub query_identity_set_sha256: Option<String>,
     /// Bridge request-binding echoes; they are not independent proof that Tally honored filters.
     pub requested_from_yyyymmdd: Option<String>,

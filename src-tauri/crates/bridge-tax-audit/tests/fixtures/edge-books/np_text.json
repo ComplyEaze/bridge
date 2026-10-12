@@ -1,0 +1,711 @@
+{
+ "comment": "Unicode and whitespace in the narration, and what a citation's label keeps. Payments of Wages from Bank A. The narration is upper-cased whole before it is read: t01 (written with the sharp s, U+00DF) and t02 (STRASSE) are one payee, as are t03 (the long s, U+017F) and t04 (SIGMA), t05 (the dotless i, U+0131) and t06 (DIL), t07 (the fi ligature, U+FB01) and t08 (FINE). Not read, in the first UPI layout: t09 (the Kelvin sign U+212A in place of K), t10 (an accented letter), t11 (a Devanagari name) and t12 (full-width letters). t13 to t17 name OMEGA MART with other whitespace between the words: a no-break space, U+2028, U+001C, U+0085, and in t17 a leading no-break space and an ideographic space among ordinary ones. Not read: t18 (a zero-width space inside the name), t19 (a leading U+FEFF) and t20 (U+2010 in place of the hyphens). t21 (Devanagari digits) and t22 (full-width digits) name PI STORES by IMPS; t23 (a superscript two after a digit) and t24 (a circled digit) are not read. t25 has Devanagari digits and a space in the reference of the second UPI layout and names RHO. In that layout t26's name field is a Devanagari word, a hyphen and the letters KA, read as one name; t27 (Devanagari only) and t28 (Greek only) are not read. t29 writes TAU with a combining circumflex, t30 and t31 with the composed letter (t31 in lower case): two payee rows, one of 2819 paise and one of 5949, whose names the dump shows alike. t32 is a cheque whose name starts with an accented letter: not read. t33 (in the name of the first UPI layout), t34 (in the NEFT code) and t35 (in an IMPS name) put a Devanagari digit where only 0 to 9 are read: not read. t40 to t43 name NU: t40's label carries its voucher type name, Bank Payment; t41 has an empty number (two spaces before on in its label) and t42 a number of two spaces (four spaces); t43's type and number are written with combining accents, which the dump shows composed. Eleven payees; the fifteen payments not read are in unresolved_bank_total (32655 paise) and the recipient_not_read finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_text-100"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_text-101"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_text-102"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 76118,
+   "closing": -76118
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 76118,
+   "credit": 0,
+   "closing": 76118
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "t01",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "narration": "upi-straße-wages",
+   "lines": [
+    [
+     "Wages",
+     101
+    ],
+    [
+     "Bank A",
+     -101
+    ]
+   ]
+  },
+  {
+   "guid": "t02",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "UPI-STRASSE-WAGES",
+   "lines": [
+    [
+     "Wages",
+     199
+    ],
+    [
+     "Bank A",
+     -199
+    ]
+   ]
+  },
+  {
+   "guid": "t03",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "narration": "UPI-ſIGMA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     299
+    ],
+    [
+     "Bank A",
+     -299
+    ]
+   ]
+  },
+  {
+   "guid": "t04",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "UPI-SIGMA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     401
+    ],
+    [
+     "Bank A",
+     -401
+    ]
+   ]
+  },
+  {
+   "guid": "t05",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "upi-dıl-wages",
+   "lines": [
+    [
+     "Wages",
+     505
+    ],
+    [
+     "Bank A",
+     -505
+    ]
+   ]
+  },
+  {
+   "guid": "t06",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "narration": "UPI-DIL-WAGES",
+   "lines": [
+    [
+     "Wages",
+     594
+    ],
+    [
+     "Bank A",
+     -594
+    ]
+   ]
+  },
+  {
+   "guid": "t07",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "upi-ﬁne-wages",
+   "lines": [
+    [
+     "Wages",
+     685
+    ],
+    [
+     "Bank A",
+     -685
+    ]
+   ]
+  },
+  {
+   "guid": "t08",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "UPI-FINE-WAGES",
+   "lines": [
+    [
+     "Wages",
+     795
+    ],
+    [
+     "Bank A",
+     -795
+    ]
+   ]
+  },
+  {
+   "guid": "t09",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "narration": "UPI-\u212aAPPA-WAGES",
+   "lines": [
+    [
+     "Wages",
+     890
+    ],
+    [
+     "Bank A",
+     -890
+    ]
+   ]
+  },
+  {
+   "guid": "t10",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "upi-café-wages",
+   "lines": [
+    [
+     "Wages",
+     987
+    ],
+    [
+     "Bank A",
+     -987
+    ]
+   ]
+  },
+  {
+   "guid": "t11",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "UPI-देव-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1086
+    ],
+    [
+     "Bank A",
+     -1086
+    ]
+   ]
+  },
+  {
+   "guid": "t12",
+   "date": "2025-04-13",
+   "base_type": "Payment",
+   "narration": "UPI-ＡＬＰＨＡ-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1170
+    ],
+    [
+     "Bank A",
+     -1170
+    ]
+   ]
+  },
+  {
+   "guid": "t13",
+   "date": "2025-04-14",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA\u00a0MART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1273
+    ],
+    [
+     "Bank A",
+     -1273
+    ]
+   ]
+  },
+  {
+   "guid": "t14",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA\u2028MART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1378
+    ],
+    [
+     "Bank A",
+     -1378
+    ]
+   ]
+  },
+  {
+   "guid": "t15",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA\u001cMART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1468
+    ],
+    [
+     "Bank A",
+     -1468
+    ]
+   ]
+  },
+  {
+   "guid": "t16",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA\u0085MART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1560
+    ],
+    [
+     "Bank A",
+     -1560
+    ]
+   ]
+  },
+  {
+   "guid": "t17",
+   "date": "2025-04-18",
+   "base_type": "Payment",
+   "narration": "\u00a0UPI-OMEGA \u3000 MART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1654
+    ],
+    [
+     "Bank A",
+     -1654
+    ]
+   ]
+  },
+  {
+   "guid": "t18",
+   "date": "2025-04-19",
+   "base_type": "Payment",
+   "narration": "UPI-OMEGA\u200bMART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1750
+    ],
+    [
+     "Bank A",
+     -1750
+    ]
+   ]
+  },
+  {
+   "guid": "t19",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "narration": "\ufeffUPI-OMEGA MART-WAGES",
+   "lines": [
+    [
+     "Wages",
+     1848
+    ],
+    [
+     "Bank A",
+     -1848
+    ]
+   ]
+  },
+  {
+   "guid": "t20",
+   "date": "2025-04-21",
+   "base_type": "Payment",
+   "narration": "UPI\u2010OMEGA MART\u2010WAGES",
+   "lines": [
+    [
+     "Wages",
+     1948
+    ],
+    [
+     "Bank A",
+     -1948
+    ]
+   ]
+  },
+  {
+   "guid": "t21",
+   "date": "2025-04-22",
+   "base_type": "Payment",
+   "narration": "IMPS-१२३-PI STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2050
+    ],
+    [
+     "Bank A",
+     -2050
+    ]
+   ]
+  },
+  {
+   "guid": "t22",
+   "date": "2025-04-23",
+   "base_type": "Payment",
+   "narration": "IMPS-４０-PI STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2154
+    ],
+    [
+     "Bank A",
+     -2154
+    ]
+   ]
+  },
+  {
+   "guid": "t23",
+   "date": "2025-04-24",
+   "base_type": "Payment",
+   "narration": "IMPS-4²-PI STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2243
+    ],
+    [
+     "Bank A",
+     -2243
+    ]
+   ]
+  },
+  {
+   "guid": "t24",
+   "date": "2025-04-25",
+   "base_type": "Payment",
+   "narration": "IMPS-①-PI STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2334
+    ],
+    [
+     "Bank A",
+     -2334
+    ]
+   ]
+  },
+  {
+   "guid": "t25",
+   "date": "2025-04-26",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/१२ ३/RHO/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2444
+    ],
+    [
+     "Bank A",
+     -2444
+    ]
+   ]
+  },
+  {
+   "guid": "t26",
+   "date": "2025-04-27",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/देव-KA/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2539
+    ],
+    [
+     "Bank A",
+     -2539
+    ]
+   ]
+  },
+  {
+   "guid": "t27",
+   "date": "2025-04-28",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/देव/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2636
+    ],
+    [
+     "Bank A",
+     -2636
+    ]
+   ]
+  },
+  {
+   "guid": "t28",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "narration": "to transfer-upi/dr/5/αλφα/zzbk",
+   "lines": [
+    [
+     "Wages",
+     2735
+    ],
+    [
+     "Bank A",
+     -2735
+    ]
+   ]
+  },
+  {
+   "guid": "t29",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/TAU\u0302/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2819
+    ],
+    [
+     "Bank A",
+     -2819
+    ]
+   ]
+  },
+  {
+   "guid": "t30",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/TAÛ/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2922
+    ],
+    [
+     "Bank A",
+     -2922
+    ]
+   ]
+  },
+  {
+   "guid": "t31",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5/taû/ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3027
+    ],
+    [
+     "Bank A",
+     -3027
+    ]
+   ]
+  },
+  {
+   "guid": "t32",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "ÉTOILE - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3117
+    ],
+    [
+     "Bank A",
+     -3117
+    ]
+   ]
+  },
+  {
+   "guid": "t33",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-NU १-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3209
+    ],
+    [
+     "Bank A",
+     -3209
+    ]
+   ]
+  },
+  {
+   "guid": "t34",
+   "date": "2025-05-07",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZ१-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     3303
+    ],
+    [
+     "Bank A",
+     -3303
+    ]
+   ]
+  },
+  {
+   "guid": "t35",
+   "date": "2025-05-08",
+   "base_type": "Payment",
+   "narration": "IMPS-5-PI १-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3399
+    ],
+    [
+     "Bank A",
+     -3399
+    ]
+   ]
+  },
+  {
+   "guid": "t40",
+   "date": "2025-05-09",
+   "base_type": "Payment",
+   "vtype": "Bank Payment",
+   "narration": "UPI-NU-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3497
+    ],
+    [
+     "Bank A",
+     -3497
+    ]
+   ]
+  },
+  {
+   "guid": "t41",
+   "date": "2025-05-10",
+   "base_type": "Payment",
+   "number": "",
+   "narration": "UPI-NU-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3597
+    ],
+    [
+     "Bank A",
+     -3597
+    ]
+   ]
+  },
+  {
+   "guid": "t42",
+   "date": "2025-05-11",
+   "base_type": "Payment",
+   "number": "  ",
+   "narration": "UPI-NU-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3699
+    ],
+    [
+     "Bank A",
+     -3699
+    ]
+   ]
+  },
+  {
+   "guid": "t43",
+   "date": "2025-05-12",
+   "base_type": "Payment",
+   "number": "Cafe\u0301/7",
+   "vtype": "Re\u0301gie",
+   "narration": "UPI-NU-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3803
+    ],
+    [
+     "Bank A",
+     -3803
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

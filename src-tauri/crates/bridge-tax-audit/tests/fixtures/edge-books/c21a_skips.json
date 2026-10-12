@@ -1,0 +1,295 @@
+{
+ "comment": "clause21a_candidates passing lines over: a penalty word on a ledger outside the P&L groups; a P&L line of nil with a penalty word; a P&L credit matching the penalty words, with no debit beside it; an optional voucher with a penalty word, out of the books; a repairs entry of exactly the large-entry threshold; P&L debits whose words match nothing; and one compounding fee, the only candidate, so the passes are measured against a hit.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Admin Expenses": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_skips-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_skips-001"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c21a_skips-002"
+  },
+  {
+   "name": "Penalty Recoverable",
+   "chain": [
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_skips-003"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_skips-004"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-c21a_skips-005"
+  },
+  {
+   "name": "Repairs",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_skips-006"
+  },
+  {
+   "name": "Penalties",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_skips-007"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 20000,
+   "credit": 5015000,
+   "closing": -4995000
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 45000,
+   "credit": 4100000,
+   "closing": -4055000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 20000,
+   "closing": -20000
+  },
+  {
+   "ledger": "Penalty Recoverable",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 2600000,
+   "credit": 0,
+   "closing": 2600000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 0,
+   "closing": 500000
+  },
+  {
+   "ledger": "Repairs",
+   "opening": 0,
+   "debit": 5000000,
+   "credit": 0,
+   "closing": 5000000
+  },
+  {
+   "ledger": "Penalties",
+   "opening": 0,
+   "debit": 0,
+   "credit": 30000,
+   "closing": -30000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-c21a_skips-v01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Penalty paid on behalf of a customer",
+   "lines": [
+    [
+     "Penalty Recoverable",
+     1000000
+    ],
+    [
+     "Bank",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_skips-v02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Rent for April",
+   "lines": [
+    [
+     "Office Rent",
+     2500000
+    ],
+    [
+     "Bank",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_skips-v03",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Repairs to the shop",
+   "lines": [
+    [
+     "Repairs",
+     5000000
+    ],
+    [
+     "Cash",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_skips-v04",
+   "date": "2025-06-01",
+   "base_type": "Receipt",
+   "narration": "Penalty refund",
+   "lines": [
+    [
+     "Bank",
+     30000
+    ],
+    [
+     "Penalties",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_skips-v05",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Penalty",
+   "lines": [
+    [
+     "Penalties",
+     40000
+    ],
+    [
+     "Bank",
+     -40000
+    ]
+   ],
+   "status": "optional"
+  },
+  {
+   "guid": "edge-c21a_skips-v06",
+   "date": "2025-06-01",
+   "base_type": "Journal",
+   "narration": "Nil penalty",
+   "lines": [
+    [
+     "Penalties",
+     0
+    ],
+    [
+     "Bank",
+     15000
+    ],
+    [
+     "Cash",
+     -15000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_skips-v07",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Stock for the shop",
+   "lines": [
+    [
+     "Purchases",
+     500000
+    ],
+    [
+     "Bank",
+     -500000
+    ]
+   ],
+   "party": "Vendor A"
+  },
+  {
+   "guid": "edge-c21a_skips-v08",
+   "date": "2025-06-01",
+   "base_type": "Sales",
+   "narration": "Late fee charged",
+   "lines": [
+    [
+     "Cash",
+     20000
+    ],
+    [
+     "Sales",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_skips-v09",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Compounding fee",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "tests": [
+  "clause21a_candidates"
+ ]
+}

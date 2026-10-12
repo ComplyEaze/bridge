@@ -1,0 +1,83 @@
+# fixture: tests/fixtures/encoding/bills-utf16.bin
+# parser: parse_native_bill_rows(20260401..20260801)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "BVL Alpha Traders",
+        reference: "ALPHA-OVERDUE",
+        bill_date: TallyDate(
+            "20260501",
+        ),
+        due_date: TallyDate(
+            "20260501",
+        ),
+        closing_balance: ExactDecimal(
+            "-11111.00",
+        ),
+        tally_overdue_days: Some(
+            92,
+        ),
+    },
+    NativeBillRow {
+        party: "BVL Alpha Traders",
+        reference: "ALPHA-FUTURE",
+        bill_date: TallyDate(
+            "20260801",
+        ),
+        due_date: TallyDate(
+            "20261001",
+        ),
+        closing_balance: ExactDecimal(
+            "-22222.00",
+        ),
+        tally_overdue_days: None,
+    },
+    NativeBillRow {
+        party: "BVL Delta Mixed",
+        reference: "DELTA-REC",
+        bill_date: TallyDate(
+            "20260801",
+        ),
+        due_date: TallyDate(
+            "20260801",
+        ),
+        closing_balance: ExactDecimal(
+            "-55555.00",
+        ),
+        tally_overdue_days: Some(
+            0,
+        ),
+    },
+    NativeBillRow {
+        party: "=BVL Zeta Formula",
+        reference: "ZETA-REC",
+        bill_date: TallyDate(
+            "20260801",
+        ),
+        due_date: TallyDate(
+            "20260801",
+        ),
+        closing_balance: ExactDecimal(
+            "-88888.00",
+        ),
+        tally_overdue_days: Some(
+            0,
+        ),
+    },
+    NativeBillRow {
+        party: "BVL एप\u{94d}सिलॉन ट\u{94d}र\u{947}डर\u{94d}स",
+        reference: "UNICODE-REC",
+        bill_date: TallyDate(
+            "20260801",
+        ),
+        due_date: TallyDate(
+            "20260801",
+        ),
+        closing_balance: ExactDecimal(
+            "-77777.00",
+        ),
+        tally_overdue_days: Some(
+            0,
+        ),
+    },
+])

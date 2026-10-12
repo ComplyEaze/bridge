@@ -205,15 +205,11 @@ pub fn parse(text: &str, part: &str) -> Result<Element> {
                     return Err(err("content after the document element".to_string()));
                 }
                 let empty = matches!(event, Event::Empty(_));
-                let name = std::str::from_utf8(start.name().as_ref())
-                    .map_err(|_| err("element name is not UTF-8".to_string()))?
-                    .to_string();
+                let name = start.name().as_ref().to_string();
                 let mut attrs = Vec::new();
                 for attr in start.attributes().with_checks(true) {
                     let attr = attr.map_err(|e| err(format!("malformed attribute: {e}")))?;
-                    let key = std::str::from_utf8(attr.key.as_ref())
-                        .map_err(|_| err("attribute name is not UTF-8".to_string()))?
-                        .to_string();
+                    let key = attr.key.as_ref().to_string();
                     let value = attr
                         .normalized_value(XmlVersion::Implicit1_0)
                         .map_err(|e| err(format!("attribute {key}: {e}")))?;
@@ -238,12 +234,10 @@ pub fn parse(text: &str, part: &str) -> Result<Element> {
                 close(&mut stack, &mut root, element);
             }
             Event::Text(t) => {
-                let text = t.xml10_content().map_err(|e| err(format!("text: {e}")))?;
-                push_text(&mut stack, &text, part)?;
+                push_text(&mut stack, &t.xml10_content(), part)?;
             }
             Event::CData(t) => {
-                let text = t.decode().map_err(|e| err(format!("CDATA: {e}")))?;
-                push_text(&mut stack, &normalize_eols(&text), part)?;
+                push_text(&mut stack, &normalize_eols(&t), part)?;
             }
             Event::GeneralRef(r) => {
                 let resolved = if r.is_char_ref() {
@@ -259,8 +253,8 @@ pub fn parse(text: &str, part: &str) -> Result<Element> {
                     }
                     c.to_string()
                 } else {
-                    let name = r.decode().map_err(|e| err(format!("reference: {e}")))?;
-                    resolve_predefined_entity(&name)
+                    let name: &str = &r;
+                    resolve_predefined_entity(name)
                         .ok_or_else(|| err(format!("undefined entity &{name};")))?
                         .to_string()
                 };

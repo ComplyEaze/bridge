@@ -1,0 +1,104 @@
+{
+ "comment": "An individual with no previous-year turnover recorded: tds_payees gives the status 'unknown'. u01 credits Ivy Agency (s.194H) Rs 24,000: 1 row, carrying the flag that the deductor status is unresolved, and 1 finding with the limit that says so.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_status_unknown-ledger-00"
+  },
+  {
+   "name": "Ivy Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_status_unknown-ledger-01"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_status_unknown-ledger-02"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_status_unknown-ledger-03"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  },
+  {
+   "ledger": "Ivy Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2400000,
+   "closing": -2400000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -40000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-u01",
+   "date": "2025-07-14",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Sales Commission",
+     2400000
+    ],
+    [
+     "Ivy Agency",
+     -2400000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ }
+}

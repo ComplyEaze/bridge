@@ -1,5 +1,6 @@
 //! Captured read replay with mode/date fault injection; no live Education calls.
 use super::*;
+use crate::tally::ConnectionStatus;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -78,7 +79,7 @@ fn stale_cache(runtime: &TallyRuntime, config: &TallyConfig) {
                 reachable: true,
                 compatible: true,
                 server_text: String::new(),
-                product: super::super::TallyProduct::Unknown,
+                product: super::super::connection::TallyProduct::Unknown,
                 error: None,
             },
             companies,
@@ -188,6 +189,7 @@ async fn financial_reads_refuse_unqualified_profiles_before_reports_despite_stal
                             &identity,
                             assertion(&extents(), &identity),
                             TallyDate::parse("20990101").unwrap(),
+                            crate::tally::connection::ComplianceRead::Standard,
                         )
                         .await
                         .unwrap_err()
@@ -271,6 +273,7 @@ async fn compliance_source_requires_closing_mode_and_preserves_source_commitment
                 &identity,
                 assertion(&extents(), &identity),
                 TallyDate::parse("20990101").unwrap(),
+                crate::tally::connection::ComplianceRead::Standard,
             )
             .await;
         let (source, evidence) = result.unwrap();
@@ -331,6 +334,7 @@ async fn party_source_ends_its_balance_snapshot_at_the_hosts_today_when_a_vouche
                 &identity,
                 assertion(&extents(), &identity),
                 TallyDate::parse(today).unwrap(),
+                crate::tally::connection::ComplianceRead::Standard,
             )
             .await
             .unwrap();
@@ -498,6 +502,7 @@ async fn rejected_currency_retains_its_completed_pair_before_any_master_read() {
                 },
                 &company_identity(&companies()),
                 TallyDate::parse("20990101").unwrap(),
+                crate::tally::connection::ComplianceRead::Standard,
             )
             .await
             .unwrap_err();

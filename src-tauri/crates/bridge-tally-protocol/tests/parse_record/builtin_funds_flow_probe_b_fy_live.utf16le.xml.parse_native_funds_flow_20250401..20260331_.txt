@@ -1,0 +1,239 @@
+# fixture: tests/fixtures/builtin_funds_flow_probe_b_fy_live.utf16le.xml
+# parser: parse_native_funds_flow(20250401..20260331)
+# source: captured
+Ok(NativeFundsFlow {
+    rows: [
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 4,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-1.00",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-7292109.25",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "-7292108.25",
+                ),
+            ),
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 5,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-7292109.25",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-28788387.96",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "-21496278.71",
+                ),
+            ),
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 6,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-28788387.96",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63119166.64",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "-34330778.68",
+                ),
+            ),
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 7,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63119166.64",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63104656.83",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "14509.81",
+                ),
+            ),
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 8,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63104656.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "-12936.00",
+                ),
+            ),
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 9,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cl: Empty,
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 10,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cl: Empty,
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 11,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cl: Empty,
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 12,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cl: Empty,
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 1,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63117592.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63121292.83",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "-3700.00",
+                ),
+            ),
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 2,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63121292.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63121292.83",
+                ),
+            ),
+            cl: Empty,
+        },
+        NativeFundsFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 3,
+            },
+            dr: Present(
+                ExactDecimal(
+                    "-63121292.83",
+                ),
+            ),
+            cr: Present(
+                ExactDecimal(
+                    "-63122592.83",
+                ),
+            ),
+            cl: Present(
+                ExactDecimal(
+                    "-1300.00",
+                ),
+            ),
+        },
+    ],
+})

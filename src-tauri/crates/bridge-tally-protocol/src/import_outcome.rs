@@ -359,22 +359,24 @@ impl TallyImportResult {
 /// response on a bare `&` inside a CDATA section. An XML comment inside the
 /// element is dropped; any other markup still refuses the response.
 fn read_line_error_text(reader: &mut Reader<&[u8]>, name: QName<'_>) -> anyhow::Result<String> {
-    let expected = name.as_ref().to_ascii_uppercase();
+    let expected = name.as_ref().as_bytes().to_ascii_uppercase();
     crate::native_ledger_collection::with_untrimmed_text(reader, |reader| {
         let mut text = String::new();
         loop {
             match reader.read_event()? {
                 Event::Text(part) => {
-                    text.push_str(&quick_xml::escape::unescape(&part.decode()?)?);
+                    text.push_str(&quick_xml::escape::unescape(&part)?);
                 }
                 Event::GeneralRef(reference) => text.push_str(
                     &crate::native_ledger_collection::resolve_party_ledger_master_reference(
                         reference,
                     )?,
                 ),
-                Event::CData(part) => text.push_str(&part.decode()?),
+                Event::CData(part) => text.push_str(&part),
                 Event::Comment(_) => {}
-                Event::End(end) if end.name().as_ref().to_ascii_uppercase() == expected => {
+                Event::End(end)
+                    if end.name().as_ref().as_bytes().to_ascii_uppercase() == expected =>
+                {
                     break;
                 }
                 Event::Eof => anyhow::bail!("Tally import LINEERROR ended before it closed"),
@@ -410,7 +412,7 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
     loop {
         match reader.read_event()? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 validate_only_attributes(&element, &[]).map_err(|_| {
                     anyhow::anyhow!("Tally import response attributes were invalid")
                 })?;
@@ -567,7 +569,12 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
                 let Some(expected) = path.pop() else {
                     anyhow::bail!("Tally import response contained an unexpected closing element");
                 };
-                if !element.name().as_ref().eq_ignore_ascii_case(&expected) {
+                if !element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&expected)
+                {
                     anyhow::bail!("Tally import response closed an unexpected element");
                 }
                 if path.is_empty() {
@@ -576,10 +583,7 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
             }
             Event::Empty(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"])
-                    && element
-                        .name()
-                        .as_ref()
-                        .eq_ignore_ascii_case(b"IMPORTRESULT") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("IMPORTRESULT") =>
             {
                 validate_only_attributes(&element, &[]).map_err(|_| {
                     anyhow::anyhow!("Tally import response attributes were invalid")
@@ -595,18 +599,18 @@ pub fn parse_import_outcome(xml: &str) -> anyhow::Result<TallyImportOutcome> {
                 );
             }
             Event::Empty(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"HEADER")
-                    || element.name().as_ref().eq_ignore_ascii_case(b"BODY") =>
+                if element.name().as_ref().eq_ignore_ascii_case("HEADER")
+                    || element.name().as_ref().eq_ignore_ascii_case("BODY") =>
             {
                 anyhow::bail!("Tally import response contained an empty critical container");
             }
             Event::Empty(_) => {
                 anyhow::bail!("Tally import response contained an unexpected empty element");
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally import response contained unexpected mixed text");
             }
-            Event::CData(text) if !text.decode()?.trim().is_empty() => {
+            Event::CData(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally import response contained unexpected mixed CDATA");
             }
             Event::DocType(_) | Event::PI(_) => {
@@ -713,7 +717,7 @@ fn parse_import_evidence_inner(xml: &str) -> anyhow::Result<ParsedImportEvidence
     let mut line_error_sha256 = Vec::new();
     loop {
         match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"LINEERROR") => {
+            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("LINEERROR") => {
                 let value = read_line_error_text(&mut reader, element.name())?;
                 if line_error_sha256.len() == MAX_LINE_ERRORS {
                     anyhow::bail!("Tally import response exceeded the line-error limit");

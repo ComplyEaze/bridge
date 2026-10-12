@@ -1,0 +1,447 @@
+{
+ "comment": "clause21a_candidates on where a word is read: \"new\" in the narration and in a ledger name, and only in the party field or inside a longer word; \"fine\" with and without a qualifier, with its qualifier in another field, and only in the party field; a club word required beside a fee or service word; the client's extra terms, padded, blank and repeated; a word in capitals; and a word after a letter outside a-z.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Admin Expenses": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_fields-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_fields-001"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c21a_fields-002"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-c21a_fields-003"
+  },
+  {
+   "name": "General Expenses",
+   "chain": [
+    "Admin Expenses",
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_fields-004"
+  },
+  {
+   "name": "New Furniture",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_fields-005"
+  },
+  {
+   "name": "Challan Charges",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_fields-006"
+  },
+  {
+   "name": "Fines for Violation",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_fields-007"
+  },
+  {
+   "name": "Club Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_fields-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2450000,
+   "closing": -2450000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 570000,
+   "credit": 0,
+   "closing": 570000
+  },
+  {
+   "ledger": "General Expenses",
+   "opening": 0,
+   "debit": 1370000,
+   "credit": 0,
+   "closing": 1370000
+  },
+  {
+   "ledger": "New Furniture",
+   "opening": 0,
+   "debit": 250000,
+   "credit": 0,
+   "closing": 250000
+  },
+  {
+   "ledger": "Challan Charges",
+   "opening": 0,
+   "debit": 40000,
+   "credit": 0,
+   "closing": 40000
+  },
+  {
+   "ledger": "Fines for Violation",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 0,
+   "closing": 60000
+  },
+  {
+   "ledger": "Club Expenses",
+   "opening": 0,
+   "debit": 160000,
+   "credit": 0,
+   "closing": 160000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-c21a_fields-v01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "New printer",
+   "lines": [
+    [
+     "General Expenses",
+     100000
+    ],
+    [
+     "Bank",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Stock",
+   "lines": [
+    [
+     "Purchases",
+     200000
+    ],
+    [
+     "Bank",
+     -200000
+    ]
+   ],
+   "party": "New Town Traders"
+  },
+  {
+   "guid": "edge-c21a_fields-v03",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Chairs",
+   "lines": [
+    [
+     "New Furniture",
+     250000
+    ],
+    [
+     "Bank",
+     -250000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v04",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Renewal charges",
+   "lines": [
+    [
+     "General Expenses",
+     350000
+    ],
+    [
+     "Bank",
+     -350000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v05",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Fine paper reams",
+   "lines": [
+    [
+     "Purchases",
+     300000
+    ],
+    [
+     "Bank",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v06",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Late fine for a return",
+   "lines": [
+    [
+     "General Expenses",
+     50000
+    ],
+    [
+     "Bank",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v07",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Fine",
+   "lines": [
+    [
+     "Challan Charges",
+     40000
+    ],
+    [
+     "Bank",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v08",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Municipal",
+   "lines": [
+    [
+     "Fines for Violation",
+     60000
+    ],
+    [
+     "Bank",
+     -60000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v09",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Challan 12",
+   "lines": [
+    [
+     "Purchases",
+     70000
+    ],
+    [
+     "Bank",
+     -70000
+    ]
+   ],
+   "party": "Fine Chemicals"
+  },
+  {
+   "guid": "edge-c21a_fields-v10",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Magazine subscription",
+   "lines": [
+    [
+     "General Expenses",
+     80000
+    ],
+    [
+     "Bank",
+     -80000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v11",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Green fee at the golf course",
+   "lines": [
+    [
+     "General Expenses",
+     90000
+    ],
+    [
+     "Bank",
+     -90000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v12",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Diwali gifts for staff",
+   "lines": [
+    [
+     "General Expenses",
+     110000
+    ],
+    [
+     "Bank",
+     -110000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v13",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "PENALTY PAID",
+   "lines": [
+    [
+     "General Expenses",
+     130000
+    ],
+    [
+     "Bank",
+     -130000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v14",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Notice of épenalty",
+   "lines": [
+    [
+     "General Expenses",
+     140000
+    ],
+    [
+     "Bank",
+     -140000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v15",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Notice of xpenalty",
+   "lines": [
+    [
+     "General Expenses",
+     150000
+    ],
+    [
+     "Bank",
+     -150000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v16",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Room charges",
+   "lines": [
+    [
+     "Club Expenses",
+     160000
+    ],
+    [
+     "Bank",
+     -160000
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_fields-v17",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Order of the CCI",
+   "lines": [
+    [
+     "General Expenses",
+     170000
+    ],
+    [
+     "Bank",
+     -170000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "clause21a_extra_terms": {
+  "personal": [
+   "  Diwali Gifts ",
+   "",
+   "   "
+  ],
+  "club_fee": [
+   "Green Fee"
+  ],
+  "settlement": [
+   "cci"
+  ]
+ },
+ "tests": [
+  "clause21a_candidates"
+ ]
+}

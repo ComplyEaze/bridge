@@ -114,8 +114,6 @@ fn party_ledger_commitment_hashes_the_three_encoded_builder_requests() {
     }
 }
 
-#[cfg(feature = "voucher-scan")]
-use super::LedgerOpeningCoverageRead;
 use super::{
     canonical_loopback_origin, decode_xml_bytes, detect_product,
     has_presentation_equivalent_guid_siblings, normalize_discovered_companies,
@@ -247,9 +245,9 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
 }
 
 /// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
-/// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The connection check
-/// reports it; so does the probe, while its XML reads find no company list (a list found
-/// replaces the code with `status_heuristic_unavailable`).
+/// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The probe reports it
+/// while its XML reads find no company list (a list found replaces the code with
+/// `status_heuristic_unavailable`).
 #[tokio::test]
 async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let failed_status =
@@ -260,12 +258,7 @@ async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
-        for response in [
-            failed_status.clone(),
-            failed_status,
-            no_list.clone(),
-            no_list,
-        ] {
+        for response in [failed_status, no_list.clone(), no_list] {
             let (mut socket, _) = listener.accept().await.unwrap();
             let request = read_complete_http_request(&mut socket).await;
             assert!(!request.is_empty());
@@ -277,11 +270,6 @@ async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
         port: address.port(),
     })
     .unwrap();
-    let status = client.check_connection().await.unwrap();
-    assert_eq!(
-        (status.reachable, status.error.as_deref()),
-        (false, Some("http_status_failure"))
-    );
     let (probe, _) = client.probe_with_wire_evidence().await.unwrap();
     server.await.unwrap();
     assert_eq!(
@@ -678,8 +666,8 @@ async fn tally_requests_ignore_configured_proxy() {
         ),
     );
 
-    let status = client
-        .check_connection()
+    let (status, _) = client
+        .check_connection_strict_with_wire_evidence()
         .await
         .expect("check synthetic Tally connection");
     tally_server.await.expect("synthetic Tally server task");
@@ -696,208 +684,8 @@ async fn tally_requests_ignore_configured_proxy() {
     );
 }
 
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn paired_outstandings_reads_health_check_between_and_after_requests() {
-    const OPTIONAL_VOUCHERS: &str = include_str!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/unit_a_optional_voucher_live.xml"
-    );
-    const STATUS: &str = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let identity = captured_company_identity();
-
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let server = tokio::spawn(async move {
-        for (index, expected_prefix) in [
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .expect("paired request timed out")
-                .expect("accept paired request");
-            let request = read_complete_http_request(&mut socket).await;
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the required read/health-check sequence"
-            );
-            let body = match index {
-                0 | 2 | 12 | 14 => COMPANY_EXTENT_V2,
-                4 | 6 | 8 | 10 => OPTIONAL_VOUCHERS,
-                _ => STATUS,
-            };
-            let response = if index % 2 == 0 {
-                utf16_xml_response(body)
-            } else {
-                utf8_status_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write paired response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let extent = client
-        .fetch_company_book_extent(&identity)
-        .await
-        .expect("paired extent reads remain stable");
-    let reporting_window = bridge_tally_protocol::outstandings::DateWindow::parse(
-        bridge_tally_protocol::outstandings::DateBoundaryProfile::ModeAgnostic,
-        "20260401",
-        "20260401",
-    )
-    .expect("synthetic one-day window");
-    let segment_window = reporting_window
-        .narrow_partitions()
-        .expect("one narrow partition")
-        .remove(0);
-    let observation = client
-        .fetch_outstandings_segment_pair(
-            extent.company(),
-            segment_window.clone(),
-            bridge_tally_protocol::outstandings::AlterIdRange::new(0, 101603)
-                .expect("non-empty synthetic range"),
-        )
-        .await
-        .expect("paired segment reads remain stable");
-    let verification = observation.verification;
-    let bridge_tally_protocol::outstandings::SegmentVerification::Complete(segment) = verification
-    else {
-        panic!("captured voucher response did not verify: {verification:?}");
-    };
-    assert!(
-        !segment.vouchers().is_empty(),
-        "captured voucher fixture unexpectedly had no vouchers"
-    );
-    let witness = client
-        .fetch_empty_partition_witness_pair(extent.company(), segment_window)
-        .await
-        .expect("paired empty-date witness reads remain stable");
-    let bridge_tally_protocol::outstandings::WitnessPairVerification::Complete(witness) = witness
-    else {
-        panic!("captured witness fixture did not verify: {witness:?}");
-    };
-    assert!(
-        !witness.vouchers().is_empty(),
-        "captured witness fixture unexpectedly had no identity rows"
-    );
-    let closing_extent = client
-        .fetch_company_book_extent(&identity)
-        .await
-        .expect("closing paired extent reads remain stable");
-    assert_eq!(closing_extent, extent, "synthetic book did not change");
-    assert_eq!(
-        client.observed_body_bytes(),
-        Some(
-            u64::try_from(
-                bridge_tally_protocol::encode_tally_xml_request_utf16le(OPTIONAL_VOUCHERS).len(),
-            )
-            .expect("encoded fixture length fits u64"),
-        ),
-        "closing extent evidence must not overwrite the larger voucher payload"
-    );
-    server.await.expect("synthetic Tally server task");
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn paired_ledger_opening_coverage_reports_intra_pair_drift() {
-    const STATUS: &str = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let identity = captured_company_identity();
-
-    let coverage = |name: &str| {
-        format!(
-            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER NAME=\"{name}\"><GUID>bb8ad19e-6aef-4239-a917-87fec0c6215e-00000001</GUID><ISBILLWISEON>Yes</ISBILLWISEON><OPENINGBALANCE>0</OPENINGBALANCE></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"
-        )
-    };
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let responses = vec![
-        COMPANY_EXTENT_V2.to_string(),
-        STATUS.to_string(),
-        COMPANY_EXTENT_V2.to_string(),
-        STATUS.to_string(),
-        coverage("Before Rename"),
-        STATUS.to_string(),
-        coverage("After Rename"),
-        STATUS.to_string(),
-    ];
-    let server = tokio::spawn(async move {
-        for (index, body) in responses.into_iter().enumerate() {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .expect("paired request timed out")
-                .expect("accept paired request");
-            let request = read_complete_http_request(&mut socket).await;
-            let expected_prefix = if index % 2 == 0 {
-                "POST / HTTP/1.1"
-            } else {
-                "GET /status HTTP/1.1"
-            };
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the required read/health-check sequence"
-            );
-            let response = if index % 2 == 0 {
-                utf16_xml_response(body)
-            } else {
-                utf8_status_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write paired response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let extent = client
-        .fetch_company_book_extent(&identity)
-        .await
-        .expect("paired extent reads remain stable");
-    assert!(matches!(
-        client
-            .fetch_ledger_opening_coverage(extent.company())
-            .await
-            .expect("coverage responses parse"),
-        LedgerOpeningCoverageRead::Drifted
-    ));
-    server.await.expect("synthetic Tally server task");
-}
-
-/// The outstandings bracket (`fetch_company_book_extent`, feeding both
-/// `fetch_outstandings_native_with_currency` and `fetch_ledgers`) must fail closed with
+/// The outstandings bracket (`fetch_company_book_extent`, feeding both the
+/// outstandings read and the ledger export) must fail closed with
 /// a typed error when both paired reads agree but neither carries
 /// `ALTMSTID`. This is the exact case the review flagged: two
 /// witness-less extents compare equal, so the ordinary `first != second`
@@ -1004,410 +792,6 @@ async fn outstandings_bracket_fails_closed_when_altmstid_is_absent() {
             }),
         "unexpected error: {error:#}"
     );
-}
-
-#[tokio::test]
-async fn http_success_with_tally_status_zero_is_not_an_empty_success() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let server = tokio::spawn(async move {
-        for (index, body) in [
-            COMPANY_EXTENT_V2,
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            COMPANY_EXTENT_V2,
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY /></ENVELOPE>",
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY /></ENVELOPE>",
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let (mut socket, _) = listener.accept().await.expect("accept Tally request");
-            let request = read_complete_http_request(&mut socket).await;
-            let expected = if index == 1 || index == 3 || index == 5 || index == 7 {
-                "GET /status HTTP/1.1"
-            } else {
-                "POST / HTTP/1.1"
-            };
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected),
-                "ledger fetch did not preserve its extent/read sequence"
-            );
-            if index == 4 || index == 6 {
-                let body_start = request
-                    .windows(4)
-                    .position(|window| window == b"\r\n\r\n")
-                    .map(|offset| offset + 4)
-                    .expect("native ledger POST has complete HTTP headers");
-                let request_xml = bridge_tally_protocol::decode_tally_text_bytes_limited(
-                    &request[body_start..],
-                    request.len(),
-                )
-                .expect("native ledger POST uses decodable UTF-16 XML")
-                .text;
-                assert!(request_xml.contains(r#"<SVFROMDATE TYPE="Date">20240401</SVFROMDATE>"#));
-                assert!(request_xml.contains(r#"<SVTODATE TYPE="Date">20260401</SVTODATE>"#));
-            }
-            let response = if index == 1 || index == 3 || index == 5 || index == 7 {
-                utf8_status_response(body)
-            } else {
-                utf16_xml_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write Tally response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let error = client
-        .fetch_ledgers(&identity, DateBoundaryProfile::ModeAgnostic)
-        .await
-        .expect_err("STATUS 0 must not become an empty ledger result");
-    server.await.expect("synthetic Tally server task");
-    assert_eq!(
-        error
-            .chain()
-            .find_map(|cause| cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()),
-        Some(&bridge_tally_protocol::NativeCollectionError::NotSuccess),
-        "unexpected error: {error:#}"
-    );
-}
-
-#[tokio::test]
-async fn invalid_book_extent_stops_ledger_export_without_a_date_fallback() {
-    let identity = captured_company_identity();
-    let invalid_extent =
-        COMPANY_EXTENT_V2.replacen(r#"<BOOKSFROM TYPE="Date">20240401</BOOKSFROM>"#, "", 1);
-    assert_ne!(invalid_extent, COMPANY_EXTENT_V2);
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let server = tokio::spawn(async move {
-        for (index, body) in [
-            invalid_extent.as_str(),
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            invalid_extent.as_str(),
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let (mut socket, _) = listener.accept().await.expect("accept extent request");
-            let request = read_complete_http_request(&mut socket).await;
-            let expected = if index % 2 == 0 {
-                "POST / HTTP/1.1"
-            } else {
-                "GET /status HTTP/1.1"
-            };
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected),
-                "request {index} did not follow the paired extent sequence"
-            );
-            let response = if index % 2 == 0 {
-                utf16_xml_response(body)
-            } else {
-                utf8_status_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write extent response");
-        }
-        assert!(
-            tokio::time::timeout(Duration::from_millis(1000), listener.accept())
-                .await
-                .is_err(),
-            "an invalid extent must stop before any native ledger request"
-        );
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    client
-        .fetch_ledgers(&identity, DateBoundaryProfile::ModeAgnostic)
-        .await
-        .expect_err("missing BOOKSFROM must fail closed");
-    server.await.expect("synthetic Tally server task");
-}
-
-#[tokio::test]
-async fn education_profile_rejects_an_unsupported_books_from_before_ledger_export() {
-    let extent = COMPANY_EXTENT_V2.replacen(
-        r#"<BOOKSFROM TYPE="Date">20240401</BOOKSFROM>"#,
-        r#"<BOOKSFROM TYPE="Date">20240115</BOOKSFROM>"#,
-        1,
-    );
-    let identity = identity_from_company_extent(&extent);
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let server = tokio::spawn(async move {
-        for (index, body) in [
-            extent.as_str(),
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            extent.as_str(),
-            "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let (mut socket, _) = listener.accept().await.expect("accept extent request");
-            let request = read_complete_http_request(&mut socket).await;
-            let expected = if index % 2 == 0 {
-                "POST / HTTP/1.1"
-            } else {
-                "GET /status HTTP/1.1"
-            };
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected),
-                "request {index} did not follow the paired extent sequence"
-            );
-            let response = if index % 2 == 0 {
-                utf16_xml_response(body)
-            } else {
-                utf8_status_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write extent response");
-        }
-        assert!(
-            tokio::time::timeout(Duration::from_millis(1000), listener.accept())
-                .await
-                .is_err(),
-            "an Education-invalid BOOKSFROM must stop before the native ledger request"
-        );
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let error = client
-        .fetch_ledgers(&identity, DateBoundaryProfile::EducationRestricted)
-        .await
-        .expect_err("unsupported boundary must not reach the ledger export");
-    server.await.expect("synthetic Tally server task");
-    assert!(
-        error
-            .to_string()
-            .contains("not supported by the endpoint compatibility profile"),
-        "unexpected error: {error:#}"
-    );
-}
-
-fn native_voucher_collection_xml(rows: &[&str]) -> String {
-    format!(
-        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>{}</COLLECTION></DATA></BODY></ENVELOPE>",
-        rows.join("")
-    )
-}
-
-const SYNTHETIC_VOUCHER_ROW: &str = r#"<VOUCHER REMOTEID="synthetic-company-guid-00000001"><DATE TYPE="Date">20260401</DATE><GUID TYPE="String">synthetic-company-guid-00000001</GUID><MASTERID TYPE="Number">1</MASTERID><ALTERID TYPE="Number">1</ALTERID><VOUCHERTYPENAME TYPE="String">Payment</VOUCHERTYPENAME><ISCANCELLED TYPE="String">No</ISCANCELLED><ISOPTIONAL TYPE="String">No</ISOPTIONAL><ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE="String">Cash</LEDGERNAME><AMOUNT TYPE="Amount">-100.00</AMOUNT><ISDEEMEDPOSITIVE TYPE="String">Yes</ISDEEMEDPOSITIVE></ALLLEDGERENTRIES.LIST></VOUCHER>"#;
-
-/// A native Voucher collection carries no envelope company GUID, and a
-/// zero-row response has no per-row GUID either -- there is nothing for
-/// `parse_native_voucher_source_records_with_evidence` to bind. Before
-/// the fix, `fetch_vouchers` accepted such a response unauthenticated,
-/// so a silently substituted or dropped company looked identical to a
-/// genuinely empty window. This reproduces that: the voucher read comes
-/// back empty, and the out-of-band book-extent bracket that should
-/// confirm the pinned company instead observes a different one.
-#[tokio::test]
-async fn empty_voucher_response_is_rejected_when_pinned_company_cannot_be_confirmed() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let empty_vouchers = native_voucher_collection_xml(&[]);
-    let substituted_extent =
-        COMPANY_EXTENT_V2.replacen(CAPTURED_COMPANY_GUID, "substituted-company-guid", 1);
-    let status = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let steps: Vec<(&str, String, bool)> = vec![
-        ("POST / HTTP/1.1", empty_vouchers, false),
-        ("POST / HTTP/1.1", substituted_extent.clone(), false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-        ("POST / HTTP/1.1", substituted_extent, false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-    ];
-    let server = tokio::spawn(async move {
-        for (index, (expected_prefix, body, is_status)) in steps.into_iter().enumerate() {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "request {index} timed out -- the empty-voucher rejection path \
-                                 did not attempt to confirm the pinned company out of band"
-                    )
-                })
-                .expect("accept synthetic Tally request");
-            let request = read_complete_http_request(&mut socket).await;
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the voucher-then-extent-bracket sequence"
-            );
-            let response = if is_status {
-                utf8_status_response(body)
-            } else {
-                utf16_xml_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write synthetic Tally response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let error = client
-        .fetch_vouchers(&identity, "20260401", "20260401")
-        .await
-        .expect_err(
-            "an empty voucher response must not be accepted when the pinned company book \
-                 extent cannot be confirmed",
-        );
-    server.await.expect("synthetic Tally server task");
-    assert!(
-        error
-            .to_string()
-            .contains("empty voucher response could not confirm the pinned company book extent"),
-        "unexpected error: {error:#}"
-    );
-}
-
-/// Same empty voucher response as above, but this time the out-of-band
-/// book-extent bracket confirms the pinned company is still selected and
-/// stable -- so the empty result is accepted.
-#[tokio::test]
-async fn empty_voucher_response_is_accepted_when_bracket_confirms_pinned_company() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let empty_vouchers = native_voucher_collection_xml(&[]);
-    let confirmed_extent = COMPANY_EXTENT_V2.to_string();
-    let status = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let steps: Vec<(&str, String, bool)> = vec![
-        ("POST / HTTP/1.1", empty_vouchers, false),
-        ("POST / HTTP/1.1", confirmed_extent.clone(), false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-        ("POST / HTTP/1.1", confirmed_extent, false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-    ];
-    let request_count = steps.len();
-    let server = tokio::spawn(async move {
-        for (index, (expected_prefix, body, is_status)) in steps.into_iter().enumerate() {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .unwrap_or_else(|_| panic!("request {index} timed out"))
-                .expect("accept synthetic Tally request");
-            let request = read_complete_http_request(&mut socket).await;
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the voucher-then-extent-bracket sequence"
-            );
-            let response = if is_status {
-                utf8_status_response(body)
-            } else {
-                utf16_xml_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write synthetic Tally response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let vouchers = client
-        .fetch_vouchers(&identity, "20260401", "20260401")
-        .await
-        .expect("an empty voucher response confirmed by the extent bracket must be accepted");
-    server.await.expect("synthetic Tally server task");
-    assert!(vouchers.is_empty());
-    assert_eq!(
-        request_count, 5,
-        "the empty path must pay for exactly one voucher read plus the extent bracket"
-    );
-}
-
-/// A non-empty voucher response keeps its existing row-GUID binding and
-/// must not pay for the extent bracket -- the common case stays a single
-/// request.
-#[tokio::test]
-async fn non_empty_voucher_response_issues_no_extra_request() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let voucher_row =
-        SYNTHETIC_VOUCHER_ROW.replace("synthetic-company-guid", CAPTURED_COMPANY_GUID);
-    let non_empty_vouchers = native_voucher_collection_xml(&[&voucher_row]);
-
-    let server = tokio::spawn(async move {
-        let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-            .await
-            .expect("voucher request timed out")
-            .expect("accept synthetic Tally request");
-        let request = read_complete_http_request(&mut socket).await;
-        assert!(
-            String::from_utf8_lossy(&request).starts_with("POST / HTTP/1.1"),
-            "unexpected request for the non-empty voucher read"
-        );
-        socket
-            .write_all(&utf16_xml_response(non_empty_vouchers))
-            .await
-            .expect("write synthetic Tally response");
-
-        // A non-empty response must not pay for the extent bracket: no
-        // further connection should ever arrive.
-        let extra = tokio::time::timeout(Duration::from_millis(1000), listener.accept()).await;
-        assert!(
-            extra.is_err(),
-            "non-empty voucher fetch issued an unexpected extra request"
-        );
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let vouchers = client
-        .fetch_vouchers(&identity, "20260401", "20260401")
-        .await
-        .expect("non-empty voucher fetch must still succeed exactly as today");
-    server.await.expect("synthetic Tally server task");
-    assert_eq!(vouchers.len(), 1);
 }
 
 #[tokio::test]
@@ -1931,25 +1315,28 @@ fn the_compliance_read_admits_by_mark_counts_by_catalogue_or_census_then_refuses
         (4_266, 22_857, 400_000)
     );
     assert_eq!(
-        super::admit_compliance_master_read(master_limit, None).unwrap(),
+        super::admit_compliance_master_read(master_limit, None, super::ComplianceRead::Standard)
+            .unwrap(),
         super::ComplianceAdmission::Admitted
     );
     for mark in [master_limit + 1, 10_001, 20_000, count_limit] {
         assert_eq!(
-            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::admit_compliance_master_read(mark, None, super::ComplianceRead::Standard)
+                .unwrap(),
             super::ComplianceAdmission::CountFirst,
             "mark {mark}"
         );
     }
     for mark in [count_limit + 1, 102_161, census_limit] {
         assert_eq!(
-            super::admit_compliance_master_read(mark, None).unwrap(),
+            super::admit_compliance_master_read(mark, None, super::ComplianceRead::Standard)
+                .unwrap(),
             super::ComplianceAdmission::CensusFirst,
             "mark {mark}"
         );
     }
     for mark in [census_limit + 1, 1_000_000] {
-        match super::admit_compliance_master_read(mark, None) {
+        match super::admit_compliance_master_read(mark, None, super::ComplianceRead::Standard) {
             Err(super::PartyLedgerMasterSourceValidationError::CatalogueTooLarge {
                 master_alter_id,
                 estimated_bytes,
@@ -1983,15 +1370,26 @@ fn a_census_count_admits_the_read_and_bounds_the_catalogue_that_names_its_parent
         / super::LEDGER_CATALOGUE_BYTES_PER_LEDGER_PARTIAL;
     // A real book: 864 ledgers under a mark of 102,161.
     assert_eq!(
-        super::admit_compliance_master_read(102_161, Some(864)).unwrap(),
+        super::admit_compliance_master_read(102_161, Some(864), super::ComplianceRead::Standard)
+            .unwrap(),
         super::ComplianceAdmission::Admitted
     );
     assert_eq!(
-        super::admit_compliance_master_read(102_161, Some(master_limit)).unwrap(),
+        super::admit_compliance_master_read(
+            102_161,
+            Some(master_limit),
+            super::ComplianceRead::Standard
+        )
+        .unwrap(),
         super::ComplianceAdmission::Admitted
     );
     assert_eq!(
-        super::admit_compliance_master_read(102_161, Some(master_limit + 1)).unwrap(),
+        super::admit_compliance_master_read(
+            102_161,
+            Some(master_limit + 1),
+            super::ComplianceRead::Standard
+        )
+        .unwrap(),
         super::ComplianceAdmission::InParts
     );
     super::admit_counted_catalogue(count_limit).expect("a count at the catalogue limit fits");
@@ -2079,7 +1477,7 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
             < bridge_tally_transport::XML_RESPONSE_MAX_BYTES as u64
     );
     assert_eq!(
-        super::admit_compliance_master_read(20_000, None).unwrap(),
+        super::admit_compliance_master_read(20_000, None, super::ComplianceRead::Standard).unwrap(),
         super::ComplianceAdmission::CountFirst
     );
 }
@@ -2114,7 +1512,7 @@ fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
                 ParentObservation::from(parent.as_deref()),
             )
         }),
-        super::parent_partition_limits(),
+        super::parent_partition_limits(super::ComplianceRead::Standard),
     )
     .unwrap_err();
     assert_eq!(error, ParentPartitionError::TooManyParts { parts: 13 });
@@ -2149,10 +1547,10 @@ fn a_real_books_many_small_parents_are_packed_into_a_few_parts() {
                 ParentObservation::from(parent.as_deref()),
             )
         }),
-        super::parent_partition_limits(),
+        super::parent_partition_limits(super::ComplianceRead::Standard),
     )
     .unwrap();
-    let limits = super::parent_partition_limits();
+    let limits = super::parent_partition_limits(super::ComplianceRead::Standard);
     assert!(partition.parts().len() <= 8, "{}", partition.parts().len());
     let mut ledgers = 0;
     let mut parents = 0;
@@ -2173,7 +1571,7 @@ fn a_complement_at_the_ledger_limit_is_planned_and_one_more_is_refused() {
     use bridge_tally_protocol::parent_partition::{
         ParentObservation, ParentPartition, ParentPartitionError,
     };
-    let limits = super::parent_partition_limits();
+    let limits = super::parent_partition_limits(super::ComplianceRead::Standard);
     let plan = |odd: u64| {
         let mut rows = vec![("Named".to_owned(), "guid-named".to_owned(), Some("P"))];
         for index in 0..odd {
@@ -2210,7 +1608,7 @@ fn only_a_parent_parts_oversized_response_is_named_as_one() {
     use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
     let partition = ParentPartition::plan(
         [("Ledger", "guid", ParentObservation::Named("P"))],
-        super::parent_partition_limits(),
+        super::parent_partition_limits(super::ComplianceRead::Standard),
     )
     .unwrap();
     let part = partition.parts().first();
@@ -2278,11 +1676,21 @@ fn a_counted_compliance_read_is_whole_at_the_master_limit_and_in_parts_one_over(
         / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED;
     for mark in [9_000, 1_000_000] {
         assert_eq!(
-            super::admit_compliance_master_read(mark, Some(master_limit)).unwrap(),
+            super::admit_compliance_master_read(
+                mark,
+                Some(master_limit),
+                super::ComplianceRead::Standard
+            )
+            .unwrap(),
             super::ComplianceAdmission::Admitted
         );
         assert_eq!(
-            super::admit_compliance_master_read(mark, Some(master_limit + 1)).unwrap(),
+            super::admit_compliance_master_read(
+                mark,
+                Some(master_limit + 1),
+                super::ComplianceRead::Standard
+            )
+            .unwrap(),
             super::ComplianceAdmission::InParts
         );
     }
@@ -2321,4 +1729,143 @@ fn a_compliance_estimate_exactly_at_the_budget_fits_and_one_over_does_not() {
             fits: false
         }
     );
+}
+
+/// The GST details read carries its own per-ledger estimate, above the shared
+/// one, and both are what the budget is divided by; the limits are the
+/// constants' own quotients, so a changed constant moves them.
+#[test]
+fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
+    use super::ComplianceRead::{Standard, WithGstDetails};
+    // UNVERIFIED: decided against one capture (a margin above 5,394).
+    assert_eq!(
+        super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
+        8_000
+    );
+    assert!(
+        std::hint::black_box(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED)
+            > super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
+    );
+    let standard = super::compliance_master_ledgers_per_read(Standard);
+    let with = super::compliance_master_ledgers_per_read(WithGstDetails);
+    assert_eq!(
+        standard,
+        super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+            / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED
+    );
+    assert_eq!(
+        with,
+        super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+            / super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED
+    );
+    assert!(with < standard);
+    // By the mark: a mark one standard read holds is counted first when the
+    // details are asked for; a mark a details read holds is admitted by both.
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, WithGstDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(with, None, WithGstDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(with + 1, None, WithGstDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(with + 1, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    // By a count: exactly the details limit fits, one more is read in parts,
+    // and the standard read still holds that one.
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(with), WithGstDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(with + 1), WithGstDetails).unwrap(),
+        super::ComplianceAdmission::InParts
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(with + 1), Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(102_161, Some(standard), WithGstDetails).unwrap(),
+        super::ComplianceAdmission::InParts
+    );
+    // The estimate a refusal or an admission reports is the read's own.
+    assert_eq!(
+        super::compliance_estimate_unverified(with, WithGstDetails).estimated_bytes,
+        with * super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED
+    );
+    assert!(super::compliance_estimate_unverified(with, WithGstDetails).fits);
+    assert!(!super::compliance_estimate_unverified(with + 1, WithGstDetails).fits);
+}
+
+/// A book read in parts is split by the read's own ledger bound; every other
+/// limit is the shared one.
+#[test]
+fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
+    use super::ComplianceRead::{Standard, WithGstDetails};
+    use bridge_tally_protocol::parent_partition::{ParentObservation, ParentPartition};
+    let standard = super::parent_partition_limits(Standard);
+    let with = super::parent_partition_limits(WithGstDetails);
+    assert_eq!(
+        with.max_ledgers_per_part,
+        super::compliance_master_ledgers_per_read(WithGstDetails)
+    );
+    assert!(with.max_ledgers_per_part < standard.max_ledgers_per_part);
+    assert_eq!(
+        (
+            with.max_parents_per_part,
+            with.max_parts,
+            with.max_complement_formula_bytes
+        ),
+        (
+            standard.max_parents_per_part,
+            standard.max_parts,
+            standard.max_complement_formula_bytes
+        )
+    );
+    // A book of one ledger more than a details part holds, under two
+    // parents: one part for the standard read, two for the details read.
+    let count = with.max_ledgers_per_part + 1;
+    let rows = (0..count)
+        .map(|index| {
+            (
+                format!("Ledger {index}"),
+                format!("guid-{index}"),
+                if index % 2 == 0 {
+                    "Debtors"
+                } else {
+                    "Creditors"
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    let plan = |limits| {
+        ParentPartition::plan(
+            rows.iter().map(|(name, guid, parent)| {
+                (
+                    name.as_str(),
+                    guid.as_str(),
+                    ParentObservation::Named(parent),
+                )
+            }),
+            limits,
+        )
+        .unwrap()
+    };
+    assert_eq!(plan(standard).parts().len(), 1);
+    let parts = plan(with);
+    assert_eq!(parts.parts().len(), 2);
+    for part in parts.parts() {
+        assert!(part.ledger_count() <= with.max_ledgers_per_part);
+    }
 }

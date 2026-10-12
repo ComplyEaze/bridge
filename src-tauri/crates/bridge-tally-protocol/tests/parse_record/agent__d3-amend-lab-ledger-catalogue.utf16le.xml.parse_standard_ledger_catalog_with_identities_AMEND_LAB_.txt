@@ -1,0 +1,133 @@
+# fixture: tests/fixtures/agent/d3-amend-lab-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(AMEND LAB)
+# source: captured
+Ok(StandardLedgerCatalog {
+    entries: [
+        StandardLedgerCatalogEntry {
+            name: "Cash",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000001f",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LA630 Scratch",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d3",
+            parent: Some(
+                "Direct Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LF239 Regroup Probe",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000dc",
+            parent: Some(
+                "Sundry Creditors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LF708 A",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d6",
+            parent: Some(
+                "LF708 Probes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LF708 A\r\n",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d5",
+            parent: Some(
+                "LF708 Probes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LF708 B",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d7",
+            parent: Some(
+                "LF708 Probes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LF708 B\r\n",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d8",
+            parent: Some(
+                "LF708 Probes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "LF708 C",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d9",
+            parent: Some(
+                "LF708 Probes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "lf708 c\r\n",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000da",
+            parent: Some(
+                "LF708 Probes",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Profit & Loss A/c",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-0000001e",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Test Bank",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000ce",
+            parent: Some(
+                "Bank Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Test Expense A",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d1",
+            parent: Some(
+                "Indirect Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Test Expense B",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000cf",
+            parent: Some(
+                "Indirect Expenses",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Test Party",
+            stored_name: None,
+            guid: "17a10910-773c-42c6-bd66-7bba9a392536-000000d0",
+            parent: Some(
+                "Sundry Creditors",
+            ),
+            parent_unsupported: false,
+        },
+    ],
+})

@@ -58,7 +58,7 @@ fn sent() -> Vec<ImportVoucher> {
     use VoucherType::{Contra, Payment, Receipt};
     let v = |n: usize, voucher_type, narration: &str, entries| ImportVoucher {
         bridge_txn_id: format!("span-{n:02}"),
-        date: "2026-07-10".into(),
+        date: bridge_tally_core::TallyDate::parse("20260710").unwrap(),
         voucher_type,
         narration: Some(narration.into()),
         reference: None,
@@ -448,7 +448,7 @@ fn content_that_differs_from_what_was_sent_refuses_at_its_position() {
         .iter_mut()
         .find(|row| row.alter_id == Some(1804))
         .unwrap();
-    ninth.effective_date = Some("20260711".into());
+    ninth.effective_date = Some(bridge_tally_core::TallyDate::parse("20260711").unwrap());
     assert_eq!(
         refusal(bind(
             &span,
@@ -627,7 +627,7 @@ fn sent_journals() -> Vec<ImportVoucher> {
     use EntrySide::{Cr, Dr};
     let v = |n: usize, narration: &str, entries| ImportVoucher {
         bridge_txn_id: format!("journal-{n:02}"),
-        date: "2026-07-11".into(),
+        date: bridge_tally_core::TallyDate::parse("20260711").unwrap(),
         voucher_type: VoucherType::Journal,
         narration: Some(narration.into()),
         reference: None,
@@ -863,4 +863,41 @@ fn an_unsettled_bind_is_left_out_of_the_journal_and_a_later_read_binds() {
         journaled,
         Some(super::super::ledger::PostSpanVerdict::Bound(expected))
     );
+}
+
+/// The read-back of one Journal posted on a ledger whose name ends in CR LF
+/// (`fixtures/POST_LINE_BREAK_CAPTURE_PROVENANCE.md`).
+const LINE_BREAK_READ: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/post-line-break-ledger-readback.utf16le.xml"
+);
+const LINE_BREAK_COMPANY_GUID: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
+
+/// bridge#626: what the row parser makes of a `LEDGERNAME` that carries a
+/// line break at its end. Tally wrote it back as two character references
+/// (measured live, 10 Oct 2026), and the row's name ends in CR LF. Written as
+/// the two raw characters, which no capture has shown, the row's name ends
+/// in CR LF as well: the parser does not fold line ends. That second
+/// spelling is the capture with that one value changed.
+#[test]
+fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
+    let sent = captured(LINE_BREAK_READ);
+    let raw = sent.replace(
+        ">Lab Line Break Ledger&#13;&#10;</LEDGERNAME>",
+        ">Lab Line Break Ledger\r\n</LEDGERNAME>",
+    );
+    assert_ne!(raw, sent, "the capture spells the break as references");
+    for (spelling, xml) in [("references", &sent), ("raw", &raw)] {
+        let rows = parse_import_voucher_rows(xml, LINE_BREAK_COMPANY_GUID).unwrap();
+        assert_eq!(rows.len(), 1, "{spelling}");
+        let named: Vec<&str> = rows[0]
+            .entries
+            .iter()
+            .map(|entry| entry.ledger.as_str())
+            .collect();
+        assert_eq!(
+            named,
+            ["Lab Line Break Ledger\r\n", "Lab Plain Ledger"],
+            "{spelling}"
+        );
+    }
 }

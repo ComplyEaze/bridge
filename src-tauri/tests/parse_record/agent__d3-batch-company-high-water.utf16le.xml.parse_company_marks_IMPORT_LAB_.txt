@@ -1,0 +1,7 @@
+# fixture: agent/d3-batch-company-high-water.utf16le.xml
+# parser: parse_company_marks(IMPORT_LAB)
+# source: captured
+Ok((
+    1469,
+    222,
+))

@@ -107,9 +107,12 @@ property that matters.**
 
 This is a rule Bridge chose, not an observation of Tally. `bridge-tally-protocol` exposes it as
 `mark_forbidden_numeric_references`. Its native collection parsers, the standard `List of
-Ledgers` catalogue, the Bridge-schema group and voucher-type parser, and every agent-facing parser
+Ledgers` catalogue, and every agent-facing parser
 in the app apply it to decoded text before an XML parser sees it, so one wire text has one
-spelling in all of them.
+spelling in all of them. (Note, 2026-10-12: the Bridge-schema group and voucher-type parser the
+list here once named was deleted; no shipped path sent those request shapes. **UNVERIFIED** that
+no real Tally ever answered one: `IMPROVEMENT_PLAN_2026H2.md` records Groups and Voucher Types as
+never probed on 2026-07-29, and nothing later is known to have probed them.)
 
 - A decimal or hexadecimal (`x` or `X`) numeric reference to a code point XML 1.0 forbids (a C0
   control other than tab, LF and CR, a surrogate, U+FFFE, U+FFFF, or beyond U+10FFFF) becomes the
@@ -139,9 +142,10 @@ other group (§8.2b). The same marker prefixes Tally's other reserved values (`&
 `&#4; Not Applicable`), which are not the root.
 
 **Parsers the rule does not cover yet.** The company-list and gateway-capability parsers,
-`export_status`, the Bridge-schema ledger, voucher and period-balance report parsers, and the
+`export_status`, the Bridge-schema ledger and period-balance report parsers, and the
 import-outcome parser still unescape a forbidden reference to its raw character. None of their
-outputs reaches a reserved-root test.
+outputs reaches a reserved-root test. (The Bridge-schema voucher parser this list once named was
+deleted 2026-10-12, Part of #1570.)
 
 ### 1.2 Request charset controls response charset
 
@@ -306,7 +310,7 @@ on the demo company.
 | `VoucherType` | 24 | |
 | `Voucher` | 150 (whole book) | See §5 for date scoping |
 
-**UNVERIFIED:** godowns, cost centres, currencies, units, budgets — never probed. Stock items
+**UNVERIFIED:** budgets — never probed. (Godowns, units and cost centres were read later, cost centres in §12a.17; currency masters in §9.10a.2.) Stock items
 are unprobed *as a collection read*; for writing them inside an invoice see §9.12.
 
 ---

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -125,11 +125,13 @@ test("the committed file's `name version` tokens are exactly what the generator 
   // generator) refuses to run unless npm_execpath is set, which only happens
   // when a pnpm script invokes it -- so drive both through `pnpm run`,
   // exactly as `pnpm run license:generate:frontend` / `pnpm run license:check`
-  // do for a real user.
-  const runScript = (script) => execFileSync("corepack", ["pnpm", "run", script], {
-    cwd: root,
-    encoding: "utf8",
-  });
+  // do for a real user. On Windows `corepack` is `corepack.cmd`, which Node starts
+  // only through a shell (#1471); passing arguments with `shell` is deprecated, so
+  // there the command is one fixed string.
+  const options = { cwd: root, encoding: "utf8" };
+  const runScript = (script) => process.platform === "win32"
+    ? execSync(`corepack pnpm run ${script}`, options)
+    : execFileSync("corepack", ["pnpm", "run", script], options);
 
   runScript("license:generate:frontend");
   const first = await readFile(reportPath, "utf8");

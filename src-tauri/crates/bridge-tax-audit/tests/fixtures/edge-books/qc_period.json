@@ -1,0 +1,192 @@
+{
+ "comment": "A calendar-year period, 2025-01-01 to 2025-12-31, and no stock result. p01, on 2025-12-31, is the one match; p02, on 31 March inside the period, p03, on 31 March after it, and p04, on the period's first day, are not: the date compared is the book's own period end.",
+ "period": [
+  "2025-01-01",
+  "2025-12-31"
+ ],
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_period-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-qc_period-001"
+  },
+  {
+   "name": "Expenses Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-qc_period-002"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_period-003"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-qc_period-004"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-qc_period-005"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-qc_period-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Expenses Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "qc-period-p01",
+   "date": "2025-12-31",
+   "base_type": "Journal",
+   "number": "JV-1",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-period-p02",
+   "date": "2025-03-31",
+   "base_type": "Journal",
+   "number": "JV-2",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-period-p03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-3",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-period-p04",
+   "date": "2025-01-01",
+   "base_type": "Journal",
+   "number": "JV-4",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "questionnaire_cl13"
+ ]
+}

@@ -605,8 +605,11 @@ human-approved batch — this ADR does not move.
   of a few dozen vouchers) sent no census and stayed `Partial`, with reason
   `nonempty_window_unqualified`; from #1029 `vouchers`, `voucher_presence` and
   the registers count it too, so a small book can read `Complete` and issue
-  `Absent`. That count on a small book has not been run against a real Tally
-  (the lab run is pending), and a census Tally cannot serve now refuses the call
+  `Absent`. That count on a small book was run against a real Tally on 7 Oct 2026:
+  one synthetic book of eight vouchers, windows of one voucher, debug builds, every
+  request served ([§11c.5](../tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21),
+  PARTIAL). It was not run on a larger book, and because Tally served the count every time,
+  what it does when it cannot is not measured: a census Tally cannot serve now refuses the call
   where the small book used to answer `Partial`. What remains open: the census and the data
   read share one date filter, so a voucher that filter drops is missed by
   both alike and the two agree.
@@ -617,8 +620,9 @@ human-approved batch — this ADR does not move.
   quarter and a month of `ledger_movement`, each part admitted against the
   census, all complete (§11c.5). A multi-day window read in **one** request
   and admitted against its census is the case this change creates, and it
-  has not been run against a real Tally; until it has, the ruling is applied
-  past what was measured for that case, and `voucher_presence` is mostly
+  has not been run against a real Tally on a large book (a day and a week of one
+  synthetic small book were counted and read once, 7 Oct, §11c.5); until it has,
+  the ruling is applied past what was measured for that case, and `voucher_presence` is mostly
   asked about such windows. Also not measured: Education and tiers other
   than Silver 7.1, and how often a voucher changed between the count and the
   read refuses an ordinary read.

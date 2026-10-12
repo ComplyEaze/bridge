@@ -6,13 +6,14 @@ import { formatCommandErrorMessage } from "./tally-command-error";
 
 type TallyConfig = { host: string; port: number };
 
-type JournalEntry = { ledger: string; side: "Dr" | "Cr"; amount: string };
+type JournalEntry = { ledger: string; side: "Dr" | "Cr"; amount: string; onAccount?: boolean };
 
 type JournalDetails = {
   date: string;
   reference: string | null;
   narration: string | null;
   entries: JournalEntry[];
+  onAccountNote?: string | null;
   totalDebit: string;
   totalCredit: string;
 };
@@ -229,10 +230,11 @@ export function JournalPostingScreen({
               <table className="journal-entry-table">
                 <caption>Journal entries</caption>
                 <thead><tr><th scope="col">Ledger</th><th scope="col">Side</th><th scope="col">Amount</th></tr></thead>
-                <tbody>{review.details.entries.map((entry, index) => <tr key={index}><td>{entry.ledger}</td><td>{entry.side}</td><td>{entry.amount}</td></tr>)}</tbody>
+                <tbody>{review.details.entries.map((entry, index) => <tr key={index}><td>{entry.ledger}{entry.onAccount ? <><br /><strong>On Account</strong></> : null}</td><td>{entry.side}</td><td>{entry.amount}</td></tr>)}</tbody>
                 <tfoot><tr><th scope="row" colSpan={2}>Total debit</th><td>{review.details.totalDebit}</td></tr><tr><th scope="row" colSpan={2}>Total credit</th><td>{review.details.totalCredit}</td></tr></tfoot>
               </table>
             </div>
+            {review.details.onAccountNote && <p className="journal-action-note">{review.details.onAccountNote}</p>}
           </section>
           <details className="journal-recovery-details">
             <summary>Connection and recovery details</summary>

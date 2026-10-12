@@ -507,6 +507,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 7,
             unsettled: 4,
             unsettled_no_response: 2,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -517,6 +518,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             sent_or_found: 0,
             unsettled: 0,
             unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -731,7 +733,7 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     );
     assert!(!already_posted(journal(&old), &extra));
     let mut later = same.clone();
-    later.vouchers[0].date = "20260902".into();
+    later.vouchers[0].date = bridge_tally_core::TallyDate::parse("20260902").unwrap();
     assert!(!already_posted(journal(&old), &later));
     // Another id with the same shape is another transaction.
     let renamed = plain("new", "t2", BANK_TO_B);
@@ -777,4 +779,56 @@ fn an_unreadable_candidate_amount_fails_closed() {
         &[("Bank", "not-a-number", "Cr"), ("Ledger B", "1", "Dr")],
     );
     assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
+}
+
+/// The batch size the tool descriptions and the README tell a caller (#865) is
+/// the code's own batch-post limit, so a change of the constant cannot leave
+/// the text stale.
+#[test]
+fn the_batch_size_the_texts_state_is_the_batch_post_limit() {
+    let phrase =
+        format!("cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers");
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    for tool in ["build_import_xml", "parse_bank_statement"] {
+        let description = definitions
+            .as_array()
+            .expect("tool list")
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition["description"].as_str())
+            .unwrap_or_else(|| panic!("{tool} has no description"));
+        assert!(
+            description.contains(&phrase),
+            "{tool}'s description does not say {phrase:?}"
+        );
+    }
+    let clause = "Batch posting is off by default, and with it off each post takes one voucher, \
+         so same-day twins post together only with batch posting on or through a hand import \
+         of the built file.";
+    for tool in ["build_import_xml", "parse_bank_statement"] {
+        let description = definitions
+            .as_array()
+            .expect("tool list")
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition["description"].as_str())
+            .unwrap_or_else(|| panic!("{tool} has no description"));
+        assert!(
+            description.contains(clause),
+            "{tool}'s description lost the batch-posting clause"
+        );
+    }
+    let readme = include_str!("../../docs/agent/README.md");
+    let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        flat.contains(clause),
+        "the README lost the batch-posting clause"
+    );
+    let sentence = format!(
+        "cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers (the batch-post limit)"
+    );
+    assert!(
+        readme.contains(&sentence),
+        "the README does not say {sentence:?}"
+    );
 }

@@ -1,0 +1,292 @@
+{
+ "comment": "Individual entity. Five person keys, each with one moving rent ledger: two that differ only in case, the same name composed (U+00E9) and decomposed (e and U+0301), and a Devanagari key. Each key is its own person with its own tag, read from the key's bytes as written, and gets its own comparable_required finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_keys-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_keys-001"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_keys-002"
+  },
+  {
+   "name": "Rent DV",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_keys-003"
+  },
+  {
+   "name": "Rent FC",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_keys-004"
+  },
+  {
+   "name": "Rent FD",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_keys-005"
+  },
+  {
+   "name": "Rent LJ",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_keys-006"
+  },
+  {
+   "name": "Rent PJ",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_keys-007"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_keys-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 9000000,
+   "credit": 3000000,
+   "closing": 56000000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50010000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Rent DV",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Rent FC",
+   "opening": 0,
+   "debit": 600000,
+   "credit": 0,
+   "closing": 600000
+  },
+  {
+   "ledger": "Rent FD",
+   "opening": 0,
+   "debit": 800000,
+   "credit": 0,
+   "closing": 800000
+  },
+  {
+   "ledger": "Rent LJ",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Rent PJ",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9000000,
+   "closing": -9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -9000000
+    ],
+    [
+     "Bank A",
+     9000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent PJ",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "p02",
+   "date": "2025-06-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent LJ",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-07-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent FC",
+     600000
+    ],
+    [
+     "Bank A",
+     -600000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-08-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent FD",
+     800000
+    ],
+    [
+     "Bank A",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-09-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Rent DV",
+     1000000
+    ],
+    [
+     "Bank A",
+     -1000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "individual",
+ "related_parties": {
+  "Person J": {
+   "relationship": "nephew of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Rent PJ"
+    ]
+   }
+  },
+  "person j": {
+   "relationship": "nephew of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Rent LJ"
+    ]
+   }
+  },
+  "Pérson F": {
+   "relationship": "nephew of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Rent FC"
+    ]
+   }
+  },
+  "Pe\u0301rson F": {
+   "relationship": "nephew of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Rent FD"
+    ]
+   }
+  },
+  "व\u094dयक\u094dत\u093f क": {
+   "relationship": "nephew of the proprietor",
+   "ledgers_by_nature": {
+    "rent": [
+     "Rent DV"
+    ]
+   }
+  }
+ }
+}

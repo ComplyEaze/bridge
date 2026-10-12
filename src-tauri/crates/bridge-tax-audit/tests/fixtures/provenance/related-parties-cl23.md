@@ -23,7 +23,7 @@ Tally read of any real assessee, and no figure comes from one.
 
 ## How they were produced
 
-At the reference engine (a private repository), commit `4df1cc43`, under Python 3.13, with
+At the reference engine (a private repository), commit `ee17d80f`, under Python 3.13, with
 `parity/edge_golden.py` extended by a runner for this test, which passes a book's `related_parties`
 key (absent meaning `{}`) through the reference's own configuration reader to the test, and the
 test's own invariant check to the canonical dump. Run from `src-tauri/crates/bridge-tax-audit`, once
@@ -44,6 +44,33 @@ The synthetic golden is the same test on the crate's synthetic engagement, throu
 Running every book a second time reproduced every golden byte for byte. The goldens are regenerated
 only by the reference's maintainers.
 
+Every one of the eleven books' goldens and the synthetic golden was regenerated at the reference's commit
+`ee17d80f` on 7 Oct 2026 and is byte-identical to the table below, so the pack (`HASHES.md`) and this file name
+the same commit.
+
+`rp_shared_guid` was re-pinned with the pack (#1243) at the reference's commit `5397bfe5`: the
+reference now keys each entry by its own voucher (`book::voucher_keys` here), so two vouchers that
+share a GUID are both counted. Its book's comment changed, and its golden's rent figure went from
+1100000 to 1400000 paise, citing four vouchers instead of three. At the reference's later commit
+`5658c8ce` every pack golden here regenerates byte-identical to this table (checked 6 Oct 2026),
+as do the synthetic golden and the related-party goldens of the `specified_persons_40a2b` pack's
+eleven books.
+
+## `rp_shared_guid_places` (#1243)
+
+`rp_shared_guid_places` and its golden are also in the pack, byte for byte (so a port written from the pack alone is
+caught by a golden). The book is invented, with round
+figures and plain names, and written as data by a small generator. Four population vouchers share
+one GUID and two have a blank GUID, so the walk reaches a key's place suffix (`book::voucher_keys`):
+the three rent vouchers of the shared GUID all count and the fourth, a salary voucher netting to
+zero on the rent set, is no rent entry; both blank-GUID vouchers count. The rent figure's citations
+are the distinct (GUID, label) pairs sorted by GUID then label: the blank-GUID pair has one label
+and is cited once, and the shared GUID's labels sort in an order the books' order does not give.
+6 figures, 2 findings. On the walk before #1243 the rent figure is 600000 paise against 1000000.
+Its golden was first produced as above, at the reference's commit `5658c8ce`, and reproduced byte for
+byte by a second run; it regenerates byte-identical at `ee17d80f`. A GUID holding a NUL, which makes two keys equal and is refused, is not
+reached: it is a unit test in `src/book.rs`, not a book.
+
 ## Bytes
 
 | File | Bytes | SHA-256 | Path |
@@ -54,7 +81,8 @@ only by the reference's maintainers.
 | `rp_partial.json` | 3,460 | `732f1a557d4a2ce0981bdd866a740276bfdd926e66e687c3ded2f97c9b840601` | `edge-books/rp_partial.json` |
 | `rp_payable_break.json` | 4,696 | `03742c56cc8cdf8ee4a64a167555097b85cf03d8d60ca65be8d42967b3634483` | `edge-books/rp_payable_break.json` |
 | `rp_quiet.json` | 4,038 | `121a604e2878c940a5114ef12f0a280a8dbec157a5711aae46f8f13676a96941` | `edge-books/rp_quiet.json` |
-| `rp_shared_guid.json` | 3,070 | `434ccddf8cf07b9fa8a34b052bfb1ed603880b0472334afeb0227ac07b12df58` | `edge-books/rp_shared_guid.json` |
+| `rp_shared_guid.json` | 3,086 | `f14ffdbd0af62ce9c328e33583bef8b0e7a16b87bead447b322eb358d77cbc25` | `edge-books/rp_shared_guid.json` |
+| `rp_shared_guid_places.json` | 3,747 | `15ba06a25bdfecfc1b744120671bab9118daa0f4bf2b72bb679c9826dda66496` | `edge-books/rp_shared_guid_places.json` |
 | `rp_sum_check.json` | 4,200 | `000ed3dd5f43daa37790da672e0bd831268f307fe9659296fd2f82431cab5aed` | `edge-books/rp_sum_check.json` |
 | `rp_unknown_ledger.json` | 2,962 | `ef09555a49c0150d2fb62cfb9a6e82209e24a23680a52e004facbb3c0f86f055` | `edge-books/rp_unknown_ledger.json` |
 | `rp_walk.json` | 6,911 | `6590a01f5f802ce4ed9f27d7fbdd4fa27df8d2b410e23c93f6852ba84139fa87` | `edge-books/rp_walk.json` |
@@ -64,7 +92,8 @@ only by the reference's maintainers.
 | `edge.rp_partial.related_parties_cl23.json` | 9,723 | `16ab6b5199abe79da29317bb62561573b8684db97528555b3992595c6da05fac` | `golden/edge.rp_partial.related_parties_cl23.json` |
 | `edge.rp_payable_break.related_parties_cl23.json` | 16,103 | `267fdf8c796f995a8d627ce97b35709b3669f0896946aea7937de59d56911472` | `golden/edge.rp_payable_break.related_parties_cl23.json` |
 | `edge.rp_quiet.related_parties_cl23.json` | 6,960 | `dabe2d1320078ae4b7b0d7ef81c0c6b11cd4dbdcdc93b8ebf244b949bc7d31c8` | `golden/edge.rp_quiet.related_parties_cl23.json` |
-| `edge.rp_shared_guid.related_parties_cl23.json` | 5,341 | `63f6c9cf426edfddf1d5bafd6d6061933d51cd5b40b82c42627827fbd5f4a6f4` | `golden/edge.rp_shared_guid.related_parties_cl23.json` |
+| `edge.rp_shared_guid.related_parties_cl23.json` | 5,459 | `b30492df8e14891740bc878f815dc5add392cc46b5bb6302d7824ae4770ed26d` | `golden/edge.rp_shared_guid.related_parties_cl23.json` |
+| `edge.rp_shared_guid_places.related_parties_cl23.json` | 6,380 | `3049528214ca7b454a5c9c3544d2afda4f14c6b6b289e44586128ca661a1c76b` | `golden/edge.rp_shared_guid_places.related_parties_cl23.json` |
 | `edge.rp_sum_check.related_parties_cl23.json` | 7,332 | `a0a479e7574b2459d7a065bebdc3d44488b0a34668e3da8f853066c29c1f5efb` | `golden/edge.rp_sum_check.related_parties_cl23.json` |
 | `edge.rp_unknown_ledger.related_parties_cl23.json` | 9,031 | `6bae2276338b8adb375947a807e200d864c59cbd67a33bbfddf87236aa082ec5` | `golden/edge.rp_unknown_ledger.related_parties_cl23.json` |
 | `edge.rp_walk.related_parties_cl23.json` | 13,349 | `c298493e495b6eacaf2202cd10377a0ccb71e825fd292cc9ab1f167b1549880b` | `golden/edge.rp_walk.related_parties_cl23.json` |

@@ -221,6 +221,15 @@ or an owner decision to amend the requirement instead:
    canary reservation, dispatch-attempt and final-verdict tables of migrations `0015`–`0021`
    (`db/tally_mirror.rs`), and the `agent-import-ledger.jsonl` journal. Only the journal has a
    runtime caller. Decide which one is authoritative, and retire or connect the others.
+   2026-10-12: the Rust code for migration `0003` (`db/tally_write_store.rs`) had no runtime
+   caller since it was added, and was removed. Migration `0003` still creates its tables, which
+   now have no reader or writer, including the legacy rows the Consequences section says remain
+   readable. Connecting `0003` later means restoring that code from history. Which contract is
+   authoritative stays open.
+   2026-10-12: the repository methods for the canary tables of migrations `0015`–`0021` had
+   no caller since #139 removed the canary coordinator, and were removed. The tables remain,
+   with no reader or writer. Row 11 stays Not met and follow-up 1 is unchanged; which contract
+   is authoritative stays open.
 7. **Write capability in the Passport (row 1).** Decide whether a verified post
    should become observed write evidence, and under what rule.
 8. **Concurrent external changes, #239. Narrowed.** Tally offers no conditional import, so
@@ -306,9 +315,10 @@ or an owner decision to amend the requirement instead:
       refuses (`voucher_altered_since_verified`, or `voucher_never_verified` when no such build has
       a record). A voucher's `ALTERID` advances on every alteration (§9.3, measured over the
       gateway; an edit in Tally's own screens is not yet measured), so equality with any recorded
-      value means nothing has altered the voucher since that reading. The value is kept in a write-once
-      `<batch>.baseline.json` beside the proof, not in the journal, so an older binary still reads the
-      journal after a rollback. That catches an edit to any field made after the first verification,
+      value means nothing has altered the voucher since that reading. The values are kept beside the
+      proof, not in the journal: in `<batch>.baseline.json` as builds before #911 wrote it (rewritten
+      as it grew), and from #911 in one file per verification that adds a voucher,
+      `<batch>.baseline.<n>.json`, written once and never replaced. That catches an edit to any field made after the first verification,
       on the premise above. An edit made between the import and the first
       verification becomes part of the baseline and is not caught; every amendable batch was imported
       by hand, since a batch Bridge posted cannot be amended, so the build asks for a verify right
@@ -371,7 +381,9 @@ reads each named ledger's `ISBILLWISEON` from the same ledger-list read it alrea
 post and the queue admission read the flag again and refuse `import_bill_wise_changed` for a
 ledger that became bill-wise since. A batch recorded before that record refuses with
 `import_batch_predates_bill_wise_record` and is rebuilt. The approval is the assistant's word,
-not proof that a person said yes; the native dialog lists each voucher of a small batch but does not mark which entries land On Account (#1234).
+not proof that a person said yes; the native dialog marks each approved ledger On Account from
+the build's record, on each of its entries for one voucher and on its totals line for a batch
+(#1234).
 The queued re-read is not the last request before the POST: the mode and
 company re-admission and the two duplicate-absence reads follow it, because
 duplicate absence stays the final source check. A regroup in Tally during those
@@ -393,7 +405,16 @@ it lists entries in the saved order while the posted XML puts debits first, and
 it does not say which ledger becomes the voucher's party (Tally 7.1 Silver read
 the bank ledger back as the party on Payments and Receipts). A preview over the
 native dialog's caps (24 lines, 100 characters a line, 1,600 characters) is
-refused, never truncated; a bank voucher fits at most seven entries.
+refused, never truncated; a bank voucher fits at most six entries (an
+assistant's post, the route a bank voucher takes, adds the line that says when
+the post happens; a text without that line fits seven). A preview that
+carries both the On Account sentence and the line about a ledger name ending
+in a line break holds one entry fewer (#626). A
+one-voucher preview ends with the voucher's own text: its reference and
+narration are the last two lines, quoted as they will be posted, under a line
+saying that no line below it is an entry, a total or an instruction, and the
+date line says where they are. Every line the preview writes itself, the On
+Account sentence included, stands above that line (#1234).
 
 **Scope.** The desktop "post a saved Journal" action stays Journal-only
 (`PostScope::JournalOnly`); its review was built for one Journal. So does the
@@ -465,7 +486,7 @@ gate (owner, 21 September): what matters is a second writer, not the licence tie
    which every later `verify_import` or reconcile reads as a doubt. The first of those that finds
    the vouchers finishes the check, against the ledger identities recorded at build (#616), and
    records its verdict. An observed doubt is also written to a file of its own that nothing
-   removes and only another doubt replaces, and readers check it first, so no later verdict,
+   removes or replaces (since #911 it is written once, and a later doubt keeps the first), and readers check it first, so no later verdict,
    pending mark or race can clear it; the readback compares by name and cannot either. It stays even after a person
    corrects the voucher in Tally, and while a doubt or a pending check stands, the batch is no
    baseline for an amendment. Bridge has no way to clear it. Follow-up: an explicit operator
@@ -475,12 +496,16 @@ gate (owner, 21 September): what matters is a second writer, not the licence tie
    Residuals, stated rather than closed:
    - a pending check finished by a later readback, perhaps days later, lengthens the window in
      which a ledger swapped away and back goes unseen;
-   - the records are renamed into place but their directory is not synced, so a power loss can
-     lose a pending mark or a doubt file whose dispatch record survived, and the batch then reads
-     as its remaining record says, or as one dispatched before these records existed;
-   - an observed doubt whose own file cannot be written is kept only by the check record, where
-     a later verdict or a losing second post's pending mark can replace it; if neither can be
-     written, it is lost. Since #722 that verdict carries `doubt_record: unavailable`, and a
+   - the pending mark is renamed into place and its directory is not synced, so a power loss can
+     lose it, or a doubt file, whose dispatch record survived, and the batch then reads as its
+     remaining record says, or as one dispatched before these records existed. Since #911 a
+     finished verdict and a doubt are each written once to a file of their own
+     (`*.masters_verdict.json`, `*.masters_doubt.json`), never replaced, and their directory is
+     synced; one that exists but cannot be read reads as pending, which no later verdict can then
+     replace, so the batch stays in doubt;
+   - an observed doubt whose own file cannot be written is kept only by its verdict record (the
+     verdict file, or for a batch step the check record, which a losing second post's pending
+     mark can replace); if neither can be written, it is lost. Since #722 that verdict carries `doubt_record: unavailable`, and a
      doubt the check record holds without its own file, whether its write failed or the file
      was lost later, is refused for review (`ack_doubt_record_unavailable`) and reported as
      `operator_review` `doubt_record_unavailable`, rather than read as no doubt. A review
@@ -552,9 +577,9 @@ dialog has not yet been shown on Windows or macOS (UNVERIFIED).
 - the masters check finds no doubt;
 - the target's voucher mark moved by exactly CREATED (`post_location.target_voucher_step`).
 
-The step verdict is durable. It is recorded beside the masters verdict in the masters-check
-records, pending before the POST, and an observed mismatch is kept in its own file that nothing
-removes. So no later readback can lose it, and neither verdict masks the other. If that file
+The step verdict is durable. It is recorded in the check record beside the masters verdict,
+pending before the POST (the finished masters verdict has its own file since #911), and an
+observed mismatch is kept in its own file that nothing removes. So no later readback can lose it, and neither verdict masks the other. If that file
 cannot be written, the check record keeps the mismatch, marked `doubt_record: unavailable`
 (#722), as it keeps a masters doubt (the residuals of #239's window 3, "After the POST").
 A mismatch, or a verdict never recorded, reads `reconciliation_required` with
@@ -614,3 +639,86 @@ is accepted, and loud.
   intent: nothing recorded or sent, and the approval withdrawn.
 - **New readback statuses:** `bound_not_in_window` and `book_rolled_back`.
   Neither is ever absence.
+
+## Amendment — owner decision, 2026-10-08: the order of the GST Sales slices after the invoice core
+
+The owner approved this order on 8 Oct 2026: lab groundwork first, then each guard as a refusal inside the Sales build. Nothing below is built yet. It fixes the order of the work that follows the Sales invoice core (#1342, a draft at this change, with its own amendment "GST invoices, Sales first" and the owed list there and in its protocol-reference section), so that each slice's pull request can cite one place. A slice that is later dropped or reordered says so here with a dated note. Every safeguard of the earlier amendments applies to every slice, and no slice below switches Sales on. Where a slice names a decision still to be taken, that decision is made, and recorded, before the slice is built.
+
+**Where the guards go.** Each check below is to be a refusal inside the Sales build, so a build that would fail it is refused on every call. It is not a separate read tool, because a check a caller must remember to run does not guard a build that skips it (AGENTS.md P2, P7).
+
+**Before any slice: lab groundwork, no code.** None of the slices can be proven until these hold.
+
+- A synthetic lab company whose own GSTIN Tally accepts as valid. On the 7 Oct rehearsal's company, whose invented GSTIN carries another state's code, Tally's GSTR-1 counted all four vouchers as uncertain and gave the company's registration details as invalid or not specified; the cause was not isolated, and a status check proves nothing on such a company. Its GSTIN stays within the synthetic family that test fixtures may carry.
+- An unregistered buyer keyed by hand on screen, then read natively. This gives the fields Tally itself writes for such a buyer.
+- A Gold edition the lab can reach, so that the Sales slices are also measured on the edition a client's book may use. The 7 Oct Sales rehearsal ran on Silver; Sales on Gold rests on hand imports only. This is a measurement prerequisite, not a release gate: the concurrent-writers amendment keeps one policy for every edition.
+
+**Slice 1 — refuse an incomplete company registration.** The build is to read the company's own GST registration in force on the invoice date: GSTIN, registration type, state and applicable-from. It is to refuse a company whose registration is absent, starts after the invoice date, is not Regular, or any of whose fields Tally does not return. A missing field is refused, never read as Regular. More than one registration in force on the date is refused until how one is chosen is decided. This closes the owed item "the company's own registration on the invoice date is not read". Today the core reads only the company's state.
+
+**Slice 2 — GST status and the buyer block in the Sales read-back.** The read-back is to read each posted invoice's GST status (Tally's included and uncertain flags) and the buyer and consignee fields the build wrote. `posted_verified` is to be kept only when the invoice reads as included and not uncertain, and those fields equal what the build wrote. A status that reads uncertain, or that the read does not return ("not established"), keeps the invoice out of `posted_verified` and counts as GST-uncertain for slice 4. Equality with what the build wrote does not show the names are right: the build writes the ledger name, because the mailing name is not read, and that read stays owed in the core's list. The slice's lab evidence compares a posted invoice, field by field, with a hand-keyed invoice of the same shape on the same company. Not measured: whether the status fields come back in a field-listed read, or only in a native one.
+
+**Slice 3 — refuse a sales ledger whose GST details do not fit its leg.** The build is to read each sales ledger's GST rate, HSN/SAC and taxability as of the invoice date. It is to refuse a ledger that is not taxable, a ledger without an HSN/SAC, and a leg whose ledger rate differs from the slab the invoice's tax amounts imply. This closes the blended-bill item owed in the core's list. It is also to read the rate of each tax leg's duty ledger, where the book gives one, and refuse a tax leg whose ledger rate is not that slab's share for its head (how Tally states a duty ledger's rate is not yet measured): the core reads no duty ledger's rate either, so a bill at one rate posted to another rate's duty ledgers passes whenever its amounts fit a slab, and a bill with lines at two rates can pass on one pair of heads as a single blended rate. One decision comes first: what a sales ledger, or a duty ledger, with no rate of its own means.
+
+**Slice 4 — a stop latch per company, with a release.** A Sales batch for a company, keyed by the company's GUID, that ends `reconciliation_required`, `posted_divergent` or GST-uncertain (as slice 2 defines it) is to block every further Sales post for that company. The latch lives in the import journal, so it survives a restart. Its release is a person's recorded act, naming the batch, in a native dialog the model cannot answer. Today's acknowledgement step (`acknowledge_post_review`) is not that release: it admits only a review of a doubt beside vouchers that all read back verified, and it unblocks nothing. Slice 4 is to extend it, or add a release beside it, for every state that latches. The release owed in the core's list is to ship in this slice: the core's number control refuses a build, on a book whose voucher mark is not 0, for a company that has sent an invoice but holds none verified posted (`invoice_number_control_unavailable`), which never clears when Tally declined that invoice or it was deleted, so a latch shipped without the release would add a second lock with no key. Decided in the slice's pull request: whether a declined or lost-answer batch also sets the latch, and whether a later verification that reaches `posted_verified` lifts the latch by itself.
+
+**After slice 4 (listed for order only).** These come after slice 4: switching Sales on once the owed items of the core's list are done; several invoices per approval, after batch posting's own proof (#1090); invoices from a CSV file in a template ComplyEaze Bridge defines, through the proposals route, generalised beyond bank statements; and two rates on one invoice, after measurement.
+
+**Rejected while the order was drafted:**
+
+| Rejected | Why |
+| --- | --- |
+| A standalone readiness read tool | A check a caller can skip does not guard the build. |
+| Creating masters through the approval window | It would ship a second dispatch path into the release (AGENTS.md P8). |
+| An xlsx reader | It needs a new dependency, and the bank-statement crate already reads CSV. |
+| A reader for one billing layout | One layout is not a product shape. |
+| Rollback inside ComplyEaze Bridge | No compensating Tally operation is implemented and verified (Decision, above). |
+
+**Not measured.** None of this has been measured against Tally: the native shape of a company's GST registration, the native shape of a sales ledger's dated GST rows, the transport of the GST status fields, and where GSTR-1 places a posted invoice.
+
+## Amendment — owner decision, 2026-10-10: master writes through the one approved path (dated deviation)
+
+The owner approved this direction on 10 Oct 2026: "yes to the direction for today, improve later". It reverses one row of the 8 Oct amendment's rejected table, "Creating masters through the approval window". The reason given there, a second dispatch path into the release, stays true of any second path. This amendment adds none. Nothing below is built yet. Every slice ships as a draft behind a setting that is off by default, and is measured on a lab company before it is switched on.
+
+**What changes.** Production may send three new write classes, each only through `post_approved_import`, the single dispatch path, with its queue, admission reads, all-company marks aim, wire lock, durable intent and native approval:
+
+- creating ledgers;
+- altering a ledger's GST, registration and state blocks, and renaming a ledger;
+- creating and altering voucher types.
+
+The request becomes a two-variant type, vouchers as today or a master batch. Each variant brings its own admission reads, approval binding, intent payload and verification. The two variants share no defaulted behaviour.
+
+**What still cannot be sent.**
+
+- Deletes of any master.
+- Openings.
+- Stock-in-Hand ledgers.
+- TDS and TCS ledgers where those features are on.
+- Caller-supplied XML. Requests are rendered by Bridge.
+- Any class not named above.
+
+**Rules that carry over unchanged.**
+
+- Every write is approved in the native dialog. A master dialog lists one master per item and refuses rather than cuts at the existing caps, so a large class is approved in parts.
+- The company is pinned by its full identity tuple. The company name in the import request is never treated as a guard.
+- Success is decided by reading back, never by Tally's counters. Counters and the company's master mark (`ALTMSTID`) are doubt signals only. Two master creates moved the mark by two (TALLY_PROTOCOL_REFERENCE §10, VERIFIED), and a gateway ledger rename by one (§11c.5, VERIFIED, synthetic company). On screen, a ledger create, regroup, opening change and delete each moved it by one (§11c.5, VERIFIED, one run each), and renaming the base currency and restoring it moved it by two, then one (§11c.5, PARTIAL). The earlier lines above that call a regroup's step not yet measured predate those screen runs. The step for a list alter and a voucher-type write is not measured, so a step other than the expected one is recorded as doubt, and only reading back decides.
+- An outcome unknown after bytes were sent is never re-sent. It is reconciled by reading back.
+
+**The dated deviation.** On 3 Oct 2026 the owner chose a different write shape, recorded here for the first time: a ledger was to be created in two requests, a Create carrying only the name and parent, then an Alter setting its other fields, subject to a lab run. That run has not been made. One reason for leaving it is measured: a ledger's GST duty head is settable at Create and silently not settable at Alter (TALLY_PROTOCOL_REFERENCE §8.3, measured both ways). Two are design judgements: it takes two writes where one approval covers one request, and it can leave a ledger half made. This amendment instead creates a ledger with one direct Create, under four conditions:
+
+1. **Before.** An absence check runs inside the queue, over every ledger and group name and alias.
+2. **Before.** The company's master mark must be unchanged from the binding read to the last read before the request.
+3. **After.** Each created name must resolve to a master that did not exist before, and the counters must show only creates. A name that resolves to an existing master, a counted `ALTERED`, or a mark step other than the expected one is reported for reconciliation, never as created. No import option such as `IMPORTDUPS` is sent: with `@@DupIgnoreCombine` an identical re-sent Create was still counted `ALTERED` (TALLY_PROTOCOL_REFERENCE §9.4g, PARTIAL, one run per envelope).
+4. **Owner's acceptance.** Between the last read and the request, no read can close the window. A ledger created there by someone else under the same name is not refused: it is overwritten in place. A Create on an existing name replaced that ledger's parent and bill-wise flag, changed together in one run, and was counted `CREATED 0, ALTERED 1`; an opening balance was replaced when one was supplied, and kept when omitted in a Create that changed nothing else (TALLY_PROTOCOL_REFERENCE §9.4g, PARTIAL, one Silver company, one run each; IMPLEMENTATION_GUIDE §3.6). An omitted opening alongside a parent or bill-wise change, which is what Bridge's Create would send, is not measured, nor are other fields. The overwrite keeps the other ledger's GUID, which the earlier read never saw, so the name check cannot tell it from a create. Only the `ALTERED` counter and a mark step larger than one create's (the other person's create also moves it) can show it, and both are signals, not proof. Its earlier values were never read, so nothing can restore them. The owner accepts that consequence, not an unnamed window.
+
+**List fields.** An Alter that carried a stock item's GST list replaced the whole list, on one book, once (TALLY_PROTOCOL_REFERENCE §9.4a); a ledger's lists are not measured and are treated the same. So a list is sent as exported, with any new dated entry added, under a check that the ledger is unchanged since it was read. The result is verified by comparing the whole ledger before and after.
+
+**Not measured.** All of these remain unmeasured:
+
+- How Tally resolves a new name against an existing alias, a case or space variant, or a group of the same name.
+- Whether a ledger's registration history is appended or replaced by an Alter.
+- Any write of a sales ledger's GST rate and HSN lists.
+- Every voucher-type write.
+- The class-batch dialog seen live.
+- The master mark's step for a list alter or a voucher type.
+- What else a Create on an existing name replaces (a GSTIN, a ledger's GST lists) beyond the three fields §9.4g measured.
+
+Each slice names the lab measurement it waits on.

@@ -5,7 +5,6 @@ use crate::db::tally_mirror::{
     LocalReconciliationMismatch, ProofSummary, RedactedProofExport, ReviewedSetupInput,
     SourceIdentityInput, WriteFixtureEnrollmentInput, WriteFixtureEnrollmentStatus,
 };
-use crate::gst::{GstDraftRequest, GstReturnDraft};
 use crate::reports::bulk_party_statement::{
     bulk_party_statement_party_count, write_bulk_party_statements_with_ageing_anchor,
     BulkPartyStatementRequest, PartyStatementDestinationApprovals,
@@ -38,7 +37,7 @@ pub use crate::tally::VerifiedCompanyIdentity;
 use crate::tally::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, ConnectionStatus,
     EndpointKey, OutstandingsLoadResult, RuntimeTallyConnector, TallyCompany, TallyConfig,
-    TallyRuntime, TallySessionSnapshot, TallyTelemetryPreviewExport, VerifiedCompanyIdentityError,
+    TallyRuntime, TallySessionSnapshot, VerifiedCompanyIdentityError,
 };
 use bridge_tally_core::{
     CapabilityFeatureId, CapabilityPackId, CapabilityState, CompanyRef as CoreCompanyRef,
@@ -457,17 +456,6 @@ fn mirror_unavailable_command_error(_error: anyhow::Error) -> TallyCommandError 
 /// commands that report errors as a plain `String` rather than a [`TallyCommandError`].
 fn mirror_unavailable_string_error(_error: anyhow::Error) -> String {
     "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.".to_string()
-}
-
-#[tauri::command]
-pub async fn check_tally_connection(
-    config: TallyConfig,
-    runtime: State<'_, TallyRuntime>,
-) -> Result<ConnectionStatus, TallyCommandError> {
-    runtime
-        .check_connection(config)
-        .await
-        .map_err(tally_runtime_command_error)
 }
 
 #[tauri::command]
@@ -1881,7 +1869,13 @@ async fn export_party_ledger_master_once(
         .into_compliance_assertion();
     let today = host_today()?;
     let source = runtime
-        .fetch_party_ledger_master_source(request.config, &identity, currency_assertion, today)
+        .fetch_party_ledger_master_source(
+            request.config,
+            &identity,
+            currency_assertion,
+            today,
+            crate::tally::connection::ComplianceRead::Standard,
+        )
         .await
         .map_err(party_ledger_master_runtime_command_error)?;
     party_ledger_master_withheld(
@@ -2335,24 +2329,6 @@ pub fn tally_runtime_snapshots(
     runtime: State<'_, TallyRuntime>,
 ) -> Result<Vec<TallySessionSnapshot>, TallyCommandError> {
     runtime.snapshots().map_err(tally_runtime_command_error)
-}
-
-#[tauri::command]
-pub fn tally_telemetry_preview(
-    runtime: State<'_, TallyRuntime>,
-) -> Result<TallyTelemetryPreviewExport, TallyCommandError> {
-    runtime
-        .telemetry_preview()
-        .map_err(tally_runtime_command_error)
-}
-
-#[tauri::command]
-pub async fn prepare_gst_return_draft(request: GstDraftRequest) -> Result<GstReturnDraft, String> {
-    let _ = request;
-    Err(
-        "GST return drafting is not implemented; ComplyEaze Bridge did not produce a GST result"
-            .to_string(),
-    )
 }
 
 #[tauri::command]

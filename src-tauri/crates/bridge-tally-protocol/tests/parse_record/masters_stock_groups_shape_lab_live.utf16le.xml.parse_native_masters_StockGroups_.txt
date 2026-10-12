@@ -1,0 +1,37 @@
+# fixture: tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml
+# parser: parse_native_masters(StockGroups)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Finished Kits",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000107",
+            master_id: 263,
+            alter_id: 265,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+        NativeMasterRow {
+            name: "Packaging",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000106",
+            master_id: 262,
+            alter_id: 264,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+        NativeMasterRow {
+            name: "Raw Chemicals",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d5",
+            master_id: 213,
+            alter_id: 214,
+            parent: Some(
+                "�#4; Primary",
+            ),
+            detail: Plain,
+        },
+    ],
+})

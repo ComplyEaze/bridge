@@ -155,7 +155,7 @@ export type OutstandingsEvidence =
       sourceBytes: number;
       receivableTotal: string;
       payableTotal: string;
-      // The native read can establish this residual; voucher scans cannot.
+      // The native read can establish this residual.
       // Undefined is intentionally distinct from an exact zero amount.
       unallocatedTotal?: string;
     }
@@ -326,7 +326,6 @@ export function OutstandingsScreen({
           currencyAssertion: inrCompleteResult.currency_assertion,
           readProvenance: {
             read_strategy: inrCompleteResult.read_strategy,
-            source_voucher_count: inrCompleteResult.report.source_voucher_count,
             open_receivable_bill_count: inrCompleteResult.report.open_receivable_bill_count,
           },
           sourceBytes: inrCompleteResult.report.source_bytes,
@@ -437,8 +436,8 @@ export function OutstandingsScreen({
   // applied per party inside groupOpenBillsByParty, never to the flattened
   // cross-party list, so one party's bill count can never push another
   // party's real bills out of the map entirely. null when statement rows are
-  // absent altogether (voucher-scan path) -- distinct from a present map that
-  // simply has no entry for a given party (that party has zero bill rows).
+  // absent altogether -- distinct from a present map that simply has no entry
+  // for a given party (that party has zero bill rows).
   const openBillsByParty = React.useMemo(
     () => groupOpenBillsByParty(inrCompleteResult?.statement_open_bills, DISPLAY_OPEN_BILL_ROW_LIMIT),
     [inrCompleteResult],
@@ -610,7 +609,6 @@ export function OutstandingsScreen({
             {completeResult
               ? ` · ${readProvenance({
                   read_strategy: completeResult.read_strategy,
-                  source_voucher_count: completeResult.report.source_voucher_count,
                   open_receivable_bill_count: completeResult.report.open_receivable_bill_count,
                 })}`
               : ""}

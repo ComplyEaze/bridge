@@ -1,0 +1,7 @@
+# fixture: agent/native-outstandings-detail-high-water.utf16le.xml
+# parser: parse_company_marks(OUTSTANDINGS_LAB)
+# source: captured
+Ok((
+    20,
+    222,
+))

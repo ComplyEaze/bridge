@@ -1,0 +1,48 @@
+# fixture: agent/register-e2e/native-register-e2e-window.utf16le.xml
+# parser: parse_agent_rows(REGISTER_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(48),
+        "amounts": Array [
+            Object {
+                "amount": String("-10000.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Purchase - Goods"),
+            },
+            Object {
+                "amount": String("-900.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input CGST"),
+            },
+            Object {
+                "amount": String("-900.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Input SGST"),
+            },
+            Object {
+                "amount": String("11800.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("SYN Supplier Intra (M2)"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250903"),
+        "guid": String("ae1490be-52c5-4544-9ffc-4b7da85f9797-0000002f"),
+        "is_invoice": Bool(false),
+        "master_id": String("47"),
+        "narration": String("SYN purchase intra-state probe [M2-SYN:M2SYN-R1-VCH-001]"),
+        "optional": Bool(false),
+        "party": String("SYN Supplier Intra (M2)"),
+        "post_dated": Bool(false),
+        "voucher_class": String("Purchase"),
+        "voucher_number": String("20"),
+        "voucher_type": String("Purchase"),
+        "voucher_type_guid": String("ae1490be-52c5-4544-9ffc-4b7da85f9797-0000002e"),
+        "voucher_type_reserved_name": String("Purchase"),
+    },
+])

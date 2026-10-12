@@ -1,0 +1,357 @@
+# fixture: tests/fixtures/native/bills_receivable_aarav.xml
+# parser: parse_native_bill_rows(20240401..20260731)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/24-25/001",
+        bill_date: TallyDate(
+            "20240402",
+        ),
+        due_date: TallyDate(
+            "20240402",
+        ),
+        closing_balance: ExactDecimal(
+            "-21558.60",
+        ),
+        tally_overdue_days: Some(
+            850,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/24-25/002",
+        bill_date: TallyDate(
+            "20240502",
+        ),
+        due_date: TallyDate(
+            "20240502",
+        ),
+        closing_balance: ExactDecimal(
+            "-24119.20",
+        ),
+        tally_overdue_days: Some(
+            820,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/24-25/004",
+        bill_date: TallyDate(
+            "20240701",
+        ),
+        due_date: TallyDate(
+            "20240701",
+        ),
+        closing_balance: ExactDecimal(
+            "-29240.40",
+        ),
+        tally_overdue_days: Some(
+            760,
+        ),
+    },
+    NativeBillRow {
+        party: "Crescent Office Mart",
+        reference: "CN/005",
+        bill_date: TallyDate(
+            "20240802",
+        ),
+        due_date: TallyDate(
+            "20240802",
+        ),
+        closing_balance: ExactDecimal(
+            "-8555.00",
+        ),
+        tally_overdue_days: Some(
+            728,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/24-25/005",
+        bill_date: TallyDate(
+            "20240802",
+        ),
+        due_date: TallyDate(
+            "20240802",
+        ),
+        closing_balance: ExactDecimal(
+            "-18998.00",
+        ),
+        tally_overdue_days: Some(
+            728,
+        ),
+    },
+    NativeBillRow {
+        party: "Evergreen Supplies",
+        reference: "SI/24-25/007",
+        bill_date: TallyDate(
+            "20241001",
+        ),
+        due_date: TallyDate(
+            "20241001",
+        ),
+        closing_balance: ExactDecimal(
+            "-41795.60",
+        ),
+        tally_overdue_days: Some(
+            668,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/24-25/007",
+        bill_date: TallyDate(
+            "20241002",
+        ),
+        due_date: TallyDate(
+            "20241002",
+        ),
+        closing_balance: ExactDecimal(
+            "-24119.20",
+        ),
+        tally_overdue_days: Some(
+            667,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/24-25/008",
+        bill_date: TallyDate(
+            "20241102",
+        ),
+        due_date: TallyDate(
+            "20241102",
+        ),
+        closing_balance: ExactDecimal(
+            "-26679.80",
+        ),
+        tally_overdue_days: Some(
+            636,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/25-26/010",
+        bill_date: TallyDate(
+            "20250102",
+        ),
+        due_date: TallyDate(
+            "20250102",
+        ),
+        closing_balance: ExactDecimal(
+            "-18998.00",
+        ),
+        tally_overdue_days: Some(
+            575,
+        ),
+    },
+    NativeBillRow {
+        party: "Evergreen Supplies",
+        reference: "CN/011",
+        bill_date: TallyDate(
+            "20250201",
+        ),
+        due_date: TallyDate(
+            "20250201",
+        ),
+        closing_balance: ExactDecimal(
+            "-9617.00",
+        ),
+        tally_overdue_days: Some(
+            545,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/25-26/011",
+        bill_date: TallyDate(
+            "20250201",
+        ),
+        due_date: TallyDate(
+            "20250201",
+        ),
+        closing_balance: ExactDecimal(
+            "-21558.60",
+        ),
+        tally_overdue_days: Some(
+            545,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/25-26/013",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250401",
+        ),
+        closing_balance: ExactDecimal(
+            "-26679.80",
+        ),
+        tally_overdue_days: Some(
+            486,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/25-26/014",
+        bill_date: TallyDate(
+            "20250501",
+        ),
+        due_date: TallyDate(
+            "20250501",
+        ),
+        closing_balance: ExactDecimal(
+            "-29240.40",
+        ),
+        tally_overdue_days: Some(
+            456,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/25-26/016",
+        bill_date: TallyDate(
+            "20250701",
+        ),
+        due_date: TallyDate(
+            "20250701",
+        ),
+        closing_balance: ExactDecimal(
+            "-21558.60",
+        ),
+        tally_overdue_days: Some(
+            395,
+        ),
+    },
+    NativeBillRow {
+        party: "Crescent Office Mart",
+        reference: "CN/017",
+        bill_date: TallyDate(
+            "20250802",
+        ),
+        due_date: TallyDate(
+            "20250802",
+        ),
+        closing_balance: ExactDecimal(
+            "-10679.00",
+        ),
+        tally_overdue_days: Some(
+            363,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/25-26/017",
+        bill_date: TallyDate(
+            "20250802",
+        ),
+        due_date: TallyDate(
+            "20250802",
+        ),
+        closing_balance: ExactDecimal(
+            "-24119.20",
+        ),
+        tally_overdue_days: Some(
+            363,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/25-26/019",
+        bill_date: TallyDate(
+            "20251002",
+        ),
+        due_date: TallyDate(
+            "20251002",
+        ),
+        closing_balance: ExactDecimal(
+            "-29240.40",
+        ),
+        tally_overdue_days: Some(
+            302,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/25-26/020",
+        bill_date: TallyDate(
+            "20251102",
+        ),
+        due_date: TallyDate(
+            "20251102",
+        ),
+        closing_balance: ExactDecimal(
+            "-18998.00",
+        ),
+        tally_overdue_days: Some(
+            271,
+        ),
+    },
+    NativeBillRow {
+        party: "Om Packaging House",
+        reference: "PI/26-27/022",
+        bill_date: TallyDate(
+            "20260102",
+        ),
+        due_date: TallyDate(
+            "20260102",
+        ),
+        closing_balance: ExactDecimal(
+            "-24119.20",
+        ),
+        tally_overdue_days: Some(
+            210,
+        ),
+    },
+    NativeBillRow {
+        party: "Evergreen Supplies",
+        reference: "CN/023",
+        bill_date: TallyDate(
+            "20260201",
+        ),
+        due_date: TallyDate(
+            "20260201",
+        ),
+        closing_balance: ExactDecimal(
+            "-11741.00",
+        ),
+        tally_overdue_days: Some(
+            180,
+        ),
+    },
+    NativeBillRow {
+        party: "Prakash Logistics",
+        reference: "PI/26-27/023",
+        bill_date: TallyDate(
+            "20260201",
+        ),
+        due_date: TallyDate(
+            "20260201",
+        ),
+        closing_balance: ExactDecimal(
+            "-26679.80",
+        ),
+        tally_overdue_days: Some(
+            180,
+        ),
+    },
+    NativeBillRow {
+        party: "Bright Retail Pvt Ltd",
+        reference: "BRIDGE-INV-0001",
+        bill_date: TallyDate(
+            "20260401",
+        ),
+        due_date: TallyDate(
+            "20260401",
+        ),
+        closing_balance: ExactDecimal(
+            "-1180.00",
+        ),
+        tally_overdue_days: Some(
+            121,
+        ),
+    },
+])

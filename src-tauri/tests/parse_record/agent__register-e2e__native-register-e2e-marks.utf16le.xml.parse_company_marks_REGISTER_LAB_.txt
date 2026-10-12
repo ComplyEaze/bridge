@@ -1,0 +1,7 @@
+# fixture: agent/register-e2e/native-register-e2e-marks.utf16le.xml
+# parser: parse_company_marks(REGISTER_LAB)
+# source: captured
+Ok((
+    59,
+    288,
+))

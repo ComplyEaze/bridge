@@ -1,0 +1,773 @@
+# fixture: tests/fixtures/native/bills_receivable_billwise_lab.xml
+# parser: parse_native_bill_rows(20240401..20260731)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "Arora Stationers",
+        reference: "INV-0007",
+        bill_date: TallyDate(
+            "20240401",
+        ),
+        due_date: TallyDate(
+            "20240401",
+        ),
+        closing_balance: ExactDecimal(
+            "-58080.00",
+        ),
+        tally_overdue_days: Some(
+            851,
+        ),
+    },
+    NativeBillRow {
+        party: "Lotus Home Stores",
+        reference: "INV-0008",
+        bill_date: TallyDate(
+            "20240401",
+        ),
+        due_date: TallyDate(
+            "20240401",
+        ),
+        closing_balance: ExactDecimal(
+            "-44975.00",
+        ),
+        tally_overdue_days: Some(
+            851,
+        ),
+    },
+    NativeBillRow {
+        party: "Metro Trade Link",
+        reference: "INV-0009",
+        bill_date: TallyDate(
+            "20240401",
+        ),
+        due_date: TallyDate(
+            "20240401",
+        ),
+        closing_balance: ExactDecimal(
+            "-184000.00",
+        ),
+        tally_overdue_days: Some(
+            851,
+        ),
+    },
+    NativeBillRow {
+        party: "Rajasthan Digital Mart",
+        reference: "INV-0010",
+        bill_date: TallyDate(
+            "20240401",
+        ),
+        due_date: TallyDate(
+            "20240401",
+        ),
+        closing_balance: ExactDecimal(
+            "-242500.00",
+        ),
+        tally_overdue_days: Some(
+            851,
+        ),
+    },
+    NativeBillRow {
+        party: "Bright Retail Pvt Ltd",
+        reference: "INV-0011",
+        bill_date: TallyDate(
+            "20240701",
+        ),
+        due_date: TallyDate(
+            "20240701",
+        ),
+        closing_balance: ExactDecimal(
+            "-13250.00",
+        ),
+        tally_overdue_days: Some(
+            760,
+        ),
+    },
+    NativeBillRow {
+        party: "Metro Trade Link",
+        reference: "INV-0019",
+        bill_date: TallyDate(
+            "20240701",
+        ),
+        due_date: TallyDate(
+            "20240701",
+        ),
+        closing_balance: ExactDecimal(
+            "-117600.00",
+        ),
+        tally_overdue_days: Some(
+            760,
+        ),
+    },
+    NativeBillRow {
+        party: "Rajasthan Digital Mart",
+        reference: "INV-0020",
+        bill_date: TallyDate(
+            "20240701",
+        ),
+        due_date: TallyDate(
+            "20240701",
+        ),
+        closing_balance: ExactDecimal(
+            "-91000.00",
+        ),
+        tally_overdue_days: Some(
+            760,
+        ),
+    },
+    NativeBillRow {
+        party: "Sharma Traders",
+        reference: "INV-0012",
+        bill_date: TallyDate(
+            "20240701",
+        ),
+        due_date: TallyDate(
+            "20240701",
+        ),
+        closing_balance: ExactDecimal(
+            "-20000.00",
+        ),
+        tally_overdue_days: Some(
+            760,
+        ),
+    },
+    NativeBillRow {
+        party: "Bright Retail Pvt Ltd",
+        reference: "INV-0021",
+        bill_date: TallyDate(
+            "20241001",
+        ),
+        due_date: TallyDate(
+            "20241001",
+        ),
+        closing_balance: ExactDecimal(
+            "-8400.00",
+        ),
+        tally_overdue_days: Some(
+            668,
+        ),
+    },
+    NativeBillRow {
+        party: "Mehta Office Supplies",
+        reference: "INV-0023",
+        bill_date: TallyDate(
+            "20241001",
+        ),
+        due_date: TallyDate(
+            "20241001",
+        ),
+        closing_balance: ExactDecimal(
+            "-30000.00",
+        ),
+        tally_overdue_days: Some(
+            668,
+        ),
+    },
+    NativeBillRow {
+        party: "Navkar Distributors",
+        reference: "INV-0024",
+        bill_date: TallyDate(
+            "20241001",
+        ),
+        due_date: TallyDate(
+            "20241001",
+        ),
+        closing_balance: ExactDecimal(
+            "-44800.00",
+        ),
+        tally_overdue_days: Some(
+            668,
+        ),
+    },
+    NativeBillRow {
+        party: "Sharma Traders",
+        reference: "INV-0022",
+        bill_date: TallyDate(
+            "20241001",
+        ),
+        due_date: TallyDate(
+            "20241001",
+        ),
+        closing_balance: ExactDecimal(
+            "-7437.00",
+        ),
+        tally_overdue_days: Some(
+            668,
+        ),
+    },
+    NativeBillRow {
+        party: "Kaveri Enterprises",
+        reference: "INV-0036",
+        bill_date: TallyDate(
+            "20250101",
+        ),
+        due_date: TallyDate(
+            "20250101",
+        ),
+        closing_balance: ExactDecimal(
+            "-86000.00",
+        ),
+        tally_overdue_days: Some(
+            576,
+        ),
+    },
+    NativeBillRow {
+        party: "Mehta Office Supplies",
+        reference: "INV-0033",
+        bill_date: TallyDate(
+            "20250101",
+        ),
+        due_date: TallyDate(
+            "20250101",
+        ),
+        closing_balance: ExactDecimal(
+            "-19080.00",
+        ),
+        tally_overdue_days: Some(
+            576,
+        ),
+    },
+    NativeBillRow {
+        party: "Navkar Distributors",
+        reference: "INV-0034",
+        bill_date: TallyDate(
+            "20250101",
+        ),
+        due_date: TallyDate(
+            "20250101",
+        ),
+        closing_balance: ExactDecimal(
+            "-16555.00",
+        ),
+        tally_overdue_days: Some(
+            576,
+        ),
+    },
+    NativeBillRow {
+        party: "Sunrise Electronics",
+        reference: "INV-0035",
+        bill_date: TallyDate(
+            "20250101",
+        ),
+        due_date: TallyDate(
+            "20250101",
+        ),
+        closing_balance: ExactDecimal(
+            "-64500.00",
+        ),
+        tally_overdue_days: Some(
+            576,
+        ),
+    },
+    NativeBillRow {
+        party: "Arora Stationers",
+        reference: "INV-0047",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250401",
+        ),
+        closing_balance: ExactDecimal(
+            "-120800.00",
+        ),
+        tally_overdue_days: Some(
+            486,
+        ),
+    },
+    NativeBillRow {
+        party: "Kaveri Enterprises",
+        reference: "INV-0046",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250401",
+        ),
+        closing_balance: ExactDecimal(
+            "-31675.00",
+        ),
+        tally_overdue_days: Some(
+            486,
+        ),
+    },
+    NativeBillRow {
+        party: "Lotus Home Stores",
+        reference: "INV-0048",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250401",
+        ),
+        closing_balance: ExactDecimal(
+            "-162500.00",
+        ),
+        tally_overdue_days: Some(
+            486,
+        ),
+    },
+    NativeBillRow {
+        party: "Sunrise Electronics",
+        reference: "INV-0045",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250401",
+        ),
+        closing_balance: ExactDecimal(
+            "-40650.00",
+        ),
+        tally_overdue_days: Some(
+            486,
+        ),
+    },
+    NativeBillRow {
+        party: "Arora Stationers",
+        reference: "INV-0057",
+        bill_date: TallyDate(
+            "20250701",
+        ),
+        due_date: TallyDate(
+            "20250701",
+        ),
+        closing_balance: ExactDecimal(
+            "-76080.00",
+        ),
+        tally_overdue_days: Some(
+            395,
+        ),
+    },
+    NativeBillRow {
+        party: "Lotus Home Stores",
+        reference: "INV-0058",
+        bill_date: TallyDate(
+            "20250701",
+        ),
+        due_date: TallyDate(
+            "20250701",
+        ),
+        closing_balance: ExactDecimal(
+            "-59850.00",
+        ),
+        tally_overdue_days: Some(
+            395,
+        ),
+    },
+    NativeBillRow {
+        party: "Metro Trade Link",
+        reference: "INV-0059",
+        bill_date: TallyDate(
+            "20250701",
+        ),
+        due_date: TallyDate(
+            "20250701",
+        ),
+        closing_balance: ExactDecimal(
+            "-244000.00",
+        ),
+        tally_overdue_days: Some(
+            395,
+        ),
+    },
+    NativeBillRow {
+        party: "Rajasthan Digital Mart",
+        reference: "INV-0060",
+        bill_date: TallyDate(
+            "20250701",
+        ),
+        due_date: TallyDate(
+            "20250701",
+        ),
+        closing_balance: ExactDecimal(
+            "-330000.00",
+        ),
+        tally_overdue_days: Some(
+            395,
+        ),
+    },
+    NativeBillRow {
+        party: "Bright Retail Pvt Ltd",
+        reference: "INV-0061",
+        bill_date: TallyDate(
+            "20251001",
+        ),
+        due_date: TallyDate(
+            "20251001",
+        ),
+        closing_balance: ExactDecimal(
+            "-17000.00",
+        ),
+        tally_overdue_days: Some(
+            303,
+        ),
+    },
+    NativeBillRow {
+        party: "Metro Trade Link",
+        reference: "INV-0069",
+        bill_date: TallyDate(
+            "20251001",
+        ),
+        due_date: TallyDate(
+            "20251001",
+        ),
+        closing_balance: ExactDecimal(
+            "-153600.00",
+        ),
+        tally_overdue_days: Some(
+            303,
+        ),
+    },
+    NativeBillRow {
+        party: "Rajasthan Digital Mart",
+        reference: "INV-0070",
+        bill_date: TallyDate(
+            "20251001",
+        ),
+        due_date: TallyDate(
+            "20251001",
+        ),
+        closing_balance: ExactDecimal(
+            "-121625.00",
+        ),
+        tally_overdue_days: Some(
+            303,
+        ),
+    },
+    NativeBillRow {
+        party: "Sharma Traders",
+        reference: "INV-0062",
+        bill_date: TallyDate(
+            "20251001",
+        ),
+        due_date: TallyDate(
+            "20251001",
+        ),
+        closing_balance: ExactDecimal(
+            "-26250.00",
+        ),
+        tally_overdue_days: Some(
+            303,
+        ),
+    },
+    NativeBillRow {
+        party: "Bright Retail Pvt Ltd",
+        reference: "INV-0071",
+        bill_date: TallyDate(
+            "20260101",
+        ),
+        due_date: TallyDate(
+            "20260101",
+        ),
+        closing_balance: ExactDecimal(
+            "-10650.00",
+        ),
+        tally_overdue_days: Some(
+            211,
+        ),
+    },
+    NativeBillRow {
+        party: "Mehta Office Supplies",
+        reference: "INV-0073",
+        bill_date: TallyDate(
+            "20260101",
+        ),
+        due_date: TallyDate(
+            "20260101",
+        ),
+        closing_balance: ExactDecimal(
+            "-39000.00",
+        ),
+        tally_overdue_days: Some(
+            211,
+        ),
+    },
+    NativeBillRow {
+        party: "Navkar Distributors",
+        reference: "INV-0074",
+        bill_date: TallyDate(
+            "20260101",
+        ),
+        due_date: TallyDate(
+            "20260101",
+        ),
+        closing_balance: ExactDecimal(
+            "-57300.00",
+        ),
+        tally_overdue_days: Some(
+            211,
+        ),
+    },
+    NativeBillRow {
+        party: "Sharma Traders",
+        reference: "INV-0072",
+        bill_date: TallyDate(
+            "20260101",
+        ),
+        due_date: TallyDate(
+            "20260101",
+        ),
+        closing_balance: ExactDecimal(
+            "-9625.00",
+        ),
+        tally_overdue_days: Some(
+            211,
+        ),
+    },
+    NativeBillRow {
+        party: "Kaveri Enterprises",
+        reference: "INV-0086",
+        bill_date: TallyDate(
+            "20260301",
+        ),
+        due_date: TallyDate(
+            "20260301",
+        ),
+        closing_balance: ExactDecimal(
+            "-108500.00",
+        ),
+        tally_overdue_days: Some(
+            152,
+        ),
+    },
+    NativeBillRow {
+        party: "Mehta Office Supplies",
+        reference: "INV-0083",
+        bill_date: TallyDate(
+            "20260301",
+        ),
+        due_date: TallyDate(
+            "20260301",
+        ),
+        closing_balance: ExactDecimal(
+            "-24480.00",
+        ),
+        tally_overdue_days: Some(
+            152,
+        ),
+    },
+    NativeBillRow {
+        party: "Navkar Distributors",
+        reference: "INV-0084",
+        bill_date: TallyDate(
+            "20260301",
+        ),
+        due_date: TallyDate(
+            "20260301",
+        ),
+        closing_balance: ExactDecimal(
+            "-20930.00",
+        ),
+        tally_overdue_days: Some(
+            152,
+        ),
+    },
+    NativeBillRow {
+        party: "Sunrise Electronics",
+        reference: "INV-0085",
+        bill_date: TallyDate(
+            "20260301",
+        ),
+        due_date: TallyDate(
+            "20260301",
+        ),
+        closing_balance: ExactDecimal(
+            "-80750.00",
+        ),
+        tally_overdue_days: Some(
+            152,
+        ),
+    },
+    NativeBillRow {
+        party: "Arora Stationers",
+        reference: "INV-0097",
+        bill_date: TallyDate(
+            "20260502",
+        ),
+        due_date: TallyDate(
+            "20260502",
+        ),
+        closing_balance: ExactDecimal(
+            "-150800.00",
+        ),
+        tally_overdue_days: Some(
+            90,
+        ),
+    },
+    NativeBillRow {
+        party: "Kaveri Enterprises",
+        reference: "INV-0096",
+        bill_date: TallyDate(
+            "20260502",
+        ),
+        due_date: TallyDate(
+            "20260502",
+        ),
+        closing_balance: ExactDecimal(
+            "-39550.00",
+        ),
+        tally_overdue_days: Some(
+            90,
+        ),
+    },
+    NativeBillRow {
+        party: "Lotus Home Stores",
+        reference: "INV-0098",
+        bill_date: TallyDate(
+            "20260502",
+        ),
+        due_date: TallyDate(
+            "20260502",
+        ),
+        closing_balance: ExactDecimal(
+            "-205000.00",
+        ),
+        tally_overdue_days: Some(
+            90,
+        ),
+    },
+    NativeBillRow {
+        party: "Sunrise Electronics",
+        reference: "INV-0095",
+        bill_date: TallyDate(
+            "20260502",
+        ),
+        due_date: TallyDate(
+            "20260502",
+        ),
+        closing_balance: ExactDecimal(
+            "-50400.00",
+        ),
+        tally_overdue_days: Some(
+            90,
+        ),
+    },
+    NativeBillRow {
+        party: "Arora Stationers",
+        reference: "INV-0107",
+        bill_date: TallyDate(
+            "20260601",
+        ),
+        due_date: TallyDate(
+            "20260601",
+        ),
+        closing_balance: ExactDecimal(
+            "-94080.00",
+        ),
+        tally_overdue_days: Some(
+            60,
+        ),
+    },
+    NativeBillRow {
+        party: "Lotus Home Stores",
+        reference: "INV-0108",
+        bill_date: TallyDate(
+            "20260601",
+        ),
+        due_date: TallyDate(
+            "20260601",
+        ),
+        closing_balance: ExactDecimal(
+            "-74725.00",
+        ),
+        tally_overdue_days: Some(
+            60,
+        ),
+    },
+    NativeBillRow {
+        party: "Metro Trade Link",
+        reference: "INV-0109",
+        bill_date: TallyDate(
+            "20260601",
+        ),
+        due_date: TallyDate(
+            "20260601",
+        ),
+        closing_balance: ExactDecimal(
+            "-304000.00",
+        ),
+        tally_overdue_days: Some(
+            60,
+        ),
+    },
+    NativeBillRow {
+        party: "Rajasthan Digital Mart",
+        reference: "INV-0110",
+        bill_date: TallyDate(
+            "20260601",
+        ),
+        due_date: TallyDate(
+            "20260601",
+        ),
+        closing_balance: ExactDecimal(
+            "-417500.00",
+        ),
+        tally_overdue_days: Some(
+            60,
+        ),
+    },
+    NativeBillRow {
+        party: "Bright Retail Pvt Ltd",
+        reference: "INV-0111",
+        bill_date: TallyDate(
+            "20260701",
+        ),
+        due_date: TallyDate(
+            "20260701",
+        ),
+        closing_balance: ExactDecimal(
+            "-20750.00",
+        ),
+        tally_overdue_days: Some(
+            30,
+        ),
+    },
+    NativeBillRow {
+        party: "Metro Trade Link",
+        reference: "INV-0119",
+        bill_date: TallyDate(
+            "20260701",
+        ),
+        due_date: TallyDate(
+            "20260701",
+        ),
+        closing_balance: ExactDecimal(
+            "-189600.00",
+        ),
+        tally_overdue_days: Some(
+            30,
+        ),
+    },
+    NativeBillRow {
+        party: "Rajasthan Digital Mart",
+        reference: "INV-0120",
+        bill_date: TallyDate(
+            "20260701",
+        ),
+        due_date: TallyDate(
+            "20260701",
+        ),
+        closing_balance: ExactDecimal(
+            "-152250.00",
+        ),
+        tally_overdue_days: Some(
+            30,
+        ),
+    },
+    NativeBillRow {
+        party: "Sharma Traders",
+        reference: "INV-0112",
+        bill_date: TallyDate(
+            "20260701",
+        ),
+        due_date: TallyDate(
+            "20260701",
+        ),
+        closing_balance: ExactDecimal(
+            "-32500.00",
+        ),
+        tally_overdue_days: Some(
+            30,
+        ),
+    },
+])

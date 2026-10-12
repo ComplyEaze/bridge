@@ -6,7 +6,7 @@ Book: synthetic BRIDGE PILOT LAB (company number 100033), loaded alone. Backups:
 - backup-pre2: taken before resuming.
 - backup-B1: taken before the W11-R re-check.
 
-Screenshots stay on the lab PC and are listed in `SHA256-screenshots.txt`. CLICK MODE: lane (no Bridge post in W11).
+Screenshots stay on the lab PC and are listed in `SHA256-screenshots.txt`. Mouse-click mode (no Bridge post in W11).
 
 ## Per voucher (read-back fields, compared by structure: `vfields.py`)
 
@@ -71,7 +71,7 @@ HSN Summary (Table 12, B2C) after G:
 
 The voucher-level tax analysis of W11-07 and W11-08 was not opened (it is reached through Voucher Alteration). The HSN summary and the read-backs show the code each voucher used.
 
-## W11-R: the master-change re-check (added step, ordered by the orchestrator)
+## W11-R: the master-change re-check (added step, added per the run's decision record)
 
 Opening GSTR-1 after step C raised a dialog the README does not list. Exact text:
 
@@ -93,7 +93,7 @@ The dialog did not reappear when GSTR-1 was opened after D, E, F or G.
 
 ## Deviations from the README
 
-- **Typed voucher numbers:** BRIDGE Sales is "Manual" numbering with "Prevent creating duplicate Voucher Nos." = Yes. Tally suggested 5 for W11-01 but left No. blank afterwards, so the lab typed 6–14 (accepted by the orchestrator).
+- **Typed voucher numbers:** BRIDGE Sales is "Manual" numbering with "Prevent creating duplicate Voucher Nos." = Yes. Tally suggested 5 for W11-01 but left No. blank afterwards, so the lab typed 6–14 (accepted by the decision record).
 - **Date shift:** an Enter on the blank No. field moved Tally's current date to 8-Aug-2026. The form was quit unsaved and the voucher date set back to 7-Aug-2026 with F2.
 - **Wrong group opened twice:** Alter > Group opened "Bank Accounts" (the top of the list); each time it was quit with Ctrl+Q unchanged.
 - **History rows:** applicable-from dates were set through the HSN/SAC history screen rather than the main screen (see Masters).

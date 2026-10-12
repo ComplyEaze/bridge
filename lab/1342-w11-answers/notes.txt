@@ -1,4 +1,4 @@
-A (12-Oct-2026 ~09:31Z): W11-01 No.5 (Tally suggested), W11-02 No.6 (TYPED by lab: BRIDGE Sales is Manual + prevent duplicates; No. stayed blank). Deviation accepted by orchestrator.
+A (12-Oct-2026 ~09:31Z): W11-01 No.5 (Tally suggested), W11-02 No.6 (TYPED by lab: BRIDGE Sales is Manual + prevent duplicates; No. stayed blank). Deviation accepted per the run's decision record.
 A side effect: Enter on blank No. moved Tally current date 7-Aug-2026 -> 8-Aug-2026; form quit unsaved; voucher date reset to 7-Aug-2026 via F2 before keying.
 A GSTR-1 Aug-2026: total 27, included 14, not relevant 6, uncertain 7. Uncertain: HSN/SAC invalid/mismatched/not specified 2 = Vch 5 (INH) and Vch 6 (INH2); tax-amount mismatch 5 (pre-existing). Shots A-gstr1-aug-summary/uncertain/hsn-list.jpg
 B: company HSN/SAC set via Alter > Company GST Details: main screen Specify Details Here 998341, and More Details > "GST - HSN/SAC & Related Details (History)" row Applicable From 1-Apr-26 set to Specify Details Here 998341 (the row had read Not Defined). Saved, no prompt. Shots B-company-hsn-history.jpg, B-company-gst-before-save.jpg.

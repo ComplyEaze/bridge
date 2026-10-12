@@ -336,6 +336,32 @@ fn a_skip_carries_its_row_into_the_view() {
     assert!(!skip.reversed_same_day);
 }
 
+/// A refused build names the check that failed, one name for each.
+#[test]
+fn each_failed_check_has_a_name_of_its_own() {
+    let txn = || st(1);
+    let checks = [
+        FactsError::EmptyLedgerGuid,
+        FactsError::InvertedCoverage,
+        FactsError::DuplicateTxnId { txn: txn() },
+        FactsError::SkipIdNotStatementId { txn: txn() },
+        FactsError::ReferenceInadmissible { txn: txn() },
+        FactsError::AmountInadmissible { txn: txn() },
+        FactsError::SkipLedgersEqual { txn: txn() },
+        FactsError::ContraRowNotOneContraVoucher { txn: txn() },
+        FactsError::ContraVoucherNotInFacts { txn: txn() },
+        FactsError::SkipIsVoucher { txn: txn() },
+        FactsError::BankLedgerUnbound,
+        FactsError::BadRecordId,
+        FactsError::NotSkipOnly,
+    ];
+    let names: BTreeSet<_> = checks.iter().map(FactsError::variant).collect();
+    assert_eq!(names.len(), checks.len());
+    assert!(names
+        .iter()
+        .all(|name| name.chars().all(|c| c.is_ascii_lowercase() || c == '_')));
+}
+
 /// The flag a statement set on a row follows it into the facts the view takes,
 /// whether the row is a Contra, a skip of a batch or a skip-only record's, and
 /// is written only when set.

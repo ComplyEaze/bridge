@@ -971,9 +971,10 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
         // out to a mapped Contra, and a line of the same amount back that day
         upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
         upi("01/08/26", "BACK", "222222222222", "", "10.00", "1000.00"),
-        // out to the other bank, skipped
+        // out to the other bank, skipped, and the same amount back that day
         upi("03/08/26", "OWN", "333333333333", "30.00", "", "970.00"),
-        upi("05/08/26", "LAST", "444444444444", "", "5.00", "975.00"),
+        upi("03/08/26", "BACK", "555555555555", "", "30.00", "1000.00"),
+        upi("05/08/26", "LAST", "444444444444", "", "5.00", "1005.00"),
     ];
     let mapping = Mapping::from_rows(
         [
@@ -1007,7 +1008,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
     let parsed = ParsedStatement {
         account_number: "00000000004321".into(),
         statement_rows: rows.len(),
-        closing: bridge_tally_core::ExactDecimal::parse("975.00").unwrap(),
+        closing: bridge_tally_core::ExactDecimal::parse("1005.00").unwrap(),
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
         check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
@@ -1046,7 +1047,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
     );
     assert_eq!(document["records"][0]["direction"], "outflow");
     assert_eq!(document["records"][0]["reversed_same_day"], true);
-    assert_eq!(document["records"][3]["reversed_same_day"], false);
+    assert_eq!(document["records"][4]["reversed_same_day"], false);
 
     let resolved = resolve_import_arguments(
         directory.path(),
@@ -1089,7 +1090,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
         skip.reference.as_ref().map(ToString::to_string).as_deref(),
         Some("333333333333")
     );
-    assert!(!skip.reversed_same_day);
+    assert!(skip.reversed_same_day);
     // the facts name the bank and the skipped row's ledger beyond the vouchers'
     assert_eq!(
         statement.ledger_names(),

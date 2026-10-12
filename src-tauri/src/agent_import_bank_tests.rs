@@ -3231,7 +3231,7 @@ fn contra_record() -> Value {
 }
 
 fn skip_record_of(ledger: &str) -> Value {
-    let mut skip = record(SKIP_ROW, json!("skipped"), ledger, "inflow", false);
+    let mut skip = record(SKIP_ROW, json!("skipped"), ledger, "inflow", true);
     skip["date"] = json!("2026-09-02");
     skip["amount"] = json!("7.50");
     skip["reference"] = json!("600000000002");
@@ -3294,7 +3294,8 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
             "contra_rows": [{"bridge_txn_id": CONTRA_ROW, "reference": "600000000001",
                 "instrument": "000417", "reversed_same_day": true}],
             "skip_rows": [{"bridge_txn_id": SKIP_ROW, "date": "20260902", "amount": "7.50",
-                "direction": "inflow", "other_ledger_guid": cash, "reference": "600000000002"}],
+                "direction": "inflow", "other_ledger_guid": cash, "reference": "600000000002",
+                "reversed_same_day": true}],
         })
     );
 
@@ -3312,7 +3313,7 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         skip.key.row,
         crate::agent::transfer_pairing::StatementRowId::new(SKIP_ROW)
     );
-    assert!(!skip.reversed_same_day);
+    assert!(skip.reversed_same_day);
     let [contra] = &found.contras[..] else {
         panic!("one Contra: {found:?}");
     };
@@ -3558,4 +3559,123 @@ async fn a_skip_only_statement_naming_a_ledger_the_book_lacks_records_nothing() 
         .join("agent-import-statement-skips.jsonl")
         .exists());
     assert_eq!(simulator.finish().expect("requests").len(), 10);
+}
+
+/// Whatever the caller's spelling of the company's GUID, a skip-only record
+/// holds the canonical form the journal's records hold.
+#[tokio::test]
+async fn a_skip_only_record_holds_the_canonical_company_guid() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let mut args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("Cash")]),
+    );
+    args["company_guid"] = json!(CAPTURED_GUID.to_uppercase());
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["state"], "skips_recorded",
+        "{response}"
+    );
+    let text = std::fs::read_to_string(directory.path().join("agent-import-statement-skips.jsonl"))
+        .unwrap();
+    let records =
+        statement_facts::read_skip_records(std::io::BufReader::new(text.as_bytes())).unwrap();
+    assert_eq!(records[0].company_guid, CAPTURED_GUID);
+    assert_ne!(CAPTURED_GUID, CAPTURED_GUID.to_uppercase());
+}
+
+/// A skip-only record is held to the checks the view makes when it reads it:
+/// a row skipped to the statement's own bank ledger is refused, and nothing is
+/// recorded.
+#[tokio::test]
+async fn a_skip_only_record_failing_a_check_is_refused_and_not_recorded() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("WR2 Sales")]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "statement_facts_invalid", "{response}");
+    assert_eq!(result["check"], "skip_ledgers_equal");
+    assert!(!directory
+        .path()
+        .join("agent-import-statement-skips.jsonl")
+        .exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 10);
+}
+
+/// The record is appended under the exclusive admission lock: while another
+/// holder has it, nothing is recorded. A skip-only statement takes neither an
+/// amendment nor an approval, which mean nothing without a batch.
+#[tokio::test]
+async fn a_skip_only_statement_waits_for_the_admission_lock_and_takes_no_amendment() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("Cash")]),
+    );
+    let held = server.lock_import_admission().unwrap();
+    let response = server
+        .call_tool_response("build_import_xml", args.clone())
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_admission_busy",
+        "{response}"
+    );
+    drop(held);
+    assert_eq!(simulator.finish().expect("requests").len(), 10);
+    assert!(!directory
+        .path()
+        .join("agent-import-statement-skips.jsonl")
+        .exists());
+
+    // refused before any read
+    let no_reads = bank_server(directory.path(), 9);
+    for (key, value, code) in [
+        (
+            "amends_batch_id",
+            json!("bridge-00000000-0000-4000-8000-000000000001"),
+            "skip_only_statement_cannot_amend",
+        ),
+        (
+            "on_account_approvals",
+            json!([{"party_digest": "a".repeat(64)}]),
+            "skip_only_statement_takes_no_approvals",
+        ),
+    ] {
+        let mut extra = args.clone();
+        extra[key] = value;
+        let response = no_reads
+            .call_tool_response("build_import_xml", extra)
+            .await
+            .value;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], code,
+            "{response}"
+        );
+    }
 }

@@ -4422,12 +4422,12 @@ mod tests {
     }
 
     /// A row's figure id ends with the first eight hex digits of the sha1 of its voucher's GUID
-    /// (`hashlib.sha1(b"g1").hexdigest()[:8]`, measured in Python), so a change to the shared tag
-    /// changes this module's ids.
+    /// (`hashlib.sha1(b"G1").hexdigest()[:8]`, measured in Python; upper-case on purpose, so a tag that
+    /// folds case is caught), so a change to the shared tag changes this module's ids.
     #[test]
     fn a_row_figure_id_ends_with_the_sha1_tag_of_its_voucher_guid() {
         let rules = Rules::vendored().unwrap();
-        let r = run_on(&book(vec![taken("g1", "20250601")]), &rules).unwrap();
+        let r = run_on(&book(vec![taken("G1", "20250601")]), &rules).unwrap();
         let ids: Vec<&str> = r
             .figures
             .iter()
@@ -4435,7 +4435,7 @@ mod tests {
             .filter(|id| id.contains(".clause31_row_amount_"))
             .collect();
         assert_eq!(ids.len(), 1);
-        assert!(ids[0].ends_with("_a46e558d"), "{}", ids[0]);
+        assert!(ids[0].ends_with("_93191cee"), "{}", ids[0]);
     }
 
     /// Without `[tds_rates].s194a_bp` coverage is not judged: no expected or covering figure, the

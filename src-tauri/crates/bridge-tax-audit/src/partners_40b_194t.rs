@@ -2128,6 +2128,26 @@ remuneration in each voucher named here and the TDS on each.";
         assert!(run(&book, &rules, &year(), "firm", &cfg(one), &BTreeSet::new()).is_ok());
     }
 
+    /// A partner's figures carry the first eight hex digits of the sha1 of its key as written
+    /// (`hashlib.sha1(b"PartnerA").hexdigest()[:8]`, measured in Python; mixed case on purpose, so
+    /// a tag that folds case is caught).
+    #[test]
+    fn a_partners_figure_id_carries_the_sha1_tag_of_its_key_as_written() {
+        let mut book = Book {
+            vouchers: Vec::new(),
+            ..unreadable_book()
+        };
+        book.ledgers
+            .insert("A Capital".to_string(), ledger("A Capital"));
+        let rules = Rules::vendored().unwrap();
+        let one = "[PartnerA]\ncapital_ledgers = [\"A Capital\"]\n";
+        let r = run(&book, &rules, &year(), "firm", &cfg(one), &BTreeSet::new()).unwrap();
+        assert!(r
+            .figures
+            .iter()
+            .any(|f| f.id == "partners_40b_194t.capital_opening_8a0577f9"));
+    }
+
     #[test]
     fn not_applicable_reads_no_voucher_and_rules_without_entities_refuse() {
         let rules = Rules::vendored().unwrap();

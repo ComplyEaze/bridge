@@ -958,7 +958,10 @@ fn proposals(bank_ledger: &str, window: Option<Value>) -> Value {
 fn journal_vouchers(vouchers: &Value) -> Value {
     let mut vouchers = vouchers.clone();
     for voucher in vouchers.as_array_mut().unwrap() {
-        let date = voucher["date"].as_str().unwrap().replace('-', "");
+        let date = voucher["date"]
+            .as_str()
+            .expect("a statement voucher's date is text")
+            .replace('-', "");
         voucher["date"] = json!(date);
     }
     vouchers

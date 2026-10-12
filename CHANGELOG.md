@@ -40,8 +40,8 @@ These changes are in source and not yet in a published build.
   parse's proposals file now also records the statement's first and last dates (part of #1211). Run once by an
   outside contributor on a live TallyPrime 7.1 Silver with two synthetic books (partial: the import summary was
   not captured, and no raw answers were kept): a differing and a tied opening before an import, tied after a hand
-  import, and after a hand-keyed duplicate a closing gap equal to its amount with its sign. Not measured: Gold,
-  a real statement, macOS.
+  import, and after a hand-keyed duplicate payment a closing gap of minus its amount (the book showing that much
+  less money). Not measured: Gold, a real statement, macOS.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the

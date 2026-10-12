@@ -25,7 +25,7 @@ These changes are in source and not yet in a published build.
   (part of #1342). HSN/SAC and type of supply are not returned because no capture shows them, the place of
   supply stays in the registration history, and slab rates are only flagged. Without the flag the requests, the
   sizing and the result are unchanged. With it the read is admitted at 8,000 bytes a ledger instead of 3,750, a
-  margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394),
+  margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element),
   not a measured ratio; a large book may be read in more parts or refused as too large. Measured on one 14-ledger lab book of TallyPrime 7.1 Silver and not yet run through this tool on a
   live Tally.
 

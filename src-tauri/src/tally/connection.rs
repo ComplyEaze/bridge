@@ -348,8 +348,10 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// empty list and 5,248 to 5,394 with one dated entry (UTF-16 bytes per
 /// `<LEDGER>` row). 8,000 is sized above the largest ledger of that one
 /// capture. It is NOT shown to cover a second dated entry: by the capture's own
-/// sizes a ledger with two dated entries could take about 8,300 bytes, and a
-/// party ledger with two about 9,100. The admission uses the mean over a read
+/// sizes (the empty-list block is 80 bytes, a dated entry's list block 2,874 to
+/// 3,264) a ledger with two dated entries could take about 8,600 bytes at the
+/// largest row, and a party ledger with two about 9,100 (extrapolated: the
+/// capture holds no party ledger with a dated entry). The admission uses the mean over a read
 /// (the estimated count times this figure against the budget), so a book in
 /// which most ledgers hold two or more entries could exceed the 16 MB response
 /// budget while still admitted. UNVERIFIED until measured on more books; it is

@@ -315,8 +315,8 @@ fn fit_response(
     //   1. the page at full width, with the widest section that fits beside it
     //      (open rows, then the counts, then a note that the check is to be run
     //      again): the page is not cut if any of them fits;
-    //   2. otherwise the page trimmed, with the note beside it, as wide as it
-    //      goes;
+    //   2. otherwise the page trimmed, with the shorter of the note and the
+    //      counts beside it, as wide as it goes;
     //   3. then the section widened again into what the trimmed page leaves.
     // A result with no computed section takes only the page step, as it always
     // did. Everything here returns true when anything was cut, the section's
@@ -338,11 +338,19 @@ fn fit_response(
         .and_then(page_shape)
         .ok_or_else(|| "agent_response_too_large".to_string())?;
     let mut original = response.clone();
-    if section.is_some() {
+    if let Some(section) = &section {
         // A result with a page is a batch's or a verification's, never a
-        // statement of only skipped rows, so the note is the batch's.
+        // statement of only skipped rows, so the note is the batch's. The page
+        // is trimmed beside the shorter of the note and the counts.
+        let note = check_not_run_section(false);
+        let counts = counts_only_section(section);
+        let placeholder = if counts.to_string().len() < note.to_string().len() {
+            counts
+        } else {
+            note
+        };
         if let Some(slot) = original.pointer_mut(&format!("{structured_path}/result/transfers")) {
-            *slot = check_not_run_section(false);
+            *slot = placeholder;
         }
     }
     let trimmed = trim_page(

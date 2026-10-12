@@ -855,16 +855,12 @@ fn contra_legs(
     )
 }
 
-/// One lineage: its builds in journal order. A lineage with no facts
-/// contributes nothing.
+/// One lineage that holds facts: its builds in journal order.
 fn lineage_facts(
     batches: &[Batch],
     members: &[usize],
     company: &CompanyGuid,
 ) -> Result<LineageFacts, TransferFactsError> {
-    if members.iter().all(|&at| batches[at].facts.is_none()) {
-        return Ok(LineageFacts::default());
-    }
     let lineage_text = batches[members[0]].line.lineage.clone();
     let lineage = LineageId::new(lineage_text.as_str());
     // the newest build to mention a row as a voucher decides its content
@@ -997,6 +993,43 @@ fn lineage_facts(
     Ok(found)
 }
 
+/// The days no window may vouch for, by endpoint and bank ledger; `None` is any.
+type Blocked = BTreeMap<(Option<EndpointOrigin>, Option<LedgerGuid>), BTreeSet<TallyDate>>;
+
+/// A batch of a lineage that holds no facts (built inline, or by a release
+/// before them) can still book a transfer: a withdrawn skip posted as a
+/// Contra, a Contra keyed by hand. Each Contra and statement row it holds is
+/// one the facts cannot see, so its date, and for a statement row the date its
+/// id carries, are not cover for any ledger it names; where the endpoint or a
+/// ledger is not bound, for any.
+fn block_unseen(batch: &Batch, blocked: &mut Blocked) {
+    let endpoint = batch
+        .line
+        .endpoint_origin
+        .as_deref()
+        .map(EndpointOrigin::new);
+    for voucher in &batch.line.vouchers {
+        let mut days = vec![voucher.date.clone()];
+        if is_statement_txn_id(&voucher.txn_id) {
+            // the id was checked to be `st-`, eight digits and the rest
+            days.extend(TallyDate::parse(voucher.txn_id[3..11].to_string()).ok());
+        }
+        for entry in &voucher.entries {
+            let ledger = batch
+                .line
+                .ledger_identities
+                .iter()
+                .flatten()
+                .find(|bound| bound.name == entry.ledger)
+                .map(|bound| LedgerGuid::new(bound.guid.as_str()));
+            blocked
+                .entry((endpoint.clone(), ledger))
+                .or_default()
+                .extend(days.iter().cloned());
+        }
+    }
+}
+
 /// Fold the journal's records and the skip-only file into the facts of one
 /// company. Records of any other company are neither read nor checked.
 pub(super) fn build_transfer_facts(
@@ -1033,14 +1066,20 @@ pub(super) fn build_transfer_facts(
     let mut windows: Vec<(EndpointOrigin, LedgerGuid, ParseWindow)> = Vec::new();
     let mut contras_not_two_leg = 0;
     let mut contras_without_facts = 0;
-    let mut blocked: BTreeMap<(EndpointOrigin, LedgerGuid), BTreeSet<TallyDate>> = BTreeMap::new();
+    let mut blocked = Blocked::new();
     for members in lineages.values() {
+        if members.iter().all(|&at| batches[at].facts.is_none()) {
+            for &at in members {
+                block_unseen(&batches[at], &mut blocked);
+            }
+            continue;
+        }
         let found = lineage_facts(&batches, members, &company)?;
         contras_not_two_leg += found.left_out;
         contras_without_facts += found.without_facts;
-        for ledger in &found.ledgers {
+        for (endpoint, ledger) in &found.ledgers {
             blocked
-                .entry(ledger.clone())
+                .entry((Some(endpoint.clone()), Some(ledger.clone())))
                 .or_default()
                 .extend(found.blocked.iter().cloned());
         }
@@ -1168,13 +1207,19 @@ pub(super) fn build_transfer_facts(
     let mut coverage = Coverage::default();
     for (endpoint, bank_ledger, window) in windows {
         // a window over a day some row cannot be vouched for says nothing of that day
-        let blocked_inside = blocked
-            .get(&(endpoint.clone(), bank_ledger.clone()))
-            .is_some_and(|days| {
-                days.range(window.from.clone()..=window.to.clone())
-                    .next()
-                    .is_some()
-            });
+        let blocked_inside = [
+            (Some(endpoint.clone()), Some(bank_ledger.clone())),
+            (Some(endpoint.clone()), None),
+            (None, Some(bank_ledger.clone())),
+            (None, None),
+        ]
+        .iter()
+        .filter_map(|key| blocked.get(key))
+        .any(|days| {
+            days.range(window.from.clone()..=window.to.clone())
+                .next()
+                .is_some()
+        });
         if !blocked_inside {
             coverage.add(company.clone(), endpoint, bank_ledger, window)?;
         }

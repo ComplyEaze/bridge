@@ -1688,6 +1688,61 @@ that turns that on.
    `PARTYLEDGERNAME`, which `Payment`, `Receipt` and `Contra` files carry — see
    the limits noted in reference §9.13.
 
+### Skipped rows and the `transfers` section (#1392)
+
+A transfer between two of the company's own bank accounts prints on both
+statements and is booked once: a Contra from one statement, and the row mapped
+`skip` on the other. `parse_bank_statement` writes proposals file version 2,
+which a build needs for this; a version 1 file holding a skip or a Contra is
+refused as `proposals_legacy` (parse the statement again).
+
+- **What a statement build records.** Beside its vouchers: the statement's bank
+  ledger GUID, the days it read in full, each Contra row's network reference,
+  and each skipped row's date, amount, direction, other ledger and reference,
+  with a flag on any row that has an equal amount going the other way the same
+  day on its own statement. A statement whose every row is skipped writes no
+  file: it appends one record to `agent-import-statement-skips.jsonl` and
+  returns `state: skips_recorded`. No pairing is stored; the view is computed
+  again from these records on every call.
+- **The section.** Every successful build, and the first page of
+  `verify_import`, returns `transfers`: `state` (`computed`, or
+  `not_established` when the view could not be computed or the section was cut
+  to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
+  `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
+  `batch_id` where one is involved: `not_found`, `ambiguous`,
+  `other_side_unverified`, `held_elsewhere`, `reversed_same_day`,
+  `not_established`, or `double_booked` for a Contra booked from both
+  statements. No amount, reference, instrument, party or ledger is returned.
+- **What `not_found` claims.** Only that the other account's statement went
+  through ComplyEaze Bridge, was verified for that day, and holds no Contra for
+  the row dated the same day. A row pairs by an equal reference, or by an equal
+  date (k = 0 until two real statements of one transfer have been measured), so
+  a Contra the other bank printed on another day is not matched.
+- **What the records cannot see.** A batch that holds no statement records
+  (built from inline vouchers, or by a release before them) can still book a
+  transfer. Each Contra and statement row it holds makes the days it names (its
+  date, and the date in its `st-` id) give no coverage for the ledgers it names,
+  so a skip pairing on such a day is `not_established`, never `not_found`. A
+  blocked day removes the whole window it falls in. Such a batch blocks its
+  days whatever its status; a statement build blocks the days of its rows until
+  it is verified, so one abandoned unsent keeps them `not_established`.
+- **Refused before anything is written:** `skip_row_already_posted`,
+  `skip_row_paired_elsewhere`, `transfer_double_booked`, `withdraw_skip_invalid`,
+  `withdraw_skip_paired` and `transfer_view_not_established`, each with a
+  `next_step`.
+- **`withdraw_skips`.** Names skipped rows a build posts anyway, only when the
+  person confirms the other account's statement does not carry them. It is
+  refused (`withdraw_skip_paired`) when the row is paired, or when any Contra
+  that could carry it is in a batch not yet verified, whatever the row's state:
+  the person can confirm only what Tally holds, so each such batch is named to
+  verify first.
+- **Records a release cannot read.** The statement records refuse unknown
+  fields, so records written by a later release make this one refuse every
+  build that needs the view (`transfer_view_not_established`); builds that do
+  not need it go on with `transfers.state: not_established`. A missing
+  skip-only file reads as no skip-only records, as a missing import journal
+  reads as no batches.
+
 The file path is deliberately not a direct-posting path. Masters must already
 exist and match exactly. File generation requires fresh supported product/mode
 observations; the checks do not make a later manual import atomic with the earlier reads.

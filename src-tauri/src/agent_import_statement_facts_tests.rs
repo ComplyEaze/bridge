@@ -1098,6 +1098,85 @@ fn a_window_outside_the_skips_date_is_no_cover() {
     );
 }
 
+/// Bank Two's verified statement, which on its own proves the skip has no other
+/// side, beside `inline`, a batch of a lineage that holds no facts.
+fn beside_bank_two(inline: Build) -> SkipState {
+    let verified = bank_two_statement(140, "posted_verified");
+    state_given(Journal::default().batch(&verified).batch(&inline), "")
+}
+
+#[test]
+fn a_transfer_booked_by_a_batch_without_facts_blocks_the_day_it_names() {
+    // a withdrawn skip posted inline as a Contra, or as a Receipt naming both
+    // banks: the facts cannot see it, sent, found or only built
+    for kind in ["Contra", "Receipt"] {
+        for status in ["built", "posted_verified"] {
+            let inline = build(141)
+                .voucher(voucher(
+                    &st(9),
+                    kind,
+                    &[(N2, "500.00", "Dr"), (N1, "500.00", "Cr")],
+                    "20260901",
+                ))
+                .status(status);
+            assert_eq!(
+                beside_bank_two(inline),
+                SkipState::NotEstablished,
+                "{kind} {status}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_statement_row_blocks_the_day_its_id_carries_as_well_as_its_date() {
+    // dated after the window, but the row the id names was printed on the 1st
+    let inline = build(142).voucher(voucher(
+        &st(9),
+        "Contra",
+        &[(N2, "500.00", "Dr"), (N1, "500.00", "Cr")],
+        "20261001",
+    ));
+    assert_eq!(beside_bank_two(inline), SkipState::NotEstablished);
+}
+
+#[test]
+fn a_ledger_or_endpoint_a_batch_did_not_bind_blocks_every_ledger() {
+    // a Contra that names neither bank of the skip by a bound GUID
+    let unbound = build(143)
+        .voucher(contra("txn-1", N3, N1, "500.00"))
+        .identities(None);
+    assert_eq!(beside_bank_two(unbound), SkipState::NotEstablished);
+    // Bank Two, by a batch that names no endpoint
+    let no_endpoint = build(144)
+        .voucher(contra("txn-1", N2, N1, "500.00"))
+        .endpoint(None);
+    assert_eq!(beside_bank_two(no_endpoint), SkipState::NotEstablished);
+    let neither = build(148)
+        .voucher(contra("txn-1", N3, N1, "500.00"))
+        .identities(None)
+        .endpoint(None);
+    assert_eq!(beside_bank_two(neither), SkipState::NotEstablished);
+}
+
+#[test]
+fn a_batch_without_facts_blocks_only_the_ledgers_and_endpoint_it_names() {
+    let other_ledgers = build(145).voucher(contra(&st(9), N3, N1, "500.00"));
+    assert_eq!(beside_bank_two(other_ledgers), SkipState::NotFound);
+    let other_endpoint = build(146)
+        .voucher(contra(&st(9), N2, N1, "500.00"))
+        .endpoint(Some(OTHER_ENDPOINT));
+    assert_eq!(beside_bank_two(other_endpoint), SkipState::NotFound);
+    // a blocked day takes the whole window it falls in: this one is outside it
+    let other_day = build(147).voucher(voucher(
+        "txn-1",
+        "Contra",
+        &[(N2, "500.00", "Dr"), (N1, "500.00", "Cr")],
+        "20261001",
+    ));
+    assert_eq!(beside_bank_two(other_day), SkipState::NotFound);
+}
+
 #[test]
 fn a_statement_without_a_window_adds_no_coverage() {
     let windowless = build(127)

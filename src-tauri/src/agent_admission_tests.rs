@@ -1135,7 +1135,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
-            "is refused as withdraw_skip_paired, naming that batch",
+            "is refused as withdraw_skip_paired, naming each such batch",
             "a skip the other account's statement carries is not withdrawn into a second booking",
         ),
         (

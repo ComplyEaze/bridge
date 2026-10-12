@@ -1048,6 +1048,121 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
         .any(|row| row["bridge_txn_id"] == SKIPPED && row["state"] == "held_elsewhere"));
 }
 
+/// Bank B's statement building `rows` as Contras, none with a reference.
+fn b_contras(directory: &Path, rows: &[&str]) -> Value {
+    statement_v2(
+        directory,
+        BANK_B,
+        window(),
+        rows.iter()
+            .map(|row| contra_voucher(row))
+            .collect::<Vec<_>>()
+            .into(),
+        rows.iter()
+            .map(|row| contra_record(row, None))
+            .collect::<Vec<_>>()
+            .into(),
+    )
+}
+
+#[tokio::test]
+async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_state() {
+    // ambiguous between two unsent builds of one statement; ambiguous between a
+    // Contra found posted and one not; reversed the same day with its only
+    // candidate unsent. In each the person cannot confirm in Tally what is not
+    // there yet.
+    for case in ["two unsent", "one found, one not", "reversed"] {
+        let directory = tempfile::tempdir().unwrap();
+        let rig = Rig::new(
+            directory.path(),
+            [
+                skip_only_plans(),
+                two_bank_plans(),
+                two_bank_plans(),
+                admission_plans(),
+            ]
+            .concat(),
+        );
+        rig.build(a_skips_flagged(
+            directory.path(),
+            &[(SKIPPED, None)],
+            case == "reversed",
+        ))
+        .await;
+        let first = rig.build(b_contras(directory.path(), &[BOOKED])).await;
+        let first = first["batch_id"].as_str().unwrap().to_string();
+        let second_row = if case == "two unsent" {
+            BOOKED
+        } else {
+            OTHER_BOOKED
+        };
+        let second = rig.build(b_contras(directory.path(), &[second_row])).await;
+        let second = second["batch_id"].as_str().unwrap().to_string();
+        if case != "two unsent" {
+            mark_found(directory.path(), &first);
+        }
+        let refused = rig.build(withdrawing(directory.path())).await;
+        rig.finish();
+        assert_eq!(
+            refused["reason"], "withdraw_skip_paired",
+            "{case}: {refused}"
+        );
+        let unverified = |batch: &str| json!({"bridge_txn_id": SKIPPED, "batch_id": batch, "state": "other_side_unverified"});
+        let mut expected = if case == "two unsent" {
+            vec![unverified(&first), unverified(&second)]
+        } else {
+            vec![unverified(&second)]
+        };
+        expected.sort_by_key(|row| row["batch_id"].as_str().unwrap().to_string());
+        assert_eq!(refused["paired_rows"], json!(expected), "{case}");
+        assert_eq!(
+            refused["next_step"],
+            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row.",
+            "{case}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_than_not_found() {
+    // the same transfer skipped on both statements; bank B's skip is withdrawn
+    // through a build of inline vouchers, which records no statement
+    const B_SKIPPED: &str = "st-20260901-00000000000000b2";
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), skip_only_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    let mut b_skip = record(B_SKIPPED, json!("skipped"), BANK_A, "inflow", false);
+    b_skip["reference"] = Value::Null;
+    rig.build(statement_v2(
+        directory.path(),
+        BANK_B,
+        window(),
+        json!([]),
+        json!([b_skip]),
+    ))
+    .await;
+    let built = rig
+        .build(json!({"company_guid": CAPTURED_GUID,
+            "vouchers": [contra_voucher(B_SKIPPED)], "withdraw_skips": [B_SKIPPED]}))
+        .await;
+    rig.finish();
+    let batch = built["batch_id"].as_str().unwrap();
+    // bank A's skip is not said to be absent from bank B's statement: the
+    // Contra that carries it is one the recorded facts cannot see
+    assert_eq!(
+        open_rows(&built["transfers"]),
+        vec![
+            open_row(SKIPPED, "not_established", None),
+            open_row(B_SKIPPED, "held_elsewhere", Some(batch)),
+        ],
+        "{built}"
+    );
+}
+
 // ---- a small response cap, hundreds of open rows --------------------------------
 
 const SMALL_CAP: usize = 20_000;

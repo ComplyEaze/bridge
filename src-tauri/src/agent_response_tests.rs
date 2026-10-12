@@ -863,6 +863,26 @@ fn an_overflowing_page_is_trimmed_beside_the_note_and_the_section_widened_after(
     assert!(len_of(&response) <= cap);
 }
 
+/// A section with no open rows has counts shorter than the note: the page is
+/// trimmed beside the counts, so it keeps every row the counts leave room for.
+#[test]
+fn an_overflowing_page_is_trimmed_beside_the_counts_when_they_are_shorter_than_the_note() {
+    let section = transfers_section(0);
+    let counts = counts_only_section(&section);
+    assert!(len_of(&counts) < len_of(&check_not_run_section(false)));
+    let mut fifteen = small_page(60, counts.clone());
+    retain_page_width(&mut fifteen, PageShape::Rows("items"), 15).unwrap();
+    let cap = len_of(&fifteen) + 2;
+    let mut with_note = small_page(60, check_not_run_section(false));
+    retain_page_width(&mut with_note, PageShape::Rows("items"), 15).unwrap();
+    assert!(len_of(&with_note) > cap);
+    let mut response = small_page(60, section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 15);
+    assert_eq!(response["result"]["transfers"], counts);
+    assert!(len_of(&response) <= cap);
+}
+
 /// With no computed section the page is trimmed exactly as it always was, and
 /// a page that cannot fit fails.
 #[test]

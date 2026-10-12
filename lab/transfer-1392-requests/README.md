@@ -6,6 +6,7 @@ About 40 minutes. Keying on screen plus reads; ComplyEaze Bridge writes nothing.
 - Where TallyPrime stores a transfer reference keyed by hand: the narration, or a bank allocation field (which one, under which transaction type).
 - What Tally sends for each voucher with ComplyEaze Bridge's own voucher request (the raw capture, which keeps `BANKALLOCATIONS.LIST`), and what ComplyEaze Bridge's `vouchers` answer shows. ComplyEaze Bridge's parser keeps only the ledger, amount and side of each entry, so a bank-allocation reference is expected to be absent from the answer and present only in the capture.
 - Whether two Contras between the same two bank ledgers with the same amount and date can be told apart by anything but the reference.
+- For two Contras with NO transfer reference, the same amount and direction, a day apart (C3, C5): what a read returns to tell them apart, and whether a hand-keyed cheque or instrument number comes back.
 
 The result decides whether a later #1392 slice (pairing a skipped statement line with a hand-keyed Contra) can be built.
 
@@ -20,7 +21,7 @@ The result decides whether a later #1392 slice (pairing a skipped statement line
 **STEPS**
 1. **Keying (Tally screen):**
    - Two ledgers under Bank Accounts: `TLab Bank A` and `TLab Bank B`, no opening balance. Accept Tally's defaults for bank details, and screenshot each ledger's creation screen, including which bank fields it offers.
-   - Four Contras, each ₹50,000, typed by hand:
+   - Five Contras, each ₹50,000, typed by hand:
 
 | # | Date | Dr | Cr | Where the reference goes |
 |---|---|---|---|---|
@@ -28,6 +29,7 @@ The result decides whether a later #1392 slice (pairing a skipped statement line
 | C2 | 3 Apr 2026 | TLab Bank B | TLab Bank A | bank allocation only (if Tally opens one; pick an electronic-transfer type and put `900000000002` in the field Tally offers for a reference or UTR; report the field's label) |
 | C3 | 4 Apr 2026 | TLab Bank B | TLab Bank A | nowhere |
 | C4 | 3 Apr 2026 | TLab Bank A | TLab Bank B | narration only: `UTR 900000000004` (reverse direction) |
+| C5 | 5 Apr 2026 | TLab Bank B | TLab Bank A | no transfer reference anywhere; if Tally opens a bank allocation, a cheque or instrument number `123456` there (report the field's label), as a same-bank transfer statement prints a cheque-column value and no UTR |
 
    If Tally opens no bank allocation for C2, say so; type C2 with the reference nowhere, and report it as "no allocation offered".
 2. **Raw capture (mandatory):** send `V-CONTRA.utf16le.xml` from this folder. Check `Get-FileHash -Algorithm SHA256` against SHA256.txt first. It is ComplyEaze Bridge's own voucher request for this company and window. Send it with:
@@ -37,7 +39,7 @@ The result decides whether a later #1392 slice (pairing a skipped statement line
 
 **REPORT, one message:**
 - the two ledgers' bank-detail fields as offered;
-- for C1-C4: the screenshots, and where the reference sits;
+- for C1-C5: the screenshots, and where the reference or instrument number sits;
 - step 2's capture facts per voucher (above), the response's bytes and SHA256;
 - step 3's answer facts per voucher;
 - any STOP;

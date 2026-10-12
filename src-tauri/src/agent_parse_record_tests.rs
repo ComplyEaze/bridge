@@ -50,6 +50,9 @@ const READS_LAB: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 /// The import lab of the D3, L1, WA1 and post-span captures (`agent_import_ack_tests.rs`'
 /// `D3_GUID`, `agent_import_span_identity_tests.rs`' `COMPANY_GUID`).
 const IMPORT_LAB: &str = "17a10910-773c-42c6-bd66-7bba9a392536";
+/// The line-break ledger capture's company (`agent_import_span_identity_tests.rs`'
+/// `LINE_BREAK_COMPANY_GUID`).
+const LINE_BREAK_LAB: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
 const FOREX_LAB: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
 const AARAV: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const BILL_ALLOCATION_LAB: &str = "74d7e825-396a-4667-90b2-83f593f06a36";
@@ -326,6 +329,11 @@ fn rows() -> Vec<Row> {
         "agent/post-span-journal-alterid-span-read.utf16le.xml",
         "parse_import_verification_rows(IMPORT_LAB)",
         |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/post-line-break-ledger-readback.utf16le.xml",
+        "parse_import_verification_rows(LINE_BREAK_LAB)",
+        |_, t| verification(t, LINE_BREAK_LAB)
     ));
     rows.push(row!(
         "agent/post-span-guid-absent.utf16le.xml",

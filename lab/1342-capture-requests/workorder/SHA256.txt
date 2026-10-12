@@ -85,3 +85,7 @@ a916741b23a0deb3f7c7496cbdb38f30883aea9db22db25f781aadcaf5de6e5b  W19-README.md
 # W20 (the GSTR-1 status read with ISCANCELLED and ISOPTIONAL only, for #1655; steps in W20-README.md; derived from w13-status-window-aug.xml, the code's own render, by adding two field names only)
 b58442823c22314087eb6941781ca92fe8627497817fbd7b25bff71cc751936c  w20-status-window-aug-cancel-optional.xml
 b917b8805abbcb56df6bae46dd910c3621484e7cd1889f7c38de8f295327073d  W20-README.md
+# W21 (the GSTR-1 status read with ISPOSTDATED, then with ISDELETED and ISDELETEDVCHRETAINED as well, for #1655's follow-up; steps in W21-README.md; derived from w20-status-window-aug-cancel-optional.xml by adding field names only)
+68aaa0002f2e8cfa90dfa01016e2d6dcecad97ca8a4c33e4dc77f7c043b9ca59  w21-status-window-aug-postdated.xml
+8ea5d5a3afcc5a8a91f4003b1684a15128fe7e7adb0b8691de6ba32f42478397  w21-status-window-aug-postdated-deleted.xml
+d24ea09d0a44e1525b850f5877e0eef90b6fdc3d6703e974d75a44c194c65d23  W21-README.md

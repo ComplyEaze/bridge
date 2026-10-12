@@ -202,7 +202,7 @@ impl TransferSummary {
     }
 }
 
-const NOT_ESTABLISHED_STEP: &str = "Whether the other account's Contra exists is not established: the other account's statement for this date is not built and verified through ComplyEaze Bridge, or a batch without statement records (inline vouchers, or a release before them) names that bank on this date. Verify any batch of the other account's statement for this date first; build that statement only if no batch of it exists. If a batch without statement records already carries this transfer, keep the skip.";
+const NOT_ESTABLISHED_STEP: &str = "Whether the other account's Contra exists is not established: the other account's statement for this date is not built and verified through ComplyEaze Bridge, or a Contra on that bank on this date is one the statement records cannot see or use (built from inline vouchers or by a release before them, recorded without a facts entry, or not two equal legs). Verify any batch of the other account's statement for this date first; build that statement only if no batch of it exists. If a batch without statement records already carries this transfer, keep the skip.";
 /// The whole check could not run, which says nothing of any one row. A batch
 /// that was written, or a verification, is checked again by verifying it.
 const CHECK_NOT_RUN_STEP: &str =
@@ -517,7 +517,8 @@ impl Server {
         // each of their batches is named. Not found, not established, and
         // ambiguous or reversed the same day among verified Contras only, are.
         // One row can be skipped under several keys (two endpoints, two bank
-        // ledgers): every one of them is read.
+        // ledgers): every one of them is read, live or not, which can only
+        // refuse more.
         let verified: BTreeSet<&ContraKey> = before
             .contras
             .iter()

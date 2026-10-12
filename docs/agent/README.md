@@ -1722,13 +1722,15 @@ refused as `proposals_legacy` (parse the statement again).
   (built from inline vouchers, or by a release before them) can still book a
   transfer. Each Contra and statement row it holds makes the days it names (its
   date, and the date in its `st-` id) give no coverage for the ledgers it names,
-  so a skip pairing on such a day is `not_established`, never `not_found`. A
-  blocked day removes the whole window it falls in. A record with no endpoint
-  or no ledger binding (from an early release) blocks those days for every
-  ledger, so it can turn every skip across its days `not_established`. A Contra
-  with no statement record inside a statement's own builds blocks the same way. Such a batch blocks its
-  days whatever its status; a statement build blocks the days of its rows until
-  it is verified, so one abandoned unsent keeps them `not_established`.
+  whatever the batch's status, so a skip pairing on such a day is
+  `not_established`, never `not_found`. A Contra with no statement record inside
+  a statement's own builds blocks the same way; another voucher there does not.
+  A record with no endpoint (from an early release) blocks the ledgers it names
+  at every endpoint, and one with no ledger binding blocks every ledger at its
+  endpoint, so such a record can turn every skip across its days
+  `not_established`. A blocked day removes the whole window it falls in. A
+  statement build blocks the days of its rows until it is verified, so one
+  abandoned unsent keeps them `not_established`.
 - **Refused before anything is written:** `skip_row_already_posted`,
   `skip_row_paired_elsewhere`, `transfer_double_booked`, `withdraw_skip_invalid`,
   `withdraw_skip_paired` and `transfer_view_not_established`, each with a

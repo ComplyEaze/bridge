@@ -23,7 +23,7 @@ use crate::parse::{Cells, Row};
 use crate::refusal::Refusal;
 use crate::text::{is_alnum, is_upper, remove_space, squash, strip};
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 use std::sync::LazyLock;
 
@@ -352,6 +352,28 @@ pub struct BankReference(String);
 impl fmt::Display for BankReference {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(&self.0)
+    }
+}
+
+impl BankReference {
+    /// A reference read back from a record: admitted only in a shape
+    /// [`Bank::transfer_reference`] can produce (twelve ASCII digits, or a
+    /// value that [`looks_like_utr`]) and never all zeros. Anything else is not
+    /// a value this build wrote.
+    pub fn from_recorded(text: &str) -> Option<Self> {
+        let admitted = (text.len() == 12 && text.bytes().all(|byte| byte.is_ascii_digit()))
+            || looks_like_utr(text);
+        (admitted && !text.chars().all(|character| character == '0'))
+            .then(|| Self(text.to_string()))
+    }
+}
+
+impl<'de> Deserialize<'de> for BankReference {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        Self::from_recorded(&text).ok_or_else(|| {
+            serde::de::Error::custom("not a reference a statement row can carry")
+        })
     }
 }
 

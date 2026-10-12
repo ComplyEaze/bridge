@@ -23,7 +23,7 @@ use crate::parse::{Cells, Row};
 use crate::refusal::Refusal;
 use crate::text::{is_alnum, is_upper, remove_space, squash, strip};
 use regex::Regex;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::Serialize;
 use std::fmt;
 use std::sync::LazyLock;
 
@@ -365,14 +365,6 @@ impl BankReference {
             || looks_like_utr(text);
         (admitted && !text.chars().all(|character| character == '0'))
             .then(|| Self(text.to_string()))
-    }
-}
-
-impl<'de> Deserialize<'de> for BankReference {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let text = String::deserialize(deserializer)?;
-        Self::from_recorded(&text)
-            .ok_or_else(|| serde::de::Error::custom("not a reference a statement row can carry"))
     }
 }
 

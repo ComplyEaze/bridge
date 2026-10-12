@@ -40,17 +40,9 @@ fn a_shape_no_row_produces_is_refused() {
         "ABCDEFGH123",
         // twelve digits that are not ASCII
         "٦٠٠٠٠٠٠٠٠٠٠٠٠",
+        // a placeholder, not a reference
+        "000000000000",
     ] {
         assert_eq!(admitted(refused), None, "{refused:?}");
-    }
-}
-
-#[test]
-fn a_reference_deserializes_only_when_a_row_could_have_produced_it() {
-    let good: BankReference = serde_json::from_str("\"600000000001\"").unwrap();
-    assert_eq!(good.to_string(), "600000000001");
-    assert_eq!(serde_json::to_string(&good).unwrap(), "\"600000000001\"");
-    for bad in ["\"\"", "\"000000000000\"", "\"abc\"", "5", "null"] {
-        assert!(serde_json::from_str::<BankReference>(bad).is_err(), "{bad}");
     }
 }

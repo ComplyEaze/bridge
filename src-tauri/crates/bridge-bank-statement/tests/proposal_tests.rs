@@ -12,8 +12,8 @@ use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Disposition,
-    Side, StatementRecord, VoucherType,
+    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Direction,
+    Disposition, Side, StatementRecord, VoucherType,
 };
 use common::*;
 
@@ -72,8 +72,9 @@ fn build_treatments() {
         ("ALPHA", "Alpha Ledger", "contra"),
         ("OWN ACCT", "Other Bank", "skip"),
     ]);
-    let Build { proposals, records } =
-        build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
+    let Build {
+        proposals, records, ..
+    } = build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
     assert_eq!(proposals.len(), 2);
     assert_eq!(records.len(), 3);
     assert_eq!(proposals[0].voucher_type, VoucherType::Contra);
@@ -449,6 +450,8 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         bridge_txn_id: "st-x".to_string(),
         cash_movement: None,
         cash_answer: None,
+        direction: Direction::Inflow,
+        reversed_same_day: false,
     }
 }
 

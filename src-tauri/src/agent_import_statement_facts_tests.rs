@@ -165,6 +165,7 @@ impl StatementFacts {
             bridge_txn_id: txn.into(),
             reference: reference.map(str::to_string),
             instrument: None,
+            reversed_same_day: false,
         });
         self
     }
@@ -193,6 +194,7 @@ fn skip_row(txn: &str, amount: &str, other: &str, reference: Option<&str>) -> Sk
         other_ledger_guid: other.into(),
         reference: reference.map(str::to_string),
         instrument: None,
+        reversed_same_day: false,
     }
 }
 
@@ -331,6 +333,90 @@ fn a_skip_carries_its_row_into_the_view() {
     assert_eq!(skip.other_ledger, LedgerGuid::new(B2));
     assert_eq!(skip.reference, None);
     assert_eq!(skip.lineage, LineageId::new(batch_id(3)));
+    assert!(!skip.reversed_same_day);
+}
+
+/// A refused build names the check that failed, one name for each.
+#[test]
+fn each_failed_check_has_a_name_of_its_own() {
+    let txn = || st(1);
+    let checks = [
+        FactsError::EmptyLedgerGuid,
+        FactsError::InvertedCoverage,
+        FactsError::DuplicateTxnId { txn: txn() },
+        FactsError::SkipIdNotStatementId { txn: txn() },
+        FactsError::ReferenceInadmissible { txn: txn() },
+        FactsError::AmountInadmissible { txn: txn() },
+        FactsError::SkipLedgersEqual { txn: txn() },
+        FactsError::ContraRowNotOneContraVoucher { txn: txn() },
+        FactsError::ContraVoucherNotInFacts { txn: txn() },
+        FactsError::SkipIsVoucher { txn: txn() },
+        FactsError::BankLedgerUnbound,
+        FactsError::BadRecordId,
+        FactsError::NotSkipOnly,
+    ];
+    let names: BTreeSet<_> = checks.iter().map(FactsError::variant).collect();
+    assert_eq!(names.len(), checks.len());
+    assert!(names
+        .iter()
+        .all(|name| name.chars().all(|c| c.is_ascii_lowercase() || c == '_')));
+}
+
+/// The flag a statement set on a row follows it into the facts the view takes,
+/// whether the row is a Contra, a skip of a batch or a skip-only record's, and
+/// is written only when set.
+#[test]
+fn the_same_day_reversal_flag_follows_each_row_into_the_facts() {
+    let mut flagged_skip = skip_row(&st(1), "500.00", B2, None);
+    flagged_skip.reversed_same_day = true;
+    let plain_skip = skip_row(&st(4), "500.00", B2, None);
+    let mut flagged_contra = facts(B2).contra(&st(2), None);
+    flagged_contra.contra_rows[0].reversed_same_day = true;
+    let journal = Journal::default()
+        .batch(&build(1).facts(facts(B1).skip(flagged_skip).skip(plain_skip)))
+        .batch(
+            &build(2)
+                .voucher(contra(&st(2), N2, N1, "500.00"))
+                .voucher(contra(&st(3), N2, N1, "500.00"))
+                .facts(flagged_contra.contra(&st(3), None)),
+        );
+    let found = journal.read().unwrap();
+    let skips: Vec<_> = found
+        .skips
+        .iter()
+        .map(|skip| (skip.key.row.clone(), skip.reversed_same_day))
+        .collect();
+    assert_eq!(
+        skips,
+        [
+            (StatementRowId::new(st(1)), true),
+            (StatementRowId::new(st(4)), false)
+        ]
+    );
+    let contras: Vec<_> = found
+        .contras
+        .iter()
+        .map(|fact| (fact.key.txn.clone(), fact.reversed_same_day))
+        .collect();
+    assert_eq!(
+        contras,
+        [(TxnId::new(st(2)), true), (TxnId::new(st(3)), false)]
+    );
+
+    // a skip-only record's row carries it too
+    let mut only = skip_row(&st(5), "500.00", B2, None);
+    only.reversed_same_day = true;
+    let record = skip_record(1, ENDPOINT, "2026-09-02T10:00:00Z", facts(B1).skip(only));
+    let found = Journal::default()
+        .read_with(&skip_file(std::slice::from_ref(&record)), COMPANY)
+        .unwrap();
+    assert!(found.skips[0].reversed_same_day);
+
+    // written only when set
+    let text = serde_json::to_string(&record).unwrap();
+    assert!(text.contains("\"reversed_same_day\":true"), "{text}");
+    let plain = serde_json::to_string(&skip_row(&st(6), "1.00", B2, None)).unwrap();
+    assert!(!plain.contains("reversed_same_day"), "{plain}");
 }
 
 #[test]
@@ -1289,6 +1375,7 @@ fn skip_only_records_are_checked_whole() {
         bridge_txn_id: st(1),
         reference: None,
         instrument: None,
+        reversed_same_day: false,
     });
     assert!(matches!(
         check(with_contra),

@@ -25,7 +25,7 @@ use crate::parse::Row;
 use crate::refusal::Refusal;
 use crate::text::{ledger_key, mapping_key, squash, strip};
 use bridge_tally_primitives::ExactDecimal;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -122,7 +122,7 @@ pub enum Side {
     Cr,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VoucherType {
     Payment,
     Receipt,
@@ -157,7 +157,7 @@ pub struct Proposal {
     pub entries: Vec<Entry>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     Voucher(VoucherType),
@@ -166,6 +166,26 @@ pub enum Disposition {
     /// A cash withdrawal or deposit nobody has answered yet. No voucher is
     /// proposed, and `build_import_xml` refuses the proposals until it is.
     NeedsAnswer,
+}
+
+/// Which way money moved on the statement's own account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Direction {
+    /// A debit-column row: money left the account.
+    Outflow,
+    /// A credit-column row: money arrived.
+    Inflow,
+}
+
+impl Direction {
+    fn of(outward: bool) -> Self {
+        if outward {
+            Self::Outflow
+        } else {
+            Self::Inflow
+        }
+    }
 }
 
 /// What became of one statement row. Kept for every row inside the date window,
@@ -195,12 +215,85 @@ pub struct StatementRecord {
     pub cash_movement: Option<CashMovement>,
     /// The person's answer for a cash line, when given.
     pub cash_answer: Option<CashAnswer>,
+    /// Which way the row moved money on the statement's own account.
+    pub direction: Direction,
+    /// The statement holds another row, read on the same date, of an equal
+    /// amount in the opposite direction: a line that came straight back is
+    /// not half of a transfer. Read over every row of the statement, not only
+    /// those in the date window.
+    pub reversed_same_day: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Build {
     pub proposals: Vec<Proposal>,
     pub records: Vec<StatementRecord>,
+    /// The date of every row the statement printed, before the date window.
+    pub dates: Vec<Date>,
+}
+
+/// The days whose every row the statement read, from the date of every row it
+/// read and the `from`/`to` window the person gave (`None` for either end
+/// that was left open).
+///
+/// The balance replay closes on balances the person types, so a statement
+/// downloaded part-way through a day can miss the rest of that day. A day at
+/// the edge of the rows therefore counts only when a row exists beyond it: the
+/// window starts at `from` when it is later than the first row's date, else the
+/// day after it; it ends at `to` when that is earlier than the last row's
+/// date, else the day before it. `None` when no day is left.
+pub fn coverage(dates: &[Date], from: Option<Date>, to: Option<Date>) -> Option<(Date, Date)> {
+    let first = *dates.iter().min()?;
+    let last = *dates.iter().max()?;
+    let start = match from {
+        Some(from) if from > first => from,
+        _ => first.next_day()?,
+    };
+    let end = match to {
+        Some(to) if to < last => to,
+        _ => last.previous_day()?,
+    };
+    (start <= end).then_some((start, end))
+}
+
+/// One row read as a movement of money, or `None` when it does not read as one
+/// (the build refuses such a row if it lies in the window).
+fn movement(row: &Row, bank: Bank, number: usize) -> Option<(Date, String, bool)> {
+    let date = bank.parse_date(strip(row.get(DATE)))?;
+    let debit = money(row.get(DEBIT), DEBIT, number).ok()?;
+    let credit = money(row.get(CREDIT), CREDIT, number).ok()?;
+    match (debit, credit) {
+        (Some(amount), None) => Some((date, format_amount(&amount), true)),
+        (None, Some(amount)) => Some((date, format_amount(&amount), false)),
+        _ => None,
+    }
+}
+
+/// For each row, whether another row of the statement moved the same amount the
+/// other way on the same date.
+fn reversed_same_day(rows: &[Row], bank: Bank) -> Vec<bool> {
+    let moves: Vec<Option<(Date, String, bool)>> = rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| movement(row, bank, index + 1))
+        .collect();
+    let mut seen: BTreeMap<(Date, &str), (bool, bool)> = BTreeMap::new();
+    for (date, amount, outward) in moves.iter().flatten() {
+        let both = seen.entry((*date, amount.as_str())).or_default();
+        if *outward {
+            both.0 = true;
+        } else {
+            both.1 = true;
+        }
+    }
+    moves
+        .iter()
+        .map(|moved| {
+            moved.as_ref().is_some_and(|(date, amount, _)| {
+                seen.get(&(*date, amount.as_str())) == Some(&(true, true))
+            })
+        })
+        .collect()
 }
 
 /// Everything `build` needs besides the rows and the mapping.
@@ -390,6 +483,8 @@ pub fn build(
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut statement_ids = BTreeSet::new();
     let mut window_ids = BTreeSet::new();
+    let mut dates = Vec::with_capacity(rows.len());
+    let reversed = reversed_same_day(rows, bank);
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -403,6 +498,7 @@ pub fn build(
                 ),
             ));
         };
+        dates.push(date);
         let txn_id = transaction_id(options.account_number, date, row);
         statement_ids.insert(txn_id.clone());
         if options.date_from.is_some_and(|from| date < from)
@@ -472,6 +568,8 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement,
                         cash_answer: None,
+                        direction: Direction::of(outward),
+                        reversed_same_day: reversed[index],
                     });
                     continue;
                 };
@@ -543,6 +641,8 @@ pub fn build(
                         bridge_txn_id: txn_id,
                         cash_movement: None,
                         cash_answer: None,
+                        direction: Direction::of(outward),
+                        reversed_same_day: reversed[index],
                     });
                     continue;
                 }
@@ -646,6 +746,8 @@ pub fn build(
             bridge_txn_id: txn_id,
             cash_movement,
             cash_answer,
+            direction: Direction::of(outward),
+            reversed_same_day: reversed[index],
         });
     }
     if let Some(stale) = options
@@ -678,7 +780,11 @@ pub fn build(
             "no statement row falls inside the date window; the window does not overlap the statement",
         ));
     }
-    Ok(Build { proposals, records })
+    Ok(Build {
+        proposals,
+        records,
+        dates,
+    })
 }
 
 /// What [`selfcheck`] counted.

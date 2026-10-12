@@ -18,13 +18,14 @@
 //! that fails the whole view, never a dropped row: losing one lineage's Contras
 //! could turn an ambiguous skip into a wrong unique pair.
 use super::*;
+use crate::agent::bank_statement::ResolvedStatement;
 use crate::agent::transfer_pairing::{
     BatchId, BatchStatus, CompanyGuid, ContraFact, ContraKey, ContraLeg, Coverage, Direction,
     EndpointOrigin, LedgerGuid, LineageId, PairingInputError, ParseWindow, Side, SkipFact, SkipKey,
     StatementRowId, TxnId,
 };
 use bridge_bank_statement::bank::BankReference;
-use bridge_bank_statement::proposals::is_statement_txn_id;
+use bridge_bank_statement::proposals::{is_statement_txn_id, Direction as FileDirection};
 use chrono::{DateTime, FixedOffset};
 use std::io::BufRead;
 
@@ -50,6 +51,10 @@ pub(super) struct ContraRow {
     /// The cheque or number the statement prints. Recorded only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) instrument: Option<String>,
+    /// The statement holds another row on the same date, of an equal amount,
+    /// the other way.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(super) reversed_same_day: bool,
 }
 
 /// Which way money moved on the statement's own bank ledger.
@@ -73,6 +78,9 @@ pub(super) struct SkipRow {
     pub(super) reference: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) instrument: Option<String>,
+    /// As on [`ContraRow`].
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(super) reversed_same_day: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -104,6 +112,58 @@ pub(super) struct SkipOnlyRecord {
     pub(super) endpoint_origin: String,
     pub(super) built_at: String,
     pub(super) statement: StatementFacts,
+}
+
+/// The skip-only file, beside the import journal.
+pub(super) const SKIPS_FILE: &str = "agent-import-statement-skips.jsonl";
+
+impl StatementFacts {
+    /// The facts a version 2 proposals file gives, each ledger name taken to the
+    /// GUID the build's own catalogue read bound it to. A name the binding does
+    /// not hold gives an empty GUID, which `validate_statement_facts` refuses.
+    pub(super) fn of_statement(statement: &ResolvedStatement, binding: &[BoundLedger]) -> Self {
+        let guid = |name: &str| {
+            binding
+                .iter()
+                .find(|bound| bound.name == name)
+                .map(|bound| bound.guid.clone())
+                .unwrap_or_default()
+        };
+        Self {
+            bank_ledger_guid: guid(&statement.bank_ledger),
+            coverage: statement
+                .coverage
+                .clone()
+                .map(|(from, to)| StatementWindow { from, to }),
+            contra_rows: statement
+                .contras
+                .iter()
+                .map(|contra| ContraRow {
+                    bridge_txn_id: contra.bridge_txn_id.clone(),
+                    reference: contra.reference.as_ref().map(ToString::to_string),
+                    instrument: contra.instrument.clone(),
+                    reversed_same_day: contra.reversed_same_day,
+                })
+                .collect(),
+            skip_rows: statement
+                .skips
+                .iter()
+                .map(|skip| SkipRow {
+                    bridge_txn_id: skip.bridge_txn_id.clone(),
+                    date: skip.date.clone(),
+                    amount: skip.amount.clone(),
+                    direction: match skip.direction {
+                        FileDirection::Outflow => RowDirection::Outflow,
+                        FileDirection::Inflow => RowDirection::Inflow,
+                    },
+                    other_ledger_guid: guid(&skip.other_ledger),
+                    reference: skip.reference.as_ref().map(ToString::to_string),
+                    instrument: skip.instrument.clone(),
+                    reversed_same_day: skip.reversed_same_day,
+                })
+                .collect(),
+        }
+    }
 }
 
 /// Read the skip-only file: the journal's framing, one record per line, each
@@ -153,6 +213,28 @@ pub(super) enum FactsError {
     NotSkipOnly,
 }
 
+impl FactsError {
+    /// Which check failed, without the value that failed it.
+    pub(super) fn variant(&self) -> &'static str {
+        match self {
+            Self::EmptyLedgerGuid => "empty_ledger_guid",
+            Self::InvertedCoverage => "inverted_coverage",
+            Self::DuplicateTxnId { .. } => "duplicate_txn_id",
+            Self::SkipIdNotStatementId { .. } => "skip_id_not_statement_id",
+            Self::ReferenceInadmissible { .. } => "reference_inadmissible",
+            Self::AmountInadmissible { .. } => "amount_inadmissible",
+            Self::SkipLedgersEqual { .. } => "skip_ledgers_equal",
+            Self::ContraRowNotOneContraVoucher { .. } => "contra_row_not_one_contra_voucher",
+            Self::ContraVoucherNotInFacts { .. } => "contra_voucher_not_in_facts",
+            Self::SkipIsVoucher { .. } => "skip_is_voucher",
+            Self::BankLedgerUnbound => "bank_ledger_unbound",
+            Self::BadRecordId => "bad_record_id",
+            Self::NotSkipOnly => "not_skip_only",
+            Self::Unparsable => "unparsable",
+        }
+    }
+}
+
 /// A batch's vouchers and bound ledgers, which the facts must agree with.
 pub(super) struct LineShape<'a> {
     pub(super) vouchers: &'a [BuildVoucher],
@@ -166,6 +248,8 @@ pub(super) struct ValidFacts {
     pub(super) window: Option<ParseWindow>,
     /// Each Contra row's id and reference.
     pub(super) contras: BTreeMap<String, Option<BankReference>>,
+    /// The Contra rows whose statement reversed them the same day.
+    pub(super) reversed_contras: BTreeSet<String>,
     pub(super) skips: Vec<ValidSkip>,
 }
 
@@ -177,6 +261,7 @@ pub(super) struct ValidSkip {
     direction: Direction,
     other_ledger: LedgerGuid,
     reference: Option<BankReference>,
+    reversed_same_day: bool,
 }
 
 fn admitted_reference(txn: &str, text: Option<&str>) -> Result<Option<BankReference>, FactsError> {
@@ -220,6 +305,7 @@ pub(super) fn validate_statement_facts(
     };
     let mut seen = BTreeSet::new();
     let mut contras = BTreeMap::new();
+    let mut reversed_contras = BTreeSet::new();
     for row in &facts.contra_rows {
         let txn = row.bridge_txn_id.as_str();
         if !seen.insert(txn) {
@@ -229,6 +315,9 @@ pub(super) fn validate_statement_facts(
             txn.to_string(),
             admitted_reference(txn, row.reference.as_deref())?,
         );
+        if row.reversed_same_day {
+            reversed_contras.insert(txn.to_string());
+        }
     }
     let mut skips = Vec::new();
     for row in &facts.skip_rows {
@@ -257,6 +346,7 @@ pub(super) fn validate_statement_facts(
             },
             other_ledger: LedgerGuid::new(row.other_ledger_guid.as_str()),
             reference,
+            reversed_same_day: row.reversed_same_day,
         });
     }
     if let Some(shape) = shape {
@@ -302,6 +392,7 @@ pub(super) fn validate_statement_facts(
         bank_ledger: LedgerGuid::new(facts.bank_ledger_guid.as_str()),
         window,
         contras,
+        reversed_contras,
         skips,
     })
 }
@@ -684,7 +775,7 @@ fn lineage_facts(
         }
     }
     // the newest facts entry for a Contra row gives its reference and bank
-    let mut entries: BTreeMap<&str, (&LedgerGuid, &Option<BankReference>)> = BTreeMap::new();
+    let mut entries: BTreeMap<&str, (&LedgerGuid, &Option<BankReference>, bool)> = BTreeMap::new();
     let mut skips: BTreeMap<SkipKey, SkipMention> = BTreeMap::new();
     let mut ledgers = BTreeSet::new();
     for &at in members {
@@ -697,7 +788,14 @@ fn lineage_facts(
             facts.bank_ledger.clone(),
         ));
         for (txn, reference) in &facts.contras {
-            entries.insert(txn.as_str(), (&facts.bank_ledger, reference));
+            entries.insert(
+                txn.as_str(),
+                (
+                    &facts.bank_ledger,
+                    reference,
+                    facts.reversed_contras.contains(txn),
+                ),
+            );
         }
         for skip in &facts.skips {
             if deciding.contains_key(skip.txn.as_str()) {
@@ -723,6 +821,7 @@ fn lineage_facts(
                         other_ledger: skip.other_ledger.clone(),
                         reference: skip.reference.clone(),
                         lineage: lineage.clone(),
+                        reversed_same_day: skip.reversed_same_day,
                     },
                     row: skip.txn.clone(),
                     built: *built,
@@ -746,7 +845,7 @@ fn lineage_facts(
         let batch = &batches[decider];
         // a Contra with no facts entry in any build is not a statement Contra,
         // in a lineage that holds facts it is one the facts do not see
-        let Some(&(bank_ledger, reference)) = entries.get(txn) else {
+        let Some(&(bank_ledger, reference, reversed_same_day)) = entries.get(txn) else {
             if voucher.kind == VoucherType::Contra {
                 found.without_facts += 1;
                 uncertain.insert(txn);
@@ -779,6 +878,7 @@ fn lineage_facts(
                         batch: BatchId::new(batch.line.batch_id.as_str()),
                     }
                 },
+                reversed_same_day,
             },
             txn: txn.to_string(),
             deciding: decider,
@@ -907,6 +1007,7 @@ pub(super) fn build_transfer_facts(
                     other_ledger: skip.other_ledger,
                     reference: skip.reference,
                     lineage: LineageId::new(record.record_id.as_str()),
+                    reversed_same_day: skip.reversed_same_day,
                 },
                 row: skip.txn,
                 built,

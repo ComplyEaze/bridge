@@ -68,6 +68,7 @@ mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
 mod statement_facts;
 pub(super) use approval::PostApprovals;
+use statement_facts::{SkipOnlyRecord, StatementFacts};
 #[path = "agent_import_verification.rs"]
 mod verification;
 use std::path::{Path, PathBuf};
@@ -799,6 +800,16 @@ impl Server {
         // admits them exactly as it admits inline vouchers.
         let resolved =
             super::bank_statement::resolve_import_arguments(&self.settings.data_dir, args)?;
+        // A statement of which every row was skipped has no batch to build.
+        if let Some(statement) = resolved
+            .statement
+            .as_ref()
+            .filter(|statement| statement.is_skip_only())
+        {
+            return self
+                .record_skip_only_statement(&resolved.args, statement)
+                .await;
+        }
         // The approvals are not part of the payload (`parse_payload` refuses
         // unknown fields, and a post builds `ImportPayload` literals), so the
         // key is taken out here and judged once the flags have been read.
@@ -833,63 +844,29 @@ impl Server {
                 .await
                 .map(|(names, catalogue, _, evidence)| (names, catalogue, evidence))?;
             accumulated = combine_evidence(accumulated.clone(), catalogue_evidence.clone());
-            let requested_names = requested_ledger_names(&payload);
-            let mut report = masters_for_payload(&payload, &catalogue)?;
-            annotate_folded_twins(&mut report, &requested_names, ledger_masters.catalog().parents());
-            if report.iter().any(|value| value["match_state"] != "exact") {
-                let report = in_batch_order(
-                    requested_names.iter().zip(report).collect(),
-                    &payload.vouchers,
-                    |(name, _)| name.as_str(),
-                )
-                .into_iter()
-                .map(|(_, master)| master)
-                .collect::<Vec<_>>();
-                return Ok(ToolOutcome {
-                    payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                        "state":"refused", "reason":"masters_not_exact", "masters":report,
-                        "catalogue_evidence_sha256":sha256_json(&catalogue),
-                        "next_step":master_recovery_guidance(&report)
-                    }}),
-                    evidence: accumulated.clone(),
-                    company_guid: Some(payload.company_guid),
-                    truncated: false,
-                });
-            }
-            let twins = in_batch_order(
-                folded_twins(&requested_names, ledger_masters.catalog().parents()),
+            // A statement's facts name its bank and its skipped rows' other
+            // ledgers beyond those of its vouchers; they are bound, and held to
+            // exactness, like any voucher ledger.
+            let facts_names = resolved
+                .statement
+                .as_ref()
+                .map(|statement| statement.ledger_names())
+                .unwrap_or_default();
+            let requested_names = requested_ledger_names_with(&payload, &facts_names);
+            if let Some(refusal) = unbindable_masters(
+                &requested_names,
                 &payload.vouchers,
-                |twins| twins.requested.as_str(),
-            );
-            if !twins.is_empty() {
-                return Ok(ToolOutcome {
-                    payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                        "state":"refused", "reason":"ledger_has_folded_twin",
-                        "ledger_twins": twins.iter().map(|twins| json!({
-                            "requested": party_name(twins.requested.clone()),
-                            "relation": "fold_equal",
-                            "live_ledgers": folded_live_ledgers_json(twins),
-                        })).collect::<Vec<_>>(),
-                        "catalogue_evidence_sha256":sha256_json(&catalogue),
-                        "next_step":FOLDED_TWIN_NEXT_STEP
-                    }}),
-                    evidence: accumulated.clone(),
-                    company_guid: Some(payload.company_guid),
-                    truncated: false,
-                });
+                &catalogue,
+                &ledger_masters,
+                &company,
+                &accumulated,
+                &payload.company_guid,
+            )? {
+                return Ok(refusal);
             }
             // Bind each named ledger to the GUID this read observed (#239): a
             // post refuses a ledger renamed and replaced under its name since.
-            let build_binding = ledger_masters
-                .catalog()
-                .bind_selected(requested_ledger_names(&payload))
-                .map_err(|_| "import_masters_changed".to_string())?
-                .pairs()
-                .map(|(name, guid)| BoundLedger {
-                    name: name.to_string(),
-                    guid: guid.to_string(),
-                })
-                .collect::<Vec<_>>();
+            let build_binding = bind_ledgers(&ledger_masters, requested_names)?;
             // Only a payload carrying a cash/bank voucher reads the group
             // collection. Every payload, a Journal-only one included, reads
             // each named ledger's bill-wise flag (#1234), from the ledger list
@@ -1168,7 +1145,7 @@ impl Server {
                 amends_batch_id.as_deref().unwrap_or(&batch_id),
             );
             let sha256 = sha256_hex(xml.as_bytes());
-            let line = ImportLedgerLine {
+            let mut line = ImportLedgerLine {
                 batch_id: batch_id.clone(),
                 identity_scheme: Some(ImportIdentityScheme::BatchV1),
                 amends_batch_id,
@@ -1202,6 +1179,30 @@ impl Server {
                 on_account_approved: Some(on_account_approved),
                 statement: None,
             };
+            // A statement file's facts, held to the same checks the transfer
+            // view makes when it reads them, before anything is written.
+            if let Some(statement) = &resolved.statement {
+                let facts = StatementFacts::of_statement(
+                    statement,
+                    line.ledger_identities.as_deref().unwrap_or_default(),
+                );
+                let shape = statement_facts::BuildLine::of(&line);
+                if let Err(error) = statement_facts::validate_statement_facts(
+                    &facts,
+                    Some(statement_facts::LineShape {
+                        vouchers: &shape.vouchers,
+                        ledger_identities: line.ledger_identities.as_deref(),
+                    }),
+                ) {
+                    return Ok(statement_facts_refusal(
+                        &company,
+                        error.variant(),
+                        &accumulated,
+                        &line.company_guid,
+                    ));
+                }
+                line.statement = Some(statement_facts::statement_record(&facts));
+            }
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
             if let Some(error) = persistence::persist_build(&imports, &line, xml.as_bytes(), || {
@@ -1302,6 +1303,84 @@ impl Server {
         }
         .await;
         result.map_err(|failure| failure.with_prior_evidence(accumulated))
+    }
+
+    /// A statement of which every row was skipped as recorded from the other
+    /// bank's statement: verified company, the bank's and the skipped rows'
+    /// ledgers bound by the catalogue, and one record appended to the skip-only
+    /// file. No XML, no batch, and nothing sent to Tally.
+    async fn record_skip_only_statement(
+        &self,
+        args: &Value,
+        statement: &super::bank_statement::ResolvedStatement,
+    ) -> Result<ToolOutcome, ToolFailure> {
+        let mut args = args.clone();
+        if !bill_wise::take_approvals(&mut args)
+            .map_err(approval_invalid)?
+            .is_empty()
+        {
+            return Err("skip_only_statement_takes_no_approvals".to_string().into());
+        }
+        let payload = parse_payload(&args)?;
+        if payload.amends_batch_id.is_some() {
+            return Err("skip_only_statement_cannot_amend".to_string().into());
+        }
+        let (company, identity, identity_evidence) =
+            self.verified_company(&payload.company_guid).await?;
+        let (catalogue, ledger_masters, catalogue_evidence) = self
+            .read_import_ledger_catalogue(&identity, &company.name)
+            .await
+            .map(|(names, catalogue, _, evidence)| (names, catalogue, evidence))
+            .map_err(|failure| failure.with_prior_evidence(identity_evidence.clone()))?;
+        let accumulated = combine_evidence(identity_evidence, catalogue_evidence);
+        let names = statement.ledger_names();
+        if let Some(refusal) = unbindable_masters(
+            &names,
+            &[],
+            &catalogue,
+            &ledger_masters,
+            &company,
+            &accumulated,
+            &payload.company_guid,
+        )
+        .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?
+        {
+            return Ok(refusal);
+        }
+        let binding = bind_ledgers(&ledger_masters, names)
+            .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
+        let company_guid = canonical_batch_guid(&payload.company_guid);
+        let record = SkipOnlyRecord {
+            record_id: format!("skips-{}", Uuid::new_v4().hyphenated()),
+            company_guid: company_guid.clone(),
+            endpoint_origin: super::canonical_loopback_origin(&self.settings.endpoint)
+                .map_err(|_| "host_setting_invalid".to_string())?,
+            built_at: now(),
+            statement: StatementFacts::of_statement(statement, &binding),
+        };
+        if let Err(error) = statement_facts::validate_skip_record(&record) {
+            return Ok(statement_facts_refusal(
+                &company,
+                error.variant(),
+                &accumulated,
+                &company_guid,
+            ));
+        }
+        let _admission_lock = self
+            .lock_import_admission()
+            .map_err(|code| ToolFailure::from(code).with_prior_evidence(accumulated.clone()))?;
+        self.append_skip_record_while_admitted(&record)
+            .map_err(|code| ToolFailure::from(code).with_prior_evidence(accumulated.clone()))?;
+        Ok(ToolOutcome {
+            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                "state": "skips_recorded",
+                "record_id": record.record_id,
+                "skipped_rows": record.statement.skip_rows.len(),
+            }}),
+            evidence: accumulated,
+            company_guid: Some(company_guid),
+            truncated: false,
+        })
     }
 
     /// The tool: page 1 verifies against Tally; a later page (`proof_sha256`
@@ -2428,7 +2507,21 @@ impl Server {
         &self,
         line: &impl Serialize,
     ) -> Result<(), String> {
-        let path = self.settings.data_dir.join("agent-import-ledger.jsonl");
+        self.append_record_while_admitted("agent-import-ledger.jsonl", line)
+    }
+
+    /// One record of a statement that posts nothing, in the file beside the
+    /// journal that only the transfer facts read.
+    fn append_skip_record_while_admitted(&self, record: &SkipOnlyRecord) -> Result<(), String> {
+        self.append_record_while_admitted(statement_facts::SKIPS_FILE, record)
+    }
+
+    fn append_record_while_admitted(
+        &self,
+        file_name: &str,
+        line: &impl Serialize,
+    ) -> Result<(), String> {
+        let path = self.settings.data_dir.join(file_name);
         let encoded = serde_json::to_string(line)
             .map_err(|_| "import_ledger_serialization_failed".to_string())?;
         let encoded = format!("{encoded}\n");
@@ -3495,14 +3588,116 @@ fn totals<D>(vouchers: &[ImportVoucher<D>]) -> Result<(ExactDecimal, ExactDecima
     Ok((debit, credit))
 }
 
+/// The refusal for requested ledgers the catalogue does not hold exactly, or
+/// holds twice under names that fold equal, or `None` when each is one live
+/// ledger by its exact name.
+fn unbindable_masters(
+    requested_names: &[String],
+    vouchers: &[ImportVoucher],
+    catalogue: &[String],
+    ledger_masters: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    company: &bridge_tally_protocol::TallyCompany,
+    evidence: &Evidence,
+    company_guid: &str,
+) -> Result<Option<ToolOutcome>, ToolFailure> {
+    let mut report = masters_for_names(requested_names, catalogue)?;
+    annotate_folded_twins(
+        &mut report,
+        requested_names,
+        ledger_masters.catalog().parents(),
+    );
+    let company_guid = Some(company_guid.to_string());
+    if report.iter().any(|value| value["match_state"] != "exact") {
+        let report = in_batch_order(
+            requested_names.iter().zip(report).collect(),
+            vouchers,
+            |(name, _)| name.as_str(),
+        )
+        .into_iter()
+        .map(|(_, master)| master)
+        .collect::<Vec<_>>();
+        return Ok(Some(ToolOutcome {
+            payload: json!({"company": company_json(company, std::slice::from_ref(company)), "result": {
+                "state":"refused", "reason":"masters_not_exact", "masters":report,
+                "catalogue_evidence_sha256":sha256_json(&catalogue),
+                "next_step":master_recovery_guidance(&report)
+            }}),
+            evidence: evidence.clone(),
+            company_guid,
+            truncated: false,
+        }));
+    }
+    let twins = in_batch_order(
+        folded_twins(requested_names, ledger_masters.catalog().parents()),
+        vouchers,
+        |twins| twins.requested.as_str(),
+    );
+    if twins.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(ToolOutcome {
+        payload: json!({"company": company_json(company, std::slice::from_ref(company)), "result": {
+            "state":"refused", "reason":"ledger_has_folded_twin",
+            "ledger_twins": twins.iter().map(|twins| json!({
+                "requested": party_name(twins.requested.clone()),
+                "relation": "fold_equal",
+                "live_ledgers": folded_live_ledgers_json(twins),
+            })).collect::<Vec<_>>(),
+            "catalogue_evidence_sha256":sha256_json(&catalogue),
+            "next_step":FOLDED_TWIN_NEXT_STEP
+        }}),
+        evidence: evidence.clone(),
+        company_guid,
+        truncated: false,
+    }))
+}
+
+/// Each requested ledger with the GUID `ledger_masters` observed for it.
+fn bind_ledgers(
+    ledger_masters: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    names: Vec<String>,
+) -> Result<Vec<BoundLedger>, ToolFailure> {
+    Ok(ledger_masters
+        .catalog()
+        .bind_selected(names)
+        .map_err(|_| "import_masters_changed".to_string())?
+        .pairs()
+        .map(|(name, guid)| BoundLedger {
+            name: name.to_string(),
+            guid: guid.to_string(),
+        })
+        .collect())
+}
+
+/// A statement's facts failed a check the transfer view makes when it reads
+/// them. Nothing was written. The check is named, not the value that failed it.
+fn statement_facts_refusal(
+    company: &bridge_tally_protocol::TallyCompany,
+    check: &str,
+    evidence: &Evidence,
+    company_guid: &str,
+) -> ToolOutcome {
+    ToolOutcome {
+        payload: json!({"company": company_json(company, std::slice::from_ref(company)), "result": {
+            "state": "refused", "reason": "statement_facts_invalid", "check": check,
+            "next_step": "No file was written. The facts this statement would record failed a check, which only a defect in ComplyEaze Bridge can cause. Report it with the check named here; do not build this statement again."
+        }}),
+        evidence: evidence.clone(),
+        company_guid: Some(company_guid.to_string()),
+        truncated: false,
+    }
+}
+
 fn masters_for_payload(
     payload: &ImportPayload,
     catalogue: &[String],
 ) -> Result<Vec<Value>, String> {
-    requested_master_report(
-        &requested_masters(&requested_ledger_names(payload))?,
-        catalogue,
-    )
+    masters_for_names(&requested_ledger_names(payload), catalogue)
+}
+
+/// [`masters_for_payload`] for the names alone.
+fn masters_for_names(names: &[String], catalogue: &[String]) -> Result<Vec<Value>, String> {
+    requested_master_report(&requested_masters(names)?, catalogue)
 }
 
 /// A ledger name as a caller requested it, parsed at the boundary (bridge#626).
@@ -3730,11 +3925,18 @@ fn served_masters_verdict(mut verdict: Value, vouchers: &[ImportVoucher]) -> Val
 /// The ledgers a batch names, each once, in name order. A list of them sent to
 /// the caller is put `in_batch_order` first.
 fn requested_ledger_names(payload: &ImportPayload) -> Vec<String> {
+    requested_ledger_names_with(payload, &[])
+}
+
+/// [`requested_ledger_names`] and the `extra` ledgers a statement's facts name
+/// beyond its vouchers, bound by the same catalogue read.
+fn requested_ledger_names_with(payload: &ImportPayload, extra: &[String]) -> Vec<String> {
     payload
         .vouchers
         .iter()
         .flat_map(|voucher| &voucher.entries)
         .map(|entry| entry.ledger.clone())
+        .chain(extra.iter().cloned())
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()

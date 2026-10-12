@@ -48,9 +48,18 @@ pub enum PartyStatementDestinationApprovalError {
 /// can turn a renderer-provided token and destination into a value accepted by
 /// the bulk writer.
 ///
-/// ```compile_fail
-/// use bridge_lib::reports::bulk_party_statement::ApprovedPartyStatementDestination;
-/// let _ = ApprovedPartyStatementDestination(std::path::PathBuf::from("/tmp"));
+/// The two doctests are the compiler's own check of that. The first names the
+/// type through the root re-export and must compile, so the path the second
+/// relies on exists. The second tries to build the value through that path and
+/// must be refused. Stable rustdoc does not check the `E0451` code after
+/// `compile_fail`, so without the first an unreachable path would also pass.
+///
+/// ```
+/// fn _named(_: &bridge_lib::ApprovedPartyStatementDestination) {}
+/// ```
+///
+/// ```compile_fail,E0451
+/// let _ = bridge_lib::ApprovedPartyStatementDestination { 0: std::path::PathBuf::from("/tmp") };
 /// ```
 #[derive(Debug)]
 pub struct ApprovedPartyStatementDestination(PathBuf);

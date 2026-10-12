@@ -338,6 +338,19 @@ fn no_path_is_in_the_json_unless_asked() {
         serde_json::json!([path]),
         "{shown}"
     );
+    // two lock folders: the first is still lock_folder_path, both are listed in order
+    let second = root.join("profile");
+    let two = to_json(
+        &report,
+        SystemTime::now(),
+        Some((root, &[root, second.as_path()])),
+    );
+    assert_eq!(two["lock_folder_path"], path, "{two}");
+    assert_eq!(
+        two["lock_folder_paths"],
+        serde_json::json!([path, second.display().to_string()]),
+        "{two}"
+    );
     assert!(names_the_path(&shown.to_string(), root), "{shown}");
 }
 

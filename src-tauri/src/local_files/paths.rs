@@ -59,18 +59,24 @@ pub(crate) fn default_dispatch_coordination_dir() -> Option<PathBuf> {
 /// is not redirected, and still under AppData first, which an earlier build on
 /// the same side of the package boundary takes alone. Elsewhere there is one.
 pub(crate) fn dispatch_coordination_roots() -> Option<Vec<PathBuf>> {
+    coordination_roots().into_iter().collect()
+}
+
+/// Each coordination root, in order, as far as it resolves: for a report that
+/// lists the lock folders, where one that does not resolve hides no other.
+pub(crate) fn coordination_roots() -> Vec<Option<PathBuf>> {
     #[cfg(windows)]
     {
-        Some(vec![
-            default_dispatch_coordination_dir()?,
+        vec![
+            default_dispatch_coordination_dir(),
             profile_coordination_dir(windows_known_folder(
                 &windows_sys::Win32::UI::Shell::FOLDERID_Profile,
-            ))?,
-        ])
+            )),
+        ]
     }
     #[cfg(not(windows))]
     {
-        default_dispatch_coordination_dir().map(|root| vec![root])
+        vec![default_dispatch_coordination_dir()]
     }
 }
 

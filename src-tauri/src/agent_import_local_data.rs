@@ -445,7 +445,10 @@ pub(super) fn to_json(
 /// why the report is incomplete, if it is. The coordination folders are the
 /// default ones.
 pub(in crate::agent) fn tool_payload(root: &Path) -> (serde_json::Value, Option<&'static str>) {
-    let coordination = crate::local_files::paths::dispatch_coordination_roots().unwrap_or_default();
+    let coordination = crate::local_files::paths::coordination_roots()
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     let coordination: Vec<&Path> = coordination.iter().map(PathBuf::as_path).collect();
     let report = build(root, &coordination);
     (
@@ -461,7 +464,10 @@ fn folders() -> (PathBuf, Vec<PathBuf>) {
         .unwrap_or_else(crate::local_files::paths::default_data_dir);
     (
         root,
-        crate::local_files::paths::dispatch_coordination_roots().unwrap_or_default(),
+        crate::local_files::paths::coordination_roots()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>(),
     )
 }
 

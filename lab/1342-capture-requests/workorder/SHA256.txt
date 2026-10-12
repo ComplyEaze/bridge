@@ -89,3 +89,7 @@ b917b8805abbcb56df6bae46dd910c3621484e7cd1889f7c38de8f295327073d  W20-README.md
 68aaa0002f2e8cfa90dfa01016e2d6dcecad97ca8a4c33e4dc77f7c043b9ca59  w21-status-window-aug-postdated.xml
 8ea5d5a3afcc5a8a91f4003b1684a15128fe7e7adb0b8691de6ba32f42478397  w21-status-window-aug-postdated-deleted.xml
 d24ea09d0a44e1525b850f5877e0eef90b6fdc3d6703e974d75a44c194c65d23  W21-README.md
+# W21b (one post-dated Sales voucher and one deletion on the synthetic company, each read with W21's request; writes after a backup, restored at the end; steps in W21B-README.md)
+0af56c5c324927ed80989090787d78650ff5e9e0943ea410f005381a88a83537  W21B-README.md
+# W18b (the verification-window read W18 did not take, from W18's book state restored from the W19-C backup, proved by the marks; reads only; steps in W18B-README.md)
+5619a02e14c496878b8095269eede43a255290a8df3a9ae91020b77310b15ce3  W18B-README.md

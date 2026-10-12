@@ -1954,6 +1954,47 @@ pub fn twin_fold_keys(value: &str) -> [String; 3] {
     [wide, verified_fold(value), both]
 }
 
+/// The third key of [`twin_fold_keys`]: the gateway fold applied after the wide
+/// one. A name-collision check matches on this key **and** on
+/// [`canonical_master_key`]; neither subsumes the other, because lowercasing and
+/// NFC do not commute (`J` + caron against `j` + caron agree on the canonical
+/// key only; NFC against NFD agrees on this key only). Equality on twin key 0
+/// implies equality on this key, since it is a function of key 0. Like the twin
+/// keys it decides nothing about a binding; it is for refusing.
+pub fn absence_key(value: &str) -> String {
+    verified_fold(&master_identity_key(value))
+}
+
+/// The composed fold §9.4d measured on licensed TallyPrime 7.1: `-` and `/`
+/// treated as a space, any Unicode whitespace run collapsed to one space,
+/// surrounding whitespace trimmed, and each character lowercased by Unicode
+/// rules (`char::to_lowercase`, not ASCII only). It applies no Unicode
+/// normalisation (NFC/NFD): §9.4d's own finding is that Tally refuses that
+/// fold, so an NFC and an NFD spelling of one name stay distinct here.
+pub fn canonical_master_key(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut last_was_space = true; // also drops leading whitespace
+    for ch in name.chars() {
+        let mapped = match ch {
+            '-' | '/' => ' ',
+            other => other,
+        };
+        if mapped.is_whitespace() {
+            if !last_was_space {
+                out.push(' ');
+            }
+            last_was_space = true;
+        } else {
+            out.extend(mapped.to_lowercase());
+            last_was_space = false;
+        }
+    }
+    while out.ends_with(' ') {
+        out.pop();
+    }
+    out
+}
+
 /// A historical candidate index, retained for deterministic ordering.
 ///
 /// It may be broader than qualified gateway measurements and cannot resolve a

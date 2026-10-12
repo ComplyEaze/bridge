@@ -52,8 +52,7 @@ const CENSUS_WIRE_BYTES_PER_VOUCHER: u64 = 4 * 1024;
 pub(super) const MAX_CENSUS_READS: usize = 256;
 
 /// The most planned data reads one window read may spend before it is refused
-/// as needing a narrower window. The same ceiling the outstandings scanner uses
-/// for its own segment pairs.
+/// as needing a narrower window.
 pub(super) const MAX_PLANNED_READS: usize = 128;
 
 /// The request shapes this bound plans for, each with the per-voucher cost to

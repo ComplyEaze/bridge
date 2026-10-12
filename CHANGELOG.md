@@ -115,8 +115,8 @@ These changes are in source and not yet in a published build.
   reason line, as any line that does not fit does. The line above the voucher lines said each
   narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
   it now says a cut narration is marked. Payment, Receipt and Contra lines still name one
-  ledger. On every line, further ledgers on a side now read "+N more", never a bare "+N" that
-  could be read as an amount.
+  ledger. On every line, the further entries on a side now read "+N more", never a bare "+N"
+  that could be read as an amount.
 
 ## [0.5.1] - 2026-10-09
 

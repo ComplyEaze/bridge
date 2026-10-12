@@ -65,7 +65,7 @@ pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
 /// A guid-based tag when `name` names a real ledger in `book.ledgers` (the case at risk of the
 /// read-shape rename churn this module exists to fix); the plain sha1 hash of `name` itself
 /// otherwise -- for a `name` that is NOT a Book ledger: a client-config alias, a synthetic
-/// sentinel bucket (e.g. `cash_payments_40a3::UNIDENTIFIED_PARTY`), or a Trial Balance row with no
+/// sentinel bucket (e.g. `high_value_register::UNIDENTIFIED_PARTY`), or a Trial Balance row with no
 /// matching ledger master. None of those is itself read fresh from Tally's ledger export on every
 /// capture, so none of them carries this module's rename-churn risk; hashing the string itself is
 /// already stable for them, and refusing would drop a real row for no benefit. When `name` DOES

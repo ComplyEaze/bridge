@@ -115,7 +115,7 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
                     if attempt < 3 {
                         ReadAttempt::Failure {
                             error: "transient",
-                            class: ReadFailureClass::RequestTimeout,
+                            class: ReadFailureClass::Connection,
                             observed_body_bytes: BodyBytesObservation::Unavailable,
                         }
                     } else {
@@ -158,6 +158,37 @@ async fn transient_reads_retry_exactly_but_validation_never_retries() {
         error,
         ReadExecutionError::Attempt("validation_failed")
     ));
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+}
+
+// A client timeout does not cancel the work Tally is still doing, and the gateway serialises,
+// so a second send queues behind the first (IMPLEMENTATION_GUIDE rule I7).
+#[tokio::test]
+async fn a_timed_out_read_is_sent_once() {
+    let runtime = test_runtime(Duration::ZERO, 100);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&attempts);
+    let error = runtime
+        .execute_read(
+            endpoint("timeout-endpoint"),
+            ReadOperation::VoucherExport,
+            ReadRetryPolicy::new(3, Duration::ZERO, Duration::ZERO, 0).unwrap(),
+            CancellationToken::new(),
+            move |_| {
+                let observed = Arc::clone(&observed);
+                async move {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                    ReadAttempt::<(), _>::Failure {
+                        error: "timed_out",
+                        class: ReadFailureClass::RequestTimeout,
+                        observed_body_bytes: BodyBytesObservation::Unavailable,
+                    }
+                }
+            },
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(error, ReadExecutionError::Attempt("timed_out")));
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
 }
 

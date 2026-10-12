@@ -1,0 +1,31 @@
+.github/workflows/ci.yml
+docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+scripts/check-ci-workflow-consistency.mjs
+src-tauri/Cargo.toml
+src-tauri/crates/bridge-tally-primitives/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/Cargo.toml
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/compute.rs
+src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/crates/bridge-tally-transport/Cargo.toml
+src-tauri/crates/bridge-tally-transport/src/lib.rs
+src-tauri/src/agent_voucher_parse.rs
+src-tauri/src/agent_voucher_window.rs
+src-tauri/src/reports/bulk_party_statement.rs
+src-tauri/src/reports/outstandings_working_paper_store.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/mod.rs
+src-tauri/src/tally/runtime.rs
+src/OutstandingsScreen.tsx
+src/outstandings-bills.ts
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/completeness.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/compute.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/mod.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/model.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/parser.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/request.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/outstandings/wire.rs
+removed-pin: src-tauri/src/tally/outstandings_runtime.rs
+reviewer: lamemustafa

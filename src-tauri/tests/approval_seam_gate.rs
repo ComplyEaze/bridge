@@ -638,7 +638,7 @@ fn the_seam_is_gated_by_bare_cfg_test_and_its_non_test_arm_is_the_real_dialog() 
             "#[cfg(test)]\npub(crate) mod test_seam {",
             "#[cfg(test)]\n/// Scripted approvals.\npub(crate) mod test_seam {",
         ),
-        format!("{source}\n#[cfg(feature = \"voucher-scan\")]\nfn unrelated() {{}}\n"),
+        format!("{source}\n#[cfg(feature = \"lab-writes\")]\nfn unrelated() {{}}\n"),
         // A word inside a string is not a cfg predicate.
         format!("{source}\n#[cfg(feature = \"test-fixtures\")]\nfn unrelated() {{}}\n"),
     ] {

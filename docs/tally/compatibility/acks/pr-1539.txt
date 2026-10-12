@@ -1,0 +1,5 @@
+src-tauri/Cargo.lock
+src-tauri/crates/bridge-tally-core/Cargo.toml
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-core/src/master_binding.rs
+reviewer: lamemustafa

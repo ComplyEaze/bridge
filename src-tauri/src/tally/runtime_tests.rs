@@ -4,7 +4,7 @@
 )]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
-use crate::tally::TallyProduct;
+use crate::tally::{ConnectionStatus, TallyProduct};
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
@@ -220,10 +220,6 @@ fn outstandings_read_strategy_serializes_as_an_explicit_wire_contract() {
     assert_eq!(
         serde_json::to_value(OutstandingsReadStrategy::NativeBills).unwrap(),
         serde_json::json!("native_bills")
-    );
-    assert_eq!(
-        serde_json::to_value(OutstandingsReadStrategy::VoucherScan).unwrap(),
-        serde_json::json!("voucher_scan")
     );
 }
 
@@ -974,178 +970,6 @@ fn education_snapshot_period_refusal_is_an_in_band_partial() {
     ));
 }
 
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn outstandings_read_failures_are_partial_and_deadlines_recommend_restart() {
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::Error::new(TallyTransportError::RequestTimedOut)),
-        "tally_segment_deadline_restart_recommended"
-    );
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::Error::new(TallyTransportError::RequestFailed)),
-        "segment_request_failed"
-    );
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::Error::new(TallyTransportError::HttpStatus {
-            status: 500
-        })),
-        "segment_http_status_failure"
-    );
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::anyhow!("connection refused")),
-        "segment_read_failed"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn outstandings_read_transport_failure_feeds_breaker_and_preserves_typed_partial() {
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: "localhost".to_string(),
-        port: 9120,
-    };
-    let result = runtime
-        .execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            |_client| async {
-                Err::<OutstandingsLoadResult, _>(anyhow::Error::new(
-                    OutstandingsReadTransportFailure {
-                        reason_code: "tally_segment_deadline_restart_recommended",
-                        source: anyhow::Error::new(TallyTransportError::RequestTimedOut),
-                    },
-                ))
-            },
-        )
-        .await;
-    let caller_value = partial_after_outstandings_read_transport_failure(result)
-        .expect("outstandings read transport failures stay in-band for the caller");
-    assert!(matches!(
-        caller_value,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "tally_segment_deadline_restart_recommended"
-    ));
-    assert_eq!(
-        runtime.snapshots().expect("runtime snapshot")[0].consecutive_failures,
-        1,
-        "the breaker must observe the transport failure before UI mapping"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn verification_partial_stays_partial_without_feeding_breaker() {
-    let runtime = TallyRuntime::default();
-    let result = runtime
-        .execute(
-            TallyConfig {
-                host: "localhost".to_string(),
-                port: 9121,
-            },
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            |_client| async { Ok::<_, anyhow::Error>(partial_result("paired_segment_mismatch")) },
-        )
-        .await;
-    let caller_value = partial_after_outstandings_read_transport_failure(result)
-        .expect("verification partial remains an in-band result");
-    assert!(matches!(
-        caller_value,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "paired_segment_mismatch"
-    ));
-    assert_eq!(
-        runtime.snapshots().expect("runtime snapshot")[0].consecutive_failures,
-        0,
-        "a verification failure reached a responder and must not poison endpoint health"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn closing_coverage_drift_is_not_reported_as_uncovered_opening_bills() {
-    assert_eq!(
-        closing_coverage_partial_reason(false, true),
-        Some("ledger_master_identity_changed_during_scan")
-    );
-    assert_eq!(
-        closing_coverage_partial_reason(true, false),
-        Some("ledger_opening_bills_not_covered")
-    );
-    assert_eq!(closing_coverage_partial_reason(true, true), None);
-}
-
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn intra_pair_ledger_coverage_drift_is_an_in_band_partial() {
-    assert_eq!(
-        paired_coverage_partial_reason(&LedgerOpeningCoverageRead::Drifted),
-        Some("ledger_master_identity_changed_during_scan")
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn witness_transport_failure_feeds_breaker_and_preserves_typed_partial() {
-    let error = fetch_empty_partition_witness(
-        VoucherAlterIdHighWater::parse("1").expect("positive high-water"),
-        || async { Err(anyhow::Error::new(TallyTransportError::RequestTimedOut)) },
-    )
-    .await
-    .expect_err("a witness transport failure must cross the runtime health boundary");
-    assert!(error.downcast_ref::<TallyTransportError>().is_some());
-
-    let runtime = TallyRuntime::default();
-    let result = runtime
-        .execute(
-            TallyConfig {
-                host: "localhost".to_string(),
-                port: 9122,
-            },
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            |_client| async {
-                Err::<OutstandingsLoadResult, _>(outstandings_read_transport_failure(
-                    anyhow::Error::new(TallyTransportError::RequestTimedOut),
-                ))
-            },
-        )
-        .await;
-    let caller_value = partial_after_outstandings_read_transport_failure(result)
-        .expect("witness transport failure stays in-band only after health accounting");
-
-    assert!(matches!(
-        caller_value,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "tally_segment_deadline_restart_recommended"
-    ));
-    assert_eq!(
-        runtime.snapshots().expect("runtime snapshot")[0].consecutive_failures,
-        1,
-        "the breaker must observe the witness transport failure"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn witness_non_transport_failure_remains_an_in_band_partial() {
-    let partial = fetch_empty_partition_witness(
-        VoucherAlterIdHighWater::parse("1").expect("positive high-water"),
-        || async { Err(anyhow::anyhow!("witness response was malformed")) },
-    )
-    .await
-    .expect("non-transport witness failure stays in-band")
-    .expect_err("a malformed witness cannot complete a non-empty book");
-
-    assert_eq!(
-        partial.reason_code,
-        "empty_date_witness_profile_unavailable"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
 #[test]
 fn outstandings_date_boundaries_follow_detected_mode_and_fallback_to_i12() {
     let mut profile = synthetic_probe_result().profile;
@@ -1175,31 +999,12 @@ fn outstandings_date_boundaries_follow_detected_mode_and_fallback_to_i12() {
     );
 }
 
-/// An uncalibrated segment width no longer refuses the read -- it selects
-/// the native bills path, which needs no width. What must NOT change is
-/// that a non-loopback endpoint is still refused.
-///
-/// This test previously asserted `outstandings_segment_sizing_uncalibrated`
-/// and, by using a non-loopback host, proved the refusal happened BEFORE
-/// endpoint admission. That refusal was the defect: production has no
-/// calibrated width by construction, so every shipped build returned it for
-/// every company on every book and the screen could only ever say "No Tally
-/// data was read". The reason code is gone with it.
-///
-/// The loopback guard is unchanged and still fails closed; it is simply now
-/// the first guard the read reaches, before its currency read (the desktop
-/// read, which the uncalibrated voucher-scan build falls back to). That is the
-/// property worth pinning, so this asserts it directly rather than inferring
-/// it from an ordering that no longer exists.
+/// A non-loopback endpoint is refused by the outstandings read before any
+/// Tally request. The loopback guard is the first guard the read reaches,
+/// before its currency read, and this asserts it directly.
 #[tokio::test]
-async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non_loopback_endpoint()
-{
+async fn the_outstandings_read_refuses_a_non_loopback_endpoint() {
     let runtime = TallyRuntime::default();
-    #[cfg(feature = "voucher-scan")]
-    assert!(
-        runtime.outstandings_segment_policy.is_none(),
-        "a default runtime must have no calibrated width -- that is what routes to the native path"
-    );
 
     let config = TallyConfig {
         host: "not-a-loopback-endpoint".to_string(),
@@ -1207,18 +1012,6 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
     };
     let identity = verified_identity("Synthetic Company", "synthetic-guid");
     let as_of = TallyDate::parse("20260731").unwrap();
-    #[cfg(feature = "voucher-scan")]
-    let error = runtime
-        .fetch_outstandings(
-            config,
-            &identity,
-            as_of,
-            OutstandingsCurrencyAssertion::Inr,
-            OutstandingsAgeingAnchor::DueDate,
-        )
-        .await
-        .expect_err("a non-loopback endpoint must never be contacted");
-    #[cfg(not(feature = "voucher-scan"))]
     let error = runtime
         .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)
         .await
@@ -1227,72 +1020,6 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
         error.to_string().contains("non_loopback_forbidden"),
         "loopback-only admission must fail closed before any Tally read, got: {error}"
     );
-}
-
-#[cfg(feature = "live-calibration-harness")]
-#[tokio::test]
-async fn calibrated_voucher_scan_withholds_totals_before_endpoint_admission_without_residual_coverage(
-) {
-    let result = TallyRuntime::for_billwise_lab_reconciliation_exit_check()
-        .fetch_outstandings(
-            TallyConfig {
-                host: "not-a-loopback-endpoint".to_string(),
-                port: 9000,
-            },
-            &verified_identity("Synthetic Company", "synthetic-guid"),
-            TallyDate::parse("20260731").unwrap(),
-            OutstandingsCurrencyAssertion::Inr,
-            OutstandingsAgeingAnchor::DueDate,
-        )
-        .await
-        .expect("missing coverage is an in-band partial result");
-    assert!(matches!(
-        result,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "unallocated_direct_postings_not_covered"
-    ));
-}
-
-#[cfg(all(feature = "voucher-scan", not(feature = "live-calibration-harness")))]
-#[test]
-fn default_build_has_no_outstandings_width_admission() {
-    let runtime = TallyRuntime::default();
-    assert!(runtime.outstandings_segment_policy.is_none());
-    assert!(runtime.outstandings_boundary_profile_override.is_none());
-}
-
-#[cfg(feature = "live-calibration-harness")]
-#[test]
-fn billwise_lab_exit_harness_uses_only_education_valid_boundaries() {
-    let runtime = TallyRuntime::for_billwise_lab_reconciliation_exit_check();
-    assert_eq!(
-        runtime.outstandings_boundary_profile_override,
-        Some(DateBoundaryProfile::EducationRestricted)
-    );
-    let reporting_window = DateWindow::parse(
-        runtime
-            .outstandings_boundary_profile_override
-            .expect("exit profile is fixed"),
-        "20240401",
-        "20260702",
-    )
-    .expect("accepted corpus extent uses Education-valid boundaries");
-    let partitions = reporting_window
-        .narrow_partitions()
-        .expect("Education-valid corpus partitions without day-3 synthesis");
-    assert!(partitions.iter().all(|partition| {
-        matches!(&partition.from().as_str()[6..8], "01" | "02" | "31")
-            && matches!(&partition.to().as_str()[6..8], "01" | "02" | "31")
-    }));
-
-    let unprofiled = DateWindow::parse(DateBoundaryProfile::ModeAgnostic, "20240401", "20260702")
-        .unwrap()
-        .narrow_partitions()
-        .unwrap();
-    assert!(unprofiled.iter().any(|partition| {
-        !matches!(&partition.from().as_str()[6..8], "01" | "02" | "31")
-            || !matches!(&partition.to().as_str()[6..8], "01" | "02" | "31")
-    }));
 }
 
 #[test]
@@ -1718,22 +1445,6 @@ async fn cancellation_registry_cancels_and_releases_requests() {
         0,
         "operator cancellation must not degrade endpoint health"
     );
-}
-
-#[test]
-fn telemetry_preview_is_privacy_reduced_and_checksummed() {
-    let preview = TallyRuntime::default()
-        .telemetry_preview()
-        .expect("telemetry preview");
-    assert_eq!(preview.schema, "bridge.tally.telemetry-preview/2");
-    assert_eq!(preview.payload_sha256.len(), 64);
-    let preview_value: serde_json::Value =
-        serde_json::from_str(&preview.preview_json).expect("valid preview JSON");
-    assert_eq!(
-        preview_value["privacy_profile"],
-        "fixed_dimensions_bucketed_values_v1"
-    );
-    assert_eq!(preview_value["authenticity_claim"], "none");
 }
 
 /// What each unallocated row says about its own composition, on captures of a

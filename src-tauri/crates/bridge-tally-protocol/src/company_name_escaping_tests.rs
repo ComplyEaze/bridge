@@ -3,9 +3,8 @@
 //! as it went in: the rendered request parses as well-formed XML, and its
 //! `SVCURRENTCOMPANY` element decodes to the raw name, byte for byte.
 //!
-//! One table-driven test per always-compiled renderer family, plus one small
-//! test for the non-default `voucher-scan` family, instead of a near-duplicate
-//! escaping test in every renderer file. The qualification-only Bills probe may
+//! One table-driven test over the renderer families, instead of a
+//! near-duplicate escaping test in every renderer file. The qualification-only Bills probe may
 //! not be referenced outside its own module (the live-read boundary gate), so
 //! its escaping stays tested there
 //! (`dynamic_values_are_escaped_and_cannot_inject_requests_or_variables`).
@@ -113,14 +112,4 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
             "{label} did not round-trip the company name byte for byte"
         );
     }
-}
-
-/// The `voucher-scan` outstandings path (`outstandings/request.rs`) is
-/// compiled only under its own feature, so it gets its own small test rather
-/// than joining the always-on table above.
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn outstandings_request_company_name_round_trips() {
-    let request = crate::outstandings::render_ledger_opening_coverage(NAME);
-    assert_eq!(decoded_svcurrentcompany(&request), NAME);
 }

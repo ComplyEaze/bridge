@@ -2,6 +2,7 @@
 use super::*;
 use crate::reports::party_ledger_master::SourceNoteKind;
 use crate::tally::connection::PartyLedgerMasterSourceValidationError;
+use crate::tally::ConnectionStatus;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };

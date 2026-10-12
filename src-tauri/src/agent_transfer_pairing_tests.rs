@@ -1469,7 +1469,7 @@ fn transfer_pairing_duplicates_fail_the_same_way_in_any_input_order() {
     }
 }
 
-// ---- a line reversed the same day is not a transfer ------------------------------
+// ---- a line with an equal amount the other way the same day --------------------
 
 fn reversed_skip(row: &str, direction: Direction) -> SkipFact {
     let mut fact = skip(row);
@@ -1490,7 +1490,7 @@ fn reversed_state(candidates: &[(&str, &str)]) -> SkipState {
 /// A payment from b2 to b1 failed and came straight back on b2's statement
 /// (out and in, the same day, the same amount), and the transfer was made again
 /// from b1: b1's statement shows one withdrawal. By amount and date alone b2's
-/// returned line matches b1's withdrawal. It is not a transfer.
+/// returned line matches b1's withdrawal. Nothing but a reference may pair it.
 #[test]
 fn transfer_pairing_a_payment_failed_and_retried_from_the_other_account_pairs_nothing() {
     // b1's one withdrawal debits b2 and credits b1
@@ -1557,27 +1557,88 @@ fn transfer_pairing_a_reversed_contra_beside_a_plain_one_pairs_with_neither() {
 }
 
 #[test]
-fn transfer_pairing_a_reversed_contra_with_an_equal_reference_does_not_pair() {
+fn transfer_pairing_a_flag_does_not_veto_an_equal_network_reference() {
+    // the flag also holds for a real round trip, so a reference that both
+    // statements print still pairs the row
     let mut flagged = contra("batch-1", "t1");
     flagged.reversed_same_day = true;
     flagged.reference = Some(reference("600000000001"));
     let mut referenced = skip("st-1");
     referenced.reference = Some(reference("600000000001"));
-    let view = view_of(
-        &[referenced.clone()],
-        &[flagged.clone()],
-        &january_covered(),
-        0,
+    for (skip_flag, contra_flag) in [(false, true), (true, false), (true, true)] {
+        let mut skip = referenced.clone();
+        skip.reversed_same_day = skip_flag;
+        let mut contra = flagged.clone();
+        contra.reversed_same_day = contra_flag;
+        let view = view_of(&[skip], &[contra], &january_covered(), 0);
+        assert_eq!(
+            state_of(&view, "st-1"),
+            paired(PairRound::Reference, "batch-1", "t1")
+        );
+    }
+    // a reference that differs is still no pair, flag or none
+    let mut other = flagged.clone();
+    other.reference = Some(reference("600000000002"));
+    let view = view_of(&[referenced], &[other], &january_covered(), 0);
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+}
+
+/// A transfer from b2 to b1 in the morning and one back in the evening, the
+/// same amount: both statements flag all four rows. b2 skipped both of its
+/// rows, as carried by b1's two Contras.
+fn round_trip(references: bool) -> (Vec<SkipFact>, Vec<ContraFact>) {
+    let tag = |fact: &mut Option<BankReference>, digits: &str| {
+        *fact = references.then(|| reference(digits));
+    };
+    let mut out = reversed_skip("st-out", Direction::Outflow);
+    tag(&mut out.reference, "600000000001");
+    let mut back = reversed_skip("st-back", Direction::Inflow);
+    tag(&mut back.reference, "600000000002");
+    // b1 received the first and sent the second
+    let mut received = contra("batch-1", "t1");
+    received.reversed_same_day = true;
+    tag(&mut received.reference, "600000000001");
+    let mut sent = contra("batch-1", "t2");
+    sent.legs = [
+        ContraLeg {
+            ledger: ledger("b1"),
+            side: Side::Credit,
+        },
+        ContraLeg {
+            ledger: ledger("b2"),
+            side: Side::Debit,
+        },
+    ];
+    sent.reversed_same_day = true;
+    tag(&mut sent.reference, "600000000002");
+    (vec![out, back], vec![received, sent])
+}
+
+#[test]
+fn transfer_pairing_a_round_trip_with_equal_references_pairs_both_legs() {
+    let (skips, contras) = round_trip(true);
+    let view = view_of(&skips, &contras, &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-out"),
+        paired(PairRound::Reference, "batch-1", "t1")
     );
     assert_eq!(
-        state_of(&view, "st-1"),
+        state_of(&view, "st-back"),
+        paired(PairRound::Reference, "batch-1", "t2")
+    );
+}
+
+#[test]
+fn transfer_pairing_a_round_trip_without_references_pairs_neither_leg_and_is_listed() {
+    let (skips, contras) = round_trip(false);
+    let view = view_of(&skips, &contras, &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-out"),
         reversed_state(&[("batch-1", "t1")])
     );
-    flagged.reversed_same_day = false;
-    let view = view_of(&[referenced], &[flagged], &january_covered(), 0);
     assert_eq!(
-        state_of(&view, "st-1"),
-        paired(PairRound::Reference, "batch-1", "t1")
+        state_of(&view, "st-back"),
+        reversed_state(&[("batch-1", "t2")])
     );
 }
 

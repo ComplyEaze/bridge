@@ -1130,7 +1130,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
-            "name a row only when the person says the other account's statement does NOT hold the transfer",
+            "name a row only when the person confirms the other account's statement does not carry it",
             "a skip is withdrawn on the person's word, never the assistant's",
         ),
         (

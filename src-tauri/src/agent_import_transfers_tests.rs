@@ -260,10 +260,19 @@ fn each_next_step_says_what_was_decided() {
     assert!(step("not_found").contains("withdraw the skip on exactly one side"));
     assert!(step("not_found").contains("Do not enter this transfer in Tally by hand"));
     assert!(step("ambiguous").contains("does not choose"));
-    assert!(step("reversed_same_day").contains("withdraw_skips"));
+    let reversed = step("reversed_same_day");
+    assert!(reversed.contains("a reversal and a pair of real transfers look alike"));
+    assert!(reversed.contains("Check in Tally which rows are transfers"));
+    assert!(reversed.contains(
+        "Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it"
+    ));
+    // it never says the row is not a transfer
+    assert!(!reversed.contains("not a transfer"), "{reversed}");
     assert!(step("held_elsewhere").contains("once it is found posted the skip is retired"));
     assert!(step("double_booked").contains("keep one"));
-    assert!(step("not_established").contains("check could not run"));
+    let open = step("not_established");
+    assert!(open.contains("Verify any batch of the other account's statement for this date first"));
+    assert!(open.contains("build that statement only if no batch of it exists"));
     for state in [
         "other_side_unverified",
         "not_found",
@@ -290,8 +299,8 @@ fn a_section_that_cannot_be_computed_says_so_and_claims_nothing() {
         assert!(section.get(claim).is_none(), "{claim} in {section}");
     }
     assert_eq!(
-        section["next_steps"]["not_established"],
-        next_step("not_established")
+        section["next_steps"],
+        json!({"check_not_run": "The transfer check could not run this time; call verify_import again."})
     );
 }
 

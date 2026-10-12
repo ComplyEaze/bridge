@@ -28,11 +28,14 @@
 //!   Contra's: a pair by date claims that nothing else exists. A row that took
 //!   part in round 1 without pairing does not pair here, although it still
 //!   counts against the rows that could.
-//! * A row reversed the same day on its own statement (`reversed_same_day`) is
-//!   not a transfer: it pairs in neither round, but it still counts against the
-//!   rows that could pair. A skip that is flagged, or any of whose candidates
-//!   is, is `ReversedSameDay` with those candidates instead of a pair or
-//!   `Ambiguous`.
+//! * A row with an equal amount going the other way the same day on its own
+//!   statement (`reversed_same_day`) may be a reversal or one of two real
+//!   transfers, and the date cannot tell them apart. Equal network references
+//!   still pair it (round 1 ignores the flag). It never pairs by date (round
+//!   2), but it still counts against the rows that could. A skip that did not
+//!   pair by reference and is flagged, or any of whose candidates is, is
+//!   `ReversedSameDay` with those candidates instead of `Ambiguous`,
+//!   `NotFound` or a pair.
 //! * A Contra that is double-booked (also booked from a second statement) pairs
 //!   in neither round; a skip whose candidate it is stays `Ambiguous`.
 //!
@@ -165,7 +168,8 @@ pub(crate) struct SkipFact {
     pub(crate) reference: Option<BankReference>,
     pub(crate) lineage: LineageId,
     /// The statement holds another row on the same date, of an equal amount,
-    /// the other way: a line that came straight back is not a transfer.
+    /// the other way: a reversal and two real transfers look alike, so the
+    /// date alone cannot pair the row.
     pub(crate) reversed_same_day: bool,
 }
 
@@ -195,7 +199,8 @@ pub(crate) struct ContraFact {
     pub(crate) lineage: LineageId,
     pub(crate) status: BatchStatus,
     /// The statement holds another row on the same date, of an equal amount,
-    /// the other way: a line that came straight back is not a transfer.
+    /// the other way: a reversal and two real transfers look alike, so the
+    /// date alone cannot pair the row.
     pub(crate) reversed_same_day: bool,
 }
 
@@ -249,8 +254,9 @@ pub(crate) enum SkipState {
         batch: BatchId,
     },
     NotEstablished,
-    /// The skipped row, or a row that could carry it, is reversed the same day
-    /// on its own statement, so it is not a transfer. Listed with the Contras
+    /// The skipped row, or a row that could carry it, has an equal amount going
+    /// the other way the same day on its own statement, so a reversal and two
+    /// real transfers look alike and the date cannot pair it. Listed with the Contras
     /// that could have carried it (none when nothing matched).
     ReversedSameDay {
         candidates: Vec<ContraKey>,
@@ -476,11 +482,7 @@ pub(crate) fn transfer_pairing_view(
     let mut contra_taken = vec![false; contras.len()];
     for (s, edges) in reference_edges.iter().enumerate() {
         if let [c] = edges[..] {
-            if contra_reference_edges[c].len() == 1
-                && is_verified(contras[c])
-                && !doubled[c]
-                && !reversed(skips[s], contras[c])
-            {
+            if contra_reference_edges[c].len() == 1 && is_verified(contras[c]) && !doubled[c] {
                 pairs[s] = Some((PairRound::Reference, c));
                 contra_taken[c] = true;
             }
@@ -661,8 +663,8 @@ fn sorted_keys(candidates: &[usize], contras: &[&ContraFact]) -> Vec<ContraKey> 
     keys
 }
 
-/// A row reversed the same day on its own statement is not a transfer, so a
-/// pair with it is never made. It still counts against the rows that could pair.
+/// A flagged row never pairs by date: a reversal and two real transfers look
+/// alike. It still counts against the rows that could pair.
 fn reversed(skip: &SkipFact, contra: &ContraFact) -> bool {
     skip.reversed_same_day || contra.reversed_same_day
 }

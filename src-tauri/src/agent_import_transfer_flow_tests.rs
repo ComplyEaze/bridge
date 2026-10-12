@@ -287,7 +287,15 @@ async fn posting_a_row_another_statement_skipped_is_refused_unless_the_skip_is_w
     assert_eq!(refused["skipped_rows"], json!([SKIPPED]));
     let step = refused["next_step"].as_str().unwrap();
     assert!(step.contains("withdraw_skips"), "{step}");
-    assert!(step.contains("does NOT hold the transfer"), "{step}");
+    assert!(
+        step.contains("the statement again with those rows mapped skip"),
+        "{step}"
+    );
+    assert!(
+        step.contains("confirms the other account's statement does not carry it"),
+        "{step}"
+    );
+    assert!(!step.contains("build again without"), "{step}");
     no_journal(directory.path());
 
     // withdrawn, the row is posted and the skip is held by the new batch
@@ -415,20 +423,25 @@ async fn a_withdrawal_must_name_a_live_skip_and_a_row_of_the_build() {
 #[tokio::test]
 async fn a_malformed_withdrawal_is_refused_before_any_read() {
     let directory = tempfile::tempdir().unwrap();
-    let server = bank_server(directory.path(), 9);
-    for bad in [
-        json!([SKIPPED, SKIPPED]),
-        json!(["bridge-1"]),
-        json!(SKIPPED),
-        json!([7]),
+    // a simulator whose one plan must stay unused: any request to Tally counts
+    let rig = Rig::new(directory.path(), two_bank_plans()[..1].to_vec());
+    for (bad, code) in [
+        // the schema layer, by the shape of the published fragment
+        (json!(["bridge-1"]), "argument_invalid:withdraw_skips"),
+        (json!(SKIPPED), "argument_invalid:withdraw_skips"),
+        (json!([7]), "argument_invalid:withdraw_skips"),
+        (json!(null), "argument_invalid:withdraw_skips"),
+        // distinctness is the parser's, since the schema layer does not check it
+        (json!([SKIPPED, SKIPPED]), "argument_schema_invalid"),
     ] {
         let mut args = contra_statement(directory.path(), BANK_A, SKIPPED, None);
         args["withdraw_skips"] = bad.clone();
-        let response = server.call_tool_response("build_import_xml", args).await;
-        assert_eq!(response.value["isError"], true, "{bad}: {}", response.value);
-        let text = response.value["structuredContent"]["result"].to_string();
-        assert!(text.contains("argument"), "{bad}: {text}");
+        let result = rig.build(args).await;
+        assert_eq!(result["error"]["code"], code, "{bad}: {result}");
     }
+    // none of them read anything, or wrote anything
+    assert_eq!(rig.simulator.received(), 0);
+    no_journal(directory.path());
 }
 
 // ---- item 14 ----------------------------------------------------------------
@@ -711,8 +724,8 @@ async fn a_build_that_is_not_about_transfers_goes_on_when_the_view_cannot_be_rea
     assert_eq!(section["state"], "not_established", "{built}");
     assert!(section.get("open").is_none());
     assert_eq!(
-        section["next_steps"]["not_established"].as_str().unwrap(),
-        "Whether the other account's Contra exists is not established: its statement for this date is not built and verified through ComplyEaze Bridge, or the check could not run. Build and verify the other account's statement for this date."
+        section["next_steps"]["check_not_run"].as_str().unwrap(),
+        "The transfer check could not run this time; call verify_import again."
     );
 }
 

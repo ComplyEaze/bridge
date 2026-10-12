@@ -2,7 +2,7 @@
 
 Book: synthetic BRIDGE PILOT LAB, company number 100033, GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85. It was loaded alone throughout. TallyPrime 7.1 Silver.
 - Request set: lab/1342-capture-requests @ 99e750ac. W12-README.md sha256 3ab06490…. Every request file matched SHA256.txt or SHA256-top.txt (`r02-marks.xml` 81892a74…) before it was sent; `send.sh` checks this on every send.
-- CLICK MODE: lane. Every Tally Yes/No and every Accept was clicked with the mouse.
+- Mouse-click mode. Every Tally Yes/No and every Accept was clicked with the mouse.
 - Owner approval: Accept As Is on BP/26-27/0003 and BP/26-27/0006 only. BP/26-27/0002 is the control and was never opened. No other voucher or master was altered.
 - Fresh backup before any change: `<lab>\w12\backup-pre\TDBK1800_100033.001`, 78,961 B, sha256 bc0b054810f45f88737403d16f2154654ffde7d39820f29bcdba266e65f2dcd8, written 12:07:43Z. It stays on the lab PC (`SHA256-backups.txt`).
 - Screenshots: 32 JPGs, which stay on the lab PC and are listed by hash in `SHA256-screenshots.txt`. This differs from the README, which asks for screens in `workorder/`; lab rule: screenshots stay local.
@@ -71,7 +71,7 @@ So 0003 and 0006 both show the expected tax-mismatch reason.
 **Observed STOP (not in the README's list).** To cover "every uncertain voucher of the book", I changed the GSTR-1 view period (F2) to 1-4-2026..31-3-2027. Tally then showed:
 > "GST-related details were altered in the masters/Return. Hence, opening the report will update the GST Status of 1 vouchers. Do you want to open the report?" Yes or No.
 - Screenshot: s3-STOP-gst-status-update-dialog.jpg, sha256 0c9a5d944442171a8e5b0666598d98476ac739557dee02b2eae08cfa18043e32.
-- I stopped and reported. On the orchestrator's decision I clicked **No**: Tally closed the report and returned to the Gateway; nothing was opened or recomputed.
+- I stopped and reported. On decision (a) I clicked **No**: Tally closed the report and returned to the Gateway; nothing was opened or recomputed.
 - **The full-year uncertain list was NOT READ.** Which voucher outside August would have been updated is not known.
 - The period was kept at August for the remaining steps.
 
@@ -163,7 +163,7 @@ So 0003 and 0006 both show the expected tax-mismatch reason.
 - GSTR-1 counts an accepted voucher at its modified (stored) tax.
 
 ## Not measured, and differences from the README
-- The full-year uncertain list was not read (observed STOP above; No clicked on the orchestrator's decision).
+- The full-year uncertain list was not read (observed STOP above; No clicked on decision (a)).
 - Multi-select ("Space: Select") was seen but not used.
 - Step 4's "alter, then accept": Tally accepted directly from the list. No alteration screen opened during Accept As Is.
 - The voucher-level Edit Log was not opened. The company Edit Log Transaction Summary was empty in both views.

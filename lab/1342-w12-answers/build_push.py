@@ -1,4 +1,4 @@
-# Build the public W12 push folder: answers, send log, report, notes (lane ids redacted), tools,
+# Build the public W12 push folder: answers, send log, report, notes (run ids redacted), tools,
 # and hash lists for the screenshots and the backup (which stay on the lab PC).
 # The full answers carry the synthetic company's GSTIN in <CMPGSTIN>; the published copy replaces it with a
 # same-length marker (UTF-16LE, so byte counts stay equal). SHA256-answers.txt lists the lab file's hash and the
@@ -28,7 +28,7 @@ with open(os.path.join(dst, 'SHA256-answers.txt'), 'w', encoding='utf-8', newlin
         f.write('%s  %s  answers/%s  %d  %d\n' % (sha(p), sha(q), n, len(b), k))
 shutil.copyfile(SRC + '/answers/log.txt', os.path.join(dst, 'send-log.txt'))
 shutil.copyfile(SRC + '/REPORT.md', os.path.join(dst, 'REPORT.md'))
-notes = re.sub(r'\bD3\d\b', '<lane>', open(SRC + '/NOTES.txt', encoding='utf-8').read())
+notes = re.sub(r'\bD3\d\b', '<run>', open(SRC + '/NOTES.txt', encoding='utf-8').read())
 open(os.path.join(dst, 'notes.txt'), 'w', encoding='utf-8', newline='\n').write(notes)
 for t in ['send.sh', 'check.py', 'vcmp.py', 'vfields.py', 'diffans.py', 'tools/build_push.py']:
     shutil.copyfile(SRC + '/' + t, os.path.join(dst, os.path.basename(t)))

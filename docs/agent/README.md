@@ -1852,8 +1852,15 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    genuinely different transaction that shares the fingerprint of a voucher
    that was opened and confirmed is entered in Tally by hand. Build the other
    rows again so they post; a rebuilt batch can be refused again, naming rows
-   the first answer did not list. Cut inline batches on whole days so same-day
-   rows of one amount are not split across batches. The list and step are
+   the first answer did not list. Import a bank statement in whole-day batches:
+   cut a batch only between days, at most 50 vouchers (the batch-post limit), so
+   same-day rows of one amount are not split across batches; they pass this
+   check together in one batch. A proposals file is whole days already, since
+   `from` and `to` are days. A day with more than 50 rows does not fit one
+   batch, and that case is open: ask the user. Batch posting is off by
+   default, and with it off each post takes one voucher, so same-day twins
+   post together only with batch posting on or through a hand import of the
+   built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's

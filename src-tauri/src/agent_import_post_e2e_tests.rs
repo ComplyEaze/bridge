@@ -666,13 +666,24 @@ fn batch_server_at(address: std::net::SocketAddr, directory: &std::path::Path) -
 
 /// `saved_batch`, with a second Journal on the same ledgers and day.
 fn saved_batch_of_two(server: &Server) -> (ImportLedgerLine, Value) {
+    saved_batch_with_second(server, |second| {
+        second
+            .entries
+            .iter_mut()
+            .for_each(|entry| entry.amount = "7.25".into());
+    })
+}
+
+/// `saved_batch`, with a second Journal: a copy of the first, changed by
+/// `change`.
+fn saved_batch_with_second(
+    server: &Server,
+    change: impl FnOnce(&mut ImportVoucher),
+) -> (ImportLedgerLine, Value) {
     let (mut line, args) = saved_batch(server);
     let mut second = line.vouchers[0].clone();
     second.bridge_txn_id = "journal-583-2".into();
-    second
-        .entries
-        .iter_mut()
-        .for_each(|entry| entry.amount = "7.25".into());
+    change(&mut second);
     line.vouchers.push(second);
     line.txn_ids.push("journal-583-2".into());
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
@@ -4407,6 +4418,47 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
         .unwrap()
         .lines()
         .all(|record| !record.contains("dispatch_intent")));
+}
+
+/// The whole-day guidance of `build_import_xml` and `parse_bank_statement`
+/// (#865): two same-day twins (same date, type, ledgers, amounts and sides;
+/// only the narration differs) in ONE batch pass the check before the dialog,
+/// on a book whose window holds neither, and the dialog is asked about both.
+/// Split across two batches, the later one is refused as
+/// `import_preexisting_identity` once the book holds the other twin: that is
+/// `a_refusal_for_a_row_already_in_the_book_names_the_row` above.
+#[tokio::test]
+async fn same_day_twins_in_one_batch_pass_the_check_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = batch_server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_with_second(&server, |second| {
+        second.narration = Some("Second payee, same amount".into());
+    });
+    // Everything but the id and the narration is equal: one fingerprint.
+    let fingerprint = |index: usize| {
+        let mut voucher = serde_json::to_value(&line.vouchers[index]).unwrap();
+        let fields = voucher.as_object_mut().unwrap();
+        fields.retain(|field, _| field != "bridge_txn_id" && field != "narration");
+        voucher
+    };
+    assert_eq!(fingerprint(0), fingerprint(1));
+    assert_ne!(line.vouchers[0].narration, line.vouchers[1].narration);
+    let before = journal(directory.path());
+    let scripted = ScriptedApproval::declining();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let _ = sent(simulator);
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_approval_declined",
+        "{response}"
+    );
+    assert_eq!(scripted.counts(), [2], "{response}");
+    assert_eq!(
+        appended_kinds(&before, &journal(directory.path())),
+        ["verification_status"]
+    );
 }
 
 /// On a response budget too small for remediation the rows and the next step are

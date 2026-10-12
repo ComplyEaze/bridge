@@ -5549,11 +5549,13 @@ async fn batch_posted_then_verified_later_with(
         .await;
     let _ = sent(simulator);
     if !keep_step_record {
-        let record = server
-            .imports_dir()
-            .unwrap()
-            .join(format!("{}.masters_check.json", line.batch_id));
-        fs::remove_file(&record).expect("the post recorded its checks");
+        // The step verdict is kept in the check and copied into the verdict
+        // written once beside it (#911): both go, or the step still reads.
+        let imports = server.imports_dir().unwrap();
+        for record in ["masters_check", "masters_verdict"] {
+            fs::remove_file(imports.join(format!("{}.{record}.json", line.batch_id)))
+                .expect("the post recorded its checks and their verdict");
+        }
     }
     let later_plans = span_readback(window, after_mark);
     let expected_requests = later_plans.len();

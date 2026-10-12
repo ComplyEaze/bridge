@@ -203,9 +203,6 @@
       "path": "src-tauri/crates/bridge-tally-core/src/report_tie_out.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-core/src/transport_qualification.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-primitives/Cargo.toml"
     },
     {
@@ -378,9 +375,6 @@
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/README.md"
-    },
-    {
-      "path": "src-tauri/crates/tally-protocol-simulator/fixtures/inconsistent_date_filter.xml"
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/src/fixtures.rs"
@@ -652,9 +646,6 @@
       "path": "src-tauri/src/db/tally_mirror.rs"
     },
     {
-      "path": "src-tauri/src/db/tally_write_store.rs"
-    },
-    {
       "path": "src-tauri/src/endpoint_coordination.rs"
     },
     {
@@ -805,9 +796,6 @@
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs"
-    },
-    {
-      "path": "src-tauri/src/tally/capability_packs.rs"
     },
     {
       "path": "src-tauri/src/tally/connection.rs"

@@ -471,10 +471,10 @@ book's path (from the code); a larger book's census cost was not measured here.
 - The `vouchers` call on the census book sent the same requests as a build without #1020, in the
   same order, with the same request hashes and response sizes.
 - On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
-  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
-  code, not the run: that reason is returned when the read widened by a day on each side finds
-  rows, none inside the window, so it names the neighbouring days, not the window, which returned
-  no row; the wording is a separate matter.
+  `empty_uncorroborated` on the census book, and, on the other, `nonempty_uncorroborated`
+  (the reason as observed; since renamed `empty_window_wider_read_nonempty`). From the code, not the run: that reason is returned when
+  the read widened by a day on each side finds rows, none inside the window, so it names the
+  neighbouring days, not the window, which returned no row; the name says so.
 
 **The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
 `post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
@@ -545,7 +545,9 @@ promoted.
 - **The native-outstandings qualification.** Accepts only an Education configuration, and its
   identity brackets read through `ledgers_v1`. It therefore refuses on load, so the tool **cannot
   run** until Phase 2 Unit A.
-- **`groups_request`.** Has no production caller, and compiles only for tests.
+- **`groups_request`.** Had no production caller and compiled only for tests. Deleted 2026-10-12
+  together with the Bridge-schema group and voucher-type parsers that read its
+  answer; core groups come from the native group collection.
 
 Reading ledgers and vouchers in Education waits for the Collection-based profiles (Phase 2 Unit A,
 `IMPROVEMENT_PLAN_2026H2.md` §8.12).

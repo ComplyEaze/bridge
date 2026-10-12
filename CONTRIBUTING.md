@@ -45,6 +45,27 @@ workflow as the complete command reference.
 Run `corepack pnpm run tauri:build` on each native target host when validating
 packaging. Do not treat a Windows build as macOS evidence or the reverse.
 
+## Before you push
+
+These checks catch the commonest CI failures in seconds, where a failed CI run
+costs a full cycle. Run them from the repository root, in this order. The times
+are rounded and were measured on one machine (macOS, Node 24.21.0, cargo 1.96.0):
+
+```text
+cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check   # about 4 s
+node scripts/check-unbounded-reads.mjs                            # about 1 s
+node scripts/check-conflict-markers.mjs                           # about 1 s
+node scripts/check-ci-workflow-consistency.mjs                    # about 1 s
+node scripts/check-surface-ack.mjs --mode pull_request --pr <N> --base origin/master  # under 1 s
+```
+
+The fourth runs `cargo metadata --no-deps`, not a build, and fetches no crates.
+The fifth needs the pull request's number, so run it once the PR is open. It
+reads commits, not the working tree, so commit your changes and the
+acknowledgement file first. The file is named for the PR number
+(`docs/tally/compatibility/acks/pr-<N>.txt`), and a pinned-path change needs it.
+The local run approximates CI, which stays the authority.
+
 ## Branching
 
 - Use short-lived branches from `master`.

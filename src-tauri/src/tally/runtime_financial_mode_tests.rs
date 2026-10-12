@@ -81,7 +81,7 @@ fn stale_cache(runtime: &TallyRuntime, config: &TallyConfig) {
                 reachable: true,
                 compatible: true,
                 server_text: String::new(),
-                product: super::super::TallyProduct::Unknown,
+                product: super::super::connection::TallyProduct::Unknown,
                 error: None,
             },
             companies,

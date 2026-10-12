@@ -69,6 +69,8 @@ pub(crate) const REVIEWED_TALLY_TERMINAL_CODES: &[&str] = &[
     "canary_cache_unavailable",
     "capability_cache_unavailable",
     "capability_probe_required",
+    "company_altmstid_missing",
+    "company_book_extent_drifted",
     "company_export_invalid",
     "company_identity_mismatch",
     "connector_context_invalid",

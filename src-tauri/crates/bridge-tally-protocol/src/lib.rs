@@ -38,10 +38,6 @@ pub mod gst_registration;
 mod import_outcome;
 #[cfg(feature = "india-tax-observation-parser")]
 pub mod india_tax_observation;
-#[cfg(feature = "jsonex-parser")]
-pub mod jsonex;
-#[cfg(feature = "jsonex-request-builder")]
-pub mod jsonex_request;
 pub mod ledger_census;
 /// One ledger `Create` message. Its one caller today is the lab rebuild;
 /// this crate runs its goldens in every build.
@@ -100,9 +96,6 @@ pub use text_encoding::{
 pub use tolerant_xml::mark_forbidden_numeric_references;
 
 pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";
-pub const BRIDGE_LEDGER_WRITE_READBACK_SCHEMA: &str = "bridge.tally.ledger-write-readback/1";
-pub const BRIDGE_GROUP_EXPORT_SCHEMA: &str = "bridge.tally.groups/1";
-pub const BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA: &str = "bridge.tally.voucher-types/1";
 pub const BRIDGE_VOUCHER_EXPORT_SCHEMA: &str = "bridge.tally.vouchers/2";
 pub const BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA: &str = "bridge.tally.ledger-period-balances/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;
@@ -129,12 +122,6 @@ pub fn is_tally_reserved_root(value: &str) -> bool {
         .trim()
         .strip_prefix(TALLY_SANITIZED_ROOT_MARKER)
         .is_some_and(|rest| rest.trim().eq_ignore_ascii_case("primary"))
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TallyEnvelope<T> {
-    #[serde(rename = "BODY")]
-    pub body: Option<T>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -271,7 +258,9 @@ pub enum TallyExportStatus {
 pub struct CompanyContextEvidence {
     pub name: Option<String>,
     pub guid: Option<String>,
-    /// Echo of the exact requested identity set for scoped write readbacks.
+    /// An echoed `QUERYIDENTITYSETSHA256`, if a response carries one. No request Bridge
+    /// renders asks for it since the scoped write readback was deleted, and it is `None` in
+    /// every fixture.
     pub query_identity_set_sha256: Option<String>,
     /// Bridge request-binding echoes; they are not independent proof that Tally honored filters.
     pub requested_from_yyyymmdd: Option<String>,
@@ -339,13 +328,6 @@ pub struct ParsedSourceRecord<T> {
     pub alter_id: Option<String>,
     pub raw_source_sha256: String,
 }
-pub fn parse_xml<T>(xml: &str) -> anyhow::Result<T>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    Ok(quick_xml::de::from_str(xml)?)
-}
-
 pub fn parse_companies(xml: &str) -> anyhow::Result<Vec<TallyCompany>> {
     Ok(parse_companies_with_evidence(xml)?.records)
 }
@@ -804,117 +786,6 @@ fn parse_gateway_yes_no(value: &str, label: &str) -> anyhow::Result<bool> {
     } else {
         anyhow::bail!("company capability collection returned an invalid {label} flag")
     }
-}
-
-pub fn parse_group_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    parse_named_master_source_records(xml, b"GROUP", BRIDGE_GROUP_EXPORT_SCHEMA, "GROUP")
-}
-
-pub fn parse_voucher_type_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    parse_named_master_source_records(
-        xml,
-        b"VOUCHERTYPE",
-        BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA,
-        "VOUCHERTYPE",
-    )
-}
-
-fn parse_named_master_source_records(
-    xml: &str,
-    element_name: &[u8],
-    schema: &str,
-    object_type: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    // Mark forbidden references before anything reads the text, as the native
-    // collection parsers do (§1.1(d)), so `&#4; Primary` reads as the marker
-    // and not as a raw U+0004. Row hashes still attest the original bytes.
-    let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
-    let text = sanitized.as_str();
-    validate_export_response(text)?;
-    let evidence = scan_export_evidence(text)?;
-    let mut reader = configured_reader(text);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if is_supported_export_parent(&path)
-                    && element
-                        .name()
-                        .as_ref()
-                        .as_bytes()
-                        .eq_ignore_ascii_case(element_name) =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&element, b"ALTERID");
-                let name = attr_value(&element, b"NAME").unwrap_or_default();
-                let record = parse_named_master(&mut reader, element_name, name)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256_from_sanitized(
-                        &sanitized,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Empty(element)
-                if is_supported_export_parent(&path)
-                    && element
-                        .name()
-                        .as_ref()
-                        .as_bytes()
-                        .eq_ignore_ascii_case(element_name) =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                records.push(ParsedSourceRecord {
-                    record: TallyNamedMaster {
-                        name: attr_value(&element, b"NAME").unwrap_or_default(),
-                        parent: PartyLedgerMasterFieldObservation::NotObserved,
-                        reserved_name: None,
-                    },
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id: attr_value(&element, b"ALTERID"),
-                    raw_source_sha256: source_fragment_sha256_from_sanitized(
-                        &sanitized,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Start(element) => {
-                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
-            }
-            Event::End(element) => {
-                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    validate_scoped_export(&evidence, schema, object_type, records.len())?;
-    Ok(ParsedExport { records, evidence })
 }
 
 pub fn parse_ledgers(xml: &str) -> anyhow::Result<Vec<TallyLedger>> {
@@ -1924,172 +1795,6 @@ fn record_identities_from_values(
     Ok(())
 }
 
-pub fn parse_ledger_write_readback_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyLedger>>> {
-    let mut reader = configured_reader(xml);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    let mut context = None::<ParsedCompanyContext>;
-    let mut header_seen = false;
-    let mut body_seen = false;
-    let mut status_seen = false;
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element) => {
-                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
-                if matches!(
-                    name.as_slice(),
-                    b"ENVELOPE" | b"HEADER" | b"BODY" | b"VERSION" | b"STATUS"
-                ) {
-                    validate_only_attributes(&element, &[]).map_err(|_| {
-                        anyhow::anyhow!("Tally export response attributes were invalid")
-                    })?;
-                }
-                if path.is_empty() {
-                    if name.as_slice() != b"ENVELOPE" {
-                        anyhow::bail!("Tally write readback root was not ENVELOPE");
-                    }
-                    path.push(name);
-                } else if path_eq(&path, &[b"ENVELOPE"]) && name.as_slice() == b"HEADER" {
-                    if std::mem::replace(&mut header_seen, true) || body_seen {
-                        anyhow::bail!("Tally write readback repeated or misplaced HEADER");
-                    }
-                    path.push(name);
-                } else if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name.as_slice() == b"STATUS"
-                {
-                    if std::mem::replace(&mut status_seen, true) {
-                        anyhow::bail!("Tally write readback repeated STATUS");
-                    }
-                    if read_required_text(&mut reader, element.name())? != "1" {
-                        anyhow::bail!("Tally write readback application STATUS was not successful");
-                    }
-                } else if path_eq(&path, &[b"ENVELOPE"]) && name.as_slice() == b"BODY" {
-                    if !status_seen || std::mem::replace(&mut body_seen, true) {
-                        anyhow::bail!("Tally write readback repeated or misplaced BODY");
-                    }
-                    path.push(name);
-                } else if path_eq(&path, &[b"ENVELOPE", b"BODY"])
-                    && name.as_slice() == b"COMPANYCONTEXT"
-                {
-                    if context.is_some() {
-                        anyhow::bail!("Tally write readback repeated COMPANYCONTEXT");
-                    }
-                    context = Some(parse_company_context(&mut reader, &element, false)?);
-                } else if path_eq(&path, &[b"ENVELOPE", b"BODY"]) && name.as_slice() == b"LEDGER" {
-                    validate_only_attributes(
-                        &element,
-                        &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                    )?;
-                    let name = attr_value(&element, b"NAME");
-                    let identities = parsed_source_identities(&element)?;
-                    let (source_id, identity_kind) = preferred_identity(&identities);
-                    let alter_id = attr_value(&element, b"ALTERID");
-                    let record = parse_ledger_write_readback(&mut reader, name)?;
-                    records.push(ParsedSourceRecord {
-                        record,
-                        identity_kind,
-                        source_id,
-                        identities,
-                        alter_id,
-                        raw_source_sha256: source_fragment_sha256(
-                            xml,
-                            record_start,
-                            reader.buffer_position() as usize,
-                        )?,
-                    });
-                } else {
-                    anyhow::bail!(
-                        "Tally write readback contained an element outside its exact profile"
-                    );
-                }
-            }
-            Event::Empty(element)
-                if path_eq(&path, &[b"ENVELOPE", b"BODY"])
-                    && element
-                        .name()
-                        .as_ref()
-                        .eq_ignore_ascii_case("COMPANYCONTEXT") =>
-            {
-                if context.is_some() {
-                    anyhow::bail!("Tally write readback repeated COMPANYCONTEXT");
-                }
-                context = Some(parse_company_context(&mut reader, &element, true)?);
-            }
-            Event::Empty(_) => {
-                anyhow::bail!(
-                    "Tally write readback contained an empty element outside its exact profile"
-                );
-            }
-            Event::End(element) => {
-                let Some(expected) = path.pop() else {
-                    anyhow::bail!("Tally write readback closed an unexpected element");
-                };
-                if !element
-                    .name()
-                    .as_ref()
-                    .as_bytes()
-                    .eq_ignore_ascii_case(&expected)
-                {
-                    anyhow::bail!("Tally write readback closed an unexpected element");
-                }
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally write readback contained unexpected text");
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    if !path.is_empty() || !header_seen || !status_seen || !body_seen {
-        anyhow::bail!("Tally write readback ended before its root closed");
-    }
-    let context =
-        context.ok_or_else(|| anyhow::anyhow!("Tally write readback omitted COMPANYCONTEXT"))?;
-    let mut identities = HashMap::<String, u64>::new();
-    let mut identified_record_count = 0_u64;
-    for record in &records {
-        let mut identified = false;
-        for identity in [
-            record.identities.guid.as_ref(),
-            record.identities.remote_id.as_ref(),
-            record.identities.master_id.as_ref(),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            *identities.entry(identity.clone()).or_insert(0) += 1;
-            identified = true;
-        }
-        identified_record_count += u64::from(identified);
-    }
-    let duplicate_identities = identities
-        .into_iter()
-        .filter(|(_, occurrences)| *occurrences > 1)
-        .map(|(identity, occurrences)| DuplicateIdentityEvidence {
-            identity_sha256: sha256_hex(identity.as_bytes()),
-            occurrences,
-        })
-        .collect();
-    let evidence = ExportEvidence {
-        company_context: Some(context.company),
-        schema: context.schema,
-        object_type: context.object_type,
-        source_record_count: context.source_record_count,
-        identified_record_count,
-        duplicate_identities,
-        ..ExportEvidence::default()
-    };
-    validate_scoped_export(
-        &evidence,
-        BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
-        "LEDGER",
-        records.len(),
-    )?;
-    Ok(ParsedExport { records, evidence })
-}
-
 fn parse_ledger_source_records_for_schema(
     xml: &str,
     expected_schema: &str,
@@ -2342,22 +2047,6 @@ fn insert_period_context_field(
         anyhow::bail!("Tally period context repeated {key}");
     }
     Ok(())
-}
-
-pub fn parse_vouchers(xml: &str) -> anyhow::Result<Vec<TallyVoucher>> {
-    Ok(parse_vouchers_with_evidence(xml)?.records)
-}
-
-pub fn parse_vouchers_with_evidence(xml: &str) -> anyhow::Result<ParsedExport<TallyVoucher>> {
-    let parsed = parse_voucher_source_records_with_evidence(xml)?;
-    Ok(ParsedExport {
-        records: parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect(),
-        evidence: parsed.evidence,
-    })
 }
 
 pub fn parse_voucher_source_records_with_evidence(
@@ -3305,50 +2994,6 @@ fn parse_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyCompany
     Ok(company)
 }
 
-fn parse_named_master(
-    reader: &mut Reader<&[u8]>,
-    element_name: &[u8],
-    name: String,
-) -> anyhow::Result<TallyNamedMaster> {
-    let mut record = TallyNamedMaster {
-        name,
-        parent: PartyLedgerMasterFieldObservation::NotObserved,
-        reserved_name: None,
-    };
-    let mut parent_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally master row repeated PARENT");
-                }
-                record.parent = PartyLedgerMasterFieldObservation::Returned(
-                    read_identifier_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::End(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .as_bytes()
-                    .eq_ignore_ascii_case(element_name) =>
-            {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally master row contained an unexpected field");
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally master row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally master response ended before its row closed"),
-            _ => {}
-        }
-    }
-    Ok(record)
-}
-
 fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Result<TallyLedger> {
     let mut ledger = TallyLedger {
         name: name.unwrap_or_default(),
@@ -3413,91 +3058,6 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
                 anyhow::bail!("Tally ledger row contained unexpected text");
             }
             Event::Eof => anyhow::bail!("Tally ledger response ended before LEDGER closed"),
-            _ => {}
-        }
-    }
-    Ok(ledger)
-}
-
-fn parse_ledger_write_readback(
-    reader: &mut Reader<&[u8]>,
-    name: Option<String>,
-) -> anyhow::Result<TallyLedger> {
-    let mut ledger = TallyLedger {
-        name: name.ok_or_else(|| anyhow::anyhow!("Tally write readback omitted ledger NAME"))?,
-        parent: PartyLedgerMasterFieldObservation::NotObserved,
-        party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
-        opening_balance: None,
-    };
-    let mut parent_seen = false;
-    let mut gstin_seen = false;
-    let mut opening_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARENT");
-                }
-                ledger.parent = PartyLedgerMasterFieldObservation::Returned(
-                    read_identifier_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARTYGSTIN") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut gstin_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARTYGSTIN");
-                }
-                ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(
-                    read_optional_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("OPENINGBALANCE") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut opening_seen, true) {
-                    anyhow::bail!("Tally write readback repeated OPENINGBALANCE");
-                }
-                ledger.opening_balance = read_optional_text(reader, element.name())?;
-            }
-            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARENT");
-                }
-                ledger.parent = PartyLedgerMasterFieldObservation::Returned(String::new());
-            }
-            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case("PARTYGSTIN") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut gstin_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARTYGSTIN");
-                }
-                ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(String::new());
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case("OPENINGBALANCE") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut opening_seen, true) {
-                    anyhow::bail!("Tally write readback repeated OPENINGBALANCE");
-                }
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally write readback contained an unexpected ledger field");
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally write readback contained unexpected ledger text");
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("LEDGER") => break,
-            Event::End(_) => anyhow::bail!("Tally write readback closed an unexpected element"),
-            Event::Eof => anyhow::bail!("Tally write readback ended before LEDGER closed"),
             _ => {}
         }
     }

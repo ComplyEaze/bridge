@@ -65,9 +65,10 @@ and a request failed with a 400 error; the published file, switched on, was not
 started either ("Unable to connect to extension server"). Neither error mentioned
 the Terms (section 4). From 0.5.1 the setting is not marked required, so Claude
 Desktop starts the extension and every tool answers `terms_not_accepted`, naming
-the setting (bridge#1413). That was seen on one Mac with a test package; it has
-not yet been checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
-or `1` is not asked.
+the setting (bridge#1413). The tools the assistant called gave that answer on one
+Mac with a test package and on one Windows computer with the build our checks
+made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
+`true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -401,7 +402,10 @@ puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
 characters it cannot show safely, or do not fit, it refuses. A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
-and up to 40 characters of its narration, with no reference) and marks the
+and up to 40 characters of its narration, with no reference; from the next
+build a Journal's line names its first debit and first credit ledger and up to
+20 characters of its narration, and the line above says a narration may be
+cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
 only, with a line saying why, and still asks for your approval, unless a ledger

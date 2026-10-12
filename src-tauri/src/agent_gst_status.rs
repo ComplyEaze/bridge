@@ -302,19 +302,14 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         let from = normalized_date(required_string(args, "from")?)?;
         let to = normalized_date(required_string(args, "to")?)?;
-        if from > to {
+        let Some(days) = window_span_days(&from, &to) else {
             return Err("invalid_date_range".to_string().into());
-        }
+        };
         let type_name = required_string(args, "voucher_type_name")?;
         // Argument refusals cost no read.
         if !read_profiles::gst_status_type_name_literal_safe(type_name) {
             return Err("gst_status_type_name_invalid".to_string().into());
         }
-        let day = |date: &bridge_tally_core::TallyDate| {
-            NaiveDate::parse_from_str(date.as_str(), "%Y%m%d")
-                .map_err(|_| "gst_status_date_invalid".to_string())
-        };
-        let days = (day(&to)? - day(&from)?).num_days() + 1;
         if days > STATUS_MAX_WINDOW_DAYS {
             return Err("gst_status_window_too_long".to_string().into());
         }

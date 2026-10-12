@@ -1929,7 +1929,6 @@ async fn immediate_checkpoint_cas_loss_terminalizes_instead_of_returning_resumab
             gap_codes: Vec::new(),
             warning_codes: Vec::new(),
         }),
-        safe_mismatches: Vec::new(),
     };
     let result = engine
         .commit_decision(
@@ -3014,7 +3013,6 @@ async fn committed_over_budget_pending_recovers_exact_proof_without_hydration() 
             gap_codes: vec!["source_count_unavailable".to_string()],
             warning_codes: Vec::new(),
         }),
-        safe_mismatches: Vec::new(),
     };
     let connector = FakeConnector {
         batch: Mutex::new(VecDeque::new()),
@@ -3559,6 +3557,36 @@ async fn reviewed_tally_error_codes_are_precise_allowlisted_and_persisted() {
                 code: "company_identity_not_found".to_string(),
             },
             "company_identity_not_found",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_changed_during_group_read".to_string(),
+            },
+            "source_changed_during_run",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_changed_during_ledger_read".to_string(),
+            },
+            "source_changed_during_run",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_changed_during_voucher_read".to_string(),
+            },
+            "source_changed_during_run",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_book_extent_drifted".to_string(),
+            },
+            "company_book_extent_drifted",
+        ),
+        (
+            TallyError::InvalidData {
+                code: "company_altmstid_missing".to_string(),
+            },
+            "company_altmstid_missing",
         ),
         (
             TallyError::Protocol {

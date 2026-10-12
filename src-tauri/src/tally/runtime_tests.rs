@@ -4,7 +4,8 @@
 )]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
-use crate::tally::{ConnectionStatus, TallyProduct};
+use crate::tally::connection::TallyProduct;
+use crate::tally::ConnectionStatus;
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
@@ -674,27 +675,34 @@ fn raw_empty_bill_references_preserve_each_amount_and_get_explicit_label() {
 #[test]
 fn party_master_currency_assertion_rejects_a_changed_company_extent() {
     const EXTENT: &str = include_str!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/unit_a_company_extent_live.xml"
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     );
-    let read_extent_xml = EXTENT.replacen(
-        r#"<GUID TYPE=\"String\">bb8ad19e-6aef-4239-a917-87fec0c6215e</GUID>"#,
-        r#"<GUID TYPE=\"String\">bb8ad19e-6aef-4239-a917-87fec0c6215e</GUID><ALTMSTID TYPE=\"Number\">1</ALTMSTID>"#,
-        1,
-    );
-    let changed_extent_xml = read_extent_xml.replace(
+    let read_extent_xml = EXTENT;
+    let changed_extent_xml = read_extent_xml.replacen(
         "<LASTVOUCHERDATE TYPE=\"Date\">20260401</LASTVOUCHERDATE>",
         "<LASTVOUCHERDATE TYPE=\"Date\">20260402</LASTVOUCHERDATE>",
+        1,
     );
-    let read_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent(
-        &read_extent_xml,
-        "Aarav Trading Company Demo",
-        "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+    assert_ne!(
+        changed_extent_xml, read_extent_xml,
+        "the mutation must apply"
+    );
+    let expectation =
+        bridge_tally_protocol::outstandings_shared::CompanyBookExtentExpectation::new(
+            "Aarav Trading Company Demo".to_string(),
+            "bb8ad19e-6aef-4239-a917-87fec0c6215e".to_string(),
+            "100000".to_string(),
+            "20240401".to_string(),
+        )
+        .expect("captured full tuple is a valid expectation");
+    let read_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
+        read_extent_xml,
+        &expectation,
     )
     .expect("captured extent parses");
-    let changed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent(
+    let changed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
         &changed_extent_xml,
-        "Aarav Trading Company Demo",
-        "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+        &expectation,
     )
     .expect("changed synthetic extent parses");
     let assertion = CompanyCurrencyRead {
@@ -707,7 +715,6 @@ fn party_master_currency_assertion_rejects_a_changed_company_extent() {
             names: Vec::new(),
         },
         extent: read_extent.clone(),
-        evidence: RuntimeReadEvidence::empty(),
     }
     .bind_party_ledger_master_assertion(OutstandingsCurrencyAssertion::Inr);
 
@@ -898,12 +905,13 @@ fn future_due_bill_from_raw_native_bytes_reaches_the_statement_source() {
     );
     assert_eq!(statement_rows[0].amount.as_str(), "100.00");
     assert_eq!(statement_rows[0].age_days, None);
-    let statement = crate::reports::party_statement::build_party_statement(
+    let statement = crate::reports::party_statement::build_party_statement_with_ageing_anchor(
         "Synthetic Company",
         as_of.as_str(),
         "Synthetic Party",
         &statement_rows,
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .expect("the future-due bill must build a party statement");
     assert_eq!(statement.bills.len(), 1);
@@ -921,19 +929,25 @@ fn future_due_bill_from_raw_native_bytes_reaches_the_statement_source() {
     let approved_destination = approvals
         .consume(&approval_id, destination.path())
         .expect("consume synthetic approval");
-    let bulk = crate::reports::bulk_party_statement::write_bulk_party_statements(
-        &approved_destination,
-        "Synthetic Company",
-        as_of.as_str(),
-        "xlsx",
-        &statement_rows,
-        &[],
-        |party_statement| {
-            crate::reports::party_statement_xlsx::render_party_statement_xlsx(party_statement)
-                .map_err(|error| error.to_string())
-        },
-    )
-    .expect("a bulk run must write the future-due party statement");
+    let bulk =
+        crate::reports::bulk_party_statement::write_bulk_party_statements_with_ageing_anchor(
+            crate::reports::bulk_party_statement::BulkPartyStatementRequest {
+                destination: &approved_destination,
+                company: "Synthetic Company",
+                as_of_yyyymmdd: as_of.as_str(),
+                format: "xlsx",
+                open_bills: &statement_rows,
+                unallocated_by_party: &[],
+                ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+                render: |party_statement: &crate::reports::party_statement::PartyStatement| {
+                    crate::reports::party_statement_xlsx::render_party_statement_xlsx(
+                        party_statement,
+                    )
+                    .map_err(|error| error.to_string())
+                },
+            },
+        )
+        .expect("a bulk run must write the future-due party statement");
     assert_eq!(bulk.written.len(), 1);
     let workbook = std::fs::File::open(destination.path().join(&bulk.written[0].file_name))
         .expect("the bulk statement file exists");
@@ -1050,6 +1064,69 @@ fn local_rejections_and_client_http_statuses_do_not_poison_endpoint_health() {
         assert_eq!(
             classify_error(&anyhow::Error::new(error)),
             HealthOutcome::TransportFailure
+        );
+    }
+}
+
+#[test]
+fn a_failed_response_body_is_its_own_unretried_class_but_counts_as_a_transport_failure() {
+    for error in [
+        TallyTransportError::ResponseTruncated,
+        TallyTransportError::ResponseReadFailed,
+    ] {
+        let error = anyhow::Error::new(error);
+        let class = classify_failure(&error);
+        assert_eq!(class, ReadFailureClass::ResponseBodyFailed);
+        assert!(!class.retryable());
+        assert_eq!(classify_error(&error), HealthOutcome::TransportFailure);
+    }
+    // A request that failed before any response is still the retryable class.
+    let class = classify_failure(&anyhow::Error::new(TallyTransportError::RequestFailed));
+    assert_eq!(class, ReadFailureClass::RequestFailed);
+    assert!(class.retryable());
+}
+
+// The response head had already arrived, so Tally had begun answering; a client cannot cancel
+// that work and the gateway serialises, so a resend makes Tally produce the answer again
+// (IMPLEMENTATION_GUIDE rule I7, section 5.2).
+#[tokio::test]
+async fn a_read_whose_response_body_fails_is_sent_once() {
+    for (port, failure) in [
+        (9130, TallyTransportError::ResponseTruncated),
+        (9131, TallyTransportError::ResponseReadFailed),
+    ] {
+        let runtime = TallyRuntime::default();
+        let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = Arc::clone(&attempts);
+        let sent_failure = failure.clone();
+        let error = runtime
+            .execute(
+                TallyConfig {
+                    host: "localhost".to_string(),
+                    port,
+                },
+                ReadRetryPolicy::new(3, std::time::Duration::ZERO, std::time::Duration::ZERO, 0)
+                    .unwrap(),
+                move |_client| {
+                    let observed = Arc::clone(&observed);
+                    let sent_failure = sent_failure.clone();
+                    async move {
+                        observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        Err::<(), _>(anyhow::Error::new(sent_failure))
+                    }
+                },
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            attempts.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "{failure:?}"
+        );
+        assert_eq!(
+            error.downcast_ref::<TallyTransportError>(),
+            Some(&failure),
+            "the typed transport error is returned"
         );
     }
 }
@@ -1399,15 +1476,10 @@ async fn cancellation_registry_cancels_and_releases_requests() {
     let runtime_task = Arc::clone(&runtime);
     let task = tokio::spawn(async move {
         runtime_task
-            .execute(
-                config,
-                ReadOperation::OtherRead,
-                ReadRetryPolicy::SINGLE_ATTEMPT,
-                |_client| async {
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    Ok::<_, anyhow::Error>(())
-                },
-            )
+            .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, |_client| async {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                Ok::<_, anyhow::Error>(())
+            })
             .await
     });
     tokio::task::yield_now().await;

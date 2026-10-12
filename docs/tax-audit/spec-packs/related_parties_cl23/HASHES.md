@@ -15,19 +15,19 @@ real assessee, and no figure comes from one.
 
 ## How the goldens were produced
 
-At the reference engine (a private repository), commit `4df1cc43`, under Python 3.13, with the
-crate's `parity/edge_golden.py` extended by a runner for this test. That runner is kept by the
-reference's maintainers and is not part of this pack: it passes the book's `related_parties` key
-(absent meaning `{}`) through the reference's own configuration reader to the test, and the test's
-own invariant check to the canonical dump, as the reference's pack does. Run from
+At the reference engine (a private repository), commit `ee17d80f`, under Python 3.13, with the
+crate's own `parity/edge_golden.py`, which runs this test: it passes the book's `related_parties`
+key (absent meaning `{}`) through the reference's own configuration reader to the test, and the
+test's own invariant check to the canonical dump, as the reference's pack does. Run from
 `src-tauri/crates/bridge-tax-audit`, once per book:
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
-        --with striprtf --with pdfplumber python EDGE_GOLDEN_WITH_RUNNER ENGINE \
+        --with striprtf --with pdfplumber python parity/edge_golden.py ENGINE \
         BOOK.json OUTDIR
 
 Each run writes `OUTDIR/edge.<book>.related_parties_cl23.json`. Running every book a second time
-reproduced every golden byte for byte.
+reproduced every golden byte for byte. The golden of each of the eleven books, and the synthetic golden, was
+regenerated at the reference's commit `ee17d80f` and is byte-identical to the table below.
 
 ## Bytes
 
@@ -39,7 +39,8 @@ reproduced every golden byte for byte.
 | `rp_partial.json` | 3,460 | `732f1a557d4a2ce0981bdd866a740276bfdd926e66e687c3ded2f97c9b840601` | `books/rp_partial.json` |
 | `rp_payable_break.json` | 4,696 | `03742c56cc8cdf8ee4a64a167555097b85cf03d8d60ca65be8d42967b3634483` | `books/rp_payable_break.json` |
 | `rp_quiet.json` | 4,038 | `121a604e2878c940a5114ef12f0a280a8dbec157a5711aae46f8f13676a96941` | `books/rp_quiet.json` |
-| `rp_shared_guid.json` | 3,070 | `434ccddf8cf07b9fa8a34b052bfb1ed603880b0472334afeb0227ac07b12df58` | `books/rp_shared_guid.json` |
+| `rp_shared_guid.json` | 3,086 | `f14ffdbd0af62ce9c328e33583bef8b0e7a16b87bead447b322eb358d77cbc25` | `books/rp_shared_guid.json` |
+| `rp_shared_guid_places.json` | 3,747 | `15ba06a25bdfecfc1b744120671bab9118daa0f4bf2b72bb679c9826dda66496` | `books/rp_shared_guid_places.json` |
 | `rp_sum_check.json` | 4,200 | `000ed3dd5f43daa37790da672e0bd831268f307fe9659296fd2f82431cab5aed` | `books/rp_sum_check.json` |
 | `rp_unknown_ledger.json` | 2,962 | `ef09555a49c0150d2fb62cfb9a6e82209e24a23680a52e004facbb3c0f86f055` | `books/rp_unknown_ledger.json` |
 | `rp_walk.json` | 6,911 | `6590a01f5f802ce4ed9f27d7fbdd4fa27df8d2b410e23c93f6852ba84139fa87` | `books/rp_walk.json` |
@@ -49,7 +50,8 @@ reproduced every golden byte for byte.
 | `edge.rp_partial.related_parties_cl23.json` | 9,723 | `16ab6b5199abe79da29317bb62561573b8684db97528555b3992595c6da05fac` | `goldens/edge.rp_partial.related_parties_cl23.json` |
 | `edge.rp_payable_break.related_parties_cl23.json` | 16,103 | `267fdf8c796f995a8d627ce97b35709b3669f0896946aea7937de59d56911472` | `goldens/edge.rp_payable_break.related_parties_cl23.json` |
 | `edge.rp_quiet.related_parties_cl23.json` | 6,960 | `dabe2d1320078ae4b7b0d7ef81c0c6b11cd4dbdcdc93b8ebf244b949bc7d31c8` | `goldens/edge.rp_quiet.related_parties_cl23.json` |
-| `edge.rp_shared_guid.related_parties_cl23.json` | 5,341 | `63f6c9cf426edfddf1d5bafd6d6061933d51cd5b40b82c42627827fbd5f4a6f4` | `goldens/edge.rp_shared_guid.related_parties_cl23.json` |
+| `edge.rp_shared_guid.related_parties_cl23.json` | 5,459 | `b30492df8e14891740bc878f815dc5add392cc46b5bb6302d7824ae4770ed26d` | `goldens/edge.rp_shared_guid.related_parties_cl23.json` |
+| `edge.rp_shared_guid_places.related_parties_cl23.json` | 6,380 | `3049528214ca7b454a5c9c3544d2afda4f14c6b6b289e44586128ca661a1c76b` | `goldens/edge.rp_shared_guid_places.related_parties_cl23.json` |
 | `edge.rp_sum_check.related_parties_cl23.json` | 7,332 | `a0a479e7574b2459d7a065bebdc3d44488b0a34668e3da8f853066c29c1f5efb` | `goldens/edge.rp_sum_check.related_parties_cl23.json` |
 | `edge.rp_unknown_ledger.related_parties_cl23.json` | 9,031 | `6bae2276338b8adb375947a807e200d864c59cbd67a33bbfddf87236aa082ec5` | `goldens/edge.rp_unknown_ledger.related_parties_cl23.json` |
 | `edge.rp_walk.related_parties_cl23.json` | 13,349 | `c298493e495b6eacaf2202cd10377a0ccb71e825fd292cc9ab1f167b1549880b` | `goldens/edge.rp_walk.related_parties_cl23.json` |

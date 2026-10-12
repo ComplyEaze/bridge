@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/statement_profit_and_loss_dense_month_live.utf16le.xml
+# parser: parse_native_statement(ProfitAndLoss)
+# source: captured
+Ok(NativeStatement {
+    kind: ProfitAndLoss,
+    lines: [
+        NativeStatementLine {
+            name: "Sales Accounts",
+            sub: Empty,
+            main: Present(
+                ExactDecimal(
+                    "113726661.73",
+                ),
+            ),
+        },
+    ],
+})

@@ -196,9 +196,35 @@ baseline (§0), not on a licensed instance, and not by client key on these vouch
 read "usable as a key" into it.
 
 **Scope: one Silver 7.1 Journal readback. PARTIAL.** Whether another voucher type, request shape or
-Tally version preserves the client value is **UNVERIFIED**. Do not generalise this into a rule that
+Tally version preserves the client value is **UNVERIFIED** beyond what the 2026-10-09 paragraph below
+records: on Windows Silver 7.1 a person-imported Receipt and Payment also read back the voucher's own
+GUID. Do not generalise this into a rule that
 the attribute is never useful — on a release that did preserve it, that rule would discard real
 identity evidence. Check what your own readback returns before relying on it either way.
+
+**Added 2026-10-09: a file Bridge built and a person imported, on Windows (issue #1413, steps 9 and 11). PARTIAL.**
+TallyPrime Release 7.1 Silver on Windows 10 (22H2, build 19045), a synthetic company, six vouchers (two
+Receipts and four Payments) from a file Bridge built, imported by a person through Tally's Import screen,
+not over the gateway. The vouchers were read back over the gateway by narration.
+
+- **VERIFIED, six of six: the `REMOTEID` attribute in the export is the voucher's own GUID
+  (`<TALLY-COMPANY-GUID>-<MASTER-ID>`), not the id in the file.** The response has no separate `REMOTEID`
+  element. The file's id survives only in the `[BRIDGE:<FILE-VOUCHER-ID>]` narration tag (on the two
+  vouchers whose narration Tally's screen showed, the tag equals that voucher's `REMOTEID` in the file;
+  on all six, the narration, tag included, was compared with the file and matched). This is the field
+  relationship of the capture above, now also seen for Receipt and Payment vouchers imported through
+  Tally's Import screen.
+- **VERIFIED by readback: an unchanged re-import of the same file (its SHA-256 checked just before) still
+  upserted.** Six AlterIDs advanced (2 to 7 became 8 to 13), the voucher mark moved by six, no GUID,
+  MasterID or voucher number was new, the company still held six vouchers, and date, type, every entry
+  and the narration matched the file again.
+- **PARTIAL: no counters.** On the re-import, Tally's screen showed only "Import successful", with no
+  created, altered, ignored or error counts (the first import's screen was not captured), so this is a count-and-readback result without the captured response that the
+  qualification paragraph below asks for before a voucher type is recorded as qualified. It does not qualify Payment or
+  Receipt on that standard.
+- **NOT established:** which field Tally matched on (the `REMOTEID` the file sent, or something that
+  coincides with it in this file: nothing was varied), and a re-import with changed content on this
+  path. Tally's own counters for either import were not measured.
 
 **Do not replace attribution with a content fingerprint.** The obvious substitute — confirm the
 voucher by date, ledger entries and amount — is not an attribution key: a company holding a
@@ -214,7 +240,8 @@ working, and why Bridge's verifier is built on the narration tag rather than on 
 **§9.8's scope limit still applies to all of the above.** The exact-file repeat was measured on the
 licensed **Journal** path; §9.8 says explicitly that it does not establish other request shapes,
 other voucher types, or universal `REMOTEID` semantics. Treat upsert-on-repeat as verified for
-Journal and **UNVERIFIED elsewhere**.
+Journal and **UNVERIFIED elsewhere** (for Payment and Receipt see the 2026-10-09 paragraph above: PARTIAL, readback
+only, no counters, not a qualification; Receipt counters from one gateway run are in §9.3a).
 
 **Qualifying another voucher type takes a captured response, not a count.** A repeat that was
 rejected, or whose transport failed before Tally processed it, also leaves the voucher count at
@@ -259,7 +286,9 @@ and master ID), and only then record the type as qualified.
 > itself a hazard: an upsert will silently turn a Payment into a Receipt. Bridge's amendment path
 > (`src-tauri/src/agent_import_amend.rs`) relies on the replacement and refuses type changes.
 >
-> **Still not measured:** a file imported through Tally's own Import menu rather than the gateway;
+> **Still not measured:** a changed payload imported through Tally's own Import menu rather than the
+> gateway, and Tally's counters for any Import-menu import (only an unchanged re-import of a Bridge-built
+> file on Windows Silver 7.1 is recorded above, PARTIAL: no counters);
 > Education or any other release (Gold is measured for a same-`REMOTEID` upsert of Payment, Receipt and
 > Contra in §9.14); bill allocations, inventory or tax entries; a voucher that
 > is cancelled or optional; and an alteration made in Tally's UI between the two imports. The
@@ -350,6 +379,72 @@ voucher to show that the `REMOTEID` was ever used: a book check cannot stand in 
 what was sent. A byte-identical resend after a cancel or delete was **not measured**, so it may not
 be assumed safe either. Note also that a cancel reports `ALTERED`, not `CANCELLED`.
 
+### 9.3a After a refusal, a corrected send under the same `REMOTEID` answered `ALTERED=1` while creating
+
+**PARTIAL: one synthetic company, run by hand over the XML gateway, one run of each step, on the lab's
+TallyPrime 7.1 Silver (the earlier rounds on that lab record the licence and release; these answers do
+not show them). The files were rendered by Bridge's code: Receipt, Accounting Voucher View,
+`ACTION="Create"`, no `VOUCHERNUMBER` sent, so Tally numbered every voucher. Seen again on a second
+book [partial].**
+Every answer below is a complete response read by structure; each window and mark read is a complete
+envelope. The ids are the `REMOTEID`s the files carried.
+
+| Step | Sent | Response | Afterwards |
+|---|---|---|---|
+| 1 | Receipt 100.00, id A | `CREATED=1 ALTERED=0`, `LASTVCHID=12` | one voucher, Receipt 1, `ALTERID` 18 |
+| 2 | the **same file** again, id A | `CREATED=0 ALTERED=1`, `LASTVCHID=12` | still one voucher: same GUID, `MASTERID` and number; `ALTERID` 19 |
+| 3 | the same content, id B | `CREATED=1`, `LASTVCHID=13` | a second voucher, Receipt 2, `MASTERID` 13 |
+| 4 | Receipt 200.00 naming a ledger the book lacks, id C | `CREATED=0 ERRORS=0 EXCEPTIONS=1`, `LASTVCHID=0`, one `LINEERROR` (the ledger does not exist) | the counters show nothing created; the voucher mark did not move (20 to 20); the next window read, after step 5, shows no extra voucher and no number gap |
+| 5 | the corrected 200.00 Receipt, **id C again** | `CREATED=0 ALTERED=1 ERRORS=0 EXCEPTIONS=0`, `LASTVCHID=14` | **a new voucher**: Receipt 3, `MASTERID` 14, vouchers 2 to 3, mark 20 to 21 |
+| 6 | control: Receipt 300.00 naming the missing ledger, id D | refused as in step 4 | the voucher mark did not move (21 to 21); the window read after step 7 shows no extra voucher and no number gap |
+| 7 | the corrected 300.00 Receipt, **a new id E** | `CREATED=1`, `LASTVCHID=15` | a new voucher: Receipt 4, `MASTERID` 15, `ALTERID` 22; the mark read at the end of the run is 22 |
+
+The windows echo each voucher's own GUID as its `REMOTEID` attribute, so which id produced which
+voucher comes from which file was sent, not from a readback. Steps 5 and 7 are **not** a one-variable
+pair: they also differ in amount (200.00 against 300.00) and in the id of the refused file (C against
+D). Only the contrast inside each pair (same id again, or a new id) is the observation.
+
+- **VERIFIED (this book, same-id case): after a refusal, `ALTERED=1` can mean "created".** Step 5
+  created a voucher that did not exist, yet Tally counted it as an alteration. The corrected send under
+  a new id (step 7, a different amount) was counted `CREATED=1`. What Tally remembers about the refused
+  id, and whether the amount or the order matters, is an inference, **UNVERIFIED**; one run each.
+- **VERIFIED (this book): a repeat of the same file under the same id upserts for a Receipt** (step 2):
+  one object, its GUID and `MASTERID` kept, `ALTERID` advanced, nothing new created. That is the response
+  and same-object evidence §9.3 asks for, from one book; recording Receipt as qualified is a separate
+  decision this section does not make.
+- **VERIFIED (this book): the same content under a new id is a second voucher** (step 3).
+- **VERIFIED (this book): a refused send moved neither the voucher mark (`ALTVCHID`, 20 to 20 and 21
+  to 21) nor the master mark (`ALTMSTID`, 223 throughout), and left no gap in the numbers** (steps 4 and
+  6), read from the marks and the later windows, not from a window straight after each refusal. The
+  descriptive counters in the answers' `CMPINFO` block did rise across each refusal (`LEDGER` 23 to 24,
+  then 28 to 29), as they rose across other reads in the run; what they count is not established, so
+  nothing here rests on them.
+- **Rule: the import id (`REMOTEID`), not the voucher number.** A retry after a refusal goes out under
+  a **new** `REMOTEID`. Bridge's native post sends a fresh one for every post (the resend note in the
+  voucher-writes part) and so never reuses one. Never read `ALTERED=1` on a first send as "the voucher was already there", and never read it as
+  "nothing was created": the voucher count and the voucher mark, read back, decide. No request here
+  carried a **voucher number**, so this section measured nothing about it and does not argue against
+  resending a rejection that readback has confirmed absent under the same number.
+- **Bridge's exact check stays as it is.** `is_clean_success_for` requires the counter it expects, so
+  step 5 would read as not clean. That is a loud failure in the safe direction. Do not loosen it to
+  accept `ALTERED=1` for a create.
+- **VERIFIED (this book): the same behaviour on a Sales voucher, in a second shape.** A zero-value Sales
+  voucher in the accounting view (id A) was refused (`EXCEPTIONS=1`, no `LINEERROR`, voucher mark
+  unchanged). A normal Sales invoice in the invoice view (100.00 plus 2.50 and 2.50), sent later under the
+  same id, answered `CREATED=0 ALTERED=1`, `LASTVCHID=22`, yet it did not exist before: the voucher mark
+  moved 29 to 30 and the voucher was found, `ALTERID` 30, included in GSTR-1. The two files differ in view,
+  amount and zero value, so this is still not a one-variable pair (see §9.18 for the zero-value refusal).
+- **Not measured:** Manual numbering, so a resend under the same number is not tested here; other
+  kinds of refusal than a missing ledger and a zero value; Gold and Education; a restart
+  between the two sends; whether the corrected send of step 5 is the same object a later
+  readback by narration marker would find.
+
+Evidence: the answers (`workorder/aw5-receipt-*.xml`, `aw5-window-*.xml`, `aw5-marks-*.xml` and `aw-marks-end-extra.xml`) are held on
+the repository's `lab/1342-capture-answers` branch at `ec1eaae16`, listed by SHA-256 in its `SHA256.txt`;
+the requests (`w5-receipt-*.xml`) are on `lab/1342-capture-requests` at `5cc927e5`. Step 2 sent
+`w5-receipt-first.xml` a second time; only the answers' `SHA256.txt` ties that answer to it, as there is no
+separate request file.
+
 ### 9.4 Master re-create is a silent Alter
 
 **VERIFIED.** Re-sending an identical ledger `ACTION="Create"` returned `CREATED=0,
@@ -403,6 +498,15 @@ establish that every omitted ledger field is preserved on every Tally version or
 synthetic read responses and the exact native master/balance/group responses are retained in
 the repository's `master_fields_lab` fixtures; every request in the lab run was bracketed by a
 200 `/status` response and every write was explicitly scoped to the lab company.
+
+**A sent list is not merged (PARTIAL; 2026-10-08; one licensed TallyPrime 7.1 Gold book, one
+stock item, once).** An `Alter` that carried a stock item's GST details list holding one new
+dated entry left the item with only the entry sent: its older entry, which held the HSN, was
+gone. The preservation above is of an omitted scalar field; a list that is sent stands for the
+whole list. Not measured: a ledger's lists (GST rate and HSN details, the dated registration
+history, the mailing details), and other releases. Until they are, a writer treats every list it
+sends as replacing the stored one, and sends the whole list as read, with its addition. The run's
+request and responses are not in this repository.
 
 ### 9.4b Master-name matching: case- and separator-insensitive, otherwise exact
 
@@ -571,8 +675,8 @@ none is `ledger_not_found`; and **more than one is `ledger_ambiguous` — an err
 comparison that returns the first match is the failure this rule exists to prevent.
 
 **Copy its discipline, not its fold.** That resolver's `ledger_lookup_key` keeps only alphanumerics,
-which is *looser* than anything §3.3b measured — it drops `&` outright, so `A & B` and `AB` share a
-key.
+which is *looser* than anything `IMPLEMENTATION_GUIDE.md` §3.3b measured — it drops `&` outright,
+so `A & B` and `AB` share a key.
 
 Be exact about what was and was not tested there, because I was not. §3.3b sent
 `ZZ Ram AND Sons Pvt Ltd` against `ZZ Ram & Sons Pvt Ltd` and it was **rejected** — that tested

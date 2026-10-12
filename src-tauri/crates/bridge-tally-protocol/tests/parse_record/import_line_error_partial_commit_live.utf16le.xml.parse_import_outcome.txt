@@ -1,0 +1,36 @@
+# fixture: tests/fixtures/import_line_error_partial_commit_live.utf16le.xml
+# parser: parse_import_outcome
+# source: captured
+Ok(TallyImportOutcome {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 49,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 1,
+        line_error_count: 1,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    tally_line_errors: [
+        TallyLineError {
+            text: "Ledger 'Lane A No Such Ledger' does not exist!",
+            truncated: false,
+        },
+    ],
+    tally_line_errors_omitted: 0,
+    last_vch_id: Some(
+        802,
+    ),
+})

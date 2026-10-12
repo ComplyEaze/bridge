@@ -8,7 +8,7 @@
 //! party's ledger (`Café Naïve Traders` holds -102.02); none names a bill.
 use super::*;
 use crate::agent::bill_trail::{DetailKind, DetailLimits};
-use crate::agent::voucher_window::{VoucherReadShape, WindowReadLimits};
+use crate::agent::voucher_window::{SmallBooks, VoucherReadShape, WindowReadLimits};
 use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedComposition, UnallocatedParty};
 
 /// The outstandings' as-of date, as the bill trail is handed it.
@@ -382,6 +382,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
         budget_bytes: crate::agent::WINDOW_READ_BUDGET_BYTES,
         default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
         max_reads: 2,
+        small_books: SmallBooks::Skip,
     };
     // (kind, named reference, code, requests the plan needs): a named bill's
     // window starts at its date, so the empty day before it is not read.

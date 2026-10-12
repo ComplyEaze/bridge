@@ -113,7 +113,14 @@ impl Server {
                 .map_err(|error| error.safe_reason_code().to_string())?;
 
             let read = self
-                .read_entry_wildcard_window(&identity, &company.name, &from, &to, None)
+                .read_entry_wildcard_window(
+                    &identity,
+                    &company.name,
+                    &from,
+                    &to,
+                    None,
+                    SmallBooks::Count,
+                )
                 .await?;
             accumulate(&mut accumulated, read.all_evidence());
             let source_marks = read.witness.as_ref().map(|witness| witness.marks);

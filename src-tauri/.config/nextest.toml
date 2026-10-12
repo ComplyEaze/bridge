@@ -1,7 +1,7 @@
 # Hang guard for the native test run (bridge#1000). Nextest reads this file from the
-# workspace root, which is src-tauri, not the repository root. It does one thing: a test
+# workspace root, which is src-tauri, not the repository root. Its main job: a test
 # that deadlocks is terminated, and the run fails, instead of holding the job until its
-# time limit. The slowest real tests take 41 to 69 s at the runner's own thread count (measured
+# time limit. (One override at the end shows what the Windows access tests print.) The slowest real tests take 41 to 69 s at the runner's own thread count (measured
 # 5 Oct 2026: 61 to 69 s on macOS, 41 to 44 s on Windows) and up to 90 s on Windows at twelve
 # threads, and several wait out 20 to 40 s deadlines on purpose, so a test is marked slow after
 # 60 s and terminated after six such periods (six minutes), at least four times the slowest real
@@ -12,3 +12,10 @@
 # command line, and this file sets neither.
 [profile.default]
 slow-timeout = { period = "60s", terminate-after = 6 }
+
+# The Windows access tests that open a file print its owner and access list as SDDL, so a
+# passing run still records the runner's real state (its owner and access lists), not only a
+# failing one.
+[[profile.default.overrides]]
+filter = 'test(/access::tests::on_windows::/)'
+success-output = "immediate"

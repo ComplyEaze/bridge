@@ -82,26 +82,33 @@ async fn voucher_selector_catalogue_contributes_to_final_wire_evidence() {
         plans[5] = plans[5].clone().with_framing(framing);
         plans[7] = plans[7].clone().with_framing(framing);
         // The pre-flight high-water read (protocol reference §11c), then the
-        // window, which ten vouchers keep whole.
+        // census of the window (#1029), then the window, which ten vouchers
+        // keep whole.
         plans.extend(cycle[10..16].iter().cloned());
         let readback = cycle[27].clone();
-        plans.extend([
-            cycle[0].clone(),
-            readback.clone(),
-            cycle[1].clone(),
-            readback,
-            cycle[1].clone(),
-            cycle[0].clone(),
-        ]);
+        for _ in 0..2 {
+            plans.extend([
+                cycle[0].clone(),
+                readback.clone(),
+                cycle[1].clone(),
+                readback.clone(),
+                cycle[1].clone(),
+                cycle[0].clone(),
+            ]);
+        }
         plans.extend(cycle[4..10].iter().cloned());
         let company = response_bytes(&plans[0]);
         let catalogue = response_bytes(&plans[5]);
         let high_water = response_bytes(&plans[11]);
-        let vouchers = response_bytes(&plans[17]);
+        let census = response_bytes(&plans[17]);
+        let vouchers = response_bytes(&plans[23]);
         let expected_response = join_hashes(
             &join_hashes(
                 &join_hashes(&sha256_hex(&company), &sha256_hex(&catalogue)),
-                &join_hashes(&sha256_hex(&high_water), &sha256_hex(&vouchers)),
+                &join_hashes(
+                    &join_hashes(&sha256_hex(&high_water), &sha256_hex(&census)),
+                    &sha256_hex(&vouchers),
+                ),
             ),
             &sha256_hex(&catalogue),
         );
@@ -124,7 +131,11 @@ async fn voucher_selector_catalogue_contributes_to_final_wire_evidence() {
         assert_eq!(evidence["response_sha256"], expected_response);
         assert_eq!(
             evidence["bytes"],
-            2 * (company.len() + 2 * catalogue.len() + high_water.len() + vouchers.len())
+            2 * (company.len()
+                + 2 * catalogue.len()
+                + high_water.len()
+                + census.len()
+                + vouchers.len())
         );
         let items = &response["structuredContent"]["result"]["items"];
         assert_eq!(items.as_array().unwrap().len(), 2);
@@ -134,7 +145,8 @@ async fn voucher_selector_catalogue_contributes_to_final_wire_evidence() {
         }
         previous = Some((items.clone(), evidence["response_sha256"].clone()));
         let observed = simulator.finish().unwrap();
-        assert_eq!(observed.len(), 28);
+        // 28 before the census (#1029) and its six legs.
+        assert_eq!(observed.len(), 34);
         assert_eq!(
             evidence["request_sha256"],
             join_hashes(
@@ -144,11 +156,14 @@ async fn voucher_selector_catalogue_contributes_to_final_wire_evidence() {
                         &observed[5].request_body_sha256,
                     ),
                     &join_hashes(
-                        &observed[11].request_body_sha256,
-                        &observed[17].request_body_sha256,
+                        &join_hashes(
+                            &observed[11].request_body_sha256,
+                            &observed[17].request_body_sha256,
+                        ),
+                        &observed[23].request_body_sha256,
                     ),
                 ),
-                &observed[23].request_body_sha256,
+                &observed[29].request_body_sha256,
             ),
         );
     }

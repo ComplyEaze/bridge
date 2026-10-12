@@ -5,6 +5,7 @@
 //! entries of the vouchers in it, so its total can be rebuilt from the vouchers `vouchers`
 //! lists for the same arguments, and the result says which vouchers it left out and why.
 use super::movement::movement_entry_effect;
+use super::voucher_groups::{Placement, Placements, Primary};
 use super::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -13,12 +14,29 @@ use std::collections::{BTreeMap, BTreeSet};
 /// bucket's ledger, type or dates, where the existing selectors allow it) lists the rest.
 pub(super) const MAX_VOUCHER_REFS_PER_BUCKET: usize = 5;
 
+/// How many member ledgers a `group` or `primary_group` bucket names. The count is exact; the names
+/// are the largest movements first and complete only when the bucket is small.
+pub(super) const MAX_MEMBERS_PER_BUCKET: usize = 10;
+
+/// How many groups a `group` summary lists in `subtree_totals`. The count is exact; the largest
+/// movements come first.
+pub(super) const MAX_SUBTREE_TOTALS: usize = 60;
+
+/// Whether every group's `subtree_totals` figure is in the answer: at most the bound of groups were reached.
+pub(super) fn subtree_totals_complete(total: usize) -> bool {
+    total <= MAX_SUBTREE_TOTALS
+}
+
 /// What the buckets are grouped by.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum SummaryGroup {
     Ledger,
     Month,
     VoucherType,
+    /// One bucket per immediate parent group of a ledger, as the ledger master shows it.
+    Group,
+    /// One bucket per group directly under the reserved root, keyed by its `RESERVEDNAME`.
+    PrimaryGroup,
 }
 
 impl SummaryGroup {
@@ -29,6 +47,8 @@ impl SummaryGroup {
             Some("ledger") => Ok(Some(Self::Ledger)),
             Some("month") => Ok(Some(Self::Month)),
             Some("voucher_type") => Ok(Some(Self::VoucherType)),
+            Some("group") => Ok(Some(Self::Group)),
+            Some("primary_group") => Ok(Some(Self::PrimaryGroup)),
             Some(_) => Err(ToolFailure::from("summarise_by_invalid".to_string())),
         }
     }
@@ -38,7 +58,14 @@ impl SummaryGroup {
             Self::Ledger => "ledger",
             Self::Month => "month",
             Self::VoucherType => "voucher_type",
+            Self::Group => "group",
+            Self::PrimaryGroup => "primary_group",
         }
+    }
+
+    /// Whether the grouping needs each ledger's place in the group tree.
+    pub(super) fn needs_placements(self) -> bool {
+        matches!(self, Self::Group | Self::PrimaryGroup)
     }
 }
 
@@ -47,6 +74,9 @@ impl SummaryGroup {
 pub(super) struct SummaryRequest {
     pub(super) group: SummaryGroup,
     pub(super) selected_ledger: Option<String>,
+    /// Each ledger's place in the group tree, read before and after the window and equal both
+    /// times, for `group` and `primary_group`; `None` for every other grouping.
+    pub(super) placements: Option<Arc<Placements>>,
 }
 
 /// One summarised window: the buckets in presentation order and what stands behind them.
@@ -70,6 +100,23 @@ pub(super) struct Summary {
     /// value means a source that did not report it; only then is a zero in `post_dated_included`
     /// not proof that none are post-dated.
     pub(super) post_dated_flag_absent: usize,
+    /// For a `group` summary: each group on any bucket's chain with the total of everything under it,
+    /// descendants included, largest movement first (at most [`MAX_SUBTREE_TOTALS`]), and how many there
+    /// are. They overlap (a ledger counts under every group above it), so they do not add up to `totals`.
+    pub(super) subtree_totals: Vec<Value>,
+    pub(super) subtree_total_count: usize,
+}
+
+/// How a bucket of a group grouping is shown: its label and the fields that say which group it is.
+struct GroupMeta {
+    label: String,
+    fields: serde_json::Map<String, Value>,
+}
+
+struct Member {
+    first_seen: usize,
+    debit: String,
+    credit: String,
 }
 
 struct Bucket {
@@ -80,18 +127,113 @@ struct Bucket {
     debit: String,
     credit: String,
     refs: Vec<Value>,
+    meta: Option<GroupMeta>,
+    /// The ledgers whose entries fall in a group bucket, by name.
+    members: BTreeMap<String, Member>,
 }
 
 impl Bucket {
-    fn new(first_seen: usize) -> Self {
+    fn new(first_seen: usize, meta: Option<GroupMeta>) -> Self {
         Self {
             first_seen,
             vouchers: 0,
             debit: "0".to_string(),
             credit: "0".to_string(),
             refs: Vec::new(),
+            meta,
+            members: BTreeMap::new(),
         }
     }
+}
+
+/// A ledger's place in the group tree, or why it has none: a ledger the catalogue does not list, or
+/// whose chain could not be walked, refuses the whole summary, so no bucket is ever short of an entry it
+/// could not place. The two reads that made the placements were equal, so a missing ledger is not drift.
+fn placement_of<'a>(request: &'a SummaryRequest, ledger: &str) -> Result<&'a Placement, String> {
+    let placements = request
+        .placements
+        .as_ref()
+        .ok_or_else(|| "summary_group_unresolved:no_placements".to_string())?;
+    match placements.get(ledger) {
+        // The ledger's name travels after the gap code (a ledger name may hold a colon, a gap code never does).
+        None => Err(format!(
+            "summary_group_unresolved:ledger_not_in_catalogue:{ledger}"
+        )),
+        Some(Err(gap)) => Err(format!("summary_group_unresolved:{gap}:{ledger}")),
+        Some(Ok(placement)) => Ok(placement),
+    }
+}
+
+/// What identifies a bucket of a group grouping.
+fn group_key(group: SummaryGroup, placement: &Placement) -> String {
+    match group {
+        SummaryGroup::PrimaryGroup => placement.primary().key,
+        // The reserved root is the only placement with no group of its own; a user group may be
+        // named like it, so the two never share a bucket.
+        _ => match placement.chain.first() {
+            Some(hop) => format!("group:{}", hop.name),
+            None => "root".to_string(),
+        },
+    }
+}
+
+/// How a bucket of a group grouping is shown. Built once, when the bucket is first filled.
+fn group_meta(group: SummaryGroup, placement: &Placement) -> GroupMeta {
+    let hop = |name: &str, reserved: Option<&str>| json!({"name": name, "reserved_name": reserved});
+    let Primary {
+        name,
+        reserved_name,
+        ..
+    } = placement.primary();
+    let mut fields = serde_json::Map::new();
+    // What a figure covers is said in every row, not only in the basis: a `group` bucket and a
+    // `subtree_totals` row of the same group have different figures.
+    if group == SummaryGroup::PrimaryGroup {
+        fields.insert("covers".to_string(), json!("every ledger under the group"));
+        fields.insert("reserved_name".to_string(), json!(reserved_name));
+        return GroupMeta {
+            label: name,
+            fields,
+        };
+    }
+    fields.insert(
+        "covers".to_string(),
+        json!("only the ledgers directly under the group, not its sub-groups"),
+    );
+    fields.insert(
+        "reserved_name".to_string(),
+        json!(placement.group_reserved_name()),
+    );
+    fields.insert(
+        "chain".to_string(),
+        Value::Array(
+            placement
+                .chain
+                .iter()
+                .map(|h| hop(&h.name, Some(&h.reserved_name)))
+                .collect(),
+        ),
+    );
+    fields.insert(
+        "primary_group".to_string(),
+        hop(&name, reserved_name.as_deref()),
+    );
+    GroupMeta {
+        label: placement.group_name().to_string(),
+        fields,
+    }
+}
+
+/// One group's total over the whole subtree under it, for a `group` summary: every ledger below it at
+/// any depth, so a predefined group whose ledgers all sit in user sub-groups still has its figure.
+struct Subtree {
+    first_seen: usize,
+    depth: usize,
+    reserved_name: String,
+    vouchers: usize,
+    last_voucher: usize,
+    debit: String,
+    credit: String,
 }
 
 struct EntryAmount<'a> {
@@ -154,6 +296,7 @@ fn month_of(date: &str) -> Result<String, String> {
 pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summary, String> {
     let (mut cancelled, mut optional, mut no_entries) = (0usize, 0usize, 0usize);
     let mut buckets: BTreeMap<String, Bucket> = BTreeMap::new();
+    let mut subtrees: BTreeMap<String, Subtree> = BTreeMap::new();
     let mut vouchers_summarised = 0usize;
     let (mut post_dated_included, mut post_dated_flag_absent) = (0usize, 0usize);
     let (mut total_debit, mut total_credit) = ("0".to_string(), "0".to_string());
@@ -201,7 +344,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
         };
         let mut touched: BTreeSet<String> = BTreeSet::new();
         let voucher_key = match request.group {
-            SummaryGroup::Ledger => None,
+            SummaryGroup::Ledger | SummaryGroup::Group | SummaryGroup::PrimaryGroup => None,
             SummaryGroup::Month => Some(month_of(row["date"].as_str().unwrap_or_default())?),
             SummaryGroup::VoucherType => Some(
                 row["voucher_type"]
@@ -211,13 +354,62 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             ),
         };
         for amount in amounts.iter().filter(|amount| counted(amount)) {
-            let key = voucher_key
-                .clone()
-                .unwrap_or_else(|| amount.ledger.to_string());
+            let placement = if request.group.needs_placements() {
+                Some(placement_of(request, amount.ledger)?)
+            } else {
+                None
+            };
+            let key = match (&voucher_key, placement) {
+                (Some(key), _) => key.clone(),
+                (None, Some(placement)) => group_key(request.group, placement),
+                (None, None) => amount.ledger.to_string(),
+            };
             let first_seen = buckets.len();
-            let bucket = buckets
-                .entry(key.clone())
-                .or_insert_with(|| Bucket::new(first_seen));
+            let bucket = buckets.entry(key.clone()).or_insert_with(|| {
+                Bucket::new(first_seen, placement.map(|p| group_meta(request.group, p)))
+            });
+            if let (SummaryGroup::Group, Some(placement)) = (request.group, placement) {
+                // The entry also counts under every group above its own, once per voucher.
+                for (position, hop) in placement.chain.iter().enumerate() {
+                    let seen = subtrees.len();
+                    let subtree = subtrees.entry(hop.name.clone()).or_insert_with(|| Subtree {
+                        first_seen: seen,
+                        depth: placement.chain.len() - position,
+                        reserved_name: hop.reserved_name.clone(),
+                        vouchers: 0,
+                        last_voucher: usize::MAX,
+                        debit: "0".to_string(),
+                        credit: "0".to_string(),
+                    });
+                    if let Some(debit) = &amount.debit {
+                        subtree.debit = add_decimal(&subtree.debit, debit)?;
+                    }
+                    if let Some(credit) = &amount.credit {
+                        subtree.credit = add_decimal(&subtree.credit, credit)?;
+                    }
+                    if subtree.last_voucher != vouchers_summarised {
+                        subtree.last_voucher = vouchers_summarised;
+                        subtree.vouchers += 1;
+                    }
+                }
+            }
+            if request.group.needs_placements() {
+                let seen = bucket.members.len();
+                let member = bucket
+                    .members
+                    .entry(amount.ledger.to_string())
+                    .or_insert_with(|| Member {
+                        first_seen: seen,
+                        debit: "0".to_string(),
+                        credit: "0".to_string(),
+                    });
+                if let Some(debit) = &amount.debit {
+                    member.debit = add_decimal(&member.debit, debit)?;
+                }
+                if let Some(credit) = &amount.credit {
+                    member.credit = add_decimal(&member.credit, credit)?;
+                }
+            }
             if let Some(debit) = &amount.debit {
                 bucket.debit = add_decimal(&bucket.debit, debit)?;
                 total_debit = add_decimal(&total_debit, debit)?;
@@ -249,21 +441,32 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             let group = match request.group {
                 SummaryGroup::Ledger => party_name_value(key.clone()),
                 SummaryGroup::Month | SummaryGroup::VoucherType => json!(key),
+                // A group's name is shown as the book has it, like `parent` in `ledger_masters`.
+                SummaryGroup::Group | SummaryGroup::PrimaryGroup => json!(bucket
+                    .meta
+                    .as_ref()
+                    .map_or(key.as_str(), |meta| meta.label.as_str())),
             };
             let refs_complete = bucket.refs.len() == bucket.vouchers;
-            Ok((
-                bucket.first_seen,
-                gross,
-                json!({
-                    "group": group,
-                    "vouchers": bucket.vouchers,
-                    "debit": bucket.debit,
-                    "credit": bucket.credit,
-                    "net": net,
-                    "voucher_refs": bucket.refs,
-                    "voucher_refs_complete": refs_complete,
-                }),
-            ))
+            let mut shown = json!({
+                "group": group,
+                "vouchers": bucket.vouchers,
+                "debit": bucket.debit,
+                "credit": bucket.credit,
+                "net": net,
+                "voucher_refs": bucket.refs,
+                "voucher_refs_complete": refs_complete,
+            });
+            if let Some(meta) = bucket.meta {
+                for (field, value) in meta.fields {
+                    shown[field] = value;
+                }
+                let total = bucket.members.len();
+                shown["members"] = members_shown(bucket.members)?;
+                shown["members_total"] = json!(total);
+                shown["members_complete"] = json!(total <= MAX_MEMBERS_PER_BUCKET);
+            }
+            Ok((bucket.first_seen, gross, shown))
         })
         .collect::<Result<Vec<_>, String>>()?;
     // Months run in calendar order; ledgers and types by the larger movement first, then by
@@ -280,6 +483,7 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             by_gross.then_with(|| left.0.cmp(&right.0))
         });
     }
+    let (subtree_totals, subtree_total_count) = subtree_totals_shown(subtrees)?;
     Ok(Summary {
         // `position` is the bucket's place in the whole ordering, so two buckets whose labels
         // read alike under masking can still be told apart and paged without a repeat.
@@ -293,6 +497,8 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             .collect(),
         post_dated_included,
         post_dated_flag_absent,
+        subtree_totals,
+        subtree_total_count,
         vouchers_summarised,
         excluded: json!({"cancelled": cancelled, "optional": optional, "no_accounting_entries": no_entries}),
         totals: json!({"debit": total_debit, "credit": total_credit}),
@@ -301,6 +507,86 @@ pub(super) fn summarise(rows: &[Value], request: &SummaryRequest) -> Result<Summ
             _ => "all_entries",
         },
     })
+}
+
+/// The `subtree_totals` of a `group` summary: largest movement first, then in the order the groups were
+/// first reached, never by name; at most [`MAX_SUBTREE_TOTALS`], and the exact count.
+fn subtree_totals_shown(
+    subtrees: BTreeMap<String, Subtree>,
+) -> Result<(Vec<Value>, usize), String> {
+    let count = subtrees.len();
+    let mut ranked = subtrees
+        .into_iter()
+        .map(|(name, subtree)| {
+            let gross = add_decimal(
+                &subtree.credit,
+                bridge_tally_core::ExactDecimal::parse(subtree.debit.clone())
+                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .magnitude()
+                    .as_str(),
+            )?;
+            Ok((subtree.first_seen, gross, name, subtree))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    ranked.sort_by(|left, right| {
+        let by_gross = bridge_tally_core::ExactDecimal::parse(right.1.clone())
+            .and_then(|right_gross| {
+                bridge_tally_core::ExactDecimal::parse(left.1.clone())
+                    .map(|left_gross| right_gross.cmp_magnitude(&left_gross))
+            })
+            .unwrap_or(std::cmp::Ordering::Equal);
+        by_gross.then_with(|| left.0.cmp(&right.0))
+    });
+    let shown = ranked
+        .into_iter()
+        .take(MAX_SUBTREE_TOTALS)
+        .map(|(_, _, name, subtree)| {
+            let net = add_decimal(&subtree.debit, &subtree.credit)?;
+            Ok(json!({
+                "group": name, "covers": "the group and everything under it, sub-groups included",
+                "reserved_name": subtree.reserved_name, "depth": subtree.depth,
+                "vouchers": subtree.vouchers, "debit": subtree.debit, "credit": subtree.credit, "net": net,
+            }))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok((shown, count))
+}
+
+/// The member ledgers of a group bucket, the largest movement first and then in the order they first
+/// appeared in the window, never by name (a masked name must not reveal the alphabetical order), at
+/// most [`MAX_MEMBERS_PER_BUCKET`]. A member's `debit` and `credit` are its entries in the bucket.
+fn members_shown(members: BTreeMap<String, Member>) -> Result<Value, String> {
+    let mut ranked = members
+        .into_iter()
+        .map(|(ledger, member)| {
+            let gross = add_decimal(
+                &member.credit,
+                bridge_tally_core::ExactDecimal::parse(member.debit.clone())
+                    .map_err(|_| "voucher_amount_invalid".to_string())?
+                    .magnitude()
+                    .as_str(),
+            )?;
+            Ok((member.first_seen, gross, ledger, member))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    ranked.sort_by(|left, right| {
+        let by_gross = bridge_tally_core::ExactDecimal::parse(right.1.clone())
+            .and_then(|right_gross| {
+                bridge_tally_core::ExactDecimal::parse(left.1.clone())
+                    .map(|left_gross| right_gross.cmp_magnitude(&left_gross))
+            })
+            .unwrap_or(std::cmp::Ordering::Equal);
+        by_gross.then_with(|| left.0.cmp(&right.0))
+    });
+    Ok(Value::Array(
+        ranked
+            .into_iter()
+            .take(MAX_MEMBERS_PER_BUCKET)
+            .map(|(_, _, ledger, member)| {
+                json!({"ledger": party_name_value(ledger), "debit": member.debit, "credit": member.credit})
+            })
+            .collect(),
+    ))
 }
 
 /// One page of buckets: from `offset`, at most `limit`, and no more than `byte_budget` bytes

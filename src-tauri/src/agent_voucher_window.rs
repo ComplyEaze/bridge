@@ -52,8 +52,7 @@ const CENSUS_WIRE_BYTES_PER_VOUCHER: u64 = 4 * 1024;
 pub(super) const MAX_CENSUS_READS: usize = 256;
 
 /// The most planned data reads one window read may spend before it is refused
-/// as needing a narrower window. The same ceiling the outstandings scanner uses
-/// for its own segment pairs.
+/// as needing a narrower window.
 pub(super) const MAX_PLANNED_READS: usize = 128;
 
 /// The request shapes this bound plans for, each with the per-voucher cost to
@@ -173,10 +172,10 @@ impl AlterIdSpan {
     }
 }
 
-/// A window date that reaches this layer as text from a read or a stored
-/// record, not from a tool argument (whose date [`normalized_date`] parses):
-/// parsed once, by the caller, and carried as a [`TallyDate`] into every
-/// request rendered from it (#861).
+/// A window date that reaches this layer as text read from the book, not from a
+/// tool argument (whose date [`normalized_date`] parses): parsed once, by its one
+/// caller, the bill trail's window start (`agent_bill_trail.rs`), and carried as
+/// a [`TallyDate`] into every request rendered from it (#861).
 pub(super) fn parse_window_date(value: &str) -> Result<TallyDate, ToolFailure> {
     TallyDate::parse(value).map_err(|_| ToolFailure::from("invalid_date_range".to_string()))
 }
@@ -325,6 +324,45 @@ pub(super) struct CompanyMarks {
 pub(super) struct WindowWitness {
     pub(super) marks: CompanyMarks,
     pub(super) census: Option<WindowCensus>,
+}
+
+/// Proof that a window read made a corroborating second read of itself
+/// redundant (#1241): it was divided, every part was admitted against a census
+/// that names every voucher's GUID (so each part held exactly the counted
+/// vouchers, by AlterID and GUID), and the company's two marks read after the
+/// last part equal the marks it opened on. A change to the company between
+/// those two reads moves a mark (§11c.5), so the read is one snapshot of the
+/// window, and a replay could only observe a later state.
+///
+/// Only the paired agent reader earns one: a reader that seals single reads
+/// (the audit reader) does not, since a part that was not read twice is not
+/// already a stable observation.
+///
+/// The field is private and nothing outside [`read_voucher_window_with`] builds
+/// one, so a caller can skip the second read only by holding it.
+#[derive(Debug)]
+pub(super) struct BracketedCount(());
+
+/// What a window read's corroborating second read is: the replay of its
+/// parts, or nothing, when the read carries a [`BracketedCount`].
+pub(super) enum SecondRead {
+    Replay(WindowPlanSource),
+    Spared(BracketedCount),
+}
+
+impl SecondRead {
+    /// The one place that decides: a read that holds the token is spared its
+    /// replay, every other read replays exactly its own parts.
+    pub(super) fn of(
+        reads: Vec<WindowPart>,
+        witness: Option<WindowWitness>,
+        bracketed: Option<BracketedCount>,
+    ) -> Self {
+        match bracketed {
+            Some(bracketed) => Self::Spared(bracketed),
+            None => Self::Replay(WindowPlanSource::replay_of(reads, witness)),
+        }
+    }
 }
 
 /// A measured per-voucher cost may replace the shape's default, but never falls
@@ -765,6 +803,21 @@ impl WindowServed {
     }
 }
 
+/// Whether a window read counts a book whose high-water mark alone shows it
+/// fits one request (#1029).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SmallBooks {
+    /// Read the window as one request without a census: the mark bounds the
+    /// book, and the read says nothing about what the window holds beyond its
+    /// rows.
+    Skip,
+    /// Count the window like a large book, so a read can report the window
+    /// complete and a presence question can be answered absent. Costs the
+    /// census requests a small book otherwise avoids. A mark of zero, a
+    /// company that has never held a voucher, is still not counted.
+    Count,
+}
+
 /// The per-call limits a window read plans under.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct WindowReadLimits {
@@ -773,6 +826,8 @@ pub(super) struct WindowReadLimits {
     /// The most data requests one read may dispatch. [`MAX_PLANNED_READS`] in
     /// production.
     pub(super) max_reads: usize,
+    /// Whether a book small enough to read whole is counted first (#1029).
+    pub(super) small_books: SmallBooks,
 }
 
 impl WindowReadLimits {
@@ -781,6 +836,16 @@ impl WindowReadLimits {
             budget_bytes: WINDOW_READ_BUDGET_BYTES,
             default_bytes_per_voucher: shape.default_wire_bytes_per_voucher(),
             max_reads: MAX_PLANNED_READS,
+            small_books: SmallBooks::Skip,
+        }
+    }
+
+    /// These limits, counting a small book as well (#1029). Only the reads
+    /// that report a window complete or a voucher absent ask for it.
+    pub(super) const fn counting_small_books(self) -> Self {
+        Self {
+            small_books: SmallBooks::Count,
+            ..self
         }
     }
 
@@ -859,6 +924,9 @@ pub(super) struct WindowReadOutcome<T> {
     /// What a replay of this read must carry. `None` only when no marks were
     /// read, which is the caller-counted source alone.
     pub(super) witness: Option<WindowWitness>,
+    /// Held when a corroborating second read would add nothing
+    /// ([`BracketedCount`]).
+    pub(super) bracketed: Option<BracketedCount>,
     /// Whether Tally refused a data request of this read as too large or timed
     /// out, and the read went on in smaller parts. The parts' sizes then say
     /// nothing about the request Tally refused.
@@ -1914,6 +1982,7 @@ where
     // reader that seals its reads: its record states the marks it read, so an
     // undivided window must also show they did not move.
     let mut closing = None;
+    let mut closed_on_opening_marks = false;
     if let (true, Some(opened)) = (is_divided(&reads) || reader.seals_its_reads(), opening) {
         let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
             .await
@@ -1926,7 +1995,16 @@ where
                 &closing,
             ));
         }
+        closed_on_opening_marks = true;
     }
+    // The only place a `BracketedCount` is made (#1241). A replay never earns
+    // one: it is itself the second read. A reader that does not seal closes
+    // only a divided read, so closing the marks is what says the read was divided.
+    let bracketed = (!replaying
+        && !reader.seals_its_reads()
+        && closed_on_opening_marks
+        && census.as_ref().is_some_and(WindowCensus::names_every_guid))
+    .then_some(BracketedCount(()));
     // Unreachable while every plan holds at least one part; kept total
     // rather than panicking on a future change to that.
     let evidence =
@@ -1938,6 +2016,7 @@ where
         closing_evidence: closing,
         reads,
         witness: opening.map(|marks| WindowWitness { marks, census }),
+        bracketed,
         refused_a_part,
         // Filled in by `read_voucher_window_with`, which owns the timer.
         timings: WindowReadTimings::new(from.clone(), to.clone()),
@@ -1987,8 +2066,9 @@ async fn read_marks<R: WindowReader>(
 }
 
 /// Establish what `window` holds, cheapest first: the company's voucher
-/// high-water mark bounds every window of the book at once; only when that
-/// bound is not enough is the window itself counted.
+/// high-water mark bounds every window of the book at once; the window itself
+/// is counted when that bound is not enough, or when the caller asks for a
+/// small book to be counted too (`SmallBooks::Count`).
 #[allow(clippy::too_many_arguments)]
 async fn estimate_window_volume<R: WindowReader>(
     reader: &R,
@@ -2010,8 +2090,14 @@ async fn estimate_window_volume<R: WindowReader>(
     let high_water = marks.vouchers;
     // Every voucher carries a distinct AlterID no greater than the high-water
     // mark (§10), so the book — and therefore any window of it — holds at
-    // most `high_water` vouchers.
-    if high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes {
+    // most `high_water` vouchers. A mark of zero is a company that has never
+    // held a voucher: there is nothing to count, whatever the limits say. A
+    // read that reports completeness or absence counts any other mark however
+    // small the book, so a small or new company can have a window checked
+    // complete and a presence question answered absent (#1029).
+    let fits_one_request =
+        high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes;
+    if high_water == 0 || (fits_one_request && limits.small_books == SmallBooks::Skip) {
         return Ok(Preflight::Whole {
             census: None,
             marks: None,
@@ -2419,7 +2505,7 @@ pub(super) fn parse_voucher_census(
                 let (Event::Start(event) | Event::Empty(event)) = event else {
                     unreachable!("matched as Start or Empty above")
                 };
-                let name = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let name = event.name().as_ref().to_ascii_uppercase();
                 if name == "VOUCHER" && scope.collection() {
                     if empty {
                         return Err(invalid());
@@ -2457,7 +2543,7 @@ pub(super) fn parse_voucher_census(
                 }
             }
             Ok(Event::End(event)) => {
-                let end = String::from_utf8_lossy(event.name().as_ref()).to_ascii_uppercase();
+                let end = event.name().as_ref().to_ascii_uppercase();
                 scope.end(&end)?;
                 if end == "VOUCHER" && scope.collection() {
                     let row = current.take().ok_or_else(invalid)?;

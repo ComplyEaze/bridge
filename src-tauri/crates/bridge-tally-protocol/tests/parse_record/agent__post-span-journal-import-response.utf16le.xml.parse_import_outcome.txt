@@ -1,0 +1,31 @@
+# fixture: tests/fixtures/agent/post-span-journal-import-response.utf16le.xml
+# parser: parse_import_outcome
+# source: captured
+Ok(TallyImportOutcome {
+    application_status: NotReported,
+    counters: TallyImportResult {
+        created: 5,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+        line_error_count: 0,
+        counter_presence: TallyImportCounterPresence {
+            created: true,
+            altered: true,
+            deleted: true,
+            ignored: true,
+            errors: true,
+            cancelled: true,
+            exceptions: true,
+        },
+    },
+    exceptions_were_reported: true,
+    tally_line_errors: [],
+    tally_line_errors_omitted: 0,
+    last_vch_id: Some(
+        1738,
+    ),
+})

@@ -1,0 +1,378 @@
+{
+ "comment": "Individual entity, so the s.40(b) rule is closed. Person A (son of the proprietor) has all five vocabulary natures moving: salary, rent, interest and purchases positive, other negative (a receipt credited to its ledger), each giving one comparable_required finding with its own comparable text. Person B is recorded as \"partner\" but the entity's rules leave the s.40(b) rule closed, so salary and interest also ask for a comparable. Person A's commission nature is outside the vocabulary and moves without a finding. One rent payment has an empty voucher number and a voucher type other than its base type, which the finding's evidence label carries over from the amount figure. Salary is also listed as a payable nature, which only related_parties_cl23 reads.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_core-001"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_core-002"
+  },
+  {
+   "name": "Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-003"
+  },
+  {
+   "name": "Person A Loan Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-004"
+  },
+  {
+   "name": "Person A Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-sp_core-005"
+  },
+  {
+   "name": "Person A Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-006"
+  },
+  {
+   "name": "Person A Services",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-007"
+  },
+  {
+   "name": "Person B Interest",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-008"
+  },
+  {
+   "name": "Person B Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_core-009"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_core-010"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_core-011"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Rent",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 9250000,
+   "credit": 9100000,
+   "closing": 50150000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 0,
+   "credit": 1500000,
+   "closing": -51510000
+  },
+  {
+   "ledger": "Commission",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Person A Loan Interest",
+   "opening": 0,
+   "debit": 800000,
+   "credit": 0,
+   "closing": 800000
+  },
+  {
+   "ledger": "Person A Purchases",
+   "opening": 0,
+   "debit": 3000000,
+   "credit": 0,
+   "closing": 3000000
+  },
+  {
+   "ledger": "Person A Salary",
+   "opening": 0,
+   "debit": 1500000,
+   "credit": 0,
+   "closing": 1500000
+  },
+  {
+   "ledger": "Person A Services",
+   "opening": 0,
+   "debit": 0,
+   "credit": 250000,
+   "closing": -250000
+  },
+  {
+   "ledger": "Person B Interest",
+   "opening": 0,
+   "debit": 700000,
+   "credit": 0,
+   "closing": 700000
+  },
+  {
+   "ledger": "Person B Remuneration",
+   "opening": 0,
+   "debit": 1800000,
+   "credit": 0,
+   "closing": 1800000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9000000,
+   "closing": -9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -9000000
+    ],
+    [
+     "Bank A",
+     9000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-05-31",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person A Salary",
+     1500000
+    ],
+    [
+     "Bank A",
+     -1500000
+    ]
+   ]
+  },
+  {
+   "guid": "sp-core-rent-p02",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "vtype": "Rent Payment",
+   "number": "",
+   "lines": [
+    [
+     "Alpha Rent",
+     2400000
+    ],
+    [
+     "Bank A",
+     -2400000
+    ]
+   ]
+  },
+  {
+   "guid": "j01",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person A Loan Interest",
+     800000
+    ],
+    [
+     "Capital",
+     -800000
+    ]
+   ]
+  },
+  {
+   "guid": "p03",
+   "date": "2025-08-14",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person A Purchases",
+     3000000
+    ],
+    [
+     "Bank A",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "r02",
+   "date": "2025-09-20",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Person A Services",
+     -250000
+    ],
+    [
+     "Bank A",
+     250000
+    ]
+   ]
+  },
+  {
+   "guid": "p04",
+   "date": "2025-10-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Commission",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "p05",
+   "date": "2025-11-30",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Person B Remuneration",
+     1800000
+    ],
+    [
+     "Bank A",
+     -1800000
+    ]
+   ]
+  },
+  {
+   "guid": "j02",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Person B Interest",
+     700000
+    ],
+    [
+     "Capital",
+     -700000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "individual",
+ "related_parties": {
+  "Person A": {
+   "relationship": "son of the proprietor",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person A Salary"
+    ],
+    "rent": [
+     "Alpha Rent"
+    ],
+    "interest": [
+     "Person A Loan Interest"
+    ],
+    "purchases": [
+     "Person A Purchases"
+    ],
+    "other": [
+     "Person A Services"
+    ],
+    "commission": [
+     "Commission"
+    ]
+   },
+   "payable_natures": [
+    "salary"
+   ]
+  },
+  "Person B": {
+   "relationship": "partner",
+   "ledgers_by_nature": {
+    "salary": [
+     "Person B Remuneration"
+    ],
+    "interest": [
+     "Person B Interest"
+    ]
+   }
+  }
+ }
+}

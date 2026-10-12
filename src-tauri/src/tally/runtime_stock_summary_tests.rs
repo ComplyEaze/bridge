@@ -1035,8 +1035,9 @@ async fn a_book_that_moved_is_reported_as_moved_not_as_a_missing_item_count() {
 
 #[tokio::test]
 async fn a_quantity_bridge_cannot_read_does_not_refuse_the_read() {
-    // An edit of captured text: a compound unit. No quantity is returned, so
-    // the book is still read, and the totals count the quantity as unread.
+    // An edit of captured text: a compound unit. The quantity is
+    // `unread` and none is returned, so the book is still read, and the totals count
+    // the quantity as unread.
     let book = Book {
         items: replaced(
             &items(),

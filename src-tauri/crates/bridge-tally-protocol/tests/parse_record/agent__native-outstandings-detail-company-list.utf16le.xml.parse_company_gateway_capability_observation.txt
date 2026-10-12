@@ -1,0 +1,12 @@
+# fixture: tests/fixtures/agent/native-outstandings-detail-company-list.utf16le.xml
+# parser: parse_company_gateway_capability_observation
+# source: captured
+Ok(CompanyGatewayCapabilityObservation {
+    product: "TallyPrime",
+    release: Some(
+        "7.1",
+    ),
+    educational_mode: false,
+    silver: true,
+    gold: false,
+})

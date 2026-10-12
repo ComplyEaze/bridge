@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bank statement to Tally vouchers: check the ledger names first: ComplyEaze Bridge</title>
-<meta name="description" content="Six steps for password-protected PDF statements from SBI, HDFC and Union Bank of India, built around one check: the ledger names in your mapping against your live book." />
+<title>Bank statement to Tally vouchers: ComplyEaze Bridge</title>
+<meta name="description" content="Six steps for password-protected PDF statements from SBI, HDFC and Union Bank of India, built around one check: the ledger names against your live book." />
 <link rel="canonical" href="https://bridge.complyeaze.com/blog-bank-statement-ledger-names.html" />
 <meta property="og:type" content="article" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
-<meta property="og:title" content="Bank statement to Tally vouchers: check the ledger names first: ComplyEaze Bridge" />
-<meta property="og:description" content="Six steps for password-protected PDF statements from SBI, HDFC and Union Bank of India, built around one check: the ledger names in your mapping against your live book." />
+<meta property="og:title" content="Bank statement to Tally vouchers: ComplyEaze Bridge" />
+<meta property="og:description" content="Six steps for password-protected PDF statements from SBI, HDFC and Union Bank of India, built around one check: the ledger names against your live book." />
 <meta property="og:url" content="https://bridge.complyeaze.com/blog-bank-statement-ledger-names.html" />
 <link rel="alternate" type="application/atom+xml" title="ComplyEaze Bridge blog" href="feed.xml" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
@@ -186,7 +186,7 @@
 <h2 id="s6">6. Read it back, then look in Tally</h2>
 <p>Ask Claude to read the batch back from Tally. A read-back asks Tally to show what it now holds. ComplyEaze Bridge compares the date, voucher type and entries and reports anything missing, different or duplicated. A match does not mean the entry is correct, complete or compliant, and it does not compare every field. Open Tally, check the bank ledger against the statement, and look at what went to suspense.</p>
 <h2 id="worked">One run on made-up books, as far as we have taken it</h2>
-<p>On 4 and 5 October 2026 we ran steps 1 to 4 once on a Mac. The extension was the 0.4.2 build made for the release candidate, not the published file. Tally was TallyPrime Silver 7.1 holding made-up books. The statement was the synthetic HDFC-format PDF our release check uses: six rows, no real party. Our dated notes, kept privately, are the record.</p>
+<p>On 4 and 5 October 2026 we ran steps 1 to 4 once on a Mac. The extension was the 0.4.2 build made for the release candidate, not the published file. Tally was TallyPrime Silver 7.1 holding made-up books. The statement was the synthetic HDFC-format PDF our release check uses: six rows, no real party.</p>
 <ol>
 <li><b>Read.</b> Six rows read. The credits (110,000.00), the debits (8,800.00) and the closing balance (102,200.00) matched the figures we supplied, and the running balance was right on every row. We gave no mapping, so all six rows went to suspense.</li>
 <li><b>First book.</b> The name check found no ledger called “Suspense”, with no candidate. The bank ledger name we first typed came back close, not equal, with one candidate. Building the file was refused (<code>masters_not_exact</code>) and no file was written.</li>

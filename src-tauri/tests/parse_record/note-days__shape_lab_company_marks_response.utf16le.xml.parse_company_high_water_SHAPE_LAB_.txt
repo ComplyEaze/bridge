@@ -1,0 +1,7 @@
+# fixture: note-days/shape_lab_company_marks_response.utf16le.xml
+# parser: parse_company_high_water(SHAPE_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(289),
+    "altvchid": Number(111),
+})

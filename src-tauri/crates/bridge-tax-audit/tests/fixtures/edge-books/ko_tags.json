@@ -1,0 +1,261 @@
+{
+ "comment": "The tag in the per-party figure ids. k01 to k06 each pay rent from Bank A, and each narration mentions one party that has no line on it. Alpha Traders has a plain lower-case GUID; Beta Stores' GUID is upper-case with spaces around it (tagged as its trimmed lower-case form); Gamma Works' GUID is empty and Delta Works' is spaces only (both tagged by the ledger's name); Epsilon Mills' GUID is upper-case (tagged as lower-case); Zoe Crafts' name is written in decomposed form (an e and a combining diaeresis) with an empty GUID, tagged by those exact bytes, and its narration writes ZOE without the mark. Bank A also has an empty GUID, which nothing tags.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_tags-alpha"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": ""
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "  EDGE-KO_TAGS-BETA  "
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_tags-cap-4"
+  },
+  {
+   "name": "Delta Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "   "
+  },
+  {
+   "name": "Epsilon Mills",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "EDGE-KO_TAGS-EPSILON"
+  },
+  {
+   "name": "Gamma Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": ""
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_tags-007"
+  },
+  {
+   "name": "Zoë Crafts",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": ""
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 2100000,
+   "closing": 47900000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Delta Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Epsilon Mills",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Gamma Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 2100000,
+   "credit": 0,
+   "closing": 2100000
+  },
+  {
+   "ledger": "Zoë Crafts",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "k01",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "Paid for Alpha Traders",
+   "lines": [
+    [
+     "Office Rent",
+     100000
+    ],
+    [
+     "Bank A",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "k02",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "Paid for Beta Stores",
+   "lines": [
+    [
+     "Office Rent",
+     200000
+    ],
+    [
+     "Bank A",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "k03",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "narration": "Paid for Gamma Works",
+   "lines": [
+    [
+     "Office Rent",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "k04",
+   "date": "2025-07-05",
+   "base_type": "Payment",
+   "narration": "Paid for Delta Works",
+   "lines": [
+    [
+     "Office Rent",
+     400000
+    ],
+    [
+     "Bank A",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "k05",
+   "date": "2025-08-05",
+   "base_type": "Payment",
+   "narration": "Paid for Epsilon Mills",
+   "lines": [
+    [
+     "Office Rent",
+     500000
+    ],
+    [
+     "Bank A",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "k06",
+   "date": "2025-09-05",
+   "base_type": "Payment",
+   "narration": "Paid for ZOE CRAFTS",
+   "lines": [
+    [
+     "Office Rent",
+     600000
+    ],
+    [
+     "Bank A",
+     -600000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

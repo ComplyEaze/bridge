@@ -1,0 +1,44 @@
+{
+ "comment": "POP-3 (#1486): with the opening stock added a difference in opening balances remains on both sums, and POP-3 names the ledger sum, the stock and that difference.",
+ "groups": {
+  "Capital Account": null,
+  "Fixed Assets": null
+ },
+ "ledgers": [
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
+  {
+   "name": "Shop Fittings",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-shop-fittings"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Owner Capital",
+   "opening": -1000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -1000000
+  },
+  {
+   "ledger": "Shop Fittings",
+   "opening": 150000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 150000
+  }
+ ],
+ "vouchers": [],
+ "opening_stock": 800000,
+ "tests": [
+  "trial_balance"
+ ]
+}

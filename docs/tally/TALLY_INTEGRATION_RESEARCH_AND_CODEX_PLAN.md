@@ -1190,6 +1190,13 @@ that evidence.
 evidence needed to qualify an exact scope against XML. No comparator result
 enables JSONEX by itself.
 
+**Amended 2026-10-12:** the parser, the request builder and the comparator
+described under "Current implementation boundary", "Implemented qualification
+boundary" and "Acceptance" below were deleted in
+[#1574](https://github.com/ComplyEaze/bridge/pull/1574), because they were
+exercised only against synthetic fixtures and no shipped build used them. The
+text below is kept as the design record and no longer describes the repository.
+
 #### Current implementation boundary
 
 The repository contains the v1 qualification comparator plus an optional,
@@ -1510,6 +1517,11 @@ Track:
 
 #### Implemented PR13A boundary
 
+(2026-10-12 note: the collector and its observation types described here were
+deleted because nothing read the counts; see the ADR 0009 amendment. The text
+below records the contract as it was designed. A support bundle is designed
+from the request trail, not from this collector.)
+
 The first observability slice is a portable, local-only aggregation contract.
 It accepts only closed request/queue/response enums, monotonic durations, and
 response-byte counts. There are no strings, arbitrary attributes, IDs,
@@ -1722,6 +1734,10 @@ another product pack.
 
 #### Implemented PR15 boundary (2026-07-15)
 
+(2026-10-12 note: the schema-v2 observations and the body-byte measurement
+described below were deleted because nothing read them; the circuit, queue,
+retry and cancellation behaviour is unchanged. See the ADR 0009 amendment.)
+
 - `bridge-tally-runtime` is a Tauri/SQLCipher-independent read control plane.
   It owns normalized per-endpoint serialization, bounded queue deadlines,
   post-attempt spacing, cancellation, a threshold/cooldown/one-probe circuit,
@@ -1738,7 +1754,8 @@ another product pack.
   including queue deadline/cancellation, response class, circuit rejection,
   and an explicit `unavailable` body-byte measurement. A Tauri command returns
   the bounded privacy-reduced preview plus its checksum; nothing is uploaded or
-  persisted automatically.
+  persisted automatically. (October 2026: no screen ever called that command,
+  and it was deleted with the preview; see the ADR 0009 amendment.)
 - The loopback simulator now supports a fail-closed sequence of 1–64 response
   plans. A real portable HTTP transport/runtime test proves an exact synthetic
   HTTP 500 then HTTP 200 sequence causes one retry and two processed requests.

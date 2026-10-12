@@ -1,5 +1,5 @@
 {
- "comment": "Narrations that name no payee: fifty-nine payments of Wages from Bank A, none read, so there is no payee row; all are in unresolved_bank_total (97105 paise) and in the one finding, recipient_not_read. First UPI layout: u01 no hyphen after the name; u02 an empty name; u03 a name starting with a digit; u04 a space before the name; u05 a space before the first hyphen; u06 an underscore, u07 a slash and u08 a comma in the name; u09 text before UPI-; u10 slashes in place of hyphens; u11 no hyphen after UPI. IMPS: u12 text before IMPS-; u20 no reference; u21 a space and u22 a letter in the reference; u23 no hyphen after the name; u24 a name starting with a digit; u25 a space in place of the first hyphen. NEFT: u30 CR in place of DR; u31 an empty code; u32 a space in the code; u33 no hyphen after the name; u34 no DR; u35 a space before the hyphen after DR; u36 another word in place of NEFT; u37 NEFT-SELF; u38 text before NEFT. Second UPI layout: u40 (Bank Acc) and u41 (Phone Pe, in lower and mixed case) are the two placeholders, 3134 paise together in placeholder_payee_total; u42 a name field of digits; u43 an empty reference; u44 a letter in the reference; u45 CR in place of DR; u46 no slash after the name; u47 an empty name field; u48 a space before the hyphen; u49 a transfer with no UPI part; u50 NEFT in place of UPI; u51 a name field of one space; u52 text before TO TRANSFER. Cheque: u60 SELF; u61 SELF after WITHDRAWAL BY; u62 a name that only begins with SELF (SELFMADE MILLS); u63 CASH PAID TO and a name; u64 a name that only begins with CASH PAID TO (CASH PAID TOWER); u65 an ampersand, u66 a digit and u67 an apostrophe in the name; u68 two hyphens; u69 a name starting with a full stop; u70 CHQ RETURN; u71 no hyphen; u72 a digit after WITHDRAWAL BY; u73 no name; u74 a digit before the name. Others: u80 an empty narration, u81 no narration, u82 spaces only, u83 a narration in no form read.",
+ "comment": "Narrations that name no payee: sixty-six payments of Wages from Bank A, none read, so there is no payee row; all are in unresolved_bank_total (123554 paise) and in the one finding, recipient_not_read. First UPI layout: u01 no hyphen after the name; u02 an empty name; u03 a name starting with a digit; u04 a space before the name; u05 a space before the first hyphen; u06 an underscore, u07 a slash and u08 a comma in the name; u09 text before UPI-; u10 slashes in place of hyphens; u11 no hyphen after UPI. IMPS: u12 text before IMPS-; u20 no reference; u21 a space and u22 a letter in the reference; u23 no hyphen after the name; u24 a name starting with a digit; u25 a space in place of the first hyphen. NEFT: u30 CR in place of DR; u31 an empty code; u32 a space in the code; u33 no hyphen after the name; u34 no DR; u35 a space before the hyphen after DR; u36 another word in place of NEFT; u37 NEFT-SELF; u38 text before NEFT. Second UPI layout: u40 (Bank Acc) and u41 (Phone Pe, in lower and mixed case) are the two placeholders, 3134 paise together in placeholder_payee_total; u42 a name field of digits; u43 an empty reference; u44 a letter in the reference; u45 CR in place of DR; u46 no slash after the name; u47 an empty name field; u48 a space before the hyphen; u49 a transfer with no UPI part; u50 NEFT in place of UPI; u51 a name field of one space; u52 text before TO TRANSFER. Cheque: u60 SELF; u61 SELF after WITHDRAWAL BY; u63 CASH PAID TO and a name; u65 an ampersand, u66 a digit and u67 an apostrophe in the name; u68 two hyphens; u69 a name starting with a full stop; u70 CHQ RETURN; u71 no hyphen; u72 a digit after WITHDRAWAL BY; u73 no name; u74 a digit before the name. Others: u80 an empty narration, u81 no narration, u82 spaces only, u83 a narration in no form read. A channel word as the name: u84 an IMPS narration whose name field is UPI; u85 the same with a space before the closing hyphen; u86 the first UPI layout with the name field IMPS; u87 NEFT with RTGS and u88 RTGS with NEFT in the name field. Cheque, the prefix read first: u89 WITHDRAWAL BY with no name before the hyphen; u90 the same with no space round the hyphen; u91 a full stop after BY. u92 SELF followed by a full stop.",
  "groups": {
   "Capital Account": null,
   "Current Assets": null,
@@ -46,8 +46,8 @@
    "ledger": "Bank A",
    "opening": 0,
    "debit": 0,
-   "credit": 97105,
-   "closing": -97105
+   "credit": 123554,
+   "closing": -123554
   },
   {
    "ledger": "Cash",
@@ -59,9 +59,9 @@
   {
    "ledger": "Wages",
    "opening": 0,
-   "debit": 97105,
+   "debit": 123554,
    "credit": 0,
-   "closing": 97105
+   "closing": 123554
   }
  ],
  "vouchers": [
@@ -738,22 +738,6 @@
    ]
   },
   {
-   "guid": "u62",
-   "date": "2025-05-16",
-   "base_type": "Payment",
-   "narration": "SELFMADE MILLS - CHQ PAID",
-   "lines": [
-    [
-     "Wages",
-     2340
-    ],
-    [
-     "Bank A",
-     -2340
-    ]
-   ]
-  },
-  {
    "guid": "u63",
    "date": "2025-05-17",
    "base_type": "Payment",
@@ -766,22 +750,6 @@
     [
      "Bank A",
      -2393
-    ]
-   ]
-  },
-  {
-   "guid": "u64",
-   "date": "2025-05-18",
-   "base_type": "Payment",
-   "narration": "CASH PAID TOWER - CHQ PAID",
-   "lines": [
-    [
-     "Wages",
-     2448
-    ],
-    [
-     "Bank A",
-     -2448
     ]
    ]
   },
@@ -1005,6 +973,150 @@
     [
      "Bank A",
      -3190
+    ]
+   ]
+  },
+  {
+   "guid": "u84",
+   "date": "2025-06-05",
+   "base_type": "Payment",
+   "narration": "IMPS-55-UPI-ALPHA TRADERS-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3251
+    ],
+    [
+     "Bank A",
+     -3251
+    ]
+   ]
+  },
+  {
+   "guid": "u85",
+   "date": "2025-06-06",
+   "base_type": "Payment",
+   "narration": "IMPS-55-UPI -BETA STORES-ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3307
+    ],
+    [
+     "Bank A",
+     -3307
+    ]
+   ]
+  },
+  {
+   "guid": "u86",
+   "date": "2025-06-07",
+   "base_type": "Payment",
+   "narration": "UPI-IMPS-ETA@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3361
+    ],
+    [
+     "Bank A",
+     -3361
+    ]
+   ]
+  },
+  {
+   "guid": "u87",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "narration": "NEFT DR-ZZBK77-RTGS-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     3413
+    ],
+    [
+     "Bank A",
+     -3413
+    ]
+   ]
+  },
+  {
+   "guid": "u88",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "narration": "RTGS DR-ZZBK77-NEFT-GAMMA MILLS-NET",
+   "lines": [
+    [
+     "Wages",
+     3467
+    ],
+    [
+     "Bank A",
+     -3467
+    ]
+   ]
+  },
+  {
+   "guid": "u89",
+   "date": "2025-06-10",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3529
+    ],
+    [
+     "Bank A",
+     -3529
+    ]
+   ]
+  },
+  {
+   "guid": "u90",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY-CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3581
+    ],
+    [
+     "Bank A",
+     -3581
+    ]
+   ]
+  },
+  {
+   "guid": "u91",
+   "date": "2025-06-12",
+   "base_type": "Payment",
+   "narration": "WITHDRAWAL BY. - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3637
+    ],
+    [
+     "Bank A",
+     -3637
+    ]
+   ]
+  },
+  {
+   "guid": "u92",
+   "date": "2025-06-13",
+   "base_type": "Payment",
+   "narration": "SELF. - CHQ PAID",
+   "lines": [
+    [
+     "Wages",
+     3691
+    ],
+    [
+     "Bank A",
+     -3691
     ]
    ]
   }

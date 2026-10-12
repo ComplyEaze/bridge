@@ -87,8 +87,11 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // published.
     const READ_TOOLS: &[&str] = &[
         "balance_sheet",
+        "cash_flow",
         "changed_since",
+        "company_features",
         "egress_log",
+        "gst_status",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -130,10 +133,11 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
         // A new file each call: additive.
         ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
-        // A newer verification replaces the saved proof.
-        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
-        // It verifies the batch twice, so it replaces the proof as well.
-        ("acknowledge_post_review", true, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
+        // Each verification adds its own proof files beside the earlier ones
+        // and replaces nothing (#911): additive.
+        ("verify_import", false, "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally."),
+        // Its two verifications add proofs as verify_import does: additive.
+        ("acknowledge_post_review", false, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions
@@ -852,6 +856,28 @@ fn the_vouchers_description_names_the_bill_date_and_credit_period_of_an_allocati
     );
 }
 
+/// The `vouchers` description states the master-mark limit of the group summaries as the code has it, and
+/// calls it provisional: the number in the text is the constant's, written with its thousands separator.
+#[test]
+fn the_vouchers_description_states_the_group_ledger_list_limit_the_code_enforces() {
+    let tools = registered_tool_definitions(true, true);
+    let description = tools
+        .as_array()
+        .expect("tools")
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("vouchers is in the catalogue");
+    let limit = super::super::vouchers::GROUP_LEDGER_LIST_MARK_LIMIT.to_string();
+    let (head, tail) = limit.split_at(limit.len() - 3);
+    let written = format!("{head},{tail}");
+    assert!(
+        description.contains(&format!("mark is above {written} is refused first")),
+        "the description does not carry the limit {written}"
+    );
+    assert!(description.contains("provisional and computed, not measured"));
+}
+
 /// The `vouchers` description states the order of summary buckets, including the rule for a tie
 /// in movement (#1230): first counted in the window, never by name, which under `mask_parties`
 /// would show the alphabetical order of the real names.
@@ -867,7 +893,7 @@ fn the_vouchers_description_states_the_tie_rule_of_summary_buckets() {
         .expect("vouchers is in the catalogue");
     assert!(
         description.contains(
-            "Buckets are ordered by the larger movement first (ledger, type), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
+            "Buckets are ordered by the larger movement first (ledger, type, group, primary_group), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
         ),
         "the vouchers description lacks the bucket order and its tie rule"
     );
@@ -1027,6 +1053,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "post_import",
             "record that review with acknowledge_post_review, and do not rebuild it",
             "a doubted batch is reviewed in Tally, never posted again",
+        ),
+        (
+            "post_import",
+            "No review can be recorded for a batch whose post_span_binding is refused: acknowledge_post_review refuses it",
+            "a refused binding is checked in Tally, never sent to a review that refuses it",
+        ),
+        (
+            "local_data_report",
+            "not_settled_binding_refused",
+            "a refused binding is a class of its own, not read as a fault",
         ),
         (
             "post_import",
@@ -1223,6 +1259,26 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "returns no partial list",
             "a read that breached its bound returns nothing partial",
         ),
+        (
+            "company_features",
+            "not_reported, never no",
+            "a setting Tally did not send is not a setting that is off",
+        ),
+        (
+            "gst_status",
+            "not a judgement of ComplyEaze Bridge",
+            "a status is Tally's own flag, not a finding about the voucher",
+        ),
+        (
+            "gst_status",
+            "never as included",
+            "a voucher whose flags were not read is not reported as in the return",
+        ),
+        (
+            "gst_status",
+            "The reason for a status is not available",
+            "the tool names no reason for a status",
+        ),
     ];
     let definitions = registered_tool_definitions(true, true);
     let description_of = |tool: &str| -> String {
@@ -1276,5 +1332,30 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             extension.contains(phrase),
             "the extension description lost {phrase:?}"
         );
+    }
+}
+
+/// A paged tool's `limit` defaults to the configured row limit (`BRIDGE_AGENT_MAX_ROWS`), which an
+/// operator can change, so its schema names no default of its own: a fixed 500 there was false
+/// whenever the row limit was not 500 (#1148). The two evidence reads default to 20 and keep it.
+#[test]
+fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
+    for tool in registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+    {
+        let name = tool["name"].as_str().expect("tool name");
+        let limit = &tool["inputSchema"]["properties"]["limit"];
+        if limit.is_null() {
+            continue;
+        }
+        if matches!(name, "egress_log" | "read_evidence") {
+            assert_eq!(limit["default"], json!(20), "{name}");
+        } else {
+            assert!(
+                limit.get("default").is_none(),
+                "{name}: its limit defaults to the configured row limit, so the schema names no default"
+            );
+        }
     }
 }

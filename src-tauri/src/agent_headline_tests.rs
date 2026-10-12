@@ -523,3 +523,141 @@ fn each_reason_has_its_own_next_step() {
         );
     }
 }
+
+// ---- cash flow ----
+
+fn cash_flow_basis(outcome: CashFlowOutcome) -> CashFlowBasis {
+    CashFlowBasis::new(date("20250401"), date("20260331"), outcome, false)
+}
+
+#[test]
+fn a_tied_cash_flow_says_what_was_checked_and_what_was_not() {
+    let lead = cash_flow_basis(CashFlowOutcome::Tied)
+        .headline(&CompanyName::new("Lab Co"))
+        .lead;
+    assert!(
+        lead.starts_with("Cash flow for \u{201c}Lab Co\u{201d}, 1 Apr 2025 to 31 Mar 2026:"),
+        "{lead}"
+    );
+    assert!(lead.contains("equals the cash and bank ledgers"), "{lead}");
+    assert!(lead.contains("has not been checked"), "{lead}");
+    assert!(
+        lead.contains("not a cash flow statement under AS 3"),
+        "{lead}"
+    );
+}
+
+#[test]
+fn every_cash_flow_state_that_is_not_established_leads_with_it_and_withholds_the_months() {
+    for (outcome, words) in [
+        (
+            CashFlowOutcome::Differs,
+            "differs from the cash and bank ledgers",
+        ),
+        (
+            CashFlowOutcome::MoneyGroupUnmeasured,
+            "Bank OD A/c or Bank OCC A/c",
+        ),
+        (CashFlowOutcome::NothingToCompare, "Nothing could be tied"),
+    ] {
+        let basis = cash_flow_basis(outcome);
+        let lead = basis.headline(&company()).lead;
+        assert!(
+            lead.starts_with("Not established: the cash flow for"),
+            "{lead}"
+        );
+        assert!(lead.contains(words), "{lead}");
+        assert!(lead.contains("months are withheld"), "{lead}");
+        assert!(basis.months_withheld());
+    }
+    assert!(!cash_flow_basis(CashFlowOutcome::Tied).months_withheld());
+}
+
+#[test]
+fn a_tied_cash_flow_with_an_unmeasured_shape_says_so_in_its_lead() {
+    let measured = CashFlowBasis::new(
+        date("20250401"),
+        date("20260331"),
+        CashFlowOutcome::Tied,
+        false,
+    )
+    .headline(&company())
+    .lead;
+    assert!(
+        measured.contains("No month's figure has been checked against"),
+        "{measured}"
+    );
+    let unmeasured = CashFlowBasis::new(
+        date("20250401"),
+        date("20260331"),
+        CashFlowOutcome::Tied,
+        true,
+    )
+    .headline(&company())
+    .lead;
+    assert!(
+        unmeasured.contains("treat each month's figure as unverified"),
+        "{unmeasured}"
+    );
+    // What was and was not run is stated, not left to the reader.
+    assert!(
+        unmeasured.contains("a window from March into April was not run"),
+        "{unmeasured}"
+    );
+    assert!(
+        unmeasured.contains("no month was compared with Tally's own Cash Flow screen"),
+        "{unmeasured}"
+    );
+    assert!(
+        !unmeasured.contains("No month's figure has been checked against"),
+        "{unmeasured}"
+    );
+}
+
+fn features(
+    cost_centres: bridge_tally_protocol::native_company_features::NativeSetting,
+    gst: bridge_tally_protocol::native_company_features::NativeSetting,
+    currency: bridge_tally_protocol::native_company_features::NativeCurrencySymbol,
+) -> CompanyFeaturesBasis {
+    use bridge_tally_protocol::native_company_features::{NativeCompanyFeatures, NativeSetting};
+    CompanyFeaturesBasis::new(&NativeCompanyFeatures {
+        cost_centres,
+        gst,
+        batch_wise: NativeSetting::Yes,
+        base_currency: currency,
+    })
+}
+
+#[test]
+fn a_company_features_headline_says_today_not_the_books_and_what_was_compared() {
+    use bridge_tally_protocol::native_company_features::{NativeCurrencySymbol, NativeSetting};
+    let basis = features(
+        NativeSetting::No,
+        NativeSetting::Yes,
+        NativeCurrencySymbol::Reported("\u{20b9}".to_string()),
+    );
+    assert!(basis.all_reported());
+    assert_eq!(
+        basis.headline(&company()).lead,
+        "The settings Tally's company record holds today for \u{201c}Synthetic Traders\u{201d}: cost centres off, GST on, batch-wise stock on. They are not what the books contain or what they were during a year, and each of the three has been compared with Tally's own screen, on synthetic books. The company's currency symbol is \u{20b9}: a symbol, not a currency code."
+    );
+}
+
+#[test]
+fn a_setting_tally_did_not_send_leads_as_not_sent_and_not_as_off() {
+    use bridge_tally_protocol::native_company_features::{NativeCurrencySymbol, NativeSetting};
+    let basis = features(
+        NativeSetting::NotReported,
+        NativeSetting::Yes,
+        NativeCurrencySymbol::NotReported,
+    );
+    assert!(!basis.all_reported());
+    let lead = basis.headline(&company()).lead;
+    assert!(lead.contains("cost centres not sent by Tally"), "{lead}");
+    assert!(
+        lead.contains("A setting Tally did not send is not reported; that is not the same as off."),
+        "{lead}"
+    );
+    assert!(lead.ends_with("Tally sent no currency symbol."), "{lead}");
+    assert!(!lead.contains("cost centres off"), "{lead}");
+}

@@ -1,23 +1,13 @@
-use super::{
-    ConnectionStatus, TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity,
-};
-use super::{TallyProbeResult, TallyVoucher};
+use super::TallyProbeResult;
+use super::{TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompanyIdentity};
 use crate::endpoint_wire::WireGateConfig;
-use crate::observability::BodyBytesObservation;
 use crate::reports::party_ledger_master::PartyLedgerMasterSource;
 use crate::tally::connection::canonical_loopback_origin;
-#[cfg(feature = "voucher-scan")]
-use crate::tally::connection::{LedgerOpeningCoverageRead, OutstandingsSegmentObservation};
 use crate::tally::connection::{NativePairedRead, PairedReadValidationError};
 use crate::tally::connector::SealedReadRequest;
-#[cfg(feature = "voucher-scan")]
-use crate::tally::outstandings_runtime::{
-    CalibratedSegmentPolicy, SegmentPlan, SegmentTrendGuard, MAX_SEGMENT_PAIRS_PER_SCAN,
-};
 use crate::tally::runtime_control::{
-    EndpointCircuitState, EndpointIdentity, EndpointRuntimeSnapshot, PortableReadRuntime,
-    ReadAttempt, ReadExecutionError, ReadFailureClass, ReadOperation, ReadRetryPolicy,
-    TELEMETRY_PREVIEW_SCHEMA,
+    CircuitRejectReason, EndpointCircuitState, EndpointIdentity, EndpointRuntimeSnapshot,
+    PortableReadRuntime, ReadAttempt, ReadExecutionError, ReadFailureClass, ReadRetryPolicy,
 };
 use crate::warning_codes::WarningCode;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
@@ -33,14 +23,6 @@ use bridge_tally_protocol::native_outstandings::{
     LedgerCurrencyRefusal, NativeBillRow, NativeBillsReportKind, NativeGroupSnapshot,
     NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
     NativeMasterSnapshot, NativeOutstandingsError, NativeOverdueCrosscheck,
-};
-#[cfg(feature = "voucher-scan")]
-use bridge_tally_protocol::outstandings::{
-    assemble_partitioned_scan, assemble_scan, compute_outstandings_with_ageing_anchor,
-    corroborate_empty_date_partition, nearest_non_empty_primary_partition,
-    AgeingAnchor as LegacyAgeingAnchor, CompleteWitnessPair, CorroboratedDatePartition, DateWindow,
-    NarrowDateWindow, PartialScan, ScanResult, SegmentVerification, StrictlyWiderDateCover,
-    VoucherAlterIdHighWater, WitnessPairVerification,
 };
 use bridge_tally_protocol::outstandings_shared::{
     CompanyBookExtent, DateBoundaryProfile, OutstandingsReport,
@@ -69,6 +51,14 @@ pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
 #[path = "runtime_masters_tests.rs"]
 mod masters_tests;
 
+#[path = "runtime_company_features.rs"]
+mod company_features;
+pub(crate) use company_features::CompanyFeaturesReadError;
+
+#[cfg(test)]
+#[path = "runtime_company_features_tests.rs"]
+mod company_features_tests;
+
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
 pub(crate) use stock_summary::StockSummaryReadError;
@@ -84,9 +74,7 @@ pub(crate) use trial_balance::{
     base_currency_ledgers_only_label, TrialBalanceCurrencyScope, TrialBalanceReadError,
     BASE_CURRENCY_LEDGERS_ONLY_LIMITATION,
 };
-pub use trial_balance::{
-    StatementsRead, TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead,
-};
+pub use trial_balance::{TrialBalanceLedgerScope, TrialBalancePeriod, TrialBalanceRead};
 
 #[cfg(test)]
 #[path = "runtime_trial_balance_tests.rs"]
@@ -508,7 +496,7 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
     loop {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if name == b"SVCURRENTCOMPANY" {
                     let anchored = path.len() == STATIC_VARIABLES.len()
                         && path
@@ -521,10 +509,7 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
                     let Ok(text) = reader.read_text(element.name()) else {
                         return false;
                     };
-                    let Ok(raw) = text.decode() else {
-                        return false;
-                    };
-                    let Ok(text) = quick_xml::escape::unescape(&raw) else {
+                    let Ok(text) = quick_xml::escape::unescape(&text) else {
                         return false;
                     };
                     named.push(text.into_owned());
@@ -536,7 +521,7 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"SVCURRENTCOMPANY") =>
+                    .eq_ignore_ascii_case("SVCURRENTCOMPANY") =>
             {
                 return false;
             }
@@ -1047,14 +1032,6 @@ fn admit_company_identity(
     Ok(())
 }
 
-/// Private capability witness for the future native-report + ledger-residual
-/// implementation. There is intentionally no constructor: a future promotion
-/// must add the release-qualified evidence and the reconciliation itself,
-/// rather than merely opt the voucher scan back in.
-#[cfg(feature = "voucher-scan")]
-#[derive(Clone)]
-struct QualifiedUnallocatedBalanceCoverage;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EndpointKey(String);
 
@@ -1081,13 +1058,6 @@ pub struct TallySessionSnapshot {
     pub last_success_unix_ms: Option<i64>,
     pub last_failure_unix_ms: Option<i64>,
     pub cached_capability_observed_at_unix_ms: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct TallyTelemetryPreviewExport {
-    pub schema: &'static str,
-    pub payload_sha256: String,
-    pub preview_json: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -1262,17 +1232,6 @@ impl ClassifiedCompanyCurrencyRead {
     }
 }
 
-/// Whether a ledger export must first prove the book keeps exactly one
-/// Currency master, and that it is INR. Its opening balances carry no
-/// currency of their own, so the `ledger_masters` basic read (bridge#714)
-/// and `ledger_movement` (bridge#716) ask for it. The ungated
-/// `fetch_ledgers` path has no production caller; only tests use it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LedgerCurrencyGate {
-    None,
-    SingleInrMaster,
-}
-
 /// `CompanyCurrencyRead::admit_inr` refused to label this company's figures
 /// as INR. The code is one of that function's static reasons, never data.
 #[derive(Debug, thiserror::Error)]
@@ -1324,15 +1283,9 @@ pub(crate) struct PartyLedgerMasterListing {
 pub(crate) struct CompanyCurrencyRead {
     currency: CompanyCurrency,
     extent: CompanyBookExtent,
-    evidence: RuntimeReadEvidence,
 }
 
 impl CompanyCurrencyRead {
-    #[cfg(test)]
-    pub(crate) fn evidence(&self) -> RuntimeReadEvidence {
-        self.evidence.clone()
-    }
-
     pub(crate) fn admit_inr(self) -> Result<PartyLedgerMasterCurrencyAssertion, &'static str> {
         match (self.currency_count(), self.is_inr()) {
             (1, true) => {
@@ -1371,7 +1324,6 @@ impl CompanyCurrencyRead {
 #[serde(rename_all = "snake_case")]
 pub enum OutstandingsReadStrategy {
     NativeBills,
-    VoucherScan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -1391,9 +1343,8 @@ pub enum OutstandingsLoadResult {
         synced_at_unix_ms: i64,
         /// Total exposure carrying no bill reference, when the read path can
         /// establish it. `None` means "not computed", which is not the same as
-        /// zero and must never be rendered as zero: the voucher scan cannot
-        /// establish this figure, while the native path recovers it exactly
-        /// from the ledger closing balances.
+        /// zero and must never be rendered as zero. The native path recovers
+        /// it exactly from the ledger closing balances.
         ///
         /// It matters more than its size suggests. On a bulk book measured
         /// 2026-08-07 the named bills totalled Rs 10.36 lakh while the
@@ -1458,16 +1409,6 @@ impl CurrencyExclusions {
     /// book and the result is complete.
     pub fn new(foreign: Vec<ForeignCurrencyLedger>, mixed: Vec<String>) -> Option<Self> {
         (!foreign.is_empty() || !mixed.is_empty()).then_some(Self { foreign, mixed })
-    }
-
-    /// Ledgers kept in another currency, in read order.
-    pub fn foreign(&self) -> &[ForeignCurrencyLedger] {
-        &self.foreign
-    }
-
-    /// Base-currency ledgers with a composite value, in read order.
-    pub fn mixed(&self) -> &[String] {
-        &self.mixed
     }
 
     /// What was set aside, each code present exactly when its list is
@@ -1703,14 +1644,6 @@ impl OutstandingsAgeingAnchor {
         match self {
             Self::DueDate => NativeAgeingAnchor::DueDate,
             Self::BillDate => NativeAgeingAnchor::BillDate,
-        }
-    }
-
-    #[cfg(feature = "voucher-scan")]
-    const fn legacy_anchor(self) -> LegacyAgeingAnchor {
-        match self {
-            Self::DueDate => LegacyAgeingAnchor::DueDate,
-            Self::BillDate => LegacyAgeingAnchor::BillDate,
         }
     }
 }
@@ -2056,28 +1989,6 @@ fn native_crosscheck_partial_reason(
     }
 }
 
-#[cfg(feature = "voucher-scan")]
-fn closing_coverage_partial_reason(
-    closing_coverage_matches_opening: bool,
-    closing_coverage_is_fully_covered_by_vouchers: bool,
-) -> Option<&'static str> {
-    if !closing_coverage_is_fully_covered_by_vouchers {
-        Some("ledger_opening_bills_not_covered")
-    } else if !closing_coverage_matches_opening {
-        Some("ledger_master_identity_changed_during_scan")
-    } else {
-        None
-    }
-}
-
-#[cfg(feature = "voucher-scan")]
-fn paired_coverage_partial_reason(coverage: &LedgerOpeningCoverageRead) -> Option<&'static str> {
-    match coverage {
-        LedgerOpeningCoverageRead::Stable(_) => None,
-        LedgerOpeningCoverageRead::Drifted => Some("ledger_master_identity_changed_during_scan"),
-    }
-}
-
 fn select_date_boundary_profile(
     profile: Option<&bridge_tally_core::CapabilityProfile>,
 ) -> DateBoundaryProfile {
@@ -2101,105 +2012,6 @@ fn select_date_boundary_profile(
         DateBoundaryProfile::EducationRestricted
     } else {
         DateBoundaryProfile::ModeAgnostic
-    }
-}
-
-#[cfg(feature = "voucher-scan")]
-fn outstandings_read_failure_reason(error: &anyhow::Error) -> &'static str {
-    if let Some(transport) = error.downcast_ref::<TallyTransportError>() {
-        return match transport {
-            TallyTransportError::EndpointInvalid { .. } => "segment_endpoint_invalid",
-            TallyTransportError::PolicyInvalid { .. } => "segment_transport_policy_invalid",
-            TallyTransportError::ClientInitializationFailed => {
-                "segment_http_client_initialization_failed"
-            }
-            TallyTransportError::RequestTooLarge { .. } => "segment_request_size_limit_exceeded",
-            TallyTransportError::ConnectionFailed => "segment_endpoint_unreachable",
-            TallyTransportError::RequestTimedOut => "tally_segment_deadline_restart_recommended",
-            TallyTransportError::RequestFailed => "segment_request_failed",
-            TallyTransportError::HttpStatus { .. } => "segment_http_status_failure",
-            TallyTransportError::ResponseTooLarge { .. } => "segment_response_size_limit_exceeded",
-            TallyTransportError::ResponseTruncated => "segment_response_truncated",
-            TallyTransportError::ResponseReadFailed => "segment_response_read_failed",
-            TallyTransportError::InvalidEncoding { .. }
-            | TallyTransportError::UnsupportedContentEncoding => {
-                "segment_response_encoding_invalid"
-            }
-            TallyTransportError::WireRefused { refusal } => refusal.safe_code(),
-            // Only the queued post gates its sends (#778); named all the same.
-            TallyTransportError::SendWithdrawn => "request_cancelled",
-        };
-    }
-    let deadline_exceeded = error.chain().any(|cause| {
-        let message = cause.to_string().to_ascii_lowercase();
-        message.contains("request exceeded its deadline")
-            || message.contains("request deadline exceeded")
-    });
-    if deadline_exceeded {
-        "tally_segment_deadline_restart_recommended"
-    } else {
-        "segment_read_failed"
-    }
-}
-
-/// An outstandings read transport failure must cross `execute_cancellable` as an error so
-/// the endpoint circuit sees it. `fetch_outstandings` converts this back to
-/// the established typed Partial only after that health boundary.
-#[cfg(feature = "voucher-scan")]
-#[derive(Debug, thiserror::Error)]
-#[error("outstandings read transport failure: {source}")]
-struct OutstandingsReadTransportFailure {
-    reason_code: &'static str,
-    #[source]
-    source: anyhow::Error,
-}
-
-#[cfg(feature = "voucher-scan")]
-fn partial_after_outstandings_read_transport_failure(
-    result: anyhow::Result<OutstandingsLoadResult>,
-) -> anyhow::Result<OutstandingsLoadResult> {
-    match result {
-        Ok(value) => Ok(value),
-        Err(error) => match error.downcast_ref::<OutstandingsReadTransportFailure>() {
-            Some(failure) => Ok(partial_result(failure.reason_code)),
-            None => Err(error),
-        },
-    }
-}
-
-#[cfg(feature = "voucher-scan")]
-fn outstandings_read_transport_failure(error: anyhow::Error) -> anyhow::Error {
-    let reason_code = outstandings_read_failure_reason(&error);
-    anyhow::Error::new(OutstandingsReadTransportFailure {
-        reason_code,
-        source: error,
-    })
-}
-
-#[cfg(feature = "voucher-scan")]
-fn is_outstandings_transport_error(error: &anyhow::Error) -> bool {
-    error
-        .chain()
-        .any(|cause| cause.downcast_ref::<TallyTransportError>().is_some())
-}
-
-#[cfg(feature = "voucher-scan")]
-async fn fetch_empty_partition_witness<F, Fut>(
-    high_water: VoucherAlterIdHighWater,
-    fetch: F,
-) -> anyhow::Result<Result<CompleteWitnessPair, PartialScan>>
-where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = anyhow::Result<WitnessPairVerification>>,
-{
-    debug_assert!(high_water.get() > 0);
-    match fetch().await {
-        Ok(WitnessPairVerification::Complete(pair)) => Ok(Ok(pair)),
-        Ok(WitnessPairVerification::Partial(partial)) => Ok(Err(partial)),
-        Err(error) if is_outstandings_transport_error(&error) => Err(error),
-        Err(_) => Ok(Err(PartialScan::new(
-            "empty_date_witness_profile_unavailable",
-        ))),
     }
 }
 
@@ -2430,10 +2242,6 @@ struct SessionSlot {
     last_used: Instant,
 }
 
-#[cfg_attr(
-    not(feature = "live-calibration-harness"),
-    doc = "```compile_fail\nuse bridge_lib::tally::TallyRuntime;\nlet _ = TallyRuntime::for_billwise_lab_reconciliation_exit_check();\n```"
-)]
 #[derive(Clone)]
 pub struct TallyRuntime {
     sessions: Arc<Mutex<HashMap<EndpointKey, SessionSlot>>>,
@@ -2445,17 +2253,6 @@ pub struct TallyRuntime {
     audit_drain_probe_stale: std::time::Duration,
     audit_drain_probe_slow: std::time::Duration,
     control: PortableReadRuntime,
-    #[cfg(feature = "voucher-scan")]
-    outstandings_segment_policy: Option<CalibratedSegmentPolicy>,
-    // A complete voucher scan proves only the bill allocations it can read.
-    // This witness may be constructed only by a qualified residual path that
-    // independently reconciles direct postings without BILLALLOCATIONS.LIST.
-    // Until then, returning a Complete result would turn an unknown balance
-    // into a plausible total (TALLY_PROTOCOL_REFERENCE.md §12a.6).
-    #[cfg(feature = "voucher-scan")]
-    unallocated_balance_coverage: Option<QualifiedUnallocatedBalanceCoverage>,
-    #[cfg(feature = "voucher-scan")]
-    outstandings_boundary_profile_override: Option<DateBoundaryProfile>,
     /// The per-port wire lock every session's client gates its sends on
     /// (`endpoint_wire`).
     wire: WireGateConfig,
@@ -2483,10 +2280,6 @@ impl CachedProbeReservation {
 
     pub fn result(&self) -> &TallyProbeResult {
         &self.result
-    }
-
-    pub fn review_id(&self) -> &str {
-        &self.review_id
     }
 
     pub fn release(&mut self) -> anyhow::Result<bool> {
@@ -2538,12 +2331,6 @@ impl Default for TallyRuntime {
             audit_drain_probe_stale: AUDIT_DRAIN_PROBE_STALE,
             audit_drain_probe_slow: AUDIT_DRAIN_PROBE_SLOW,
             control: PortableReadRuntime::default(),
-            #[cfg(feature = "voucher-scan")]
-            outstandings_segment_policy: None,
-            #[cfg(feature = "voucher-scan")]
-            unallocated_balance_coverage: None,
-            #[cfg(feature = "voucher-scan")]
-            outstandings_boundary_profile_override: None,
             wire: WireGateConfig::default(),
             #[cfg(test)]
             transport_policy: None,
@@ -2598,21 +2385,6 @@ impl TallyRuntime {
         &self.wire
     }
 
-    /// Manual-only admission for the ignored Billwise Lab reconciliation
-    /// check. Both owner-bound target ports are Educational instances, so the
-    /// harness also carries that attested compatibility profile. No generic or
-    /// default-build width/profile constructor exists.
-    #[cfg(feature = "live-calibration-harness")]
-    pub fn for_billwise_lab_reconciliation_exit_check() -> Self {
-        Self {
-            outstandings_segment_policy: Some(
-                CalibratedSegmentPolicy::for_billwise_lab_exit_check(),
-            ),
-            outstandings_boundary_profile_override: Some(DateBoundaryProfile::EducationRestricted),
-            ..Self::default()
-        }
-    }
-
     fn session(&self, config: TallyConfig) -> anyhow::Result<Arc<TallySession>> {
         let endpoint = EndpointKey::from_config(&config)?;
         let mut sessions = self
@@ -2663,7 +2435,6 @@ impl TallyRuntime {
     async fn execute<T, F, Fut>(
         &self,
         config: TallyConfig,
-        operation_class: ReadOperation,
         retry: ReadRetryPolicy,
         operation: F,
     ) -> anyhow::Result<T>
@@ -2671,7 +2442,7 @@ impl TallyRuntime {
         F: FnMut(TallyClient) -> Fut,
         Fut: Future<Output = anyhow::Result<T>>,
     {
-        self.execute_cancellable(config, None, operation_class, retry, operation)
+        self.execute_cancellable(config, None, retry, operation)
             .await
     }
 
@@ -2679,7 +2450,6 @@ impl TallyRuntime {
         &self,
         config: TallyConfig,
         external_cancellation: Option<CancellationToken>,
-        operation_class: ReadOperation,
         retry: ReadRetryPolicy,
         mut operation: F,
     ) -> anyhow::Result<T>
@@ -2718,40 +2488,18 @@ impl TallyRuntime {
         });
         let result = self
             .control
-            .execute_read(
-                endpoint,
-                operation_class,
-                retry,
-                effective_cancellation,
-                move |_| {
-                    let attempt_client = client.clone();
-                    attempt_client.reset_observed_body_bytes();
-                    let future = operation(attempt_client.clone());
-                    async move {
-                        let observed_body_bytes = || {
-                            if operation_class == ReadOperation::Capability {
-                                BodyBytesObservation::Unavailable
-                            } else {
-                                attempt_client
-                                    .observed_body_bytes()
-                                    .map(BodyBytesObservation::Observed)
-                                    .unwrap_or(BodyBytesObservation::Unavailable)
-                            }
-                        };
-                        match future.await {
-                            Ok(value) => ReadAttempt::Success {
-                                value,
-                                observed_body_bytes: observed_body_bytes(),
-                            },
-                            Err(error) => ReadAttempt::Failure {
-                                class: classify_failure(&error),
-                                error,
-                                observed_body_bytes: observed_body_bytes(),
-                            },
-                        }
+            .execute_read(endpoint, retry, effective_cancellation, move |_| {
+                let future = operation(client.clone());
+                async move {
+                    match future.await {
+                        Ok(value) => ReadAttempt::Success { value },
+                        Err(error) => ReadAttempt::Failure {
+                            class: classify_failure(&error),
+                            error,
+                        },
                     }
-                },
-            )
+                }
+            })
             .await;
         if let Some(watcher) = external_watcher {
             watcher.abort();
@@ -2768,17 +2516,6 @@ impl TallyRuntime {
         };
         session.record_result(health_outcome);
         result.map_err(map_execution_error)
-    }
-
-    pub async fn check_connection(&self, config: TallyConfig) -> anyhow::Result<ConnectionStatus> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        self.execute(
-            config,
-            ReadOperation::Status,
-            ReadRetryPolicy::transient_default(),
-            |client| async move { client.check_connection_strict().await },
-        )
-        .await
     }
 
     pub async fn probe_with_observation(
@@ -2808,7 +2545,6 @@ impl TallyRuntime {
         let (result, evidence) = self
             .execute(
                 config,
-                ReadOperation::Capability,
                 ReadRetryPolicy::SINGLE_ATTEMPT,
                 |client| async move { client.probe_with_wire_evidence().await },
             )
@@ -2851,7 +2587,6 @@ impl TallyRuntime {
         let mut result = self
             .execute(
                 config.clone(),
-                ReadOperation::Capability,
                 ReadRetryPolicy::SINGLE_ATTEMPT,
                 |client| async move { client.probe().await },
             )
@@ -2860,15 +2595,10 @@ impl TallyRuntime {
             anyhow::bail!("Tally direct company bootstrap was not required");
         }
         let company = self
-            .execute(
-                config,
-                ReadOperation::Capability,
-                ReadRetryPolicy::SINGLE_ATTEMPT,
-                move |client| {
-                    let candidate_name = candidate_name.clone();
-                    async move { client.bootstrap_direct_company(&candidate_name).await }
-                },
-            )
+            .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+                let candidate_name = candidate_name.clone();
+                async move { client.bootstrap_direct_company(&candidate_name).await }
+            })
             .await?;
         apply_scoped_standard_identity(&mut result, company);
         let observed_at_unix_ms = chrono::Utc::now().timestamp_millis();
@@ -2902,7 +2632,6 @@ impl TallyRuntime {
         let mut result = self
             .execute(
                 config.clone(),
-                ReadOperation::Capability,
                 ReadRetryPolicy::SINGLE_ATTEMPT,
                 |client| async move { client.probe().await },
             )
@@ -2910,36 +2639,24 @@ impl TallyRuntime {
         if result.companies.is_empty() {
             let expected_company_name = expected_company_name.to_string();
             let company = self
-                .execute(
-                    config,
-                    ReadOperation::Capability,
-                    ReadRetryPolicy::SINGLE_ATTEMPT,
-                    move |client| {
-                        let expected_company_name = expected_company_name.clone();
-                        async move {
-                            client
-                                .bootstrap_direct_company(&expected_company_name)
-                                .await
-                        }
-                    },
-                )
+                .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+                    let expected_company_name = expected_company_name.clone();
+                    async move {
+                        client
+                            .bootstrap_direct_company(&expected_company_name)
+                            .await
+                    }
+                })
                 .await?;
             apply_scoped_standard_identity(&mut result, company);
         }
         Ok((chrono::Utc::now().timestamp_millis(), result))
     }
 
-    pub async fn probe(&self, config: TallyConfig) -> anyhow::Result<TallyProbeResult> {
-        self.probe_with_observation(config)
-            .await
-            .map(|(_, _, result)| result)
-    }
-
     pub async fn fetch_companies(&self, config: TallyConfig) -> anyhow::Result<Vec<TallyCompany>> {
         let _lease = self.begin_ordinary_read(&config)?;
         self.execute(
             config,
-            ReadOperation::CompanyList,
             ReadRetryPolicy::transient_default(),
             |client| async move { client.fetch_companies().await },
         )
@@ -2957,7 +2674,6 @@ impl TallyRuntime {
         let _lease = self.begin_ordinary_read(&config)?;
         self.execute(
             config,
-            ReadOperation::CompanyList,
             ReadRetryPolicy::transient_default(),
             |client| async move {
                 client
@@ -2979,7 +2695,6 @@ impl TallyRuntime {
         let _lease = self.begin_ordinary_read(&config)?;
         self.execute(
             config,
-            ReadOperation::CompanyList,
             ReadRetryPolicy::transient_default(),
             |client| async move {
                 let request = ReadOnlyProfile::CompanyListV2.render();
@@ -2995,39 +2710,9 @@ impl TallyRuntime {
         .await
     }
 
-    pub async fn fetch_ledgers(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        self.fetch_ledgers_with_evidence(config, identity)
-            .await
-            .map(|(ledgers, _)| ledgers)
-    }
-
     /// Reads the BOOKSFROM-pinned ledger export and retains the paired wire
-    /// evidence used by agent-visible ledger responses.
-    pub async fn fetch_ledgers_with_evidence(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<(Vec<TallyLedger>, RuntimeReadEvidence)> {
-        self.fetch_ledger_opening_with_evidence(
-            config,
-            identity,
-            None,
-            false,
-            LedgerCurrencyGate::None,
-            // Left retrying: no agent tool calls this read, only tests, so the
-            // single-attempt rule for agent catalogue reads does not reach it (#937).
-            ReadRetryPolicy::transient_default(),
-        )
-        .await
-        .map(|read| (read.listing.ledgers, read.listing.evidence))
-    }
-
-    /// As `fetch_ledgers_with_evidence`, also returning the `SVFROMDATE` the
-    /// export was pinned to (the admitted BOOKSFROM). Each ledger's
+    /// evidence used by agent-visible ledger responses, also returning the
+    /// `SVFROMDATE` the export was pinned to (the admitted BOOKSFROM). Each ledger's
     /// `OPENINGBALANCE` is the opening at that date (TALLY_PROTOCOL_REFERENCE
     /// §5.5), which on a multi-year book is not the current year's opening.
     ///
@@ -3043,7 +2728,6 @@ impl TallyRuntime {
             identity,
             None,
             false,
-            LedgerCurrencyGate::SingleInrMaster,
             // Sent once, as the movement catalogue is: a catalogue that outlived
             // its deadline is abandoned, and sending it again queues more work
             // behind a gateway still building the response (#485, #937).
@@ -3069,7 +2753,6 @@ impl TallyRuntime {
                 identity,
                 None,
                 true,
-                LedgerCurrencyGate::SingleInrMaster,
                 // Sent once, as above (#485, #937).
                 ReadRetryPolicy::SINGLE_ATTEMPT,
             )
@@ -3100,7 +2783,6 @@ impl TallyRuntime {
             identity,
             Some(from),
             false,
-            LedgerCurrencyGate::SingleInrMaster,
             // Sent once. A catalogue that outlived its deadline is abandoned, and
             // sending it again queues more work behind a gateway still building
             // the response: agent voucher reads take the same rule (#485, #937).
@@ -3116,14 +2798,12 @@ impl TallyRuntime {
         identity: &VerifiedCompanyIdentity,
         opening_date: Option<TallyDate>,
         read_groups: bool,
-        currency_gate: LedgerCurrencyGate,
         retry: ReadRetryPolicy,
     ) -> anyhow::Result<LedgerOpeningRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(
             config,
-            ReadOperation::MasterExport,
             // The caller's: a movement sends its catalogue once (#485, #937).
             retry,
             move |client| {
@@ -3139,36 +2819,34 @@ impl TallyRuntime {
                         evidence = opening_evidence;
                         bracket_verified_company_identity(&client, &identity).await?;
                         let opening_extent = client.fetch_company_book_extent(&identity).await?;
-                        if currency_gate == LedgerCurrencyGate::SingleInrMaster {
-                            // A bare opening balance names no currency, so a
-                            // book with several Currency masters is refused
-                            // before any ledger request (bridge#714). A foreign
-                            // ledger's non-zero bare opening is UNOBSERVED; the
-                            // captured book's dollar openings are 0.00.
-                            let request = render_company_currency_request(identity.display_name());
-                            let (body, encoded_bytes, encoded_sha256) = client
-                                .fetch_native_report_paired(request.clone())
-                                .await?
-                                .require_stable(PairedReadValidationError::CurrencyMaster)?;
-                            evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
-                                &request,
-                                encoded_sha256,
-                                encoded_bytes,
-                            ));
-                            // A single master that is not INR is refused too: its
-                            // figures would come back as bare numbers with nothing
-                            // naming the currency (bridge#716), as `admit_inr`
-                            // refuses for the other monetary reads.
-                            let currency = parse_company_currency(&body)?;
-                            let refusal = match (currency.currency_count, currency.is_inr) {
-                                (1, true) => None,
-                                (0, _) => Some("company_currency_probe_failed"),
-                                (1, false) => Some("company_base_currency_not_inr"),
-                                _ => Some("company_several_currency_masters"),
-                            };
-                            if let Some(code) = refusal {
-                                return Err(anyhow::Error::new(CurrencyAdmissionRefusal(code)));
-                            }
+                        // A bare opening balance names no currency, so a
+                        // book with several Currency masters is refused
+                        // before any ledger request (bridge#714). A foreign
+                        // ledger's non-zero bare opening is UNOBSERVED; the
+                        // captured book's dollar openings are 0.00.
+                        let request = render_company_currency_request(identity.display_name());
+                        let (body, encoded_bytes, encoded_sha256) = client
+                            .fetch_native_report_paired(request.clone())
+                            .await?
+                            .require_stable(PairedReadValidationError::CurrencyMaster)?;
+                        evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
+                            &request,
+                            encoded_sha256,
+                            encoded_bytes,
+                        ));
+                        // A single master that is not INR is refused too: its
+                        // figures would come back as bare numbers with nothing
+                        // naming the currency (bridge#716), as `admit_inr`
+                        // refuses for the other monetary reads.
+                        let currency = parse_company_currency(&body)?;
+                        let refusal = match (currency.currency_count, currency.is_inr) {
+                            (1, true) => None,
+                            (0, _) => Some("company_currency_probe_failed"),
+                            (1, false) => Some("company_base_currency_not_inr"),
+                            _ => Some("company_several_currency_masters"),
+                        };
+                        if let Some(code) = refusal {
+                            return Err(anyhow::Error::new(CurrencyAdmissionRefusal(code)));
                         }
                         let period = ledger_opening_period(
                             boundary_profile,
@@ -3258,43 +2936,36 @@ impl TallyRuntime {
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::MasterExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                let currency_assertion = currency_assertion.clone();
-                let today = today.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        let (boundary_profile, opening_evidence) =
-                            observe_read_boundary(&client).await?;
-                        evidence = opening_evidence;
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let (source, count_evidence) = client
-                            .fetch_party_ledger_master_source(
-                                &identity,
-                                boundary_profile,
-                                currency_assertion,
-                                &today,
-                            )
-                            .await?;
-                        evidence =
-                            Self::party_ledger_master_source_evidence(&source, evidence.clone())
-                                .combine(count_evidence);
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let closing_evidence =
-                            confirm_read_boundary(&client, boundary_profile).await?;
-                        evidence = evidence.clone().combine(closing_evidence);
-                        Ok((source, evidence.clone()))
-                    }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            let currency_assertion = currency_assertion.clone();
+            let today = today.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    let (boundary_profile, opening_evidence) =
+                        observe_read_boundary(&client).await?;
+                    evidence = opening_evidence;
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let (source, count_evidence) = client
+                        .fetch_party_ledger_master_source(
+                            &identity,
+                            boundary_profile,
+                            currency_assertion,
+                            &today,
+                        )
+                        .await?;
+                    evidence = Self::party_ledger_master_source_evidence(&source, evidence.clone())
+                        .combine(count_evidence);
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let closing_evidence = confirm_read_boundary(&client, boundary_profile).await?;
+                    evidence = evidence.clone().combine(closing_evidence);
+                    Ok((source, evidence.clone()))
                 }
-            },
-        )
+                .await;
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
         .await
     }
 
@@ -3385,7 +3056,6 @@ impl TallyRuntime {
         let identity = identity.clone();
         self.execute(
             config,
-            ReadOperation::OtherRead,
             ReadRetryPolicy::transient_default(),
             move |client| {
                 let identity = identity.clone();
@@ -3435,67 +3105,6 @@ impl TallyRuntime {
         })
     }
 
-    /// Fetches the limited, documented standard collection response used for
-    /// compatibility diagnostics. This is intentionally separate from the
-    /// Bridge ledger export: it returns only ledger names and parents and is
-    /// never eligible for qualification or synchronization.
-    pub async fn fetch_standard_ledger_catalog(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<Vec<TallyLedger>> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::MasterExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                async move {
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    let ledgers = client
-                        .fetch_standard_ledger_catalog(
-                            identity.display_name(),
-                            identity.company_guid(),
-                        )
-                        .await?;
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    Ok(ledgers)
-                }
-            },
-        )
-        .await
-    }
-
-    pub async fn fetch_vouchers(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-        from: String,
-        to: String,
-    ) -> anyhow::Result<Vec<TallyVoucher>> {
-        let _lease = self.begin_ordinary_read(&config)?;
-        let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::transient_default(),
-            move |client| {
-                let identity = identity.clone();
-                let from = from.clone();
-                let to = to.clone();
-                async move {
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    let vouchers = client.fetch_vouchers(&identity, &from, &to).await?;
-                    bracket_verified_company_identity(&client, &identity).await?;
-                    Ok(vouchers)
-                }
-            },
-        )
-        .await
-    }
-
     /// Dispatches a read-only adapter request through the same serialized,
     /// identity-bracketed runtime used by the product read paths.  The caller
     /// owns parsing the documented response shape; it cannot bypass the
@@ -3508,20 +3117,15 @@ impl TallyRuntime {
     ) -> anyhow::Result<AgentRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::OtherRead,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                let request = request.clone();
-                async move {
-                    fetch_admitted_agent_read(&client, &identity, request)
-                        .await
-                        .map(|(read, _)| read)
-                }
-            },
-        )
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            let request = request.clone();
+            async move {
+                fetch_admitted_agent_read(&client, &identity, request)
+                    .await
+                    .map(|(read, _)| read)
+            }
+        })
         .await
     }
 
@@ -3582,36 +3186,31 @@ impl TallyRuntime {
         let identity = identity.clone();
         let armed_endpoint = endpoint;
         let result = self
-            .execute(
-                config,
-                ReadOperation::OtherRead,
-                ReadRetryPolicy::SINGLE_ATTEMPT,
-                move |client| {
-                    let identity = identity.clone();
-                    let request = request.clone();
-                    let registry = Arc::clone(&registry);
-                    let endpoint = armed_endpoint.clone();
-                    async move {
-                        arm_audit_drain(&registry, &endpoint, ticket)?;
-                        let armed = ArmedAuditDrain {
-                            registry,
-                            endpoint,
-                            ticket,
-                            settled: false,
-                        };
-                        match fetch_admitted_audit_part(&client, &identity, request, shape).await {
-                            Ok(part) => {
-                                armed.settle(false);
-                                Ok(part)
-                            }
-                            Err(error) => {
-                                armed.settle(classify_audit_part_failure(&error).kind.owes_drain());
-                                Err(error)
-                            }
+            .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+                let identity = identity.clone();
+                let request = request.clone();
+                let registry = Arc::clone(&registry);
+                let endpoint = armed_endpoint.clone();
+                async move {
+                    arm_audit_drain(&registry, &endpoint, ticket)?;
+                    let armed = ArmedAuditDrain {
+                        registry,
+                        endpoint,
+                        ticket,
+                        settled: false,
+                    };
+                    match fetch_admitted_audit_part(&client, &identity, request, shape).await {
+                        Ok(part) => {
+                            armed.settle(false);
+                            Ok(part)
+                        }
+                        Err(error) => {
+                            armed.settle(classify_audit_part_failure(&error).kind.owes_drain());
+                            Err(error)
                         }
                     }
-                },
-            )
+                }
+            })
             .await;
         // An armed part has settled its own debt inside the gate, or left it
         // owed by being dropped; a failure before arming sent nothing.
@@ -3690,7 +3289,6 @@ impl TallyRuntime {
             Ok(_lease) => self
                 .execute(
                     config,
-                    ReadOperation::Status,
                     ReadRetryPolicy::SINGLE_ATTEMPT,
                     |client| async move {
                         let started = Instant::now();
@@ -3811,7 +3409,6 @@ impl TallyRuntime {
         let withdrawal = TOOL_CANCELLATION.try_with(Clone::clone).ok();
         self.execute(
             config,
-            ReadOperation::Import,
             ReadRetryPolicy::SINGLE_ATTEMPT,
             |client| {
                 let identity = identity.clone();
@@ -4063,15 +3660,10 @@ impl TallyRuntime {
     ) -> anyhow::Result<String> {
         let _lease = self.begin_ordinary_read(&config)?;
         let xml = request.into_xml();
-        self.execute(
-            config,
-            ReadOperation::CompanyList,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let xml = xml.clone();
-                async move { client.post_xml_raw(xml).await.map(|marks| marks.text) }
-            },
-        )
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let xml = xml.clone();
+            async move { client.post_xml_raw(xml).await.map(|marks| marks.text) }
+        })
         .await
     }
 
@@ -4092,19 +3684,14 @@ impl TallyRuntime {
         xml: String,
     ) -> anyhow::Result<(String, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
-        self.execute(
-            config,
-            ReadOperation::Import,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let xml = xml.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let body = client.post_probe_xml(xml, &mut evidence).await?;
-                    Ok((body, evidence))
-                }
-            },
-        )
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let xml = xml.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let body = client.post_probe_xml(xml, &mut evidence).await?;
+                Ok((body, evidence))
+            }
+        })
         .await
     }
 
@@ -4192,10 +3779,6 @@ impl TallyRuntime {
         currency_witness: impl Into<OutstandingsCurrencyWitness>,
         ageing_anchor: OutstandingsAgeingAnchor,
     ) -> anyhow::Result<(OutstandingsLoadResult, RuntimeReadEvidence)> {
-        #[cfg(feature = "voucher-scan")]
-        if self.outstandings_segment_policy.is_some() {
-            anyhow::bail!("outstandings_read_evidence_unavailable");
-        }
         self.fetch_outstandings_native_with_currency(
             config,
             identity,
@@ -4237,322 +3820,308 @@ impl TallyRuntime {
     ) -> anyhow::Result<(OutstandingsLoadResult, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                let as_of = as_of.clone();
-                let currency_witness = currency_witness.clone();
-                async move {
-                    let mut read_evidence = RuntimeReadEvidence::empty();
-                    let outcome = async {
-                        let (boundary_profile, opening_evidence) =
-                            observe_read_boundary(&client).await?;
-                        read_evidence = opening_evidence;
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let company = identity.display_name();
-                        let expected_company_guid = identity.company_guid();
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        // The base each ledger's own currency is compared with
-                        // (bridge#551).
-                        let witness = currency_witness.assertion();
-                        let classify_against = witness.base.clone().map_or(
-                            LedgerClassification::BaseUnknown,
-                            LedgerClassification::Against,
-                        );
-                        let currency_assertion = witness.require_opening_extent(&extent)?.assertion;
-                        if &as_of < extent.books_from() {
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            let as_of = as_of.clone();
+            let currency_witness = currency_witness.clone();
+            async move {
+                let mut read_evidence = RuntimeReadEvidence::empty();
+                let outcome = async {
+                    let (boundary_profile, opening_evidence) =
+                        observe_read_boundary(&client).await?;
+                    read_evidence = opening_evidence;
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let company = identity.display_name();
+                    let expected_company_guid = identity.company_guid();
+                    let extent = client.fetch_company_book_extent(&identity).await?;
+                    // The base each ledger's own currency is compared with
+                    // (bridge#551).
+                    let witness = currency_witness.assertion();
+                    let classify_against = witness.base.clone().map_or(
+                        LedgerClassification::BaseUnknown,
+                        LedgerClassification::Against,
+                    );
+                    let currency_assertion = witness.require_opening_extent(&extent)?.assertion;
+                    if &as_of < extent.books_from() {
+                        return Ok((
+                            partial_result("as_of_precedes_books_from"),
+                            read_evidence.clone(),
+                        ));
+                    }
+                    let books_from = extent.books_from().clone();
+                    let snapshot_period = match admit_native_ledger_snapshot_period(
+                        boundary_profile,
+                        books_from.clone(),
+                        as_of.clone(),
+                    ) {
+                        NativeLedgerSnapshotPeriodAdmission::Period(period) => period,
+                        NativeLedgerSnapshotPeriodAdmission::Partial(partial) => {
+                            return Ok((partial, read_evidence.clone()));
+                        }
+                    };
+                    let mut total_bytes = 0usize;
+                    let read =
+                        |kind| render_native_bills_request(kind, company, &books_from, &as_of);
+                    let receivable_request = read(NativeBillsReportKind::Receivable);
+                    let receivable = client
+                        .fetch_native_report_paired(receivable_request.clone())
+                        .await?;
+                    let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
+                        NativePairedRead::Stable {
+                            body,
+                            encoded_bytes,
+                            encoded_sha256,
+                        } => (body, encoded_bytes, encoded_sha256),
+                        NativePairedRead::Drifted(evidence) => {
+                            read_evidence = read_evidence.clone().combine(evidence);
                             return Ok((
-                                partial_result("as_of_precedes_books_from"),
+                                partial_result("native_bills_report_drifted"),
                                 read_evidence.clone(),
                             ));
                         }
-                        let books_from = extent.books_from().clone();
-                        let snapshot_period = match admit_native_ledger_snapshot_period(
-                            boundary_profile,
-                            books_from.clone(),
-                            as_of.clone(),
-                        ) {
-                            NativeLedgerSnapshotPeriodAdmission::Period(period) => period,
-                            NativeLedgerSnapshotPeriodAdmission::Partial(partial) => {
-                                return Ok((partial, read_evidence.clone()));
-                            }
-                        };
-                        let mut total_bytes = 0usize;
-                        let read =
-                            |kind| render_native_bills_request(kind, company, &books_from, &as_of);
-                        let receivable_request = read(NativeBillsReportKind::Receivable);
-                        let receivable = client
-                            .fetch_native_report_paired(receivable_request.clone())
-                            .await?;
-                        let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
-                            NativePairedRead::Stable {
-                                body,
-                                encoded_bytes,
-                                encoded_sha256,
-                            } => (body, encoded_bytes, encoded_sha256),
-                            NativePairedRead::Drifted(evidence) => {
-                                read_evidence = read_evidence.clone().combine(evidence);
-                                return Ok((
-                                    partial_result("native_bills_report_drifted"),
-                                    read_evidence.clone(),
-                                ));
-                            }
-                        };
-                        total_bytes += encoded_bytes;
-                        read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                            &receivable_request,
-                            encoded_sha256,
-                            encoded_bytes,
-                        ));
+                    };
+                    total_bytes += encoded_bytes;
+                    read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
+                        &receivable_request,
+                        encoded_sha256,
+                        encoded_bytes,
+                    ));
 
-                        // A ledger's immediate parent can be an arbitrary custom
-                        // subgroup. The native group snapshot resolves it all the
-                        // way to Sundry Debtors/Creditors without importing the
-                        // legacy custom-TDL profile.
-                        let group_request = render_native_group_snapshot_request(company);
-                        let groups = client
-                            .fetch_native_report_paired(group_request.clone())
-                            .await?;
-                        let (group_body, encoded_bytes, encoded_sha256) = match groups {
-                            NativePairedRead::Stable {
-                                body,
-                                encoded_bytes,
-                                encoded_sha256,
-                            } => (body, encoded_bytes, encoded_sha256),
-                            NativePairedRead::Drifted(evidence) => {
-                                read_evidence = read_evidence.clone().combine(evidence);
-                                return Ok((
-                                    partial_result("native_group_snapshot_drifted"),
-                                    read_evidence.clone(),
-                                ));
-                            }
-                        };
-                        total_bytes += encoded_bytes;
-                        read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                            &group_request,
-                            encoded_sha256,
+                    // A ledger's immediate parent can be an arbitrary custom
+                    // subgroup. The native group snapshot resolves it all the
+                    // way to Sundry Debtors/Creditors without importing the
+                    // legacy custom-TDL profile.
+                    let group_request = render_native_group_snapshot_request(company);
+                    let groups = client
+                        .fetch_native_report_paired(group_request.clone())
+                        .await?;
+                    let (group_body, encoded_bytes, encoded_sha256) = match groups {
+                        NativePairedRead::Stable {
+                            body,
                             encoded_bytes,
-                        ));
-
-                        let payable_request = read(NativeBillsReportKind::Payable);
-                        let payable = client
-                            .fetch_native_report_paired(payable_request.clone())
-                            .await?;
-                        let (payable_body, encoded_bytes, encoded_sha256) = match payable {
-                            NativePairedRead::Stable {
-                                body,
-                                encoded_bytes,
-                                encoded_sha256,
-                            } => (body, encoded_bytes, encoded_sha256),
-                            NativePairedRead::Drifted(evidence) => {
-                                read_evidence = read_evidence.clone().combine(evidence);
-                                return Ok((
-                                    partial_result("native_bills_report_drifted"),
-                                    read_evidence.clone(),
-                                ));
-                            }
-                        };
-                        total_bytes += encoded_bytes;
-                        read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                            &payable_request,
                             encoded_sha256,
-                            encoded_bytes,
-                        ));
-
-                        let ledger_request =
-                            render_native_ledger_snapshot_request(company, &snapshot_period);
-                        let ledgers = client
-                            .fetch_native_report_paired(ledger_request.clone())
-                            .await?;
-                        let (ledger_body, encoded_bytes, encoded_sha256) = match ledgers {
-                            NativePairedRead::Stable {
-                                body,
-                                encoded_bytes,
-                                encoded_sha256,
-                            } => (body, encoded_bytes, encoded_sha256),
-                            NativePairedRead::Drifted(evidence) => {
-                                read_evidence = read_evidence.clone().combine(evidence);
-                                return Ok((
-                                    partial_result("native_ledger_snapshot_drifted"),
-                                    read_evidence.clone(),
-                                ));
-                            }
-                        };
-                        total_bytes += encoded_bytes;
-                        read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                            &ledger_request,
-                            encoded_sha256,
-                            encoded_bytes,
-                        ));
-
-                        // Re-pin after every read. The native rows cannot be
-                        // GUID-checked individually, so an unchanged extent across
-                        // the whole sequence is the only identity evidence
-                        // available.
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
+                        } => (body, encoded_bytes, encoded_sha256),
+                        NativePairedRead::Drifted(evidence) => {
+                            read_evidence = read_evidence.clone().combine(evidence);
                             return Ok((
-                                partial_result("book_changed_during_read"),
+                                partial_result("native_group_snapshot_drifted"),
                                 read_evidence.clone(),
                             ));
                         }
-                        bracket_verified_company_identity(&client, &identity).await?;
+                    };
+                    total_bytes += encoded_bytes;
+                    read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
+                        &group_request,
+                        encoded_sha256,
+                        encoded_bytes,
+                    ));
 
-                        let closing_evidence =
-                            confirm_read_boundary(&client, boundary_profile).await?;
-                        read_evidence = read_evidence.clone().combine(closing_evidence);
-                        let receivable_rows =
-                            parse_native_bill_rows(&receivable_body, &books_from, &as_of)
-                                .map_err(|error| error.in_report("receivable"))?;
-                        let payable_rows =
-                            parse_native_bill_rows(&payable_body, &books_from, &as_of)
-                                .map_err(|error| error.in_report("payable"))?;
-                        let snapshot = match classify_against {
-                            LedgerClassification::Against(base) => {
-                                parse_native_ledger_snapshot_classified(&ledger_body, &base)
-                            }
-                            LedgerClassification::BaseUnknown => {
-                                Err(NativeOutstandingsError::LedgerCurrency(
-                                    LedgerCurrencyRefusal::BaseUnmatched { ledger: None },
-                                ))
-                            }
-                        };
-                        let snapshot = match admit_native_ledger_snapshot(
-                            snapshot.map_err(anyhow::Error::from),
-                        )? {
-                            NativeLedgerSnapshotAdmission::Snapshot(snapshot) => snapshot,
-                            NativeLedgerSnapshotAdmission::Partial(partial) => {
-                                return Ok((partial, read_evidence.clone()));
-                            }
-                        };
-                        // A book with one Currency master holds no composite
-                        // legitimately. Its read keeps the refusal it had
-                        // before bridge#642, at the same point and naming the
-                        // ledger, rather than setting the ledger aside. This is
-                        // decided by the base's master count, not the witness
-                        // kind: production reads a one-master book through the
-                        // classified witness too. A base that is not known
-                        // refuses as one master does.
-                        let one_master = currency_witness
-                            .assertion()
-                            .base
-                            .as_ref()
-                            .is_none_or(|base| base.is_single_master());
-                        if one_master {
-                            if let Some(ledger) = snapshot.mixed.first() {
-                                return Ok((
-                                    partial_result(
-                                        OutstandingsPartialReason::foreign_currency_ledger_balance(
-                                            ledger.clone(),
-                                        ),
+                    let payable_request = read(NativeBillsReportKind::Payable);
+                    let payable = client
+                        .fetch_native_report_paired(payable_request.clone())
+                        .await?;
+                    let (payable_body, encoded_bytes, encoded_sha256) = match payable {
+                        NativePairedRead::Stable {
+                            body,
+                            encoded_bytes,
+                            encoded_sha256,
+                        } => (body, encoded_bytes, encoded_sha256),
+                        NativePairedRead::Drifted(evidence) => {
+                            read_evidence = read_evidence.clone().combine(evidence);
+                            return Ok((
+                                partial_result("native_bills_report_drifted"),
+                                read_evidence.clone(),
+                            ));
+                        }
+                    };
+                    total_bytes += encoded_bytes;
+                    read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
+                        &payable_request,
+                        encoded_sha256,
+                        encoded_bytes,
+                    ));
+
+                    let ledger_request =
+                        render_native_ledger_snapshot_request(company, &snapshot_period);
+                    let ledgers = client
+                        .fetch_native_report_paired(ledger_request.clone())
+                        .await?;
+                    let (ledger_body, encoded_bytes, encoded_sha256) = match ledgers {
+                        NativePairedRead::Stable {
+                            body,
+                            encoded_bytes,
+                            encoded_sha256,
+                        } => (body, encoded_bytes, encoded_sha256),
+                        NativePairedRead::Drifted(evidence) => {
+                            read_evidence = read_evidence.clone().combine(evidence);
+                            return Ok((
+                                partial_result("native_ledger_snapshot_drifted"),
+                                read_evidence.clone(),
+                            ));
+                        }
+                    };
+                    total_bytes += encoded_bytes;
+                    read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
+                        &ledger_request,
+                        encoded_sha256,
+                        encoded_bytes,
+                    ));
+
+                    // Re-pin after every read. The native rows cannot be
+                    // GUID-checked individually, so an unchanged extent across
+                    // the whole sequence is the only identity evidence
+                    // available.
+                    let closing_extent = client.fetch_company_book_extent(&identity).await?;
+                    if closing_extent != extent {
+                        return Ok((
+                            partial_result("book_changed_during_read"),
+                            read_evidence.clone(),
+                        ));
+                    }
+                    bracket_verified_company_identity(&client, &identity).await?;
+
+                    let closing_evidence = confirm_read_boundary(&client, boundary_profile).await?;
+                    read_evidence = read_evidence.clone().combine(closing_evidence);
+                    let receivable_rows =
+                        parse_native_bill_rows(&receivable_body, &books_from, &as_of)
+                            .map_err(|error| error.in_report("receivable"))?;
+                    let payable_rows = parse_native_bill_rows(&payable_body, &books_from, &as_of)
+                        .map_err(|error| error.in_report("payable"))?;
+                    let snapshot = match classify_against {
+                        LedgerClassification::Against(base) => {
+                            parse_native_ledger_snapshot_classified(&ledger_body, &base)
+                        }
+                        LedgerClassification::BaseUnknown => {
+                            Err(NativeOutstandingsError::LedgerCurrency(
+                                LedgerCurrencyRefusal::BaseUnmatched { ledger: None },
+                            ))
+                        }
+                    };
+                    let snapshot = match admit_native_ledger_snapshot(
+                        snapshot.map_err(anyhow::Error::from),
+                    )? {
+                        NativeLedgerSnapshotAdmission::Snapshot(snapshot) => snapshot,
+                        NativeLedgerSnapshotAdmission::Partial(partial) => {
+                            return Ok((partial, read_evidence.clone()));
+                        }
+                    };
+                    // A book with one Currency master holds no composite
+                    // legitimately. Its read keeps the refusal it had
+                    // before bridge#642, at the same point and naming the
+                    // ledger, rather than setting the ledger aside. This is
+                    // decided by the base's master count, not the witness
+                    // kind: production reads a one-master book through the
+                    // classified witness too. A base that is not known
+                    // refuses as one master does.
+                    let one_master = currency_witness
+                        .assertion()
+                        .base
+                        .as_ref()
+                        .is_none_or(|base| base.is_single_master());
+                    if one_master {
+                        if let Some(ledger) = snapshot.mixed.first() {
+                            return Ok((
+                                partial_result(
+                                    OutstandingsPartialReason::foreign_currency_ledger_balance(
+                                        ledger.clone(),
                                     ),
-                                    read_evidence.clone(),
-                                ));
-                            }
-                        }
-                        // A foreign ledger's bills are plain amounts that are
-                        // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d), and a
-                        // mixed ledger's are rupee amounts behind a balance
-                        // that was never read (bridge#642): both leave every
-                        // figure, the statement rows included.
-                        let foreign = snapshot.foreign;
-                        let mixed = snapshot.mixed;
-                        let receivable_rows =
-                            without_excluded_parties(receivable_rows, &foreign, &mixed);
-                        let payable_rows = without_excluded_parties(payable_rows, &foreign, &mixed);
-                        let ledger_rows = snapshot.base;
-                        let group_rows =
-                            parse_native_group_snapshot(&group_body, expected_company_guid)?;
-
-                        // Ageing anchors on the DUE date. Measured 2026-08-07: on a
-                        // bill carrying a 30-day credit period Tally's own
-                        // BILLOVERDUE counted 61 days, which is the age from
-                        // BILLDUE, not the 91 days from BILLDATE. Where no credit
-                        // period exists the two dates coincide, so this is correct
-                        // on both books.
-                        let result = compute_native_outstandings_with_exclusions(
-                            company,
-                            &receivable_rows,
-                            &payable_rows,
-                            NativeMasterSnapshot {
-                                ledgers: &ledger_rows,
-                                groups: NativeGroupSnapshot::Complete(&group_rows),
-                            },
-                            &foreign,
-                            &mixed,
-                            ageing_anchor.native_anchor(),
-                            &as_of,
-                            total_bytes,
-                        )?;
-
-                        if let Some(reason) = native_crosscheck_partial_reason(&result, &as_of) {
-                            return Ok((partial_result(reason), read_evidence.clone()));
-                        }
-
-                        let statement_open_bills = all_open_bill_rows(
-                            &receivable_rows,
-                            &payable_rows,
-                            ageing_anchor,
-                            &as_of,
-                        );
-                        let statement_unallocated_by_party =
-                            all_unallocated_parties(&result.residuals);
-                        if let Some(exclusions) = CurrencyExclusions::new(
-                            result.foreign_currency_ledgers_excluded,
-                            result.mixed_currency_ledgers_excluded,
-                        ) {
-                            // A single-master base refuses a ledger in another
-                            // currency before this point (classify_ledger_currencies),
-                            // and a composite value above; without a classified
-                            // witness this result cannot be built, so it refuses
-                            // here too.
-                            let Some(classified) = currency_witness.classified_base() else {
-                                return Ok((
-                                    partial_result("ledger_currency_base_unmatched"),
-                                    read_evidence.clone(),
-                                ));
-                            };
-                            return Ok((
-                                OutstandingsLoadResult::BaseCurrencyLedgersOnly {
-                                    classified,
-                                    exclusions,
-                                    synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
-                                    base_currency_ledgers: Box::new(
-                                        BaseCurrencyLedgersOutstandings {
-                                            report: result.report,
-                                            currency_assertion,
-                                            ageing_anchor,
-                                            unallocated_total: result.residual_total,
-                                            statement_unallocated_by_party,
-                                            statement_open_bills,
-                                        },
-                                    ),
-                                },
+                                ),
                                 read_evidence.clone(),
                             ));
                         }
-                        Ok((
-                            OutstandingsLoadResult::Complete {
-                                report: Box::new(result.report),
-                                read_strategy: OutstandingsReadStrategy::NativeBills,
-                                currency_assertion,
-                                ageing_anchor,
+                    }
+                    // A foreign ledger's bills are plain amounts that are
+                    // not rupees (TALLY_PROTOCOL_REFERENCE §8.2d), and a
+                    // mixed ledger's are rupee amounts behind a balance
+                    // that was never read (bridge#642): both leave every
+                    // figure, the statement rows included.
+                    let foreign = snapshot.foreign;
+                    let mixed = snapshot.mixed;
+                    let receivable_rows =
+                        without_excluded_parties(receivable_rows, &foreign, &mixed);
+                    let payable_rows = without_excluded_parties(payable_rows, &foreign, &mixed);
+                    let ledger_rows = snapshot.base;
+                    let group_rows =
+                        parse_native_group_snapshot(&group_body, expected_company_guid)?;
+
+                    // Ageing anchors on the DUE date. Measured 2026-08-07: on a
+                    // bill carrying a 30-day credit period Tally's own
+                    // BILLOVERDUE counted 61 days, which is the age from
+                    // BILLDUE, not the 91 days from BILLDATE. Where no credit
+                    // period exists the two dates coincide, so this is correct
+                    // on both books.
+                    let result = compute_native_outstandings_with_exclusions(
+                        company,
+                        &receivable_rows,
+                        &payable_rows,
+                        NativeMasterSnapshot {
+                            ledgers: &ledger_rows,
+                            groups: NativeGroupSnapshot::Complete(&group_rows),
+                        },
+                        &foreign,
+                        &mixed,
+                        ageing_anchor.native_anchor(),
+                        &as_of,
+                        total_bytes,
+                    )?;
+
+                    if let Some(reason) = native_crosscheck_partial_reason(&result, &as_of) {
+                        return Ok((partial_result(reason), read_evidence.clone()));
+                    }
+
+                    let statement_open_bills =
+                        all_open_bill_rows(&receivable_rows, &payable_rows, ageing_anchor, &as_of);
+                    let statement_unallocated_by_party = all_unallocated_parties(&result.residuals);
+                    if let Some(exclusions) = CurrencyExclusions::new(
+                        result.foreign_currency_ledgers_excluded,
+                        result.mixed_currency_ledgers_excluded,
+                    ) {
+                        // A single-master base refuses a ledger in another
+                        // currency before this point (classify_ledger_currencies),
+                        // and a composite value above; without a classified
+                        // witness this result cannot be built, so it refuses
+                        // here too.
+                        let Some(classified) = currency_witness.classified_base() else {
+                            return Ok((
+                                partial_result("ledger_currency_base_unmatched"),
+                                read_evidence.clone(),
+                            ));
+                        };
+                        return Ok((
+                            OutstandingsLoadResult::BaseCurrencyLedgersOnly {
+                                classified,
+                                exclusions,
                                 synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
-                                unallocated_total: Some(result.residual_total),
-                                statement_unallocated_by_party,
-                                statement_open_bills,
+                                base_currency_ledgers: Box::new(BaseCurrencyLedgersOutstandings {
+                                    report: result.report,
+                                    currency_assertion,
+                                    ageing_anchor,
+                                    unallocated_total: result.residual_total,
+                                    statement_unallocated_by_party,
+                                    statement_open_bills,
+                                }),
                             },
                             read_evidence.clone(),
-                        ))
+                        ));
                     }
-                    .await;
-                    outcome.map_err(|error| with_read_evidence(error, read_evidence))
+                    Ok((
+                        OutstandingsLoadResult::Complete {
+                            report: Box::new(result.report),
+                            read_strategy: OutstandingsReadStrategy::NativeBills,
+                            currency_assertion,
+                            ageing_anchor,
+                            synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
+                            unallocated_total: Some(result.residual_total),
+                            statement_unallocated_by_party,
+                            statement_open_bills,
+                        },
+                        read_evidence.clone(),
+                    ))
                 }
-            },
-        )
+                .await;
+                outcome.map_err(|error| with_read_evidence(error, read_evidence))
+            }
+        })
         .await
     }
 
@@ -4576,19 +4145,6 @@ impl TallyRuntime {
             .currency)
     }
 
-    /// Reads the base-currency assertion together with the exact paired wire
-    /// evidence that established it for an agent-visible monetary result.
-    pub async fn detect_base_currency_with_evidence(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-    ) -> anyhow::Result<(CompanyCurrency, RuntimeReadEvidence)> {
-        let read = self
-            .detect_base_currency_with_extent(config, identity)
-            .await?;
-        Ok((read.currency, read.evidence))
-    }
-
     /// Runs the existing currency probe while retaining its stable company
     /// extent for the party/ledger master document boundary.
     pub(crate) async fn detect_base_currency_with_extent(
@@ -4598,43 +4154,36 @@ impl TallyRuntime {
     ) -> anyhow::Result<CompanyCurrencyRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        // Pin identity first: a currency read against the wrong
-                        // company is worse than none.
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        let request = render_company_currency_request(identity.display_name());
-                        let body = client.fetch_native_report_paired(request.clone()).await?;
-                        let (body, encoded_bytes, encoded_sha256) =
-                            body.require_stable(PairedReadValidationError::CurrencyMaster)?;
-                        evidence =
-                            RuntimeReadEvidence::paired(&request, encoded_sha256, encoded_bytes);
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
-                            return Err(anyhow::Error::new(
-                                PairedReadValidationError::CurrencyExtent,
-                            ));
-                        }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        Ok(CompanyCurrencyRead {
-                            currency: parse_company_currency(&body)?,
-                            extent,
-                            evidence: evidence.clone(),
-                        })
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    // Pin identity first: a currency read against the wrong
+                    // company is worse than none.
+                    let extent = client.fetch_company_book_extent(&identity).await?;
+                    let request = render_company_currency_request(identity.display_name());
+                    let body = client.fetch_native_report_paired(request.clone()).await?;
+                    let (body, encoded_bytes, encoded_sha256) =
+                        body.require_stable(PairedReadValidationError::CurrencyMaster)?;
+                    evidence = RuntimeReadEvidence::paired(&request, encoded_sha256, encoded_bytes);
+                    let closing_extent = client.fetch_company_book_extent(&identity).await?;
+                    if closing_extent != extent {
+                        return Err(anyhow::Error::new(
+                            PairedReadValidationError::CurrencyExtent,
+                        ));
                     }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    Ok(CompanyCurrencyRead {
+                        currency: parse_company_currency(&body)?,
+                        extent,
+                    })
                 }
-            },
-        )
+                .await;
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
         .await
     }
 
@@ -4653,409 +4202,34 @@ impl TallyRuntime {
     ) -> anyhow::Result<ClassifiedCompanyCurrencyRead> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        let (currency_count, identified) =
-                            read_classified_currency(&client, &identity, &mut evidence).await?;
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
-                            return Err(anyhow::Error::new(
-                                PairedReadValidationError::CurrencyExtent,
-                            ));
-                        }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        Ok(ClassifiedCompanyCurrencyRead {
-                            currency_count,
-                            identified,
-                            extent,
-                            evidence: evidence.clone(),
-                        })
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let extent = client.fetch_company_book_extent(&identity).await?;
+                    let (currency_count, identified) =
+                        read_classified_currency(&client, &identity, &mut evidence).await?;
+                    let closing_extent = client.fetch_company_book_extent(&identity).await?;
+                    if closing_extent != extent {
+                        return Err(anyhow::Error::new(
+                            PairedReadValidationError::CurrencyExtent,
+                        ));
                     }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    Ok(ClassifiedCompanyCurrencyRead {
+                        currency_count,
+                        identified,
+                        extent,
+                        evidence: evidence.clone(),
+                    })
                 }
-            },
-        )
-        .await
-    }
-
-    #[cfg(feature = "voucher-scan")]
-    pub async fn fetch_outstandings(
-        &self,
-        config: TallyConfig,
-        identity: &VerifiedCompanyIdentity,
-        as_of: TallyDate,
-        currency_assertion: OutstandingsCurrencyAssertion,
-        ageing_anchor: OutstandingsAgeingAnchor,
-    ) -> anyhow::Result<OutstandingsLoadResult> {
-        // Tally's own Bills Receivable/Payable reports answer this question in
-        // O(open bills) instead of O(vouchers), so they need no segment
-        // calibration at all. Measured 2026-08-07 against the same book the
-        // voucher scan reconciles against: identical 48 open bills,
-        // Rs 45,14,597 receivable and 4/4/4/36 ageing, in 0.21 s and 11 KB
-        // against the scan's 8.30 s, 54 requests and 3.44 MB.
-        //
-        // This ordering matters for a reason that is not a preference: a
-        // production build has no calibrated width by construction --
-        // `CalibratedSegmentPolicy`'s only constructors are `#[cfg(test)]` and
-        // `#[cfg(feature = "live-calibration-harness")]`, and `Self::default`
-        // sets the field to `None`. Before this, the command returned
-        // `outstandings_segment_sizing_uncalibrated` for every company on every
-        // book, before any request, and the screen could only ever say "No
-        // Tally data was read".
-        let Some(segment_policy) = self.outstandings_segment_policy else {
-            return self
-                .fetch_operator_outstandings(config, identity, as_of, ageing_anchor)
                 .await;
-        };
-        let Some(_coverage) = self.unallocated_balance_coverage.as_ref() else {
-            return Ok(partial_result("unallocated_direct_postings_not_covered"));
-        };
-        let cached_probe = self.cached_probe(&config)?;
-        let boundary_profile = self
-            .outstandings_boundary_profile_override
-            .unwrap_or_else(|| {
-                select_date_boundary_profile(cached_probe.as_ref().map(|probe| &probe.profile))
-            });
-        let _lease = self.begin_ordinary_read(&config)?;
-        let identity = identity.clone();
-        let result = self
-            .execute(
-                config,
-                ReadOperation::VoucherExport,
-                ReadRetryPolicy::SINGLE_ATTEMPT,
-                move |client| {
-                    let identity = identity.clone();
-                    let as_of = as_of.clone();
-                    async move {
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let extent = client
-                            .fetch_company_book_extent(&identity)
-                            .await?;
-                        // The reporting window must never run past the as-of date.
-                        // A future-dated voucher pushes LastVoucherDate beyond
-                        // today, and a window ending there makes the computation
-                        // reject the entire read rather than simply excluding
-                        // future activity. Clamp through the compatibility profile,
-                        // because an Education boundary is legal only on day
-                        // 01/02/31.
-                        let cutoff = if extent.last_voucher_date() <= &as_of {
-                            extent.last_voucher_date().clone()
-                        } else {
-                            let Some(clamped) =
-                                boundary_profile.latest_boundary_at_or_before(&as_of)
-                            else {
-                                return Ok(partial_result("as_of_has_no_valid_window_boundary"));
-                            };
-                            clamped
-                        };
-                        if &cutoff < extent.books_from() {
-                            return Ok(partial_result("as_of_precedes_books_from"));
-                        }
-                        // One extra paired read, before any voucher segment. Bills
-                        // opened by a ledger's bill-wise OPENING balance exist with
-                        // no voucher at all, so this scan cannot observe them.
-                        // Detect them and refuse to claim Complete rather than
-                        // silently under-report a client's outstandings.
-                        let opening_coverage = client
-                            .fetch_ledger_opening_coverage(extent.company())
-                            .await?;
-                        if let Some(reason_code) = paired_coverage_partial_reason(&opening_coverage) {
-                            return Ok(partial_result(reason_code));
-                        }
-                        let LedgerOpeningCoverageRead::Stable(opening_coverage) = opening_coverage
-                        else {
-                            unreachable!(
-                                "paired coverage drift returns before a stable value is required"
-                            )
-                        };
-                        if !opening_coverage.is_fully_covered_by_vouchers() {
-                            return Ok(partial_result("ledger_opening_bills_not_covered"));
-                        }
-                        let requested = DateWindow::parse(
-                            boundary_profile,
-                            extent.books_from().as_str(),
-                            cutoff.as_str(),
-                        )?;
-                        let Some(high_water) = extent.voucher_alter_id_high_water() else {
-                            return Ok(partial_result(
-                                "company_voucher_alter_id_high_water_missing",
-                            ));
-                        };
-                        let date_partitions = requested.narrow_partitions()?;
-                        let plan = SegmentPlan::new(
-                            date_partitions.len(),
-                            high_water.get(),
-                            segment_policy,
-                        )?;
-                        tracing::info!(
-                            target: "bridge::tally::outstandings",
-                            date_partitions = plan.date_partitions,
-                            alter_id_high_water = plan.alter_id_high_water,
-                            initial_width = plan.initial_width,
-                            planned_primary_segment_pairs = plan.planned_primary_segment_pairs,
-                            reserved_empty_partition_witness_pairs = plan.reserved_empty_partition_witness_pairs,
-                            planned_segment_pairs = plan.planned_segment_pairs,
-                            maximum_segment_pairs = MAX_SEGMENT_PAIRS_PER_SCAN,
-                            admitted = plan.is_admitted(),
-                            "planned outstandings segment scan"
-                        );
-                        let Some(mut pair_budget) = plan.admitted_budget() else {
-                            return Ok(partial_result("outstandings_segment_plan_exceeds_budget"));
-                        };
-                        let mut trend_guard = SegmentTrendGuard::new(segment_policy);
-                        let mut completed_date_partitions = Vec::new();
-                        for segment_window in date_partitions {
-                            let verification_window = segment_window.as_date_window().clone();
-                            let mut segments = Vec::new();
-                            let mut cursor = 0_u64;
-                            while let Some(alter_id_range) =
-                                trend_guard.next_range(cursor, high_water.get())?
-                            {
-                                if !pair_budget.admit_next() {
-                                    // NOT the preflight refusal: reaching here means
-                                    // the trend guard shrank the width after the plan
-                                    // was computed, so live requests have already been
-                                    // spent. The UI renders the preflight code as "no
-                                    // voucher scan started", which would be false.
-                                    return Ok(partial_result(
-                                        "outstandings_segment_budget_exhausted_mid_scan",
-                                    ));
-                                }
-                                let observation = match client
-                                    .fetch_outstandings_segment_pair(
-                                        extent.company(),
-                                        segment_window.clone(),
-                                        alter_id_range,
-                                    )
-                                    .await
-                                {
-                                    Ok(observation) => observation,
-                                    Err(error) => {
-                                        return Err(outstandings_read_transport_failure(error));
-                                    }
-                                };
-                                let OutstandingsSegmentObservation {
-                                    verification,
-                                    first_read_elapsed,
-                                    second_read_elapsed,
-                                } = observation;
-                                let max_read_elapsed = first_read_elapsed.max(second_read_elapsed);
-                                match verification {
-                                    SegmentVerification::Complete(segment) => {
-                                        let end = segment.alter_id_range().inclusive_end();
-                                        let should_stop = trend_guard
-                                            .observe_complete_segment(&segment, max_read_elapsed);
-                                        segments.push(SegmentVerification::Complete(segment));
-                                        if should_stop {
-                                            return Ok(partial_result(
-                                            "tally_segment_latency_trending_restart_recommended",
-                                        ));
-                                        }
-                                        cursor = end;
-                                    }
-                                    SegmentVerification::Partial(partial) => {
-                                        return Ok(partial_result(partial.reason_code.as_str()))
-                                    }
-                                }
-                            }
-                            match assemble_scan(
-                                extent.company().clone(),
-                                verification_window,
-                                high_water,
-                                segments,
-                            ) {
-                                ScanResult::Complete(scan) => completed_date_partitions.push(scan),
-                                ScanResult::Partial(partial) => {
-                                    return Ok(partial_result(partial.reason_code.as_str()))
-                                }
-                            }
-                        }
-                        // `VoucherEmptyPartitionWitnessV1` was qualified under
-                        // supervised dispatch. A positive-high-water empty primary
-                        // partition now needs its nearest non-empty control plus
-                        // every date-shifted cover slice before it can enter totals.
-                        let mut corroborated_date_partitions =
-                            Vec::with_capacity(completed_date_partitions.len());
-                        for partition in &completed_date_partitions {
-                            let corroborated = if partition.vouchers().is_empty() {
-                                if high_water.get() == 0 {
-                                    CorroboratedDatePartition::empty_book(partition.clone())
-                                } else {
-                                    let primary = match NarrowDateWindow::try_from(
-                                        partition.window().clone(),
-                                    ) {
-                                        Ok(window) => window,
-                                        Err(_) => {
-                                            return Ok(partial_result(
-                                                "empty_date_witness_scope_mismatch",
-                                            ))
-                                        }
-                                    };
-                                    let Some(cover) = StrictlyWiderDateCover::for_primary(&primary)
-                                    else {
-                                        return Ok(partial_result(
-                                            "empty_date_witness_cover_unavailable",
-                                        ));
-                                    };
-                                    let Some(control) = nearest_non_empty_primary_partition(
-                                        &completed_date_partitions,
-                                        partition.window(),
-                                    ) else {
-                                        return Ok(partial_result("empty_date_partition_no_control"));
-                                    };
-                                    let control_window = match NarrowDateWindow::try_from(
-                                        control.window().clone(),
-                                    ) {
-                                        Ok(window) => window,
-                                        Err(_) => {
-                                            return Ok(partial_result(
-                                                "empty_date_witness_control_scope_mismatch",
-                                            ))
-                                        }
-                                    };
-                                    if !pair_budget.admit_next() {
-                                        return Ok(partial_result(
-                                            "outstandings_segment_budget_exhausted_mid_scan",
-                                        ));
-                                    }
-                                    let control_pair = match fetch_empty_partition_witness(
-                                        high_water,
-                                        || {
-                                            client.fetch_empty_partition_witness_pair(
-                                                extent.company(),
-                                                control_window,
-                                            )
-                                        },
-                                    )
-                                    .await
-                                    {
-                                        Ok(Ok(pair)) => pair,
-                                        Ok(Err(partial)) => {
-                                            return Ok(partial_result(partial.reason_code.as_str()))
-                                        }
-                                        Err(error) => {
-                                            return Err(outstandings_read_transport_failure(error))
-                                        }
-                                    };
-                                    let mut cover_pairs = Vec::with_capacity(cover.slices().len());
-                                    for slice in cover.slices() {
-                                        if !pair_budget.admit_next() {
-                                            return Ok(partial_result(
-                                                "outstandings_segment_budget_exhausted_mid_scan",
-                                            ));
-                                        }
-                                        let pair = match fetch_empty_partition_witness(
-                                            high_water,
-                                            || {
-                                                client.fetch_empty_partition_witness_pair(
-                                                    extent.company(),
-                                                    slice.clone(),
-                                                )
-                                            },
-                                        )
-                                        .await
-                                        {
-                                            Ok(Ok(pair)) => pair,
-                                            Ok(Err(partial)) => {
-                                                return Ok(partial_result(partial.reason_code.as_str()))
-                                            }
-                                            Err(error) => {
-                                                return Err(outstandings_read_transport_failure(error))
-                                            }
-                                        };
-                                        cover_pairs.push(pair);
-                                    }
-                                    corroborate_empty_date_partition(
-                                        partition.clone(),
-                                        &completed_date_partitions,
-                                        cover,
-                                        control_pair,
-                                        cover_pairs,
-                                    )
-                                }
-                            } else {
-                                CorroboratedDatePartition::non_empty(partition.clone())
-                            };
-                            match corroborated {
-                                Ok(partition) => corroborated_date_partitions.push(partition),
-                                Err(partial) => {
-                                    return Ok(partial_result(partial.reason_code.as_str()))
-                                }
-                            }
-                        }
-                        // A scan is not instantaneous: primary segments and empty
-                        // partition witnesses must describe one book state before
-                        // a Complete result can be assembled.
-                        let closing_extent = client
-                            .fetch_company_book_extent(&identity)
-                            .await?;
-                        if closing_extent != extent {
-                            return Ok(partial_result("book_changed_during_scan"));
-                        }
-                        // The extent does not cover bill-wise ledger openings, so
-                        // revalidate their GUID-to-name coverage after the witness
-                        // loop as well.
-                        let closing_coverage = client
-                            .fetch_ledger_opening_coverage(extent.company())
-                            .await?;
-                        if let Some(reason_code) = paired_coverage_partial_reason(&closing_coverage) {
-                            return Ok(partial_result(reason_code));
-                        }
-                        let LedgerOpeningCoverageRead::Stable(closing_coverage) = closing_coverage
-                        else {
-                            unreachable!(
-                                "paired coverage drift returns before a stable value is required"
-                            )
-                        };
-                        if let Some(reason_code) = closing_coverage_partial_reason(
-                            closing_coverage == opening_coverage,
-                            closing_coverage.is_fully_covered_by_vouchers(),
-                        ) {
-                            return Ok(partial_result(reason_code));
-                        }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        match assemble_partitioned_scan(
-                            &extent,
-                            requested,
-                            corroborated_date_partitions,
-                        ) {
-                            ScanResult::Complete(scan) => Ok(OutstandingsLoadResult::Complete {
-                                report: Box::new(compute_outstandings_with_ageing_anchor(
-                                    &scan,
-                                    as_of,
-                                    ageing_anchor.legacy_anchor(),
-                                )?),
-                                read_strategy: OutstandingsReadStrategy::VoucherScan,
-                                currency_assertion,
-                                ageing_anchor,
-                                synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
-                                // The voucher scan derives bills from vouchers
-                                // and cannot establish the unallocated
-                                // remainder, so it must stay absent rather
-                                // than be reported as zero.
-                                unallocated_total: None,
-                                statement_unallocated_by_party: Vec::new(),
-                                statement_open_bills: Vec::new(),
-                            }),
-                            ScanResult::Partial(partial) => {
-                                Ok(partial_result(partial.reason_code.as_str()))
-                            }
-                        }
-                    }
-                },
-            )
-            .await;
-        partial_after_outstandings_read_transport_failure(result)
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
+        .await
     }
 
     pub(super) async fn post_xml_cancellable_validated<P>(
@@ -5074,7 +4248,6 @@ impl TallyRuntime {
         self.execute_cancellable(
             config,
             Some(cancellation),
-            ReadOperation::ReportExport,
             ReadRetryPolicy::transient_default(),
             move |client| {
                 let request_xml = request_xml.clone();
@@ -5131,6 +4304,9 @@ impl TallyRuntime {
         Ok(snapshots)
     }
 
+    /// The review cache's current probe for `config`'s endpoint, if any. Only tests look
+    /// at it: a production caller reserves it by review id instead.
+    #[cfg(test)]
     pub fn cached_probe(&self, config: &TallyConfig) -> anyhow::Result<Option<TallyProbeResult>> {
         let endpoint = EndpointKey::from_config(config)?;
         let sessions = self
@@ -5209,15 +4385,6 @@ impl TallyRuntime {
         Ok(Some(reservation))
     }
 
-    pub fn telemetry_preview(&self) -> anyhow::Result<TallyTelemetryPreviewExport> {
-        let export = self.control.collector().privacy_reduced_export_v2()?;
-        Ok(TallyTelemetryPreviewExport {
-            schema: TELEMETRY_PREVIEW_SCHEMA,
-            payload_sha256: export.payload_sha256().to_string(),
-            preview_json: export.json().to_string(),
-        })
-    }
-
     fn begin_ordinary_read(&self, config: &TallyConfig) -> anyhow::Result<OrdinaryReadLease> {
         let endpoint = EndpointKey::from_config(config)?;
         let sessions = self
@@ -5263,6 +4430,7 @@ fn classify_error(error: &anyhow::Error) -> HealthOutcome {
         ReadFailureClass::Connection
         | ReadFailureClass::RequestTimeout
         | ReadFailureClass::RequestFailed
+        | ReadFailureClass::ResponseBodyFailed
         | ReadFailureClass::HttpServer
         | ReadFailureClass::RateLimited => HealthOutcome::TransportFailure,
         ReadFailureClass::HttpClient
@@ -5290,11 +4458,11 @@ fn classify_failure(error: &anyhow::Error) -> ReadFailureClass {
     match transport_error {
         Some(TallyTransportError::ConnectionFailed) => ReadFailureClass::Connection,
         Some(TallyTransportError::RequestTimedOut) => ReadFailureClass::RequestTimeout,
+        Some(TallyTransportError::RequestFailed) => ReadFailureClass::RequestFailed,
+        // The response head had arrived, so Tally had begun answering (I7, section 5.2).
         Some(
-            TallyTransportError::RequestFailed
-            | TallyTransportError::ResponseTruncated
-            | TallyTransportError::ResponseReadFailed,
-        ) => ReadFailureClass::RequestFailed,
+            TallyTransportError::ResponseTruncated | TallyTransportError::ResponseReadFailed,
+        ) => ReadFailureClass::ResponseBodyFailed,
         Some(TallyTransportError::HttpStatus { status: 429 }) => ReadFailureClass::RateLimited,
         Some(TallyTransportError::HttpStatus { status }) if *status >= 500 => {
             ReadFailureClass::HttpServer
@@ -5331,11 +4499,11 @@ fn map_execution_error(error: ReadExecutionError<anyhow::Error>) -> anyhow::Erro
             anyhow::Error::new(TallyRuntimeControlError::QueueDeadline)
         }
         ReadExecutionError::CircuitRejected {
-            reason: crate::observability::CircuitRejectReason::Cooldown,
+            reason: CircuitRejectReason::Cooldown,
             ..
         } => anyhow::Error::new(TallyRuntimeControlError::CircuitCooldown),
         ReadExecutionError::CircuitRejected {
-            reason: crate::observability::CircuitRejectReason::HalfOpenProbeInFlight,
+            reason: CircuitRejectReason::HalfOpenProbeInFlight,
             ..
         } => anyhow::Error::new(TallyRuntimeControlError::HalfOpenProbeInFlight),
         ReadExecutionError::EndpointSessionLimit => {

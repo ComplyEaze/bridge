@@ -31,7 +31,6 @@ byte-level fidelity is not. Each is pending a future re-capture from live Tally.
 - `bills_receivable_billwise_lab.xml`
 - `bills_receivable_unloaded_company_failure.xml`
 - `company_collection_live.xml`
-- `company_extent_9000.xml`
 - `ledger_snapshot_aarav.xml`
 - `ledger_snapshot_billwise_lab.xml`
 
@@ -48,8 +47,8 @@ These fixtures are byte-exact responses captured from the purpose-built,
 synthetic `Bridge Validation Lab` on TallyPrime port 9001. Each POST was issued
 alone and bracketed by successful `/status` identity checks. The existing
 native Bills Receivable, Bills Payable, and `List of Ledgers` request builders
-were used with `SVTODATE=20260817`; a separate existing
-`CompanyBookExtentV1` read established `BOOKSFROM=20250401`.
+were used with `SVTODATE=20260817`; a separate `CompanyBookExtentV1` read (a
+profile since removed) established `BOOKSFROM=20250401`.
 
 | Fixture | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -188,7 +187,6 @@ repeats only what this note says above.
 | `bills_receivable_billwise_lab.xml` | 10,644 | `a0fcd5020e38ab674b757fdfe098e009d26fca4af1b8692cd49f6840c6074d35` | not established: normalised by Git, as above |
 | `bills_receivable_unloaded_company_failure.xml` | 226 | `c07f07022c9193b4ebc09aeea1a136cf3b4022244e6d4583cb811702aee13deb` | not established: normalised by Git, as above |
 | `company_collection_live.xml` | 2,003 | `7ed31800023bc29f45d71bbb743fd77558ef656642c80c418a5a6b5eef4bfa64` | not established: normalised by Git, as above |
-| `company_extent_9000.xml` | 2,605 | `68967b5aad738f3a81011c1dcf8f7c53ef0321b1fb000c810592bb3e3575a982` | not established: normalised by Git, as above |
 | `ledger_snapshot_aarav.xml` | 39,971 | `129b632f32ced9bc160abf34bc88c87de6f93fd3b27243af0f0f88897c59fe04` | not established: normalised by Git, as above |
 | `ledger_snapshot_billwise_lab.xml` | 7,728 | `3de872e62a3d71a24170c27a3669dfa49a75e5c04f9eed98148db5af615d573d` | not established: normalised by Git, as above |
 | `bills_payable_billwise_lab_empty.xml` | 23 | `2240a70758a0d0245b359bc8c2c727335d9c73bdc0c4c88abf7982fb47cee522` | not a re-capture: content determined independently, as above |

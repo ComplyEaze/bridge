@@ -1,0 +1,1000 @@
+# fixture: tests/fixtures/agent/native-voucher-types-reads-lab.utf16le.xml
+# parser: parse_native_voucher_type_source_records_with_evidence(READS LAB)
+# source: captured
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Attendance",
+                parent: Returned(
+                    "Attendance",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000004e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000004e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "78",
+                ),
+            },
+            alter_id: Some(
+                "80",
+            ),
+            raw_source_sha256: "5eb47b0a8bcec5e0dad5991f5fe13ceac17affe9bcde955c005767287ce2f871",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Contra",
+                parent: Returned(
+                    "Contra",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000020",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000020",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "32",
+                ),
+            },
+            alter_id: Some(
+                "34",
+            ),
+            raw_source_sha256: "84c9610abafcdcd52c65ecd75396af3fac30f692b9c163c0d3e31c9c54e4d49f",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Credit Note",
+                parent: Returned(
+                    "Credit Note",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000028",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000028",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "40",
+                ),
+            },
+            alter_id: Some(
+                "42",
+            ),
+            raw_source_sha256: "e3aa02e70f9ce3375d6d31c8fdf322ce0f31d14cf8580d6cb0a7d15498bbd1ab",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Debit Note",
+                parent: Returned(
+                    "Debit Note",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000002a",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000002a",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "42",
+                ),
+            },
+            alter_id: Some(
+                "44",
+            ),
+            raw_source_sha256: "433de97c8d3cd8104f3a4ea4aae0fa43bcd621946852ea831edee38d390a2394",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Delivery Note",
+                parent: Returned(
+                    "Delivery Note",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000030",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000030",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "48",
+                ),
+            },
+            alter_id: Some(
+                "50",
+            ),
+            raw_source_sha256: "f8e08bcd98ce0d836b5828a18d46c873d60644f9c4a4af770e876b78a34cf2f4",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Job Work In Order",
+                parent: Returned(
+                    "Job Work In Order",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000052",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000052",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "82",
+                ),
+            },
+            alter_id: Some(
+                "84",
+            ),
+            raw_source_sha256: "9f81177a419f6b09ec15fab1e4b36cefa8d7af117c9e93e3b49ad81416917b32",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Job Work Out Order",
+                parent: Returned(
+                    "Job Work Out Order",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000054",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000054",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "84",
+                ),
+            },
+            alter_id: Some(
+                "86",
+            ),
+            raw_source_sha256: "8f3a22d83b6c994b40926f9c29c460f6ff0f7bdf65d01f495e512744e912f782",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Journal",
+                parent: Returned(
+                    "Journal",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000026",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000026",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "38",
+                ),
+            },
+            alter_id: Some(
+                "40",
+            ),
+            raw_source_sha256: "49fb47f5e2a86c2fcdc811c6a79eae804cb1b5baf4f63f5a6d113af2a99ed2cd",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Contra",
+                parent: Returned(
+                    "Contra",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000dd",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000dd",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "221",
+                ),
+            },
+            alter_id: Some(
+                "232",
+            ),
+            raw_source_sha256: "6bd8bda2c066c438650cbcd2db28901324a43c6e8db74f76fad53576434e244c",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Credit Note",
+                parent: Returned(
+                    "Credit Note",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e3",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e3",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "227",
+                ),
+            },
+            alter_id: Some(
+                "238",
+            ),
+            raw_source_sha256: "025ab993c7663c5308fc34568e50599780af7a9b277d1754206fd39df781f9e4",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Debit Note",
+                parent: Returned(
+                    "Debit Note",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e1",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e1",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "225",
+                ),
+            },
+            alter_id: Some(
+                "236",
+            ),
+            raw_source_sha256: "ab481fc2b2f3f630d75b6debb87581a4322031f2ff49d4238a64b9de2caa1f1f",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Journal",
+                parent: Returned(
+                    "Journal",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000df",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000df",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "223",
+                ),
+            },
+            alter_id: Some(
+                "234",
+            ),
+            raw_source_sha256: "19a960f59e0a51d0c785fd3c801f121424346d241b9462b7fe59d30b323528cb",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Memorandum",
+                parent: Returned(
+                    "Memorandum",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "231",
+                ),
+            },
+            alter_id: Some(
+                "242",
+            ),
+            raw_source_sha256: "3a77f409ab41b4909e8827b376740130cded2a40cd0afc9ce8a63e7a06515c9a",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Payment",
+                parent: Returned(
+                    "PAYMENT A/C",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d9",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d9",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "217",
+                ),
+            },
+            alter_id: Some(
+                "228",
+            ),
+            raw_source_sha256: "05e463b9277b06d36aa5d604d97395ed651a69ae5686e0a31d73c6a5c1cea9b1",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Receipt",
+                parent: Returned(
+                    "Receipt",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000db",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000db",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "219",
+                ),
+            },
+            alter_id: Some(
+                "230",
+            ),
+            raw_source_sha256: "12c81ca7946957a5d957f34622077a11df0aca5a8b3ee774a8d376a5a50c71d5",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Reversing",
+                parent: Returned(
+                    "Reversing Journal",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e5",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000e5",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "229",
+                ),
+            },
+            alter_id: Some(
+                "240",
+            ),
+            raw_source_sha256: "245cbc9ec78d6a6eb8dade3866b62ffc6408d98f0b9f277543239c2c34f711ea",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "LA Child Sales",
+                parent: Returned(
+                    "Sales",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d7",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d7",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "215",
+                ),
+            },
+            alter_id: Some(
+                "226",
+            ),
+            raw_source_sha256: "544506f45cdb30dc7102f4c69acd79db935f7d872c8b4b5c301fd7a4cd4ee9cc",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Material In",
+                parent: Returned(
+                    "Material In",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000058",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000058",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "88",
+                ),
+            },
+            alter_id: Some(
+                "90",
+            ),
+            raw_source_sha256: "c83aa159382aff6d0d2ad003008fe1492abbf8517633b601516d769fa0f6bdd2",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Material Out",
+                parent: Returned(
+                    "Material Out",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000056",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000056",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "86",
+                ),
+            },
+            alter_id: Some(
+                "88",
+            ),
+            raw_source_sha256: "3643055acbaa72dff440ccabb5d5436ff1fa367b6b2f71b039c069d991e39faf",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Memorandum",
+                parent: Returned(
+                    "Memorandum",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000003c",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000003c",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "60",
+                ),
+            },
+            alter_id: Some(
+                "62",
+            ),
+            raw_source_sha256: "5af3d0e7460f408ae3e6a741c43c373f27cdf99e2cb1f16e1b58772b3bc99669",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "PAYMENT A/C",
+                parent: Returned(
+                    "PAYMENT A/C",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000022",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000022",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "34",
+                ),
+            },
+            alter_id: Some(
+                "219",
+            ),
+            raw_source_sha256: "30e51664a4ed032d5b9137285fb11a8dca473bb323f2cc0759148d2230fe42a1",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Payroll",
+                parent: Returned(
+                    "Payroll",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000050",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000050",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "80",
+                ),
+            },
+            alter_id: Some(
+                "82",
+            ),
+            raw_source_sha256: "91acfc7bd82e5e7f091316fc0505e270919655fed845d1c51760372e1b0b6869",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Physical Stock",
+                parent: Returned(
+                    "Physical Stock",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000038",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000038",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "56",
+                ),
+            },
+            alter_id: Some(
+                "58",
+            ),
+            raw_source_sha256: "66d2c25d419d527bb46e2e2d8e54b5190bdc0dc21e725992a8ac9fa76c7bfd40",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Purchase",
+                parent: Returned(
+                    "Attendance",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d2",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d2",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "210",
+                ),
+            },
+            alter_id: Some(
+                "215",
+            ),
+            raw_source_sha256: "b09bcf79715b62c469dc92f189c640b769f4daee1f594521698376311a472e0c",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "PURCHASE A/C",
+                parent: Returned(
+                    "PURCHASE A/C",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000002e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000002e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "46",
+                ),
+            },
+            alter_id: Some(
+                "213",
+            ),
+            raw_source_sha256: "98420d93caae84af30662c53d368d5de54b4d4d28ed4836ad638d85612700f2b",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Purchase Local",
+                parent: Returned(
+                    "PURCHASE A/C",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d4",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-000000d4",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "212",
+                ),
+            },
+            alter_id: Some(
+                "224",
+            ),
+            raw_source_sha256: "38b9095a2f926f8e7b82449d874802007dc4f2d2d5efb183fed0f926b3110575",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Purchase Order",
+                parent: Returned(
+                    "Purchase Order",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000042",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000042",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "66",
+                ),
+            },
+            alter_id: Some(
+                "68",
+            ),
+            raw_source_sha256: "dd8639fccdd45df82f64bad67d5593463a50a600c2e85ae8eef8d555d0c16bb4",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Receipt",
+                parent: Returned(
+                    "Receipt",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000024",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000024",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "36",
+                ),
+            },
+            alter_id: Some(
+                "38",
+            ),
+            raw_source_sha256: "e326f40e1bf9200b8bc0e633d2a08e1ce1952b187e2a89c8a0123b5f6e8328fb",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Receipt Note",
+                parent: Returned(
+                    "Receipt Note",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000032",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000032",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "50",
+                ),
+            },
+            alter_id: Some(
+                "52",
+            ),
+            raw_source_sha256: "6e03446f727e0970ebc8567a6822964ab2f703f83be8dfa5ab8b444aabf4967b",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Rejections In",
+                parent: Returned(
+                    "Rejections In",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000036",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000036",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "54",
+                ),
+            },
+            alter_id: Some(
+                "56",
+            ),
+            raw_source_sha256: "8686b2125c3dbc8d1d84eace86ec5c038a1ebd1db549923efdf52db059d464f7",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Rejections Out",
+                parent: Returned(
+                    "Rejections Out",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000034",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000034",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "52",
+                ),
+            },
+            alter_id: Some(
+                "54",
+            ),
+            raw_source_sha256: "4ce1f797ba1487bb30a8613dce422cb96352bfe7c83324298d10eddc8674e7a8",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Reversing Journal",
+                parent: Returned(
+                    "Reversing Journal",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000003e",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000003e",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "62",
+                ),
+            },
+            alter_id: Some(
+                "64",
+            ),
+            raw_source_sha256: "85371e4ca8a4fb84e678a7783aaf369d4914a0d8c9063f2f0e2375fe5bf2014d",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Sales",
+                parent: Returned(
+                    "Sales",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000002c",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000002c",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "44",
+                ),
+            },
+            alter_id: Some(
+                "46",
+            ),
+            raw_source_sha256: "f9bb7196d9a37bf7d4320ec8b4673082dfa5a7f4efacbe86e982b092ae77998e",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Sales Order",
+                parent: Returned(
+                    "Sales Order",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000040",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-00000040",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "64",
+                ),
+            },
+            alter_id: Some(
+                "66",
+            ),
+            raw_source_sha256: "ed11390078e164b266fe5639d3354d822faef3bc850497fd630daec03098f534",
+        },
+        ParsedSourceRecord {
+            record: TallyNamedMaster {
+                name: "Stock Journal",
+                parent: Returned(
+                    "Stock Journal",
+                ),
+                reserved_name: None,
+            },
+            source_id: Some(
+                "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000003a",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "de2e15f2-6d42-4715-b6e7-b7a95a68abe8-0000003a",
+                ),
+                remote_id: None,
+                master_id: Some(
+                    "58",
+                ),
+            },
+            alter_id: Some(
+                "60",
+            ),
+            raw_source_sha256: "db3a418d8af4e9ae64a1fcdfbd0bcf3350a1d29dfefa3c2256b7a6cb77621052",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: None,
+        schema: None,
+        object_type: None,
+        observed_record_count: Some(
+            35,
+        ),
+        source_record_count: None,
+        identified_record_count: 35,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 35,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

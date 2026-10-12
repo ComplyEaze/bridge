@@ -125,6 +125,37 @@ impl Cost {
         }
     }
 
+    /// A call that reads its window twice, a planned read and a replay of its parts
+    /// (`ledger_movement`): the vouchers are the window's, counted once; the times
+    /// and the census reads of both are added; the floor is each read's own gaps
+    /// between consecutive census reads, so it never counts a gap that was not
+    /// between two of them.
+    fn of_replayed(first: &WindowReadTimings, second: &WindowReadTimings, ended: Ended) -> Self {
+        let a = Self::of(first, ended);
+        let b = Self::of(second, ended);
+        let marks_ms = a.marks_ms.saturating_add(b.marks_ms);
+        let census_ms = a.census_ms.saturating_add(b.census_ms);
+        let parts_ms = a.parts_ms.saturating_add(b.parts_ms);
+        let total_ms = marks_ms.saturating_add(census_ms).saturating_add(parts_ms);
+        let fit = match ended {
+            Ended::Stopped => Fit::NotEstablished,
+            Ended::Read if a.vouchers == 0 => Fit::NotEstablished,
+            Ended::Read if total_ms > DESKTOP_CALL_LIMIT_MS => Fit::TooLong,
+            Ended::Read => Fit::Fits {
+                vouchers: a.vouchers,
+            },
+        };
+        Self {
+            census_reads: a.census_reads.saturating_add(b.census_reads),
+            vouchers: a.vouchers,
+            marks_ms,
+            census_ms,
+            parts_ms,
+            floor_ms: a.floor_ms.saturating_add(b.floor_ms),
+            fit,
+        }
+    }
+
     fn total_ms(&self) -> u64 {
         self.marks_ms
             .saturating_add(self.census_ms)
@@ -179,7 +210,20 @@ fn vouchers_phrase(count: u64) -> String {
 /// The block, or `None` when the call was quick enough that nothing needs
 /// saying.
 pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Value> {
-    let cost = Cost::of(timings, ended);
+    block(Cost::of(timings, ended), ended, 1)
+}
+
+/// [`read_cost`] for a call that read its window twice, a planned read and a replay
+/// of it (`ledger_movement`): `first` and `second` are the two reads' timings.
+pub(super) fn read_cost_of_replayed(
+    first: &WindowReadTimings,
+    second: &WindowReadTimings,
+    ended: Ended,
+) -> Option<Value> {
+    block(Cost::of_replayed(first, second, ended), ended, 2)
+}
+
+fn block(cost: Cost, ended: Ended, window_reads: u64) -> Option<Value> {
     if !cost.notable() {
         return None;
     }
@@ -187,7 +231,7 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
     if let Fit::Fits { vouchers } = cost.fit {
         host_240["vouchers_that_fitted"] = json!(vouchers);
     }
-    Some(json!({
+    let mut block = json!({
         "ended": match ended {
             Ended::Read => "read",
             Ended::Stopped => "stopped",
@@ -208,8 +252,13 @@ pub(super) fn read_cost(timings: &WindowReadTimings, ended: Ended) -> Option<Val
             {"host": "claude_desktop_chat_windows", "seconds": null, "basis": "unmeasured"},
             {"host": "claude_code", "seconds": null, "basis": "default_completed_150s_two_builds_configured_60s_cut_at_60s_earlier_60s_unexplained"},
         ],
-        "say": say(&cost, ended),
-    }))
+        "say": say(&cost, ended, window_reads),
+    });
+    // Said only when it is not the usual one read, so the `vouchers` block keeps its shape.
+    if window_reads > 1 {
+        block["window_reads"] = json!(window_reads);
+    }
+    Some(block)
 }
 
 /// Adds the block to a `window` value as its `read_cost` when there is one and
@@ -224,7 +273,27 @@ pub(super) fn add_read_cost(
     ended: Ended,
     max_bytes: usize,
 ) {
-    let Some(block) = read_cost(timings, ended) else {
+    place_block(window, container_len, read_cost(timings, ended), max_bytes);
+}
+
+/// [`add_read_cost`] for a call that read its window twice (`ledger_movement`).
+pub(super) fn add_read_cost_of_replayed(
+    window: &mut Value,
+    container_len: usize,
+    (first, second): (&WindowReadTimings, &WindowReadTimings),
+    ended: Ended,
+    max_bytes: usize,
+) {
+    place_block(
+        window,
+        container_len,
+        read_cost_of_replayed(first, second, ended),
+        max_bytes,
+    );
+}
+
+fn place_block(window: &mut Value, container_len: usize, block: Option<Value>, max_bytes: usize) {
+    let Some(block) = block else {
         return;
     };
     let needed = container_len
@@ -247,8 +316,13 @@ pub(super) fn add_read_cost(
 /// is judged against that, since a page that is trimmed to fit its budget gives up
 /// rows, never the block's own refusal code or its last row.
 pub(super) fn smallest_page_len(payload: &Value) -> usize {
+    smallest_page_len_of(payload, "items")
+}
+
+/// [`smallest_page_len`] for a result whose page is the array `key` (`ledgers`).
+pub(super) fn smallest_page_len_of(payload: &Value, key: &str) -> usize {
     let whole = payload.to_string().len();
-    let Some(items) = payload["result"]["items"].as_array() else {
+    let Some(items) = payload["result"][key].as_array() else {
         return whole;
     };
     let all: usize = items.iter().map(|item| item.to_string().len() + 1).sum();
@@ -258,10 +332,15 @@ pub(super) fn smallest_page_len(payload: &Value) -> usize {
 
 /// The outcome first, then what is certain of the cost, then whether it fitted.
 /// Built from numbers and the states above, never from text of the book.
-fn say(cost: &Cost, ended: Ended) -> String {
+fn say(cost: &Cost, ended: Ended, window_reads: u64) -> String {
     let lead = match (ended, cost.vouchers) {
         (Ended::Read, vouchers) => format!(
-            "The window read took {} for {}.",
+            "The {} took {} for {}.",
+            if window_reads > 1 {
+                "two window reads"
+            } else {
+                "window read"
+            },
             seconds(lead_seconds(cost)),
             vouchers_phrase(vouchers)
         ),
@@ -281,8 +360,13 @@ fn say(cost: &Cost, ended: Ended) -> String {
         } else {
             ""
         };
+        let census = if window_reads > 1 {
+            "Across the two reads the census took"
+        } else {
+            "This book's census took"
+        };
         format!(
-            " This book's census took {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} of this call went on the gaps between them (derived).",
+            " {census} {at_least}{} reads, and the 0.5 second gate keeps consecutive reads that far apart, so at least {} of this call went on the gaps between them (derived).",
             cost.census_reads,
             seconds(cost.floor_ms / 1000)
         )
@@ -296,11 +380,17 @@ fn say(cost: &Cost, ended: Ended) -> String {
         ),
         Fit::TooLong => "That is past 240 seconds, where Claude Desktop's chat app stops a silent call (measured twice, on one Mac build). A shorter window saves the time of its vouchers but pays the same census reads, so how short is enough is not established. For totals over a long period read trial_balance, which reads no vouchers.".to_string(),
         Fit::NotEstablished => match ended {
-            Ended::Read => "No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census and is not in these figures.".to_string(),
+            Ended::Read if window_reads > 1 => "No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more by each of the two reads, a day wider on each side, to confirm it is empty; those reads pay their own census when the book is large, and are not in these figures.".to_string(),
+            Ended::Read => "No voucher was read, so what a call can carry is not established. A window with no voucher is also read once more, a day wider on each side, to confirm it is empty; that read pays its own census when the book is large, and is not in these figures.".to_string(),
             Ended::Stopped => "The read stopped, so what a call can carry is not established.".to_string(),
         },
     };
-    format!("{lead}{floor} {fit}")
+    let twice = if window_reads > 1 {
+        " This call reads the window twice, a planned read and a replay of it that proves nothing moved, and these figures add both."
+    } else {
+        ""
+    };
+    format!("{lead}{floor}{twice} {fit}")
 }
 
 #[cfg(test)]

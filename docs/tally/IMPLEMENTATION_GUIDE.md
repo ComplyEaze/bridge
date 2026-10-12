@@ -113,7 +113,7 @@ company lookups to produce a value that is constant for the entire request.
 > **Rule: never use `<COMPUTE>` to carry a per-request constant.** Company name, company GUID,
 > schema identifiers and record counts are all obtainable from a separate, cheap request — or
 > from the client that built the request in the first place. Bridge's existing
-> `company_book_extent_v1` profile already returns the verified company GUID in milliseconds.
+> `company_book_extent_v2` profile already returns the verified company GUID in milliseconds.
 
 This is the same category of error as the self-referential `$$NumItems` in §5.3b: a TDL
 construct that looks like free metadata and is actually per-row work. Both were inherited from
@@ -284,6 +284,10 @@ requires a restart.
 
 **OWNER-RULED 2026-07-30.** The wildcard outstandings profile has one narrow response-bound
 exception because a live 1,632-voucher boundary produced approximately 33.6 MiB:
+
+(October 2026: the voucher-scan outstandings read, its `VoucherOutstandingsV1` request and its
+40 MiB cap were deleted from the code; every read now has the 32 MiB cap. This section stays as
+the rule a future scan must meet.)
 
 - the general XML response cap remains **32 MiB**;
 - only the closed `VoucherOutstandingsV1` request type may use a **40 MiB** response cap;
@@ -618,6 +622,14 @@ licensed or standard TallyPrime.
 > set in place (`CREATED=0 ALTERED=1`, same GUID) for Journal, Payment, Receipt and Contra; date and
 > voucher-type replacement were observed on a Payment only. See TALLY_PROTOCOL_REFERENCE §9.3 for
 > the row-by-row table and what remains unmeasured.
+
+> **Scoped addition, 2026-10-09 (PARTIAL):** an unchanged re-import was seen again, on TallyPrime
+> Release 7.1 Silver on Windows 10, for a file Bridge built (two Receipts and four Payments) and a
+> person imported through Tally's Import screen. The six vouchers were altered in place: same GUIDs,
+> MasterIDs and numbers, AlterIDs advanced, six vouchers afterwards. On the re-import Tally's screen
+> showed only "Import successful", with no counters. The export's `REMOTEID` attribute is the voucher's own GUID
+> there too, and the file's id survives only in the narration tag. Which field Tally matched on is not
+> established. See TALLY_PROTOCOL_REFERENCE §9.3.
 
 ### 3.3b Master-name matching: directional alternatives, otherwise exact
 

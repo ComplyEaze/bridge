@@ -1,0 +1,186 @@
+# fixture: tests/fixtures/agent/native-party-balances.utf16le.xml
+# parser: parse_native_ledger_snapshot_for_company(WR2)
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "Bridge Nested Debtor WR4",
+        parent: Some(
+            "Bridge Nested Debtors WR4",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-50000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-50000.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-50000.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Cafe\u{301} NFD2 Probe WR3",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Café Naïve Traders",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-102.02",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Café NFD Probe WR3",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-12.50",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "318.56",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "WR2 Sales",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "318.56",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "WR2 XML Café Naïve Ledger 01A01A2F",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-103.03",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "नमस\u{94d}त\u{947} ट\u{94d}र\u{947}डर\u{94d}स",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-101.01",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+])

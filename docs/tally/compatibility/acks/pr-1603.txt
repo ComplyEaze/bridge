@@ -1,0 +1,3 @@
+docs/adr/0004-tally-write-safety.md
+removed-pin: src-tauri/src/db/tally_write_store.rs
+reviewer: lamemustafa

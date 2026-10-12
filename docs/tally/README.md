@@ -240,8 +240,6 @@ mode is tested as Education mode; Bridge does not bypass its restrictions.
 
 The simulator and fixture rules live in
 [`src-tauri/crates/tally-protocol-simulator`](../../src-tauri/crates/tally-protocol-simulator/README.md).
-The parser-only evidence contract lives in
-[`tools/bridge-tally-qualification`](../../tools/bridge-tally-qualification/README.md).
 The separate live-observation DTO and release gate live in
 [`tools/bridge-tally-compatibility`](../../tools/bridge-tally-compatibility/README.md).
 That crate performs no network requests. The separate

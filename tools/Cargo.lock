@@ -133,22 +133,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bridge-tally-qualification"
-version = "0.1.0"
-dependencies = [
- "bridge-tally-protocol",
- "hex",
- "libc",
- "serde",
- "serde_json",
- "sha2",
- "tally-protocol-simulator",
- "tempfile",
- "thiserror",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "bridge-tally-read-transport"
 version = "0.1.0"
 dependencies = [

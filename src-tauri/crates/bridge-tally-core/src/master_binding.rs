@@ -657,10 +657,6 @@ impl FallbackBinding {
         self.reason
     }
 
-    pub fn retained(&self) -> &[Identifier] {
-        &self.retained
-    }
-
     /// The identity to carry into a narration so the parked amount can be
     /// reallocated without re-reading the source. Empty when the source name
     /// carried no identifier at all — which is itself worth seeing.

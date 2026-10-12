@@ -12,6 +12,7 @@ use crate::geometry::Page;
 use crate::mapping::Mapping;
 use crate::money::{reconcile, statement_totals, verify_against_statement, Controls, Totals};
 use crate::parse::{parse_statement, require_account_match};
+use crate::pdf::{no_readable_text, StatementText};
 use crate::proposals::{
     build, coverage, group_counterparties, selfcheck, Build, BuildOptions, CounterpartyGroup,
     Selfcheck,
@@ -46,6 +47,34 @@ pub struct ParsedStatement {
     pub counterparties: Vec<CounterpartyGroup>,
     /// The days whose every row the statement read (see [`coverage`]).
     pub coverage: Option<(Date, Date)>,
+}
+
+/// [`prepare`] over the words read from a statement PDF.
+///
+/// A refusal is reported as `no_readable_text` when most of the PDF's own text
+/// is in render mode 3 (a scan's OCR layer, which is not read) and the rest of
+/// its text yields no statement row (its parse finds none, or refuses): a scan
+/// that also draws a stamp or page numbers gets the right next step, a text
+/// PDF, instead of a name that points at the layout. A PDF whose text that is
+/// read has rows keeps its refusal, so a request fault on a statement with a
+/// scanned page appended is named as itself; and a statement that prepares is
+/// never refused here.
+pub fn prepare_text(
+    text: &StatementText,
+    request: &StatementRequest<'_>,
+) -> Result<ParsedStatement, Refusal> {
+    prepare(text.pages(), request).map_err(|refusal| {
+        name_hidden_text(refusal, text.pages(), text.mostly_hidden(), request.bank)
+    })
+}
+
+fn name_hidden_text(refusal: Refusal, pages: &[Page], mostly_hidden: bool, bank: Bank) -> Refusal {
+    // the second parse runs only for a mostly hidden PDF
+    if mostly_hidden && !parse_statement(pages, bank).is_ok_and(|rows| !rows.is_empty()) {
+        no_readable_text()
+    } else {
+        refusal
+    }
 }
 
 /// Pages → proven proposals, or the first refusal.
@@ -98,3 +127,7 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
         coverage,
     })
 }
+
+#[cfg(test)]
+#[path = "pipeline_tests.rs"]
+mod tests;

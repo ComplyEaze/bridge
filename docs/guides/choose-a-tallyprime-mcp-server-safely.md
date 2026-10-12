@@ -64,7 +64,7 @@ ComplyEaze Bridge is our TallyPrime MCP server for Claude Desktop. In short:
   what Claude reads goes to your AI provider. Response redaction can shorten
   party and ledger names and bank account numbers or drop narrations; it does
   not hide amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
-  numbers, contact details or references.
+  numbers, contact details or references, or the last four digits of a bank statement's account number.
 - Posting is off by default for a new install; an earlier version may have
   saved it on, so check the setting. When it is on, each voucher waits for your
   approval in a separate ComplyEaze Bridge window. No ComplyEaze Bridge tool can

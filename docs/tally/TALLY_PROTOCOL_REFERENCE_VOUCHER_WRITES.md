@@ -17,6 +17,12 @@ and `PROMPT_PLAYBOOK.md` Phase 4 step 4. Their prescriptions are separate from t
 
 ### 9.8 Voucher numbering method changes everything — **use Manual**
 
+**Scope: "use Manual" applies when ComplyEaze Bridge supplies the voucher number.** A numberless
+native post is the opposite case: under Manual numbering its second voucher was given a repeated
+number or refused, and under Automatic with "Retain Original Voucher No." it was numbered in
+sequence; see "A numberless native post under Manual and Automatic numbering" at the end of this
+section.
+
 **VERIFIED.** The voucher type's numbering method silently determines both whether your
 voucher number survives and how a failed Alter behaves.
 
@@ -164,6 +170,69 @@ without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PRE
   observation, not a method, and a method outside `Automatic`, `Manual` and
   `Automatic (Manual Override)` is kept raw and never read as `Manual`
   (`native_voucher_type_numbering.rs`).
+
+**Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
+observation.**
+- Setup: a licensed TallyPrime on Windows, a synthetic company. Its Payment type, holding 32
+  Payments numbered 1 to 32, was altered from Automatic to Manual on the screen.
+- Tally asked twice before saving:
+  - "Changing the method of voucher numbering will affect voucher numbers of existing
+    transactions. Continue?"
+  - then, on saving, "Are you sure you want to update the voucher numbers of existing vouchers?
+    Y: Accept Master & Update Vouchers / N: Back".
+- **VERIFIED:** after Y, all 32 stored voucher numbers read back blank (`""`).
+  - Unchanged: every voucher's `MASTERID`, `ALTERID`, `GUID`, date, amounts and narration.
+  - The company's voucher mark (`ALTVCHID`) did not move, at 87.
+  - Only the master mark (`ALTMSTID`) moved, 224 to 226.
+  - Restoring the backup taken before the change brought the numbers back. The read after the
+    restore was byte-identical to the read before the change.
+- **VERIFIED, this sitting only:** on that type the screen showed "Prevent creating duplicate
+  Voucher Nos." as No, and the field never took focus (keyboard or mouse). So Manual with
+  duplicates prevented could not be set by hand there. The capture above shows the same field
+  set on a Payment screen elsewhere, so this is not a rule.
+- **Consequence:** a stored voucher field can change while neither the voucher's `ALTERID` nor
+  `ALTVCHID` moves.
+  - **Checked in the code, 2026-10-12:** no ComplyEaze Bridge read reuses a number across such a
+    change. The held `vouchers` pages compare both company marks, so this switch's `ALTMSTID`
+    move refuses or re-reads them; the mirror re-reads and hashes content; and the
+    `changed_since` cursor is disabled.
+  - A change that moves neither mark would still be served from held pages until they expire,
+    as already documented for them.
+  - A native post is unaffected: it supplies no voucher number, and its read-back compares the
+    number only when the batch supplied one.
+  - **Known limit:** an amendment's build-time check treats an unchanged `ALTERID` as "not
+    altered since verified", and compares the number only when the batch supplied one. So a
+    blanked number does not stop such a build. Posting an amendment natively is refused, so no
+    post follows from it.
+- Evidence: the never-merged branch `lab/1c-numbering-evidence` (`s1c-RESULT.md`,
+  `s1c-pre-payment-numbers.txt`, `s1c-after-manual-payment-numbers.txt`).
+
+**A numberless native post under Manual and Automatic numbering: verified 2026-10-12, one post per
+setting (PARTIAL; VERIFIED applies to each bullet as marked).** The rule above is about a flow that supplies the voucher number. A native post
+supplies none: it refuses a supplied `VOUCHERNUMBER` (see "Native mutation selector" above), so Tally
+numbers every voucher it creates.
+- Setup: licensed TallyPrime 7.1 Silver on Windows, new synthetic companies, each loaded alone; one
+  ComplyEaze Bridge build, `bridge_mcp` SHA-256 `411f7cca…`; single native posts with no voucher
+  number. Each type's setting was set or read on Tally's own screen.
+- **VERIFIED:** the first numberless voucher of a type is created and numbered `1`, with Manual
+  numbering and duplicates prevented (a Payment and a Journal) or allowed (a Payment).
+- **VERIFIED, Manual with duplicates allowed (Payment):** the second numberless voucher was created
+  and numbered `1` again. Both read `posted_verified`, because a post's readback compares the number
+  only when the batch supplied one.
+- **VERIFIED, Manual with duplicates prevented (Journal):** the second numberless voucher was refused
+  whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`. Tally's 538-byte answer
+  has the same SHA-256 (`09a713e2…`) as earlier whole refusals of zero-value vouchers
+  (`lab/1342-capture-answers`), so it names no cause; that the cause is the repeated number is
+  inferred.
+- **VERIFIED, Automatic with "Retain Original Voucher No." on insertion and deletion (Journal):** a
+  second numberless voucher was numbered `2`, and a third dated before both was numbered `3`. The
+  first two kept their numbers and AlterIDs, and a later read-back still read them `posted_verified`.
+- Not established: Receipt and Contra under Manual numbering; a batch; Automatic (Manual Override);
+  Multi-user Auto; Automatic set to renumber on insertion; Gold; a file imported through Tally's
+  Import menu.
+- Evidence: the never-merged branches `lab/724-m-manual-numbering-answers` (`2fd954f9`),
+  `lab/724-m3-second-voucher-answers` (`6ab6a667`) and `lab/724-m4-m5-numbering-answers`
+  (`3684c58c`, under `m5/`); bridge#724.
 
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
@@ -812,8 +881,13 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
 - **VERIFIED: the flags were read as No, Yes, No on an uncertain voucher (the tax figure of §9.17 that differed),
   and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The uncertain voucher is dated 1-Aug-2026,
   outside the narrow two-day window, so it was shown by the wider voucher read-back (the `three-vouchers` fixture),
-  not by the narrow request; the narrow request has **not** been seen to answer an uncertain voucher. The Accept As Is
-  voucher was read by both.
+  not by the narrow request. The Accept As Is voucher was read by both.
+- **VERIFIED: the narrow request answers uncertain vouchers, and shows an accept between two reads** (lab set W13,
+  12 Oct 2026, the same company, evidence on `lab/1342-w13-answers`, answers `aw13-status-window-0` and `-1`, the
+  request for 1 to 31 August 2026 and type `BRIDGE Sales`, byte for byte what the code renders). Of the 28 vouchers
+  each read returned, six read No, Yes, No in the first. `BP/26-27/0005` was then accepted as it stands on Tally's
+  screen, alone, and in the second read it was the only voucher that differed: included, not uncertain,
+  `ISGSTOVERRIDDEN` Yes, with a higher `ALTERID`.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;

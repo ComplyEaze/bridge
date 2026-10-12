@@ -33,6 +33,7 @@ use sha2::Sha256;
 use crate::book::{Book, Ledger, Voucher};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
+use crate::high_value_register::{cash_269st_rows, Direction, Row};
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::iso;
 use crate::rules::Rules;
@@ -53,7 +54,7 @@ const UNIDENTIFIED_PARTY: &str = "\u{2039}cash leg with no identified party\u{20
 const UNIDENTIFIED_PARTY_ROW: &str = "cash_payments_40a3:unidentified_party";
 
 /// The party an s.269ST row is about, as evidence: its ledger, or the no-party bucket as a row.
-fn party_ref(ledger_name: &str, row: &RowAgg<'_>) -> EvidenceRef {
+fn party_ref(ledger_name: &str, row: &Row<'_>) -> EvidenceRef {
     if ledger_name == UNIDENTIFIED_PARTY {
         EvidenceRef::with_label(
             "row",
@@ -79,10 +80,8 @@ const GROUP_BY_KIND: [(&str, &str); 5] = [
 /// pool several people's cash, and says so.
 const POOLING_LEDGER_GROUPS: [&str; 3] =
     ["Purchase Accounts", "Direct Expenses", "Indirect Expenses"];
-const SALES_ACCOUNTS_GROUP: &str = "Sales Accounts";
 const PURCHASE_ACCOUNTS_GROUP: &str = "Purchase Accounts";
 const LOANS_LIABILITY_GROUP: &str = "Loans (Liability)";
-const DUTIES_TAXES_GROUP: &str = "Duties & Taxes";
 
 fn overflow() -> AuditError {
     AuditError::Config("cash_payments_40a3: a total overflowed i64 paise".to_string())
@@ -174,13 +173,15 @@ fn evidence_for_vouchers(vouchers: &BTreeMap<(String, String), &Voucher>) -> Vec
         .collect()
 }
 
-/// Evidence refs across every voucher touched by any row in `rows`, deduplicated by GUID and label
-/// as the reference's set of refs is: two vouchers sharing a GUID (blank, or one GUID on different
-/// days) are both cited (#1134).
-fn evidence_for_rows(rows: &RowMap<'_>) -> Vec<EvidenceRef> {
+/// Evidence refs across every voucher touched by any row, given each row's voucher map, deduplicated
+/// by GUID and label as the reference's set of refs is: two vouchers sharing a GUID (blank, or one
+/// GUID on different days) are both cited (#1134).
+fn evidence_for_rows<'r, 'a: 'r>(
+    rows: impl Iterator<Item = &'r BTreeMap<(String, String), &'a Voucher>>,
+) -> Vec<EvidenceRef> {
     let mut all: BTreeSet<(String, String)> = BTreeSet::new();
-    for agg in rows.values() {
-        for ((g, _), v) in &agg.vouchers {
+    for vouchers in rows {
+        for ((g, _), v) in vouchers {
             all.insert((g.clone(), voucher_label(v)));
         }
     }
@@ -230,137 +231,6 @@ fn compute_40a3_rows<'a>(
         }
     }
     Ok((in_scope, excluded))
-}
-
-/// A voucher whose cash leg names no party, pooled by the day with every other such voucher,
-/// whatever name each prints: the row shows every usable printed name and asserts no person.
-fn pool_unidentified<'a>(
-    rows: &mut RowMap<'a>,
-    v: &'a Voucher,
-    total: i64,
-    cash: &BTreeSet<String>,
-    bank: &BTreeSet<String>,
-) -> Result<()> {
-    let row = rows
-        .entry((v.date.clone(), UNIDENTIFIED_PARTY.to_string()))
-        .or_insert_with(RowAgg::new);
-    row.add(total, v)?;
-    row.names.note(v, [cash, bank]);
-    Ok(())
-}
-
-/// party_rows: (date, party ledger name) -> aggregate, for cash RECEIVED from a party.
-pub(crate) fn compute_269st_rows<'a>(
-    pop: &[&'a Voucher],
-    book: &Book,
-    cash: &BTreeSet<String>,
-    bank: &BTreeSet<String>,
-    round_off_ledgers: &BTreeSet<String>,
-) -> Result<RowMap<'a>> {
-    let mut party_rows: RowMap = BTreeMap::new();
-    for &v in pop {
-        if v.base_type == "Contra" {
-            continue;
-        }
-        let cash_received = v
-            .lines
-            .iter()
-            .any(|l| cash.contains(&l.ledger) && l.amount_paise > 0);
-        if !cash_received {
-            continue; // no cash line debited (cash received) on this voucher
-        }
-        let mut party_amounts: BTreeMap<String, i64> = BTreeMap::new();
-        let mut fallback_total: i64 = 0;
-        for l in &v.lines {
-            if cash.contains(&l.ledger) || bank.contains(&l.ledger) || l.amount_paise >= 0 {
-                continue; // only non-cash, non-bank CREDIT lines are party candidates
-            }
-            let amt = -l.amount_paise;
-            let ledger = book.ledgers.get(&l.ledger);
-            let is_sales = ledger.is_some_and(|l2| l2.under(SALES_ACCOUNTS_GROUP));
-            let is_tax_or_roundoff = ledger.is_some_and(|l2| l2.under(DUTIES_TAXES_GROUP))
-                || round_off_ledgers.contains(&l.ledger);
-            fallback_total = fallback_total.checked_add(amt).ok_or_else(overflow)?;
-            if is_sales || is_tax_or_roundoff {
-                continue; // never itself a party; its amount stays in fallback_total only
-            }
-            let entry = party_amounts.entry(l.ledger.clone()).or_insert(0);
-            *entry = entry.checked_add(amt).ok_or_else(overflow)?;
-        }
-        if party_amounts.len() == 1 {
-            let only = party_amounts.keys().next().unwrap().clone();
-            party_amounts.insert(only, fallback_total);
-        }
-        if !party_amounts.is_empty() {
-            for (ledger_name, amt) in party_amounts {
-                let key = (v.date.clone(), ledger_name);
-                party_rows
-                    .entry(key)
-                    .or_insert_with(RowAgg::new)
-                    .add(amt, v)?;
-            }
-        } else if fallback_total > 0 {
-            pool_unidentified(&mut party_rows, v, fallback_total, cash, bank)?;
-        }
-    }
-    Ok(party_rows)
-}
-
-/// Mirrors `compute_269st_rows` for the PAYMENT leg: cash paid BY the assessee to a party.
-fn compute_269st_payment_rows<'a>(
-    pop: &[&'a Voucher],
-    book: &Book,
-    cash: &BTreeSet<String>,
-    bank: &BTreeSet<String>,
-    round_off_ledgers: &BTreeSet<String>,
-) -> Result<RowMap<'a>> {
-    let mut party_rows: RowMap = BTreeMap::new();
-    for &v in pop {
-        if v.base_type == "Contra" {
-            continue;
-        }
-        let cash_paid_out = v
-            .lines
-            .iter()
-            .any(|l| cash.contains(&l.ledger) && l.amount_paise < 0);
-        if !cash_paid_out {
-            continue;
-        }
-        let mut party_amounts: BTreeMap<String, i64> = BTreeMap::new();
-        let mut fallback_total: i64 = 0;
-        for l in &v.lines {
-            if cash.contains(&l.ledger) || bank.contains(&l.ledger) || l.amount_paise <= 0 {
-                continue;
-            }
-            let amt = l.amount_paise;
-            let ledger = book.ledgers.get(&l.ledger);
-            let is_purchase = ledger.is_some_and(|l2| l2.under(PURCHASE_ACCOUNTS_GROUP));
-            let is_tax_or_roundoff = ledger.is_some_and(|l2| l2.under(DUTIES_TAXES_GROUP))
-                || round_off_ledgers.contains(&l.ledger);
-            fallback_total = fallback_total.checked_add(amt).ok_or_else(overflow)?;
-            if is_purchase || is_tax_or_roundoff {
-                continue;
-            }
-            let entry = party_amounts.entry(l.ledger.clone()).or_insert(0);
-            *entry = entry.checked_add(amt).ok_or_else(overflow)?;
-        }
-        if party_amounts.len() == 1 {
-            let only = party_amounts.keys().next().unwrap().clone();
-            party_amounts.insert(only, fallback_total);
-        }
-        if !party_amounts.is_empty() {
-            for (ledger_name, amt) in party_amounts {
-                let key = (v.date.clone(), ledger_name);
-                party_rows
-                    .entry(key)
-                    .or_insert_with(RowAgg::new)
-                    .add(amt, v)?;
-            }
-        } else if fallback_total > 0 {
-            pool_unidentified(&mut party_rows, v, fallback_total, cash, bank)?;
-        }
-    }
-    Ok(party_rows)
 }
 
 /// A loan ledger's sides on one voucher, in the order first met: ("cr", credits) or ("dr", debits).
@@ -519,7 +389,7 @@ pub fn run(
         .filter(|(_, d)| d.paise > limit_40a3)
         .collect();
 
-    let in_scope_ev = evidence_for_rows(&in_scope_rows);
+    let in_scope_ev = evidence_for_rows(in_scope_rows.values().map(|d| &d.vouchers));
     r.fig(
         "s40a3_payee_days_any_amount_count",
         Value::Int(in_scope_count as i64),
@@ -569,7 +439,7 @@ assets and duties and taxes; the in-scope count is a subset.",
         let total: i64 = rows
             .values()
             .try_fold(0i64, |acc, d| acc.checked_add(d.paise).ok_or_else(overflow))?;
-        let ev = evidence_for_rows(rows);
+        let ev = evidence_for_rows(rows.values().map(|d| &d.vouchers));
         let group = group_for_kind(kind)?;
         r.fig(
             &format!("s40a3_excluded_total_{kind}"),
@@ -696,15 +566,22 @@ several payments."
     }
 
     // ---------------------------------------------------------------- (b) s.269ST limb (i)
-    let party_rows = compute_269st_rows(&pop, book, cash, bank, round_off_ledgers)?;
+    let party_rows = cash_269st_rows(
+        &pop,
+        book,
+        cash,
+        bank,
+        Direction::Receipt,
+        round_off_ledgers,
+    )?;
     let party_total: i64 = party_rows
         .values()
         .try_fold(0i64, |acc, d| acc.checked_add(d.paise).ok_or_else(overflow))?;
-    let rows_269st: Vec<(&(TallyDate, String), &RowAgg)> = party_rows
+    let rows_269st: Vec<(&(TallyDate, String), &Row)> = party_rows
         .iter()
         .filter(|(_, d)| d.paise >= limit_269st)
         .collect();
-    let party_ev = evidence_for_rows(&party_rows);
+    let party_ev = evidence_for_rows(party_rows.values().map(|d| &d.vouchers));
     r.fig(
         "s269st_party_days_any_amount_count",
         Value::Int(party_rows.len() as i64),
@@ -802,15 +679,22 @@ limit this day? Supply each payer's name and PAN."
     }
 
     // ---------------------------------------------------------------- (b2) s.269ST payment leg
-    let party_pay_rows = compute_269st_payment_rows(&pop, book, cash, bank, round_off_ledgers)?;
+    let party_pay_rows = cash_269st_rows(
+        &pop,
+        book,
+        cash,
+        bank,
+        Direction::Payment,
+        round_off_ledgers,
+    )?;
     let pay_total: i64 = party_pay_rows
         .values()
         .try_fold(0i64, |acc, d| acc.checked_add(d.paise).ok_or_else(overflow))?;
-    let rows_269st_pay: Vec<(&(TallyDate, String), &RowAgg)> = party_pay_rows
+    let rows_269st_pay: Vec<(&(TallyDate, String), &Row)> = party_pay_rows
         .iter()
         .filter(|(_, d)| d.paise >= limit_269st)
         .collect();
-    let pay_ev = evidence_for_rows(&party_pay_rows);
+    let pay_ev = evidence_for_rows(party_pay_rows.values().map(|d| &d.vouchers));
     r.fig(
         "s269st_payment_party_days_any_amount_count",
         Value::Int(party_pay_rows.len() as i64),
@@ -1220,5 +1104,249 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(voucher_label(&v), "Payment guid-ééééééa on 2025-06-01");
+    }
+
+    fn invented_ledger(name: &str, group: &str) -> Ledger {
+        Ledger {
+            name: name.to_string(),
+            parent: group.to_string(),
+            chain: vec![group.to_string()],
+            chain_complete: true,
+            master_opening_paise: 0,
+            guid: format!("invented-{name}"),
+            masterid: None,
+            pan: String::new(),
+            gstin: String::new(),
+        }
+    }
+
+    /// One day's cash vouchers on an invented book, for the receipt leg (cash debited, parties
+    /// credited) or the payment leg (the same lines, every amount reversed). `own` is the Sales or
+    /// Purchase ledger that is never a party on that leg, and `other` the one that is.
+    fn s269st_book(receipt: bool, own: &str, other: &str) -> Book {
+        use crate::book::{LedgerLine, VoucherStatus};
+        let sign = if receipt { 1 } else { -1 };
+        let base = if receipt { "Receipt" } else { "Payment" };
+        let voucher = |guid: &str, base_type: &str, lines: &[(&str, i64)]| Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse("20250601").unwrap(),
+            base_type: base_type.to_string(),
+            status: VoucherStatus::Regular,
+            lines: lines
+                .iter()
+                .map(|(ledger, amount_paise)| LedgerLine {
+                    ledger: (*ledger).to_string(),
+                    amount_paise: sign * amount_paise,
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let ledgers = [
+            invented_ledger("Customer A", "Sundry Debtors"),
+            invented_ledger("Customer B", "Sundry Debtors"),
+            invented_ledger("Customer C", "Sundry Debtors"),
+            invented_ledger("Customer D", "Sundry Debtors"),
+            invented_ledger("Customer E", "Sundry Debtors"),
+            invented_ledger("Sales", "Sales Accounts"),
+            invented_ledger("Purchases", "Purchase Accounts"),
+            invented_ledger("GST", "Duties & Taxes"),
+            invented_ledger("Round Off", "Indirect Expenses"),
+            invented_ledger("Loan X", "Loans (Liability)"),
+        ];
+        let mut vouchers = vec![
+            // One party, so it takes the whole voucher, the own ledger's Rs 50,000 included.
+            voucher(
+                "g1",
+                base,
+                &[
+                    ("Cash", 15_000_000),
+                    ("Customer A", -10_000_000),
+                    (own, -5_000_000),
+                ],
+            ),
+            // The same party on the same day: the two vouchers make one row of Rs 2.1 lakh.
+            voucher(
+                "g2",
+                base,
+                &[("Cash", 6_000_000), ("Customer A", -6_000_000)],
+            ),
+            // Two parties, so none takes the tax line.
+            voucher(
+                "g3",
+                base,
+                &[
+                    ("Cash", 10_000_000),
+                    ("Customer B", -4_000_000),
+                    ("Customer C", -4_000_000),
+                    ("GST", -2_000_000),
+                ],
+            ),
+            // A round-off line is never a party but stays in the voucher's total.
+            voucher(
+                "g4",
+                base,
+                &[
+                    ("Cash", 1_000_100),
+                    ("Customer D", -1_000_000),
+                    ("Round Off", -100),
+                ],
+            ),
+            // No party at all: pooled as the unidentified row.
+            voucher(
+                "g5",
+                base,
+                &[
+                    ("Cash", 30_000_000),
+                    (own, -25_000_000),
+                    ("GST", -5_000_000),
+                ],
+            ),
+            // A Contra is never a row, and neither is a voucher with no cash line.
+            voucher(
+                "g6",
+                "Contra",
+                &[("Cash", 30_000_000), ("Customer A", -30_000_000)],
+            ),
+            voucher(
+                "g7",
+                base,
+                &[("Bank", 30_000_000), ("Customer A", -30_000_000)],
+            ),
+            // The other leg's Sales or Purchase ledger is a party, and so is a loan ledger.
+            voucher("g8", base, &[("Cash", 2_000_000), (other, -2_000_000)]),
+            voucher("g9", base, &[("Cash", 1_000_000), ("Loan X", -1_000_000)]),
+            // Pooled with g5: it prints the bank ledger, which names no one.
+            voucher("ga", base, &[("Cash", 1_000), (own, -1_000)]),
+            // A bank line on a cash voucher is never a party, and stays out of the total.
+            voucher(
+                "gc",
+                base,
+                &[
+                    ("Cash", 10_000_000),
+                    ("Bank", -3_000_000),
+                    ("Customer E", -7_000_000),
+                ],
+            ),
+            // The same party on the next day is a row of its own.
+            voucher(
+                "gb",
+                base,
+                &[("Cash", 5_000_000), ("Customer A", -5_000_000)],
+            ),
+        ];
+        for v in &mut vouchers {
+            match v.guid.as_str() {
+                "g5" => v.party_field = "Walk-in".to_string(),
+                "ga" => v.party_field = "Bank".to_string(),
+                "gb" => v.date = TallyDate::parse("20250602").unwrap(),
+                _ => {}
+            }
+        }
+        Book {
+            ledgers: ledgers.into_iter().map(|l| (l.name.clone(), l)).collect(),
+            vouchers,
+            ..Default::default()
+        }
+    }
+
+    /// The s.269ST rows of `s269st_book`, read through `run`: nine rows, two of them at the limit,
+    /// and 75,001,100 paise in all.
+    fn check_s269st_leg(receipt: bool) {
+        let (own, other) = if receipt {
+            ("Sales", "Purchases")
+        } else {
+            ("Purchases", "Sales")
+        };
+        let prefix = if receipt { "s269st" } else { "s269st_payment" };
+        let rules = Rules::vendored().unwrap();
+        assert_eq!(rules.s269st_limit_per_person_per_day_paise, 20_000_000);
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|n| (*n).to_string()).collect()
+        };
+        let r = run(
+            &s269st_book(receipt, own, other),
+            &rules,
+            &set(&["Cash"]),
+            &set(&["Bank"]),
+            &BTreeSet::new(),
+            &set(&["Round Off"]),
+        )
+        .unwrap();
+        let fig = |name: &str| {
+            let id = format!("{TEST_ID}.{name}");
+            r.figures.iter().find(|f| f.id == id).unwrap()
+        };
+        assert!(matches!(
+            fig(&format!("{prefix}_party_days_any_amount_count")).value,
+            Value::Int(9)
+        ));
+        let total = fig(&format!("{prefix}_party_days_any_amount_total"));
+        assert!(matches!(total.value, Value::Int(75_001_100)));
+        // g6 (Contra) and g7 (no cash line) are cited nowhere.
+        let cited: Vec<&str> = total.evidence.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            cited,
+            ["g1", "g2", "g3", "g4", "g5", "g8", "g9", "ga", "gb", "gc"]
+        );
+        let over = format!("{prefix}_at_or_over_limit_count");
+        assert!(matches!(fig(&over).value, Value::Int(2)));
+
+        let findings: Vec<&Finding> = r
+            .findings
+            .iter()
+            .filter(|f| f.id.starts_with(&format!("{TEST_ID}/{prefix}/")))
+            .collect();
+        assert_eq!(findings.len(), 2);
+        assert!(findings
+            .iter()
+            .all(|f| f.id.starts_with(&format!("{TEST_ID}/{prefix}/2025-06-01_"))));
+        let amount = |f: &Finding| {
+            let id = &f.facts[0].1;
+            match r.figures.iter().find(|g| &g.id == id).unwrap().value {
+                Value::Int(v) => v,
+                _ => panic!("not an integer"),
+            }
+        };
+        let named = findings
+            .iter()
+            .find(|f| f.evidence.iter().any(|e| e.kind == "ledger"))
+            .unwrap();
+        assert!(named
+            .evidence
+            .iter()
+            .any(|e| e.kind == "ledger" && e.id == "Customer A"));
+        assert_eq!(amount(named), 21_000_000);
+        let unnamed = findings
+            .iter()
+            .find(|f| f.evidence.iter().any(|e| e.kind == "row"))
+            .unwrap();
+        assert!(unnamed
+            .evidence
+            .iter()
+            .any(|e| e.kind == "row" && e.id == UNIDENTIFIED_PARTY_ROW));
+        assert_eq!(amount(unnamed), 30_001_000);
+        // The pooled row shows the one usable printed name, and that a voucher printed none.
+        let row = unnamed.evidence.iter().find(|e| e.kind == "row").unwrap();
+        assert_eq!(
+            row.label,
+            format!(
+                "{UNIDENTIFIED_PARTY} (printed as 'Walk-in', and vouchers printing no usable name)"
+            )
+        );
+    }
+
+    /// Characterises the receipt leg of the s.269ST walk (`high_value_register::cash_269st_rows`),
+    /// so a mutation of the shared walk is killed by a `cash_payments_40a3` test as well as by the
+    /// edge books.
+    #[test]
+    fn the_s269st_receipt_rows_are_the_parties_a_cash_receipt_names() {
+        check_s269st_leg(true);
+    }
+
+    /// The same for the payment leg: Purchase Accounts, not Sales Accounts, is the ledger that is
+    /// never a party.
+    #[test]
+    fn the_s269st_payment_rows_are_the_parties_a_cash_payment_names() {
+        check_s269st_leg(false);
     }
 }

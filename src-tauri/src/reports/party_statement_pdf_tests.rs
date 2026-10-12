@@ -1,5 +1,5 @@
 use super::*;
-use crate::reports::party_statement::build_party_statement;
+use crate::reports::party_statement::{build_party_statement_with_ageing_anchor, subtotals_sum};
 use crate::reports::party_statement_xlsx::render_party_statement_xlsx;
 use crate::tally::{ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor, UnallocatedParty};
 use bridge_tally_core::ExactDecimal;
@@ -153,12 +153,13 @@ fn xlsx_sheet_xml(xlsx: &[u8]) -> String {
 
 #[test]
 fn renders_extractable_inr_text_instead_of_an_unsupported_rupee_glyph() {
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &[bill("INV-1", "1250.75", 40)],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -170,12 +171,13 @@ fn renders_extractable_inr_text_instead_of_an_unsupported_rupee_glyph() {
 
 #[test]
 fn pdf_and_xlsx_disclose_the_statement_selected_ageing_basis() {
-    let mut statement = build_party_statement(
+    let mut statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &[bill("INV-1", "1250.75", 40)],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
     statement.ageing_anchor = OutstandingsAgeingAnchor::BillDate;
@@ -193,12 +195,13 @@ fn pdf_and_xlsx_disclose_the_statement_selected_ageing_basis() {
 fn renders_bill_direction_for_mixed_party_documents() {
     let mut payable = bill("BILL-1", "1250.75", 40);
     payable.kind = ExposureDirection::Payable;
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &[bill("INV-1", "1250.75", 40), payable],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -212,12 +215,13 @@ fn renders_bill_direction_for_mixed_party_documents() {
 fn mixed_direction_bucket_subtotals_are_explicit_in_both_formats() {
     let mut payable = bill("BILL-80", "80.00", 20);
     payable.kind = ExposureDirection::Payable;
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &[bill("INV-100", "100.00", 20), payable],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -231,7 +235,7 @@ fn mixed_direction_bucket_subtotals_are_explicit_in_both_formats() {
     assert!(xlsx_text.contains("Ageing subtotals by direction (magnitudes; not net)"));
     assert!(xlsx_text.contains("Receivable | 0-30 days"));
     assert!(xlsx_text.contains("Payable | 0-30 days"));
-    assert_eq!(statement.subtotals.total().unwrap(), statement.bill_total);
+    assert_eq!(subtotals_sum(&statement.subtotals), statement.bill_total);
 }
 
 #[test]
@@ -244,8 +248,15 @@ fn long_company_identity_cannot_evict_party_from_continuation_headers() {
             source_bill
         })
         .collect::<Vec<_>>();
-    let statement =
-        build_party_statement(&company, "20260808", "Bounded Party", &bills, &[]).unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        &company,
+        "20260808",
+        "Bounded Party",
+        &bills,
+        &[],
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
 
     let header = page_header_identity_lines(&statement)
         .into_iter()
@@ -271,7 +282,15 @@ fn pathological_identities_keep_party_counter_and_width_bounds() {
             source_bill
         })
         .collect::<Vec<_>>();
-    let statement = build_party_statement(&company, "20260808", &party, &bills, &[]).unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        &company,
+        "20260808",
+        &party,
+        &bills,
+        &[],
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
 
     let pdf = render_party_statement_pdf(&statement).unwrap();
     let header = page_header_identity_lines(&statement)
@@ -293,12 +312,13 @@ fn long_party_and_bill_names_are_wrapped_without_being_clipped() {
         "SYNTHETIC-REFERENCE-WITH-A-DELIBERATELY-LONG-BILL-NAME-THAT-MUST-WRAP-WITHOUT-CLIPPING";
     let mut source_bill = bill(long_reference, "1.00", 1);
     source_bill.party = long_party.to_string();
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         long_party,
         &[source_bill],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -313,12 +333,13 @@ fn long_party_and_bill_names_are_wrapped_without_being_clipped() {
 #[test]
 fn wide_win_ansi_bill_reference_never_exceeds_the_printable_width() {
     let reference = string_from_codepoints(&[0x00c6; 40]);
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &[bill(&reference, "1.00", 1)],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -333,12 +354,13 @@ fn non_identity_win_ansi_scalars_degrade_visibly() {
             string_from_codepoints(&[0x0050, 0x0061, 0x0072, 0x0074, 0x0079, 0x0020, codepoint]);
         let mut source_bill = bill("INV-1", "1.00", 1);
         source_bill.party = party.clone();
-        let statement = build_party_statement(
+        let statement = build_party_statement_with_ageing_anchor(
             "Synthetic Books Pvt Ltd",
             "20260808",
             &party,
             &[source_bill],
             &[],
+            OutstandingsAgeingAnchor::DueDate,
         )
         .unwrap();
 
@@ -369,12 +391,13 @@ fn every_pdf_page_repeats_the_statement_identity() {
     let bills = (0..110)
         .map(|index| bill(&format!("INV-{index:03}"), "1.00", 1))
         .collect::<Vec<_>>();
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &bills,
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -402,12 +425,13 @@ fn xlsx_and_pdf_render_the_same_model_total() {
         opening_balance: None,
         composition: None,
     }];
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &bills,
         &unallocated,
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -430,12 +454,13 @@ fn renders_not_due_and_unallocated_direction_in_the_pdf_text() {
         opening_balance: None,
         composition: None,
     }];
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &[future_due],
         &unallocated,
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
     let pdf = render_party_statement_pdf(&statement).unwrap();
@@ -457,22 +482,24 @@ fn unrepresentable_party_name_keeps_the_document_bills_and_totals() {
     ]);
     let mut source_bill = bill("INV-1", "10.00", 5);
     source_bill.party = party.to_string();
-    let unrepresentable = build_party_statement(
+    let unrepresentable = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         &party,
         &[source_bill],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
     let mut ascii_bill = bill("INV-1", "10.00", 5);
     ascii_bill.party = "ASCII Party".to_string();
-    let ascii = build_party_statement(
+    let ascii = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "ASCII Party",
         &[ascii_bill],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -506,12 +533,13 @@ fn every_aarav_ledger_name_renders_in_both_statement_formats() {
     for ledger in ledgers {
         let mut source_bill = bill("INV-1", "10.00", 5);
         source_bill.party = ledger.name.clone();
-        let statement = build_party_statement(
+        let statement = build_party_statement_with_ageing_anchor(
             "Synthetic Books Pvt Ltd",
             "20260808",
             &ledger.name,
             &[source_bill],
             &[],
+            OutstandingsAgeingAnchor::DueDate,
         )
         .expect("a billed fixture ledger produces a statement");
 
@@ -539,12 +567,13 @@ fn ageing_subtotals_are_rendered_exactly_in_both_formats() {
         bill("D90", "40.125", 91),
         not_yet_due,
     ];
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         "Synthetic Party",
         &bills,
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -581,7 +610,7 @@ fn ageing_subtotals_are_rendered_exactly_in_both_formats() {
             assert!(xlsx_xml.contains(&format!("<v>{}</v>", subtotal.as_str())));
         }
     }
-    assert_eq!(statement.subtotals.total().unwrap(), statement.bill_total);
+    assert_eq!(subtotals_sum(&statement.subtotals), statement.bill_total);
 }
 
 #[test]
@@ -594,8 +623,15 @@ fn degraded_multi_page_headers_wrap_identity_and_keep_every_page_counter() {
             source_bill
         })
         .collect::<Vec<_>>();
-    let statement =
-        build_party_statement("Synthetic Books Pvt Ltd", "20260808", &party, &bills, &[]).unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        "Synthetic Books Pvt Ltd",
+        "20260808",
+        &party,
+        &bills,
+        &[],
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
 
     let header_lines = page_header_identity_lines(&statement);
     assert!(header_lines.len() > 1);
@@ -648,12 +684,13 @@ fn rendered_pdf_declares_win_ansi_and_emits_its_extended_bytes() {
     ]);
     let mut source_bill = bill("INV-1", "10.00", 5);
     source_bill.party = party.clone();
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "20260808",
         &party,
         &[source_bill],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
 
@@ -680,12 +717,13 @@ fn string_from_codepoints(codepoints: &[u32]) -> String {
 
 #[test]
 fn invalid_statement_date_fails_instead_of_using_a_default() {
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Synthetic Books Pvt Ltd",
         "not-a-date",
         "Synthetic Party",
         &[bill("INV-1", "10.00", 5)],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .expect("the renderer owns document-date validation");
 

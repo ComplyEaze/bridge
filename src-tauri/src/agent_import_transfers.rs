@@ -11,7 +11,7 @@
 //! leaves this module.
 use super::*;
 use crate::agent::transfer_pairing::{
-    transfer_pairing_view, DoubleBookedClass, SkipState, TransferView,
+    transfer_pairing_view, DoubleBookedClass, SkipKey, SkipState, TransferView,
 };
 use statement_facts::{Candidate, TransferFacts, TransferFactsError};
 
@@ -150,7 +150,7 @@ impl TransferSummary {
     /// The section, with as many open rows as `available` bytes hold once its
     /// frame is paid for. The rows that do not fit are counted, and the step for
     /// that says how to see them.
-    pub(super) fn render(&self, available: usize) -> Value {
+    pub(super) fn render(&self, available: usize, recorded: bool) -> Value {
         let Self::Computed {
             paired,
             skips_open,
@@ -160,7 +160,11 @@ impl TransferSummary {
         else {
             return json!({
                 "state": "not_established",
-                "next_steps": {"check_not_run": CHECK_NOT_RUN_STEP},
+                "next_steps": {"check_not_run": if recorded {
+                    CHECK_NOT_RUN_RECORDED_STEP
+                } else {
+                    CHECK_NOT_RUN_STEP
+                }},
             });
         };
         let mut next_steps = serde_json::Map::new();
@@ -205,9 +209,12 @@ impl TransferSummary {
 }
 
 const NOT_ESTABLISHED_STEP: &str = "Whether the other account's Contra exists is not established. Verify any batch of the other account's statement for this date first; build that statement only if no batch of it exists.";
-/// The whole check could not run, which says nothing of any one row.
+/// The whole check could not run, which says nothing of any one row. A batch
+/// that was written, or a verification, is checked again by verifying it.
 const CHECK_NOT_RUN_STEP: &str =
-    "The transfer check could not run this time; call verify_import again.";
+    "The transfer check could not run this time; run verify_import on this batch again.";
+/// A statement of only skipped rows has no batch to verify.
+const CHECK_NOT_RUN_RECORDED_STEP: &str = "The skipped rows are recorded; the transfer check will show on the next build or verification for this company.";
 const OPEN_OMITTED_STEP: &str =
     "Some open rows are not listed because the response is full. Raise BRIDGE_AGENT_MAX_BYTES to list every open row.";
 
@@ -243,8 +250,8 @@ pub(in crate::agent) fn counts_only_section(section: &Value) -> Value {
 
 /// What a section says when nothing of it fits: that the check is to be run
 /// again. It claims no count.
-pub(in crate::agent) fn check_not_run_section() -> Value {
-    TransferSummary::NotEstablished.render(0)
+pub(in crate::agent) fn check_not_run_section(recorded: bool) -> Value {
+    TransferSummary::NotEstablished.render(0, recorded)
 }
 
 /// What to do about an open row of each state, for the assistant to follow.
@@ -320,9 +327,23 @@ pub(super) struct TransferInput {
     pub(super) own_lineage: Option<String>,
     /// The build carries a statement's facts.
     pub(super) carries_statement: bool,
+    /// The endpoint the build reads, which a skip must share to be this
+    /// build's skip: one statement read through two endpoints is two skips.
+    pub(super) endpoint: String,
+    /// The bank ledger the build's statement is of, when it is of one.
+    pub(super) bank_ledger: Option<String>,
 }
 
 impl TransferInput {
+    /// A skip of the endpoint and bank this build reads.
+    fn is_ours(&self, key: &SkipKey) -> bool {
+        key.endpoint_origin.as_str() == self.endpoint
+            && self
+                .bank_ledger
+                .as_deref()
+                .is_none_or(|bank| key.bank_ledger.as_str() == bank)
+    }
+
     pub(super) fn candidate_build(&self) -> Option<&str> {
         match &self.candidate {
             Candidate::Build(line) => Some(line.batch_id.as_str()),
@@ -357,8 +378,26 @@ const SKIP_ROW_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing
 const SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP: &str = "No file was written and nothing was recorded. This build posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Do not post these rows. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf.";
 const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing was recorded. Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch sent to Tally or found posted, or in a statement of only skipped rows) and a voucher of this build. Build again with withdraw_skips naming only rows that are both, or without it.";
 const WITHDRAW_SKIP_PAIRED_NEXT_STEP: &str = "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.";
+const WITHDRAW_SKIP_UNVERIFIED_NEXT_STEP: &str = "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row.";
+const WITHDRAW_SKIP_BOTH_NEXT_STEP: &str = "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first. Do not post these rows.";
 const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing was recorded. A Contra in this build carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Posting both books it twice. Do not build this Contra: run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger) and build again.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and nothing was recorded. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this build books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this can come only from a defect in it: report it with the error named here, and do not build this statement again until it is fixed.";
+
+/// What to do about withdrawn rows the other account's statement carries, by
+/// whether its Contra is found posted or waits in a batch not yet verified.
+fn withdraw_paired_step(rows: &[Value]) -> &'static str {
+    let unverified = rows
+        .iter()
+        .filter(|row| row["state"] == "other_side_unverified")
+        .count();
+    if unverified == 0 {
+        WITHDRAW_SKIP_PAIRED_NEXT_STEP
+    } else if unverified == rows.len() {
+        WITHDRAW_SKIP_UNVERIFIED_NEXT_STEP
+    } else {
+        WITHDRAW_SKIP_BOTH_NEXT_STEP
+    }
+}
 
 /// The most `st-` ids a refusal lists.
 const REFUSAL_ROWS_LISTED: usize = 50;
@@ -468,6 +507,7 @@ impl Server {
         let live: BTreeSet<&str> = before
             .live_skips
             .iter()
+            .filter(|key| input.is_ours(key))
             .map(|key| key.row.as_str())
             .collect();
         let invalid: Vec<String> = input
@@ -492,22 +532,28 @@ impl Server {
             .iter()
             .filter_map(|row| {
                 before_view.skips.iter().find_map(|(key, state)| {
-                    let batch = match state {
-                        SkipState::Paired { contra, .. } => &contra.batch,
-                        SkipState::OtherSideUnverified { batch } => batch,
+                    if key.row.as_str() != row || !input.is_ours(key) {
+                        return None;
+                    }
+                    let (batch, label) = match state {
+                        SkipState::Paired { contra, .. } => (&contra.batch, "paired"),
+                        SkipState::OtherSideUnverified { batch } => {
+                            (batch, "other_side_unverified")
+                        }
                         _ => return None,
                     };
-                    (key.row.as_str() == row)
-                        .then(|| json!({"bridge_txn_id": row, "batch_id": batch.as_str()}))
+                    Some(json!({"bridge_txn_id": row, "batch_id": batch.as_str(),
+                        "state": label}))
                 })
             })
             .collect();
         if !carried.is_empty() {
+            let next_step = withdraw_paired_step(&carried);
             let (listed, omitted) = rows_listed_json(carried);
             return Ok(Admission::Refused(TransferRefusal {
                 reason: "withdraw_skip_paired",
                 detail: json!({"paired_rows": listed, "paired_rows_omitted": omitted}),
-                next_step: WITHDRAW_SKIP_PAIRED_NEXT_STEP,
+                next_step,
             }));
         }
         let paired_elsewhere: Vec<String> = input
@@ -566,7 +612,10 @@ impl Server {
                     TransferSummary::of(&facts, &view)
                 })
         };
-        summary.render(transfers_budget(self.settings.max_bytes, essential_len))
+        summary.render(
+            transfers_budget(self.settings.max_bytes, essential_len),
+            false,
+        )
     }
 }
 

@@ -204,7 +204,7 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
 
 #[test]
 fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
-    let section = summary_of(&every_state()).render(usize::MAX);
+    let section = summary_of(&every_state()).render(usize::MAX, false);
     assert_eq!(section["state"], "computed");
     assert_eq!(section["skips_paired"], 1);
     assert_eq!(section["skips_open"], 6);
@@ -293,14 +293,14 @@ fn each_next_step_says_what_was_decided() {
 
 #[test]
 fn a_section_that_cannot_be_computed_says_so_and_claims_nothing() {
-    let section = TransferSummary::NotEstablished.render(usize::MAX);
+    let section = TransferSummary::NotEstablished.render(usize::MAX, false);
     assert_eq!(section["state"], "not_established");
     for claim in ["skips_paired", "skips_open", "open", "retired"] {
         assert!(section.get(claim).is_none(), "{claim} in {section}");
     }
     assert_eq!(
         section["next_steps"],
-        json!({"check_not_run": "The transfer check could not run this time; call verify_import again."})
+        json!({"check_not_run": "The transfer check could not run this time; run verify_import on this batch again."})
     );
 }
 
@@ -323,14 +323,14 @@ fn many_open(count: usize) -> TransferSummary {
 #[test]
 fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
     let summary = many_open(30);
-    let everything = summary.render(usize::MAX);
+    let everything = summary.render(usize::MAX, false);
     assert_eq!(everything["open"].as_array().unwrap().len(), 30);
     assert_eq!(everything["open_omitted"], 0);
     assert!(everything["next_steps"].get("open_omitted").is_none());
     let full = everything.to_string().len();
     // a section never exceeds a budget that holds its frame
     for available in [full / 2, full / 3, full / 4] {
-        let section = summary.render(available);
+        let section = summary.render(available, false);
         let listed = section["open"].as_array().unwrap().len();
         assert!(listed > 0 && listed < 30, "{available}: {listed}");
         assert_eq!(section["open_omitted"], 30 - listed);
@@ -345,7 +345,7 @@ fn a_budget_cuts_the_open_rows_and_counts_what_it_left_out() {
         let step = section["next_steps"]["open_omitted"].as_str().unwrap();
         assert!(step.contains("BRIDGE_AGENT_MAX_BYTES"), "{step}");
     }
-    let none = summary.render(0);
+    let none = summary.render(0, false);
     assert_eq!(none["open"], json!([]));
     assert_eq!(none["open_omitted"], 30);
     assert!(none["next_steps"]["open_omitted"].is_string());
@@ -486,14 +486,14 @@ fn trimming_a_section_adds_to_what_was_already_left_out() {
     let TransferSummary::Computed { .. } = many_open(10) else {
         panic!("computed");
     };
-    let mut section = many_open(10).render(usize::MAX);
+    let mut section = many_open(10).render(usize::MAX, false);
     section["open_omitted"] = json!(5);
     let trimmed = trim_section(&section, 3);
     assert_eq!(trimmed["open"].as_array().unwrap().len(), 3);
     assert_eq!(trimmed["open_omitted"], 12);
     assert!(trimmed["next_steps"]["open_omitted"].is_string());
     // keeping every row of a section that left nothing out changes nothing
-    let whole = many_open(10).render(usize::MAX);
+    let whole = many_open(10).render(usize::MAX, false);
     assert_eq!(trim_section(&whole, 10), whole);
     assert_eq!(trim_section(&whole, 99), whole);
     // counts only: no step texts, and no step for rows not cut
@@ -507,6 +507,39 @@ fn trimming_a_section_adds_to_what_was_already_left_out() {
             .collect::<Vec<_>>(),
         ["open_omitted"]
     );
-    let empty = many_open(0).render(usize::MAX);
+    let empty = many_open(0).render(usize::MAX, false);
     assert_eq!(counts_only_section(&empty)["next_steps"], json!({}));
+}
+
+#[test]
+fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
+    let row = |state: &str| json!({"bridge_txn_id": "st-x", "batch_id": "b", "state": state});
+    let paired = withdraw_paired_step(&[row("paired")]);
+    let waiting = withdraw_paired_step(&[row("other_side_unverified")]);
+    let both = withdraw_paired_step(&[row("paired"), row("other_side_unverified")]);
+    assert!(paired.contains("already carries this row as a Contra"));
+    assert!(!paired.contains("not verified yet"));
+    assert!(waiting.contains("which is not verified yet. Run verify_import on that batch first"));
+    assert!(!waiting.contains("already carries"));
+    assert!(both.contains("state paired") && both.contains("state other_side_unverified"));
+    assert_ne!(paired, waiting);
+    assert_ne!(both, paired);
+    assert_ne!(both, waiting);
+    for step in [paired, waiting, both] {
+        assert!(step.contains("do not post this row") || step.contains("Do not post these rows"));
+    }
+}
+
+#[test]
+fn a_section_that_did_not_run_names_the_call_that_made_it() {
+    let batch = TransferSummary::NotEstablished.render(0, false);
+    assert_eq!(
+        batch["next_steps"]["check_not_run"],
+        "The transfer check could not run this time; run verify_import on this batch again."
+    );
+    let recorded = TransferSummary::NotEstablished.render(0, true);
+    assert_eq!(
+        recorded["next_steps"]["check_not_run"],
+        "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
 }

@@ -660,7 +660,7 @@ fn a_section_that_cannot_keep_its_texts_keeps_its_counts_and_then_only_a_note() 
         ["open_omitted"]
     );
     // room for nothing but a note that the check is to be run again
-    let cap = len_of(&with(check_not_run_section()));
+    let cap = len_of(&with(check_not_run_section(false)));
     let mut note = with(section);
     assert!(fit_response(&mut note, "", cap, |value| len_of(value)).unwrap());
     let kept = &note["result"]["transfers"];
@@ -687,4 +687,123 @@ fn a_section_that_already_fits_or_is_not_computed_is_left_alone() {
     assert!(fit_response(&mut paged, "", 300, |value| len_of(value)).unwrap());
     assert!(paged["result"]["items"].as_array().unwrap().len() < 50);
     assert_eq!(paged["result"]["transfers"], before);
+}
+
+// ---- the section is fitted again into what a trimmed page leaves ----------------
+
+fn verify_page(items: usize, section: Value) -> Value {
+    json!({"result": {
+        "verification_status": "posted_verified", "counts": {"posted_verified": items},
+        "offset": 0,
+        "items": (0..items)
+            .map(|id| json!({"id": id, "padding": "x".repeat(300)}))
+            .collect::<Vec<_>>(),
+        "transfers": section,
+    }})
+}
+
+/// A page whose own rows exceed the cap: the check did run, so the section
+/// stays computed, widened into what the trimmed page leaves.
+#[test]
+fn a_page_cut_to_the_cap_leaves_its_computed_section_as_wide_as_the_room_allows() {
+    let section = transfers_section(40);
+    let mut response = verify_page(30, section.clone());
+    let cap = 4_000;
+    assert!(len_of(&response) > cap);
+    assert!(len_of(&verify_page(30, counts_only_section(&section))) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    // the page is cut, its verdict is not
+    let kept = response["result"]["items"].as_array().unwrap().len();
+    assert!(kept >= 1 && kept < 30, "{kept}");
+    assert_eq!(response["result"]["verification_status"], "posted_verified");
+    assert_eq!(response["result"]["counts"], json!({"posted_verified": 30}));
+    // the check ran: the section is computed, with every open row kept or counted
+    let shown = &response["result"]["transfers"];
+    assert_eq!(shown["state"], "computed");
+    assert_eq!(shown["skips_open"], 40);
+    let rows = shown["open"].as_array().unwrap().len();
+    assert_eq!(shown["open_omitted"], 40 - rows);
+    // and it is as wide as the trimmed page leaves room for
+    let mut wider = response.clone();
+    wider["result"]["transfers"] = trim_section(&section, rows + 1);
+    assert!(rows == 40 || len_of(&wider) > cap, "{rows}");
+}
+
+#[test]
+fn a_page_cut_to_the_cap_keeps_its_counts_when_no_row_fits_beside_it() {
+    let section = transfers_section(40);
+    let mut response = verify_page(30, section.clone());
+    // one page row and the counts, and no room for an open row
+    let mut one = verify_page(1, counts_only_section(&section));
+    one["result"]["offset"] = json!(0);
+    let cap = len_of(&one) + 40;
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 1);
+    let shown = &response["result"]["transfers"];
+    assert_eq!(shown["state"], "computed");
+    assert_eq!(shown["open"], json!([]));
+    assert_eq!(shown["open_omitted"], 40);
+}
+
+#[test]
+fn a_page_cut_to_the_cap_says_the_check_is_to_be_run_again_only_when_not_even_counts_fit() {
+    let section = transfers_section(40);
+    let mut response = verify_page(30, section.clone());
+    let one = verify_page(1, check_not_run_section(false));
+    let cap = len_of(&one) + 40;
+    assert!(len_of(&verify_page(1, counts_only_section(&section))) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    assert_eq!(response["result"]["transfers"]["state"], "not_established");
+}
+
+/// `truncated` on the whole answer stays true when only the section's rows were
+/// cut: something was left out, and the flag is the conservative reading.
+#[test]
+fn cutting_only_the_section_still_reports_that_something_was_cut() {
+    let mut response = json!({"result": {"batch_id": "bridge-x",
+        "transfers": transfers_section(300)}});
+    let cap = 3_000;
+    let (fitted, truncated, _) = enforce_response_byte_cap(response.clone(), cap).unwrap();
+    assert!(truncated);
+    assert!(
+        fitted["result"]["transfers"]["open_omitted"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    // a section that already fits reports nothing cut
+    response["result"]["transfers"] = transfers_section(2);
+    let (_, truncated, _) = enforce_response_byte_cap(response, 100_000).unwrap();
+    assert!(!truncated);
+}
+
+#[test]
+fn the_note_that_the_check_did_not_run_names_the_call_that_made_it() {
+    let batch = check_not_run_section(false);
+    assert_eq!(
+        batch["next_steps"]["check_not_run"],
+        "The transfer check could not run this time; run verify_import on this batch again."
+    );
+    let recorded = check_not_run_section(true);
+    assert_eq!(
+        recorded["next_steps"]["check_not_run"],
+        "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
+}
+
+#[test]
+fn a_recorded_statement_that_cannot_keep_its_section_is_told_the_next_call_will_show_it() {
+    let section = transfers_section(40);
+    let with = |section: Value| json!({"result": {"state": "skips_recorded", "record_id": "skips-x", "transfers": section}});
+    let cap = len_of(&with(check_not_run_section(true)));
+    assert!(len_of(&with(counts_only_section(&section))) > cap);
+    let mut response = with(section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(
+        response["result"]["transfers"]["next_steps"]["check_not_run"],
+        "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
 }

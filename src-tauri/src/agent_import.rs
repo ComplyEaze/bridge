@@ -1021,6 +1021,11 @@ impl Server {
             let transfers = match self.admit_transfers_while_admitted(transfers::TransferInput {
                 company_guid: company_guid.clone(),
                 carries_statement: statement_record.is_some(),
+                endpoint: origin.clone(),
+                bank_ledger: statement_record
+                    .as_ref()
+                    .and_then(|record| record["bank_ledger_guid"].as_str())
+                    .map(str::to_string),
                 skip_rows: resolved
                     .statement
                     .iter()
@@ -1347,10 +1352,10 @@ impl Server {
             // Computed before the append, with this build in it: nothing after
             // the append can turn a written build into a refusal.
             let essential = payload.to_string().len();
-            payload["result"]["transfers"] = transfers.render(transfers::transfers_budget(
-                self.settings.max_bytes,
-                essential,
-            ));
+            payload["result"]["transfers"] = transfers.render(
+                transfers::transfers_budget(self.settings.max_bytes, essential),
+                false,
+            );
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),
@@ -1439,6 +1444,8 @@ impl Server {
                 withdraw,
                 own_lineage: None,
                 carries_statement: true,
+                endpoint: record.endpoint_origin.clone(),
+                bank_ledger: Some(record.statement.bank_ledger_guid.clone()),
             })
             .map_err(fail)?
         {
@@ -1455,10 +1462,10 @@ impl Server {
             "skipped_rows": record.statement.skip_rows.len(),
         }});
         let essential = payload.to_string().len();
-        payload["result"]["transfers"] = transfers.render(transfers::transfers_budget(
-            self.settings.max_bytes,
-            essential,
-        ));
+        payload["result"]["transfers"] = transfers.render(
+            transfers::transfers_budget(self.settings.max_bytes, essential),
+            true,
+        );
         Ok(ToolOutcome {
             payload,
             evidence: accumulated,

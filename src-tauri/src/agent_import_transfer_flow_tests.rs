@@ -30,8 +30,14 @@ fn window() -> Value {
 
 /// A row of `bank`'s statement skipped as carried by the other bank's Contra.
 fn skip_record(bank: &str, txn: &str, reference: Option<&str>) -> Value {
+    skip_record_flagged(bank, txn, reference, false)
+}
+
+/// The same, with the parse's flag for a row that has an equal amount the other
+/// way the same day on its own statement.
+fn skip_record_flagged(bank: &str, txn: &str, reference: Option<&str>, flagged: bool) -> Value {
     let other = if bank == BANK_A { BANK_B } else { BANK_A };
-    let mut skip = record(txn, json!("skipped"), other, "outflow", false);
+    let mut skip = record(txn, json!("skipped"), other, "outflow", flagged);
     skip["reference"] = reference.map_or(Value::Null, |reference| json!(reference));
     skip
 }
@@ -51,13 +57,17 @@ fn contra_voucher(txn: &str) -> Value {
 
 /// Bank A's statement of only skipped rows.
 fn a_skips(directory: &Path, rows: &[(&str, Option<&str>)]) -> Value {
+    a_skips_flagged(directory, rows, false)
+}
+
+fn a_skips_flagged(directory: &Path, rows: &[(&str, Option<&str>)], flagged: bool) -> Value {
     statement_v2(
         directory,
         BANK_A,
         window(),
         json!([]),
         rows.iter()
-            .map(|(txn, reference)| skip_record(BANK_A, txn, *reference))
+            .map(|(txn, reference)| skip_record_flagged(BANK_A, txn, *reference, flagged))
             .collect::<Vec<_>>()
             .into(),
     )
@@ -725,7 +735,7 @@ async fn a_build_that_is_not_about_transfers_goes_on_when_the_view_cannot_be_rea
     assert!(section.get("open").is_none());
     assert_eq!(
         section["next_steps"]["check_not_run"].as_str().unwrap(),
-        "The transfer check could not run this time; call verify_import again."
+        "The transfer check could not run this time; run verify_import on this batch again."
     );
 }
 
@@ -927,14 +937,20 @@ fn withdrawing(directory: &Path) -> Value {
 
 #[tokio::test]
 async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
-    for found in [true, false] {
+    // paired (found) or waiting in an unverified batch, flagged by the parse or not:
+    // the reference says why the row is open, whatever the flag
+    for (found, flagged) in [(true, false), (false, false), (true, true), (false, true)] {
         let directory = tempfile::tempdir().unwrap();
         let rig = Rig::new(
             directory.path(),
             [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
         );
-        rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-            .await;
+        rig.build(a_skips_flagged(
+            directory.path(),
+            &[(SKIPPED, Some(REFERENCE))],
+            flagged,
+        ))
+        .await;
         let built = rig
             .build(contra_statement(
                 directory.path(),
@@ -945,32 +961,46 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
             .await;
         let carrying = built["batch_id"].as_str().unwrap().to_string();
         if found {
-            // Paired
             mark_found(directory.path(), &carrying);
         }
-        // else OtherSideUnverified
+        let section = &built["transfers"];
         let refused = rig.build(withdrawing(directory.path())).await;
         rig.finish();
-        assert_eq!(refused["state"], "refused", "{found}: {refused}");
-        assert_eq!(refused["reason"], "withdraw_skip_paired", "{found}");
+        let case = format!("found {found}, flagged {flagged}");
+        assert_eq!(refused["state"], "refused", "{case}: {refused}");
+        assert_eq!(refused["reason"], "withdraw_skip_paired", "{case}");
+        let state = if found {
+            "paired"
+        } else {
+            "other_side_unverified"
+        };
         assert_eq!(
             refused["paired_rows"],
-            json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying}])
+            json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying, "state": state}]),
+            "{case}"
         );
+        // what the build said of the row, before it was found, is the same reason
+        if !found {
+            assert_eq!(
+                open_rows(section),
+                vec![open_row(SKIPPED, "other_side_unverified", Some(&carrying))],
+                "{case}: {built}"
+            );
+        }
         let step = refused["next_step"].as_str().unwrap();
-        assert!(
-            step.contains("already carries this row as a Contra in the batch named"),
-            "{step}"
-        );
-        assert!(step.contains("do not post this row"), "{step}");
-        // only the skip and the carrying batch are in the journal
-        assert_eq!(
-            fs::read_to_string(directory.path().join("agent-import-ledger.jsonl"))
-                .unwrap()
-                .lines()
-                .count(),
-            if found { 2 } else { 1 }
-        );
+        if found {
+            assert_eq!(
+                step,
+                "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.",
+                "{case}"
+            );
+        } else {
+            assert_eq!(
+                step,
+                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row.",
+                "{case}"
+            );
+        }
     }
 }
 
@@ -1115,4 +1145,49 @@ async fn a_verification_at_a_small_cap_cuts_the_open_rows_and_keeps_its_verdict(
     let proof: Value = serde_json::from_slice(&fs::read(proof_path).unwrap()).unwrap();
     assert_eq!(page["verification_status"], proof["verification_status"]);
     assert_eq!(page["counts"], proof["counts"]);
+}
+
+#[tokio::test]
+async fn a_skip_read_through_another_endpoint_is_not_this_builds_skip() {
+    let directory = tempfile::tempdir().unwrap();
+    // the skip is recorded through one endpoint, and then a build through
+    // another posts the same row
+    run(
+        directory.path(),
+        skip_only_plans(),
+        a_skips(directory.path(), &[(SKIPPED, None)]),
+    )
+    .await;
+    let posting = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+    let built = run(directory.path(), two_bank_plans(), posting).await;
+    assert_eq!(built["voucher_count"], 1, "{built}");
+    // and a withdrawal of it is for a skip this build does not have
+    let mut withdrawn = contra_statement(directory.path(), BANK_A, OTHER_BOOKED, None);
+    withdrawn["withdraw_skips"] = json!([SKIPPED]);
+    let refused = run(directory.path(), admission_plans(), withdrawn).await;
+    assert_eq!(refused["reason"], "withdraw_skip_invalid", "{refused}");
+    assert_eq!(refused["invalid_rows"], json!([SKIPPED]));
+}
+
+#[tokio::test]
+async fn a_skip_of_another_bank_ledger_is_not_this_builds_skip() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    // bank B's statement skipped the row; bank A's statement now posts it
+    rig.build(statement_v2(
+        directory.path(),
+        BANK_B,
+        window(),
+        json!([]),
+        json!([skip_record(BANK_B, SKIPPED, None)]),
+    ))
+    .await;
+    let built = rig
+        .build(contra_statement(directory.path(), BANK_A, SKIPPED, None))
+        .await;
+    rig.finish();
+    assert_eq!(built["voucher_count"], 1, "{built}");
 }

@@ -11,7 +11,7 @@ use bridge_tally_primitives::TallyDate;
 use sha2::{Digest, Sha256};
 
 use crate::encode_tally_xml_request_utf16le;
-use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
+use crate::outstandings_shared::render_company_book_extent_v2;
 use crate::xml_text::escape_text as xml_escape;
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
@@ -111,7 +111,6 @@ impl ValidatedDateRange {
 pub enum ReadOnlyProfileId {
     CompanyListV1,
     CompanyListV2,
-    CompanyBookExtentV1,
     CompanyBookExtentV2,
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
@@ -129,7 +128,6 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV1 => "company_list_v1",
             Self::CompanyListV2 => "company_list_v2",
-            Self::CompanyBookExtentV1 => "company_book_extent_v1",
             Self::CompanyBookExtentV2 => "company_book_extent_v2",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
@@ -170,7 +168,6 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV1 => render_company_book_extent(TEMPLATE_COMPANY),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
@@ -249,9 +246,6 @@ pub enum ReadOnlyProfile<'a> {
     /// so it can satisfy the trust check instead of being parsed as an
     /// unverified direct report.
     CompanyListV2,
-    CompanyBookExtentV1 {
-        company: &'a ValidatedCompanyName,
-    },
     /// A versioned Company collection that includes the observed company
     /// number required to distinguish year-split sibling books.
     CompanyBookExtentV2 {
@@ -311,7 +305,6 @@ impl ReadOnlyProfile<'_> {
         match self {
             Self::CompanyListV1 => ReadOnlyProfileId::CompanyListV1,
             Self::CompanyListV2 => ReadOnlyProfileId::CompanyListV2,
-            Self::CompanyBookExtentV1 { .. } => ReadOnlyProfileId::CompanyBookExtentV1,
             Self::CompanyBookExtentV2 { .. } => ReadOnlyProfileId::CompanyBookExtentV2,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
@@ -333,7 +326,6 @@ impl ReadOnlyProfile<'_> {
         match self {
             Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV1 { company } => render_company_book_extent(company.as_str()),
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
             }

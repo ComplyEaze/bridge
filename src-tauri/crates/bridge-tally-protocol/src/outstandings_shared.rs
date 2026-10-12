@@ -5,7 +5,7 @@
 //! and `List of Ledgers` reports directly and produces an
 //! [`OutstandingsReport`]. It begins by pinning a verified company identity
 //! and book extent (`PinnedCompany`, `CompanyBookExtent`, via
-//! `parse_company_book_extent`) and ends by producing that report shape
+//! `parse_company_book_extent_v2`) and ends by producing that report shape
 //! (`OutstandingsReport` and its constituents).
 //!
 //! The bill credit-period type and its parser ([`CreditPeriod`],
@@ -133,7 +133,7 @@ pub enum OutstandingsError {
     InvalidResponse(&'static str),
     /// A production bracket formed a [`CompanyBookExtent`] whose `ALTMSTID`
     /// (master-alteration high-water) witness is absent. The parser stays
-    /// tolerant of this -- see [`parse_company_book_extent`] -- but a
+    /// tolerant of this -- see [`parse_company_book_extent_v2`] -- but a
     /// bracket that cannot detect a master edit between its two reads is not
     /// a bracket: two witness-less extents compare equal regardless of what
     /// moved between them. See [`require_master_witness`].
@@ -458,7 +458,7 @@ pub struct OutstandingsReport {
     pub source_bytes: usize,
 }
 
-// --- Wire scaffold + parsing for the paired `CompanyBookExtentV1` read. ---
+// --- Wire scaffold + parsing for the paired company-book-extent read. ---
 
 #[derive(Deserialize)]
 pub(crate) struct Envelope<T> {
@@ -518,37 +518,9 @@ struct RawCompany {
     alter_master_id: Option<Value>,
 }
 
-pub fn parse_company_book_extent(
-    xml: &str,
-    expected_name: &str,
-    expected_guid: &str,
-) -> Result<CompanyBookExtent, OutstandingsError> {
-    require_complete_envelope(xml)?;
-    let sanitized = sanitize_invalid_numeric_references(xml);
-    let parsed: Envelope<CompanyCollection> = quick_xml::de::from_str(&sanitized)
-        .map_err(|_| OutstandingsError::InvalidResponse("company_extent_xml_invalid"))?;
-    require_success(&parsed.header)?;
-    let mut matching = parsed
-        .body
-        .data
-        .collection
-        .companies
-        .into_iter()
-        .filter(|raw| raw.guid.text.trim().eq_ignore_ascii_case(expected_guid));
-    let raw = matching
-        .next()
-        .ok_or(OutstandingsError::CompanyIdentityMismatch)?;
-    if matching.next().is_some() {
-        return Err(OutstandingsError::InvalidResponse(
-            "company_identity_ambiguous",
-        ));
-    }
-    company_book_extent_from_raw(&raw, expected_name, expected_guid)
-}
-
-/// Parses the V2 company-book-extent response against the complete expected
-/// company tuple. V1 remains available for historical captures that did not
-/// fetch `COMPANYNUMBER`; production callers must not fall back to it.
+/// Parses the company-book-extent response against the complete expected
+/// company tuple, including the observed `COMPANYNUMBER` that tells year-split
+/// sibling books apart.
 pub fn parse_company_book_extent_v2(
     xml: &str,
     expected: &CompanyBookExtentExpectation,
@@ -654,12 +626,10 @@ fn company_book_extent_from_raw(
 /// Requires a [`CompanyBookExtent`] to carry the `ALTMSTID` master-alteration
 /// witness before it is trusted as one side of a paired-extent bracket.
 ///
-/// `parse_company_book_extent` deliberately stays tolerant of an absent
-/// `ALTMSTID` -- older captures, from before this field was fetched, still
-/// parse, with it `None` -- so old fixtures and their parser-level tests keep
-/// working. But a *production* bracket is different: it compares two extents
-/// and rejects the read when they differ, and two witness-less (`None`)
-/// extents compare equal no matter what master-level edit happened between
+/// `parse_company_book_extent_v2` deliberately stays tolerant of an absent
+/// `ALTMSTID`, leaving it `None`. But a *production* bracket is different: it
+/// compares two extents and rejects the read when they differ, and two
+/// witness-less (`None`) extents compare equal no matter what master-level edit happened between
 /// them. That silently drops the one signal (`ALTMSTID`) able to detect a
 /// GROUP/LEDGER edit mid-window, since a master edit moves nothing else in
 /// the struct.
@@ -711,22 +681,12 @@ fn is_valid_company_number(value: &str) -> bool {
     (1..=16).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_digit())
 }
 
-// --- Request rendering for the paired `CompanyBookExtentV1` read. ---
+// --- Request rendering for the paired company-book-extent read. ---
 
-const COMPANY_EXTENT_COLLECTION_NAME: &str = "BridgeCompanyBookExtentV1";
-const COMPANY_EXTENT_FETCH: &str = "Name, GUID, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID";
 const COMPANY_EXTENT_V2_COLLECTION_NAME: &str = "BridgeCompanyBookExtentV2";
 /// Also the head of the inventory-flags request's `FETCH` (`native_stock_summary`).
 pub(crate) const COMPANY_EXTENT_V2_FETCH: &str =
     "Name, GUID, CompanyNumber, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID";
-
-pub(crate) fn render_company_book_extent(company: &str) -> String {
-    render_company_book_extent_with_contract(
-        company,
-        COMPANY_EXTENT_COLLECTION_NAME,
-        COMPANY_EXTENT_FETCH,
-    )
-}
 
 pub(crate) fn render_company_book_extent_v2(company: &str) -> String {
     render_company_book_extent_with_contract(

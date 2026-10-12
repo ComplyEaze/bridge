@@ -2,31 +2,20 @@
 //! book-extent read the native outstandings path pins against.
 
 use bridge_tally_protocol::outstandings_shared::{
-    parse_company_book_extent, parse_company_book_extent_v2, CompanyBookExtentExpectation,
-    OutstandingsError,
+    parse_company_book_extent_v2, CompanyBookExtentExpectation, OutstandingsError,
 };
 
-const COMPANY_EXTENT: &str = include_str!("fixtures/unit_a_company_extent_live.xml");
-const COMPANY_NAME: &str = "Aarav Trading Company Demo";
-const COMPANY_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
+const AARAV_NAME: &str = "Aarav Trading Company Demo";
+const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
+const AARAV_NUMBER: &str = "100000";
+const AARAV_BOOKS_FROM: &str = "20240401";
+const AARAV_ALTMSTID: &str = "328";
 const COMPANY_EXTENT_V2: &str =
     include_str!("fixtures/agent/native-company-book-extents-with-number.utf8.xml");
 const SPLIT_COMPANY_NAME: &str = "BRIDGE PROBE B SANDBOX";
 const SPLIT_COMPANY_GUID: &str = "ec4454ae-5c4c-4bfa-b3b0-68182a749689";
 const SPLIT_COMPANY_NUMBER: &str = "100005";
 const SPLIT_BOOKS_FROM: &str = "20250401";
-
-/// Real capture (`tests/fixtures/native/company_extent_9000.xml`) that
-/// includes `ALTMSTID` for every company row, unlike `COMPANY_EXTENT` above.
-/// `docs/tally/TEST_CORPUS.md` records this exact value (327) for
-/// "Aarav Trading Company Demo".
-const COMPANY_EXTENT_WITH_ALTMSTID: &str = include_str!("fixtures/native/company_extent_9000.xml");
-const ALTMSTID_COMPANY_ALTMSTID: &str = "327";
-
-fn extent() -> bridge_tally_protocol::outstandings_shared::CompanyBookExtent {
-    parse_company_book_extent(COMPANY_EXTENT, COMPANY_NAME, COMPANY_GUID)
-        .expect("real company extent capture parses")
-}
 
 fn split_expectation() -> CompanyBookExtentExpectation {
     CompanyBookExtentExpectation::new(
@@ -227,104 +216,59 @@ fn v2_refuses_same_guid_selector_attribute_with_a_different_nested_name() {
     );
 }
 
+fn aarav_expectation(guid: &str) -> CompanyBookExtentExpectation {
+    CompanyBookExtentExpectation::new(
+        AARAV_NAME.to_string(),
+        guid.to_string(),
+        AARAV_NUMBER.to_string(),
+        AARAV_BOOKS_FROM.to_string(),
+    )
+    .expect("captured full tuple is a valid expectation")
+}
+
 #[test]
-fn company_pin_is_created_only_after_live_identity_matches() {
-    let extent = extent();
-    assert_eq!(extent.company().name(), COMPANY_NAME);
-    assert_eq!(extent.company().guid(), COMPANY_GUID);
+fn v2_company_pin_is_created_only_after_live_identity_matches() {
+    let extent = parse_company_book_extent_v2(COMPANY_EXTENT_V2, &aarav_expectation(AARAV_GUID))
+        .expect("captured V2 extent selects the Aarav book");
+    assert_eq!(extent.company().name(), AARAV_NAME);
+    assert_eq!(extent.company().guid(), AARAV_GUID);
     assert!(matches!(
-        parse_company_book_extent(COMPANY_EXTENT, COMPANY_NAME, "wrong-guid"),
+        parse_company_book_extent_v2(
+            COMPANY_EXTENT_V2,
+            &aarav_expectation("00000000-0000-4000-8000-000000000001")
+        ),
         Err(OutstandingsError::CompanyIdentityMismatch)
     ));
 }
 
-#[test]
-fn company_extent_selects_the_expected_guid_in_a_multi_company_collection() {
-    let company_start = COMPANY_EXTENT
-        .find("    <COMPANY ")
-        .expect("real capture contains a company row");
-    let company_end = COMPANY_EXTENT[company_start..]
-        .find("    </COMPANY>")
-        .map(|offset| company_start + offset + "    </COMPANY>".len())
-        .expect("real capture company row is complete");
-    let expected_row = &COMPANY_EXTENT[company_start..company_end];
-    let unrelated_row = expected_row
-        .replace(COMPANY_NAME, "Earlier Loaded Synthetic Company")
-        .replace(COMPANY_GUID, "00000000-0000-4000-8000-000000000001");
-    let response =
-        COMPANY_EXTENT.replacen(expected_row, &format!("{unrelated_row}\n{expected_row}"), 1);
-
-    let selected = parse_company_book_extent(&response, COMPANY_NAME, COMPANY_GUID)
-        .expect("GUID selection is independent of collection order");
-    assert_eq!(selected.company().name(), COMPANY_NAME);
-    assert_eq!(selected.company().guid(), COMPANY_GUID);
-}
-
-#[test]
-fn company_extent_rejects_duplicate_rows_for_the_expected_guid() {
-    let company_start = COMPANY_EXTENT
-        .find("    <COMPANY ")
-        .expect("real capture contains a company row");
-    let company_end = COMPANY_EXTENT[company_start..]
-        .find("    </COMPANY>")
-        .map(|offset| company_start + offset + "    </COMPANY>".len())
-        .expect("real capture company row is complete");
-    let expected_row = &COMPANY_EXTENT[company_start..company_end];
-    let response =
-        COMPANY_EXTENT.replacen(expected_row, &format!("{expected_row}\n{expected_row}"), 1);
-
-    assert_eq!(
-        parse_company_book_extent(&response, COMPANY_NAME, COMPANY_GUID),
-        Err(OutstandingsError::InvalidResponse(
-            "company_identity_ambiguous"
-        ))
-    );
-}
-
 /// The core-window bracket in `connector.rs` compares two `CompanyBookExtent`
-/// reads by `PartialEq` and rejects the window when they differ
-/// (`closing_extent != opening_extent`). `ALTMSTID` -- Tally's MASTER
-/// alteration high-water mark -- has to move that comparison when a GROUP or
-/// LEDGER master is edited mid-window, because nothing else in the struct
-/// does. `docs/tally/TEST_CORPUS.md` records a real pair of extents that
-/// agreed on GUID, `BooksFrom`, `LastVoucherDate` and `ALTVCHID` (252) while
-/// differing only on `ALTMSTID` (218 vs 219), concealing roughly Rs 15 lakh
-/// of outstandings from a voucher-only bracket.
+/// reads by `PartialEq` and rejects the window when they differ. `ALTMSTID` --
+/// Tally's master alteration high-water mark -- has to move that comparison
+/// when a GROUP or LEDGER master is edited mid-window, because nothing else in
+/// the struct does.
 #[test]
-fn captured_extent_with_altmstid_parses_with_the_master_high_water_populated() {
-    let extent =
-        parse_company_book_extent(COMPANY_EXTENT_WITH_ALTMSTID, COMPANY_NAME, COMPANY_GUID)
-            .expect("real company_extent_9000.xml capture parses");
+fn v2_extents_differing_only_in_master_high_water_are_not_equal() {
+    let expectation = aarav_expectation(AARAV_GUID);
+    let opening = parse_company_book_extent_v2(COMPANY_EXTENT_V2, &expectation)
+        .expect("captured V2 extent parses");
     assert_eq!(
-        extent.master_alter_id_high_water().map(|w| w.get()),
+        opening.master_alter_id_high_water().map(|w| w.get()),
         Some(
-            ALTMSTID_COMPANY_ALTMSTID
+            AARAV_ALTMSTID
                 .parse::<u64>()
                 .expect("test constant is a valid u64")
         )
     );
-}
-
-/// Two otherwise-identical extents that differ ONLY in `ALTMSTID` must
-/// compare as not-equal -- this is the entire point of wiring the field into
-/// `CompanyBookExtent`'s derived `PartialEq`: it is what lets the existing
-/// paired-extent bracket reject a core window torn by a mid-window master
-/// edit, without any change to the bracket's control flow.
-#[test]
-fn extents_differing_only_in_master_high_water_are_not_equal() {
-    let opening =
-        parse_company_book_extent(COMPANY_EXTENT_WITH_ALTMSTID, COMPANY_NAME, COMPANY_GUID)
-            .expect("real company_extent_9000.xml capture parses");
-    let edited_master_response = COMPANY_EXTENT_WITH_ALTMSTID.replacen(
-        &format!(r#"<ALTMSTID TYPE="Number"> {ALTMSTID_COMPANY_ALTMSTID}</ALTMSTID>"#),
-        r#"<ALTMSTID TYPE="Number"> 328</ALTMSTID>"#,
+    let edited_master_response = COMPANY_EXTENT_V2.replacen(
+        &format!(r#"<ALTMSTID TYPE="Number"> {AARAV_ALTMSTID}</ALTMSTID>"#),
+        r#"<ALTMSTID TYPE="Number"> 329</ALTMSTID>"#,
         1,
     );
     assert_ne!(
-        edited_master_response, COMPANY_EXTENT_WITH_ALTMSTID,
+        edited_master_response, COMPANY_EXTENT_V2,
         "the replacement must actually change the response for this test to prove anything"
     );
-    let closing = parse_company_book_extent(&edited_master_response, COMPANY_NAME, COMPANY_GUID)
+    let closing = parse_company_book_extent_v2(&edited_master_response, &expectation)
         .expect("edited capture still parses");
 
     assert_eq!(
@@ -341,16 +285,4 @@ fn extents_differing_only_in_master_high_water_are_not_equal() {
         opening, closing,
         "a master-only edit must be visible to the whole-struct PartialEq the bracket compares"
     );
-}
-
-/// A response that omits `ALTMSTID` entirely (as `COMPANY_EXTENT`, captured
-/// before this field was fetched, does) must still parse, with the field
-/// `None` -- absence is not a hard failure, matching `ALTVCHID`'s existing
-/// optional-field pattern.
-#[test]
-fn extent_response_omitting_altmstid_still_parses_with_it_none() {
-    let extent = parse_company_book_extent(COMPANY_EXTENT, COMPANY_NAME, COMPANY_GUID)
-        .expect("real company extent capture parses");
-    assert!(!COMPANY_EXTENT.contains("ALTMSTID"));
-    assert_eq!(extent.master_alter_id_high_water(), None);
 }

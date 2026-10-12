@@ -43,8 +43,12 @@ impl Drop for HeldLocks {
     }
 }
 
-/// Open each of `paths`, then lock each in order, all or none.
+/// Open each of `paths`, then lock each in order, all or none. An empty set is
+/// refused: it would hold nothing while saying it holds the lock.
 pub(crate) fn try_lock_all(paths: &[PathBuf], mode: LockMode) -> Result<HeldLocks, LockSetError> {
+    if paths.is_empty() {
+        return Err(LockSetError::Unavailable);
+    }
     let mut files: Vec<File> = Vec::with_capacity(paths.len());
     let mut seen: Vec<FileIdentity> = Vec::with_capacity(paths.len());
     for path in paths {
@@ -92,8 +96,10 @@ fn file_identity(file: &File) -> io::Result<FileIdentity> {
 }
 
 /// The volume serial number and 128-bit file ID (the 64-bit file index is not
-/// unique on ReFS). A lock file on a remote volume is refused: a lock taken
-/// over the network is not one this design relies on.
+/// unique on ReFS). A lock file on a volume that answers as remote (Windows
+/// returns its remote protocol) is refused: a lock taken over the network is
+/// not one this design relies on. A remote file system that does not answer
+/// that query is not detected.
 #[cfg(windows)]
 fn file_identity(file: &File) -> io::Result<FileIdentity> {
     use std::os::windows::io::AsRawHandle;

@@ -72,6 +72,15 @@ impl WireRoot {
         }
     }
 
+    /// Test only: every root a build takes the lock under, in order.
+    #[cfg(test)]
+    pub(crate) fn at_all(paths: Vec<PathBuf>) -> Self {
+        Self {
+            paths: Some(paths),
+            _isolated: None,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn at(path: PathBuf) -> Self {
         Self {

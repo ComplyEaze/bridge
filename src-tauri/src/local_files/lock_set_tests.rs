@@ -28,19 +28,48 @@ fn an_exclusive_set_excludes_every_other_hold_and_shared_sets_coexist() {
 }
 
 /// A build that takes only one of the files (an earlier one, or one on the
-/// other side of a package boundary) still excludes a build that takes both.
+/// other side of a package boundary) still excludes a build that takes both,
+/// whichever of the two holds exclusively.
 #[test]
 fn a_hold_on_any_one_file_of_the_set_makes_the_set_busy() {
     let directory = tempfile::tempdir().unwrap();
     let both = paths(directory.path(), &["old.lock", "new.lock"]);
     for one in [&both[..1], &both[1..]] {
-        let single = try_lock_all(one, LockMode::Exclusive).unwrap();
-        assert_eq!(
-            try_lock_all(&both, LockMode::Shared).err(),
-            Some(LockSetError::Busy)
-        );
-        drop(single);
+        for (single_mode, set_mode) in [
+            (LockMode::Exclusive, LockMode::Shared),
+            (LockMode::Shared, LockMode::Exclusive),
+        ] {
+            let single = try_lock_all(one, single_mode).unwrap();
+            assert_eq!(
+                try_lock_all(&both, set_mode).err(),
+                Some(LockSetError::Busy)
+            );
+            drop(single);
+        }
     }
+}
+
+#[test]
+fn an_empty_set_is_refused_rather_than_held() {
+    assert_eq!(
+        try_lock_all(&[], LockMode::Exclusive).err(),
+        Some(LockSetError::Unavailable)
+    );
+}
+
+/// The locks are released explicitly, not only by closing the handle: a
+/// second handle to the same open file keeps it open past the drop, and the
+/// lock can be taken again. A refused set drops what it took the same way.
+#[cfg(unix)]
+#[test]
+fn a_set_releases_its_locks_itself_when_dropped() {
+    let directory = tempfile::tempdir().unwrap();
+    let both = paths(directory.path(), &["old.lock", "new.lock"]);
+    let held = try_lock_all(&both, LockMode::Exclusive).unwrap();
+    let kept_open = held.files[0].try_clone().unwrap();
+    drop(held);
+    drop(try_lock_all(&both, LockMode::Exclusive).expect("released on drop"));
+    drop(kept_open);
 }
 
 /// A set refused by its last file has released its first one by the time the
@@ -92,7 +121,13 @@ fn a_held_lock_file_cannot_be_deleted_and_an_earlier_builds_open_contends_as_bus
     let directory = tempfile::tempdir().unwrap();
     let set = paths(directory.path(), &["lease.lock"]);
     let held = try_lock_all(&set, LockMode::Exclusive).unwrap();
-    assert!(fs::remove_file(&set[0]).is_err());
+    // ERROR_SHARING_VIOLATION, not any error
+    assert_eq!(
+        fs::remove_file(&set[0])
+            .err()
+            .and_then(|error| error.raw_os_error()),
+        Some(32)
+    );
     let earlier = OpenOptions::new()
         .read(true)
         .write(true)

@@ -109,6 +109,25 @@ fn the_wire_lock_and_the_dispatch_lease_are_separate_files() {
     );
 }
 
+/// The wire lock is taken under every root: a send held under the second
+/// root alone (a build on the other side of a package boundary) refuses this
+/// one as busy, not as unavailable.
+#[test]
+fn a_wire_lock_held_under_any_one_root_refuses_a_send_as_busy() {
+    let directory = tempfile::tempdir().unwrap();
+    let roots = vec![directory.path().join("old"), directory.path().join("new")];
+    let endpoint = endpoint("127.0.0.1", 9001);
+    for held in &roots {
+        let path = wire_lock_path(&WireRoot::at(held.clone()), &endpoint);
+        let holder = open_local_file(&path, true).unwrap();
+        holder.try_lock().unwrap();
+        let gate = FileWireGate::new(WireRoot::at_all(roots.clone()), endpoint.clone());
+        assert_eq!(gate.try_acquire().err(), Some(WireRefusal::Busy));
+        drop(holder);
+        drop(gate.try_acquire().expect("taken once released"));
+    }
+}
+
 #[test]
 fn an_unusable_root_fails_closed() {
     let gate = FileWireGate::new(

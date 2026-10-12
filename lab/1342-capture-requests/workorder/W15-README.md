@@ -8,6 +8,12 @@ Synthetic company `BRIDGE PILOT LAB` only. W13 found that each GSTR-1 JSON expor
 - `make-w15-request.py BEFORE AFTER FROM TO OUTFILE` writes the request for the vouchers whose `AlterID` is above BEFORE and not above AFTER, in the date window FROM to TO (a collection read with no dates returns only the display period, so a window is always given). It prints the file's SHA-256 and size; write the printed line into your notes. Its header ID equals its collection name (checked by the script).
 - `check-w15-answer.py ANSWER BEFORE AFTER` reads the answer and says IDENTIFIED (exactly AFTER minus BEFORE vouchers, with each `ALTERID` from BEFORE+1 to AFTER once), NOT IDENTIFIED (a complete answer that does not hold that set: this is not "nothing was altered", the counter moved) or FAILED READ (nothing is claimed).
 
+## Step 0: a positive control of the request shape, BEFORE any export
+A request that filters vouchers by an `AlterID` span has never returned rows from this Tally, so it is tried first on a span whose one voucher is known. Nothing is written in this step.
+0a. Send `w13-status-0005.xml` (earlier set) -> `aw15-status-0005-c.xml`. Read the voucher `BP/26-27/0005`'s `ALTERID` (54 after W13; call it A; if it is not 54, say what changed it).
+0b. Run `make-w15-request.py (A-1) A 20260401 20270331 w15-control.xml`, send it -> `aw15-control.xml`, and run `check-w15-answer.py aw15-control.xml (A-1) A`. **It must print IDENTIFIED with exactly one voucher, `BP/26-27/0005`.** Paste the output.
+**STOP if it prints NOT IDENTIFIED or FAILED READ:** the request shape does not work; do NOT run the export; send the answer and the checker output.
+
 ## Steps
 1. Send `r02-marks.xml` (earlier set) -> `aw15-marks-0.xml`. Read `ALTVCHID`: call it BEFORE.
 2. Do ONE GSTR-1 JSON export of August 2026 exactly as in W13 (Export > GST Returns > Upload GSTR-1 > the X: button that writes the file rather than the S: Send button, with the same choices as W13; do not use Include Uploaded). Say what the Upload GSTR-1 screen read before and after (pending counts). Copy the JSON file out unchanged as `gstr1-aug-2026-w15.json`.

@@ -63,3 +63,7 @@ f1ed50752865e0d901136d3bdb85da79bf7abdbfe6ad8079ab0975af4ffee3fd  w12-full-0006.
 # W13 (what the GSTR-1 JSON export holds for uncertain, accepted and included vouchers; steps in W13-README.md)
 f363e3e749669b3030f27c87c34ab3a42c45fa4e718e40cc6180a58e235f7097  w13-status-window-aug.xml
 15d54537c68041c8f1ebc7cb26bd7404c75df60cc09d7edc91d5ee71d6253a90  w13-status-0005.xml
+# W14 (the company-level HSN read and the company tax-amount tolerance; steps in W14-README.md)
+72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648  w14-company-object.xml
+b4bd99a9ace9f892a322582ccec0b24b3266e1172c6c2946dc7630f07e733e46  w14-company-fetch.xml
+00f71fbd860ac0a024d070c3a397899bb7412afce746bbd4b2b22083a470187c  w14-status-0008.xml

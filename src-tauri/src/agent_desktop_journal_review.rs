@@ -97,6 +97,10 @@ impl DesktopJournalError {
                 "This saved Journal was built before ComplyEaze Bridge began checking bill-wise ledgers, so it cannot be posted from here.",
                 "First check in Tally that this Journal was not already entered by hand, then build it again and choose the new file. Do not post this one, and do not import it in Tally without checking its ledgers: an entry on a ledger that keeps bills would land On Account.",
             ),
+            post::DESKTOP_LEDGER_LINE_BREAK => (
+                "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name.",
+                "Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again.",
+            ),
             "file_picker_failed" => (
                 "ComplyEaze Bridge could not open the native file picker.",
                 "Close any modal dialogs and choose the Journal file again.",
@@ -218,6 +222,27 @@ mod tests {
         assert!(refused.message.contains("amends an earlier batch"));
         assert!(refused.remediation.contains("promptly"));
         assert!(refused.remediation.contains("overwritten"));
+    }
+
+    /// bridge#626: what the review says of a saved Journal that names a ledger
+    /// whose name ends in a line break, whole.
+    #[test]
+    fn a_journal_naming_a_line_break_ledger_is_sent_to_the_assistant() {
+        let refused = DesktopJournalError::refused(post::DESKTOP_LEDGER_LINE_BREAK);
+        assert_eq!(refused.code, "journal_review_refused");
+        assert_eq!(
+            refused.message,
+            "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name."
+        );
+        assert_eq!(
+            refused.remediation,
+            "Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again."
+        );
+        // The desktop's post and reconcile say both.
+        assert_eq!(
+            format!("{} {}", refused.message, refused.remediation),
+            post::DESKTOP_LEDGER_LINE_BREAK_ACTION
+        );
     }
 
     #[test]

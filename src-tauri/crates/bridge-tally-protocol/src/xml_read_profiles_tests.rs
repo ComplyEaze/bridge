@@ -174,7 +174,7 @@ fn profile_ids_and_template_hashes_are_stable() {
         ),
         (
             ReadOnlyProfileId::InvoiceCompanyHsnV1,
-            "0000000000000000000000000000000000000000000000000000000000000000",
+            "bb3efcb756ab15771e58e1daaa543af6bb73b0e32a43a723f0d1ed7d11219703",
         ),
         (
             ReadOnlyProfileId::AuditLedgersV1,

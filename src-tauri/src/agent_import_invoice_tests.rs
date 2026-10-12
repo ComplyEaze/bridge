@@ -103,6 +103,7 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
         rate_of_tax_calculation: Some("0".to_string()),
         rounding_method: None,
         rounding_limit: Some("0".to_string()),
+        hsn: Ok(None),
     }
 }
 
@@ -113,6 +114,7 @@ fn tax_rates(half: &str) -> wire::LedgerRateRow {
         rate_of_tax_calculation: Some(half.to_string()),
         rounding_method: Some("Not Applicable".to_string()),
         rounding_limit: Some("0".to_string()),
+        hsn: Ok(None),
     }
 }
 

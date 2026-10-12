@@ -2293,7 +2293,8 @@ const SALES_REHEARSAL: &str = "answers of the GST Sales rehearsal (7 Oct 2026), 
      this crate reads: the app crate's invoice code parses them (src/agent_import_invoice_wire.rs), \
      and its tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
      pin what each parse returns; sales-rehearsal/PROVENANCE.md says what each file is";
-const PILOT_LAB_READBACK: &str = "a read-back answer of the pilot lab (9 and 10 Oct 2026), with no \
+const PILOT_LAB_READBACK: &str =
+    "a read-back answer of the pilot lab (9 and 10 Oct 2026), with no \
      row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
      src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";

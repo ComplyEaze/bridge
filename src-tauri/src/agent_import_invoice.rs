@@ -1877,26 +1877,31 @@ impl super::super::Server {
             })?
             .state;
 
-        // 4b. The HSN/SAC each sales ledger resolves to on the invoice date
-        // (#691, section 9.16). Its refusals are reported with the
-        // classification's, so a caller fixes every defect at once.
-        let (hsn_refusals, evidence) = self
-            .sales_hsn_refusals(identity, company_name, &facts, &as_of, evidence)
-            .await?;
-        let roles = match classify_sales_invoice(voucher, &facts, &company_state, &as_of) {
-            Ok(roles) if hsn_refusals.is_empty() => roles,
-            Ok(_) => return Err(InvoiceAdmission::Refused(hsn_refusals)),
-            Err(mut refusals) => {
-                refusals.extend(hsn_refusals);
-                return Err(InvoiceAdmission::Refused(refusals));
-            }
-        };
+        let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
+            .map_err(InvoiceAdmission::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
-        let sales_ledgers = roles
+        let sales_ledgers: Vec<String> = roles
             .sales
             .iter()
             .map(|&index| voucher.entries[index].ledger.clone())
             .collect();
+        // 5. The HSN/SAC each sales line's ledger resolves to on the invoice
+        // date (#691, section 9.16), asked only of an invoice admitted so
+        // far: a code is fixed in Tally and the rest by the caller, and an
+        // invoice refused above costs these reads nothing.
+        let (hsn_refusals, evidence) = self
+            .sales_hsn_refusals(
+                identity,
+                company_name,
+                &sales_ledgers,
+                &facts,
+                &as_of,
+                evidence,
+            )
+            .await?;
+        if !hsn_refusals.is_empty() {
+            return Err(InvoiceAdmission::Refused(hsn_refusals));
+        }
         let observed = observe(
             &facts[party].gstin,
             resolved.guid,
@@ -1912,25 +1917,26 @@ impl super::super::Server {
 }
 
 impl super::super::Server {
-    /// One refusal per Sales Accounts ledger whose HSN/SAC does not resolve
-    /// on the invoice date. The company object is read for every invoice,
-    /// because its settings decide whether the measured order holds at any
-    /// level; the groups only when a sales ledger's own row defers.
+    /// One refusal per sales ledger (the classification's sales lines) whose
+    /// HSN/SAC does not resolve on the invoice date. The company object is
+    /// read for every admitted invoice, because its settings decide whether
+    /// the measured order holds at any level; the groups only when a sales
+    /// ledger's own row defers.
     async fn sales_hsn_refusals(
         &self,
         identity: &super::super::VerifiedCompanyIdentity,
         company_name: &str,
+        sales_ledgers: &[String],
         facts: &BTreeMap<String, LedgerFacts>,
         as_of: &str,
         mut evidence: super::super::Evidence,
     ) -> Result<(Vec<InvoiceRefusal>, super::super::Evidence), InvoiceAdmission> {
-        let sales = facts
+        let mut sales = sales_ledgers
             .iter()
-            .filter(|(_, fact)| fact.under("Sales Accounts"))
+            .map(|name| (name, facts.get(name)))
             .collect::<Vec<_>>();
-        if sales.is_empty() {
-            return Ok((Vec::new(), evidence));
-        }
+        sales.sort_by(|left, right| left.0.cmp(right.0));
+        sales.dedup_by(|left, right| left.0 == right.0);
         let (xml, read) = self.post_invoice_company_hsn_read(identity).await?;
         evidence = super::super::combine_evidence(evidence, read);
         let company = wire::parse_company_hsn(&xml, identity.company_guid()).map_err(failed)?;
@@ -1939,17 +1945,18 @@ impl super::super::Server {
             let steps = sales
                 .iter()
                 .map(|(name, fact)| {
-                    let chain =
-                        (!fact.group_names.is_empty()).then_some(fact.group_names.as_slice());
-                    let step = match fact.rates.as_ref() {
-                        // The rate check refuses it as well; this check never
-                        // passes a ledger it did not read.
+                    let chain = fact
+                        .map(|fact| fact.group_names.as_slice())
+                        .filter(|names| !names.is_empty());
+                    let step = match fact.and_then(|fact| fact.rates.as_ref()) {
+                        // Not reachable after the classification; this check
+                        // never passes a ledger it did not read.
                         None => wire::HsnStep::Refused(wire::HSN_NOT_MEASURED),
                         Some(row) => {
                             wire::resolve_hsn(&row.hsn, chain, groups.as_ref(), &company, as_of)
                         }
                     };
-                    (*name, step)
+                    (name.as_str(), step)
                 })
                 .collect::<Vec<_>>();
             if groups.is_none()

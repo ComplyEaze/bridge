@@ -1758,7 +1758,8 @@ and can set no opening balance or parent. `prepare_ledger_creates` reads the
 company's ledger and group names once, refuses a name that already exists as a
 ledger, a group or an alias (`master_name_taken`), saves the request in the
 local masters journal and returns a `batch_id` with the preview the person will
-be shown; it writes nothing to Tally. `post_ledger_creates` takes that
+be shown (under `mask_parties` the ledger's name in it is masked; the dialog
+shows it whole); it writes nothing to Tally. `post_ledger_creates` takes that
 `batch_id`, asks the local user in a native dialog, and sends the create once;
 its approval, pending and approved answers behave as `post_import`'s do. A batch
 already sent is never sent again: a later call only reports what was recorded.
@@ -1775,8 +1776,10 @@ ledger as sent, nothing else changed), `posted_into_existing_master` or
 `master_write_located_elsewhere` (loud: check Tally, do not retry),
 `confirmed_absent` (a later call found nothing created and no mark moved; a new
 batch needs a new approval), `masters_after_post_unconfirmed` (the book could
-not be read back; call again, which only reads) or `reconciliation_required`
-(with reasons). A later call for a sent batch repeats the read-back and never
+not be read back; call again, which only reads), `posted_unverified` with
+`answer_recorded` false (Tally answered, with the counters given, but its answer
+could not be recorded; never send again, check Tally) or
+`reconciliation_required` (with reasons). A later call for a sent batch repeats the read-back and never
 sends. No PAN, bank detail, e-mail address or phone number is put in an answer
 or a record. The setting is a command-line setting only and is not in the MCPB
 extension.

@@ -62,6 +62,30 @@ pub(super) fn master_review_text(
     company: &VerifiedCompanyIdentity,
     origin: &str,
 ) -> Result<String, MasterReviewError> {
+    review_text(item, company, origin, item.name().as_str())
+}
+
+/// The same preview with the ledger's name masked, for a tool result under
+/// `mask_parties`: the dialog shows the name whole, a result never does.
+pub(super) fn masked_review_text(
+    item: &LedgerCreateItem,
+    company: &VerifiedCompanyIdentity,
+    origin: &str,
+) -> Result<String, MasterReviewError> {
+    review_text(
+        item,
+        company,
+        origin,
+        &super::super::mask(item.name().as_str()),
+    )
+}
+
+fn review_text(
+    item: &LedgerCreateItem,
+    company: &VerifiedCompanyIdentity,
+    origin: &str,
+    name: &str,
+) -> Result<String, MasterReviewError> {
     let shown = [
         company.display_name(),
         company.company_guid(),
@@ -105,11 +129,7 @@ pub(super) fn master_review_text(
         ),
         format!("Tally: {origin}"),
         String::new(),
-        format!(
-            "Create ledger {} under {}",
-            quoted(item.name().as_str()),
-            item.parent()
-        ),
+        format!("Create ledger {} under {}", quoted(name), item.parent()),
         format!(
             "{gst}, bill-by-bill {}",
             if bill_wise { "Yes" } else { "No" }

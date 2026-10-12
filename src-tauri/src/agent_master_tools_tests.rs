@@ -787,6 +787,28 @@ async fn prepare_refuses_an_unreadable_ledger_index_and_saves_nothing() {
 }
 
 #[tokio::test]
+async fn under_mask_parties_the_preview_a_prepare_returns_names_the_ledger_masked() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.redaction = Redaction::MaskParties;
+    let response = TEST_LEDGER_INDEX
+        .scope(
+            book(),
+            server.call_tool("prepare_ledger_creates", prepare_args(LEDGER)),
+        )
+        .await;
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let preview = result(&response)["preview"].as_str().unwrap();
+    assert_eq!(
+        preview,
+        super::super::master_review::masked_review_text(&item(LEDGER), &identity(), &origin)
+            .unwrap()
+    );
+    assert!(!response.to_string().contains(LEDGER), "{response}");
+}
+
+#[tokio::test]
 async fn prepare_saves_the_batch_and_returns_the_preview_the_person_will_be_shown() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -2099,6 +2121,54 @@ async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appe
         assert_ne!(result(&response)["state"], "confirmed_absent");
         let _ = batch;
     }
+}
+
+#[tokio::test]
+async fn an_answer_that_cannot_be_recorded_is_reported_as_answered_not_as_maybe_sent() {
+    // Tally answers, but another process holds the journal's lock when the
+    // answer is recorded: the call says Tally answered, with its counters.
+    let plans = through_post(
+        xml(created_one()).with_delivery(Delivery::SlowHeaders(Duration::from_secs(2))),
+    );
+    let post_at = plans.len() - 1;
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let data_dir = directory.path().to_path_buf();
+    let approving = ScriptedApproval::approving();
+    let post = posting(&approving, server.call_tool("post_ledger_creates", args));
+    let hold_lock = async {
+        let started = std::time::Instant::now();
+        // Once the POST has arrived the intent's use of the lock is over: hold
+        // it while the answer is recorded.
+        while simulator.received() <= post_at {
+            assert!(
+                started.elapsed() < Duration::from_secs(20),
+                "the POST never arrived"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        let lock = ExclusiveAdmission::acquire(&data_dir).expect("free while the POST is held");
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        drop(lock);
+    };
+    let (response, ()) = tokio::join!(post, hold_lock);
+    sent(simulator);
+    let answered = result(&response);
+    assert_eq!(answered["state"], "posted_unverified", "{response}");
+    assert_eq!(answered["answer_recorded"], false, "{response}");
+    assert_eq!(answered["counters"]["created"], 1, "{response}");
+    assert!(
+        !response.to_string().contains("may have been sent"),
+        "{response}"
+    );
+    // Only the intent is in the journal: a later call reconciles it.
+    assert_eq!(
+        record_types(directory.path()),
+        ["master_batch", "master_dispatch_intent"]
+    );
+    let _ = batch;
 }
 
 #[tokio::test]

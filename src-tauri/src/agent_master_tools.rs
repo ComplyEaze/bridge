@@ -34,7 +34,7 @@ use super::master_ledger::{
 use super::master_post::{
     check_name_free, recheck_master_for_dispatch, MasterAim, MasterPostRequest,
 };
-use super::master_review::master_review_text;
+use super::master_review::{masked_review_text, master_review_text};
 use super::post::{refusal_cause, refusal_code, ApprovalTarget, Entry, Pass, Step};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
@@ -62,6 +62,7 @@ const PREPARED_NEXT_STEP: &str = "Nothing was written to Tally. To create this l
 
 /// What a caller is told after the one POST when the read-back could not be
 /// attempted at all: the ledger is not verified.
+const ANSWER_UNRECORDED_NOTE: &str = "Tally answered the one create (its counters are here), but ComplyEaze Bridge could not record that answer: another ComplyEaze Bridge process held its record at that instant. It is NOT verified. Never post this batch again: check the ledger in Tally before relying on it.";
 const POSTED_UNVERIFIED_NOTE: &str = "Tally answered the one create and ComplyEaze Bridge recorded the answer, but has not read the ledger back: it is NOT verified. Check the ledger in Tally before relying on it. Never post this batch again.";
 
 /// What a caller is told when a batch has a recorded intent and no recorded
@@ -421,8 +422,12 @@ impl Server {
         check_name_free(&ledgers, &groups, &item, identity.company_guid())
             .map_err(|error| name_check_failure(&error))?;
         let request = MasterPostRequest::render(item.clone(), &identity);
-        let preview = master_review_text(&item, &identity, &origin)
-            .map_err(|error| ToolFailure::from(error.code().to_string()))?;
+        let preview = if self.settings.redaction == super::super::Redaction::MaskParties {
+            masked_review_text(&item, &identity, &origin)
+        } else {
+            master_review_text(&item, &identity, &origin)
+        }
+        .map_err(|error| ToolFailure::from(error.code().to_string()))?;
         let batch = MasterBatch {
             batch_id: format!("bridge-{}", Uuid::new_v4()),
             batch_sha256: request.sha256().to_string(),
@@ -704,19 +709,37 @@ impl Server {
                 response_sha256: posted.response_evidence.response_sha256.clone(),
                 counters,
             };
-            {
-                // Known limit, shared with the voucher path's response append:
-                // the lock is tried once, never waited for, so another process
-                // holding it at this instant fails the append. The send is
-                // already recorded by its intent; only Tally's answer goes
-                // unrecorded, and the batch is then reported for reconciliation.
-                let lock = ExclusiveAdmission::acquire(&self.settings.data_dir)?;
-                append(
-                    &self.settings.data_dir,
-                    &lock,
-                    MasterRecord::DispatchResponse(response.clone()),
-                )
-                .map_err(|error| error.code().to_string())?;
+            // Known limit, shared with the voucher path's response append: the
+            // lock is tried once, never waited for, so another process holding
+            // it at this instant fails the append. The send is already recorded
+            // by its intent; only Tally's answer goes unrecorded. Tally did
+            // answer, so the call says so, with its counters, rather than that
+            // the create may have been sent.
+            let answer_recorded =
+                ExclusiveAdmission::acquire(&self.settings.data_dir).and_then(|lock| {
+                    append(
+                        &self.settings.data_dir,
+                        &lock,
+                        MasterRecord::DispatchResponse(response.clone()),
+                    )
+                    .map_err(|error| error.code().to_string())
+                });
+            if let Err(code) = answer_recorded {
+                return Ok(Step::Done(Box::new(ToolOutcome {
+                    payload: json!({"result":{
+                        "batch_id": batch.batch_id,
+                        "state": "posted_unverified",
+                        "attempt_recorded": true,
+                        "answer_recorded": false,
+                        "dispatch": {"state": "dispatched", "resent": false},
+                        "counters": counters_json(response.counters.as_ref()),
+                        "verification": {"attempted": false, "error": {"code": code}},
+                        "note": ANSWER_UNRECORDED_NOTE,
+                    }}),
+                    evidence: accumulated.clone(),
+                    company_guid: Some(guid.clone()),
+                    truncated: false,
+                })));
             }
             // The book as it stands now, with the intent and the answer just
             // recorded: read back and judged. Only a read-back that cannot be

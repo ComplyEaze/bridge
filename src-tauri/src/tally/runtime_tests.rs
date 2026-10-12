@@ -1649,12 +1649,11 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
 /// Pins Bridge's handling of a read whose connection closes after the whole
 /// request was received and before any response: the transport calls it
 /// `RequestFailed`, and the read retry policy sends it again, three sends in
-/// all. Only small reads use that policy, so the re-send is kept (#1658). The
-/// double is local; this measures Bridge's mapping and retry count, not what a
-/// real Tally does when it closes.
+/// all. The read retry policy also serves the connector's reads; see #1658.
+/// The double is local; this measures Bridge's mapping and retry count, not
+/// what a real Tally does when it closes.
 #[tokio::test]
-async fn a_small_read_is_sent_three_times_when_its_connection_closes_after_the_request_was_received(
-) {
+async fn a_read_is_sent_three_times_when_its_connection_closes_after_the_request_was_received() {
     const MAX_HOST_ABORT_ATTEMPTS: usize = 3;
     for attempt in 1..=MAX_HOST_ABORT_ATTEMPTS {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")

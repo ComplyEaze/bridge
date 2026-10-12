@@ -1,0 +1,40 @@
+(b) aw20-a vs W19 aw19-e-1 (status fields only)
+aw20-a: 32 vouchers, aw19-e-1: 32 vouchers; only in aw20-a: []; only in aw19-e-1: []
+  vouchers with a difference in ['ALTERID', 'MASTERID', 'ISGSTOVERRIDDEN', 'VCHGSTSTATUSISINCLUDED', 'VCHGSTSTATUSISUNCERTAIN', 'VCHGSTSTATUSISEXCLUDED', 'ISDELETED']: 0
+(d) aw20-a vs aw20-b (status fields)
+aw20-a: 32 vouchers, aw20-b: 32 vouchers; only in aw20-a: []; only in aw20-b: []
+  vouchers with a difference in ['ALTERID', 'MASTERID', 'ISGSTOVERRIDDEN', 'VCHGSTSTATUSISINCLUDED', 'VCHGSTSTATUSISUNCERTAIN', 'VCHGSTSTATUSISEXCLUDED', 'ISDELETED']: 0
+(c) aw20-b ISCANCELLED / ISOPTIONAL per voucher (count of each tag in the voucher text)
+  BP/26-27/0001    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0002    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0003    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0004    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0005    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0006    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0007    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0008    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0009    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0011    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0010    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0012    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0013    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0014    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0015    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0016    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0019    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0021    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  5                ISCANCELLED ['No'] ISOPTIONAL ['No']
+  6                ISCANCELLED ['No'] ISOPTIONAL ['No']
+  7                ISCANCELLED ['No'] ISOPTIONAL ['No']
+  8                ISCANCELLED ['No'] ISOPTIONAL ['No']
+  9                ISCANCELLED ['No'] ISOPTIONAL ['No']
+  10               ISCANCELLED ['No'] ISOPTIONAL ['No']
+  11               ISCANCELLED ['No'] ISOPTIONAL ['No']
+  12               ISCANCELLED ['No'] ISOPTIONAL ['No']
+  13               ISCANCELLED ['No'] ISOPTIONAL ['No']
+  14               ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0041    ISCANCELLED ['Yes'] ISOPTIONAL ['No']   <--
+  BP/26-27/0042    ISCANCELLED ['No'] ISOPTIONAL ['Yes']   <--
+  BP/26-27/0043    ISCANCELLED ['No'] ISOPTIONAL ['No']
+  BP/26-27/0044    ISCANCELLED ['No'] ISOPTIONAL ['No']
+aw20-a ISCANCELLED tags: 0 ISOPTIONAL tags: 0

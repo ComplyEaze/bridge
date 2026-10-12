@@ -77,8 +77,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let mut input = payload();
     for entry in input
@@ -114,8 +113,7 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let mut input = payload();
     input.vouchers[0].narration = Some("Paid \u{fffd}#5; settled".into());
@@ -146,8 +144,7 @@ async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_n
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let build = |input: &ImportPayload<String>| {
         let args = serde_json::to_value(input).unwrap();
@@ -432,8 +429,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     };
     let server = Server::new(settings.clone());
     let append_admission = server
@@ -471,8 +467,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
@@ -595,8 +590,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -730,8 +724,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -1098,8 +1091,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let input = admitted_payload();
     let line = ImportLedgerLine {
@@ -2222,8 +2214,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             max_bytes: 200_000,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -2703,8 +2694,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let response = server
         .call_tool_response("build_import_xml", serde_json::to_value(unique).unwrap())
@@ -2971,9 +2961,10 @@ fn verify_observed_batch(line: &ImportLedgerLine, rows: &[ReadVoucher]) -> Resul
 
 #[tokio::test]
 async fn built_batch_guidance_matches_the_saved_native_admission() {
+    // Posting on admits a batch of 2 under the same setting (#1090).
     for (writes_enabled, voucher_count, numbered, native) in [
         (true, 1, false, true),
-        (true, 2, false, false),
+        (true, 2, false, true),
         (true, 1, true, false),
         (false, 1, false, false),
     ] {
@@ -2990,8 +2981,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::from_enabled(writes_enabled),
         });
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
@@ -3071,29 +3061,27 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
 }
 
 /// bridge#866: the build's warning names the refusal `post_import` returns for
-/// that saved batch, not one fixed reason, and reflects the batch-posting
-/// setting. Each case is a different admission family.
+/// that saved batch, not one fixed reason. Each case is a different admission
+/// family. Posting on admits a batch of 2 (one setting governs every post,
+/// #1090), so a 2-voucher batch is no refusal.
 #[tokio::test]
 async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
-    // (batch posting, vouchers, edit, refusal the build must name)
+    // (vouchers, edit, refusal the build must name)
     type Edit = fn(&mut ImportPayload<String>);
-    let cases: [(bool, usize, Edit, Option<&str>); 4] = [
-        (false, 2, |_| {}, Some("import_post_requires_one_voucher")),
-        (true, 2, |_| {}, None),
+    let cases: [(usize, Edit, Option<&str>); 3] = [
+        (2, |_| {}, None),
         (
-            false,
             1,
             |input| input.vouchers[0].voucher_number = Some("TEST-1".into()),
             Some("import_post_numbered_journal_unsupported"),
         ),
         (
-            false,
             1,
             |input| input.vouchers[0].narration = Some("line one\u{2028}line two".into()),
             Some("import_review_layout_text"),
         ),
     ];
-    for (batch_post_enabled, voucher_count, edit, refusal) in cases {
+    for (voucher_count, edit, refusal) in cases {
         let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec())
             .expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
@@ -3107,8 +3095,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: true,
-            batch_post_enabled,
+            posting: crate::agent::Posting::On,
         });
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
@@ -3147,61 +3134,43 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
                 );
             }
         }
-        if refusal == Some("import_post_requires_one_voucher") {
-            assert!(first.contains("batch posting is off"), "{first}");
-            // Refused before any Tally request, with the same code.
-            let response = server
-                .call_tool_response(
-                    "post_import",
-                    json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
-                )
-                .await;
-            assert_eq!(
-                response.value["structuredContent"]["result"]["error"]["code"],
-                "import_post_requires_one_voucher",
-                "{}",
-                response.value
-            );
-        }
         assert_eq!(simulator.finish().unwrap().len(), 32);
     }
 }
 
-/// The count rule in the warning follows the batch-posting setting (#866).
+/// The count rule in the warning is the batch cap: the build asks only while
+/// posting is on, and posting on admits a batch (#866, #1090).
 #[test]
 fn refusal_reason_states_the_current_voucher_limit() {
-    let off = native_post_refusal_reason("import_post_requires_one_voucher", 1);
+    let on = native_post_refusal_reason("import_post_requires_one_voucher");
     assert!(
-        off.contains("one voucher (the limit while batch posting is off)"),
-        "{off}"
+        on.contains("native posting takes 1 to 50 vouchers,"),
+        "{on}"
     );
-    let on = native_post_refusal_reason("import_post_requires_one_voucher", 50);
-    assert!(on.contains("1 to 50 vouchers"), "{on}");
-    assert!(!on.contains("batch posting is off"), "{on}");
-    let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported", 1);
+    let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported");
     assert!(numbered.contains("carries its own number"), "{numbered}");
     for code in ["import_review_layout_text", "import_review_format_text"] {
         assert_eq!(
-            native_post_refusal_reason(code, 1),
+            native_post_refusal_reason(code),
             "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)",
             "{code}"
         );
     }
-    let dialog = native_post_refusal_reason("import_review_too_large", 1);
+    let dialog = native_post_refusal_reason("import_review_too_large");
     assert!(
         dialog.contains("does not fit in one native dialog"),
         "{dialog}"
     );
-    let too_large = native_post_refusal_reason("import_post_batch_too_large", 50);
+    let too_large = native_post_refusal_reason("import_post_batch_too_large");
     assert!(too_large.contains("(50)"), "{too_large}");
-    let unmarked = native_post_refusal_reason("import_review_on_account_unmarked", 1);
+    let unmarked = native_post_refusal_reason("import_review_on_account_unmarked");
     assert!(
         unmarked.contains("without its On Account mark"),
         "{unmarked}"
     );
     // An unlisted code keeps its own name in the warning and a neutral reason.
     let (warnings, _) =
-        build_import_guidance(true, Some("import_something_new"), 1, false, false, false);
+        build_import_guidance(true, Some("import_something_new"), false, false, false);
     assert!(warnings[0]
         .as_str()
         .unwrap()
@@ -3377,8 +3346,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let line = ImportLedgerLine {
         ledger_identities: None,
@@ -3508,8 +3476,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             max_bytes,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         })
     };
     let page = json!({"items": [], "dispatch": {"response": {"outcome": {
@@ -3554,8 +3521,7 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3598,8 +3564,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             max_bytes,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         })
     };
     let server = server_with(200_000);
@@ -3740,8 +3705,7 @@ async fn verify_saved_batch_after_dispatch(
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3819,8 +3783,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))
@@ -3974,8 +3937,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             max_bytes: 200_000,
             redaction: super::super::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         let built = server
             .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4082,8 +4044,7 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("json"))
@@ -4564,8 +4525,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             max_bytes: 200_000,
             redaction,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         })
     };
     let masked = server_with(super::super::Redaction::MaskParties);

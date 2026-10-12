@@ -162,8 +162,7 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         max_bytes: 200_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     }
 }
 
@@ -895,8 +894,7 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -949,8 +947,7 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     };
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
@@ -1013,8 +1010,7 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -1074,8 +1070,7 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
     assert_eq!(
@@ -1328,8 +1323,7 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     server.call_tool("voucher_schema", json!({})).await;
     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
@@ -1414,6 +1408,110 @@ fn a_ledger_resolves_only_on_its_spelling_or_ascii_case_and_spaces() {
             similar: Vec::new()
         })
     );
+}
+
+/// An upgrade stores no value for the new posting key, so a host may pass the
+/// manifest's placeholder unresolved, or an empty string: both read as off, and
+/// the server keeps every read. A typo still fails loud.
+#[test]
+fn the_posting_setting_reads_an_absent_empty_or_unresolved_value_as_off() {
+    assert_eq!(posting_setting(None), Ok(false));
+    assert_eq!(posting_setting(Some("")), Ok(false));
+    assert_eq!(posting_setting(Some(POSTING_PLACEHOLDER)), Ok(false));
+    for on in ["1", "true"] {
+        assert_eq!(posting_setting(Some(on)), Ok(true), "{on}");
+    }
+    for off in ["0", "false"] {
+        assert_eq!(posting_setting(Some(off)), Ok(false), "{off}");
+    }
+    for bad in [
+        "probe",
+        "TRUE",
+        "yes",
+        " true",
+        " ",
+        // Another key's placeholder, the released posting key's included, is not this key's.
+        "${user_config.accept_terms_2026_10_1}",
+        "${user_config.enable_writes}",
+        "${user_config.enable_posting_2026_10} ",
+        "${user_config.enable_posting_2026_10",
+    ] {
+        assert_eq!(
+            posting_setting(Some(bad)),
+            Err("boolean_setting_invalid".to_string()),
+            "{bad:?} must still fail at settings admission"
+        );
+    }
+}
+
+/// The placeholder the server tolerates is the one the manifest passes for the
+/// posting setting, so the two cannot drift, and the released key is gone.
+#[test]
+fn the_tolerated_posting_placeholder_is_the_manifests_own_mapping() {
+    let manifest: Value =
+        serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
+    let mapped = &manifest["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_WRITES"];
+    assert_eq!(
+        mapped.as_str(),
+        Some(format!("${{user_config.{POSTING_SETTING_KEY}}}").as_str())
+    );
+    assert_eq!(mapped.as_str(), Some(POSTING_PLACEHOLDER));
+    assert!(manifest["user_config"][POSTING_SETTING_KEY].is_object());
+    assert!(manifest["user_config"].get("enable_writes").is_none());
+}
+
+/// One setting governs every post (#1090). The retired batch setting counts only
+/// while posting is on, and then it refuses `post_import` rather than posting.
+#[test]
+fn posting_follows_its_setting_and_the_retired_batch_setting_only_refuses() {
+    assert_eq!(Posting::from_settings(false, false), Posting::Off);
+    assert_eq!(Posting::from_settings(false, true), Posting::Off);
+    assert_eq!(Posting::from_settings(true, false), Posting::On);
+    assert_eq!(
+        Posting::from_settings(true, true),
+        Posting::RetiredSettingPresent
+    );
+    assert!(Posting::RetiredSettingPresent.enabled());
+    assert!(!Posting::Off.enabled());
+}
+
+/// `Settings::from_env` reads the posting key through the tolerant function
+/// only, and passes whether the retired batch setting is present at all.
+#[test]
+fn settings_read_posting_through_the_tolerant_function_and_the_retired_name() {
+    assert_eq!(RETIRED_BATCH_POST_SETTING, "BRIDGE_AGENT_ENABLE_BATCH_POST");
+    let source = include_str!("agent.rs");
+    let start = source.find("impl Settings {").unwrap();
+    let body = &source[start..start + source[start..].find("\n}\n").unwrap()];
+    assert!(body.contains("posting_setting("), "{body}");
+    assert!(body.contains("\"BRIDGE_AGENT_ENABLE_WRITES\""), "{body}");
+    assert!(
+        !body.contains("enabled_setting(\"BRIDGE_AGENT_ENABLE_WRITES\")"),
+        "{body}"
+    );
+    assert!(
+        body.contains("env::var_os(RETIRED_BATCH_POST_SETTING).is_some()"),
+        "{body}"
+    );
+}
+
+/// Only the posting key tolerates a placeholder: every other boolean setting
+/// still refuses one. `enabled_setting` reads the process environment, so this
+/// uses a name no other code reads (hermetic).
+#[test]
+fn other_boolean_settings_still_refuse_an_unresolved_placeholder() {
+    const NAME: &str = "BRIDGE_TEST_ONLY_BOOLEAN_PLACEHOLDER_SETTING";
+    std::env::set_var(NAME, POSTING_PLACEHOLDER);
+    let placeholder = enabled_setting(NAME);
+    std::env::set_var(NAME, "");
+    let empty = enabled_setting(NAME);
+    std::env::set_var(NAME, "true");
+    let on = enabled_setting(NAME);
+    std::env::remove_var(NAME);
+    assert_eq!(placeholder, Err("boolean_setting_invalid".to_string()));
+    assert_eq!(empty, Err("boolean_setting_invalid".to_string()));
+    assert_eq!(on, Ok(true));
+    assert_eq!(enabled_setting(NAME), Ok(false));
 }
 
 #[test]
@@ -1789,8 +1887,7 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
     assert_eq!(
@@ -1816,8 +1913,7 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
@@ -2200,8 +2296,7 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
     assert!(down_response["structuredContent"]["result"]["error"]["code"].is_string());
@@ -2535,8 +2630,7 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
     let record = |index: usize| Evidence {
@@ -2598,8 +2692,7 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         for index in 0..3 {
             server.record_evidence(Evidence {

@@ -1750,7 +1750,7 @@ fn a_joined_approval_is_posted_in_its_call_only_while_the_measured_redeem_fits()
 #[test]
 fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
     let (one, _) = saved_batch(&server);
     let endpoint = server.settings.endpoint.clone();
     let narration_line = |line: &ImportLedgerLine| {
@@ -1819,7 +1819,7 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
 #[test]
 fn the_agent_preview_says_when_the_post_happens() {
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
     let (one, _) = saved_batch(&server);
     let endpoint = server.settings.endpoint.clone();
     let [now] = agent_post_timing_lines();

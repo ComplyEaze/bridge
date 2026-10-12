@@ -165,8 +165,7 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let response = server
             .call_tool(
@@ -519,8 +518,7 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
             max_bytes: 16_000_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let response = server
             .call_tool(
@@ -572,8 +570,7 @@ async fn movement_call(plans: Vec<ScenarioPlan>, guid: &str, ledger: &str) -> (V
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let response = server
         .call_tool(
@@ -776,8 +773,7 @@ fn movement_server(
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     server.runtime = TallyRuntime::with_transport_policy(policy);
     (server, directory)

@@ -301,8 +301,7 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let mut args = json!({"company_guid":"00000000-0000-4000-8000-000000000001",
         "from":"20260901","to":"20260902","voucher_type":"名".repeat(1025)});
@@ -337,8 +336,7 @@ async fn unqualified_change_feed_is_hidden_and_direct_calls_refuse_before_tally(
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     // A dispatched read against this unavailable endpoint would return a
     // transport/company failure, not the explicit admission refusal.
@@ -380,8 +378,7 @@ async fn verification_remains_catalogued_and_admitted_when_import_and_writes_are
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let response = server.call_tool_response("verify_import", json!({})).await;
     assert_eq!(response.value["isError"], true);
@@ -405,8 +402,7 @@ async fn master_validation_rejects_unbounded_and_blank_names_before_tally() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     for ledgers in [
         json!([""]),
@@ -452,8 +448,7 @@ async fn ledger_selectors_are_bounded_before_company_or_catalogue_reads() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     for tool in ["vouchers", "ledger_movement"] {
         for ledger in ["x".repeat(1025), " ".into(), String::new()] {
@@ -488,8 +483,7 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         max_bytes: 5_000_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     for key in ["unknown".to_string(), "x".repeat(1_000_000)] {
         let value = server.call_tool("tally_status", json!({key: null})).await;
@@ -936,9 +930,9 @@ fn the_vouchers_description_does_not_say_a_capture_showed_post_dated_omitted() {
 fn the_posting_setting_keeps_each_known_limit() {
     let manifest: Value =
         serde_json::from_str(include_str!("../../packaging/mcpb/manifest.json")).unwrap();
-    let writes = manifest["user_config"]["enable_writes"]["description"]
+    let writes = manifest["user_config"]["enable_posting_2026_10"]["description"]
         .as_str()
-        .expect("the enable_writes setting has a description");
+        .expect("the enable_posting_2026_10 setting has a description");
     const LIMITS: &[(&str, &str)] = &[
         ("Off by default", "the setting says posting is off until the person turns it on"),
         (
@@ -994,6 +988,47 @@ fn the_posting_setting_keeps_each_known_limit() {
         (
             "can do so without it",
             "limit 4: that connector can change entries without the approval",
+        ),
+        (
+            "This is a new setting",
+            "an upgrader's earlier posting choice does not carry over (#1090): it consented to one voucher at a time",
+        ),
+        ("2 to 50", "the batch size the post admits"),
+        (
+            "shows a summary: the totals for each ledger",
+            "a batch's window shows per-ledger totals, not each voucher",
+        ),
+        (
+            "only when there are 10 or fewer",
+            "per-voucher lines appear only for small batches",
+        ),
+        (
+            "and those lines fit",
+            "per-voucher lines that do not fit leave the totals only, so 10 or fewer is a ceiling",
+        ),
+        (
+            "creates only some vouchers of a batch",
+            "batch limit 5: a batch can land partly",
+        ),
+        (
+            "which ones it finds in the book and which it does not",
+            "batch limit 5: the report is per voucher, by what the read-back finds",
+        ),
+        (
+            "refuses to post the missing ones again",
+            "batch limit 5: rows of a sent batch are refused if posted again",
+        ),
+        (
+            "check each in Tally",
+            "batch limit 5: a voucher not found may be absent or edited, so the person checks it",
+        ),
+        (
+            "may still be in Tally, edited: do not re-enter it before you check",
+            "batch limit 5: a voucher not found is never re-entered unchecked, since it may be edited, not absent",
+        ),
+        (
+            "more than 50, or one whose summary does not fit the window",
+            "batch limit 6: the cap and the window's size, each refused rather than cut",
         ),
         (
             "that writes nothing to Tally",

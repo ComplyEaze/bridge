@@ -18,8 +18,7 @@ fn server(path: &Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::MaskParties,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 
@@ -117,7 +116,7 @@ async fn served_instructions(import_enabled: bool, writes_enabled: bool) -> Stri
     let directory = tempfile::tempdir().unwrap();
     let mut served = server(directory.path());
     served.settings.import_enabled = import_enabled;
-    served.settings.writes_enabled = writes_enabled;
+    served.settings.posting = Posting::from_enabled(writes_enabled);
     let responses = session(served, &[initialize("2025-06-18")]).await;
     responses[0]["result"]["instructions"]
         .as_str()
@@ -215,7 +214,7 @@ async fn every_served_description_and_instruction_pairs_its_backticks() {
         let mut served = server(directory.path());
         served.settings.max_bytes = 4_000_000;
         served.settings.import_enabled = import_enabled;
-        served.settings.writes_enabled = writes_enabled;
+        served.settings.posting = Posting::from_enabled(writes_enabled);
         let responses = session(
             served,
             &[

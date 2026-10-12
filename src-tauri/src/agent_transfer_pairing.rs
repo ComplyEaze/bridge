@@ -281,6 +281,14 @@ pub(crate) fn transfer_pairing_view(
         })
         .collect();
 
+    // A Contra booked from two statements pairs with nothing: which of the two
+    // is the real one is not for this view to say.
+    let double_booked = double_booked(&contras, &buckets, k_days);
+    let doubled: BTreeSet<&ContraKey> = double_booked
+        .iter()
+        .flat_map(|found| [&found.first, &found.second])
+        .collect();
+
     // Round 1: equal references.
     let mut reference_edges: Vec<Vec<usize>> = Vec::new();
     let mut contra_reference_edges: Vec<Vec<usize>> = vec![Vec::new(); contras.len()];
@@ -299,7 +307,10 @@ pub(crate) fn transfer_pairing_view(
     let mut contra_taken = vec![false; contras.len()];
     for (s, edges) in reference_edges.iter().enumerate() {
         if let [c] = edges[..] {
-            if contra_reference_edges[c].len() == 1 && is_verified(contras[c]) {
+            if contra_reference_edges[c].len() == 1
+                && is_verified(contras[c])
+                && !doubled.contains(&contras[c].key)
+            {
                 pairs[s] = Some((PairRound::Reference, c));
                 contra_taken[c] = true;
             }
@@ -328,6 +339,7 @@ pub(crate) fn transfer_pairing_view(
                 && contra_reference_edges[c].is_empty()
                 && contra_loose_edges[c].len() == 1
                 && is_verified(contras[c])
+                && !doubled.contains(&contras[c].key)
             {
                 pairs[s] = Some((PairRound::NoReference, c));
             }
@@ -339,6 +351,20 @@ pub(crate) fn transfer_pairing_view(
         .enumerate()
         .map(|(s, skip)| {
             let state = match pairs[s] {
+                // A pair by date claims that nothing else exists, so both
+                // statements must be known around the dates it rests on.
+                Some((PairRound::NoReference, c))
+                    if !(covers(coverage, skip, &skip.other_ledger, &skip.date, k_days)
+                        && covers(
+                            coverage,
+                            skip,
+                            &skip.key.bank_ledger,
+                            &contras[c].date,
+                            k_days,
+                        )) =>
+                {
+                    SkipState::NotEstablished
+                }
                 Some((round, c)) => SkipState::Paired {
                     round,
                     contra: contras[c].key.clone(),
@@ -358,7 +384,7 @@ pub(crate) fn transfer_pairing_view(
 
     Ok(TransferView {
         skips: states,
-        double_booked: double_booked(&contras, &buckets, k_days),
+        double_booked,
     })
 }
 
@@ -449,7 +475,7 @@ fn open_state(
     k_days: u32,
 ) -> SkipState {
     if candidates.is_empty() {
-        return if covers(coverage, skip, k_days) {
+        return if covers(coverage, skip, &skip.other_ledger, &skip.date, k_days) {
             SkipState::NotFound
         } else {
             SkipState::NotEstablished
@@ -478,13 +504,20 @@ fn open_state(
     SkipState::Ambiguous { candidates: keys }
 }
 
-/// Whether the other ledger's verified windows hold the skip's whole
-/// date -/+ k interval. Windows that overlap or touch are one window.
-fn covers(coverage: &Coverage, skip: &SkipFact, k_days: u32) -> bool {
+/// Whether the ledger's verified windows (same company and endpoint as the
+/// skip) hold the whole `date` -/+ k interval. Windows that overlap or touch
+/// are one window.
+fn covers(
+    coverage: &Coverage,
+    skip: &SkipFact,
+    ledger: &LedgerGuid,
+    date: &TallyDate,
+    k_days: u32,
+) -> bool {
     let Some(windows) = coverage.0.get(&(
         skip.key.company.clone(),
         skip.key.endpoint_origin.clone(),
-        skip.other_ledger.clone(),
+        ledger.clone(),
     )) else {
         return false;
     };
@@ -514,7 +547,7 @@ fn covers(coverage: &Coverage, skip: &SkipFact, k_days: u32) -> bool {
     };
     merged
         .iter()
-        .any(|(from, to)| room(from, &skip.date) && room(&skip.date, to))
+        .any(|(from, to)| room(from, date) && room(date, to))
 }
 
 /// Contra pairs between two different bank statements for one transfer.

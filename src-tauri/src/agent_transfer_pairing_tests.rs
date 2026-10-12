@@ -103,15 +103,17 @@ fn window(from: &str, to: &str) -> ParseWindow {
     }
 }
 
-/// b1's statement for January is verified.
+/// Both banks' statements for January are verified.
 fn january_covered() -> Coverage {
     let mut coverage = Coverage::default();
-    coverage.add(
-        CompanyGuid::new("co"),
-        EndpointOrigin::new("ep"),
-        ledger("b1"),
-        window("20260101", "20260131"),
-    );
+    for bank in ["b1", "b2"] {
+        coverage.add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep"),
+            ledger(bank),
+            window("20260101", "20260131"),
+        );
+    }
     coverage
 }
 
@@ -428,12 +430,167 @@ fn transfer_pairing_without_coverage_an_absent_contra_is_not_established() {
     assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
     let view = view_of(&[skip("st-1")], &[], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
-    // a skip that paired needs no coverage
+    // a pair by date claims that nothing else exists, which needs coverage
     let view = view_of(&[skip("st-1")], &[contra("batch-1", "t1")], &none, 0);
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
+    // a pair by reference stands on the reference alone
+    let mut referenced = skip("st-1");
+    referenced.reference = Some(reference("600000000001"));
+    let mut carried = contra("batch-1", "t1");
+    carried.reference = Some(reference("600000000001"));
+    let view = view_of(&[referenced], &[carried], &none, 0);
     assert_eq!(
         state_of(&view, "st-1"),
+        paired(PairRound::Reference, "batch-1", "t1")
+    );
+}
+
+fn covering(windows: &[(&str, &str, &str)]) -> Coverage {
+    let mut coverage = Coverage::default();
+    for (bank, from, to) in windows {
+        coverage.add(
+            CompanyGuid::new("co"),
+            EndpointOrigin::new("ep"),
+            ledger(bank),
+            window(from, to),
+        );
+    }
+    coverage
+}
+
+#[test]
+fn transfer_pairing_a_date_pair_needs_both_ledgers_windows_around_its_dates() {
+    // the Contra is on the 5th, the skip on the 6th, k = 1
+    let mut c0 = contra("batch-1", "t1");
+    c0.date = date("20260105");
+    let mut s1 = skip("st-1");
+    s1.date = date("20260106");
+    let state =
+        |coverage: Coverage| state_of(&view_of(&[s1.clone()], &[c0.clone()], &coverage, 1), "st-1");
+    // b1 stops on the 5th and b2 starts on the 6th: neither side holds its half
+    assert_eq!(
+        state(covering(&[
+            ("b1", "20260101", "20260105"),
+            ("b2", "20260106", "20260131")
+        ])),
+        SkipState::NotEstablished
+    );
+    // b1 holds the skip's 5th-7th, but b2 starts on the 6th and misses the
+    // Contra's 4th
+    assert_eq!(
+        state(covering(&[
+            ("b1", "20260101", "20260131"),
+            ("b2", "20260106", "20260131")
+        ])),
+        SkipState::NotEstablished
+    );
+    // b2 holds the Contra's 4th-6th, but b1 stops on the 5th and misses the
+    // skip's 7th
+    assert_eq!(
+        state(covering(&[
+            ("b1", "20260101", "20260105"),
+            ("b2", "20260101", "20260131")
+        ])),
+        SkipState::NotEstablished
+    );
+    // both hold theirs
+    assert_eq!(
+        state(covering(&[
+            ("b1", "20260104", "20260107"),
+            ("b2", "20260104", "20260106")
+        ])),
         paired(PairRound::NoReference, "batch-1", "t1")
     );
+}
+
+#[test]
+fn transfer_pairing_a_double_booked_contra_never_pairs() {
+    // b1's statement posted the Contra, and b2's statement posted one too
+    let mut other_lineage = skip("st-1");
+    other_lineage.lineage = LineageId::new("lineage-b2");
+    let b2_contra = |batch: &str, txn: &str| {
+        let mut fact = contra_from_b2(batch, txn);
+        fact.lineage = LineageId::new("lineage-b2-amended");
+        fact
+    };
+    // no reference: listed, and the only candidate no longer pairs
+    let view = view_of(
+        &[other_lineage.clone()],
+        &[contra("batch-1", "t1"), b2_contra("batch-2", "t2")],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(view.double_booked.len(), 1);
+    assert_eq!(state_of(&view, "st-1"), ambiguous(&[("batch-1", "t1")]));
+    // equal references: the pair by reference is refused for the same reason
+    let mut referenced = other_lineage;
+    referenced.reference = Some(reference("600000000001"));
+    let mut first = contra("batch-1", "t1");
+    first.reference = Some(reference("600000000001"));
+    let mut second = b2_contra("batch-2", "t2");
+    second.reference = Some(reference("600000000001"));
+    let view = view_of(&[referenced], &[first, second], &january_covered(), 0);
+    assert_eq!(
+        view.double_booked[0].class,
+        DoubleBookedClass::RefuseAtBuild
+    );
+    assert_eq!(state_of(&view, "st-1"), ambiguous(&[("batch-1", "t1")]));
+}
+
+#[test]
+fn transfer_pairing_a_reference_ambiguity_is_not_a_way_in_for_a_referenceless_skip() {
+    // two skips and a Contra share one reference; a third skip, with none,
+    // matches the Contra by amount and day
+    let mut first = skip("st-1");
+    first.reference = Some(reference("600000000001"));
+    let mut second = skip("st-2");
+    second.reference = Some(reference("600000000001"));
+    let third = skip("st-3");
+    let mut c = contra("batch-1", "t1");
+    c.reference = Some(reference("600000000001"));
+    let view = view_of(&[first, second, third], &[c], &january_covered(), 0);
+    for row in ["st-1", "st-2", "st-3"] {
+        assert_eq!(
+            state_of(&view, row),
+            ambiguous(&[("batch-1", "t1")]),
+            "{row}"
+        );
+    }
+}
+
+#[test]
+fn transfer_pairing_a_contra_paired_by_reference_is_not_a_candidate_by_date() {
+    let mut referenced = skip("st-1");
+    referenced.reference = Some(reference("600000000001"));
+    let mut c = contra("batch-1", "t1");
+    c.reference = Some(reference("600000000001"));
+    let view = view_of(&[referenced, skip("st-2")], &[c], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        paired(PairRound::Reference, "batch-1", "t1")
+    );
+    // st-2 matches the same amount and day, but that Contra is spoken for
+    assert_eq!(state_of(&view, "st-2"), SkipState::NotFound);
+}
+
+#[test]
+fn transfer_pairing_a_window_inside_another_does_not_shorten_it() {
+    // January 1st-10th with a window nested in it: the 8th is still covered
+    let mut eighth = skip("st-1");
+    eighth.date = date("20260108");
+    for windows in [
+        [
+            ("b1", "20260101", "20260110"),
+            ("b1", "20260102", "20260105"),
+        ],
+        [
+            ("b1", "20260102", "20260105"),
+            ("b1", "20260101", "20260110"),
+        ],
+    ] {
+        let view = view_of(&[eighth.clone()], &[], &covering(&windows), 0);
+        assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+    }
 }
 
 #[test]
@@ -826,7 +983,7 @@ fn transfer_pairing_the_result_does_not_depend_on_input_order() {
         window("20260116", "20260131"),
     ];
     let covered = |halves: &[ParseWindow]| {
-        let mut coverage = Coverage::default();
+        let mut coverage = covering(&[("b2", "20260101", "20260131")]);
         for half in halves {
             coverage.add(
                 CompanyGuid::new("co"),

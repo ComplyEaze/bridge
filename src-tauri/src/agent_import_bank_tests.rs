@@ -1337,6 +1337,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
+            statement: None,
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,

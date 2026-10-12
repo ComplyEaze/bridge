@@ -729,6 +729,32 @@ pub(super) fn vouchers_already_posted(
     Ok(holds_a_row.intersection(&sent_or_found).next().cloned())
 }
 
+/// The facts the transfer pairing view takes for one company: the journal
+/// (every record admitted, as for every other read) and the skip-only file.
+// B2's tools are the first caller.
+#[allow(dead_code)]
+pub(super) fn transfer_facts(
+    journal: impl BufRead,
+    skips_file: impl BufRead,
+    company_guid: &str,
+) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
+    use statement_facts::{BuildLine, JournalEvent, TransferFactsError};
+    let mut events = Vec::new();
+    scan_records(journal, |record, _| match record {
+        Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
+        Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
+            sent: matches!(update.record_type, StatusKind::DispatchIntent),
+            batch_id: update.batch_id,
+            status: update.status,
+        }),
+        Record::Status(_) => {}
+    })
+    .map_err(|code| TransferFactsError::JournalUnreadable { code })?;
+    let skip_records = statement_facts::read_skip_records(skips_file)
+        .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
+    statement_facts::build_transfer_facts(events, skip_records, company_guid)
+}
+
 fn scan_records(
     mut reader: impl BufRead,
     mut visit: impl FnMut(Record, VerificationGeneration),
@@ -966,7 +992,7 @@ fn admit_post_span_verdict(
     }
 }
 
-fn read_record(reader: &mut impl BufRead, line: &mut Vec<u8>) -> Result<bool, String> {
+pub(super) fn read_record(reader: &mut impl BufRead, line: &mut Vec<u8>) -> Result<bool, String> {
     line.clear();
     loop {
         let available = reader

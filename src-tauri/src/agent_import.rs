@@ -63,7 +63,12 @@ mod persistence;
 mod post;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
+// Nothing writes statement facts yet, so nothing reads them outside tests.
+#[allow(dead_code)]
+#[path = "agent_import_statement_facts.rs"]
+mod statement_facts;
 pub(super) use approval::PostApprovals;
+use statement_facts::StatementFacts;
 #[path = "agent_import_verification.rs"]
 mod verification;
 use std::path::{Path, PathBuf};
@@ -338,13 +343,14 @@ pub(super) struct ImportLedgerLine {
     /// resolves to another GUID. Absent on records built before this field
     /// existed: such a batch is refused for posting and must be rebuilt.
     ///
-    /// Written as `ledger_identities_2`. Releases 0.3.0 to 0.4.2 read only
-    /// `ledger_identities`, find none, and refuse the batch as built before
-    /// this record (`import_batch_predates_ledger_binding`), which is their
-    /// one refusal of a record they cannot check. They do not read the two
-    /// records below, so without this they would post a batch this build
-    /// saved, with neither check. The old name is still read, for a batch one
-    /// of them saved. No writer may write both names: a record carrying both
+    /// Written as `ledger_identities_3`. Releases 0.3.0 to 0.4.2 read only
+    /// `ledger_identities`, and the releases after them only
+    /// `ledger_identities_2`; each finds none here and refuses the batch as
+    /// built before this record (`import_batch_predates_ledger_binding`),
+    /// which is their one refusal of a record they cannot check. They do not
+    /// read `statement` or the two records below, so without this they would
+    /// post a batch this build saved without the checks those records feed.
+    /// Both earlier names are still read, for a batch one of them saved. No writer may write both names: a record carrying both
     /// does not parse, and the journal reader refuses the whole history on a
     /// record it cannot parse. When a record is added to or removed from a saved
     /// batch, write this one under a new name again and keep every earlier
@@ -352,7 +358,8 @@ pub(super) struct ImportLedgerLine {
     /// compiling, or fails, until that is looked at.
     #[serde(
         default,
-        rename = "ledger_identities_2",
+        rename = "ledger_identities_3",
+        alias = "ledger_identities_2",
         alias = "ledger_identities",
         skip_serializing_if = "Option::is_none"
     )]
@@ -377,6 +384,14 @@ pub(super) struct ImportLedgerLine {
     /// `ledger_identities`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     on_account_approved: Option<Vec<bill_wise::OnAccountApproved>>,
+    /// What a bank-statement build recorded for the transfer pairing view: its
+    /// skipped rows, its Contras and the dates it read in full. Absent on every
+    /// build that is not a statement build, and on all older records. A release
+    /// older than this field does not read it (this struct does not deny
+    /// unknown fields); the binding's written name keeps those releases from
+    /// posting the batch (see `ledger_identities`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    statement: Option<StatementFacts>,
 }
 
 /// A ledger a bank cash answer named as cash in hand, and the voucher built
@@ -1182,6 +1197,7 @@ impl Server {
                         .collect(),
                 ),
                 on_account_approved: Some(on_account_approved),
+                statement: None,
             };
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));

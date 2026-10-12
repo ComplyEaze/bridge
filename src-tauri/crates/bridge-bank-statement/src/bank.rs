@@ -371,9 +371,8 @@ impl BankReference {
 impl<'de> Deserialize<'de> for BankReference {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let text = String::deserialize(deserializer)?;
-        Self::from_recorded(&text).ok_or_else(|| {
-            serde::de::Error::custom("not a reference a statement row can carry")
-        })
+        Self::from_recorded(&text)
+            .ok_or_else(|| serde::de::Error::custom("not a reference a statement row can carry"))
     }
 }
 

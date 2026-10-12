@@ -32,6 +32,7 @@
 use super::*;
 use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
+use bridge_bank_statement::bank::BankReference;
 use bridge_bank_statement::cash::{CashAnswer, CashAnswerRow, CashAnswers, CashMovement};
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
@@ -39,7 +40,7 @@ use bridge_bank_statement::money::Controls;
 use bridge_bank_statement::pdf::{self, MAX_PDF_BYTES};
 use bridge_bank_statement::pipeline::{prepare, ParsedStatement, StatementRequest};
 use bridge_bank_statement::proposals::StatementRecord;
-use bridge_bank_statement::proposals::{format_amount, Disposition};
+use bridge_bank_statement::proposals::{format_amount, Direction, Disposition, VoucherType};
 use bridge_bank_statement::Refusal;
 use std::fs;
 use std::io::Read;
@@ -51,7 +52,11 @@ pub(super) const MAX_CASH_ANSWERS: usize = 1000;
 const MAX_PASSWORD_FILE_BYTES: u64 = 1024;
 const MAX_PATH_CHARS: usize = 4096;
 const PROPOSALS_DIRECTORY: &str = "bank-statements";
-const PROPOSALS_SCHEMA: &str = "bridge.bank_statement.proposals.v1";
+/// The schema before facts: no direction, reversal flag or coverage.
+const PROPOSALS_SCHEMA_V1: &str = "bridge.bank_statement.proposals.v1";
+/// The schema this tool writes: v1 plus `coverage` and, on each record, its
+/// `direction` and `reversed_same_day`.
+const PROPOSALS_SCHEMA: &str = "bridge.bank_statement.proposals.v2";
 /// Larger than any admissible file: 1000 vouchers at the text limits.
 const MAX_PROPOSALS_FILE_BYTES: u64 = 16 * 1024 * 1024;
 
@@ -426,6 +431,7 @@ fn persist(
             "total_debits": request.controls.debits.as_ref().map(|value| value.as_str()),
             "total_credits": request.controls.credits.as_ref().map(|value| value.as_str()),
         },
+        "coverage": parsed.coverage.map(|(from, to)| json!({"from": from.iso(), "to": to.iso()})),
         "vouchers": parsed.build.proposals,
         "records": parsed.build.records,
     });
@@ -644,6 +650,143 @@ pub(super) struct ResolvedImport {
     pub(super) cash_ledgers: Vec<AnsweredCashLedger>,
     /// The two ledgers the parse was given, when the file names both.
     pub(super) statement_ledgers: Option<StatementLedgers>,
+    /// What the statement's own file says of its Contras and skipped rows;
+    /// `None` for inline vouchers and for a file written before it did.
+    pub(super) statement: Option<ResolvedStatement>,
+}
+
+/// A statement's Contras, skipped rows and the days it read in full, read from
+/// a version 2 proposals file at the boundary, so a later step relies on the
+/// types and checks nothing again.
+pub(super) struct ResolvedStatement {
+    pub(super) bank_ledger: String,
+    pub(super) coverage: Option<(bridge_tally_core::TallyDate, bridge_tally_core::TallyDate)>,
+    /// One per Contra voucher the file proposes, cash-answer Contras included.
+    pub(super) contras: Vec<StatementContra>,
+    /// One per row the person skipped as recorded from the other bank's
+    /// statement.
+    pub(super) skips: Vec<StatementSkip>,
+    /// The file proposes no voucher.
+    posts_nothing: bool,
+}
+
+pub(super) struct StatementContra {
+    pub(super) bridge_txn_id: String,
+    pub(super) reference: Option<BankReference>,
+    pub(super) instrument: Option<String>,
+    pub(super) reversed_same_day: bool,
+}
+
+pub(super) struct StatementSkip {
+    pub(super) bridge_txn_id: String,
+    pub(super) date: bridge_tally_core::TallyDate,
+    pub(super) amount: String,
+    pub(super) direction: Direction,
+    pub(super) other_ledger: String,
+    pub(super) reference: Option<BankReference>,
+    pub(super) instrument: Option<String>,
+    pub(super) reversed_same_day: bool,
+}
+
+impl ResolvedStatement {
+    /// A statement whose every row was skipped: it proposes no voucher and
+    /// holds at least one skipped row, and so is recorded without a batch.
+    pub(super) fn is_skip_only(&self) -> bool {
+        self.posts_nothing && !self.skips.is_empty()
+    }
+
+    /// The ledgers the facts name beyond the vouchers': the statement's bank
+    /// and each skipped row's other ledger, each once, in name order.
+    pub(super) fn ledger_names(&self) -> Vec<String> {
+        std::iter::once(&self.bank_ledger)
+            .chain(self.skips.iter().map(|skip| &skip.other_ledger))
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+}
+
+/// A record of a version 2 file, as far as the facts need it. Only a skipped
+/// row reads the fields after the first four.
+#[derive(serde::Deserialize)]
+struct FileRecord {
+    bridge_txn_id: String,
+    disposition: Disposition,
+    direction: Direction,
+    reversed_same_day: bool,
+    #[serde(default)]
+    date: Option<String>,
+    #[serde(default)]
+    amount: Option<String>,
+    #[serde(default)]
+    ledger: Option<String>,
+    #[serde(default)]
+    reference: Option<String>,
+    #[serde(default)]
+    instrument: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct FileCoverage {
+    from: String,
+    to: String,
+}
+
+/// The facts a version 2 file carries. Any part that is missing or not of the
+/// shape the parse writes makes the file invalid.
+fn read_statement_facts(
+    document: &Value,
+    records: &[Value],
+    posts_nothing: bool,
+) -> Result<ResolvedStatement, String> {
+    let invalid = || "proposals_file_invalid".to_string();
+    let bank_ledger = document["bank_ledger"].as_str().ok_or_else(invalid)?;
+    let date = |text: &str| normalized_date(text).map_err(|_| invalid());
+    // `coverage` is always written, null when no day was read in full
+    let coverage = match document.get("coverage").ok_or_else(invalid)? {
+        Value::Null => None,
+        value => {
+            let window: FileCoverage =
+                serde_json::from_value(value.clone()).map_err(|_| invalid())?;
+            Some((date(&window.from)?, date(&window.to)?))
+        }
+    };
+    let reference = |text: Option<String>| {
+        text.map(|text| BankReference::from_recorded(&text).ok_or_else(invalid))
+            .transpose()
+    };
+    let mut contras = Vec::new();
+    let mut skips = Vec::new();
+    for record in records {
+        let record: FileRecord = serde_json::from_value(record.clone()).map_err(|_| invalid())?;
+        match record.disposition {
+            Disposition::Voucher(VoucherType::Contra) => contras.push(StatementContra {
+                bridge_txn_id: record.bridge_txn_id,
+                reference: reference(record.reference)?,
+                instrument: record.instrument,
+                reversed_same_day: record.reversed_same_day,
+            }),
+            Disposition::Skipped => skips.push(StatementSkip {
+                bridge_txn_id: record.bridge_txn_id,
+                date: date(record.date.as_deref().ok_or_else(invalid)?)?,
+                amount: record.amount.ok_or_else(invalid)?,
+                direction: record.direction,
+                other_ledger: record.ledger.ok_or_else(invalid)?,
+                reference: reference(record.reference)?,
+                instrument: record.instrument,
+                reversed_same_day: record.reversed_same_day,
+            }),
+            Disposition::Voucher(_) | Disposition::NeedsAnswer => {}
+        }
+    }
+    Ok(ResolvedStatement {
+        bank_ledger: bank_ledger.to_string(),
+        coverage,
+        contras,
+        skips,
+        posts_nothing,
+    })
 }
 
 /// The bank and suspense ledgers a proposals file was parsed for.
@@ -713,6 +856,7 @@ pub(super) fn resolve_import_arguments(
             args: args.clone(),
             cash_ledgers: Vec::new(),
             statement_ledgers: None,
+            statement: None,
         });
     };
     if object.contains_key("vouchers") {
@@ -758,7 +902,12 @@ pub(super) fn resolve_import_arguments(
     }
     let document: Value =
         serde_json::from_slice(&bytes).map_err(|_| "proposals_file_invalid".to_string())?;
-    if document["schema"] != PROPOSALS_SCHEMA || document["proposals_id"] != proposals_id {
+    let legacy = match document["schema"].as_str() {
+        Some(PROPOSALS_SCHEMA) => false,
+        Some(PROPOSALS_SCHEMA_V1) => true,
+        _ => return Err("proposals_file_invalid".into()),
+    };
+    if document["proposals_id"] != proposals_id {
         return Err("proposals_file_invalid".into());
     }
     let vouchers = document
@@ -785,6 +934,21 @@ pub(super) fn resolve_import_arguments(
                     .is_none())
     }) {
         return Err("cash_questions_open".into());
+    }
+    // A file written before facts existed cannot say which rows were skipped or
+    // which Contras it holds. Built anyway, its Contras would be invisible to
+    // the transfer checks and its skips unrecorded, so it is parsed again.
+    if legacy
+        && (records
+            .iter()
+            .any(|record| record["disposition"] == "skipped")
+            || vouchers.as_array().is_some_and(|vouchers| {
+                vouchers
+                    .iter()
+                    .any(|voucher| voucher["voucher_type"] == "Contra")
+            }))
+    {
+        return Err("proposals_legacy".into());
     }
     // Every ledger a person named in an answer, bound to the voucher actually
     // built: that bridge_txn_id's voucher has the type the answer makes, with
@@ -829,6 +993,12 @@ pub(super) fn resolve_import_arguments(
             bank_ledger: bank_ledger.to_string(),
             suspense_ledger: suspense_ledger.to_string(),
         });
+    let statement = if legacy {
+        None
+    } else {
+        let posts_nothing = vouchers.as_array().is_some_and(Vec::is_empty);
+        Some(read_statement_facts(&document, records, posts_nothing)?)
+    };
     let mut resolved = object.clone();
     resolved.remove("proposals_id");
     resolved.remove("proposals_sha256");
@@ -837,6 +1007,7 @@ pub(super) fn resolve_import_arguments(
         args: Value::Object(resolved),
         cash_ledgers,
         statement_ledgers,
+        statement,
     })
 }
 

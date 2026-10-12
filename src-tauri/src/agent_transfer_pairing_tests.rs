@@ -61,6 +61,7 @@ fn skip(row: &str) -> SkipFact {
         other_ledger: ledger("b1"),
         reference: None,
         lineage: LineageId::new("lineage-b2"),
+        reversed_same_day: false,
     }
 }
 
@@ -86,6 +87,7 @@ fn contra(batch: &str, txn: &str) -> ContraFact {
         statement_bank_ledger: ledger("b1"),
         lineage: LineageId::new(format!("lineage-{batch}")),
         status: BatchStatus::PostedVerified,
+        reversed_same_day: false,
     }
 }
 

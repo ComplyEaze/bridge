@@ -2572,6 +2572,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 bridge_txn_id: _,
                 reference: _,
                 instrument: _,
+                reversed_same_day: _,
             } in contra_rows
             {}
             for SkipRow {
@@ -2582,6 +2583,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 other_ledger_guid: _,
                 reference: _,
                 instrument: _,
+                reversed_same_day: _,
             } in skip_rows
             {}
         }
@@ -2605,6 +2607,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             bridge_txn_id: "st-20260901-0000000000000001".into(),
             reference: Some("600000000001".into()),
             instrument: Some("000417".into()),
+            reversed_same_day: true,
         }],
         skip_rows: vec![SkipRow {
             bridge_txn_id: "st-20260901-0000000000000002".into(),
@@ -2614,6 +2617,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             other_ledger_guid: "h".into(),
             reference: Some("600000000002".into()),
             instrument: Some("000418".into()),
+            reversed_same_day: true,
         }],
     });
     every_field_is_named(&line);
@@ -2656,6 +2660,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             "statement.contra_rows[].bridge_txn_id",
             "statement.contra_rows[].instrument",
             "statement.contra_rows[].reference",
+            "statement.contra_rows[].reversed_same_day",
             "statement.coverage",
             "statement.coverage.from",
             "statement.coverage.to",
@@ -2667,6 +2672,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             "statement.skip_rows[].instrument",
             "statement.skip_rows[].other_ledger_guid",
             "statement.skip_rows[].reference",
+            "statement.skip_rows[].reversed_same_day",
             "status",
             "txn_ids",
             "vouchers",

@@ -155,6 +155,11 @@ pub(crate) struct SkipFact {
     pub(crate) other_ledger: LedgerGuid,
     pub(crate) reference: Option<BankReference>,
     pub(crate) lineage: LineageId,
+    /// The statement holds another row on the same date, of an equal amount,
+    /// the other way: a line that came straight back is not a transfer.
+    // Not yet read by the view (a later change makes it refuse to pair).
+    #[allow(dead_code)]
+    pub(crate) reversed_same_day: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -182,6 +187,11 @@ pub(crate) struct ContraFact {
     pub(crate) statement_bank_ledger: LedgerGuid,
     pub(crate) lineage: LineageId,
     pub(crate) status: BatchStatus,
+    /// The statement holds another row on the same date, of an equal amount,
+    /// the other way: a line that came straight back is not a transfer.
+    // Not yet read by the view (a later change makes it refuse to pair).
+    #[allow(dead_code)]
+    pub(crate) reversed_same_day: bool,
 }
 
 /// A verified statement parse window, both ends inclusive.

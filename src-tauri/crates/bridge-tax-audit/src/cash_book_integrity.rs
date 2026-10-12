@@ -253,8 +253,10 @@ cash was actually paid."
         "opening_difference",
         Value::Int(diff),
         Unit::Paise,
-        "Sum of every ledger's Trial Balance opening balance (Dr positive). Tally shows a non-zero \
-sum as 'Difference in opening balances'.",
+        "Sum of every ledger's Trial Balance opening balance (Dr positive). Without integrated \
+inventory, Tally shows a non-zero sum as 'Difference in opening balances'; with it, the sum also \
+leaves out the opening stock, and the difference in opening balances is the figure after opening \
+stock.",
         Vec::new(),
     )?;
     // Opening stock is held on the stock items, never on a ledger, so on a book with integrated
@@ -731,8 +733,10 @@ prior year's closing balance sheet settles it.";
         figure(
             "opening_difference",
             value,
-            "Sum of every ledger's Trial Balance opening balance (Dr positive). Tally shows a \
-non-zero sum as 'Difference in opening balances'.",
+            "Sum of every ledger's Trial Balance opening balance (Dr positive). Without \
+integrated inventory, Tally shows a non-zero sum as 'Difference in opening balances'; with it, \
+the sum also leaves out the opening stock, and the difference in opening balances is the figure \
+after opening stock.",
         )
     }
 

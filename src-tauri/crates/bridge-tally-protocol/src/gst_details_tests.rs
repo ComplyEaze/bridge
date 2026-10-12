@@ -318,3 +318,19 @@ fn duplicate_duty_heads_or_state_names_are_a_defect_and_absent_ones_are_not_comp
     two_states.states[1].state_name = None;
     assert_eq!(defect(vec![two_states]), None);
 }
+
+/// bridge#1520: the type keeps serialising "asked, none returned" as an
+/// observation. The `ledger_masters` tool drops the key from its default rows
+/// itself, so the opt-in GST details read can rely on this.
+#[test]
+fn not_observed_still_serialises_as_an_observation() {
+    assert_eq!(
+        serde_json::to_string(&GstDetailsObservation::NotObserved).unwrap(),
+        r#"{"observation":"not_observed"}"#
+    );
+    let fields = serde_json::to_value(crate::PartyLedgerMasterFields::default()).unwrap();
+    assert_eq!(
+        fields["gst_details"],
+        serde_json::json!({"observation": "not_observed"})
+    );
+}

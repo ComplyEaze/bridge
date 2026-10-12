@@ -114,8 +114,6 @@ fn party_ledger_commitment_hashes_the_three_encoded_builder_requests() {
     }
 }
 
-#[cfg(feature = "voucher-scan")]
-use super::LedgerOpeningCoverageRead;
 use super::{
     canonical_loopback_origin, decode_xml_bytes, detect_product,
     has_presentation_equivalent_guid_siblings, normalize_discovered_companies,
@@ -247,9 +245,9 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
 }
 
 /// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
-/// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The connection check
-/// reports it; so does the probe, while its XML reads find no company list (a list found
-/// replaces the code with `status_heuristic_unavailable`).
+/// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The probe reports it
+/// while its XML reads find no company list (a list found replaces the code with
+/// `status_heuristic_unavailable`).
 #[tokio::test]
 async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let failed_status =
@@ -260,12 +258,7 @@ async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
-        for response in [
-            failed_status.clone(),
-            failed_status,
-            no_list.clone(),
-            no_list,
-        ] {
+        for response in [failed_status, no_list.clone(), no_list] {
             let (mut socket, _) = listener.accept().await.unwrap();
             let request = read_complete_http_request(&mut socket).await;
             assert!(!request.is_empty());
@@ -277,11 +270,6 @@ async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
         port: address.port(),
     })
     .unwrap();
-    let status = client.check_connection().await.unwrap();
-    assert_eq!(
-        (status.reachable, status.error.as_deref()),
-        (false, Some("http_status_failure"))
-    );
     let (probe, _) = client.probe_with_wire_evidence().await.unwrap();
     server.await.unwrap();
     assert_eq!(
@@ -678,8 +666,8 @@ async fn tally_requests_ignore_configured_proxy() {
         ),
     );
 
-    let status = client
-        .check_connection()
+    let (status, _) = client
+        .check_connection_strict_with_wire_evidence()
         .await
         .expect("check synthetic Tally connection");
     tally_server.await.expect("synthetic Tally server task");
@@ -696,204 +684,33 @@ async fn tally_requests_ignore_configured_proxy() {
     );
 }
 
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn paired_outstandings_reads_health_check_between_and_after_requests() {
-    const OPTIONAL_VOUCHERS: &str = include_str!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/unit_a_optional_voucher_live.xml"
-    );
-    const STATUS: &str = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let identity = captured_company_identity();
-
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let server = tokio::spawn(async move {
-        for (index, expected_prefix) in [
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-            "POST / HTTP/1.1",
-            "GET /status HTTP/1.1",
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .expect("paired request timed out")
-                .expect("accept paired request");
-            let request = read_complete_http_request(&mut socket).await;
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the required read/health-check sequence"
-            );
-            let body = match index {
-                0 | 2 | 12 | 14 => COMPANY_EXTENT_V2,
-                4 | 6 | 8 | 10 => OPTIONAL_VOUCHERS,
-                _ => STATUS,
-            };
-            let response = if index % 2 == 0 {
-                utf16_xml_response(body)
-            } else {
-                utf8_status_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write paired response");
-        }
-    });
-
+/// A later, smaller response must not lower the largest response body a read
+/// observed: the runtime reports that figure as the read's evidence, and a
+/// closing bracket read (a small company-extent response) comes after the
+/// large payload it brackets. This was first asserted inside the legacy
+/// voucher-scan paired-read test (a voucher payload followed by a closing
+/// extent); it holds for the shipped recorder itself.
+#[test]
+fn observed_body_bytes_keep_the_largest_response_until_reset() {
     let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
+        host: "127.0.0.1".to_string(),
+        port: 9,
     })
-    .expect("build synthetic Tally client");
-    let extent = client
-        .fetch_company_book_extent(&identity)
-        .await
-        .expect("paired extent reads remain stable");
-    let reporting_window = bridge_tally_protocol::outstandings::DateWindow::parse(
-        bridge_tally_protocol::outstandings::DateBoundaryProfile::ModeAgnostic,
-        "20260401",
-        "20260401",
-    )
-    .expect("synthetic one-day window");
-    let segment_window = reporting_window
-        .narrow_partitions()
-        .expect("one narrow partition")
-        .remove(0);
-    let observation = client
-        .fetch_outstandings_segment_pair(
-            extent.company(),
-            segment_window.clone(),
-            bridge_tally_protocol::outstandings::AlterIdRange::new(0, 101603)
-                .expect("non-empty synthetic range"),
-        )
-        .await
-        .expect("paired segment reads remain stable");
-    let verification = observation.verification;
-    let bridge_tally_protocol::outstandings::SegmentVerification::Complete(segment) = verification
-    else {
-        panic!("captured voucher response did not verify: {verification:?}");
-    };
-    assert!(
-        !segment.vouchers().is_empty(),
-        "captured voucher fixture unexpectedly had no vouchers"
-    );
-    let witness = client
-        .fetch_empty_partition_witness_pair(extent.company(), segment_window)
-        .await
-        .expect("paired empty-date witness reads remain stable");
-    let bridge_tally_protocol::outstandings::WitnessPairVerification::Complete(witness) = witness
-    else {
-        panic!("captured witness fixture did not verify: {witness:?}");
-    };
-    assert!(
-        !witness.vouchers().is_empty(),
-        "captured witness fixture unexpectedly had no identity rows"
-    );
-    let closing_extent = client
-        .fetch_company_book_extent(&identity)
-        .await
-        .expect("closing paired extent reads remain stable");
-    assert_eq!(closing_extent, extent, "synthetic book did not change");
+    .expect("build Tally client");
+    assert_eq!(client.observed_body_bytes(), None);
+    client.record_observed_body_bytes(1_000);
+    client.record_observed_body_bytes(40);
     assert_eq!(
         client.observed_body_bytes(),
-        Some(
-            u64::try_from(
-                bridge_tally_protocol::encode_tally_xml_request_utf16le(OPTIONAL_VOUCHERS).len(),
-            )
-            .expect("encoded fixture length fits u64"),
-        ),
-        "closing extent evidence must not overwrite the larger voucher payload"
+        Some(1_000),
+        "a smaller later response must not overwrite the larger payload"
     );
-    server.await.expect("synthetic Tally server task");
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn paired_ledger_opening_coverage_reports_intra_pair_drift() {
-    const STATUS: &str = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let identity = captured_company_identity();
-
-    let coverage = |name: &str| {
-        format!(
-            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER NAME=\"{name}\"><GUID>bb8ad19e-6aef-4239-a917-87fec0c6215e-00000001</GUID><ISBILLWISEON>Yes</ISBILLWISEON><OPENINGBALANCE>0</OPENINGBALANCE></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"
-        )
-    };
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let responses = vec![
-        COMPANY_EXTENT_V2.to_string(),
-        STATUS.to_string(),
-        COMPANY_EXTENT_V2.to_string(),
-        STATUS.to_string(),
-        coverage("Before Rename"),
-        STATUS.to_string(),
-        coverage("After Rename"),
-        STATUS.to_string(),
-    ];
-    let server = tokio::spawn(async move {
-        for (index, body) in responses.into_iter().enumerate() {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .expect("paired request timed out")
-                .expect("accept paired request");
-            let request = read_complete_http_request(&mut socket).await;
-            let expected_prefix = if index % 2 == 0 {
-                "POST / HTTP/1.1"
-            } else {
-                "GET /status HTTP/1.1"
-            };
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the required read/health-check sequence"
-            );
-            let response = if index % 2 == 0 {
-                utf16_xml_response(body)
-            } else {
-                utf8_status_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write paired response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let extent = client
-        .fetch_company_book_extent(&identity)
-        .await
-        .expect("paired extent reads remain stable");
-    assert!(matches!(
-        client
-            .fetch_ledger_opening_coverage(extent.company())
-            .await
-            .expect("coverage responses parse"),
-        LedgerOpeningCoverageRead::Drifted
-    ));
-    server.await.expect("synthetic Tally server task");
+    client.record_observed_body_bytes(2_000);
+    assert_eq!(client.observed_body_bytes(), Some(2_000));
+    client.reset_observed_body_bytes();
+    assert_eq!(client.observed_body_bytes(), None);
+    client.record_observed_body_bytes(40);
+    assert_eq!(client.observed_body_bytes(), Some(40));
 }
 
 /// The outstandings bracket (`fetch_company_book_extent`, feeding both
@@ -1212,202 +1029,6 @@ async fn education_profile_rejects_an_unsupported_books_from_before_ledger_expor
             .contains("not supported by the endpoint compatibility profile"),
         "unexpected error: {error:#}"
     );
-}
-
-fn native_voucher_collection_xml(rows: &[&str]) -> String {
-    format!(
-        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>{}</COLLECTION></DATA></BODY></ENVELOPE>",
-        rows.join("")
-    )
-}
-
-const SYNTHETIC_VOUCHER_ROW: &str = r#"<VOUCHER REMOTEID="synthetic-company-guid-00000001"><DATE TYPE="Date">20260401</DATE><GUID TYPE="String">synthetic-company-guid-00000001</GUID><MASTERID TYPE="Number">1</MASTERID><ALTERID TYPE="Number">1</ALTERID><VOUCHERTYPENAME TYPE="String">Payment</VOUCHERTYPENAME><ISCANCELLED TYPE="String">No</ISCANCELLED><ISOPTIONAL TYPE="String">No</ISOPTIONAL><ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE="String">Cash</LEDGERNAME><AMOUNT TYPE="Amount">-100.00</AMOUNT><ISDEEMEDPOSITIVE TYPE="String">Yes</ISDEEMEDPOSITIVE></ALLLEDGERENTRIES.LIST></VOUCHER>"#;
-
-/// A native Voucher collection carries no envelope company GUID, and a
-/// zero-row response has no per-row GUID either -- there is nothing for
-/// `parse_native_voucher_source_records_with_evidence` to bind. Before
-/// the fix, `fetch_vouchers` accepted such a response unauthenticated,
-/// so a silently substituted or dropped company looked identical to a
-/// genuinely empty window. This reproduces that: the voucher read comes
-/// back empty, and the out-of-band book-extent bracket that should
-/// confirm the pinned company instead observes a different one.
-#[tokio::test]
-async fn empty_voucher_response_is_rejected_when_pinned_company_cannot_be_confirmed() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let empty_vouchers = native_voucher_collection_xml(&[]);
-    let substituted_extent =
-        COMPANY_EXTENT_V2.replacen(CAPTURED_COMPANY_GUID, "substituted-company-guid", 1);
-    let status = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let steps: Vec<(&str, String, bool)> = vec![
-        ("POST / HTTP/1.1", empty_vouchers, false),
-        ("POST / HTTP/1.1", substituted_extent.clone(), false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-        ("POST / HTTP/1.1", substituted_extent, false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-    ];
-    let server = tokio::spawn(async move {
-        for (index, (expected_prefix, body, is_status)) in steps.into_iter().enumerate() {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "request {index} timed out -- the empty-voucher rejection path \
-                                 did not attempt to confirm the pinned company out of band"
-                    )
-                })
-                .expect("accept synthetic Tally request");
-            let request = read_complete_http_request(&mut socket).await;
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the voucher-then-extent-bracket sequence"
-            );
-            let response = if is_status {
-                utf8_status_response(body)
-            } else {
-                utf16_xml_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write synthetic Tally response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let error = client
-        .fetch_vouchers(&identity, "20260401", "20260401")
-        .await
-        .expect_err(
-            "an empty voucher response must not be accepted when the pinned company book \
-                 extent cannot be confirmed",
-        );
-    server.await.expect("synthetic Tally server task");
-    assert!(
-        error
-            .to_string()
-            .contains("empty voucher response could not confirm the pinned company book extent"),
-        "unexpected error: {error:#}"
-    );
-}
-
-/// Same empty voucher response as above, but this time the out-of-band
-/// book-extent bracket confirms the pinned company is still selected and
-/// stable -- so the empty result is accepted.
-#[tokio::test]
-async fn empty_voucher_response_is_accepted_when_bracket_confirms_pinned_company() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let empty_vouchers = native_voucher_collection_xml(&[]);
-    let confirmed_extent = COMPANY_EXTENT_V2.to_string();
-    let status = "<RESPONSE>TallyPrime Server is Running</RESPONSE>";
-    let steps: Vec<(&str, String, bool)> = vec![
-        ("POST / HTTP/1.1", empty_vouchers, false),
-        ("POST / HTTP/1.1", confirmed_extent.clone(), false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-        ("POST / HTTP/1.1", confirmed_extent, false),
-        ("GET /status HTTP/1.1", status.to_string(), true),
-    ];
-    let request_count = steps.len();
-    let server = tokio::spawn(async move {
-        for (index, (expected_prefix, body, is_status)) in steps.into_iter().enumerate() {
-            let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-                .await
-                .unwrap_or_else(|_| panic!("request {index} timed out"))
-                .expect("accept synthetic Tally request");
-            let request = read_complete_http_request(&mut socket).await;
-            assert!(
-                String::from_utf8_lossy(&request).starts_with(expected_prefix),
-                "request {index} did not follow the voucher-then-extent-bracket sequence"
-            );
-            let response = if is_status {
-                utf8_status_response(body)
-            } else {
-                utf16_xml_response(body)
-            };
-            socket
-                .write_all(&response)
-                .await
-                .expect("write synthetic Tally response");
-        }
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let vouchers = client
-        .fetch_vouchers(&identity, "20260401", "20260401")
-        .await
-        .expect("an empty voucher response confirmed by the extent bracket must be accepted");
-    server.await.expect("synthetic Tally server task");
-    assert!(vouchers.is_empty());
-    assert_eq!(
-        request_count, 5,
-        "the empty path must pay for exactly one voucher read plus the extent bracket"
-    );
-}
-
-/// A non-empty voucher response keeps its existing row-GUID binding and
-/// must not pay for the extent bracket -- the common case stays a single
-/// request.
-#[tokio::test]
-async fn non_empty_voucher_response_issues_no_extra_request() {
-    let identity = captured_company_identity();
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("bind synthetic Tally server");
-    let address = listener.local_addr().expect("synthetic Tally address");
-    let voucher_row =
-        SYNTHETIC_VOUCHER_ROW.replace("synthetic-company-guid", CAPTURED_COMPANY_GUID);
-    let non_empty_vouchers = native_voucher_collection_xml(&[&voucher_row]);
-
-    let server = tokio::spawn(async move {
-        let (mut socket, _) = tokio::time::timeout(Duration::from_secs(2), listener.accept())
-            .await
-            .expect("voucher request timed out")
-            .expect("accept synthetic Tally request");
-        let request = read_complete_http_request(&mut socket).await;
-        assert!(
-            String::from_utf8_lossy(&request).starts_with("POST / HTTP/1.1"),
-            "unexpected request for the non-empty voucher read"
-        );
-        socket
-            .write_all(&utf16_xml_response(non_empty_vouchers))
-            .await
-            .expect("write synthetic Tally response");
-
-        // A non-empty response must not pay for the extent bracket: no
-        // further connection should ever arrive.
-        let extra = tokio::time::timeout(Duration::from_millis(1000), listener.accept()).await;
-        assert!(
-            extra.is_err(),
-            "non-empty voucher fetch issued an unexpected extra request"
-        );
-    });
-
-    let client = TallyClient::new(TallyConfig {
-        host: address.ip().to_string(),
-        port: address.port(),
-    })
-    .expect("build synthetic Tally client");
-    let vouchers = client
-        .fetch_vouchers(&identity, "20260401", "20260401")
-        .await
-        .expect("non-empty voucher fetch must still succeed exactly as today");
-    server.await.expect("synthetic Tally server task");
-    assert_eq!(vouchers.len(), 1);
 }
 
 #[tokio::test]

@@ -622,7 +622,8 @@ is accepted, and loud.
 ## Amendment — owner decision, 2026-10-12: one posting setting for one voucher and a batch
 
 This supersedes "exactly one voucher per call" in the sections above (the "What it can send" item
-and the "Small batches" row) and the 2026-09-22 amendment's "one voucher per call", and replaces the
+and the "Small batches" row), the MCPB key named in the "Gates" item and row 2 (now
+`enable_posting_2026_10`), and the 2026-09-22 amendment's "one voucher per call", and replaces the
 setting described in "batch posting behind a setting" below; that amendment otherwise stands, and
 its safeguards, summary approval and outcome rules are unchanged (#1090).
 
@@ -633,7 +634,9 @@ its safeguards, summary approval and outcome rules are unchanged (#1090).
 - **A new consent.** The extension maps it from a new key, `enable_posting_2026_10`, titled "Allow
   voucher posting, one voucher or a batch of up to 50". The released `enable_writes` offered one
   voucher at a time, so a value stored for it is mapped to nothing and every upgrader starts with
-  posting off, as for the Terms (`agent_terms.rs`). An absent or empty value, or the key's own
+  posting off, as for the Terms (`agent_terms.rs`). This covers the extension only: a hand-set
+  `BRIDGE_AGENT_ENABLE_WRITES=true` on the command line now admits batches with no new prompt,
+  by the owner's decision, and the changelog says so. An absent or empty value, or the key's own
   unresolved placeholder, reads as off; any other value that is not a plain boolean still refuses at
   startup. What Claude Desktop passes for a new key on an upgrade is not yet measured.
 - **The retired setting refuses in band.** While `BRIDGE_AGENT_ENABLE_BATCH_POST` is present, with
@@ -643,7 +646,9 @@ its safeguards, summary approval and outcome rules are unchanged (#1090).
 - **Evidence.** The batch path is the one run live for #1516 through the extension, on a synthetic
   company on licensed TallyPrime 7.1 Silver: batches of 10, 50, and 7 and 7 vouchers each read back
   `posted_verified`, and a batch of 51 was refused as `import_post_batch_too_large` (branch
-  `lab/1516-rehearsal-evidence`). This change moves no part of the post path.
+  `lab/1516-rehearsal-evidence`). That run used a lab manifest with two keys, `enable_writes` and
+  `enable_batch_post`; the single key, the upgrade from 0.5.1 and `setting_retired` have not run
+  live. This change moves no part of the post path.
 
 ## Amendment — 2026-10-02: native posts carry no narration tag
 

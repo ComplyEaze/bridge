@@ -194,6 +194,32 @@ fn descriptions<'a>(value: &'a Value, path: &str, out: &mut Vec<(String, &'a str
     }
 }
 
+/// While the retired batch setting refuses `post_import` (#1090), posting is
+/// still configured on: both posting tools stay listed, so the refusal names
+/// what to remove rather than the tool vanishing.
+#[tokio::test]
+async fn the_retired_batch_setting_keeps_the_posting_tools_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut served = server(directory.path());
+    served.settings.posting = Posting::RetiredSettingPresent;
+    let responses = session(
+        served,
+        &[
+            initialize("2025-06-18"),
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+        ],
+    )
+    .await;
+    let names: Vec<&str> = responses[1]["result"]["tools"]
+        .as_array()
+        .expect("tools/list result")
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"post_import"), "{names:?}");
+    assert!(names.contains(&"acknowledge_post_review"), "{names:?}");
+}
+
 /// The server instructions and every tool and parameter description pair their
 /// backticks, checked as `initialize` and `tools/list` serve them, with posting
 /// off and on. One lost backtick turns every later code span in that text inside

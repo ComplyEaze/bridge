@@ -1475,43 +1475,59 @@ fn posting_follows_its_setting_and_the_retired_batch_setting_only_refuses() {
     assert!(!Posting::Off.enabled());
 }
 
-/// `Settings::from_env` reads the posting key through the tolerant function
-/// only, and passes whether the retired batch setting is present at all.
+/// `Settings::from_env` reads posting through `posting_from_env`: the posting
+/// key by its tolerant reader, and the retired batch setting by presence alone.
 #[test]
-fn settings_read_posting_through_the_tolerant_function_and_the_retired_name() {
-    assert_eq!(RETIRED_BATCH_POST_SETTING, "BRIDGE_AGENT_ENABLE_BATCH_POST");
-    let source = include_str!("agent.rs");
-    let start = source.find("impl Settings {").unwrap();
-    let body = &source[start..start + source[start..].find("\n}\n").unwrap()];
-    assert!(body.contains("posting_setting("), "{body}");
-    assert!(body.contains("\"BRIDGE_AGENT_ENABLE_WRITES\""), "{body}");
-    assert!(
-        !body.contains("enabled_setting(\"BRIDGE_AGENT_ENABLE_WRITES\")"),
-        "{body}"
+fn posting_is_read_from_its_variable_and_the_retired_one_by_presence() {
+    let read = |pairs: &[(&str, &str)]| {
+        let pairs: std::collections::HashMap<String, std::ffi::OsString> = pairs
+            .iter()
+            .map(|(name, value)| (name.to_string(), (*value).into()))
+            .collect();
+        posting_from_env(|name| pairs.get(name).cloned())
+    };
+    const WRITES: &str = "BRIDGE_AGENT_ENABLE_WRITES";
+    const RETIRED: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
+    assert_eq!(read(&[]), Ok(Posting::Off));
+    assert_eq!(read(&[(WRITES, "true")]), Ok(Posting::On));
+    assert_eq!(read(&[(WRITES, POSTING_PLACEHOLDER)]), Ok(Posting::Off));
+    for retired in ["", "false", "true", "probe"] {
+        assert_eq!(
+            read(&[(WRITES, "true"), (RETIRED, retired)]),
+            Ok(Posting::RetiredSettingPresent),
+            "{retired:?}"
+        );
+        assert_eq!(
+            read(&[(WRITES, "false"), (RETIRED, retired)]),
+            Ok(Posting::Off),
+            "{retired:?}"
+        );
+    }
+    assert_eq!(
+        read(&[(WRITES, "yes")]),
+        Err("boolean_setting_invalid".to_string())
     );
-    assert!(
-        body.contains("env::var_os(RETIRED_BATCH_POST_SETTING).is_some()"),
-        "{body}"
+    // The released extension key's placeholder is not the posting key's.
+    assert_eq!(
+        read(&[(WRITES, "${user_config.enable_writes}")]),
+        Err("boolean_setting_invalid".to_string())
     );
 }
 
-/// Only the posting key tolerates a placeholder: every other boolean setting
-/// still refuses one. `enabled_setting` reads the process environment, so this
-/// uses a name no other code reads (hermetic).
+/// Only the posting key tolerates a placeholder or an empty value: every other
+/// boolean setting still refuses both.
 #[test]
 fn other_boolean_settings_still_refuse_an_unresolved_placeholder() {
-    const NAME: &str = "BRIDGE_TEST_ONLY_BOOLEAN_PLACEHOLDER_SETTING";
-    std::env::set_var(NAME, POSTING_PLACEHOLDER);
-    let placeholder = enabled_setting(NAME);
-    std::env::set_var(NAME, "");
-    let empty = enabled_setting(NAME);
-    std::env::set_var(NAME, "true");
-    let on = enabled_setting(NAME);
-    std::env::remove_var(NAME);
-    assert_eq!(placeholder, Err("boolean_setting_invalid".to_string()));
-    assert_eq!(empty, Err("boolean_setting_invalid".to_string()));
-    assert_eq!(on, Ok(true));
-    assert_eq!(enabled_setting(NAME), Ok(false));
+    for refused in [POSTING_PLACEHOLDER, "", "yes"] {
+        assert_eq!(
+            boolean_setting(Some(refused)),
+            Err("boolean_setting_invalid".to_string()),
+            "{refused:?}"
+        );
+    }
+    assert_eq!(boolean_setting(None), Ok(false));
+    assert_eq!(boolean_setting(Some("true")), Ok(true));
+    assert_eq!(boolean_setting(Some("0")), Ok(false));
 }
 
 #[test]

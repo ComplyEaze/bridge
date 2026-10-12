@@ -847,6 +847,33 @@ async fn a_batch_is_refused_while_the_retired_batch_setting_is_present() {
     assert!(sent(simulator).is_empty());
 }
 
+/// The retired setting refuses a one-voucher post too, not only a batch, and
+/// leaves `acknowledge_post_review` to its own checks (#1090).
+#[tokio::test]
+async fn the_retired_batch_setting_refuses_one_voucher_but_not_a_review() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.posting = crate::agent::Posting::RetiredSettingPresent;
+    let (_, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "setting_retired",
+        "{response}"
+    );
+    assert!(sent(simulator).is_empty());
+    let review = server.call_tool("acknowledge_post_review", args).await;
+    let code = &review["structuredContent"]["result"]["error"]["code"];
+    assert!(code.is_string(), "{review}");
+    assert_ne!(code, "setting_retired", "{review}");
+    assert_ne!(code, "import_posting_disabled", "{review}");
+}
+
 /// The same REMOTEID recorded by another process while the dialog is open is
 /// caught as the intent is written: no intent for this batch, and no POST. The
 /// control, an injected intent with another REMOTEID, posts: so the match is

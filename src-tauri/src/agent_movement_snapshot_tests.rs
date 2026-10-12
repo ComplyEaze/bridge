@@ -319,8 +319,7 @@ async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_read
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let response = server
         .call_tool(

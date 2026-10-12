@@ -365,16 +365,7 @@ impl Settings {
             #[cfg(unix)]
             DirectoryAdmissionError::Permissions => "agent_data_dir_permissions_failed".to_string(),
         })?;
-        let posting = posting_setting(
-            match env::var("BRIDGE_AGENT_ENABLE_WRITES") {
-                Ok(value) => Some(value),
-                Err(env::VarError::NotPresent) => None,
-                Err(_) => return Err("boolean_setting_invalid".to_string()),
-            }
-            .as_deref(),
-        )?;
-        let posting =
-            Posting::from_settings(posting, env::var_os(RETIRED_BATCH_POST_SETTING).is_some());
+        let posting = posting_from_env(|name| env::var_os(name))?;
         let writes_enabled = posting.enabled();
         Ok(Self {
             endpoint,
@@ -390,10 +381,20 @@ impl Settings {
 
 fn enabled_setting(name: &str) -> Result<bool, String> {
     match env::var(name) {
-        Err(env::VarError::NotPresent) => Ok(false),
-        Ok(value) if matches!(value.as_str(), "1" | "true") => Ok(true),
-        Ok(value) if matches!(value.as_str(), "0" | "false") => Ok(false),
-        _ => Err("boolean_setting_invalid".into()),
+        Err(env::VarError::NotPresent) => boolean_setting(None),
+        Ok(value) => boolean_setting(Some(&value)),
+        Err(env::VarError::NotUnicode(_)) => Err("boolean_setting_invalid".into()),
+    }
+}
+
+/// A boolean setting's raw value: absent is off, and anything but `true`,
+/// `false`, `1` or `0` fails loud.
+fn boolean_setting(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        None => Ok(false),
+        Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
+        Some(_) => Err("boolean_setting_invalid".into()),
     }
 }
 
@@ -414,11 +415,25 @@ const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
 /// Anything else that is not a plain boolean still fails loud.
 fn posting_setting(value: Option<&str>) -> Result<bool, String> {
     match value {
-        None | Some("") | Some(POSTING_PLACEHOLDER) => Ok(false),
-        Some("1" | "true") => Ok(true),
-        Some("0" | "false") => Ok(false),
-        Some(_) => Err("boolean_setting_invalid".into()),
+        Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
     }
+}
+
+/// The posting setting and whether the retired batch setting is present, read
+/// through `var`: the process environment in `Settings::from_env`, a map in tests.
+fn posting_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<Posting, String> {
+    let writes = var("BRIDGE_AGENT_ENABLE_WRITES")
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    Ok(Posting::from_settings(
+        posting_setting(writes.as_deref())?,
+        var(RETIRED_BATCH_POST_SETTING).is_some(),
+    ))
 }
 
 fn tally_port(value: Option<String>) -> Result<u16, String> {

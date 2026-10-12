@@ -80,19 +80,17 @@ actually on.
 Voucher file preparation and bank-statement parsing are available by default;
 they write nothing to Tally. **Voucher posting is off by default** while four
 known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
-Turning on **Allow voucher posting, one voucher or a batch of up to 50** in the
+Turning on **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the
 extension settings adds posting; every new posting still requires your approval in a separate Bridge
-dialog. Leave it off unless you accept those risks. It is a new setting: if you
-turned posting on in an earlier version, it starts off, and you turn it on
-again here.
+dialog. Leave it off unless you accept those risks. If you installed an earlier
+version, check the setting: an earlier default may still be saved as on.
 
-Native posting accepts one Journal, Payment, Receipt or Contra per approval,
-with existing ledgers and no supplied voucher number, or a saved batch of 2 to
-50 such vouchers after one approval of a summary (per-ledger totals, not each
-voucher's date or narration). The same posting setting covers both (bridge#1090).
-The earlier command-line setting `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired:
-while it is set and posting is on, posting refuses as `setting_retired` until
-it is removed.
+Native posting through the extension accepts one Journal, Payment, Receipt or
+Contra per approval, with existing ledgers and no supplied voucher number. A
+command-line installation can also post a saved batch of 2 to 50 such vouchers
+after one approval of a summary (per-ledger totals, not each voucher's date or
+narration), when `BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting.
+That setting is off by default and the extension does not set it (bridge#712).
 Batch posting through Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was
 raised, and verified; it is not proven on a multi-user book (bridge#725). A Payment, Receipt or Contra is

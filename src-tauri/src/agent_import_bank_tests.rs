@@ -3184,6 +3184,7 @@ fn statement_v2(
 
 const CONTRA_ROW: &str = "st-20260901-00000000000000a1";
 const SKIP_ROW: &str = "st-20260902-00000000000000a2";
+const OUTFLOW_SKIP_ROW: &str = "st-20260903-00000000000000a3";
 
 /// The captured plans with both money-bearing demo ledgers moved under Bank
 /// Accounts, for this test only, so a Contra between them is admitted.
@@ -3239,6 +3240,17 @@ fn skip_record_of(ledger: &str) -> Value {
     skip
 }
 
+/// A skipped row of the opposite direction, with no reversal.
+fn outflow_skip_record() -> Value {
+    let mut skip = skip_record_of("Cash");
+    skip["bridge_txn_id"] = json!(OUTFLOW_SKIP_ROW);
+    skip["direction"] = json!("outflow");
+    skip["reversed_same_day"] = json!(false);
+    skip["date"] = json!("2026-09-03");
+    skip["reference"] = Value::Null;
+    skip
+}
+
 fn guid_of(batch: &ImportLedgerLine, name: &str) -> String {
     batch
         .ledger_identities
@@ -3267,7 +3279,11 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         "WR2 Sales",
         json!({"from": "2026-08-02", "to": "2026-09-29"}),
         json!([statement_contra()]),
-        json!([contra_record(), skip_record_of("Cash")]),
+        json!([
+            contra_record(),
+            skip_record_of("Cash"),
+            outflow_skip_record()
+        ]),
     );
     let response = server
         .call_tool_response("build_import_xml", args)
@@ -3295,7 +3311,9 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
                 "instrument": "000417", "reversed_same_day": true}],
             "skip_rows": [{"bridge_txn_id": SKIP_ROW, "date": "20260902", "amount": "7.50",
                 "direction": "inflow", "other_ledger_guid": cash, "reference": "600000000002",
-                "reversed_same_day": true}],
+                "reversed_same_day": true},
+                {"bridge_txn_id": OUTFLOW_SKIP_ROW, "date": "20260903", "amount": "7.50",
+                "direction": "outflow", "other_ledger_guid": cash}],
         })
     );
 
@@ -3306,14 +3324,23 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         .unwrap()
         .expect("a journal");
     let found = ledger::transfer_facts(journal, no_skip_file(), CAPTURED_GUID).unwrap();
-    let [skip] = &found.skips[..] else {
-        panic!("one skip: {found:?}");
+    let [skip, outflow] = &found.skips[..] else {
+        panic!("two skips: {found:?}");
     };
     assert_eq!(
         skip.key.row,
         crate::agent::transfer_pairing::StatementRowId::new(SKIP_ROW)
     );
     assert!(skip.reversed_same_day);
+    assert_eq!(
+        outflow.direction,
+        crate::agent::transfer_pairing::Direction::Outflow
+    );
+    assert_eq!(
+        skip.direction,
+        crate::agent::transfer_pairing::Direction::Inflow
+    );
+    assert!(!outflow.reversed_same_day);
     let [contra] = &found.contras[..] else {
         panic!("one Contra: {found:?}");
     };

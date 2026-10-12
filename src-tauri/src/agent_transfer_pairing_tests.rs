@@ -1153,6 +1153,36 @@ fn transfer_pairing_two_thousand_double_booked_contras_in_one_group_are_found() 
 }
 
 #[test]
+fn transfer_pairing_equal_amounts_match_whatever_their_spelling() {
+    for spelling in ["500", "500.0", "0500.00", "500.000"] {
+        let mut spelled = contra("batch-1", "t1");
+        spelled.amount = ExactDecimal::parse(spelling).unwrap();
+        let view = view_of(&[skip("st-1")], &[spelled], &january_covered(), 0);
+        assert_eq!(
+            state_of(&view, "st-1"),
+            paired(PairRound::NoReference, "batch-1", "t1"),
+            "{spelling}"
+        );
+    }
+    // zero has one spelling too, whatever its sign
+    let mut zero = skip("st-1");
+    zero.amount = ExactDecimal::parse("0.00").unwrap();
+    let mut negative_zero = contra("batch-1", "t1");
+    negative_zero.amount = ExactDecimal::parse("-0").unwrap();
+    let view = view_of(&[zero], &[negative_zero], &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        paired(PairRound::NoReference, "batch-1", "t1")
+    );
+    for other in ["50", "5000", "500.5", "0.5"] {
+        let mut spelled = contra("batch-1", "t1");
+        spelled.amount = ExactDecimal::parse(other).unwrap();
+        let view = view_of(&[skip("st-1")], &[spelled], &january_covered(), 0);
+        assert_eq!(state_of(&view, "st-1"), SkipState::NotFound, "{other}");
+    }
+}
+
+#[test]
 fn transfer_pairing_a_contra_from_a_third_banks_statement_is_no_edge() {
     // only the other ledger's own statement carries the other side of the skip
     let mut third = contra("batch-1", "t1");

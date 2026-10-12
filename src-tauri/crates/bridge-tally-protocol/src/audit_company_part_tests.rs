@@ -1,4 +1,10 @@
 use super::*;
+use crate::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+use crate::{
+    decode_tally_xml_response_bytes_limited, encode_tally_xml_request_utf16le,
+    ExpectedTallyTextEncoding,
+};
+use sha2::{Digest, Sha256};
 
 const GUID: &str = "00000000-0000-4000-8000-00000000c0de";
 
@@ -379,5 +385,88 @@ fn a_part_status_is_one_failure_or_absent_and_its_shape_is_checked() {
     assert_eq!(
         AuditCompanyPartError::StatusAbsent.code(),
         "audit_company_part_status_absent"
+    );
+}
+
+// The live capture (protocol reference §9.11e; provenance in
+// `tests/fixtures/COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md`): the request
+// Bridge renders and the answer of a licensed TallyPrime 7.1 Silver to it, for
+// one synthetic company. The negative cases below edit nothing; they ask the
+// captured bytes a different question.
+const LIVE_REQUEST: &[u8] =
+    include_bytes!("../tests/fixtures/company_audit_object_batch_lab_request.utf16le.xml");
+const LIVE_RESPONSE: &[u8] =
+    include_bytes!("../tests/fixtures/company_audit_object_batch_lab_live.utf16le.xml");
+const LIVE_COMPANY: &str = "BRIDGE BATCH LAB";
+const LIVE_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
+const LIVE_BOOKS_FROM: &str = "20260401";
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The captured answer, decoded as production decodes a response.
+fn live_response() -> String {
+    decode_tally_xml_response_bytes_limited(
+        LIVE_RESPONSE,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        LIVE_RESPONSE.len(),
+    )
+    .expect("the captured answer decodes")
+    .text
+}
+
+#[test]
+fn the_request_is_byte_for_byte_the_one_sent_live() {
+    let company = ValidatedCompanyName::new(LIVE_COMPANY).unwrap();
+    let sent = encode_tally_xml_request_utf16le(
+        &ReadOnlyProfile::AuditCompanyObjectV1 { company: &company }.render(),
+    );
+    assert_eq!(sent, LIVE_REQUEST);
+    assert_eq!(sent.len(), 896);
+    assert_eq!(
+        sha256_hex(&sent),
+        "55b145be1d140f86b0f312f41d055ef7697cf9daa41c897ad4f384cac6a2803f"
+    );
+}
+
+#[test]
+fn the_captured_answer_is_admitted_for_the_verified_identity() {
+    assert_eq!(LIVE_RESPONSE.len(), 4216);
+    assert_eq!(
+        sha256_hex(LIVE_RESPONSE),
+        "960d98d4908eb72b512ceddc912b37e4e1c55efe243b13ac2da7f73de4fe94fe"
+    );
+    assert_eq!(
+        admit_audit_company_part(&live_response(), LIVE_GUID, LIVE_BOOKS_FROM),
+        Ok(AuditCompanyPart {
+            name: LIVE_COMPANY.to_string(),
+            guid: LIVE_GUID.to_string(),
+            books_from_yyyymmdd: LIVE_BOOKS_FROM.to_string(),
+            is_integrated: Some("No".to_string()),
+        })
+    );
+}
+
+#[test]
+fn the_captured_answer_is_refused_for_any_other_identity() {
+    let text = live_response();
+    // The same bytes, a different book: the refusals are typed, so a decode or
+    // parse failure cannot pass for them.
+    assert_eq!(
+        admit_audit_company_part(
+            &text,
+            "00000000-0000-4000-8000-00000000beef",
+            LIVE_BOOKS_FROM
+        ),
+        Err(AuditCompanyPartError::GuidMismatch)
+    );
+    assert_eq!(
+        admit_audit_company_part(&text, LIVE_GUID, "20250401"),
+        Err(AuditCompanyPartError::BooksFromMismatch)
     );
 }

@@ -2670,3 +2670,93 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
     assert_eq!(with.skips.len(), 2);
     assert!(with.live_skips.contains(&key(B1, 10)));
 }
+
+// ---- rows a batch holds as vouchers, read from the journal alone -----------------
+
+fn held(
+    journal: &Journal,
+    own_lineage: Option<u32>,
+    rows: &[u32],
+) -> Option<(String, Vec<String>)> {
+    let rows: BTreeSet<String> = rows.iter().map(|row| st(*row)).collect();
+    let own = own_lineage.map(batch_id);
+    ledger::rows_held_as_vouchers(
+        Cursor::new(journal.0.as_bytes()),
+        COMPANY,
+        own.as_deref(),
+        &rows,
+    )
+    .unwrap()
+    .map(|(batch, rows)| (batch, rows.into_iter().collect()))
+}
+
+#[test]
+fn a_row_is_held_by_a_sent_or_found_batch_of_the_company_and_by_no_other() {
+    let posting = build(100).voucher(payment(&st(1), "500.00"));
+    // only built: held by no one, unless it is the asker's own lineage
+    let built = Journal::default().batch(&posting);
+    assert_eq!(held(&built, None, &[1]), None);
+    // sent, or found posted
+    let wanted = Some((batch_id(100), vec![st(1)]));
+    assert_eq!(held(&built.sent(&posting), None, &[1]), wanted);
+    let found = Journal::default()
+        .batch(&posting)
+        .status(&posting, "posted_verified");
+    assert_eq!(held(&found, None, &[1]), wanted);
+    // a batch found posted by its own record
+    let recorded = build(100)
+        .voucher(payment(&st(1), "500.00"))
+        .status("posted_verified");
+    assert_eq!(
+        held(&Journal::default().batch(&recorded), None, &[1]),
+        wanted
+    );
+    // a row it does not hold
+    assert_eq!(held(&found, None, &[2]), None);
+    // another company's batch holds nothing of this one's
+    let elsewhere = build(101)
+        .company(OTHER_COMPANY)
+        .voucher(payment(&st(1), "500.00"))
+        .status("posted_verified");
+    assert_eq!(
+        held(&Journal::default().batch(&elsewhere), None, &[1]),
+        None
+    );
+}
+
+#[test]
+fn a_row_is_held_by_the_askers_own_lineage_at_any_status() {
+    let original = build(110)
+        .voucher(payment(&st(1), "500.00"))
+        .voucher(payment(&st(2), "600.00"));
+    let journal = Journal::default().batch(&original);
+    let both = Some((batch_id(110), vec![st(1), st(2)]));
+    assert_eq!(held(&journal, Some(110), &[1, 2]), both);
+    // only the rows asked for are named
+    assert_eq!(
+        held(&journal, Some(110), &[2]),
+        Some((batch_id(110), vec![st(2)]))
+    );
+    // an amendment is of the lineage its original names
+    let amendment = build(111).amends(110).voucher(payment(&st(1), "500.00"));
+    let journal = journal.batch(&amendment);
+    assert_eq!(held(&journal, Some(110), &[1, 2]), both);
+    // another lineage's built batch is not held against the asker
+    assert_eq!(held(&journal, Some(120), &[1, 2]), None);
+    assert_eq!(held(&journal, None, &[1, 2]), None);
+}
+
+#[test]
+fn the_first_holding_batch_in_id_order_is_named() {
+    let low = build(130).voucher(payment(&st(1), "500.00"));
+    let high = build(131).voucher(payment(&st(1), "500.00"));
+    let journal = Journal::default()
+        .batch(&high)
+        .sent(&high)
+        .batch(&low)
+        .sent(&low);
+    assert_eq!(
+        held(&journal, None, &[1]),
+        Some((batch_id(130), vec![st(1)]))
+    );
+}

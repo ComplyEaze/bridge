@@ -330,6 +330,22 @@ fn rows_listed(rows: impl IntoIterator<Item = String>) -> (Vec<String>, usize) {
     (listed, omitted)
 }
 
+/// The batch holding the other Contra of a double booking that refuses the
+/// build, when one of the two Contras is in `ours`.
+fn double_booked_with<'a>(view: &'a TransferView, ours: &str) -> Option<&'a str> {
+    view.double_booked.iter().find_map(|booked| {
+        if booked.class != DoubleBookedClass::RefuseAtBuild {
+            None
+        } else if booked.first.batch.as_str() == ours {
+            Some(booked.second.batch.as_str())
+        } else if booked.second.batch.as_str() == ours {
+            Some(booked.first.batch.as_str())
+        } else {
+            None
+        }
+    })
+}
+
 impl Server {
     /// The skip-only file, empty when there is none yet.
     fn skip_file_while_admitted(&self) -> Result<Box<dyn std::io::BufRead>, String> {
@@ -441,19 +457,9 @@ impl Server {
                 Ok(view) => view,
                 Err(error) => return Ok(without_facts(needs_the_view, &error)),
             };
-        let other_batch = view.double_booked.iter().find_map(|booked| {
-            if booked.class != DoubleBookedClass::RefuseAtBuild {
-                return None;
-            }
-            let ours = candidate_batch.as_deref()?;
-            if booked.first.batch.as_str() == ours {
-                Some(booked.second.batch.as_str())
-            } else if booked.second.batch.as_str() == ours {
-                Some(booked.first.batch.as_str())
-            } else {
-                None
-            }
-        });
+        let other_batch = candidate_batch
+            .as_deref()
+            .and_then(|ours| double_booked_with(&view, ours));
         if let Some(other) = other_batch {
             return Ok(Admission::Refused(TransferRefusal {
                 reason: "transfer_double_booked",

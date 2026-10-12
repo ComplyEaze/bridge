@@ -3,8 +3,8 @@
 use super::*;
 use crate::agent::transfer_pairing::{
     BatchId, BatchStatus, CompanyGuid, ContraFact, ContraKey, ContraLeg, Coverage, Direction,
-    EndpointOrigin, LedgerGuid, LineageId, ParseWindow, Side, SkipFact, SkipKey, StatementRowId,
-    TxnId,
+    DoubleBooked, EndpointOrigin, LedgerGuid, LineageId, ParseWindow, Side, SkipFact, SkipKey,
+    StatementRowId, TxnId,
 };
 
 fn date(text: &str) -> TallyDate {
@@ -426,4 +426,48 @@ fn a_failure_is_named_by_its_kind_and_record_and_never_by_a_value() {
             assert!(!named.contains(value), "{value} in {named}");
         }
     }
+}
+
+fn booked(first: &str, second: &str, class: DoubleBookedClass) -> DoubleBooked {
+    let key = |batch: &str| ContraKey {
+        batch: BatchId::new(batch),
+        txn: TxnId::new("t"),
+    };
+    DoubleBooked {
+        first: key(first),
+        second: key(second),
+        class,
+    }
+}
+
+fn view_of(double_booked: Vec<DoubleBooked>) -> TransferView {
+    TransferView {
+        skips: BTreeMap::new(),
+        double_booked,
+    }
+}
+
+/// The other batch is named whichever of the pair the build's Contra is, and
+/// only for a pair that refuses a build.
+#[test]
+fn a_double_booking_names_the_other_batch_whichever_side_the_build_is() {
+    let view = view_of(vec![booked(
+        "batch-a",
+        "batch-b",
+        DoubleBookedClass::RefuseAtBuild,
+    )]);
+    assert_eq!(double_booked_with(&view, "batch-a"), Some("batch-b"));
+    assert_eq!(double_booked_with(&view, "batch-b"), Some("batch-a"));
+    assert_eq!(double_booked_with(&view, "batch-c"), None);
+    // a pair that is only listed refuses nothing
+    let listed = view_of(vec![booked("batch-a", "batch-b", DoubleBookedClass::List)]);
+    assert_eq!(double_booked_with(&listed, "batch-a"), None);
+    assert_eq!(double_booked_with(&listed, "batch-b"), None);
+    // a pair that does not involve the build is not its refusal, but a later one may be
+    let two = view_of(vec![
+        booked("batch-x", "batch-y", DoubleBookedClass::RefuseAtBuild),
+        booked("batch-a", "batch-b", DoubleBookedClass::RefuseAtBuild),
+    ]);
+    assert_eq!(double_booked_with(&two, "batch-b"), Some("batch-a"));
+    assert_eq!(double_booked_with(&view_of(Vec::new()), "batch-a"), None);
 }

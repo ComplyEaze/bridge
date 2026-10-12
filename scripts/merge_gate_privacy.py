@@ -82,8 +82,12 @@ HOME_RE = re.compile(
     re.I,
 )
 PEM_RE = re.compile(r"-----BEGIN\s+(?:(?:X509|TRUSTED)\s+)?CERTIFICATE-----", re.I)
+# The spaced or hyphenated PAN shape is bounded by non-letters on both sides. With re.I and no boundary it matched five
+# letters of one word, a number and the first letter of the next, as in "migration 0003 job". The trade is deliberate: a
+# PAN glued to a letter on either side (a word before or after it) is no longer read by this alternative; a digit, an
+# underscore or punctuation beside it still is.
 IDENTIFIER_RE = re.compile(
-    r"\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]{3}|[A-Z]{5}[ -]\d{4}[ -][A-Z]|"
+    r"\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z]{3}|(?<![A-Z])[A-Z]{5}[ -]\d{4}[ -][A-Z](?![A-Z])|"
     r"[A-Z]{5}\d{4}[A-Z]|[6-9]\d{9}",
     re.I,
 )

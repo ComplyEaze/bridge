@@ -61,8 +61,7 @@ use bridge_tally_protocol::{
     parse_native_voucher_type_source_records_with_evidence,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    parse_voucher_source_records_with_evidence, ExpectedTallyTextEncoding,
-    TallyImportApplicationStatus, TallyImportResult,
+    ExpectedTallyTextEncoding, TallyImportApplicationStatus, TallyImportResult,
 };
 use sha2::{Digest, Sha256};
 
@@ -2186,12 +2185,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "parse_ledgers_with_evidence",
         parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_voucher_source_records_with_evidence",
-        parse: |_, text| untyped(parse_voucher_source_records_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",

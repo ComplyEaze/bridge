@@ -16,9 +16,8 @@ use bridge_tally_compatibility::{
 };
 use bridge_tally_protocol::{
     export_failure_reason_code, export_status, parse_companies_with_evidence,
-    parse_ledger_source_records_with_evidence, parse_voucher_source_records_with_evidence,
-    verify_company_context,
-    xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange},
+    parse_ledger_source_records_with_evidence, verify_company_context,
+    xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ExportEvidence, TallyExportStatus, TallyTextEncoding,
 };
 use bridge_tally_read_transport::{
@@ -32,13 +31,12 @@ use thiserror::Error;
 pub mod native_outstandings_qualification;
 
 /// What an operator is told when Education mode stops a read: Bridge's ledger
-/// and voucher profiles are custom reports whose TDL Education answers with a
-/// blocking "Bad formula!" dialog on the Tally screen, so they are refused
-/// before sending (`education_report_family_unsupported`, bridge#45).
-pub const EDUCATION_REPORT_FAMILY_NOTICE: &str =
-    "Education mode: Bridge's ledger and voucher reads \
-are refused before sending (education_report_family_unsupported). Their report TDL raises a \
-blocking \"Bad formula!\" dialog on the Tally screen in Education (bridge#45). Qualifying them in \
+/// profile is a custom report whose TDL Education answers with a blocking
+/// "Bad formula!" dialog on the Tally screen, so it is refused before sending
+/// (`education_report_family_unsupported`, bridge#45).
+pub const EDUCATION_REPORT_FAMILY_NOTICE: &str = "Education mode: Bridge's ledger read \
+is refused before sending (education_report_family_unsupported). Its report TDL raises a \
+blocking \"Bad formula!\" dialog on the Tally screen in Education (bridge#45). Qualifying it in \
 Education waits for the Collection-based reads (Phase 2 Unit A); use a licensed Tally meanwhile.";
 
 const CONFIG_SCHEMA_VERSION: u16 = 1;
@@ -84,26 +82,14 @@ struct LiveRunConfig {
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct DateWindow {
-    from_yyyymmdd: String,
-    to_yyyymmdd: String,
-}
-
-#[derive(Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct SyntheticFixtureManifest {
     schema_version: u16,
     fixture_id: String,
     dataset_tier: DatasetTier,
     company_marker: String,
     ledger_sentinel: String,
-    voucher_number_sentinel: String,
-    empty_voucher_range: DateWindow,
-    populated_voucher_range: DateWindow,
     minimum_ledger_count: u64,
     maximum_ledger_count: u64,
-    minimum_populated_voucher_count: u64,
-    maximum_populated_voucher_count: u64,
 }
 
 struct RunMetadata {
@@ -232,7 +218,7 @@ impl LiveRunInputs {
     }
 
     /// [`EDUCATION_REPORT_FAMILY_NOTICE`] when this run is configured for
-    /// Education, whose ledger and voucher reads are refused before sending.
+    /// Education, whose ledger read is refused before sending.
     pub fn education_notice(&self) -> Option<&'static str> {
         (self.config.mode == TallyMode::Education).then_some(EDUCATION_REPORT_FAMILY_NOTICE)
     }
@@ -283,16 +269,14 @@ impl LiveRunInputs {
 }
 
 /// The run's read transport. For a run configured for Education, it refuses
-/// the ledger and voucher profiles before sending: their report TDL raised a
-/// blocking dialog on an Education Tally's screen (bridge#45). The receipt then
-/// records the ledger step as failed with `education_report_family_unsupported`,
-/// and the voucher steps as not attempted.
+/// the ledger profile before sending: its report TDL raised a blocking dialog
+/// on an Education Tally's screen (bridge#45). The receipt then records the
+/// ledger step as failed with `education_report_family_unsupported`.
 ///
 /// The mode is the configuration's, not observed: this tool's company read
 /// (`CompanyListV1`) carries no `EDUMODE`, so a run configured as `Licensed`
 /// against an endpoint that is actually in Education is not protected. A ledger
-/// or voucher read in Education waits for the Collection-based profiles
-/// (Phase 2 Unit A).
+/// read in Education waits for the Collection-based profiles (Phase 2 Unit A).
 fn read_transport(config: &LiveRunConfig) -> Result<ReadOnlyTransport, LiveReadError> {
     let transport = ReadOnlyTransport::new(read_loopback(config.endpoint_family), config.port)
         .map_err(|_| error("endpoint_configuration_invalid"))?;
@@ -445,18 +429,8 @@ async fn execute_with_transport(
 ) -> Result<LiveCompatibilityReceipt, LiveReadError> {
     let company_name = ValidatedCompanyName::new(fixture.company_marker.clone())
         .map_err(|_| error("fixture_company_marker_invalid"))?;
-    let empty_range = ValidatedDateRange::new(
-        fixture.empty_voucher_range.from_yyyymmdd.clone(),
-        fixture.empty_voucher_range.to_yyyymmdd.clone(),
-    )
-    .map_err(|_| error("fixture_empty_range_invalid"))?;
-    let populated_range = ValidatedDateRange::new(
-        fixture.populated_voucher_range.from_yyyymmdd.clone(),
-        fixture.populated_voucher_range.to_yyyymmdd.clone(),
-    )
-    .map_err(|_| error("fixture_populated_range_invalid"))?;
 
-    let mut operations = Vec::with_capacity(5);
+    let mut operations = Vec::with_capacity(3);
     let mut endpoint_response_observed = false;
     let mut loaded_company_count = CountBucket::Unknown;
     let company_profile = ReadOnlyProfile::CompanyListV1;
@@ -476,7 +450,7 @@ async fn execute_with_transport(
                 company_profile.template_sha256(),
                 "company_enumeration_not_passed",
             ));
-            append_company_reads_not_attempted(&mut operations, &company_name, &empty_range);
+            append_company_reads_not_attempted(&mut operations, &company_name);
             return seal_receipt(
                 config,
                 fixture,
@@ -513,7 +487,7 @@ async fn execute_with_transport(
                 company_profile.template_sha256(),
                 "company_enumeration_not_passed",
             ));
-            append_company_reads_not_attempted(&mut operations, &company_name, &empty_range);
+            append_company_reads_not_attempted(&mut operations, &company_name);
             return seal_receipt(
                 config,
                 fixture,
@@ -552,7 +526,7 @@ async fn execute_with_transport(
             &company_response,
             "synthetic_fixture_unverified",
         ));
-        append_company_reads_not_attempted(&mut operations, &company_name, &empty_range);
+        append_company_reads_not_attempted(&mut operations, &company_name);
         return seal_receipt(
             config,
             fixture,
@@ -581,7 +555,6 @@ async fn execute_with_transport(
                 ledger_profile.template_sha256(),
                 &transport_error,
             ));
-            append_vouchers_not_attempted(&mut operations, &company_name, &empty_range);
             return seal_receipt(
                 config,
                 fixture,
@@ -615,7 +588,6 @@ async fn execute_with_transport(
                 application_status(ledger_response.text()),
                 "ledger_fixture_or_context_invalid",
             ));
-            append_vouchers_not_attempted(&mut operations, &company_name, &empty_range);
             return seal_receipt(
                 config,
                 fixture,
@@ -633,131 +605,6 @@ async fn execute_with_transport(
         &ledger_response,
         ledger_count,
     ));
-
-    let empty_profile = ReadOnlyProfile::VouchersV2 {
-        company: &company_name,
-        range: &empty_range,
-    };
-    let empty_response = match transport.send(empty_profile).await {
-        Ok(response) => response,
-        Err(transport_error) => {
-            operations.push(transport_failure(
-                ReadProfileId::XmlVoucherEmptyRangeV1,
-                empty_profile.template_sha256(),
-                &transport_error,
-            ));
-            operations.push(not_attempted(
-                ReadProfileId::XmlVoucherPopulatedRangeV1,
-                empty_profile.template_sha256(),
-                "empty_voucher_profile_not_passed",
-            ));
-            return seal_receipt(
-                config,
-                fixture,
-                metadata,
-                operations,
-                true,
-                endpoint_response_observed,
-                loaded_company_count,
-            );
-        }
-    };
-    match parse_voucher_source_records_with_evidence(empty_response.text()) {
-        Ok(parsed)
-            if parsed.records.is_empty()
-                && context_matches(&parsed.evidence, &fixture.company_marker, selected_guid) =>
-        {
-            operations.push(passed_response(
-                ReadProfileId::XmlVoucherEmptyRangeV1,
-                empty_profile.template_sha256(),
-                &empty_response,
-                0,
-            ));
-        }
-        _ => {
-            operations.push(response_failure(
-                ReadProfileId::XmlVoucherEmptyRangeV1,
-                empty_profile.template_sha256(),
-                &empty_response,
-                application_status(empty_response.text()),
-                "empty_voucher_fixture_or_context_invalid",
-            ));
-            operations.push(not_attempted(
-                ReadProfileId::XmlVoucherPopulatedRangeV1,
-                empty_profile.template_sha256(),
-                "empty_voucher_profile_not_passed",
-            ));
-            return seal_receipt(
-                config,
-                fixture,
-                metadata,
-                operations,
-                true,
-                endpoint_response_observed,
-                loaded_company_count,
-            );
-        }
-    }
-
-    let populated_profile = ReadOnlyProfile::VouchersV2 {
-        company: &company_name,
-        range: &populated_range,
-    };
-    let populated_response = match transport.send(populated_profile).await {
-        Ok(response) => response,
-        Err(transport_error) => {
-            operations.push(transport_failure(
-                ReadProfileId::XmlVoucherPopulatedRangeV1,
-                populated_profile.template_sha256(),
-                &transport_error,
-            ));
-            return seal_receipt(
-                config,
-                fixture,
-                metadata,
-                operations,
-                true,
-                endpoint_response_observed,
-                loaded_company_count,
-            );
-        }
-    };
-    match parse_voucher_source_records_with_evidence(populated_response.text()) {
-        Ok(parsed)
-            if context_matches(&parsed.evidence, &fixture.company_marker, selected_guid)
-                && parsed.records.len() as u64 >= fixture.minimum_populated_voucher_count
-                && parsed.records.len() as u64 <= fixture.maximum_populated_voucher_count
-                && parsed
-                    .records
-                    .iter()
-                    .filter(|record| {
-                        record.record.voucher_number.as_deref()
-                            == Some(fixture.voucher_number_sentinel.as_str())
-                    })
-                    .count()
-                    == 1
-                && parsed.records.iter().all(|record| {
-                    record.record.date.as_deref().is_some_and(|date| {
-                        date >= populated_range.from_yyyymmdd()
-                            && date <= populated_range.to_yyyymmdd()
-                    })
-                }) =>
-        {
-            operations.push(passed_response(
-                ReadProfileId::XmlVoucherPopulatedRangeV1,
-                populated_profile.template_sha256(),
-                &populated_response,
-                parsed.records.len(),
-            ));
-        }
-        _ => operations.push(response_failure(
-            ReadProfileId::XmlVoucherPopulatedRangeV1,
-            populated_profile.template_sha256(),
-            &populated_response,
-            application_status(populated_response.text()),
-            "populated_voucher_fixture_range_or_context_invalid",
-        )),
-    }
 
     seal_receipt(
         config,
@@ -880,32 +727,12 @@ fn locale_profile(value: LocaleProfile) -> ProfileValue<LocaleProfile> {
 fn append_company_reads_not_attempted(
     operations: &mut Vec<OperationEvidence>,
     company: &ValidatedCompanyName,
-    range: &ValidatedDateRange,
 ) {
     let ledger = ReadOnlyProfile::LedgersV1 { company };
     operations.push(not_attempted(
         ReadProfileId::XmlLedgerReadV1,
         ledger.template_sha256(),
         "synthetic_fixture_unverified",
-    ));
-    append_vouchers_not_attempted(operations, company, range);
-}
-
-fn append_vouchers_not_attempted(
-    operations: &mut Vec<OperationEvidence>,
-    company: &ValidatedCompanyName,
-    range: &ValidatedDateRange,
-) {
-    let vouchers = ReadOnlyProfile::VouchersV2 { company, range };
-    operations.push(not_attempted(
-        ReadProfileId::XmlVoucherEmptyRangeV1,
-        vouchers.template_sha256(),
-        "prior_read_profile_not_passed",
-    ));
-    operations.push(not_attempted(
-        ReadProfileId::XmlVoucherPopulatedRangeV1,
-        vouchers.template_sha256(),
-        "prior_read_profile_not_passed",
     ));
 }
 
@@ -1074,29 +901,13 @@ fn validate_fixture(fixture: &SyntheticFixtureManifest) -> Result<(), LiveReadEr
         || fixture.company_marker.len() > 128
         || fixture.company_marker.chars().any(char::is_control)
         || !valid_fixture_sentinel(&fixture.ledger_sentinel, "BRIDGE-LEDGER-")
-        || !valid_fixture_sentinel(&fixture.voucher_number_sentinel, "BRIDGE-VOUCHER-")
         || fixture.minimum_ledger_count == 0
         || fixture.minimum_ledger_count > fixture.maximum_ledger_count
-        || fixture.minimum_populated_voucher_count == 0
-        || fixture.minimum_populated_voucher_count > fixture.maximum_populated_voucher_count
     {
         return Err(error("fixture_invalid"));
     }
     ValidatedCompanyName::new(fixture.company_marker.clone())
         .map_err(|_| error("fixture_invalid"))?;
-    let empty = ValidatedDateRange::new(
-        fixture.empty_voucher_range.from_yyyymmdd.clone(),
-        fixture.empty_voucher_range.to_yyyymmdd.clone(),
-    )
-    .map_err(|_| error("fixture_invalid"))?;
-    let populated = ValidatedDateRange::new(
-        fixture.populated_voucher_range.from_yyyymmdd.clone(),
-        fixture.populated_voucher_range.to_yyyymmdd.clone(),
-    )
-    .map_err(|_| error("fixture_invalid"))?;
-    if ranges_overlap(&empty, &populated) {
-        return Err(error("fixture_ranges_overlap"));
-    }
     Ok(())
 }
 
@@ -1105,10 +916,6 @@ fn valid_fixture_sentinel(value: &str, prefix: &str) -> bool {
         && value.len() >= prefix.len() + 36
         && value.len() <= 128
         && !value.chars().any(char::is_control)
-}
-
-fn ranges_overlap(left: &ValidatedDateRange, right: &ValidatedDateRange) -> bool {
-    left.from_yyyymmdd() <= right.to_yyyymmdd() && right.from_yyyymmdd() <= left.to_yyyymmdd()
 }
 
 fn valid_release(value: &str) -> bool {

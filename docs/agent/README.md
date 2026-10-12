@@ -173,7 +173,7 @@ A compliance ledger read (`ledger_masters fields=compliance`) whose company's ma
 mark puts the estimated response over Bridge's budget has its ledgers counted first with a
 balance-free catalogue read (a stable pair, bound to the company by name and GUID) (#637, #668,
 #679). A count that fits is read whole. A count that does not is read in parts: the catalogue's
-parent groups are packed by ledger count into parts of at most 4,266 ledgers and 200 parents, and
+parent groups are packed by ledger count into parts of at most 4,266 ledgers (2,000 with `include_gst_details`) and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
@@ -188,7 +188,7 @@ whose name cannot sit in a filter, such as one with a control character, are rea
 last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
 parents per formula, all applied together), and the same coverage proof applies to it. A book
 that cannot be split is refused before any master request: one parent group, or the ledgers
-under unnameable parents, over 4,266 ledgers (`parent_over_budget`), more than 12 named parts
+under unnameable parents, over 4,266 ledgers (2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
 (`parent_partition_too_many_parts`), a complement filter over 256 KiB
 (`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
@@ -223,6 +223,26 @@ estimated past `limit_bytes`; a response past the transport's cap is cut off mid
 company with fewer ledgers may be refused. The limits are unverified against a live Tally beyond a
 two-parent filter and the census slices measured on three books; `fields=basic` still reads any of
 these books.
+`ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
+false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
+and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every
+request, the request commitment, the sizing and the result are what they were, and no row has a `gst_details`
+key. With it, the master read of each request (the whole book or each part by parent group) also names every
+ledger's `GSTDETAILS.LIST`, and each row's `compliance.gst_details` holds Tally's ledger-level GST details as
+sent: `observation` is `not_observed`, `entries` (each dated entry with its taxability, source, input-credit
+flag and state rows, whose rate rows carry a `rate` that is `absent`, `empty`, `zero` or `value` with `raw` and
+`decimal`, never merged) or `unreadable` (a `defect`, for that ledger only). HSN/SAC and type of supply are
+not returned because no capture shows them, the place of supply is in the registration history
+(`compliance.gst_registrations`), and slab rates are flagged, not read. The result's `limitations` say this
+and that the shape was measured on one 14-ledger lab book of TallyPrime 7.1 Silver and has not yet been run
+through this tool on a live Tally. The read is admitted at 8,000 bytes a ledger instead of 3,750, an
+UNVERIFIED margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry
+5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio: a read, whole or one part, holds at most 2,000 ledgers (4,266 without
+the flag; both figures are the 16 MB budget over the per-ledger constant, not measured), so a book that fits one
+read today may come back in more parts, or be refused as the existing `parent_over_budget`, never truncated.
+A held listing is served only to a page that asks for the same mode, so repeat `include_gst_details` on later
+pages as well as `as_of`: a later page without it reads afresh and returns rows without `gst_details`
+(`snapshot.reused` false), and only a call that names `snapshot_id` is refused.
 When Bridge got no response it could read, the `cause` names why and the error also carries
 `endpoint`, the configured origin that was tried (#629). The causes are:
 - `endpoint_invalid`: the configured endpoint failed validation. The `endpoint` field then appears only
@@ -255,6 +275,12 @@ than a company's name. Both are attached only to a refusal made before anything 
 Tally: `company_guid_invalid` also comes back after a read when Tally itself lists a company whose
 GUID is malformed, and then it carries neither. Other argument refusals carry no `expected`. A date that fits the pattern but is not a real day,
 such as `2026-02-30`, is `invalid_date`; it gets the same date guidance in `remediation`.
+
+A `post_import` refusal does not carry `remediation`. When its journal shows that nothing was sent
+(`attempt_recorded` is `false`), it carries the same next step as `error.next_step` instead, when
+one exists: its code's, or else its cause's, under the same 4,096-byte rule. A step the post sets itself, for a busy
+port or a row another batch posted, is kept. A refusal after a send, or when a send could not be ruled
+out, is given no such step: it is reconciled with `verify_import`, never retried (#1573).
 
 Like `remediation`, `expected`, `cause`, `counts`, `size`, `endpoint`, `ledger`, `bill_row`,
 `partial_reason` (and `partial_reasons`), `reads`, `unsupported_parent_ledgers`, `candidates_listing`,
@@ -1840,8 +1866,15 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    genuinely different transaction that shares the fingerprint of a voucher
    that was opened and confirmed is entered in Tally by hand. Build the other
    rows again so they post; a rebuilt batch can be refused again, naming rows
-   the first answer did not list. Cut inline batches on whole days so same-day
-   rows of one amount are not split across batches. The list and step are
+   the first answer did not list. Import a bank statement in whole-day batches:
+   cut a batch only between days, at most 50 vouchers (the batch-post limit), so
+   same-day rows of one amount are not split across batches; they pass this
+   check together in one batch. A proposals file is whole days already, since
+   `from` and `to` are days. A day with more than 50 rows does not fit one
+   batch, and that case is open: ask the user. Batch posting is off by
+   default, and with it off each post takes one voucher, so same-day twins
+   post together only with batch posting on or through a hand import of the
+   built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's
@@ -1980,10 +2013,11 @@ company whose voucher mark reads below the mark the post left, every voucher it
 no longer holds as `book_rolled_back`, never `not_found`, with nothing bound in
 it. Such a book was rolled back (a backup restored, or another copy put in its
 place). The check sees a rollback only while the mark reads below the post's: a
-book keyed past it again after a restore is not seen as rolled back, and if
-Tally then gave new vouchers the MasterIDs the post's vouchers held (unmeasured),
-a bound voucher names another voucher, which reads `posted_divergent`, or a false
-`posted_verified` when its content is the same (bridge#1050). Bridge still records those rows as posted, so a rebuilt batch holding
+book keyed past it again after a restore is not seen as rolled back. Tally then
+gives the vouchers keyed again the MasterIDs, GUIDs and numbers the post's
+vouchers held (measured once on a synthetic company, bridge#1050), so a bound
+voucher names another voucher, which reads `posted_divergent`, or a false
+`posted_verified` when its content is the same. Bridge still records those rows as posted, so a rebuilt batch holding
 them is refused as `import_txn_already_posted`; re-entering them in that book is
 the person's decision. The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
@@ -1994,7 +2028,10 @@ again by the next verification),
 
 A native post that sent no tag is never attributed by one: a row carrying its
 batch's tag is a hand import of the batch's file, matched by content only. The
-binding compares narration byte for byte. A narration holding the one sequence
+binding compares narration byte for byte, and so does every verification since
+#1608: an attributed voucher whose narration differs from the one written reads
+`posted_divergent`, with `narration` in its `diffs` (a voucher matched by content
+only stays `matching_content_observed` and only lists it). A narration holding the one sequence
 the agent readers are known to rewrite (a literal U+FFFD followed by `#`, digits
 and `;`) is refused when the batch is built (`voucher_text_invalid`), and
 `post_import` refuses a batch saved before that check in the same way, before

@@ -1375,7 +1375,16 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             alter_id: Some(63),
             date: bridge_tally_core::TallyDate::parse(voucher.date.as_str()).unwrap(),
             voucher_type: Some(voucher_type.as_str().into()),
-            narration: Some(format!("[BRIDGE:{}]", voucher.bridge_txn_id)),
+            // What Bridge writes for this voucher: its narration, then its tag.
+            narration: Some(
+                format!(
+                    "{} [BRIDGE:{}]",
+                    voucher.narration.as_deref().unwrap_or(""),
+                    voucher.bridge_txn_id
+                )
+                .trim()
+                .to_string(),
+            ),
             // Tally's own number, which Bridge never sent and must not compare.
             voucher_number: Some("463".into()),
             cancelled: Some(false),

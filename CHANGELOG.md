@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
+  any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
+  carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,
+  with a rate that is `absent`, `empty`, `zero` or a `value` (the text as sent and the decimal), never merged
+  (part of #1342). HSN/SAC and type of supply are not returned because no capture shows them, the place of
+  supply stays in the registration history, and slab rates are only flagged. Without the flag the requests, the
+  sizing and the result are unchanged. With it the read is admitted at 8,000 bytes a ledger instead of 3,750, a
+  margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element),
+  not a measured ratio; a large book may be read in more parts or refused as too large. Measured on one 14-ledger lab book of TallyPrime 7.1 Silver and not yet run through this tool on a
+  live Tally.
+
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
   Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
   and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,
@@ -75,6 +86,16 @@ These changes are in source and not yet in a published build.
   `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set and posting is on, `post_import` refuses
   as `setting_retired` until you remove it. A batch saved earlier that was refused as more than one
   voucher now posts after its own approval.
+- **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
+  differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
+  every other compared field matched and it read `posted_verified`, and a divergent voucher never
+  listed a narration difference. A narration edited in Tally after the post therefore leaves the
+  batch unsettled until the narration in Tally matches the approved text again. The read-back, the post's span binding and the amendment
+  check now share one comparison: the text as written (trimmed, with its `[BRIDGE:…]` tag for a
+  file imported by hand) against the text read, byte for byte; a narration Tally holds none of
+  equals only an empty one written. Whether Tally changes trailing spaces or line breaks on import
+  is unmeasured; the first live run will show it (#1608).
+
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
   Administrators, or that anyone but you, SYSTEM and Administrators can read or change
   (`statement_password_file_permissions`), as a Mac already refuses one that other users can read.
@@ -116,12 +137,21 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A `post_import` refusal made before anything was sent now says what to do next.** Its
+  `error.next_step` carries the same step every other tool gives for that refusal: its code's,
+  or else its cause's. Before, a code raised inside the post, such as a date range too large to
+  check in one request, came back with no step. Only when the journal shows nothing was sent: a
+  refusal after a send, or when a send could not be ruled out, still carries no such step, and is
+  reconciled with `verify_import`. The steps the post already gave (a busy port, a row another
+  batch posted) are unchanged (#1573).
+
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
   its first debit ledger, so the person could not see what each Journal credited; it now shows
   `Dr "<first debit>" +N more  Cr "<first credit>" +M more`, with up to 20 characters of its
-  narration (other types keep 40). A Journal line that does not fit leaves the totals and the
-  reason line, as any line that does not fit does. The line above the voucher lines said each
+  narration (other types keep 40), cut shorter, never under 10, when that makes the line fit. A
+  Journal line that fits at no such cut leaves the totals and the reason line, as any line that
+  does not fit does. The line above the voucher lines said each
   narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
   it now says a cut narration is marked. Payment, Receipt and Contra lines still name one
   ledger. On every line, the further entries on a side now read "+N more", never a bare "+N"

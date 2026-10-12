@@ -35,7 +35,9 @@ use bridge_tally_protocol::{
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
         render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
         render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
-        BaseCurrencyName, ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
+        render_party_ledger_master_request_for_parents_with_gst_details,
+        render_party_ledger_master_request_with_gst_details, BaseCurrencyName,
+        ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
         NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
     outstandings_shared::{
@@ -339,6 +341,52 @@ fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -
 /// on a row: party rows cost 3.2 to 3.3 KB there.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 
+/// Bytes one ledger is estimated to add to the compliance master response when
+/// the request also names each ledger's `GSTDETAILS.LIST`
+/// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
+/// ledgers, a lab book) measured 2,138 to 2,704 bytes for a ledger with an
+/// empty list and 5,248 to 5,394 with one dated entry (UTF-16 bytes per
+/// `<LEDGER>` row). 8,000 is sized above the largest ledger of that one
+/// capture. It is NOT shown to cover a second dated entry: by the capture's own
+/// sizes (the empty-list block is 80 bytes, a dated entry's list block 2,874 to
+/// 3,264) a ledger with two dated entries could take about 8,600 bytes at the
+/// largest row, and a party ledger with two about 9,100 (extrapolated: the
+/// capture holds no party ledger with a dated entry). The admission uses the mean over a read
+/// (the estimated count times this figure against the budget), so a book in
+/// which most ledgers hold two or more entries could exceed the 16 MB response
+/// budget while still admitted. UNVERIFIED until measured on more books; it is
+/// not a bound. The shared [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is
+/// for reads without the details.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
+
+/// What a compliance master read asks Tally for. [`Self::Standard`] is the
+/// production request, and every caller other than a `ledger_masters` call
+/// that asked for the GST details passes it. [`Self::WithGstDetails`] names
+/// each ledger's dated GST details in the request's `FETCH` and is sized by
+/// its own per-ledger estimate everywhere the standard one would be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ComplianceRead {
+    Standard,
+    WithGstDetails,
+}
+
+impl ComplianceRead {
+    /// The bytes one ledger is estimated to add to this read's master response.
+    const fn bytes_per_ledger(self) -> u64 {
+        match self {
+            Self::Standard => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+            Self::WithGstDetails => COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
+        }
+    }
+}
+
+/// The most ledgers one master read of this kind is admitted for: the budget
+/// over its per-ledger estimate. The whole-read bound and the per-part bound
+/// of a book read in parts are this one figure.
+pub(crate) const fn compliance_master_ledgers_per_read(read: ComplianceRead) -> u64 {
+    COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED / read.bytes_per_ledger()
+}
+
 /// The largest estimated compliance master response Bridge will request
 /// (#637). UNVERIFIED: 0.8 MB/s is that book's 35.6 MB over about 44 s,
 /// averaged over more than one request, so 16 MB is about one 20 s request at
@@ -433,12 +481,16 @@ const fn ledger_census_mark_limit() -> u64 {
 const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 
 /// The ceiling on one parent group is the whole-read bound: a group with more
-/// ledgers than one part may carry (4,266) is refused as `parent_over_budget`,
-/// never split, because a group cannot be read in pieces by `$Parent`.
+/// ledgers than one part may carry is refused as `parent_over_budget`, never
+/// split, because a group cannot be read in pieces by `$Parent`. That figure is
+/// the budget over the read's per-ledger constant, not a measurement: 4,266
+/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers, far past what the mark bound admits.
+/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
+/// far past what the mark bound admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
 /// Most bytes of `NOT` formula text the complement part's request may carry
@@ -450,10 +502,9 @@ const PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED: usize = 262_144;
 /// The limits a book's parent parts must fit (#679): each part's estimated
 /// master response is inside the same budget a whole read is admitted by, so
 /// the per-part ledger bound is the whole-read bound.
-fn parent_partition_limits() -> PartitionLimits {
+pub(crate) fn parent_partition_limits(read: ComplianceRead) -> PartitionLimits {
     PartitionLimits {
-        max_ledgers_per_part: COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
-            / COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+        max_ledgers_per_part: compliance_master_ledgers_per_read(read),
         max_parents_per_part: PARENT_PART_MAX_PARENTS_UNVERIFIED,
         max_parts: PARENT_PART_MAX_PARTS_UNVERIFIED,
         max_complement_formula_bytes: PARENT_COMPLEMENT_MAX_FORMULA_BYTES_UNVERIFIED,
@@ -486,11 +537,12 @@ pub(crate) fn compliance_estimate(
     }
 }
 
-/// [`compliance_estimate`] at the two UNVERIFIED constants.
-fn compliance_estimate_unverified(count: u64) -> ComplianceEstimate {
+/// [`compliance_estimate`] at the budget and the read's per-ledger constant,
+/// both UNVERIFIED.
+fn compliance_estimate_unverified(count: u64, read: ComplianceRead) -> ComplianceEstimate {
     compliance_estimate(
         count,
-        COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+        read.bytes_per_ledger(),
         COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED,
     )
 }
@@ -549,7 +601,8 @@ enum ComplianceAdmission {
 /// Sizes a compliance read before any master request is sent (#637, #668, #679).
 ///
 /// With `counted` ledgers the count decides: the estimate is `counted` times
-/// the per-ledger constant, and a count that does not fit is read in parts.
+/// the per-ledger constant of `read` (larger when the request also names the
+/// GST details), and a count that does not fit is read in parts.
 /// Without one, the company's master-alteration mark (`ALTMSTID`, from the
 /// opening extent; the extent read already fails closed without it,
 /// `require_master_witness`) stands in: it fits, or the catalogue that counts
@@ -572,8 +625,9 @@ enum ComplianceAdmission {
 fn admit_compliance_master_read(
     master_alter_id: u64,
     counted: Option<u64>,
+    read: ComplianceRead,
 ) -> Result<ComplianceAdmission, PartyLedgerMasterSourceValidationError> {
-    if compliance_estimate_unverified(counted.unwrap_or(master_alter_id)).fits {
+    if compliance_estimate_unverified(counted.unwrap_or(master_alter_id), read).fits {
         return Ok(ComplianceAdmission::Admitted);
     }
     if counted.is_some() {
@@ -1616,6 +1670,7 @@ impl TallyClient {
         boundary_profile: DateBoundaryProfile,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
         today: &bridge_tally_core::TallyDate,
+        read: ComplianceRead,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let mut evidence = RuntimeReadEvidence::empty();
         let mut count_evidence = RuntimeReadEvidence::empty();
@@ -1629,7 +1684,7 @@ impl TallyClient {
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
             // once the local checks below have passed (#668).
-            let admission = admit_compliance_master_read(master_mark, None)?;
+            let admission = admit_compliance_master_read(master_mark, None, read)?;
             let currency = currency_assertion.require_opening_extent(&opening_extent)?;
             let master_period = NativeLedgerExportPeriod::new(
                 boundary_profile,
@@ -1669,7 +1724,7 @@ impl TallyClient {
                 let counted = census.get();
                 count_cross_check = Some(cross_check);
                 census_count = Some(counted);
-                if admit_compliance_master_read(master_mark, Some(counted))?
+                if admit_compliance_master_read(master_mark, Some(counted), read)?
                     == ComplianceAdmission::InParts
                 {
                     // Their parents are named by the catalogue, which the
@@ -1720,12 +1775,12 @@ impl TallyClient {
                 // A count the whole read cannot fit is read as parts by parent
                 // group (#679); the catalogue that counted the book also
                 // names each ledger's parent, so nothing more is asked first.
-                if admit_compliance_master_read(master_mark, Some(counted))?
+                if admit_compliance_master_read(master_mark, Some(counted), read)?
                     == ComplianceAdmission::InParts
                 {
                     let planned = ParentPartition::plan(
                         catalogue.identified_parents(),
-                        parent_partition_limits(),
+                        parent_partition_limits(read),
                     )
                     .map_err(|source| {
                         PartyLedgerMasterSourceValidationError::ParentPartition { source }
@@ -1749,7 +1804,18 @@ impl TallyClient {
             let group_request = render_native_group_snapshot_request(identity.display_name());
             let part_requests = match &partition {
                 None => vec![(
-                    render_party_ledger_master_request(identity.display_name(), &master_period),
+                    match read {
+                        ComplianceRead::Standard => render_party_ledger_master_request(
+                            identity.display_name(),
+                            &master_period,
+                        ),
+                        ComplianceRead::WithGstDetails => {
+                            render_party_ledger_master_request_with_gst_details(
+                                identity.display_name(),
+                                &master_period,
+                            )
+                        }
+                    },
                     render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
                 )],
                 Some(partition) => partition
@@ -1757,11 +1823,22 @@ impl TallyClient {
                     .iter()
                     .map(|part| {
                         (
-                            render_party_ledger_master_request_for_parents(
-                                identity.display_name(),
-                                &master_period,
-                                part,
-                            ),
+                            match read {
+                                ComplianceRead::Standard => {
+                                    render_party_ledger_master_request_for_parents(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                                ComplianceRead::WithGstDetails => {
+                                    render_party_ledger_master_request_for_parents_with_gst_details(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                            },
                             render_native_ledger_snapshot_request_for_parents(
                                 identity.display_name(),
                                 &balance_period,

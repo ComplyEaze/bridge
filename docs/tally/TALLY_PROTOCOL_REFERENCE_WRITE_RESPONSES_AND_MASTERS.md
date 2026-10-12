@@ -666,8 +666,8 @@ none is `ledger_not_found`; and **more than one is `ledger_ambiguous` — an err
 comparison that returns the first match is the failure this rule exists to prevent.
 
 **Copy its discipline, not its fold.** That resolver's `ledger_lookup_key` keeps only alphanumerics,
-which is *looser* than anything §3.3b measured — it drops `&` outright, so `A & B` and `AB` share a
-key.
+which is *looser* than anything `IMPLEMENTATION_GUIDE.md` §3.3b measured — it drops `&` outright,
+so `A & B` and `AB` share a key.
 
 Be exact about what was and was not tested there, because I was not. §3.3b sent
 `ZZ Ram AND Sons Pvt Ltd` against `ZZ Ram & Sons Pvt Ltd` and it was **rejected** — that tested

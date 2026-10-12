@@ -3,6 +3,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use crate::tally::ConnectionStatus;
 use std::collections::BTreeMap;
 
 #[test]

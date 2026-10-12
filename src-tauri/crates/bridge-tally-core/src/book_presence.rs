@@ -1871,9 +1871,10 @@ fn decide(
 
     // Rule one: identity first, and *every* identity is resolved before any of
     // them settles. A `REMOTEID` and a narration marker are both keys Bridge
-    // itself wrote; only their survival differs (§3.3a, §9.8). Resolving them
-    // together is what lets a disagreement be reported instead of decided by
-    // whichever branch happened to run first.
+    // itself wrote; only their survival differs (`IMPLEMENTATION_GUIDE.md`
+    // §3.3a, protocol reference §9.8). Resolving them together is what lets a
+    // disagreement be reported instead of decided by whichever branch happened
+    // to run first.
     let identities = IdentityMatches::lookup(proposal, index);
     let collision = CollisionEvidence::gather(window, &identities, &number_matches, method);
 
@@ -2598,8 +2599,9 @@ fn label(value: &str) -> String {
 /// than the one master names use.
 ///
 /// `comparison_key` folds case and unifies dash and quote variants, and that
-/// fold is not arbitrary: §3.3b measured Tally's own master-name matching and
-/// the key follows it. **No such measurement exists for voucher numbers.**
+/// fold is not arbitrary: `IMPLEMENTATION_GUIDE.md` §3.3b measured Tally's own
+/// master-name matching and the key follows it. **No such measurement exists
+/// for voucher numbers.**
 /// Applying the name fold to them was an assumption wearing a measurement's
 /// clothes, and it fails in the silent direction: folding produces *more*
 /// matches, a wrong match on a number is a `Present`, and a `Present` tells a

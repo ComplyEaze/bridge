@@ -3,6 +3,7 @@ use crate::tally::runtime::MastersKind;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::group_ancestry::{AncestryChain, AncestryGap, GroupIndex};
 use bridge_tally_protocol::gst_registration::GstRegistrationHistory;
+use bridge_tally_protocol::PartyLedgerMasterFields;
 
 use super::*;
 
@@ -42,6 +43,19 @@ fn ancestry_gap_code(gap: AncestryGap) -> &'static str {
         AncestryGap::Cycle => "cycle",
         AncestryGap::Exhausted => "exhausted",
     }
+}
+
+/// One ledger's `compliance` object: the master fields as serialised, with the
+/// party names marked, and without `gst_details`. No request asks for the GST
+/// details list yet, so every row would carry `{"observation":"not_observed"}`
+/// (bridge#1520). Removed here and not on the type, because a later opt-in
+/// read must report "asked, none returned" as `not_observed`.
+fn compliance_json(fields: PartyLedgerMasterFields) -> Value {
+    let mut compliance = serde_json::to_value(fields).unwrap_or_default();
+    if let Value::Object(object) = &mut compliance {
+        object.remove("gst_details");
+    }
+    mark_compliance_party_names(compliance)
 }
 
 /// Renders one ledger's resolved ancestry for the wire. `hops` is always the
@@ -764,9 +778,7 @@ impl Server {
                             "parent": parent,
                             "opening_balance": record.ledger.opening_balance,
                             "opening_balance_as_of": &opening_as_of,
-                            "compliance": mark_compliance_party_names(
-                                serde_json::to_value(record.fields).unwrap_or_default(),
-                            ),
+                            "compliance": compliance_json(record.fields),
                             "ancestry": ancestry_json(&chain),
                         });
                         if let Value::Object(fields) = &mut row {

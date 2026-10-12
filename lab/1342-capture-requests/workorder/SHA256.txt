@@ -78,3 +78,7 @@ e92e7ceb6e4923f9d5796a48c8c7afc476cdcd05718ae20a5589e6c22af5ce12  W16-README.md
 # W18 (every read a Sales invoice build sends, in one sitting; steps in W18-README.md; w18-number-0040.xml is ../r09-number-new-invoice.xml with the number changed only)
 84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8  w18-number-0040.xml
 c24bcc93cec788af7844c47ad57112c68312da41843d433b1ea0d3f206c29129  W18-README.md
+# W19 (the GSTR-1 status read with PARTYLEDGERNAME, ISCANCELLED, ISOPTIONAL and AMOUNT added; steps in W19-README.md; derived from w13-status-window-aug.xml, the code's own render, by adding field names only)
+3d4f084ffc509080f8806a7f644336e4d493c618b1c800c1ede46ad5f2ee527c  w19-status-window-aug-wide.xml
+eb406ba4f035eb8487e0922937d2de8b928a1b85e6fb1152d501e635803f08a2  w19-status-window-aug-wide-two.xml
+a916741b23a0deb3f7c7496cbdb38f30883aea9db22db25f781aadcaf5de6e5b  W19-README.md

@@ -1,0 +1,1 @@
+fields_prepared omitted in w1-trail.json (list of field names only); everything else copied from the egress_log record.

@@ -1,0 +1,127 @@
+{
+  "alter_id_delta": {
+    "after_seen": 7,
+    "before": 1,
+    "delta": 6,
+    "from": "build_mark"
+  },
+  "batch_id": "bridge-21f8cfe4-67a1-44d2-8f7e-77fd6619db13",
+  "batch_sha256": "89b59f16215dc9d69ca4774a8e3f0e50b81e367d1b197e98a122755041866be8",
+  "built_at": "2026-10-10T05:03:08.036Z",
+  "company": {
+    "books_from": "20260401",
+    "company_number": "100045",
+    "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1",
+    "identity_state": "verified_tuple",
+    "missing_field": null,
+    "name": "BRIDGE TIE OUT LAB 1"
+  },
+  "counts": {
+    "bound_not_in_window": 0,
+    "cancelled_with_effective_copy": 0,
+    "duplicate_fingerprint": 0,
+    "matching_content_observed": 0,
+    "not_attributable": 0,
+    "not_found": 0,
+    "posted_divergent": 0,
+    "posted_not_effective": 0,
+    "posted_verified": 6
+  },
+  "dispatch_response": null,
+  "duplicates": [],
+  "evidence": {
+    "company": {
+      "bytes": 8036,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_sha256": "7a9c46ce2ff748b362cb178cfa462b2b06d0ad356b97985deabf31de046f65ae",
+      "state": "complete"
+    },
+    "mode_closing": null,
+    "mode_opening": {
+      "bytes": 4069,
+      "request_sha256": "08553f864e24068d545afb217c89b88f63c7f380d8ca74454ff2f9af2704f1b8",
+      "response_sha256": "68ecb496f4d9f444468984ac95db1304f1aa7f34e9b180057a81c2d01dcc6071",
+      "state": "complete"
+    },
+    "voucher_read": {
+      "bytes": 68340,
+      "request_sha256": "3f7d81912f486c719544814ac8859564ac29f0caae1cd07f021b6b76534c699a",
+      "response_sha256": "5e91b09a7920bd60653723ec2d420ea521efda232b215078cd2bc8e5b5537eca",
+      "state": "complete"
+    },
+    "voucher_read_corroboration": {
+      "bytes": 68340,
+      "request_sha256": "3f7d81912f486c719544814ac8859564ac29f0caae1cd07f021b6b76534c699a",
+      "response_sha256": "5e91b09a7920bd60653723ec2d420ea521efda232b215078cd2bc8e5b5537eca",
+      "state": "complete"
+    },
+    "voucher_read_sha256": "5e91b09a7920bd60653723ec2d420ea521efda232b215078cd2bc8e5b5537eca"
+  },
+  "post_span_binding": {
+    "state": "not_applicable"
+  },
+  "pre_import_mark": {
+    "kind": "company_high_water",
+    "master_value": 210,
+    "value": 1
+  },
+  "unrelated_duplicates_in_window": [],
+  "verification_status": "posted_verified",
+  "verified_at": "2026-10-10T05:05:54.671Z",
+  "vouchers": [
+    {
+      "alter_id": 2,
+      "bridge_txn_id": "st-20260801-f4a74c43efa1ba77",
+      "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1-00000002",
+      "marker": "narration_tag",
+      "master_id": "2",
+      "status": "posted_verified",
+      "voucher_number": "2"
+    },
+    {
+      "alter_id": 3,
+      "bridge_txn_id": "st-20260802-054e5436c79aebbb",
+      "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1-00000003",
+      "marker": "narration_tag",
+      "master_id": "3",
+      "status": "posted_verified",
+      "voucher_number": "1"
+    },
+    {
+      "alter_id": 4,
+      "bridge_txn_id": "st-20260803-ca1149f25a7a8720",
+      "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1-00000004",
+      "marker": "narration_tag",
+      "master_id": "4",
+      "status": "posted_verified",
+      "voucher_number": "3"
+    },
+    {
+      "alter_id": 5,
+      "bridge_txn_id": "st-20260804-628ad4b40ead0462",
+      "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1-00000005",
+      "marker": "narration_tag",
+      "master_id": "5",
+      "status": "posted_verified",
+      "voucher_number": "2"
+    },
+    {
+      "alter_id": 6,
+      "bridge_txn_id": "st-20260805-4268ee2b10d21b78",
+      "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1-00000006",
+      "marker": "narration_tag",
+      "master_id": "6",
+      "status": "posted_verified",
+      "voucher_number": "4"
+    },
+    {
+      "alter_id": 7,
+      "bridge_txn_id": "st-20260806-5dcfe98707064697",
+      "guid": "ead80089-9c57-4d75-aaff-7f65bef58ee1-00000007",
+      "marker": "narration_tag",
+      "master_id": "7",
+      "status": "posted_verified",
+      "voucher_number": "5"
+    }
+  ]
+}

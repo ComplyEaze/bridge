@@ -846,3 +846,60 @@ async fn the_verification_a_post_makes_never_computes_the_section() {
     assert!(result["verification_status"].is_string(), "{result}");
     assert!(result.get("transfers").is_none(), "{result}");
 }
+
+#[tokio::test]
+async fn the_readback_right_after_a_post_never_computes_the_section() {
+    let directory = tempfile::tempdir().unwrap();
+    run(
+        directory.path(),
+        skip_only_plans(),
+        a_skips(directory.path(), &[(SKIPPED, None)]),
+    )
+    .await;
+    let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        writes_enabled: true,
+        batch_post_enabled: false,
+    });
+    let built = server
+        .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
+        .await
+        .expect("build");
+    let batch_id = built.payload["result"]["batch_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let saved = latest(directory.path(), &batch_id);
+    {
+        let _admission = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&saved))
+            .unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::response(
+                &saved,
+                persisted_dispatch_response(1, 0),
+            ))
+            .unwrap();
+    }
+    let outcome = server
+        .verify_import_after_current_dispatch(
+            &json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
+            json!({"state": "not_checked", "reason": "masters_unmoved"}),
+            None,
+        )
+        .await
+        .expect("the readback");
+    let result = &outcome.payload["result"];
+    assert!(result["dispatch"]["state"].is_string(), "{result}");
+    assert!(result.get("transfers").is_none(), "{result}");
+}

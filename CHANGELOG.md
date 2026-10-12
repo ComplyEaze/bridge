@@ -140,8 +140,8 @@ These changes are in source and not yet in a published build.
   `empty_window_wider_read_nonempty` where they gave `nonempty_uncorroborated`, which read as if the window
   itself held rows. Only the name changes: the state stays `partial` (a refusal, for `ledger_movement`),
   and an empty window next to a busy day still cannot reach `complete`. The other reasons
-  (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the tool
-  descriptions and the agent guide now list all three outcomes of an empty window.
+  (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
+  `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
 
 ## [0.5.1] - 2026-10-09
 

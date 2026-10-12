@@ -8,10 +8,12 @@ Covers `vouchers-empty-window-beside-busy-day.live-answer.json`.
 
 Captured, not authored: the file is the tool's answer to one `vouchers` call as the lab
 recorded it, beside the call's arguments, copied here without any change (its size and hash
-are in the table; how the lab wrote the file is not known beyond that, so "captured" rests
-on the lab's record and the hash). It is the tool's answer, not Tally wire bytes: the answer
-records only the response's hash and size (`response_sha256`, `bytes`), and the lab recorded
-that the response bytes were not retained.
+are in the table; how the lab wrote the file is not known beyond that). The same file, with
+the same hash, is listed in `SHA256.txt` of the lab evidence branch
+`lab/2-r10-fingerprint-answers` (commit 69a5baa93fee6087ef341c70b9d59c6a802b8c51, file
+`m4-before-0902-0903.json`, with the lab's notes beside it). It is the tool's answer, not
+Tally wire bytes: the answer records only the response's hash and size (`response_sha256`,
+`bytes`), and the lab recorded that the response bytes were not retained.
 
 ## What was read
 
@@ -24,8 +26,9 @@ The rest is context the lab recorded when it took the file; this file does not p
   Windows lab machine, with the installed Bridge build 411f7cca (the build in which this
   reason was still named `nonempty_uncorroborated`).
 - A second call in the same minute, `vouchers` for 2026-09-01 to 2026-09-30, answered
-  `complete` with a total of 6 vouchers, all dated 1 September (that answer is not committed
-  here); so 2 and 3 September held none, and the day before the window was busy.
+  `complete` with a total of 6 vouchers, all dated 1 September (that answer is not in this
+  tree: it is `m4-before-sep.json` on the same evidence branch); so 2 and 3 September held
+  none, and the day before the window was busy.
 
 ## What it establishes
 

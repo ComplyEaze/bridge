@@ -50,15 +50,15 @@ These changes are in source and not yet in a published build.
   currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
   a setting changed inside a sitting, Education mode and other releases are not measured.
 
-- `voucher_read_cost` says, before a call, how many census reads one call of `vouchers`, `ledger_movement` or
-  `verify_import` will send on a company, and the least time those reads spend on the gaps between them (part of
-  #1465, after #1239). It reads only the company's marks (the read every windowed call opens with) and sends no
-  census and no voucher request. The census follows the book's voucher mark, not the window, so the figure is for
+- `voucher_read_cost` says, before a call, the most census reads one call of `vouchers`, `ledger_movement` or
+  `verify_import` will send on a company (a read can be refused before its census ends), and the least time a call
+  that is not refused earlier spends on the gaps between them (part of #1465, after #1239). It reads the company's
+  identity and then its marks (the opening every windowed call makes) and sends no census and no voucher request. The census follows the book's voucher mark, not the window, so the figure is for
   one call: a narrower window does not lower it, and N calls pay it N times. The count and the floor are derived
   from the mark and the read's own rules, not measured on the book, and they leave out the data parts and the
   wider re-read an empty window gets in `vouchers` and `ledger_movement`; no estimate is made. Beside them are the
-  census runs the protocol reference records (one book, about 250,000 vouchers, 31 census reads), as data marked
-  as not a bound. Nothing is refused on it. Not measured: Windows hosts, and any book other than that one.
+  whole calls the protocol reference records, with their census reads and data parts (one book, about 250,000
+  vouchers, 31 census reads), as data marked as not a bound. Nothing is refused on it. Not measured: Windows hosts, and any book other than that one.
 
 - `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
   two real statements, held privately, and the profile follows what was seen there:

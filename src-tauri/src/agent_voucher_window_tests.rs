@@ -5679,9 +5679,14 @@ async fn the_preview_states_the_census_reads_a_real_vouchers_call_then_sends() {
         assert_eq!(preview["isError"], false, "{preview}");
         let stated = &preview["structuredContent"]["result"]["per_call"]["vouchers"];
         assert_eq!(stated["census_reads"], sent, "reads {reads}: {stated}");
-        // The real call states its floor from 16 reads on; it is the same figure.
-        if let Some(floor) = window["read_cost"].get("floor_seconds") {
+        // The real call states its floor from 16 reads on (not at 3); it is the same
+        // figure, and at 18 reads it is there, so a missing field fails the test.
+        if reads >= 16 {
+            let floor = &window["read_cost"]["floor_seconds"];
+            assert!(floor.is_u64(), "reads {reads}: {window}");
             assert_eq!(&stated["floor_seconds"], floor, "reads {reads}: {stated}");
+        } else {
+            assert!(window.get("read_cost").is_none(), "reads {reads}: {window}");
         }
         // The preview sent the identity read and one marks read, and nothing else.
         assert_eq!(one.requests(), 10);

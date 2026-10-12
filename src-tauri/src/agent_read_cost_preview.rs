@@ -15,7 +15,7 @@
 //!   the gaps between census reads of a call that is not refused earlier. It leaves
 //!   out every data part and the wider re-read an empty window gets in `vouchers`
 //!   and `ledger_movement`;
-//! - the `measured` block is **constant text**: census runs recorded in the public
+//! - the `measured` block is **constant text**: whole calls recorded in the public
 //!   protocol reference, each with its host, date, confidence and "not a bound".
 //!   Bridge computes no estimate from them. If one is wanted later it gets its own
 //!   type; until then there is none, and no field is ever 0 for "not known".
@@ -85,15 +85,15 @@ fn tools() -> [(&'static str, WindowReadLimits); 3] {
     ]
 }
 
-/// The measured census runs the public protocol reference records, as data. Each
+/// The measured calls the public protocol reference records, as data. Each
 /// carries its source section, host, date and confidence, and says it is not a
 /// bound. Nothing here is computed, and nothing is added to or scaled from these
 /// figures. The book's mark is rounded, as the reference rounds it: an exact mark
 /// identifies a book.
 fn measured() -> Value {
     json!({
-        "kind": "measured_census_runs_not_a_bound",
-        "say": "These are census runs recorded in the protocol reference, each on one book. Bridge computes no estimate from them. A different book, host or load can take a different time per census read, and a call also pays its data parts. They are not a bound.",
+        "kind": "measured_calls_not_a_bound",
+        "say": "These are whole calls recorded in the protocol reference, each on one book, with the census reads and data parts each made. The seconds are the whole call, not the census alone. Bridge computes no estimate from them. A different book, host or load can take a different time per census read. They are not a bound.",
         "points": [
             {
                 "call": "vouchers",
@@ -146,7 +146,7 @@ fn say(mark: u64, costs: &[(&'static str, CensusCost)]) -> String {
             CensusCost::Reads(reads) => {
                 let floor = census_floor_ms(*reads) / 1000;
                 format!(
-                    "{tool} sends {reads} census read{} and takes at least {floor} second{} of gaps between them (derived)",
+                    "{tool} sends at most {reads} census read{}, and a call that is not refused earlier spends at least {floor} second{} on the gaps between them (derived)",
                     if *reads == 1 { "" } else { "s" },
                     if floor == 1 { "" } else { "s" },
                 )

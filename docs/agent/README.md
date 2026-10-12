@@ -1285,7 +1285,8 @@ The census a window read pays follows the book's voucher mark, not the window, s
 does not lower it and N one-day calls pay it N times. The tool reads the company's marks once (the
 paired, identity-bracketed read every windowed call opens with: the identity read, then one marks read;
 no census and no voucher request) and says, for `vouchers`, `ledger_movement` and `verify_import`
-each, how many census reads one call of it will send on this book.
+each, the most census reads one call of it will send on this book (a read can be refused before its census
+ends).
 
 - `voucher_mark` is the mark that read saw. `per_call` has one entry per tool: `state: counted` with
   `census_reads` and `floor_seconds`, or `state: refused_by_allowance` with `code:
@@ -1301,8 +1302,9 @@ each, how many census reads one call of it will send on this book.
   reads of a call that is not refused earlier. It leaves out every data part, and the recorded runs took
   more than twice their floor. There is no estimate and no field for one: a computed figure was cut from
   #1289, and a floor is never presented as one.
-- `measured` is **constant text**: census runs the protocol reference records (§11c.5), each with its
-  book, host, date, confidence and `not_a_bound: true`. Bridge computes nothing from them. The book's
+- `measured` is **constant text**: whole calls the protocol reference records (§11c.5), each with its
+  census reads, data parts, seconds (the whole call, not the census alone), book, host, date, confidence and
+  `not_a_bound: true`. Bridge computes nothing from them. The book's
   mark is rounded (it is not a lab company).
 - `host_limits` is the block `read_cost` states, unchanged.
 - If the marks cannot be read, the call fails with the code that read gives (for example

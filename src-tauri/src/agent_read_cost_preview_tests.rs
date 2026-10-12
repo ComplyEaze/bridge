@@ -336,7 +336,7 @@ async fn the_measured_block_is_constant_text_with_its_markers() {
         assert_eq!(point["voucher_mark"], "about 250,000");
         assert_eq!(point["book"], "an inventory-heavy book");
     }
-    assert_eq!(block["kind"], "measured_census_runs_not_a_bound");
+    assert_eq!(block["kind"], "measured_calls_not_a_bound");
     // The figures are the ones protocol reference 11c.5 records: one-day `vouchers`
     // 34.3 s (31 census spans, 2 data parts), one-month `ledger_movement` 104.7 s
     // (31, 5). This test does not read that document: it is outside the native

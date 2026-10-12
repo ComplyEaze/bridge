@@ -91,9 +91,9 @@ Tally can answer other programs on the same computer, such as ComplyEaze Bridge.
 it on. It changes one setting in TallyPrime and no data.
 
 **A caution before you turn it on.** With this setting on, Tally may answer other computers on the same network too,
-without asking for a password. In one test by a maintainer on TallyPrime 7.1, a browser on another computer on the
-same network opened the Tally computer's network address and the port, and got Tally's "TallyPrime Server is Running"
-answer. We did not test what else the gateway shows. ComplyEaze Bridge only ever calls Tally from this same computer, but the setting is Tally's own. What keeps
+without asking for a password: a browser on another computer that opens the Tally computer's network address and the
+port can get Tally's "TallyPrime Server is Running" answer, and possibly more. ComplyEaze Bridge only ever calls Tally
+from this same computer, but the setting is Tally's own. What keeps
 other computers out is the firewall of the computer Tally runs on: on a Mac, that is the Windows firewall inside the
 virtual machine. Check that the firewall does not allow incoming connections to the port, and that you are on a
 network you trust.
@@ -151,7 +151,8 @@ computer cannot confirm who made it. Keep the file only if you got it from the p
 
 ## Step 4. Fill in the settings
 
-A settings window opens with five lines. Go from top to bottom.
+A settings window opens with five lines. If none opens, open Settings, then Extensions, click ComplyEaze Bridge, then
+**Configure**. Go from top to bottom.
 
 ![The five settings, drawn as a diagram: the Terms line ticked, Tally host localhost, Tally port 9000, Response redaction none, Allow voucher posting switched off.](./img/install-settings.svg)
 
@@ -160,7 +161,7 @@ A settings window opens with five lines. Go from top to bottom.
 | **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
 | **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer's own address is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
-| **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names and bank account numbers; some names are not shortened, see [Security and privacy](../security-and-privacy.md)) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides these: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references. |
+| **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
 | **Allow voucher posting (Journal, Payment, Receipt, Contra)** | Leave it **off**. | Lets Claude make entries in Tally, each one only after you approve it. |
 
 Click **Save**.
@@ -234,14 +235,16 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 
 - **Remove:** open Settings, then Extensions, click ComplyEaze Bridge and uninstall it there. This changes nothing in
   Tally. If you want Tally as it was, set **TallyPrime acts as** back to what you wrote down in Step 1. Removing it
-  may leave ComplyEaze Bridge's data folder on the computer, unencrypted. Nothing in it is shortened or hidden. It holds:
+  may leave ComplyEaze Bridge's data folder on the computer, unencrypted. Nothing in it is shortened or hidden. Among
+  other files, it holds:
   - the import journal and saved batches: every voucher it prepared or posted, with dates, narrations, amounts and
     ledgers;
   - the bank-statement proposals: every row of a statement you asked it to read, with date, amount, bank reference
-    and narration, and the last four digits of the account number;
+    and narration, the bank, suspense and other ledger names you chose, and the last four digits of the account number;
   - the receipt log: tool names, times and sizes, with no names or amounts;
   - a small record for each review of a posted voucher you record, which can include the name you sign in to the
     computer with.
+  - a record of your acceptance of the Terms of Use.
 
   Section 7 of the
   [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how to archive them: keep the import journal in an

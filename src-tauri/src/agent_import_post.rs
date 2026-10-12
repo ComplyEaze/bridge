@@ -56,7 +56,7 @@ impl PostScope {
 const RECHECK_REFUSAL_BUDGET: usize = 4_096;
 
 /// Where a post stands with its person, when it returns without posting.
-enum ApprovalState {
+pub(super) enum ApprovalState {
     /// The dialog is open, with this much of its time limit left when known.
     Pending(Option<std::time::Duration>),
     Approved,
@@ -80,9 +80,19 @@ pub(in crate::agent) enum Entry {
 /// What a post's checked body came to: an answer, or an approval its Join
 /// found that the same call redeems by entering again from the top, so every
 /// check before the wait is made again after it.
-enum Step {
+pub(super) enum Step {
     Done(Box<ToolOutcome>),
     Redeem,
+}
+
+/// What an agent post's approval steps need to know about the post they serve,
+/// whichever kind it is: the tool a caller is told to call again, the batch,
+/// the company, and how many vouchers (one for a master) it would send.
+pub(super) struct ApprovalTarget<'a> {
+    pub(super) tool: &'a str,
+    pub(super) batch_id: &'a str,
+    pub(super) guid: &'a str,
+    pub(super) vouchers: usize,
 }
 
 /// What one pass of a post call came to: its answer, or a click its Join
@@ -97,7 +107,7 @@ pub(in crate::agent) enum Pass {
 }
 
 /// What waiting on a dialog came to.
-enum Waited {
+pub(super) enum Waited {
     Answered((Result<ApprovedImport, String>, Answered)),
     Open(PendingPostApproval),
     /// The call was withdrawn while it waited. The dialog was dropped, which
@@ -107,7 +117,7 @@ enum Waited {
 
 /// What is left of the call's budget for waiting on the person, never less
 /// than enough to have the dialog up before the call returns.
-fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
+pub(super) fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
     approval::CALL_BUDGET
         .saturating_sub(call_started.elapsed())
         .max(approval::MIN_DIALOG_WAIT)
@@ -145,7 +155,7 @@ fn after_read_retry_budget(
 /// admission read that meets a held lock is refused at once as
 /// `tally_endpoint_busy`, before the attempt is recorded and before anything is
 /// sent, rather than holding the call past its ceiling.
-fn redeem_pass_wire_budget(
+pub(super) fn redeem_pass_wire_budget(
     elapsed: std::time::Duration,
     shared_left: std::time::Duration,
 ) -> std::time::Duration {
@@ -171,7 +181,10 @@ fn after_read_cause(error: &anyhow::Error) -> &'static str {
 
 /// Wait up to `budget` for the person's answer, stopping at once if the call
 /// is withdrawn (#554): nothing is sent to Tally while waiting.
-async fn wait_for_answer(dialog: PendingPostApproval, budget: std::time::Duration) -> Waited {
+pub(super) async fn wait_for_answer(
+    dialog: PendingPostApproval,
+    budget: std::time::Duration,
+) -> Waited {
     let withdrawn = crate::tally::runtime::TOOL_CANCELLATION
         .try_with(Clone::clone)
         .ok();
@@ -401,8 +414,9 @@ impl Server {
     /// open (`pending`) or answered and not yet posted (`approved`). Nothing
     /// was sent to Tally; calling `post_import` again with the same batch
     /// waits on the dialog or posts the approved batch.
-    fn approval_outcome(
+    pub(super) fn approval_outcome(
         &self,
+        tool: &str,
         batch_id: &str,
         guid: &str,
         state: ApprovalState,
@@ -421,7 +435,7 @@ impl Server {
                     .approval_remaining(batch_id)
                     .map(|remaining| remaining.as_secs()),
                 "retry_after_s": 0,
-                "next_step": "Call post_import again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s.",
+                "next_step": format!("Call {tool} again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s."),
             }),
         };
         ToolOutcome {
@@ -435,6 +449,149 @@ impl Server {
             evidence,
             company_guid: Some(guid.to_string()),
             truncated: false,
+        }
+    }
+
+    /// What a call finds held for its batch, before it checks anything else
+    /// (#725): the one place an agent post's Pending, Redeem and Join are
+    /// decided, shared by the voucher and the master tools so neither forks it.
+    /// `Ok(Ok(redeeming))` goes on; `Ok(Err(step))` is the call's answer, or a
+    /// click found that a second, redeem-only pass takes.
+    pub(super) async fn begin_agent_approval(
+        &self,
+        target: &ApprovalTarget<'_>,
+        redeem_only: bool,
+        call_started: std::time::Instant,
+        accumulated: &Evidence,
+    ) -> Result<Result<bool, Step>, ToolFailure> {
+        let ApprovalTarget {
+            tool,
+            batch_id,
+            guid,
+            vouchers,
+        } = *target;
+        // Re-entered to redeem what its Join found: only that approval lets it
+        // go on, and it never asks (#725 slice 2.0).
+        if redeem_only {
+            self.post_approvals.begin_redeem(batch_id)?;
+            return Ok(Ok(true));
+        }
+        match self.post_approvals.begin(batch_id) {
+            Begin::Ask => Ok(Ok(false)),
+            Begin::Redeem => Ok(Ok(true)),
+            Begin::Busy(code) => Err(code.to_string().into()),
+            Begin::Refused(code) => Err(code.into()),
+            Begin::Waiting => Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                tool,
+                batch_id,
+                guid,
+                ApprovalState::Pending(None),
+                accumulated.clone(),
+            ))))),
+            Begin::Join(dialog) => {
+                // Only a click that landed while no call waited is posted by the
+                // call that finds it (#725 slice 2.0): posting after this call's
+                // own wait could run past the host's timeout on a large book
+                // (#852).
+                let answered_at_join = dialog.answered().is_some();
+                let waited = match wait_for_answer(dialog, call_budget(call_started)).await {
+                    Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                    Waited::Open(dialog) => Err(dialog),
+                    Waited::Answered(answer) => Ok(answer),
+                };
+                match self.post_approvals.settle_join(batch_id, waited) {
+                    Joined::StillOpen { remaining } => {
+                        Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                            tool,
+                            batch_id,
+                            guid,
+                            ApprovalState::Pending(Some(remaining)),
+                            accumulated.clone(),
+                        )))))
+                    }
+                    // Posted by this call when it found the click already made
+                    // and the redeem fits in it, entering again from the top so
+                    // every check is made anew.
+                    Joined::Approved
+                        if answered_at_join
+                            && self
+                                .post_approvals
+                                .redeem_fits_in_call(call_started.elapsed(), vouchers) =>
+                    {
+                        Ok(Err(Step::Redeem))
+                    }
+                    Joined::Approved => Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                        tool,
+                        batch_id,
+                        guid,
+                        ApprovalState::Approved,
+                        accumulated.clone(),
+                    ))))),
+                    Joined::Refused(code) => Err(code.into()),
+                }
+            }
+        }
+    }
+
+    /// Ask the person in `asked`, wait for the answer within the call's budget,
+    /// and hold what came of it for a later call: the shared tail of every
+    /// agent post's approval. `Ok(Some(step))` is the call's answer (the dialog
+    /// is still open, or was answered too late in the call for the post to
+    /// fit); `Ok(None)` is an approval held for this call to take at once.
+    pub(super) async fn ask_and_hold(
+        &self,
+        target: &ApprovalTarget<'_>,
+        asked: PendingPostApproval,
+        binding: &ApprovalBinding,
+        held: impl Into<HeldRequest>,
+        call_started: std::time::Instant,
+        accumulated: &Evidence,
+    ) -> Result<Option<Step>, ToolFailure> {
+        let ApprovalTarget {
+            tool,
+            batch_id,
+            guid,
+            vouchers,
+        } = *target;
+        match wait_for_answer(asked, call_budget(call_started)).await {
+            Waited::Cancelled => Err("request_cancelled".to_string().into()),
+            Waited::Open(dialog) => {
+                let remaining = dialog.remaining();
+                self.post_approvals
+                    .hold_pending(batch_id, binding.clone(), dialog, held)?;
+                Ok(Some(Step::Done(Box::new(self.approval_outcome(
+                    tool,
+                    batch_id,
+                    guid,
+                    ApprovalState::Pending(Some(remaining)),
+                    accumulated.clone(),
+                )))))
+            }
+            Waited::Answered((answer, answered)) => {
+                self.post_approvals.hold_approved(
+                    batch_id,
+                    binding.clone(),
+                    answer?,
+                    held,
+                    answered,
+                )?;
+                // Answered too late in the call for the post to fit: the next
+                // call redeems it, after checking the book again.
+                if self
+                    .post_approvals
+                    .fits_in_call(call_started.elapsed(), vouchers)
+                {
+                    Ok(None)
+                } else {
+                    Ok(Some(Step::Done(Box::new(self.approval_outcome(
+                        tool,
+                        batch_id,
+                        guid,
+                        ApprovalState::Approved,
+                        accumulated.clone(),
+                    )))))
+                }
+            }
         }
     }
 
@@ -651,68 +808,25 @@ impl Server {
                 PostScope::JournalOnly => false,
                 // Re-entered to redeem what its Join found: only that
                 // approval lets it go on, and it never asks (#725 slice 2.0).
-                PostScope::Vouchers if redeem_only => {
-                    self.post_approvals.begin_redeem(batch_id)?;
-                    true
-                }
-                PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
-                    Begin::Ask => false,
-                    Begin::Redeem => true,
-                    Begin::Busy(code) => return Err(code.to_string().into()),
-                    Begin::Refused(code) => return Err(code.into()),
-                    Begin::Waiting => {
-                        return Ok(Step::Done(Box::new(self.approval_outcome(
-                            batch_id,
-                            guid,
-                            ApprovalState::Pending(None),
-                            accumulated.clone(),
-                        ))))
-                    }
-                    Begin::Join(dialog) => {
-                        // Only a click that landed while no call waited is
-                        // posted by the call that finds it (#725 slice 2.0):
-                        // posting after this call's own wait could run past
-                        // the host's timeout on a large book (#852).
-                        let answered_at_join = dialog.answered().is_some();
-                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await
-                        {
-                            Waited::Cancelled => {
-                                return Err("request_cancelled".to_string().into())
-                            }
-                            Waited::Open(dialog) => Err(dialog),
-                            Waited::Answered(answer) => Ok(answer),
-                        };
-                        return match self.post_approvals.settle_join(batch_id, waited) {
-                            Joined::StillOpen { remaining } => {
-                                Ok(Step::Done(Box::new(self.approval_outcome(
-                                    batch_id,
-                                    guid,
-                                    ApprovalState::Pending(Some(remaining)),
-                                    accumulated.clone(),
-                                ))))
-                            }
-                            // Posted by this call when it found the click
-                            // already made and the redeem fits in it, entering
-                            // again from the top so every check is made anew.
-                            Joined::Approved
-                                if answered_at_join
-                                    && self.post_approvals.redeem_fits_in_call(
-                                        call_started.elapsed(),
-                                        line.vouchers.len(),
-                                    ) =>
-                            {
-                                Ok(Step::Redeem)
-                            }
-                            Joined::Approved => Ok(Step::Done(Box::new(self.approval_outcome(
+                PostScope::Vouchers => {
+                    match self
+                        .begin_agent_approval(
+                            &ApprovalTarget {
+                                tool: "post_import",
                                 batch_id,
                                 guid,
-                                ApprovalState::Approved,
-                                accumulated.clone(),
-                            )))),
-                            Joined::Refused(code) => Err(code.into()),
-                        };
+                                vouchers: line.vouchers.len(),
+                            },
+                            redeem_only,
+                            call_started,
+                            &accumulated,
+                        )
+                        .await?
+                    {
+                        Ok(redeeming) => redeeming,
+                        Err(step) => return Ok(step),
                     }
-                },
+                }
             };
             // Tally may have seen any REMOTEID the journal records, and resending
             // one can undo a person's cancel or delete (protocol reference §9.3).
@@ -936,44 +1050,23 @@ impl Server {
                             currency_request,
                             company_marks_request.clone(),
                         );
-                        match wait_for_answer(asked, call_budget(call_started)).await {
-                            Waited::Cancelled => {
-                                return Err("request_cancelled".to_string().into())
-                            }
-                            Waited::Open(dialog) => {
-                                let remaining = dialog.remaining();
-                                self.post_approvals
-                                    .hold_pending(batch_id, binding, dialog, native)?;
-                                return Ok(Step::Done(Box::new(self.approval_outcome(
+                        if let Some(step) = self
+                            .ask_and_hold(
+                                &ApprovalTarget {
+                                    tool: "post_import",
                                     batch_id,
                                     guid,
-                                    ApprovalState::Pending(Some(remaining)),
-                                    accumulated.clone(),
-                                ))));
-                            }
-                            Waited::Answered((answer, answered)) => {
-                                self.post_approvals.hold_approved(
-                                    batch_id,
-                                    binding.clone(),
-                                    answer?,
-                                    native,
-                                    answered,
-                                )?;
-                                // Answered too late in the call for the post to
-                                // fit: the next call redeems it, after checking
-                                // the book again.
-                                if !self
-                                    .post_approvals
-                                    .fits_in_call(call_started.elapsed(), line.vouchers.len())
-                                {
-                                    return Ok(Step::Done(Box::new(self.approval_outcome(
-                                        batch_id,
-                                        guid,
-                                        ApprovalState::Approved,
-                                        accumulated.clone(),
-                                    ))));
-                                }
-                            }
+                                    vouchers: line.vouchers.len(),
+                                },
+                                asked,
+                                &binding,
+                                native,
+                                call_started,
+                                &accumulated,
+                            )
+                            .await?
+                        {
+                            return Ok(step);
                         }
                     }
                     let (taken, request, held) =
@@ -1670,7 +1763,7 @@ fn post_failure_outcome(
 /// The cause a failure adds to its code: none when it would only repeat the
 /// code, as a wire refusal's transport code does once `from_runtime` made it the
 /// code itself (#697).
-fn refusal_cause(
+pub(super) fn refusal_cause(
     code: &str,
     group: Option<&'static str>,
     transport: Option<&'static str>,

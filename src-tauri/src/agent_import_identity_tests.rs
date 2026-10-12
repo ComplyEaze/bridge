@@ -17,6 +17,7 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         import_enabled: true,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let legacy: ImportLedgerLine = serde_json::from_value(legacy_record()).unwrap();
     server.append_import_ledger(&legacy).unwrap();

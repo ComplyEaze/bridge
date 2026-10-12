@@ -17,10 +17,10 @@
 //! [`recheck_master_admission`] is the closure body a masters caller passes to
 //! the queue. It reads nothing and sends nothing; [`admit_master_create`]
 //! below it is pure over parsed indexes, so it is tested on constructed ones.
+use super::master_ledger::MasterMark;
 use super::post::admit_queued_aim;
-use crate::tally::approved_import::{
-    ApprovedImportAdmissionError, BeforeDispatchError, QueuedAdmission, UnderLockRefusal,
-};
+use crate::agent::change_parse::parse_all_company_marks;
+use crate::tally::approved_import::{ApprovedImportAdmissionError, QueuedAdmission};
 use crate::tally::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
@@ -31,6 +31,7 @@ use bridge_tally_protocol::native_outstandings::{
 };
 use bridge_tally_protocol::StandardLedgerCatalogError;
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 /// The request a master approval is held with: the item and the request
 /// rendered from it, once. It is the masters twin of `NativePostRequest` in the
@@ -49,6 +50,7 @@ impl MasterPostRequest {
         Self { item, rendered }
     }
 
+    #[cfg(test)]
     pub(super) fn item(&self) -> &LedgerCreateItem {
         &self.item
     }
@@ -78,7 +80,23 @@ pub(super) fn parse_ledger_name_index(
     _xml: &str,
     _expected_company_guid: &str,
 ) -> Result<Vec<IndexedMaster>, LedgerIndexNotCaptured> {
+    // The one seam: a unit test that must get past the missing parser scopes
+    // the ledgers it wants the book to hold. It is compiled under bare
+    // `cfg(test)`, so no shipped build holds it (`scripts/check-no-test-seam.mjs`
+    // scans the executables).
+    #[cfg(test)]
+    if let Ok(injected) = TEST_LEDGER_INDEX.try_with(Clone::clone) {
+        return Ok(injected);
+    }
     Err(LedgerIndexNotCaptured)
+}
+
+#[cfg(test)]
+tokio::task_local! {
+    /// The ledgers a test says the book holds, standing in for the parser that
+    /// does not exist yet. Scoped around the call under test; absent, the
+    /// parser refuses as it does in a shipped build.
+    pub(super) static TEST_LEDGER_INDEX: Vec<IndexedMaster>;
 }
 
 fn group_masters(rows: Vec<GroupNameRow>) -> Vec<IndexedMaster> {
@@ -137,18 +155,10 @@ pub(super) fn recheck_master_admission(
         )
         .into());
     }
-    let groups = parse_group_name_index(groups_first, company_guid).map_err(|error| {
-        ApprovedImportAdmissionError::GroupExportInvalid {
-            cause: group_cause(&error),
-        }
-    })?;
-    let ledgers =
-        parse_ledger_name_index(ledgers_first, company_guid).map_err(|LedgerIndexNotCaptured| {
-            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable
-        })?;
+    let (ledgers, groups) = parse_indexes(ledgers_first, groups_first, company_guid)?;
     admit_master_create(
         ledgers,
-        group_masters(groups),
+        groups,
         item,
         company_marks_at_binding,
         company_marks,
@@ -156,16 +166,84 @@ pub(super) fn recheck_master_admission(
     )
 }
 
-/// What a master post's `before_dispatch` is until the dispatch slice: a typed
-/// refusal. The intent, the approval spend and the master journal's append
-/// belong to that slice (they need the approval binding for the masters kind),
-/// and this slice records nothing, so a master post stops here with nothing
-/// sent. Any caller of the queue that builds a master post passes this; there is
-/// no permissive default.
-pub(super) fn master_before_dispatch() -> Result<(), BeforeDispatchError> {
-    Err(BeforeDispatchError::Refused(
-        UnderLockRefusal::MasterDispatchNotWired,
-    ))
+/// Parses the two index answers of `company_guid`: the groups first, so an
+/// unusable group answer is named before the missing ledger parser is.
+fn parse_indexes(
+    ledgers_xml: &str,
+    groups_xml: &str,
+    company_guid: &str,
+) -> anyhow::Result<(Vec<IndexedMaster>, Vec<IndexedMaster>)> {
+    let groups = parse_group_name_index(groups_xml, company_guid).map_err(|error| {
+        ApprovedImportAdmissionError::GroupExportInvalid {
+            cause: group_cause(&error),
+        }
+    })?;
+    let ledgers =
+        parse_ledger_name_index(ledgers_xml, company_guid).map_err(|LedgerIndexNotCaptured| {
+            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable
+        })?;
+    Ok((ledgers, group_masters(groups)))
+}
+
+/// The check a master tool makes before it saves or asks anything: the proposed
+/// name resolves to no ledger or group in the index answers just read. It is
+/// the queue's name decision without the aim, which only the queue can make.
+/// Typed refusals as [`recheck_master_admission`] gives them.
+pub(super) fn check_name_free(
+    ledgers_xml: &str,
+    groups_xml: &str,
+    item: &LedgerCreateItem,
+    company_guid: &str,
+) -> anyhow::Result<()> {
+    let (ledgers, groups) = parse_indexes(ledgers_xml, groups_xml, company_guid)?;
+    admit_free_name(ledgers, groups, item).map(|_| ())
+}
+
+/// What the queue's recheck leaves for `before_dispatch` to record: the books
+/// as the aim snapshot showed them, the last read before the POST.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MasterAim {
+    /// Every indexed master's lowercased GUID with its `ALTERID`.
+    pub(super) pre_image: BTreeMap<String, u64>,
+    /// Every loaded company's master mark (`ALTMSTID`) in that snapshot.
+    pub(super) marks: Vec<MasterMark>,
+}
+
+/// The recheck closure body of a master post: [`recheck_master_admission`], then
+/// the aim it left, set into `aim` for the intent. The queue's recheck returns
+/// `()` and its signature stays that way; this is the side channel, as the
+/// voucher path's `aimed_mark` is. `aim` is written only when the recheck
+/// admitted the post, and a recheck that refuses leaves it as it was.
+pub(super) fn recheck_master_for_dispatch(
+    queued: QueuedAdmission<'_>,
+    aim: &Mutex<Option<MasterAim>>,
+) -> anyhow::Result<()> {
+    let QueuedAdmission::Masters { company_marks, .. } = &queued else {
+        return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
+    };
+    let marks_text = (*company_marks).to_string();
+    let pre_image = recheck_master_admission(queued)?;
+    let marks = aim_master_marks(&marks_text)?;
+    *aim.lock()
+        .map_err(|_| ApprovedImportAdmissionError::AdmissionInconsistent)? =
+        Some(MasterAim { pre_image, marks });
+    Ok(())
+}
+
+/// Every loaded company's master mark in the aim snapshot. A snapshot that does
+/// not parse, or whose GUIDs are not distinct, cannot be recorded: the recheck
+/// has already confirmed the same text for the target, so this is a fault, not
+/// a refusal a caller can act on.
+fn aim_master_marks(company_marks: &str) -> anyhow::Result<Vec<MasterMark>> {
+    let rows = parse_all_company_marks(company_marks)
+        .map_err(|_| ApprovedImportAdmissionError::CompanyScopeUnconfirmed)?;
+    Ok(rows
+        .into_iter()
+        .map(|row| MasterMark {
+            company_guid: row.guid.to_ascii_lowercase(),
+            altmstid: row.masters,
+        })
+        .collect())
 }
 
 /// The decision, over parsed indexes: no master holds the name in the one namespace
@@ -180,6 +258,27 @@ pub(super) fn admit_master_create(
     company_marks: &str,
     company: &VerifiedCompanyIdentity,
 ) -> anyhow::Result<BTreeMap<String, u64>> {
+    let index = admit_free_name(ledgers, groups, item)?;
+    admit_queued_aim(
+        company_marks_at_binding,
+        company_marks,
+        company.company_guid(),
+        company.display_name(),
+    )?;
+    // The pre-image is returned, not kept: [`recheck_master_for_dispatch`]
+    // carries it from the queue's recheck closure to `before_dispatch`, which
+    // writes it as the sidecar its intent names.
+    Ok(index.pre_image())
+}
+
+/// The name decision over parsed indexes: the one namespace ledgers and groups
+/// share holds no master the item's name could resolve to. Returns the index,
+/// whose pre-image the dispatch records.
+fn admit_free_name(
+    ledgers: Vec<IndexedMaster>,
+    groups: Vec<IndexedMaster>,
+    item: &LedgerCreateItem,
+) -> anyhow::Result<MasterNameIndex> {
     let mut masters = ledgers;
     masters.extend(groups);
     let index = MasterNameIndex::new(masters).map_err(|error| {
@@ -203,18 +302,7 @@ pub(super) fn admit_master_create(
         }
         .into());
     }
-    admit_queued_aim(
-        company_marks_at_binding,
-        company_marks,
-        company.company_guid(),
-        company.display_name(),
-    )?;
-    // The pre-image is returned, not kept. The dispatch slice must carry it from
-    // here, through the queue's recheck closure, to `before_dispatch`, which
-    // writes it as the sidecar its intent names. The closure's signature returns
-    // `()` today, so that flow (a side channel such as the voucher path's
-    // `aimed_mark`) does not exist yet.
-    Ok(index.pre_image())
+    Ok(index)
 }
 
 #[cfg(test)]

@@ -3576,7 +3576,7 @@ impl TallyRuntime {
     /// One approved mutation through the shared endpoint queue. The durable
     /// intent is committed after identity admission and before any import bytes.
     /// Unlike paired reads, an import must never be repeated automatically.
-    pub(crate) async fn post_approved_import<A, F>(
+    pub(crate) async fn post_approved_import<A, F, L>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
@@ -3586,7 +3586,8 @@ impl TallyRuntime {
     ) -> anyhow::Result<ApprovedImportDispatch>
     where
         A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<()>,
-        F: Fn() -> Result<(), super::approved_import::BeforeDispatchError>,
+        F: Fn() -> Result<L, super::approved_import::BeforeDispatchError>,
+        L: super::approved_import::DispatchLicense,
     {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
@@ -3924,7 +3925,7 @@ impl TallyRuntime {
                             admission_evidence.clone(),
                         )
                     })?;
-                    before_dispatch().map_err(|error| {
+                    let license = before_dispatch().map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
                                 anyhow::Error::from(refusal)
@@ -3935,6 +3936,19 @@ impl TallyRuntime {
                         };
                         with_read_evidence(error, admission_evidence.clone())
                     })?;
+                    // The licence the closure returned must cover this request:
+                    // a master request is sent only on the intent recorded for
+                    // the very bytes it carries, and a voucher request on none
+                    // but its own kind's. Anything else is a wiring fault, and
+                    // nothing is sent (the intent, if one was recorded, stands).
+                    if !super::approved_import::DispatchLicense::licenses(license, &request) {
+                        return Err(with_read_evidence(
+                            anyhow::Error::from(
+                                super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
+                            ),
+                            admission_evidence.clone(),
+                        ));
+                    }
                     let mut response_evidence = RuntimeReadEvidence::empty();
                     let body = wire
                         .post_probe_xml(xml, &mut response_evidence)

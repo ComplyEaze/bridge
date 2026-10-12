@@ -551,6 +551,7 @@ pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
         import_enabled: true,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 

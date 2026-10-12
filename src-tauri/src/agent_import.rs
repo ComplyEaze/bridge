@@ -58,18 +58,20 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
-// The master write journal; a building block no caller reaches yet.
+// The master write journal. The read-back piece, which follows the tools,
+// reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
 #[path = "agent_master_ledger.rs"]
 mod master_ledger;
-// The master post's queue recheck; no caller reaches it until the dispatch slice.
-#[cfg_attr(not(test), allow(dead_code))]
+// The master post's queue recheck.
 #[path = "agent_master_post.rs"]
 mod master_post;
-// The one-ledger dialog's preview; no caller reaches it until the masters tools.
-#[cfg_attr(not(test), allow(dead_code))]
+// The one-ledger dialog's preview.
 #[path = "agent_master_review.rs"]
 mod master_review;
+// `prepare_ledger_creates` and `post_ledger_creates`.
+#[path = "agent_master_tools.rs"]
+mod master_tools;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]

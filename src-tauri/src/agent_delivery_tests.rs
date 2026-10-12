@@ -21,6 +21,7 @@ fn server(path: &Path) -> Server {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 
@@ -442,6 +443,7 @@ mod request_trail_receipts {
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         })
     }
 

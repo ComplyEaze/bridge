@@ -3191,4 +3191,56 @@ mod masters {
         );
         assert!(matches!(approvals.begin(&batch), Begin::Ask));
     }
+
+    /// A call that names a batch of the other kind withdraws nothing: a voucher
+    /// tool given a master batch id leaves the master approval held, a master
+    /// tool given a voucher batch id leaves the voucher approval held, and each
+    /// kind's own withdrawal still works.
+    #[tokio::test]
+    async fn withdrawing_a_post_of_one_kind_leaves_the_other_kinds_approval() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let held_master = |approvals: &PostApprovals| hold_masters(approvals, &batch, &item());
+        let redeemable =
+            |approvals: &PostApprovals| matches!(approvals.begin(&batch), Begin::Redeem);
+
+        // A master approval, withdrawn as a voucher post: kept.
+        held_master(&approvals);
+        approvals.revoke_unredeemed(&batch, "post_refused_before_intent");
+        assert!(redeemable(&approvals), "revoke_unredeemed (voucher)");
+        approvals.revoke(&batch, "batch_already_dispatched");
+        assert!(redeemable(&approvals), "revoke (voucher)");
+        approvals.revoke_of(PostKind::Vouchers, &batch, "request_cancelled");
+        assert!(redeemable(&approvals), "revoke_of (voucher)");
+        // Withdrawn as a master post: gone, with a note.
+        approvals.revoke_unredeemed_of(PostKind::Masters, &batch, "post_refused_before_intent");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask));
+        assert_eq!(
+            approvals.lapse_note(&batch).unwrap()["reason"],
+            "post_refused_before_intent"
+        );
+        held_master(&approvals);
+        approvals.revoke_of(PostKind::Masters, &batch, "request_cancelled");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask));
+
+        // A voucher approval, withdrawn as a master post: kept.
+        let (request, answered_at, native) = granted(&line, 1).await;
+        approvals
+            .hold_approved(
+                &batch,
+                binding_of(&line, "Synthetic preview"),
+                request,
+                native,
+                answered_at,
+            )
+            .unwrap();
+        approvals.revoke_unredeemed_of(PostKind::Masters, &batch, "post_refused_before_intent");
+        assert!(redeemable(&approvals), "revoke_unredeemed_of (masters)");
+        approvals.revoke_of(PostKind::Masters, &batch, "request_cancelled");
+        assert!(redeemable(&approvals), "revoke_of (masters)");
+        approvals.revoke_unredeemed(&batch, "post_refused_before_intent");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask));
+    }
 }

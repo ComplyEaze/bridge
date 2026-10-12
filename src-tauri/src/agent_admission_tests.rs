@@ -137,6 +137,8 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         ("verify_import", false, "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally."),
         // Its two verifications add proofs as verify_import does: additive.
         ("acknowledge_post_review", false, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally."),
+        // A new record of the prepared ledger each call, replacing nothing: additive.
+        ("prepare_ledger_creates", false, "Reads the company's ledger and group names from Tally once, then writes one record of the prepared ledger to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions
@@ -149,6 +151,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     let mut expected: Vec<&str> = READ_TOOLS.to_vec();
     expected.extend(LOCAL_WRITERS.iter().map(|(name, _, _)| *name));
     expected.push("post_import");
+    expected.push("post_ledger_creates");
     let mut published_sorted = published.clone();
     published_sorted.sort_unstable();
     expected.sort_unstable();
@@ -208,9 +211,12 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
             );
             assert!(!description.contains(READ_SENTENCE), "{name}");
         } else {
-            // post_import: its own long description says it posts to Tally, and it
-            // takes no appended sentence.
-            assert_eq!(name, "post_import");
+            // post_import and post_ledger_creates: each long description says it
+            // posts to Tally, and takes no appended sentence.
+            assert!(
+                matches!(name, "post_import" | "post_ledger_creates"),
+                "{name}"
+            );
             assert_eq!(annotation(tool, "readOnlyHint"), json!(false), "{name}");
             assert_eq!(annotation(tool, "destructiveHint"), json!(true), "{name}");
             assert!(!description.contains(READ_SENTENCE), "{name}");
@@ -303,6 +309,7 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let mut args = json!({"company_guid":"00000000-0000-4000-8000-000000000001",
         "from":"20260901","to":"20260902","voucher_type":"名".repeat(1025)});
@@ -339,6 +346,7 @@ async fn unqualified_change_feed_is_hidden_and_direct_calls_refuse_before_tally(
         import_enabled: true,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     // A dispatched read against this unavailable endpoint would return a
     // transport/company failure, not the explicit admission refusal.
@@ -382,6 +390,7 @@ async fn verification_remains_catalogued_and_admitted_when_import_and_writes_are
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server.call_tool_response("verify_import", json!({})).await;
     assert_eq!(response.value["isError"], true);
@@ -407,6 +416,7 @@ async fn master_validation_rejects_unbounded_and_blank_names_before_tally() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     for ledgers in [
         json!([""]),
@@ -454,6 +464,7 @@ async fn ledger_selectors_are_bounded_before_company_or_catalogue_reads() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     for tool in ["vouchers", "ledger_movement"] {
         for ledger in ["x".repeat(1025), " ".into(), String::new()] {
@@ -490,6 +501,7 @@ async fn oversized_unknown_property_cannot_expand_response_or_retained_evidence(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     for key in ["unknown".to_string(), "x".repeat(1_000_000)] {
         let value = server.call_tool("tally_status", json!({key: null})).await;

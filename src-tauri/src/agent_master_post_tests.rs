@@ -362,7 +362,7 @@ fn a_group_answer_for_another_company_is_refused() {
 
 mod queue {
     use super::*;
-    use crate::tally::approved_import::ApprovedImport;
+    use crate::tally::approved_import::{ApprovedImport, BeforeDispatchError, UnderLockRefusal};
     use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem, MasterName};
     use crate::tally::{TallyConfig, TallyRuntime, VerifiedCompanyIdentity};
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -468,8 +468,9 @@ mod queue {
     }
 
     /// Runs one master post whose recheck is `recheck_master_admission` and
-    /// whose intent is `master_before_dispatch`, against `plans` cut to
-    /// `requests`.
+    /// whose intent closure refuses (`import_batch_not_found`), against `plans`
+    /// cut to `requests`. The closure's refusal stands in for any refusal under
+    /// the lock; the real intent is proved in the tool's own tests.
     async fn run(
         companies: String,
         mut plans: Vec<ScenarioPlan>,
@@ -498,7 +499,9 @@ mod queue {
                 move || {
                     // Reaching the intent at all is what the test watches for.
                     flag.store(true, Ordering::Release);
-                    master_before_dispatch()
+                    Err::<(), _>(BeforeDispatchError::Refused(
+                        UnderLockRefusal::BatchNotFound,
+                    ))
                 },
             )
             .await
@@ -557,10 +560,11 @@ mod queue {
         assert!(!run.intent_recorded);
     }
 
-    /// With the admission passed, the intent closure is the last stop: it
-    /// refuses with its own code, and nothing is sent after the 32nd request.
+    /// With the admission passed, the intent closure is the last stop: a
+    /// refusal there keeps its own code, and nothing is sent after the 32nd
+    /// request.
     #[tokio::test]
-    async fn the_intent_of_a_master_post_is_refused_until_the_dispatch_slice_wires_it() {
+    async fn a_refusing_intent_closure_is_the_last_stop_and_nothing_is_sent() {
         let companies = companies();
         let run = run(
             companies.clone(),
@@ -573,7 +577,7 @@ mod queue {
             true,
         )
         .await;
-        assert_eq!(refusal_code(&run.error), "master_dispatch_unavailable");
+        assert_eq!(refusal_code(&run.error), "import_batch_not_found");
         assert_eq!(run.observed, 32, "no POST follows the refused intent");
         assert!(run.intent_recorded, "the intent closure was reached");
     }

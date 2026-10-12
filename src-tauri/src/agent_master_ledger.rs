@@ -802,11 +802,10 @@ impl MasterJournal {
     }
 
     /// Whether another batch was dispatched, has no terminal verdict, and names
-    /// a ledger that may be one master with a ledger `intent` names, or that
+    /// a ledger that may be one master with a ledger `items` names, or that
     /// recorded an equal key.
-    fn overlaps_open_dispatch(&self, intent: &MasterDispatchIntent) -> bool {
-        let new_items: Vec<(&IntentItem, NameKeys)> = intent
-            .items
+    fn overlaps_open_dispatch(&self, batch_id: &str, items: &[IntentItem]) -> bool {
+        let new_items: Vec<(&IntentItem, NameKeys)> = items
             .iter()
             .map(|item| (item, NameKeys::of(&item.name)))
             .collect();
@@ -814,7 +813,7 @@ impl MasterJournal {
             .values()
             .filter(|state| !state.is_settled())
             .filter_map(|state| state.intent.as_ref())
-            .filter(|open| open.batch_id != intent.batch_id)
+            .filter(|open| open.batch_id != batch_id)
             .flat_map(|open| open.items.iter())
             .any(|held| {
                 let held_keys = NameKeys::of(&held.name);
@@ -824,6 +823,66 @@ impl MasterJournal {
                         || new_keys.may_be_one_master(&held_keys)
                 })
             })
+    }
+
+    /// Every refusal the journal would raise for a dispatch intent of the batch
+    /// with `batch_sha256`, naming `items` and recording `marks`, except the
+    /// ones about the pre-image sidecar. It is the one place the intent's
+    /// admission is decided: [`Self::admit`] calls it, and a caller about to
+    /// write a sidecar calls it first through [`Self::check_intent_admissible`],
+    /// so no sidecar is written for an intent the journal would refuse.
+    fn intent_refusal(
+        &self,
+        batch_id: &str,
+        batch_sha256: &str,
+        items: &[IntentItem],
+        marks: &[MasterMark],
+    ) -> Result<(), MasterLedgerError> {
+        let state = self
+            .batches
+            .get(batch_id)
+            .ok_or(MasterLedgerError::Invalid(Invalid::NoBatch))?;
+        if state.batch.batch_sha256 != batch_sha256 {
+            return Err(MasterLedgerError::Invalid(Invalid::ShaMismatch));
+        }
+        if state.intent.is_some() {
+            return Err(MasterLedgerError::DuplicateDispatch);
+        }
+        let named = items
+            .iter()
+            .map(|item| item.name.as_str())
+            .collect::<Vec<_>>();
+        if named != state.batch.names() {
+            return Err(MasterLedgerError::Invalid(Invalid::ItemsMismatch));
+        }
+        if !marks
+            .iter()
+            .any(|mark| mark.company_guid == state.batch.company.guid)
+        {
+            return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
+        }
+        if self.overlaps_open_dispatch(batch_id, items) {
+            return Err(MasterLedgerError::OpenDispatchOverlaps);
+        }
+        Ok(())
+    }
+
+    /// Whether a dispatch intent for this batch, recording `marks`, would be
+    /// admitted as far as the journal's own rules go. Its items are the batch's
+    /// names, as [`MasterDispatchIntent::new`] builds them. For a caller holding
+    /// the exclusive lock that is about to write the sidecar the intent must
+    /// name; the append checks again.
+    pub(super) fn check_intent_admissible(
+        &self,
+        batch: &MasterBatch,
+        marks: &[MasterMark],
+    ) -> Result<(), MasterLedgerError> {
+        let items = batch
+            .items
+            .iter()
+            .map(|item| IntentItem::of(&item.name))
+            .collect::<Vec<_>>();
+        self.intent_refusal(&batch.batch_id, &batch.batch_sha256, &items, marks)
     }
 
     /// Admit one record, or refuse it and leave the journal as it was.
@@ -848,28 +907,12 @@ impl MasterJournal {
                 Ok(())
             }
             MasterRecord::DispatchIntent(intent) => {
-                let state = self.batch_of(&record).map_err(MasterLedgerError::Invalid)?;
-                if state.intent.is_some() {
-                    return Err(MasterLedgerError::DuplicateDispatch);
-                }
-                let named = intent
-                    .items
-                    .iter()
-                    .map(|item| item.name.as_str())
-                    .collect::<Vec<_>>();
-                if named != state.batch.names() {
-                    return Err(MasterLedgerError::Invalid(Invalid::ItemsMismatch));
-                }
-                if !intent
-                    .pre_post_master_marks
-                    .iter()
-                    .any(|mark| mark.company_guid == state.batch.company.guid)
-                {
-                    return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
-                }
-                if self.overlaps_open_dispatch(intent) {
-                    return Err(MasterLedgerError::OpenDispatchOverlaps);
-                }
+                self.intent_refusal(
+                    &intent.batch_id,
+                    &intent.batch_sha256,
+                    &intent.items,
+                    &intent.pre_post_master_marks,
+                )?;
                 if let Some(state) = self.batches.get_mut(&intent.batch_id) {
                     state.intent = Some(intent.clone());
                 }
@@ -1010,25 +1053,7 @@ pub(super) fn append(
     append_syncing(data_dir, lock, record, sync_directory)
 }
 
-/// An intent that is in the journal, synced, under the exclusive lock. The send
-/// it licenses takes this by value: no send is built without one. Only
-/// [`append_intent`] makes one.
-#[must_use = "the send consumes the recorded intent"]
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct RecordedIntent {
-    batch_id: String,
-    native_request_sha256: String,
-}
-
-impl RecordedIntent {
-    pub(super) fn batch_id(&self) -> &str {
-        &self.batch_id
-    }
-
-    pub(super) fn native_request_sha256(&self) -> &str {
-        &self.native_request_sha256
-    }
-}
+pub(super) use crate::tally::approved_import::RecordedIntent;
 
 /// Append a dispatch intent and return the token for its send. An error, a
 /// failed directory sync included, returns no token: the intent may be in the
@@ -1047,12 +1072,12 @@ fn append_intent_syncing(
     intent: MasterDispatchIntent,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<RecordedIntent, MasterLedgerError> {
-    let recorded = RecordedIntent {
-        batch_id: intent.batch_id.clone(),
-        native_request_sha256: intent.native_request_sha256.clone(),
-    };
+    let (batch_id, native_request_sha256) = (
+        intent.batch_id.clone(),
+        intent.native_request_sha256.clone(),
+    );
     append_syncing(data_dir, lock, MasterRecord::DispatchIntent(intent), sync)?;
-    Ok(recorded)
+    Ok(RecordedIntent::issue(batch_id, native_request_sha256))
 }
 
 /// [`append`] for any record, with the directory sync given so a test can fail
@@ -1117,6 +1142,9 @@ pub(super) enum PreImageError {
     /// The sidecar is in place but its directory entry could not be made durable.
     DirectorySyncFailed,
     WriteFailed,
+    /// A sidecar written for a dispatch that was then refused could not be
+    /// removed again.
+    RemoveFailed,
 }
 
 impl PreImageError {
@@ -1132,6 +1160,7 @@ impl PreImageError {
             Self::Missing => "master_pre_image_missing",
             Self::Unreadable | Self::TooLarge => "master_pre_image_unavailable",
             Self::OtherBatch => "master_pre_image_invalid",
+            Self::RemoveFailed => "master_pre_image_remove_failed",
             Self::ExistsDifferent
             | Self::TooLargeToWrite
             | Self::DirectorySyncFailed
@@ -1257,6 +1286,23 @@ fn write_pre_image_syncing(
         sha256: sha256_hex(&bytes),
         count: pre_image.len() as u64,
     })
+}
+
+/// Remove the sidecar of `batch_id`, under the admission lock: for a dispatch
+/// the journal refused after its sidecar was written, which no intent names. An
+/// absent sidecar is already removed. Never call it for a batch that may have an
+/// intent recorded: the sidecar is what that intent's digest was taken from.
+pub(super) fn remove_pre_image(
+    data_dir: &Path,
+    _lock: &ExclusiveAdmission,
+    batch_id: &str,
+) -> Result<(), PreImageError> {
+    match std::fs::remove_file(pre_image_path(data_dir, batch_id)?) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => return Err(PreImageError::RemoveFailed),
+    }
+    sync_directory(data_dir).map_err(|_| PreImageError::RemoveFailed)
 }
 
 fn read_sidecar_bytes(path: &Path) -> Result<Vec<u8>, PreImageError> {

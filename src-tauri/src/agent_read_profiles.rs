@@ -399,6 +399,21 @@ pub(super) fn import_ledger_catalogue_read(company: &str) -> anyhow::Result<Read
         .map(ReadRequest)
 }
 
+/// The ledger name index a master post reads: the V3 ledger catalogue, the
+/// request `MasterAdmission` re-reads inside the queue. It has no parser for its
+/// answer yet (`agent_master_post::parse_ledger_name_index`).
+pub(super) fn ledger_name_index_read(company: &str) -> anyhow::Result<ReadRequest> {
+    use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+    let validated = ValidatedCompanyName::new(company)
+        .map_err(|_| anyhow::anyhow!("master_request_invalid"))?;
+    Ok(ReadRequest(
+        ReadOnlyProfile::StandardLedgerCatalogV3 {
+            company: &validated,
+        }
+        .render(),
+    ))
+}
+
 pub(super) fn native_group_snapshot_read(company: &str) -> ReadRequest {
     ReadRequest(
         bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(company),

@@ -73,6 +73,7 @@ async fn tally_status_uses_observed_gateway_product_and_preserves_wire_evidence(
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         let before = tally_host_today();
         let response = server.call_tool("tally_status", json!({})).await;
@@ -196,6 +197,7 @@ async fn tally_status_failure_retains_completed_sources_in_response_and_history(
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         let response = server.call_tool("tally_status", json!({})).await;
         assert_eq!(response["isError"], true);
@@ -306,6 +308,7 @@ fn server_at(port: u16, max_bytes: usize) -> (Server, tempfile::TempDir) {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     (server, directory)
 }

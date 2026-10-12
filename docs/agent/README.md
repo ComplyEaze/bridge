@@ -1748,7 +1748,29 @@ was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuil
 `acknowledge_post_review` records that review, one doubt at a time, and changes
 no verdict.
 
-All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
+`BRIDGE_AGENT_ENABLE_MASTER_WRITES=true`, together with
+`BRIDGE_AGENT_ENABLE_WRITES=true`, lists two more tools, which are not among the
+ordinary default tools above: `prepare_ledger_creates` and `post_ledger_creates`.
+Together they create ONE new ledger (a party under Sundry Debtors or Sundry
+Creditors, a Suspense ledger, or a GST duty ledger whose head has been measured)
+from typed fields: ComplyEaze Bridge builds the request itself, accepts no XML,
+and can set no opening balance or parent. `prepare_ledger_creates` reads the
+company's ledger and group names once, refuses a name that already exists as a
+ledger, a group or an alias (`master_name_taken`), saves the request in the
+local masters journal and returns a `batch_id` with the preview the person will
+be shown; it writes nothing to Tally. `post_ledger_creates` takes that
+`batch_id`, asks the local user in a native dialog, and sends the create once;
+its approval, pending and approved answers behave as `post_import`'s do. A batch
+already sent is never sent again: a later call only reports what was recorded.
+With the setting off or posting off, neither tool is listed and a call to either
+is refused `master_writes_disabled`. Until a ledger-name answer captured from a
+real TallyPrime can be parsed, `prepare_ledger_creates` refuses
+`master_ledger_index_unavailable` and nothing is created. After the one send the
+answer is `posted_unverified`: Tally's answer was recorded, but ComplyEaze
+Bridge does not yet read the ledger back, so the ledger is not verified. The
+setting is a command-line setting only and is not in the MCPB extension.
+
+All four switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 

@@ -174,7 +174,6 @@ impl ApprovalBinding {
     /// The binding of one ledger `Create`: the batch digest, the endpoint,
     /// the verified company tuple, every field of the item, and the preview
     /// the person was shown.
-    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
     pub(super) fn masters(
         batch_sha256: &str,
         endpoint_origin: &str,
@@ -305,6 +304,15 @@ impl Drop for Redemption<'_> {
     fn drop(&mut self) {
         self.approvals
             .release_unspent(&self.batch_id, self.id, "post_refused_before_intent");
+    }
+}
+
+/// The kind of post a held approval or dialog is for. A taken approval carries
+/// no binding and has none.
+fn held_kind(held: &Held) -> Option<PostKind> {
+    match held {
+        Held::Pending { binding, .. } | Held::Approved { binding, .. } => Some(binding.kind()),
+        Held::Redeeming { .. } => None,
     }
 }
 
@@ -801,11 +809,25 @@ impl PostApprovals {
         }
     }
 
-    /// Withdraw whatever is held for `batch_id`: an open dialog is closed, an
-    /// approval, redeemed or not, can no longer be spent, and an unread refusal
-    /// is dropped, so the next call asks again.
+    /// Withdraw whatever is held for `batch_id` as a voucher post: see
+    /// [`Self::revoke_of`].
     pub(in crate::agent) fn revoke(&self, batch_id: &str, reason: &str) {
+        self.revoke_of(PostKind::Vouchers, batch_id, reason);
+    }
+
+    /// Withdraw whatever is held for `batch_id` as a post of `kind`: an open
+    /// dialog is closed, an approval, redeemed or not, can no longer be spent,
+    /// and an unread refusal is dropped, so the next call asks again. An
+    /// approval held for the other kind of post is left as it is: a call that
+    /// names a batch of the other kind (a voucher batch id given to the master
+    /// tool, or the reverse) cannot withdraw it.
+    pub(in crate::agent) fn revoke_of(&self, kind: PostKind, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
+        if slot.as_ref().is_some_and(|(held_batch, held)| {
+            held_batch == batch_id && held_kind(held).is_some_and(|held| held != kind)
+        }) {
+            return;
+        }
         self.refusals().retain(|kept| kept.batch_id != batch_id);
         if slot
             .as_ref()
@@ -817,21 +839,29 @@ impl PostApprovals {
         }
     }
 
-    /// Withdraw `batch_id`'s approval if it was given and not taken: a call
-    /// that was to redeem it was refused before taking it. That is an
-    /// approval a call has collected (`Approved`), and one clicked while no call
-    /// waited, whose dialog still sits in the slot with its answer. An open or
-    /// declined dialog, one a call is waiting on, a taken approval and another
-    /// batch's hold are left as they are.
+    /// [`Self::revoke_unredeemed_of`] for a voucher post.
     pub(super) fn revoke_unredeemed(&self, batch_id: &str, reason: &str) {
+        self.revoke_unredeemed_of(PostKind::Vouchers, batch_id, reason);
+    }
+
+    /// Withdraw `batch_id`'s approval of a post of `kind` if it was given and
+    /// not taken: a call that was to redeem it was refused before taking it.
+    /// That is an approval a call has collected (`Approved`), and one clicked
+    /// while no call waited, whose dialog still sits in the slot with its
+    /// answer. An open or declined dialog, one a call is waiting on, a taken
+    /// approval, another batch's hold and an approval of the other kind of post
+    /// are left as they are.
+    pub(super) fn revoke_unredeemed_of(&self, kind: PostKind, batch_id: &str, reason: &str) {
         let mut slot = self.slot();
         if matches!(
             slot.as_ref(),
-            Some((held_batch, Held::Approved { .. })) if held_batch == batch_id
+            Some((held_batch, held @ Held::Approved { .. }))
+                if held_batch == batch_id && held_kind(held) == Some(kind)
         ) || matches!(
             slot.as_ref(),
-            Some((held_batch, Held::Pending { dialog: Some(dialog), .. }))
+            Some((held_batch, held @ Held::Pending { dialog: Some(dialog), .. }))
                 if held_batch == batch_id
+                    && held_kind(held) == Some(kind)
                     && dialog.answered().is_some_and(|answered| answered.approved)
         ) {
             if let Some((_, held)) = slot.take() {

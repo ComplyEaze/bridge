@@ -167,6 +167,7 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         let response = server
             .call_tool(
@@ -367,6 +368,7 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         let response = server
             .call_tool(
@@ -420,6 +422,7 @@ async fn movement_call(plans: Vec<ScenarioPlan>, guid: &str, ledger: &str) -> (V
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server
         .call_tool(
@@ -624,6 +627,7 @@ fn movement_server(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     server.runtime = TallyRuntime::with_transport_policy(policy);
     (server, directory)

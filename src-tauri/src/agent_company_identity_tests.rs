@@ -19,6 +19,7 @@ pub(super) fn server(address: std::net::SocketAddr, path: &std::path::Path) -> S
         import_enabled: true,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 

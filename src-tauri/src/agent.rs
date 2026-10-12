@@ -296,6 +296,12 @@ struct Settings {
     /// vouchers of one batch in one import. Off by default and not in the
     /// extension's settings until a live batch post through Bridge is proved.
     batch_post_enabled: bool,
+    /// `BRIDGE_AGENT_ENABLE_MASTER_WRITES`, in force only together with
+    /// `BRIDGE_AGENT_ENABLE_WRITES`: lets `prepare_ledger_creates` and
+    /// `post_ledger_creates` be listed and called. Off by default and not in
+    /// the extension's settings until a one-ledger create through Bridge is
+    /// proved on a live book.
+    master_writes_enabled: bool,
 }
 
 impl Settings {
@@ -342,17 +348,35 @@ impl Settings {
             // Validated even when posting is off, so a typo never hides.
             batch_post_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_BATCH_POST")?
                 && writes_enabled,
+            master_writes_enabled: master_writes_effective(
+                env::var("BRIDGE_AGENT_ENABLE_MASTER_WRITES"),
+                writes_enabled,
+            )?,
         })
     }
 }
 
 fn enabled_setting(name: &str) -> Result<bool, String> {
-    match env::var(name) {
+    enabled_value(env::var(name))
+}
+
+fn enabled_value(value: Result<String, env::VarError>) -> Result<bool, String> {
+    match value {
         Err(env::VarError::NotPresent) => Ok(false),
         Ok(value) if matches!(value.as_str(), "1" | "true") => Ok(true),
         Ok(value) if matches!(value.as_str(), "0" | "false") => Ok(false),
         _ => Err("boolean_setting_invalid".into()),
     }
+}
+
+/// Whether master writes are in force: the setting is on and so is posting. The
+/// setting is validated first and always, so a typo never hides behind a posting
+/// switch that is off.
+fn master_writes_effective(
+    setting: Result<String, env::VarError>,
+    writes_enabled: bool,
+) -> Result<bool, String> {
+    Ok(enabled_value(setting)? && writes_enabled)
 }
 
 fn tally_port(value: Option<String>) -> Result<u16, String> {
@@ -2127,6 +2151,11 @@ impl Server {
         {
             return Err("import_posting_disabled".to_string().into());
         }
+        if matches!(name, "post_ledger_creates" | "prepare_ledger_creates")
+            && !self.settings.master_writes_enabled
+        {
+            return Err("master_writes_disabled".to_string().into());
+        }
         #[cfg(feature = "lab-writes")]
         if matches!(
             name,
@@ -2170,6 +2199,8 @@ impl Server {
                 self.parse_bank_statement(args).await
             }
             "post_import" => self.post_import(args).await,
+            "post_ledger_creates" => self.post_ledger_creates(args).await,
+            "prepare_ledger_creates" => self.prepare_ledger_creates(args).await,
             "profit_and_loss" => self.profit_and_loss(args).await,
             "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
@@ -2330,6 +2361,7 @@ pub(crate) async fn desktop_selected_vouchers(
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         },
         runtime.clone(),
     );

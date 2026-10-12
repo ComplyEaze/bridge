@@ -77,7 +77,6 @@ pub(crate) struct ApprovedImport {
 #[derive(Clone)]
 pub(super) enum ApprovedKind {
     Vouchers(VoucherAdmission),
-    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
     /// Boxed: a master admission carries a rendered request and two reads, and
     /// every `ApprovedImport` moves by value through the approval path.
     Masters(Box<MasterAdmission>),
@@ -141,7 +140,6 @@ impl VoucherAdmission {
 /// which builds it before the dialog and holds it only if the person approves,
 /// so no code holds an approved masters kind without that answer (P2).
 #[derive(Clone)]
-#[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
 pub(super) struct MasterAdmission {
     item: LedgerCreateItem,
     rendered: RenderedLedgerCreate,
@@ -150,6 +148,10 @@ pub(super) struct MasterAdmission {
     /// The group name index read (the group snapshot request).
     group_index_request: AgentReadRequest,
     company: VerifiedCompanyIdentity,
+    /// The master journal batch this approval is for, once the tool binds it
+    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
+    /// batch is licensed by no intent.
+    batch_id: Option<String>,
 }
 
 impl MasterAdmission {
@@ -178,16 +180,12 @@ impl MasterAdmission {
                 ),
             )?,
             company: company.clone(),
+            batch_id: None,
         })
     }
 
     pub(super) fn item(&self) -> &LedgerCreateItem {
         &self.item
-    }
-
-    #[allow(dead_code, reason = "read by the dispatch slice's intent")]
-    pub(super) fn rendered(&self) -> &RenderedLedgerCreate {
-        &self.rendered
     }
 
     pub(super) fn ledger_index_request(&self) -> AgentReadRequest {
@@ -281,10 +279,6 @@ impl ApprovedImport {
     /// `preview` is what the person is shown. It is built from `item` and
     /// `company` by the caller's review builder, and bound with them in the
     /// approval binding.
-    ///
-    /// NOT called from any production tool path yet: the masters tools that
-    /// ask it, and the dispatch that spends its approval, are the next piece.
-    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
     pub(crate) async fn confirm_masters(
         item: LedgerCreateItem,
         company: &VerifiedCompanyIdentity,
@@ -321,6 +315,32 @@ impl ApprovedImport {
     /// Whether the one POST would send exactly `xml`.
     pub(crate) fn sends_exactly(&self, xml: &str) -> bool {
         self.xml() == xml
+    }
+
+    /// Lowercase hex digest of the bytes the one POST sends, as a master
+    /// dispatch intent records them.
+    pub(crate) fn xml_sha256(&self) -> String {
+        bridge_tally_protocol::sha256_hex(self.xml().as_bytes())
+    }
+
+    /// This approval bound to the master journal batch it was taken for, so the
+    /// intent that licenses its send must be that batch's. A voucher approval is
+    /// returned as it is.
+    #[must_use]
+    pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
+        if let ApprovedKind::Masters(masters) = &mut self.kind {
+            masters.batch_id = Some(batch_id.to_string());
+        }
+        self
+    }
+
+    /// The master journal batch this approval is bound to, if it is a master
+    /// approval that was bound.
+    pub(crate) fn master_batch_id(&self) -> Option<&str> {
+        match &self.kind {
+            ApprovedKind::Masters(masters) => masters.batch_id.as_deref(),
+            ApprovedKind::Vouchers(_) => None,
+        }
     }
 
     pub(super) fn company_marks_request(&self) -> AgentReadRequest {
@@ -456,9 +476,7 @@ impl PendingPostApproval {
     }
 
     /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
-    /// with exactly these arguments, on its own task. Not called from any
-    /// production tool path yet.
-    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
+    /// with exactly these arguments, on its own task.
     pub(crate) fn ask_masters(
         item: LedgerCreateItem,
         company: VerifiedCompanyIdentity,
@@ -731,11 +749,33 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
-    /// A master post reached the point where its intent is recorded, and the
-    /// master journal is not wired to it yet. Nothing was recorded and nothing
-    /// was sent: the dispatch slice replaces the closure that raises this.
-    #[error("master_dispatch_unavailable")]
-    MasterDispatchNotWired,
+    /// A master post reached the lock without the pre-image its queue recheck
+    /// was to leave for the intent: no sidecar can be named, so no intent is
+    /// recorded and nothing is sent.
+    #[error("master_pre_image_unrecorded")]
+    PreImageUnrecorded,
+    /// The pre-image sidecar could not be written. Refused before the intent:
+    /// nothing was recorded in the master journal and nothing was sent.
+    #[error("master_pre_image_write_failed")]
+    PreImageWriteFailed,
+    /// The pre-image sidecar written for a dispatch the journal then refused
+    /// could not be removed again: nothing was recorded or sent, but a file for
+    /// the batch is left behind.
+    #[error("master_pre_image_remove_failed")]
+    PreImageRemoveFailed,
+    /// Another dispatched master batch, whose outcome is still open, names a
+    /// ledger this one names: a second send of it under a new batch id. Nothing
+    /// was recorded and nothing was sent.
+    #[error("master_ledger_open_dispatch_overlaps")]
+    MasterOverlapsOpenDispatch,
+    /// The master journal refused the record before writing it: nothing was
+    /// recorded and nothing was sent.
+    #[error("master_ledger_invalid")]
+    MasterJournalRefused,
+    /// The master journal could not be read under the lock, so the batch's
+    /// state could not be checked: nothing was recorded and nothing was sent.
+    #[error("master_ledger_unavailable")]
+    MasterJournalUnavailable,
 }
 
 impl UnderLockRefusal {
@@ -748,10 +788,21 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
-            Self::MasterDispatchNotWired => "master_dispatch_unavailable",
+            Self::PreImageUnrecorded => "master_pre_image_unrecorded",
+            Self::PreImageWriteFailed => "master_pre_image_write_failed",
+            Self::PreImageRemoveFailed => "master_pre_image_remove_failed",
+            Self::MasterOverlapsOpenDispatch => "master_ledger_open_dispatch_overlaps",
+            Self::MasterJournalRefused => "master_ledger_invalid",
+            Self::MasterJournalUnavailable => "master_ledger_unavailable",
         }
     }
 }
+
+// What `before_dispatch` hands the send: the licence to send this request. Sealed
+// in its own module, where the only two licences are defined.
+#[path = "dispatch_license.rs"]
+mod dispatch_license;
+pub(crate) use dispatch_license::{DispatchLicense, RecordedIntent};
 
 /// Why `before_dispatch` refused. Only a named check made before the intent
 /// append is `Refused`; the lock, the journal read and the append itself are

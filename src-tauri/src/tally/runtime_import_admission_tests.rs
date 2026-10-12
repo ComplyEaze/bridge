@@ -976,6 +976,117 @@ async fn a_master_post_whose_book_turns_to_education_is_refused_at_the_closing_o
     assert_eq!(simulator.finish().unwrap().len(), 31);
 }
 
+const MASTER_BATCH: &str = "bridge-00000000-0000-4000-8000-0000000000a1";
+
+/// A closure that licenses nothing a master request needs (the unit licence of
+/// the voucher path) lets no master POST through: the intent closure ran, and
+/// the request after it, the 33rd, never arrives.
+#[tokio::test]
+async fn a_master_post_with_the_voucher_licence_sends_nothing() {
+    let companies = captured_companies();
+    let (ledgers, groups) = distinct_index_bodies();
+    let mut plans = masters_queue_plans(
+        companies.clone(),
+        ledgers,
+        groups,
+        companies.clone(),
+        Some(companies.clone()),
+    );
+    plans.truncate(32);
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let dispatched = Arc::new(AtomicBool::new(false));
+    let dispatch_flag = dispatched.clone();
+    let error = TallyRuntime::default()
+        .post_approved_import(
+            TallyConfig {
+                host: "127.0.0.1".into(),
+                port: simulator.address().port(),
+            },
+            &identity(&companies),
+            approved_masters(&companies),
+            |_: QueuedAdmission<'_>| Ok(()),
+            move || {
+                dispatch_flag.store(true, Ordering::Release);
+                Ok(())
+            },
+        )
+        .await
+        .expect_err("a unit licence does not cover a master request");
+    assert!(dispatched.load(Ordering::Acquire), "the closure ran");
+    assert!(error.chain().any(|cause| matches!(
+        cause.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+    )));
+    assert_eq!(simulator.finish().unwrap().len(), 32, "every read, no POST");
+}
+
+/// A recorded intent for another batch, or for other bytes, or for a request
+/// bound to no batch, licenses nothing: the intent closure ran, and no POST
+/// follows.
+#[tokio::test]
+async fn a_recorded_intent_of_another_batch_or_other_bytes_sends_nothing() {
+    for (case, bound, sha_of_request) in [
+        (
+            "another batch",
+            Some("bridge-00000000-0000-4000-8000-0000000000b2"),
+            true,
+        ),
+        ("other bytes", Some(MASTER_BATCH), false),
+        ("no batch", None, true),
+    ] {
+        let companies = captured_companies();
+        let (ledgers, groups) = distinct_index_bodies();
+        let mut plans = masters_queue_plans(
+            companies.clone(),
+            ledgers,
+            groups,
+            companies.clone(),
+            Some(companies.clone()),
+        );
+        plans.truncate(32);
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let mut approved = approved_masters(&companies);
+        if let Some(batch) = bound {
+            approved = approved.bound_to_batch(batch);
+        }
+        let digest = if sha_of_request {
+            approved.xml_sha256()
+        } else {
+            "e".repeat(64)
+        };
+        // The intent is always for MASTER_BATCH; the request is bound elsewhere,
+        // to nothing, or carries other bytes.
+        let batch = MASTER_BATCH;
+        let error = TallyRuntime::default()
+            .post_approved_import(
+                TallyConfig {
+                    host: "127.0.0.1".into(),
+                    port: simulator.address().port(),
+                },
+                &identity(&companies),
+                approved,
+                |_: QueuedAdmission<'_>| Ok(()),
+                move || {
+                    Ok(
+                        crate::tally::approved_import::RecordedIntent::issued_for_test(
+                            batch, &digest,
+                        ),
+                    )
+                },
+            )
+            .await
+            .expect_err(case);
+        assert!(
+            error.chain().any(|cause| matches!(
+                cause.downcast_ref::<ApprovedImportAdmissionError>(),
+                Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+            )),
+            "{case}"
+        );
+        assert_eq!(simulator.finish().unwrap().len(), 32, "{case}: no POST");
+    }
+}
+
 /// The queue reads the ledger index, the ledger index again, the group index
 /// and the group index again, in that order, between the two mark reads, and
 /// hands the recheck each body in its own place. The POST is the bytes
@@ -993,14 +1104,16 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
         Some(companies.clone()),
     );
     let simulator = SequenceSimulator::spawn(plans).unwrap();
-    let approved = approved_masters(&companies);
-    let rendered = match &approved.kind {
-        crate::tally::approved_import::ApprovedKind::Masters(masters) => masters.rendered().clone(),
-        crate::tally::approved_import::ApprovedKind::Vouchers(_) => panic!("masters expected"),
-    };
+    let approved = approved_masters(&companies).bound_to_batch(MASTER_BATCH);
+    assert_eq!(
+        approved.post_kind(),
+        crate::tally::approved_import::PostKind::Masters
+    );
+    let rendered = masters_item().render_import(&identity(&companies));
     let dispatched = Arc::new(AtomicBool::new(false));
     let dispatch_flag = dispatched.clone();
     let seen = (ledgers.clone(), groups.clone(), companies.clone());
+    let sent_sha = approved.xml_sha256();
     let dispatch = TallyRuntime::default()
         .post_approved_import(
             TallyConfig {
@@ -1037,11 +1150,16 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
             },
             move || {
                 dispatch_flag.store(true, Ordering::Release);
-                Ok(())
+                Ok(
+                    crate::tally::approved_import::RecordedIntent::issued_for_test(
+                        MASTER_BATCH,
+                        &sent_sha,
+                    ),
+                )
             },
         )
         .await
-        .expect("a permissive recheck and intent let the one POST through");
+        .expect("a permissive recheck and a recorded intent let the one POST through");
     assert!(dispatched.load(Ordering::Acquire));
     let observed = simulator.finish().unwrap();
     // 31 admission requests, the aim marks, then the POST.

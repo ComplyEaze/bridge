@@ -233,6 +233,7 @@ fn service_debiting(
         import_enabled: true,
         writes_enabled: true,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     // Fixture construction exclusively owns this temporary directory. Avoid a
     // setup lock that another parallel test's fork can transiently inherit.

@@ -226,7 +226,7 @@ fn masters_of(approved: &ApprovedImport) -> &MasterAdmission {
 #[test]
 fn a_master_post_sends_the_bytes_rendered_once_whose_digest_it_records() {
     let approved = approved_masters("Queue Test Suspense");
-    let rendered = masters_of(&approved).rendered();
+    let rendered = &masters_of(&approved).rendered;
     assert_eq!(approved.xml(), rendered.xml());
     assert_eq!(
         bridge_tally_protocol::sha256_hex(approved.xml().as_bytes()),

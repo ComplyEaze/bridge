@@ -300,6 +300,7 @@ impl Settings {
             import_enabled: true,
             writes_enabled: true,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         })
     }
 }

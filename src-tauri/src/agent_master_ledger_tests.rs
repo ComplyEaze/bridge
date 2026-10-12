@@ -1703,3 +1703,31 @@ fn the_summary_counts_open_intents() {
         }
     );
 }
+
+/// Removing a sidecar written for a refused dispatch: present, absent and
+/// unremovable are told apart, and a name that could leave the data dir is
+/// refused.
+#[test]
+fn a_sidecar_is_removed_checked() {
+    let directory = tempfile::tempdir().unwrap();
+    let batch = batch(&batch_id());
+    write_pre_image(directory.path(), &lock(), &batch, &pre_image()).unwrap();
+    let path = directory
+        .path()
+        .join(format!("master-pre-image-{}.json", batch.batch_id));
+    assert!(path.exists());
+    remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap();
+    assert!(!path.exists());
+    // Already absent is already removed.
+    remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap();
+    // A name that is not a batch id reaches no file.
+    assert_eq!(
+        remove_pre_image(directory.path(), &lock(), "../x"),
+        Err(PreImageError::BadBatchId)
+    );
+    // Not removable (a directory stands where the file would be): reported.
+    std::fs::create_dir(&path).unwrap();
+    let error = remove_pre_image(directory.path(), &lock(), &batch.batch_id).unwrap_err();
+    assert_eq!(error, PreImageError::RemoveFailed);
+    assert_eq!(error.code(), "master_pre_image_remove_failed");
+}

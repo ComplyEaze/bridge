@@ -15,14 +15,7 @@
 //!   reporting success (`docs/tally/TALLY_PROTOCOL_REFERENCE.md` §8.3), so an
 //!   unmeasured head is refused here rather than sent.
 //!
-//! Nothing calls this yet; the dispatch that sends it is a later change.
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "staged: the approved masters dispatch is not wired yet"
-    )
-)]
+//! The master tools build it (`agent_master_tools.rs`); nothing else does.
 
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_binding::MAX_NAME_CHARS;

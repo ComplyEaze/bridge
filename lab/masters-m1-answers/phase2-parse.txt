@@ -1,0 +1,25 @@
+== R-MARKS: 3308 bytes, charset utf-16, ctrl chars []; COLLECTION rows LEDGER=0 GROUP=0 COMPANY=1; other child tags=[]
+== R-V2: 12910 bytes, charset utf-16, ctrl chars ['ref &#4; x1']; COLLECTION rows LEDGER=8 GROUP=0 COMPANY=0; other child tags=[]
+   LEDGER 'Cash' ALTERID=ABSENT PARENT='Cash-in-Hand' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f
+   LEDGER 'MLab Alias Target' ALTERID=ABSENT PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf
+      NAME list (doc order): ['MLab Alias Target', 'MLab Alias Name', 'MLab Alias Two']
+   LEDGER 'MLab Case Target' ALTERID=ABSENT PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0
+   LEDGER 'MLab Dash-Target' ALTERID=ABSENT PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2
+   LEDGER 'MLab Exact Target' ALTERID=ABSENT PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce
+   LEDGER 'MLab Slash/Target' ALTERID=ABSENT PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3
+   LEDGER 'MLab Space Target' ALTERID=ABSENT PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1
+   LEDGER 'Profit & Loss A/c' ALTERID=ABSENT PARENT='? Primary' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e
+== R-V3: 13610 bytes, charset utf-16, ctrl chars ['ref &#4; x1']; COLLECTION rows LEDGER=8 GROUP=0 COMPANY=0; other child tags=[]
+   LEDGER 'Cash' ALTERID=present:32 PARENT='Cash-in-Hand' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f
+   LEDGER 'MLab Alias Target' ALTERID=present:211 PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf
+      NAME list (doc order): ['MLab Alias Target', 'MLab Alias Name', 'MLab Alias Two']
+   LEDGER 'MLab Case Target' ALTERID=present:212 PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0
+   LEDGER 'MLab Dash-Target' ALTERID=present:214 PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2
+   LEDGER 'MLab Exact Target' ALTERID=present:210 PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce
+   LEDGER 'MLab Slash/Target' ALTERID=present:215 PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3
+   LEDGER 'MLab Space Target' ALTERID=present:213 PARENT='Sundry Debtors' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1
+   LEDGER 'Profit & Loss A/c' ALTERID=present:31 PARENT='? Primary' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e
+   R-V3 ALTERID on 8 of 8 ledger rows
+== R-GRP: 56068 bytes, charset utf-16, ctrl chars ['0x3', 'ref &#4; x30']; COLLECTION rows LEDGER=0 GROUP=29 COMPANY=0; other child tags=[]
+   GROUP 'MLab Group Target' GUID=f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d4 ALTERID=' 216' PARENT='Sundry Debtors' names=['MLab Group Target', 'MLab Group Alias']
+   all group names: ['Bank Accounts', 'Bank OD A/c', 'Branch / Divisions', 'Capital Account', 'Cash-in-Hand', 'Current Assets', 'Current Liabilities', 'Deposits (Asset)', 'Direct Expenses', 'Direct Incomes', 'Duties & Taxes', 'Fixed Assets', 'Indirect Expenses', 'Indirect Incomes', 'Investments', 'Loans & Advances (Asset)', 'Loans (Liability)', 'Misc. Expenses (ASSET)', 'MLab Group Target', 'Provisions', 'Purchase Accounts', 'Reserves & Surplus', 'Sales Accounts', 'Secured Loans', 'Stock-in-Hand', 'Sundry Creditors', 'Sundry Debtors', 'Suspense A/c', 'Unsecured Loans']

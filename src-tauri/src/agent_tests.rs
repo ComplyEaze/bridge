@@ -770,7 +770,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // amounts and counts of ledgers, and no ledger name; `company_features`
     // returns only three settings, a currency symbol and the company's own name;
     // `gst_status` returns only voucher numbers, dates, the voucher type's name
-    // and ids, and no party or ledger name.
+    // and ids, and no party or ledger name; `statement_tie_out` returns two
+    // dates, three signed gaps and fixed sentences, and never a ledger name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
@@ -778,6 +779,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "company_features",
         "gst_status",
         "local_data_report",
+        "statement_tie_out",
     ];
     // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
     // is set as it is built, and another test changes that variable, so the

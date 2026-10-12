@@ -597,19 +597,25 @@ type in the window, and returns for each voucher its `voucher_number`, `date`, `
 same class under another name is not read, and a name that holds a double quote, a backslash, `&`, `<`, `>`, `'` or a control
 character, or a space at either end, is refused before any read (`gst_status_type_name_invalid`).
 
-`gst_status` is `included`, `uncertain`, `excluded` or `not_in_return`. `not_in_return` means Tally's three flags
-all read No. On the lab's Receipts that means Tally does not list the voucher in the return; it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
+`gst_status` is `included`, `uncertain`, `excluded`, `not_in_return`, `cancelled` or `optional`. `cancelled` and
+`optional` are Tally's own `ISCANCELLED` and `ISOPTIONAL` flags read Yes, decided before the three status flags and
+never counted as `included` or `not_in_return`: on the lab's book a cancelled Sales voucher read the included flag Yes
+and an optional one read all three No (one voucher each); whether Tally lists a cancelled voucher anywhere in the
+return is not measured, and a voucher that reads both Yes is unread. `not_in_return` means Tally's three flags
+all read No. On the lab's Receipts that means Tally does not list the voucher in the return (read with the request before it
+fetched the cancelled and optional flags; the request as it is now is measured on Sales vouchers only); it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
 accepted the voucher as it stands (Accept As Is) and `false` otherwise; `included` counts such a voucher too, so it is not
 'clean', and it is included by a person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
 voucher is right or wrong, or that a return is ready. The reason for a status (the one measured is a tax figure that did not match Tally's own)
 is on Tally's screen only; no field carries it, so none is returned. Tally keeps the
-status a voucher was given when it was saved (one voucher, cause unverified). Cancelled, optional and post-dated
-vouchers are not marked, and a total of 0 may mean that the type name matched nothing. Each page is a new read,
+status a voucher was given when it was saved (one voucher, cause unverified). Post-dated vouchers are not marked,
+and a total of 0 may mean that the type name matched nothing. Each page is a new read,
 so a voucher saved between two pages can shift the offsets. The result holds `counts` (`included`, `uncertain`,
-`excluded`, `not_in_return`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
+`excluded`, `not_in_return`, `cancelled`, `optional`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
 `items`; page with `limit` and `offset` (`next_offset` when more remain).
 
-A voucher whose flags are absent, repeated, nested in another element or spelled another way keeps its row with
+A voucher whose flags, or whose cancelled or optional flag, are absent, repeated, nested in another element or
+spelled another way keeps its row with
 `{"unread": code}` (`gst_status_not_reported` or `gst_status_unreadable`) in place of the value and is never read as
 `included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). An answer in which a voucher
 cannot be told apart from another (a missing or repeated `MASTERID`, or a missing number, date, type or

@@ -1,5 +1,6 @@
 //! Captured read replay with mode/date fault injection; no live Education calls.
 use super::*;
+use crate::tally::ConnectionStatus;
 use tally_protocol_simulator::{
     encode, Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };

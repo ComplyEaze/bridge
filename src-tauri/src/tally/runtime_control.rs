@@ -36,7 +36,6 @@ const DEFAULT_REQUEST_SPACING: Duration = SHIPPED_REQUEST_SPACING;
 const DEFAULT_REQUEST_SPACING: Duration = Duration::ZERO;
 const MAX_CIRCUIT_COOLDOWN: Duration = Duration::from_secs(10 * 60);
 const MAX_RETRY_DELAY: Duration = Duration::from_secs(60);
-pub(super) const TELEMETRY_PREVIEW_SCHEMA: &str = crate::observability::PREVIEW_SCHEMA;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub(super) struct EndpointIdentity(String);
@@ -133,11 +132,7 @@ impl ReadFailureClass {
     pub(super) const fn retryable(self) -> bool {
         matches!(
             self,
-            Self::Connection
-                | Self::RequestTimeout
-                | Self::RequestFailed
-                | Self::HttpServer
-                | Self::RateLimited
+            Self::Connection | Self::RequestFailed | Self::HttpServer | Self::RateLimited
         )
     }
 
@@ -554,22 +549,11 @@ impl Default for PortableReadRuntime {
 
 impl PortableReadRuntime {
     pub(super) fn new(policy: RuntimePolicy) -> Result<Self, RuntimeConfigurationError> {
-        Self::with_collector(policy, Arc::new(TelemetryCollector::new()))
-    }
-
-    pub(super) fn with_collector(
-        policy: RuntimePolicy,
-        collector: Arc<TelemetryCollector>,
-    ) -> Result<Self, RuntimeConfigurationError> {
         Ok(Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            collector,
+            collector: Arc::new(TelemetryCollector::new()),
             policy: policy.validate()?,
         })
-    }
-
-    pub(super) fn collector(&self) -> Arc<TelemetryCollector> {
-        Arc::clone(&self.collector)
     }
 
     pub(super) fn endpoint_snapshot(

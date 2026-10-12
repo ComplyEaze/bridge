@@ -1738,7 +1738,8 @@ another product pack.
   including queue deadline/cancellation, response class, circuit rejection,
   and an explicit `unavailable` body-byte measurement. A Tauri command returns
   the bounded privacy-reduced preview plus its checksum; nothing is uploaded or
-  persisted automatically.
+  persisted automatically. (October 2026: no screen ever called that command,
+  and it was deleted with the preview; see the ADR 0009 amendment.)
 - The loopback simulator now supports a fail-closed sequence of 1–64 response
   plans. A real portable HTTP transport/runtime test proves an exact synthetic
   HTTP 500 then HTTP 200 sequence causes one retry and two processed requests.

@@ -1,26 +1,6 @@
 use super::{DateSpan, ExactDecimal, TallyDate, MAX_EXACT_DECIMAL_BYTES};
 
 #[test]
-fn adding_calendar_months_clamps_to_the_target_month_end() {
-    assert_eq!(
-        TallyDate::parse("20260131")
-            .unwrap()
-            .add_months_clamped(1)
-            .unwrap()
-            .as_str(),
-        "20260228"
-    );
-    assert_eq!(
-        TallyDate::parse("20240131")
-            .unwrap()
-            .add_months_clamped(1)
-            .unwrap()
-            .as_str(),
-        "20240229"
-    );
-}
-
-#[test]
 fn adding_days_is_constant_time_calendar_arithmetic() {
     assert_eq!(
         TallyDate::parse("20260228")

@@ -270,6 +270,12 @@ or `1` is not asked.
 | Windows: `%LOCALAPPDATA%\Bridge\agent` | the files below |
 | macOS: `~/Library/Application Support/Bridge` | the files below |
 
+On a Microsoft Store install of Claude Desktop, Windows may keep some of these
+files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
+and a given file can be in either place. Bridge prints the location Windows
+reports for an existing file. Uninstalling or resetting the Store app removes
+that folder, including the import journal.
+
 - **A receipt log** (`agent-egress.jsonl`): two lines for each tool call. The
   first has the tool name, the time, the company's Tally GUID, fingerprints of
   the request and the response, the names (not the values) of the fields

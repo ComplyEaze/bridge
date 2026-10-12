@@ -66,6 +66,7 @@ mod span_identity;
 pub(super) use approval::PostApprovals;
 #[path = "agent_import_verification.rs"]
 mod verification;
+use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 use verification::{
@@ -1243,9 +1244,8 @@ impl Server {
                 }
                 None => next_step,
             };
-            Ok(ToolOutcome {
-                payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                    "batch_id": batch_id, "path": path, "sha256": sha256,
+            let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
+                    "batch_id": batch_id, "sha256": sha256,
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
                     // How many lines a bank import sent to suspense, by tag,
@@ -1275,7 +1275,13 @@ impl Server {
                     "warnings": warnings,
                     "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
-                }}),
+                }});
+            // Where a person finds the file: the real location, which a Microsoft
+            // Store install of Claude Desktop redirects into its package (#1459).
+            // The file was stored and is read by the logical `path`.
+            user_visible_path(&path).put_into(&mut payload["result"], "path");
+            Ok(ToolOutcome {
+                payload,
                 evidence: accumulated.clone(),
                 company_guid: Some(line.company_guid.clone()),
                 truncated: false,

@@ -536,7 +536,7 @@ fn transfer_pairing_a_double_booked_contra_never_pairs() {
     };
     // no reference: listed, and the only candidate no longer pairs
     let view = view_of(
-        &[skipped.clone()],
+        std::slice::from_ref(&skipped),
         &[contra("batch-1", "t1"), b2_contra("batch-2", "t2")],
         &january_covered(),
         0,

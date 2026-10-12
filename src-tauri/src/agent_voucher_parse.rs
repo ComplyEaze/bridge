@@ -388,8 +388,9 @@ fn parse_voucher_rows(
                         // typed allocation. It is NOT empty, so the filter above admits
                         // it, and requiring BILLTYPE unconditionally aborted the entire
                         // read over a row that carries nothing to record. The rule for
-                        // which untyped rows are placeholders is shared with the
-                        // voucher-scan boundary rather than restated here.
+                        // which untyped rows are placeholders lives in
+                        // `bill_allocation_without_type_is_placeholder` rather
+                        // than being restated here.
                         //
                         // A skipped row must still fall through to `scope.end` below, so
                         // this is an `if let` and not a `continue`: continuing the event
@@ -421,9 +422,8 @@ fn parse_voucher_rows(
                                 // A NAME here is a contradiction, not a value to drop.
                                 // Silently discarding it loses a supplier reference that
                                 // a malformed response -- or a request-shape regression
-                                // -- is trying to tell us about. The typed boundary in
-                                // outstandings/parser.rs refuses the same state as
-                                // `bill_reference_forbidden`; refuse it here too.
+                                // -- is trying to tell us about. Refuse it as
+                                // `bill_reference_forbidden`.
                                 if name.is_some() {
                                     return Err("bill_reference_forbidden".to_string());
                                 }

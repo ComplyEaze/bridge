@@ -2812,37 +2812,76 @@ fn append_private_import_ledger(
     bytes: &[u8],
     prepare_permissions: impl FnOnce(&std::fs::File) -> Result<(), String>,
 ) -> Result<(), String> {
+    append_private_import_ledger_syncing(
+        path,
+        bytes,
+        prepare_permissions,
+        persistence::sync_directory,
+    )
+}
+
+/// [`append_private_import_ledger`] with the directory sync given, so a test can
+/// fail it.
+fn append_private_import_ledger_syncing(
+    path: &Path,
+    bytes: &[u8],
+    prepare_permissions: impl FnOnce(&std::fs::File) -> Result<(), String>,
+    sync_directory: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<(), String> {
     // Admission serializes writers; read/write access also permits Windows rollback.
     let mut file = super::local_file::open_local_file(path, true)
         .map_err(|_| "import_ledger_unavailable".to_string())?;
     prepare_permissions(&file)?;
     file.seek(SeekFrom::End(0))
         .map_err(|_| "import_ledger_unavailable".to_string())?;
-    append_import_ledger_bytes(&mut file, bytes)
+    let mut journal = JournalFile {
+        file,
+        directory: path.parent().unwrap_or(path).to_path_buf(),
+        sync_directory: Some(sync_directory),
+    };
+    append_import_ledger_bytes(&mut journal, bytes)
 }
 
 trait ImportLedgerWriter {
     fn length(&mut self) -> std::io::Result<u64>;
     fn append(&mut self, bytes: &[u8]) -> std::io::Result<()>;
     fn sync(&mut self) -> std::io::Result<()>;
+    /// Make the file's name in its directory durable. Called after an append to
+    /// a file that was empty or has just been created: a file a power failure
+    /// can take back is no record.
+    fn sync_entry(&mut self) -> std::io::Result<()>;
     fn truncate(&mut self, length: u64) -> std::io::Result<()>;
 }
 
-impl ImportLedgerWriter for std::fs::File {
+/// The journal file and the directory it is in.
+struct JournalFile<S> {
+    file: std::fs::File,
+    directory: PathBuf,
+    sync_directory: Option<S>,
+}
+
+impl<S: FnOnce(&Path) -> std::io::Result<()>> ImportLedgerWriter for JournalFile<S> {
     fn length(&mut self) -> std::io::Result<u64> {
-        self.metadata().map(|metadata| metadata.len())
+        self.file.metadata().map(|metadata| metadata.len())
     }
 
     fn append(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-        self.write_all(bytes)
+        self.file.write_all(bytes)
     }
 
     fn sync(&mut self) -> std::io::Result<()> {
-        self.sync_data()
+        self.file.sync_data()
+    }
+
+    fn sync_entry(&mut self) -> std::io::Result<()> {
+        match self.sync_directory.take() {
+            Some(sync) => sync(&self.directory),
+            None => Err(std::io::Error::other("directory already synced")),
+        }
     }
 
     fn truncate(&mut self, length: u64) -> std::io::Result<()> {
-        self.set_len(length)
+        self.file.set_len(length)
     }
 }
 
@@ -2853,7 +2892,20 @@ fn append_import_ledger_bytes(
     let original_length = writer
         .length()
         .map_err(|_| "import_ledger_unavailable".to_string())?;
-    if writer.append(bytes).and_then(|_| writer.sync()).is_err() {
+    // The length is read afresh for every append: a journal that is empty here
+    // (just created, or left empty by an append that stopped) may lack a durable
+    // directory entry, so the write is not complete until that is synced.
+    let appended = writer
+        .append(bytes)
+        .and_then(|_| writer.sync())
+        .and_then(|_| {
+            if original_length == 0 {
+                writer.sync_entry()
+            } else {
+                Ok(())
+            }
+        });
+    if appended.is_err() {
         writer
             .truncate(original_length)
             .and_then(|_| writer.sync())
@@ -2952,7 +3004,7 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
             "a voucher carries its own number, and native posting lets Tally assign it".to_string()
         }
         "import_review_layout_text" | "import_review_format_text" => {
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully".to_string()
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)".to_string()
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()

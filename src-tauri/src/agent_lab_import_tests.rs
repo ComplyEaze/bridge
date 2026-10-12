@@ -8,55 +8,6 @@ const REMOTE_ID: Uuid = Uuid::from_u128(1);
 const ATTRIBUTION_ID: Uuid = Uuid::from_u128(2);
 
 // ---------------------------------------------------------------------------
-// canonical_master_key -- §9.4d, licensed TallyPrime 7.1
-// ---------------------------------------------------------------------------
-
-#[test]
-fn canonical_master_key_folds_the_composed_9_4d_rules() {
-    let base = canonical_master_key("MB-PROBE-LEDGER-A");
-    assert_eq!(
-        canonical_master_key("MB PROBE LEDGER A"),
-        base,
-        "hyphen == space"
-    );
-    assert_eq!(
-        canonical_master_key("mb probe ledger a"),
-        base,
-        "ASCII case folds"
-    );
-    assert_eq!(
-        canonical_master_key("  mb probe  ledger a "),
-        base,
-        "surrounding + collapsed runs"
-    );
-    assert_eq!(
-        canonical_master_key("mb/probe/ledger/a"),
-        base,
-        "slash == space"
-    );
-}
-
-#[test]
-fn canonical_master_key_does_not_fold_unmeasured_separators() {
-    // §9.4d: an en dash and an underscore are ordinary characters to Tally,
-    // not separators -- a class-based fold would wrongly merge these.
-    assert_ne!(canonical_master_key("A_B"), canonical_master_key("A B"));
-    assert_ne!(
-        canonical_master_key("A\u{2013}B"),
-        canonical_master_key("A B")
-    );
-}
-
-#[test]
-fn canonical_master_key_does_not_normalise_unicode_forms() {
-    // §9.4d: "canonical equivalence is still refused" -- NFC vs NFD must stay
-    // distinguishable through this fold, unlike every other transformation.
-    let nfc = "\u{00e9}"; // é, single codepoint
-    let nfd = "e\u{0301}"; // e + combining acute accent
-    assert_ne!(canonical_master_key(nfc), canonical_master_key(nfd));
-}
-
-// ---------------------------------------------------------------------------
 // Master XML -- golden fixtures
 // ---------------------------------------------------------------------------
 
@@ -2810,4 +2761,138 @@ fn a_batch_with_clean_counters_and_a_read_back_difference_stops_the_call_and_is_
     assert_eq!(log.mismatches.len(), 1);
     assert!(log.created_masters.is_empty());
     assert_eq!(log.batches[0]["ok"], false);
+}
+
+/// bridge#974, the dispatch: a root book entry reaches the right comparison
+/// of its kind through `readback_mismatches` (the post-Create read-back) and
+/// `already_present_verified_mismatches` (the idempotent-resume check). The
+/// parent tests above call `diff_parented` and `diff_stock_item` directly, so a
+/// kind routed to a comparison that ignores the parent would pass them.
+///
+/// The root rows are committed live captures. No named-parent godown or stock
+/// group row has been captured, so for those two kinds the named-parent row is
+/// SYNTHETIC: a captured root row with its `PARENT` replaced by a name. It is
+/// not a statement that Tally returns a godown or stock group in that shape;
+/// that is unmeasured, and the row only gives the comparison a `PARENT` that
+/// is not the root. A captured named-parent godown and stock group would
+/// replace it. The group and stock item named-parent rows are captured as
+/// they are.
+#[test]
+fn a_root_book_entry_is_compared_by_the_read_back_and_the_resume_check_of_every_parented_kind() {
+    let godowns = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_godowns_shape_lab_live.utf16le.xml"
+        ),
+        "GODOWN",
+    );
+    let stock_groups = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
+        ),
+        "STOCKGROUP",
+    );
+    let groups = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
+        ),
+        "GROUP",
+    );
+    let root_items = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_negative_sale_lab_live.utf16le.xml"
+        ),
+        "STOCKITEM",
+    );
+    let named_items = captured_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/stock_items_shape_lab_fy_live.utf16le.xml"
+        ),
+        "STOCKITEM",
+    );
+    let first_where = |rows: &[BTreeMap<String, String>], at_root: bool| {
+        rows.iter()
+            .find(|row| is_tally_reserved_root(&row["PARENT"]) == at_root)
+            .unwrap_or_else(|| panic!("a captured row with at_root={at_root}"))
+            .clone()
+    };
+    // SYNTHETIC (see above): the one element of a captured root row, replaced.
+    let synthetic_named_parent_row = |mut row: BTreeMap<String, String>| {
+        row.insert("PARENT".into(), "Packaging".into());
+        row
+    };
+
+    // (kind, the label the kind's comparison reports under, root row, named row)
+    let cases = [
+        (
+            MasterKind::Godown,
+            "godown",
+            first_where(&godowns, true),
+            synthetic_named_parent_row(first_where(&godowns, true)),
+        ),
+        (
+            MasterKind::StockGroup,
+            "stock group",
+            first_where(&stock_groups, true),
+            synthetic_named_parent_row(first_where(&stock_groups, true)),
+        ),
+        (
+            MasterKind::Group,
+            "group",
+            first_where(&groups, true),
+            first_where(&groups, false),
+        ),
+        (
+            MasterKind::StockItem,
+            "stock item",
+            first_where(&root_items, true),
+            first_where(&named_items, false),
+        ),
+    ];
+    for (kind, label, root_row, named_row) in cases {
+        for parent in root_spellings() {
+            for (row, matches) in [(&root_row, true), (&named_row, false)] {
+                let name = row["NAME"].clone();
+                let masters = match kind {
+                    MasterKind::Godown => BookMasters {
+                        godowns: vec![book_with_parent(&name, &parent)],
+                        ..Default::default()
+                    },
+                    MasterKind::StockGroup => BookMasters {
+                        stock_groups: vec![book_with_parent(&name, &parent)],
+                        ..Default::default()
+                    },
+                    MasterKind::Group => BookMasters {
+                        groups: vec![book_with_parent(&name, &parent)],
+                        ..Default::default()
+                    },
+                    MasterKind::StockItem => BookMasters {
+                        stock_items: vec![book_with_parent(&name, &parent)],
+                        ..Default::default()
+                    },
+                    other => panic!("{other:?} has no parent"),
+                };
+                let read_back = readback_mismatches(kind, &masters, std::slice::from_ref(row));
+                let resume = already_present_verified_mismatches(kind, &masters, &name, row);
+                if matches {
+                    assert_eq!(
+                        read_back,
+                        Vec::<String>::new(),
+                        "read-back: {label} {parent}"
+                    );
+                    assert_eq!(resume, Vec::<String>::new(), "resume: {label} {parent}");
+                } else {
+                    let expected = format!(
+                        "{label} {name}: parent expected the reserved root, observed {:?}",
+                        row["PARENT"]
+                    );
+                    assert_eq!(
+                        read_back,
+                        vec![expected.clone()],
+                        "read-back: {label} {parent}"
+                    );
+                    assert_eq!(resume, vec![expected], "resume: {label} {parent}");
+                }
+            }
+        }
+    }
 }

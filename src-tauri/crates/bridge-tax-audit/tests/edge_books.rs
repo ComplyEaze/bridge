@@ -1304,7 +1304,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 30] = [
+const EDGE_TESTS: [&str; 31] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1317,6 +1317,7 @@ const EDGE_TESTS: [&str; 30] = [
     "creditor_ageing_43bh",
     "depreciation",
     "entity_269st_gap",
+    "financial_statements",
     "high_value_register",
     "knock_off_candidates",
     "ledger_scrutiny",

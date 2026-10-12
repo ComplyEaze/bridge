@@ -1073,6 +1073,10 @@ fn the_batch_setting_keeps_each_known_limit() {
             "limit 1: a voucher not found may be absent or edited, so the person checks it",
         ),
         (
+            "may still be in Tally, edited: do not re-enter it before you check",
+            "limit 1: a voucher not found is never re-entered unchecked, since it may be edited, not absent",
+        ),
+        (
             "more than 50, or one whose summary does not fit the window",
             "limit 2: the cap and the window's size, each refused rather than cut",
         ),

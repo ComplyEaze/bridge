@@ -527,9 +527,9 @@ amendment's "has not yet been observed live" is superseded.
 `BRIDGE_AGENT_ENABLE_BATCH_POST` is on together with posting. It is off by default. It is a
 command-line setting, not in the MCPB extension, until a live batch post through Bridge is
 proved. (Deviation, 2026-10-10, #1090: the extension now carries its own setting for it,
-`enable_batch_post`, off by default and used only with posting on. The change stays a draft until a
-batch post through the extension has run on a synthetic company; the cap and every safeguard below
-are unchanged.) With it off, a batch of more than one voucher refuses exactly as before
+`enable_batch_post`, off by default and used only with posting on. A batch post through the extension
+ran on a synthetic company on 2026-10-12: batches of 10 and 50, and a statement in two windows of
+7, each read back verified. The cap and every safeguard below are unchanged.) With it off, a batch of more than one voucher refuses exactly as before
 (`import_post_requires_one_voucher`), and a one-voucher post is unchanged.
 
 **Every safeguard applies to every voucher** (slice D1):

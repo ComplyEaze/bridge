@@ -93,6 +93,8 @@ impl DesktopJournalService {
                 let no_attempt_recorded = failure.code == "import_not_dispatched";
                 let message = if no_attempt_recorded {
                     "No posting attempt is recorded for this original Journal."
+                } else if failure.code == super::post::DESKTOP_LEDGER_LINE_BREAK {
+                    super::post::DESKTOP_LEDGER_LINE_BREAK_ACTION
                 } else {
                     "ComplyEaze Bridge could not confirm this original Journal. Reconcile it again after the underlying condition changes."
                 };
@@ -123,6 +125,7 @@ impl DesktopJournalService {
     ) -> Result<DesktopJournalReview, String> {
         if snapshot.dispatched {
             let _ = admit_saved_journal_integrity(&snapshot.batch, &self.server.settings.endpoint)?;
+            super::post::refuse_a_line_break_name_on_the_desktop(&snapshot.batch)?;
         } else {
             let _ = admit_saved_journal(&snapshot.batch, &self.server.settings.endpoint)?;
         }

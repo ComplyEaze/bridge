@@ -848,3 +848,36 @@ A Sales invoice is an accounting invoice: the invoice view, `LEDGERENTRIES.LIST`
 - Where Tally's GSTR-1 places a posted invoice (B2B for a registered customer, B2C for an unregistered one): Tally's report counted the four vouchers the month then held as uncertain, giving the company's GST registration details as invalid or not specified, so it showed only that the first posted invoice was counted as the keyed ones were (the list under the count was not opened, and the second invoice was posted after the look). HSN is not carried. On a company whose registration is valid, one imported invoice was listed as included (above); a registered customer was not tried there.
 - That the invoice's masters are unchanged inside the endpoint queue after the approval: they are read again before the dialog and again before the approval is spent, not under the queue's lock.
 - Any release or licence tier other than the one measured.
+
+### 9.20 The GSTR-1 status of one voucher type in a window, read by the type's name with a narrow field list
+
+**PARTIAL: one synthetic company, licensed TallyPrime 7.1 Silver, one run per request, the unregistered buyer of
+its Sales invoices.** This is the read that §9.17's flags can be taken through without fetching whole vouchers.
+The answers are committed byte for byte with their hashes (the `gst-status` fixtures and their provenance file).
+
+- **VERIFIED: a request that selects the vouchers of one type by the type's name, in a window of two days,
+  with only the date, number, type name, `MASTERID`, `ALTERID`, the three status flags
+  (`VCHGSTSTATUSISINCLUDED`, `VCHGSTSTATUSISUNCERTAIN`, `VCHGSTSTATUSISEXCLUDED`) and `ISGSTOVERRIDDEN`,
+  returns those fields without the ledger entries.** An answer cost about 3.0 KB per voucher and 3.2 KB once;
+  the full voucher export of the same book is 78 to 94 KB per voucher.
+- **VERIFIED: selecting the type by its name and by its GUID gave byte-identical answers, and neither
+  selected another type.** The by-GUID answer is `aw8-status-narrow-window-sales.xml` on the lab's answers branch
+  (commit `313f5439b`), with the same SHA-256 as the by-name answer committed as a fixture, so it is not committed
+  twice. A second Sales type (`Z1`) in the same window was not selected by the first type's name.
+- **VERIFIED: the three flags read No, No, No on the four Receipts in the window.** For Receipts that is
+  Tally not listing the voucher in the return. It is **not measured** for any other type, and the two keyed Purchase
+  invoices of §9.19 read uncertain, so "all three No" is not a general meaning.
+- **VERIFIED: the flags were read as No, Yes, No on an uncertain voucher (the tax figure of §9.17 that differed),
+  and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The uncertain voucher is dated 1-Aug-2026,
+  outside the narrow two-day window, so it was shown by the wider voucher read-back (the `three-vouchers` fixture),
+  not by the narrow request; the narrow request has **not** been seen to answer an uncertain voucher. The Accept As Is
+  voucher was read by both.
+- **NOT established:**
+  - a voucher flagged excluded (never observed);
+  - a registered buyer;
+  - the reason for a status: no field in the two lists tried carries it, which is a negative measured on those
+    lists only;
+  - cancelled, optional and post-dated vouchers (the request does not fetch them);
+  - the cost of the selection on a large book: it was timed on about thirty vouchers, so any size bound a
+    program applies is its own provisional choice and not a Tally limit;
+  - another release or licence tier.

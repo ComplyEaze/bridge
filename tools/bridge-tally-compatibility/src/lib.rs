@@ -289,11 +289,7 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// (`agent_lab.rs`, `jsonex*.rs`, `india_tax_observation.rs`), operator filing
 /// labels (`client_groups.rs`, `client_group_label_migration.rs` and the
 /// `commands/all_clients.rs` commands over them, none of which reads Tally),
-/// dead or declaration-only modules, and `observability.rs`. It only counts
-/// the read runtime's attempts into fixed buckets: nothing reads the counts out
-/// and nothing sends them off the machine (the preview command that once did
-/// was deleted, never having been called). It becomes a candidate when something
-/// reads them. bridge#416 records the reasoning for the rest.
+/// dead or declaration-only modules. bridge#416 records the reasoning for the rest.
 ///
 /// Also not pinned: the four frontend modules bridge#468 moved out of the pinned
 /// `src/main.tsx` and `src/MirrorProofScreen.tsx`, where they had been copied.

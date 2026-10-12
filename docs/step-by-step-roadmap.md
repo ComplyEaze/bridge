@@ -130,8 +130,10 @@ pending consented synthetic live qualification.
     bucketed privacy-reduced previews, and no exporter dependency. PR15 wired
     its first read-runtime caller; the local preview command it also added was
     never called by the app and has since been deleted, so nothing reads the
-    counts out. Phase/reconciliation metrics, persistence, general support
-    bundles, and measured platform budgets remain follow-on work.
+    counts out. (2026-10-12: the collector and its observation types were then
+    deleted as well; see the ADR 0009 amendment.) Phase/reconciliation
+    metrics, persistence, general support bundles, and measured platform
+    budgets remain follow-on work.
 11. PR13B1 now has bounded deterministic voucher generators and a versioned
     parser-only qualification receipt. Inputs are generated before measurement;
     each sample uses a fresh worker and must match exact bytes, hashes, record
@@ -162,7 +164,8 @@ pending consented synthetic live qualification.
     remains pending; macOS live/simulator evidence is also pending.
 14. PR15 adds a portable read-only endpoint runtime with per-endpoint
     serialization, queue deadlines, cancellation, spacing, typed bounded retry,
-    circuit admission, and schema-v2 observations. The simulator can serve a
+    circuit admission, and schema-v2 observations (2026-10-12: the observations
+    were removed because nothing read them). The simulator can serve a
     bounded deterministic response sequence, including a tested 500-to-200
     retry. Native source wiring and the Windows workspace checks now pass with
     the documented SQLCipher Perl/libclang prerequisites; macOS verification

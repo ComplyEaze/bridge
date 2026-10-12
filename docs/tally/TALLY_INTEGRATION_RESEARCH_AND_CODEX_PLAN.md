@@ -1510,6 +1510,11 @@ Track:
 
 #### Implemented PR13A boundary
 
+(2026-10-12 note: the collector and its observation types described here were
+deleted because nothing read the counts; see the ADR 0009 amendment. The text
+below records the contract as it was designed. A support bundle is designed
+from the request trail, not from this collector.)
+
 The first observability slice is a portable, local-only aggregation contract.
 It accepts only closed request/queue/response enums, monotonic durations, and
 response-byte counts. There are no strings, arbitrary attributes, IDs,
@@ -1721,6 +1726,10 @@ A release may not broaden its support claim unless the matrix has current eviden
 another product pack.
 
 #### Implemented PR15 boundary (2026-07-15)
+
+(2026-10-12 note: the schema-v2 observations and the body-byte measurement
+described below were deleted because nothing read them; the circuit, queue,
+retry and cancellation behaviour is unchanged. See the ADR 0009 amendment.)
 
 - `bridge-tally-runtime` is a Tauri/SQLCipher-independent read control plane.
   It owns normalized per-endpoint serialization, bounded queue deadlines,

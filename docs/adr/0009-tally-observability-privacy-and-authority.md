@@ -11,6 +11,18 @@ read runtime's attempts into the fixed cells, and nothing reads them out; the
 paragraphs below describing the preview record the contract as it was
 designed, not a capability the application offers.
 
+Amendment (2026-10-12): the collector and every type it aggregated
+(`TelemetryCollector`, the observation sink, the request-class, queue-outcome
+and response-outcome enums, and the attempt and body-byte observations) are
+removed, together with the observed-body-byte recorder on the Tally client that
+only fed them. Nothing read the counts, so they were unused code that still
+ran on every read. The read runtime keeps its circuit-breaker rejection
+reasons, which decide behaviour. The statement below that imports must not be
+wired into the collector is now moot: imports are not counted anywhere. A
+future reader, such as a support bundle, is designed from the request trail
+(`src-tauri/src/tally/request_trail.rs`), which already records per-call sizes
+and outcomes, and not from a revived collector.
+
 ## Decision
 
 Bridge starts PR13 with a local-only `bridge-tally-observability` crate. Its

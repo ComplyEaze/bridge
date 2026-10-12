@@ -809,3 +809,24 @@ fn a_recorded_statement_that_cannot_keep_its_section_is_told_the_next_call_will_
         "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
     );
 }
+
+/// The counts of a check that ran are not traded for more page rows, however
+/// small the rows: the note would make room, and it is not used while the counts
+/// fit beside some rows.
+#[test]
+fn a_page_is_not_cut_further_to_make_room_for_a_note_over_the_counts() {
+    let section = transfers_section(40);
+    let page = |items: usize, section: Value| {
+        json!({"result": {"offset": 0, "verification_status": "posted_verified",
+            "items": (0..items).map(|id| json!({"id": id})).collect::<Vec<_>>(),
+            "transfers": section}})
+    };
+    let mut five = page(60, counts_only_section(&section));
+    retain_page_width(&mut five, PageShape::Rows("items"), 5).unwrap();
+    let cap = len_of(&five) + 8;
+    let mut response = page(60, section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 5);
+    assert_eq!(response["result"]["transfers"]["state"], "computed");
+    assert_eq!(response["result"]["transfers"]["open_omitted"], 40);
+}

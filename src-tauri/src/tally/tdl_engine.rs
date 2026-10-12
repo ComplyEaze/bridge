@@ -80,95 +80,6 @@ pub fn ledgers_request(company: &str) -> String {
     bridge_tally_protocol::xml_read_profiles::compatibility::ledgers_request(company)
 }
 
-/// No production path sends this: core groups come from the native group
-/// collection. Its report TDL is one Education answers with a blocking dialog
-/// (bridge#45), so it compiles only for tests, and nothing can dispatch it.
-#[cfg(test)]
-pub fn groups_request(company: &str) -> String {
-    format!(
-        r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>DATA</TYPE>
-        <ID>BRIDGE Group Export V1</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="BRIDGE Group Export V1">
-                        <FORMS>BRIDGE Group Export Form V1</FORMS>
-                        <PLAINXML>Yes</PLAINXML>
-                    </REPORT>
-                    <FORM NAME="BRIDGE Group Export Form V1">
-                        <TOPPARTS>BRIDGE Group Context Part V1, BRIDGE Group Rows Part V1</TOPPARTS>
-                    </FORM>
-                    <PART NAME="BRIDGE Group Context Part V1">
-                        <TOPLINES>BRIDGE Group Context Line V1</TOPLINES>
-                    </PART>
-                    <PART NAME="BRIDGE Group Rows Part V1">
-                        <TOPLINES>BRIDGE Group Row Line V1</TOPLINES>
-                        <REPEAT>BRIDGE Group Row Line V1 : BRIDGE Group Collection V1</REPEAT>
-                    </PART>
-                    <LINE NAME="BRIDGE Group Context Line V1">
-                        <LEFTFIELDS>BRIDGE Group Schema V1, BRIDGE Group Object Type V1, BRIDGE Group Company Name V1, BRIDGE Group Company GUID V1, BRIDGE Group Record Count V1</LEFTFIELDS>
-                        <XMLTAG>"COMPANYCONTEXT"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Group Schema V1">
-                        <SET>"bridge.tally.groups/1"</SET>
-                        <XMLTAG>"SCHEMA"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Object Type V1">
-                        <SET>"GROUP"</SET>
-                        <XMLTAG>"OBJECTTYPE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Company Name V1">
-                        <SET>##SVCurrentCompany</SET>
-                        <XMLTAG>"NAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Company GUID V1">
-                        <SET>$GUID:Company:##SVCurrentCompany</SET>
-                        <XMLTAG>"GUID"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Group Record Count V1">
-                        <SET>$$NumItems:BRIDGE Group Collection V1</SET>
-                        <XMLTAG>"RECORDCOUNT"</XMLTAG>
-                    </FIELD>
-                    <LINE NAME="BRIDGE Group Row Line V1">
-                        <LEFTFIELDS>BRIDGE Group Parent V1</LEFTFIELDS>
-                        <XMLTAG>"GROUP"</XMLTAG>
-                        <XMLATTR>"NAME" : $Name</XMLATTR>
-                        <XMLATTR>"GUID" : $GUID</XMLATTR>
-                        <XMLATTR>"REMOTEID" : $RemoteID</XMLATTR>
-                        <XMLATTR>"MASTERID" : $MasterID</XMLATTR>
-                        <XMLATTR>"ALTERID" : $AlterID</XMLATTR>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Group Parent V1">
-                        <SET>$Parent</SET>
-                        <XMLTAG>"PARENT"</XMLTAG>
-                    </FIELD>
-                    <COLLECTION NAME="BRIDGE Group Collection V1" ISMODIFY="No" ISFIXED="No" ISINITIALIZE="No" ISOPTION="No" ISINTERNAL="No">
-                        <TYPE>Group</TYPE>
-                        <FETCH>Name, GUID, RemoteID, MasterID, AlterID, Parent</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#,
-        xml_escape(company)
-    )
-    .trim()
-    .to_string()
-}
-
 /// Experimental Bridge-defined ledger-balance cross-view. The request emits no
 /// ledger names: rows are joined to the canonical mirror by candidate native
 /// identifiers. Exact semantics and applicability remain capability-gated.
@@ -260,7 +171,7 @@ pub fn ledger_period_balances_request(company: &str, from: &TallyDate, to: &Tall
 #[cfg(test)]
 mod tests {
     use super::{
-        company_list_request, groups_request, ledger_period_balances_request, ledgers_request,
+        company_list_request, ledger_period_balances_request, ledgers_request,
         legacy_company_list_request, TallyDate,
     };
 
@@ -296,8 +207,6 @@ mod tests {
             "render_vouchers",
             // `RuntimeTallyConnector::read_core_period_balance_report`.
             "ledger_period_balances_request",
-            // `#[cfg(test)]`: nothing outside tests can send it.
-            "groups_request",
         ];
         assert_eq!(listed, guarded.into_iter().collect());
         for id in [ReadOnlyProfileId::LedgersV1, ReadOnlyProfileId::VouchersV2] {
@@ -311,7 +220,6 @@ mod tests {
                 "ledger_period_balances_request",
                 ledger_period_balances_request("Synthetic Company", &synthetic_from, &synthetic_to),
             ),
-            ("groups_request", groups_request("Synthetic Company")),
         ] {
             assert!(
                 first_spaced_function_argument(&request).is_some(),
@@ -332,9 +240,8 @@ mod tests {
     #[test]
     fn requests_only_fields_used_by_the_renderer() {
         let combined = format!(
-            "{}{}{}",
+            "{}{}",
             company_list_request(),
-            groups_request("Synthetic Company"),
             ledgers_request("Synthetic Company")
         );
         for prohibited in [
@@ -374,14 +281,6 @@ mod tests {
         assert!(ledgers.contains("<XMLATTR>\"MASTERID\" : $MasterID</XMLATTR>"));
         assert!(ledgers.contains("<XMLATTR>\"ALTERID\" : $AlterID</XMLATTR>"));
         assert!(ledgers.contains("Name, GUID, RemoteID, MasterID, AlterID"));
-
-        let groups = groups_request("BRIDGE SYNTHETIC BOOK");
-        assert!(groups.contains("<TYPE>DATA</TYPE>"));
-        assert!(groups.contains("<ID>BRIDGE Group Export V1</ID>"));
-        assert!(groups.contains("$$NumItems:BRIDGE Group Collection V1"));
-        assert!(groups
-            .contains("<REPEAT>BRIDGE Group Row Line V1 : BRIDGE Group Collection V1</REPEAT>"));
-        assert!(groups.contains("<TYPE>Group</TYPE>"));
     }
 
     #[test]
@@ -389,9 +288,6 @@ mod tests {
         let ledgers = ledgers_request("BRIDGE & <SYNTHETIC> \"BOOK\"");
         assert!(ledgers.contains("BRIDGE &amp; &lt;SYNTHETIC&gt; &quot;BOOK&quot;"));
         assert!(!ledgers.contains("BRIDGE & <SYNTHETIC>"));
-
-        let groups = groups_request("BRIDGE & <GROUPS>");
-        assert!(groups.contains("BRIDGE &amp; &lt;GROUPS&gt;"));
 
         let from = TallyDate::parse("20260401").unwrap();
         let to = TallyDate::parse("20260430").unwrap();

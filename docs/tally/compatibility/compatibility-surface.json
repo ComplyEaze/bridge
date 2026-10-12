@@ -377,9 +377,6 @@
       "path": "src-tauri/crates/tally-protocol-simulator/README.md"
     },
     {
-      "path": "src-tauri/crates/tally-protocol-simulator/fixtures/inconsistent_date_filter.xml"
-    },
-    {
       "path": "src-tauri/crates/tally-protocol-simulator/src/fixtures.rs"
     },
     {
@@ -647,9 +644,6 @@
     },
     {
       "path": "src-tauri/src/db/tally_mirror.rs"
-    },
-    {
-      "path": "src-tauri/src/db/tally_write_store.rs"
     },
     {
       "path": "src-tauri/src/endpoint_coordination.rs"

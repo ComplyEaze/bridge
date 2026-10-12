@@ -3125,7 +3125,7 @@ fn voucher_block(preview: &str) -> Vec<&str> {
 
 /// A batch of at most ten lists each voucher on one line (#1063): its type,
 /// date, value, the ledger a statement row names (a Receipt's first credit,
-/// any other type's first debit, "+N" for the rest of that side) and its
+/// any other type's first debit, "+N more" for the rest of that side) and its
 /// narration as posted, in the batch file's order.
 #[test]
 fn a_small_batch_lists_each_voucher_on_one_line() {
@@ -3135,8 +3135,8 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
         voucher_block(&preview),
         [
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
-            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
             "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
             "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
@@ -3159,8 +3159,8 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
     assert_eq!(
         voucher_block(&preview)[2..4],
         [
-            "Journal 20260901  12.5  \"Expense\" +1  \"Synthetic test only\"",
-            "Receipt 20260902  40  \"Party C\" +1  \"Synthetic test only\"",
+            "Journal 20260901  12.5  Dr \"Expense\" +1 more  Cr \"Cash\"  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party C\" +1 more  \"Synthetic test only\"",
         ],
         "{preview}"
     );
@@ -3187,11 +3187,49 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
     assert_eq!(
         voucher_block(&preview)[2..],
         [
-            "Journal 20260901  12.5  \"Expense\"  \"जुलाई का किराया ₹500\"",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"जुलाई का किराया ₹500\"",
             "Receipt 20260902  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
             "Payment 20260902  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
             "Contra 20260902  5  \"Bank\"  (none)",
         ],
+        "{preview}"
+    );
+}
+
+/// A Journal's line names its first debit and first credit ledger, each with
+/// "+N more" for the rest of its side, so the person sees what each Journal
+/// credits; its narration is cut at 20 characters, marked. A Journal line too
+/// wide for the window leaves the totals and the reason line instead, never a
+/// cut ledger name.
+#[test]
+fn a_journal_line_names_a_ledger_on_each_side() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Expense","amount":"12.50","side":"Dr"},
+        {"ledger":"Cash","amount":"10.00","side":"Cr"},
+        {"ledger":"Rent","amount":"2.50","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[0].narration = Some("Reclass of July rent to the right head".into());
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview)[2],
+        "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\" +1 more  \"Reclass of July rent\"… (+18 characters)",
+        "{preview}"
+    );
+    // The Payment, Receipt and Contra lines still name one side.
+    assert!(voucher_block(&preview)[3].starts_with("Receipt 20260902  40  \"Party A\"  "));
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":format!("Expense {}", "E".repeat(40)),"amount":"12.50","side":"Dr"},
+        {"ledger":format!("Cash {}", "C".repeat(40)),"amount":"12.50","side":"Cr"}]))
+    .unwrap();
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(preview.contains(VOUCHER_LINES_DO_NOT_FIT), "{preview}");
+    assert!(
+        !preview
+            .lines()
+            .any(|shown| shown.starts_with("Journal 2026")),
         "{preview}"
     );
 }
@@ -3316,7 +3354,7 @@ fn ten_vouchers_are_listed_and_eleven_are_summarised() {
         block[..2],
         [
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
         ]
     );
     let mut eleven = line.clone();
@@ -4375,8 +4413,8 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
             "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
-            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
             "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
             "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
@@ -4690,8 +4728,8 @@ fn a_batch_text_with_a_line_break_name_is_shown_whole() {
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
             "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
-            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
             r#"Receipt 20260902  40  Line break  "Party A\r\n"  "Synthetic test only""#,
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
             "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",

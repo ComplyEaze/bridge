@@ -2714,6 +2714,8 @@ pub(super) const BATCH_REVIEW_MAX_VOUCHER_LINES: usize = 10;
 /// cut. Characters, not graphemes: a cut can split a Devanagari conjunct, and
 /// the marker says so rather than hiding it (#1063).
 pub(super) const BATCH_REVIEW_NARRATION_CHARS: usize = 40;
+/// The same for a Journal's line, which names a ledger on each side.
+pub(super) const BATCH_REVIEW_JOURNAL_NARRATION_CHARS: usize = 20;
 
 /// The line above a small batch's voucher lines.
 pub(super) const VOUCHER_LINES_HEADING: &str =
@@ -2726,7 +2728,7 @@ pub(super) const VOUCHER_LINES_HEADING_MARKED: &str =
 /// dialog wraps long lines, so a narration's tail can begin a row of its own
 /// (#1063 follow-up).
 pub(super) const VOUCHER_LINES_NARRATION_HEADING: &str =
-    "Each line ends with its narration, quoted exactly as it will be posted.";
+    "Each line ends with its narration, quoted; a cut one is marked … (+N characters).";
 /// What a voucher's line shows in place of a narration that reads like a line
 /// of this dialog. It echoes none of the narration.
 pub(super) const NARRATION_WITHHELD: &str = "(narration withheld: it reads like a dialog line)";
@@ -2814,9 +2816,12 @@ pub(super) fn reads_like_a_dialog_line(text: &str) -> bool {
 
 /// One line per voucher of a small batch (#1063): its type and date, its
 /// value (the sum of its debits), the ledger a statement row names (a
-/// Receipt's first credit, any other type's first debit, in the batch file's
-/// order, with "+N" for the rest of that side) and its narration as posted,
-/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` with the cut marked, or
+/// Receipt's first credit, a Payment's or Contra's first debit, in the batch
+/// file's order, with "+N more" for the rest of that side, never a bare
+/// "+N" that could read as an amount; a Journal's first debit and first
+/// credit, each so, as `Dr … Cr …`) and its narration as posted,
+/// quoted and cut at `BATCH_REVIEW_NARRATION_CHARS` (a Journal's at
+/// `BATCH_REVIEW_JOURNAL_NARRATION_CHARS`) with the cut marked, or
 /// `NARRATION_WITHHELD` when it reads like a line of this dialog; the On
 /// Account legend counts as one only when this dialog carries it (`legend`).
 /// `None` when a narration or reference holds a character the dialog cannot
@@ -2850,26 +2855,42 @@ fn voucher_review_lines(
                 .checked_add(&amount)
                 .map_err(|_| "voucher_amount_overflow".to_string())?;
         }
-        let side = if voucher.voucher_type == VoucherType::Receipt {
-            EntrySide::Cr
-        } else {
-            EntrySide::Dr
-        };
-        let named: Vec<&str> = voucher
-            .entries
-            .iter()
-            .filter(|entry| entry.side == side)
-            .map(|entry| entry.ledger.as_str())
-            .collect();
         let shown = |name: &str| {
             ReviewLedgerName::parse(name)
                 .map(ReviewLedgerName::shown)
                 .map_err(ReviewTextRefusal::import_code)
         };
-        let ledger = match named.as_slice() {
-            [] => "(none)".to_string(),
-            [only] => shown(only)?,
-            [first, rest @ ..] => format!("{} +{}", shown(first)?, rest.len()),
+        let side_named = |side: EntrySide| -> Result<String, String> {
+            let named: Vec<&str> = voucher
+                .entries
+                .iter()
+                .filter(|entry| entry.side == side)
+                .map(|entry| entry.ledger.as_str())
+                .collect();
+            Ok(match named.as_slice() {
+                [] => "(none)".to_string(),
+                [only] => shown(only)?,
+                [first, rest @ ..] => format!("{} +{} more", shown(first)?, rest.len()),
+            })
+        };
+        // A Journal has no bank side fixed by its type, so its line names
+        // the first ledger of each side; its narration gets fewer characters.
+        let journal = voucher.voucher_type == VoucherType::Journal;
+        let ledger = if journal {
+            format!(
+                "Dr {}  Cr {}",
+                side_named(EntrySide::Dr)?,
+                side_named(EntrySide::Cr)?
+            )
+        } else if voucher.voucher_type == VoucherType::Receipt {
+            side_named(EntrySide::Cr)?
+        } else {
+            side_named(EntrySide::Dr)?
+        };
+        let cut = if journal {
+            BATCH_REVIEW_JOURNAL_NARRATION_CHARS
+        } else {
+            BATCH_REVIEW_NARRATION_CHARS
         };
         let narration = match super::posted_narration(voucher) {
             None => "(none)".to_string(),
@@ -2880,13 +2901,9 @@ fn voucher_review_lines(
             }
             Some(text) => {
                 let length = text.chars().count();
-                if length > BATCH_REVIEW_NARRATION_CHARS {
-                    let kept: String = text.chars().take(BATCH_REVIEW_NARRATION_CHARS).collect();
-                    format!(
-                        "{}… (+{} characters)",
-                        quoted(&kept),
-                        length - BATCH_REVIEW_NARRATION_CHARS
-                    )
+                if length > cut {
+                    let kept: String = text.chars().take(cut).collect();
+                    format!("{}… (+{} characters)", quoted(&kept), length - cut)
                 } else {
                     quoted(text)
                 }

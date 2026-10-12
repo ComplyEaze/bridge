@@ -16,8 +16,7 @@ UTF-16 variants are never checked in.
 
 Because these are authored rather than captured, no capture byte count or
 SHA-256 is declared here; the integrity digests at the end pin the committed
-bytes only. `inconsistent_date_filter.xml` is additionally pinned by
-SHA-256 in `docs/tally/compatibility/compatibility-surface.json`.
+bytes only.
 
 | Fixture | Models |
 | --- | --- |
@@ -30,7 +29,6 @@ SHA-256 in `docs/tally/compatibility/compatibility-surface.json`.
 | `duplicate_identity.xml` | two ledgers sharing one GUID |
 | `wrong_company.xml` | a response for a different synthetic company |
 | `voucher_export.xml` | one Receipt voucher carrying `REMOTEID` |
-| `inconsistent_date_filter.xml` | a declared July window containing a June voucher |
 | `record_count_mismatch.xml` | declares two records, contains one |
 | `malformed_export_metadata.xml` | `RECORDCOUNT` -1 |
 | `duplicate_export_metadata.xml` | `COMPANYCONTEXT` given both as attribute and as child elements |
@@ -60,7 +58,6 @@ repeats only what this note says above.
 | `duplicate_identity.xml` | 560 | `5b2f9b82e9d16821d542c8a116066f322e375506f51e29f8ee85adf6fa89f85d` | not a capture: authored, as above |
 | `wrong_company.xml` | 323 | `bcce68996fdedddb31ef799dc8ecb949860ed069922eb89f9376b8ad25b8d475` | not a capture: authored, as above |
 | `voucher_export.xml` | 626 | `621c185473bb9fa8e059cb6932117ba0670264820ed41a7999166eb200bb964d` | not a capture: authored, as above |
-| `inconsistent_date_filter.xml` | 675 | `2bb6598b08167f3c38f99e7e0fc2902bbc2012b210b2f4c1ba030eacac27068c` | not a capture: authored, as above |
 | `record_count_mismatch.xml` | 449 | `44da2028856326617f3bc596b508768711b1481adcf21d6d7339e3282c1a6bc0` | not a capture: authored, as above |
 | `malformed_export_metadata.xml` | 320 | `41406e5029ff136132a6649af7b9443968a956129b076279aa923b6e86c5db4b` | not a capture: authored, as above |
 | `duplicate_export_metadata.xml` | 351 | `eaa617c9ec831e3416dec7a16eca1c91b92b7ab0ccac06ac1cbecfeb9a282734` | not a capture: authored, as above |

@@ -1,0 +1,11 @@
+{
+  "isEnabled": true,
+  "userConfig": {
+    "accept_terms_2026_10_1": true,
+    "host": "localhost",
+    "port": 9001,
+    "redaction": "none",
+    "enable_writes": true,
+    "enable_batch_post": true
+  }
+}

@@ -1,0 +1,35 @@
+﻿---------------------------
+ComplyEaze Bridge — post 7 vouchers?
+---------------------------
+Create 7 vouchers in "BRIDGE BATCH LAB"
+Company GUID: a30f23c3-4819-4334-96ab-ffa6fba70976
+Company number: 100050  Books from: 20260401
+Tally: http://127.0.0.1:9001
+Types: 4 Payment, 3 Receipt
+Dates: 20260803 to 20260805  Voucher numbers: Tally assigns them
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted exactly as it will be posted.
+Receipt 20260803  750.5  "Suspense"  "CASH from CASH DEPOSIT | BOB CA 12399999"… (+64 characters)
+Receipt 20260803  1500  "Suspense"  "UPI 600000000001 from nw@okzz | BOB CA 1"… (+69 characters)
+Receipt 20260803  9876.54  "Suspense"  "UPI 600000000002 from northwind.traders."… (+98 characters)
+Payment 20260804  2250.5  "Suspense"  "NEFT ZZZZZ00000000001 to ACME INDUSTRIES"… (+85 characters)
+Payment 20260804  12000  "Suspense"  "RTGS ZZZZZ00000000000000002 to GREEN FIE"… (+86 characters)
+Payment 20260805  500  "Suspense"  "IMPS 600000000003 to UNRESOLVED | BOB CA"… (+71 characters)
+Payment 20260805  5.9  "Suspense"  "TXN to BANK CHARGES | BOB CA 12399999999"… (+59 characters)
+
+Dr 14756.4  Cr 12127.04  7 entries  "Suspense"
+Dr 12127.04  Cr 14756.4  7 entries  "Synthetic Bank Ledger"
+
+Total debit: 26883.44  Total credit: 26883.44
+Money in by Receipt vouchers: 12127.04
+Money out by Payment vouchers: 14756.4
+Batch: bridge-7da1c033-f403-4f04-85f7-dc423939685c
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---------------------------
+Yes   No   Cancel   
+---------------------------

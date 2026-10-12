@@ -1,0 +1,43 @@
+---------------------------
+ComplyEaze Bridge — post 10 vouchers?
+---------------------------
+Create 10 vouchers in "BRIDGE BATCH LAB"
+Company GUID: a30f23c3-4819-4334-96ab-ffa6fba70976
+Company number: 100050  Books from: 20260401
+Tally: http://127.0.0.1:9001
+Types: 2 Contra, 4 Payment, 4 Receipt
+Dates: 20260715 to 20260715  Voucher numbers: Tally assigns them
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted exactly as it will be posted.
+Payment 20260715  1100  "Party C"  "Lab batch S3 row 01"
+Payment 20260715  210.5  "Lab Charges"  "Lab batch S3 row 02"
+Payment 20260715  320.25  "Party C"  "Lab batch S3 row 03"
+Payment 20260715  45.75  "Lab Charges"  "Lab batch S3 row 04"
+Receipt 20260715  2500  "Party A"  "Lab batch S3 row 05"
+Receipt 20260715  1750.4  "Party B"  "Lab batch S3 row 06"
+Receipt 20260715  640.1  "Party A"  "Lab batch S3 row 07"
+Receipt 20260715  99.99  "Party B"  "Lab batch S3 row 08"
+Contra 20260715  300  "Cash"  "Lab batch S3 row 09"
+Contra 20260715  150  "Cash"  "Lab batch S3 row 10"
+
+Dr 450  Cr 0  2 entries  "Cash"
+Dr 256.25  Cr 0  2 entries  "Lab Charges"
+Dr 0  Cr 3140.1  2 entries  "Party A"
+Dr 0  Cr 1850.39  2 entries  "Party B"
+Dr 1420.25  Cr 0  2 entries  "Party C"
+Dr 4990.49  Cr 2126.5  10 entries  "Synthetic Bank Ledger"
+
+Total debit: 7116.99  Total credit: 7116.99
+Money in by Receipt vouchers: 4990.49
+Money out by Payment vouchers: 1676.5
+Contra: moves between cash/bank ledgers, net zero
+Batch: bridge-5fa159f9-2452-48cf-9f93-0437144e5d66
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---------------------------
+Yes   No   Cancel   
+---------------------------

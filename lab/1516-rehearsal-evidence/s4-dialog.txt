@@ -1,0 +1,32 @@
+﻿---------------------------
+ComplyEaze Bridge — post 50 vouchers?
+---------------------------
+Create 50 vouchers in "BRIDGE BATCH LAB"
+Company GUID: a30f23c3-4819-4334-96ab-ffa6fba70976
+Company number: 100050  Books from: 20260401
+Tally: http://127.0.0.1:9001
+Types: 10 Contra, 20 Payment, 20 Receipt
+Dates: 20260716 to 20260720  Voucher numbers: Tally assigns them
+Per-voucher lines are not shown: this batch has over 10 vouchers.
+
+Dr 18095  Cr 0  10 entries  "Cash"
+Dr 18030  Cr 0  10 entries  "Lab Charges"
+Dr 0  Cr 18060  10 entries  "Party A"
+Dr 0  Cr 18070  10 entries  "Party B"
+Dr 18020  Cr 0  10 entries  "Party C"
+Dr 36130  Cr 54145  50 entries  "Synthetic Bank Ledger"
+
+Total debit: 90275  Total credit: 90275
+Money in by Receipt vouchers: 36130
+Money out by Payment vouchers: 36050
+Contra: moves between cash/bank ledgers, net zero
+Batch: bridge-4e014308-d72c-4c75-b1c9-d238dfe80c25
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---------------------------
+Yes   No   Cancel   
+---------------------------

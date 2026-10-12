@@ -71,3 +71,7 @@ b4bd99a9ace9f892a322582ccec0b24b3266e1172c6c2946dc7630f07e733e46  w14-company-fe
 f30857f4c17609f32e12136e3ca0d8a36f12761d81cd4b945ca4ed140883244b  make-w15-request.py
 5f48973b2fecc784f48c945ec10ebee7b34316b68f6466266c66930064a7f1be  check-w15-answer.py
 173bc41a8d351634475baa1a25a920c67b37441c66ab5b144178119080eeeb37  check-request-ids.py
+# W16 (the ledger, group and company reads of the HSN/SAC check; steps in W16-README.md; derived from w7-ledgers-rates.xml and ../r07-groups.xml by adding field names only)
+03de8fa7e3e3477a527e2a1ecf4c0c69a2bf2d190fa76b5c8def9e595eb94c5e  w16-ledger-rates-hsn.xml
+237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02  w16-groups-hsn.xml
+e92e7ceb6e4923f9d5796a48c8c7afc476cdcd05718ae20a5589e6c22af5ce12  W16-README.md

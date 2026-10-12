@@ -96,8 +96,6 @@ pub use text_encoding::{
 pub use tolerant_xml::mark_forbidden_numeric_references;
 
 pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";
-pub const BRIDGE_GROUP_EXPORT_SCHEMA: &str = "bridge.tally.groups/1";
-pub const BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA: &str = "bridge.tally.voucher-types/1";
 pub const BRIDGE_VOUCHER_EXPORT_SCHEMA: &str = "bridge.tally.vouchers/2";
 pub const BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA: &str = "bridge.tally.ledger-period-balances/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;
@@ -788,117 +786,6 @@ fn parse_gateway_yes_no(value: &str, label: &str) -> anyhow::Result<bool> {
     } else {
         anyhow::bail!("company capability collection returned an invalid {label} flag")
     }
-}
-
-pub fn parse_group_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    parse_named_master_source_records(xml, b"GROUP", BRIDGE_GROUP_EXPORT_SCHEMA, "GROUP")
-}
-
-pub fn parse_voucher_type_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    parse_named_master_source_records(
-        xml,
-        b"VOUCHERTYPE",
-        BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA,
-        "VOUCHERTYPE",
-    )
-}
-
-fn parse_named_master_source_records(
-    xml: &str,
-    element_name: &[u8],
-    schema: &str,
-    object_type: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    // Mark forbidden references before anything reads the text, as the native
-    // collection parsers do (§1.1(d)), so `&#4; Primary` reads as the marker
-    // and not as a raw U+0004. Row hashes still attest the original bytes.
-    let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
-    let text = sanitized.as_str();
-    validate_export_response(text)?;
-    let evidence = scan_export_evidence(text)?;
-    let mut reader = configured_reader(text);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if is_supported_export_parent(&path)
-                    && element
-                        .name()
-                        .as_ref()
-                        .as_bytes()
-                        .eq_ignore_ascii_case(element_name) =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&element, b"ALTERID");
-                let name = attr_value(&element, b"NAME").unwrap_or_default();
-                let record = parse_named_master(&mut reader, element_name, name)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256_from_sanitized(
-                        &sanitized,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Empty(element)
-                if is_supported_export_parent(&path)
-                    && element
-                        .name()
-                        .as_ref()
-                        .as_bytes()
-                        .eq_ignore_ascii_case(element_name) =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                records.push(ParsedSourceRecord {
-                    record: TallyNamedMaster {
-                        name: attr_value(&element, b"NAME").unwrap_or_default(),
-                        parent: PartyLedgerMasterFieldObservation::NotObserved,
-                        reserved_name: None,
-                    },
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id: attr_value(&element, b"ALTERID"),
-                    raw_source_sha256: source_fragment_sha256_from_sanitized(
-                        &sanitized,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Start(element) => {
-                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
-            }
-            Event::End(element) => {
-                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    validate_scoped_export(&evidence, schema, object_type, records.len())?;
-    Ok(ParsedExport { records, evidence })
 }
 
 pub fn parse_ledgers(xml: &str) -> anyhow::Result<Vec<TallyLedger>> {
@@ -2162,22 +2049,6 @@ fn insert_period_context_field(
     Ok(())
 }
 
-pub fn parse_vouchers(xml: &str) -> anyhow::Result<Vec<TallyVoucher>> {
-    Ok(parse_vouchers_with_evidence(xml)?.records)
-}
-
-pub fn parse_vouchers_with_evidence(xml: &str) -> anyhow::Result<ParsedExport<TallyVoucher>> {
-    let parsed = parse_voucher_source_records_with_evidence(xml)?;
-    Ok(ParsedExport {
-        records: parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect(),
-        evidence: parsed.evidence,
-    })
-}
-
 pub fn parse_voucher_source_records_with_evidence(
     xml: &str,
 ) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyVoucher>>> {
@@ -3121,50 +2992,6 @@ fn parse_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyCompany
         }
     }
     Ok(company)
-}
-
-fn parse_named_master(
-    reader: &mut Reader<&[u8]>,
-    element_name: &[u8],
-    name: String,
-) -> anyhow::Result<TallyNamedMaster> {
-    let mut record = TallyNamedMaster {
-        name,
-        parent: PartyLedgerMasterFieldObservation::NotObserved,
-        reserved_name: None,
-    };
-    let mut parent_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally master row repeated PARENT");
-                }
-                record.parent = PartyLedgerMasterFieldObservation::Returned(
-                    read_identifier_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::End(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .as_bytes()
-                    .eq_ignore_ascii_case(element_name) =>
-            {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally master row contained an unexpected field");
-            }
-            Event::Text(text) if !text.trim().is_empty() => {
-                anyhow::bail!("Tally master row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally master response ended before its row closed"),
-            _ => {}
-        }
-    }
-    Ok(record)
 }
 
 fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Result<TallyLedger> {

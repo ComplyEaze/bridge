@@ -556,7 +556,7 @@ async fn an_invalid_book_extent_stops_the_ledger_read_before_any_ledger_request(
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         observed.name.clone(),
-        observed.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
         observed.company_number.clone().unwrap(),
         observed.books_from.clone().unwrap(),
         &companies,

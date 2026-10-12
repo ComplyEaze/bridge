@@ -205,15 +205,6 @@ pub(super) fn drop_tally_line_error_text(value: &mut Value) -> bool {
     }
 }
 
-/// How little of a computed `transfers` section may be left.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum SectionFloor {
-    /// The counts alone: the check ran, and a page that is cut keeps saying so.
-    CountsOnly,
-    /// A note that the check is to be run again, when not even the counts fit.
-    Note,
-}
-
 /// The computed `transfers` section of a result, if it has one.
 fn computed_section(response: &Value, structured_path: &str) -> Option<Value> {
     response
@@ -222,17 +213,16 @@ fn computed_section(response: &Value, structured_path: &str) -> Option<Value> {
         .cloned()
 }
 
-/// Put `original` into the result as wide as the real encoded response allows:
-/// as many open rows as fit (the rest counted in `open_omitted`), then the
-/// counts alone, then, if the floor allows, a note that the check is to be run
-/// again. Whether the response fits.
+/// Put `original` into the result as wide as the real encoded response allows,
+/// largest first: as many open rows as fit (the rest counted in `open_omitted`),
+/// then the counts alone, then a note that the check is to be run again.
+/// Whether the response fits.
 fn fit_section(
     response: &mut Value,
     structured_path: &str,
     max_bytes: usize,
     encoded_len: &mut impl FnMut(&mut Value) -> usize,
     original: &Value,
-    floor: SectionFloor,
 ) -> bool {
     let pointer = format!("{structured_path}/result/transfers");
     // a statement of only skipped rows has no batch to verify
@@ -262,7 +252,7 @@ fn fit_section(
         Some(keep) => place(response, trim_section(original, keep)),
         None => {
             place(response, counts_only_section(original))
-                || (floor == SectionFloor::Note && place(response, check_not_run_section(recorded)))
+                || place(response, check_not_run_section(recorded))
         }
     }
 }
@@ -320,33 +310,42 @@ fn fit_response(
             return Ok(false);
         }
     }
-    // The transfers section is the least essential part of a result, so its
-    // open rows go before any row of a page does. A page keeps at least the
-    // counts of a check that ran; a result with no page may fall back to a note.
-    // Everything below returns true when anything was cut, the section's rows
-    // included: `truncated` on the whole answer is the conservative reading.
+    // The transfers section is the least essential part of a result, so it gives
+    // way before any row of a page does, in this order:
+    //   1. the page at full width, with the widest section that fits beside it
+    //      (open rows, then the counts, then a note that the check is to be run
+    //      again): the page is not cut if any of them fits;
+    //   2. otherwise the page trimmed, with the note beside it, as wide as it
+    //      goes;
+    //   3. then the section widened again into what the trimmed page leaves.
+    // A result with no computed section takes only the page step, as it always
+    // did. Everything here returns true when anything was cut, the section's
+    // rows included: `truncated` on the whole answer is the conservative reading.
     let section = computed_section(response, structured_path);
-    let page = response.pointer(structured_path).and_then(page_shape);
     if let Some(section) = &section {
-        let floor = if page.is_some() {
-            SectionFloor::CountsOnly
-        } else {
-            SectionFloor::Note
-        };
         if fit_section(
             response,
             structured_path,
             max_bytes,
             &mut encoded_len,
             section,
-            floor,
         ) {
             return Ok(true);
         }
     }
-    let (shape, width) = page.ok_or_else(|| "agent_response_too_large".to_string())?;
-    let original = response.clone();
-    let mut best = trim_page(
+    let (shape, width) = response
+        .pointer(structured_path)
+        .and_then(page_shape)
+        .ok_or_else(|| "agent_response_too_large".to_string())?;
+    let mut original = response.clone();
+    if section.is_some() {
+        // A result with a page is a batch's or a verification's, never a
+        // statement of only skipped rows, so the note is the batch's.
+        if let Some(slot) = original.pointer_mut(&format!("{structured_path}/result/transfers")) {
+            *slot = check_not_run_section(false);
+        }
+    }
+    let trimmed = trim_page(
         &original,
         structured_path,
         shape,
@@ -354,25 +353,7 @@ fn fit_response(
         max_bytes,
         &mut encoded_len,
     )?;
-    if best.is_none() && section.is_some() {
-        // not even one page row fits beside the counts: a note takes less room.
-        // A result with a page is a batch's or a verification's, never a
-        // statement of only skipped rows, so the note is the batch's.
-        let mut noted = original.clone();
-        if let Some(slot) = noted.pointer_mut(&format!("{structured_path}/result/transfers")) {
-            *slot = check_not_run_section(false);
-        }
-        best = trim_page(
-            &noted,
-            structured_path,
-            shape,
-            width,
-            max_bytes,
-            &mut encoded_len,
-        )?;
-    }
-    *response = best.ok_or_else(|| "agent_response_too_large".to_string())?;
-    // what the trimmed page leaves room for goes back to the section
+    *response = trimmed.ok_or_else(|| "agent_response_too_large".to_string())?;
     if let Some(section) = &section {
         fit_section(
             response,
@@ -380,7 +361,6 @@ fn fit_response(
             max_bytes,
             &mut encoded_len,
             section,
-            SectionFloor::Note,
         );
     }
     Ok(true)

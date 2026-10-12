@@ -810,23 +810,88 @@ fn a_recorded_statement_that_cannot_keep_its_section_is_told_the_next_call_will_
     );
 }
 
-/// The counts of a check that ran are not traded for more page rows, however
-/// small the rows: the note would make room, and it is not used while the counts
-/// fit beside some rows.
+fn small_page(items: usize, section: Value) -> Value {
+    json!({"result": {"offset": 0, "verification_status": "posted_verified",
+        "items": (0..items).map(|id| json!({"id": id})).collect::<Vec<_>>(),
+        "transfers": section}})
+}
+
+/// A page that fits beside the note at full width is not cut, however many open
+/// rows the section has and however little room the counts would need.
 #[test]
-fn a_page_is_not_cut_further_to_make_room_for_a_note_over_the_counts() {
+fn a_page_that_fits_with_the_note_at_full_width_is_not_cut() {
     let section = transfers_section(40);
-    let page = |items: usize, section: Value| {
-        json!({"result": {"offset": 0, "verification_status": "posted_verified",
-            "items": (0..items).map(|id| json!({"id": id})).collect::<Vec<_>>(),
-            "transfers": section}})
-    };
-    let mut five = page(60, counts_only_section(&section));
-    retain_page_width(&mut five, PageShape::Rows("items"), 5).unwrap();
-    let cap = len_of(&five) + 8;
-    let mut response = page(60, section);
+    let cap = len_of(&small_page(30, check_not_run_section(false))) + 5;
+    assert!(len_of(&small_page(30, counts_only_section(&section))) > cap);
+    let mut response = small_page(30, section);
     assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
-    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 5);
-    assert_eq!(response["result"]["transfers"]["state"], "computed");
-    assert_eq!(response["result"]["transfers"]["open_omitted"], 40);
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 30);
+    assert!(response["result"].get("next_offset").is_none());
+    assert_eq!(response["result"]["transfers"]["state"], "not_established");
+    assert!(len_of(&response) <= cap);
+}
+
+/// A page of one row, or none, has no width to give up: the section is what
+/// gives way, down to the note.
+#[test]
+fn a_page_of_one_row_or_none_keeps_its_rows_and_the_section_gives_way_to_the_note() {
+    let section = transfers_section(40);
+    for rows in [0, 1] {
+        let cap = len_of(&small_page(rows, check_not_run_section(false))) + 5;
+        assert!(len_of(&small_page(rows, counts_only_section(&section))) > cap);
+        let mut response = small_page(rows, section.clone());
+        assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+        assert_eq!(response["result"]["items"].as_array().unwrap().len(), rows);
+        assert_eq!(response["result"]["transfers"]["state"], "not_established");
+        assert!(len_of(&response) <= cap);
+    }
+}
+
+/// A page whose rows alone overflow is trimmed with the note beside it, and the
+/// section is then widened into what is left. Here the trimmed page leaves room
+/// for the note and not the counts.
+#[test]
+fn an_overflowing_page_is_trimmed_beside_the_note_and_the_section_widened_after() {
+    let section = transfers_section(40);
+    let mut fifteen = small_page(60, check_not_run_section(false));
+    retain_page_width(&mut fifteen, PageShape::Rows("items"), 15).unwrap();
+    let cap = len_of(&fifteen) + 8;
+    let mut response = small_page(60, section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 15);
+    assert_eq!(response["result"]["transfers"]["state"], "not_established");
+    assert!(len_of(&response) <= cap);
+}
+
+/// With no computed section the page is trimmed exactly as it always was, and
+/// a page that cannot fit fails.
+#[test]
+fn a_result_with_no_computed_section_takes_the_old_path() {
+    for transfers in [
+        None,
+        Some(json!({"state": "not_established", "next_steps": {}})),
+    ] {
+        let page = |items: usize| {
+            let mut page = small_page(items, Value::Null);
+            match &transfers {
+                Some(section) => page["result"]["transfers"] = section.clone(),
+                None => {
+                    page["result"].as_object_mut().unwrap().remove("transfers");
+                }
+            }
+            page
+        };
+        let mut five = page(60);
+        retain_page_width(&mut five, PageShape::Rows("items"), 5).unwrap();
+        let cap = len_of(&five) + 3;
+        let mut response = page(60);
+        assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+        assert_eq!(response["result"]["items"].as_array().unwrap().len(), 5);
+        assert_eq!(response["result"].get("transfers"), transfers.as_ref());
+        // a page of one row that does not fit fails
+        let mut one = page(1);
+        assert!(fit_response(&mut one, "", 20, |value| len_of(value)).is_err());
+        let mut none = page(0);
+        assert!(fit_response(&mut none, "", 20, |value| len_of(value)).is_err());
+    }
 }

@@ -203,9 +203,6 @@
       "path": "src-tauri/crates/bridge-tally-core/src/report_tie_out.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-core/src/transport_qualification.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-primitives/Cargo.toml"
     },
     {
@@ -329,27 +326,6 @@
       "path": "src-tauri/crates/bridge-tally-protocol/src/native_trial_balance/wire.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/completeness.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/compute.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/mod.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/model.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/parser.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/request.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings/wire.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs"
     },
     {
@@ -399,9 +375,6 @@
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/README.md"
-    },
-    {
-      "path": "src-tauri/crates/tally-protocol-simulator/fixtures/inconsistent_date_filter.xml"
     },
     {
       "path": "src-tauri/crates/tally-protocol-simulator/src/fixtures.rs"
@@ -673,9 +646,6 @@
       "path": "src-tauri/src/db/tally_mirror.rs"
     },
     {
-      "path": "src-tauri/src/db/tally_write_store.rs"
-    },
-    {
       "path": "src-tauri/src/endpoint_coordination.rs"
     },
     {
@@ -828,9 +798,6 @@
       "path": "src-tauri/src/tally/canonical_window.rs"
     },
     {
-      "path": "src-tauri/src/tally/capability_packs.rs"
-    },
-    {
       "path": "src-tauri/src/tally/connection.rs"
     },
     {
@@ -838,9 +805,6 @@
     },
     {
       "path": "src-tauri/src/tally/mod.rs"
-    },
-    {
-      "path": "src-tauri/src/tally/outstandings_runtime.rs"
     },
     {
       "path": "src-tauri/src/tally/runtime.rs"

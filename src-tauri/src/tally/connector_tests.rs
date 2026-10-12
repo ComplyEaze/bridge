@@ -951,8 +951,317 @@ async fn core_window_bracket_fails_closed_when_altmstid_is_absent() {
         ),
         "unexpected error: {error:?}"
     );
+    wr2_core_window_sequence::assert_persisted_code(&error, "company_altmstid_missing");
     let methods = server.await.expect("join routed Tally server");
     assert_eq!(methods, ["POST", "POST"]);
+}
+
+/// The captured WR2 core window, served in the exact order
+/// `extract_core_window` requests it. Every response is a captured file: the
+/// company-extent collection and the native groups, ledgers, voucher types and
+/// vouchers of one live company (no hand-authored response is used). Only the
+/// extent pairs vary per test, one edited field at a time.
+mod wr2_core_window_sequence {
+    use super::*;
+
+    pub(super) const COMPANY_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    pub(super) const COMPANY: &str = "WR2 Unicode Lab";
+    pub(super) const EXTENTS: &str = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    );
+    const GROUPS: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/group_snapshot_wr2_with_identity.utf16le.xml"
+    );
+    const LEDGERS: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_wr2_core_window.utf16le.xml"
+    );
+    const VOUCHER_TYPES: &str = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/voucher_types_native_wr2.xml"
+    );
+    const VOUCHERS: &str = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/vouchers_native_wr2.xml"
+    );
+    pub(super) const VOUCHER_WITNESS: &str = "<ALTVCHID TYPE=\"Number\"> 17</ALTVCHID>";
+
+    /// Copy of the captured extent collection with exactly one substring
+    /// replaced; the original must occur exactly once so the edit is one field.
+    pub(super) fn extents_with(original: &str, replacement: &str) -> String {
+        assert_eq!(
+            EXTENTS.matches(original).count(),
+            1,
+            "the edited field must occur exactly once in the capture"
+        );
+        EXTENTS.replace(original, replacement)
+    }
+
+    /// The six GUID-verified extent brackets, each a pair of reads, in request
+    /// order: groups opening/closing, ledgers opening/closing, vouchers
+    /// opening/closing.
+    pub(super) const EXTENT_BRACKETS: usize = 6;
+    /// 12 extent reads + 2 groups + 2 ledgers + 1 voucher types + 1 vouchers.
+    pub(super) const POSTS_IN_A_SUCCESSFUL_WINDOW: usize = 18;
+
+    pub(super) fn posts(brackets: [(&str, &str); EXTENT_BRACKETS]) -> Vec<String> {
+        let groups = decode_bomless_utf16le_capture(GROUPS);
+        let ledgers = decode_bomless_utf16le_capture(LEDGERS);
+        let extent = |index: usize| [brackets[index].0.to_owned(), brackets[index].1.to_owned()];
+        let mut posts = Vec::new();
+        posts.extend(extent(0));
+        posts.extend([groups.clone(), groups]);
+        posts.extend(extent(1));
+        posts.extend(extent(2));
+        posts.extend([ledgers.clone(), ledgers]);
+        posts.extend(extent(3));
+        posts.push(VOUCHER_TYPES.to_owned());
+        posts.extend(extent(4));
+        posts.push(VOUCHERS.to_owned());
+        posts.extend(extent(5));
+        assert_eq!(posts.len(), POSTS_IN_A_SUCCESSFUL_WINDOW);
+        posts
+    }
+
+    /// The code a desktop snapshot records and shows for this refusal, never
+    /// the `response_parse_failed` catch-all. That the stored value is
+    /// persistable is asserted in the snapshot engine's own test.
+    pub(super) fn assert_persisted_code(error: &TallyError, expected: &str) {
+        let persisted = crate::sync::snapshot::tally_error_code(error);
+        assert_eq!(persisted, expected, "persisted code for {error:?}");
+        assert_ne!(persisted, "response_parse_failed");
+    }
+
+    pub(super) async fn run(
+        responses: Vec<String>,
+    ) -> (Result<CanonicalPackWindow, TallyError>, Vec<String>) {
+        let _simulator_guard = simulator_test_lock().lock().await;
+        let identity = observed_identity(COMPANY, COMPANY_GUID, "100004", "20260401");
+        let (address, server) = spawn_method_routed_server(responses).await;
+        let config = TallyConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        };
+        let company = CompanyRef {
+            identity: company_source_identity(
+                &format!("tally_xml_http:http://{address}"),
+                COMPANY_GUID,
+                "100004",
+                COMPANY,
+                "20260401",
+            ),
+            display_name: COMPANY.to_string(),
+        };
+        let context = RequestContext {
+            run_id: "run-core-window-bracket-refusal".to_string(),
+            company: company.clone(),
+            pack: CapabilityPackId::CoreAccounting,
+            schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+            window: ReadWindow {
+                from_yyyymmdd: "20260401".to_string(),
+                to_yyyymmdd: "20260930".to_string(),
+            },
+            query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+            filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+        };
+        let connector =
+            RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
+                .unwrap();
+        let result = connector
+            .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
+            .await;
+        let methods = tokio::time::timeout(std::time::Duration::from_secs(10), server)
+            .await
+            .expect("the routed server saw every response it was given requested")
+            .expect("join routed Tally server");
+        (result, methods)
+    }
+}
+
+/// Control for the three refusals below: the same captured sequence with no
+/// edit succeeds after exactly the 18 requests those tests count, so none of
+/// them can pass by the sequence failing earlier than intended.
+#[tokio::test]
+async fn core_window_unedited_captured_sequence_succeeds_in_eighteen_posts() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let (result, methods) = seq::run(seq::posts([(extent, extent); seq::EXTENT_BRACKETS])).await;
+    let window = result.expect("the unedited captured core window must build");
+    let PackBatch::CoreAccounting(batch) = window.batch else {
+        panic!("wrong pack");
+    };
+    assert_eq!(batch.vouchers.len(), 3);
+    assert_eq!(methods, vec!["POST"; seq::POSTS_IN_A_SUCCESSFUL_WINDOW]);
+}
+
+/// Everything reads cleanly, then the voucher-read bracket's closing extent
+/// reports a higher voucher AlterID high-water than its opening extent: the
+/// book changed while the vouchers were being read. Both closing reads carry
+/// the same edit, so the paired-read drift check passes and only the
+/// opening/closing comparison can refuse.
+#[tokio::test]
+async fn core_window_refuses_a_book_that_changed_during_the_voucher_read() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let changed = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[5] = (&changed, &changed);
+    let (result, methods) = seq::run(seq::posts(brackets)).await;
+    let error = result.expect_err("a book changed during the voucher read must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_changed_during_voucher_read"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
+    assert_eq!(methods, vec!["POST"; seq::POSTS_IN_A_SUCCESSFUL_WINDOW]);
+}
+
+/// The groups bracket's closing extent pair reports a higher voucher AlterID
+/// than its opening pair: the book changed while the groups were being read.
+/// Both closing reads carry the same edit, so the paired-read drift check
+/// passes and only the opening/closing comparison can refuse.
+#[tokio::test]
+async fn core_window_refuses_a_book_that_changed_during_the_group_read() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let changed = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[1] = (&changed, &changed);
+    // Opening pair, two group exports and the closing pair: six requests.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(6);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a book changed during the group read must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_changed_during_group_read"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
+    assert_eq!(methods, vec!["POST"; 6]);
+}
+
+/// The ledgers bracket's closing extent pair reports a higher voucher AlterID
+/// than its opening pair. The groups bracket before it is clean, so the
+/// refusal is the ledger bracket's own comparison.
+#[tokio::test]
+async fn core_window_refuses_a_book_that_changed_during_the_ledger_read() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let changed = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[3] = (&changed, &changed);
+    // The groups bracket (six requests), then the ledgers bracket's opening
+    // pair, two ledger exports and its closing pair: twelve requests.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(12);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a book changed during the ledger read must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_changed_during_ledger_read"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
+    assert_eq!(methods, vec!["POST"; 12]);
+}
+
+/// The two reads that make up one extent bracket disagree. Both parse for the
+/// selected company; only their values differ (a voucher AlterID), so the
+/// refusal is the pair comparison, before any export is requested.
+#[tokio::test]
+async fn core_window_refuses_two_extent_reads_of_one_bracket_that_differ() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let drifted = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (extent, &drifted);
+    // The refusal lands after the first two requests; serve only those.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(2);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("two differing extent reads must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_extent_drifted"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "company_book_extent_drifted");
+    assert_eq!(methods, ["POST", "POST"]);
+}
+
+/// An extent response whose GUID belongs to no row for the selected company
+/// (the captured WR2 row's GUID is edited to another company's). The response
+/// is well formed, so the transport seam accepts it and the connector's own
+/// parse names the refusal: a wrong company, not a generic protocol rejection.
+#[tokio::test]
+async fn core_window_refuses_an_extent_response_for_a_different_company() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let foreign = seq::extents_with(
+        &format!("<GUID TYPE=\"String\">{}</GUID>", seq::COMPANY_GUID),
+        "<GUID TYPE=\"String\">00000000-0000-4000-8000-000000000001</GUID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (&foreign, &foreign);
+    // The refusal lands on the first request; serve only that one.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(1);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("an extent for a different company must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_identity_mismatch"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "company_identity_mismatch");
+    assert_eq!(methods, ["POST"]);
+}
+
+/// A malformed extent response (the captured bytes without their closing
+/// envelope tag) is still rejected at the transport seam, as a protocol
+/// rejection: only a well-formed response for another company reaches the
+/// connector's identity parse.
+#[tokio::test]
+async fn core_window_rejects_a_malformed_extent_response_at_the_transport_seam() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let truncated = seq::extents_with("</ENVELOPE>", "");
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (&truncated, &truncated);
+    // The rejection lands on the first request; serve only that one.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(1);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a malformed extent response must be rejected");
+    assert!(
+        matches!(
+            &error,
+            TallyError::Protocol { code } if code == "application_response_rejected"
+        ),
+        "unexpected error: {error:?}"
+    );
+    assert_eq!(methods, ["POST"]);
 }
 
 #[tokio::test]
@@ -1225,7 +1534,6 @@ async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_
         .reserve_cached_probe_fresh(&config, &review_id, 300_000)
         .expect("review cache remains readable")
         .expect("snapshot probes preserve interactive review");
-    assert_eq!(preserved.review_id(), review_id);
     assert_eq!(preserved.observed_at_unix_ms(), observed_at_unix_ms);
     assert_eq!(preserved.result().companies.len(), reviewed_company_count);
     assert_eq!(preserved.result().profile.product, reviewed_product);

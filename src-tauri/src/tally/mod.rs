@@ -1,10 +1,7 @@
 pub(crate) mod agent_read_request;
 pub(crate) mod approved_import;
-pub mod capability_packs;
 pub mod connection;
 pub mod connector;
-#[cfg(feature = "voucher-scan")]
-pub(crate) mod outstandings_runtime;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.
@@ -15,19 +12,17 @@ pub mod xml_parser;
 // Crate-internal only: `tally::connector` is the sole consumer.
 mod canonical_window;
 
-pub use bridge_tally_core as core;
-pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult, TallyProduct};
+pub use connection::{ConnectionStatus, TallyClient, TallyConfig, TallyProbeResult};
 pub(crate) use connector::core_snapshot_start_authorized_codes;
 pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CachedProbeReservation, CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow,
-    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
-    OutstandingsPartialReason, OutstandingsReadStrategy, TallyRuntime, TallySessionSnapshot,
-    UnallocatedComposition, UnallocatedParty,
+    CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
+    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason, TallyRuntime,
+    TallySessionSnapshot, UnallocatedComposition, UnallocatedParty,
 };
-pub use xml_parser::{TallyCompany, TallyImportResult, TallyLedger, TallyVoucher};
+pub use xml_parser::{TallyCompany, TallyLedger};
 
 /// A complete company tuple that a fresh Company collection has matched once.
 ///
@@ -122,30 +117,6 @@ impl VerifiedCompanyIdentity {
             books_from_yyyymmdd: bridge_tally_core::TallyDate::parse("20260401")
                 .expect("fixed fixture date is valid"),
         }
-    }
-
-    #[cfg(feature = "live-calibration-harness")]
-    pub fn live_calibration_harness_identity(
-        display_name: impl Into<String>,
-        company_guid: impl Into<String>,
-    ) -> Self {
-        let display_name = display_name.into();
-        let company_guid = company_guid.into();
-        let parsed_guid = bridge_tally_core::company_guid::CompanyGuid::parse(&company_guid)
-            .expect("the calibration fixture company GUID is strict-shaped");
-        Self::from_observed_companies(
-            display_name.clone(),
-            parsed_guid,
-            "1".to_string(),
-            "20260401".to_string(),
-            &[TallyCompany {
-                name: display_name,
-                guid: Some(company_guid),
-                company_number: Some("1".to_string()),
-                books_from: Some("20260401".to_string()),
-            }],
-        )
-        .expect("the fixed calibration fixture is one complete company tuple")
     }
 
     pub(crate) fn display_name(&self) -> &str {

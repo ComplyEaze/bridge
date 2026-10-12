@@ -109,7 +109,28 @@ pub(super) fn publish_proofs(
     json: &[u8],
     markdown: &[u8],
     append_status: impl FnOnce(&ledger::StatusRecord) -> Result<(), String>,
+    before: impl FnMut(PublicationStep) -> Result<(), String>,
+) -> Result<ledger::ProofName, String> {
+    publish_proofs_syncing(
+        imports,
+        update,
+        json,
+        markdown,
+        append_status,
+        before,
+        sync_directory,
+    )
+}
+
+/// [`publish_proofs`] with the directory sync given, so a test can fail it.
+fn publish_proofs_syncing(
+    imports: &Path,
+    update: &ImportLedgerLine,
+    json: &[u8],
+    markdown: &[u8],
+    append_status: impl FnOnce(&ledger::StatusRecord) -> Result<(), String>,
     mut before: impl FnMut(PublicationStep) -> Result<(), String>,
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
 ) -> Result<ledger::ProofName, String> {
     let name = ledger::ProofName::of(json, Utc::now());
     before(PublicationStep::WriteJson)?;
@@ -119,7 +140,9 @@ pub(super) fn publish_proofs(
         &imports.join(name.markdown_file(&update.batch_id)),
         markdown,
     )?;
-    sync_directory(imports);
+    // The status record appended next names this pair: it must not be durable
+    // before the pair is. A failure refuses, leaving files no record names.
+    sync(imports).map_err(|_| "import_file_write_failed".to_string())?;
     let record = ledger::StatusRecord::verified(update, name.clone());
     before(PublicationStep::MarkAppend)?;
     let transaction = imports.join(TRANSACTION);
@@ -183,8 +206,21 @@ pub(super) enum RecordOnce {
 /// record whole and alone or absent, never with a second link, which every
 /// reader refuses (`open_local_file`). A stage that is not placed is removed.
 ///
+/// When the directory sync that makes the new name durable fails, the record is
+/// in place but not known durable: the result is `Failed`, the file stays whole,
+/// and a retry finds `Exists`.
+///
 /// [`rename_new`]: crate::local_files::file::rename_new
 pub(super) fn write_record_once(path: &Path, bytes: &[u8]) -> Result<(), RecordOnce> {
+    write_record_once_syncing(path, bytes, sync_directory)
+}
+
+/// [`write_record_once`] with the directory sync given, so a test can fail it.
+fn write_record_once_syncing(
+    path: &Path,
+    bytes: &[u8],
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<(), RecordOnce> {
     let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
     if write_private(&staged, bytes).is_err() {
         let _ = fs::remove_file(&staged);
@@ -194,8 +230,7 @@ pub(super) fn write_record_once(path: &Path, bytes: &[u8]) -> Result<(), RecordO
         Ok(()) => {
             // Make the new name durable; a record lost to a power failure
             // reads as absent, never as someone else's.
-            sync_directory(path.parent().unwrap_or(path));
-            Ok(())
+            sync(path.parent().unwrap_or(path)).map_err(|_| RecordOnce::Failed)
         }
         Err(error) => {
             let _ = fs::remove_file(&staged);
@@ -208,13 +243,18 @@ pub(super) fn write_record_once(path: &Path, bytes: &[u8]) -> Result<(), RecordO
     }
 }
 
-fn sync_directory(directory: &Path) {
+/// Make the entries of `directory` durable. Windows has no directory handle to
+/// sync, so there this does nothing and succeeds.
+pub(super) fn sync_directory(directory: &Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
-        let _ = fs::File::open(directory).and_then(|directory| directory.sync_all());
+        fs::File::open(directory)?.sync_all()
     }
     #[cfg(not(unix))]
-    let _ = directory;
+    {
+        let _ = directory;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

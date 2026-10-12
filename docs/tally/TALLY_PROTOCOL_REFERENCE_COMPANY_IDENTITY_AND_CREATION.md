@@ -161,7 +161,7 @@ not a financial report, another endpoint, a compatibility cell, or accounting
 writes. V1 remains for historical corpus interpretation; production extent reads
 use V2 without fallback.
 
-### 9.11e The audit read's company part is the one admitted Object export — **CODE; live unmeasured**
+### 9.11e The audit read's company part is the one admitted Object export — **PARTIAL: shape measured live once; failure cases unmeasured**
 
 **Code, 2026-09-21.** Every agent read passes `AgentReadRequest::parse`, which admits
 only an `Export` of `TYPE=Collection`. The tally-read v1 read also needs a `company` part
@@ -199,21 +199,45 @@ never through `parse`:
     name comparison could refuse the right company. The GUID and `BOOKSFROM` already bind
     the part.
 
+**Measured 2026-10-12 (VERIFIED for the shape, on one book).** The request above, as Bridge
+renders and encodes it, was sent once with curl (not Bridge's transport) to a lab TallyPrime
+7.1 (`PRODMAJORREL`/`PRODMINORREL` in the answer) for a synthetic company, `BRIDGE BATCH LAB`:
+HTTP 200, 4,216 bytes of BOM-less UTF-16LE, `STATUS` `1`, only CRLF after `</ENVELOPE>`. The
+bytes of the request (896, with a BOM) and the answer are committed with their hashes in
+[`COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md`](../../src-tauri/crates/bridge-tally-protocol/tests/fixtures/COMPANY_AUDIT_OBJECT_CAPTURE_PROVENANCE.md).
+One test proves the profile renders and encodes to those request bytes; another admits the
+answer for the verified GUID and `BOOKSFROM` (`audit_company_part_tests.rs`). Bridge's own
+HTTP framing and admission on a live dispatch were not exercised.
+
+- There is one `DATA/TALLYMESSAGE` with one `COMPANY` child, whose `NAME` attribute is the
+  company name. `GUID` and `BOOKSFROM` occur once each in the whole document.
+- **An explicit `FETCHLIST` narrowed this single-object Company export (inferred: the control
+  is another book).** The answer has 56 distinct tags and the `COMPANY` 7 children, against
+  the 565 distinct tags of the `FETCH *` answer in §9.11a, which was a different book; no
+  same-book `FETCH *` was sent. The four named fields came back (`BOOKSFROM`, `NAME`, `GUID`, `ISINTEGRATED` = `No`)
+  with three that the list does not name: `ISDEEMEDPOSITIVE` (empty), `CANDELETE` (`No`) and
+  `MASTERID` (`29`). So the answer is not limited to the list, and admission still checks
+  the fields the consumers need, not the absence of the rest.
+- The only other `COMPANY` element is `DESC/CMPINFO/COMPANY`, which read `2`, with no children
+  and no GUID. With one company loaded the counter read `2`; this is recorded as observed
+  and nothing is concluded from it.
+- Not repeated: a second send, so byte-stability is still unmeasured.
+
 **Unmeasured, and required before any use on a client book:**
 
 - what an `ID` that does not resolve does, for example a company unloaded between the
   listing and the read: a refusal, an empty response, or the §1.2 modal;
 - names with `&`, quotes or non-ASCII text in the `ID` (§9.11a measured one plain name);
-- whether an explicit `FETCHLIST` narrows an Object export (only `FETCH *` was measured,
-  §9.11a);
 - whether two sends of the same Object export are byte-stable, since the `CMPINFO`
-  counters could differ;
+  counters could differ (one send was measured, above);
 - the part read while another user is writing to the company. Gold differs from Silver only in
   allowing several users, so a book changing during a read is the normal case there. The read's
   company high-water bracket, not this part, is what refuses a moved book.
 
-The first live use is one request on a synthetic company on the licensed lab, with an
-operator watching the Tally screen (§1.2), stopping on the first silence.
+The first live use was one request on a synthetic company on the lab (above). Any
+further request that can fail in Tally's UI, such as an `ID` that does not resolve, is sent
+one at a time with an operator watching the Tally screen (§1.2), stopping on the first
+silence.
 
 ## 9.10 Company creation over XML — **PARTIAL: symbol element found, formal-name element not**
 
@@ -435,11 +459,9 @@ show no figures, only which ledgers were left out. Among several masters, a book
 identified, or not INR, is refused before any bill. No surface in a shipped build (the desktop, the
 sweep, MCP) admits a book as INR on an operator's word: the desktop's confirmation for one master Tally
 does not name INR was removed after three client-derived lab copies, one master each, were all found
-INR by their mailing names (not committed; live client books beyond them are unmeasured). The
-non-default `voucher-scan` feature's calibrated read still takes an explicit INR assertion. It is not
-compiled into shipped builds; CI builds, tests and lints it on macOS only, and only runtime tests and
-the ignored live calibration harness call it. Every other path still refuses a book with several masters, until it
-compares each ledger's own currency with the base.
+INR by their mailing names (not committed; live client books beyond them are unmeasured). Every
+path still refuses a book with several masters, until it compares each ledger's own currency with
+the base.
 
 **Not established:**
 - that `ORIGINALNAME` rather than `NAME` is the match on every book. The two differ on the FOREX

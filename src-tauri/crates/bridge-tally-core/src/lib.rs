@@ -11,11 +11,11 @@ pub use bridge_tally_primitives::{
 pub mod bills_reconciliation;
 pub mod book_presence;
 pub mod master_binding;
+pub mod master_name_index;
 mod pack_models;
 pub mod reconciliation;
 pub mod report_tie_out;
 pub mod text_search;
-pub mod transport_qualification;
 
 pub use pack_models::*;
 

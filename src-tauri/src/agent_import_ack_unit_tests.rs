@@ -43,7 +43,7 @@ fn the_review_shows_the_doubt_and_the_voucher() {
     let voucher: ReadVoucher = serde_json::from_value(voucher).unwrap();
     let preview = review_preview(BATCH, MARKER, "Books", &doubt(), &voucher).unwrap();
     for shown in [
-        "Record that you reviewed ONE Journal in \"Books\"",
+        "Record that you reviewed ONE \"Journal\" in \"Books\"",
         "  \"Cash\"",
         "Date: \"20260907\"  Voucher number: \"2\"  ALTERID: 10",
         "Narration:\n  \"Paid\"",
@@ -54,7 +54,7 @@ fn the_review_shows_the_doubt_and_the_voucher() {
     ] {
         assert!(preview.contains(shown), "{shown}: {preview}");
     }
-    assert!(preview.starts_with("Record that you reviewed ONE Journal"));
+    assert!(preview.starts_with("Record that you reviewed ONE \"Journal\""));
     assert!(
         preview.contains("\nComplyEaze Bridge posted it, but these ledgers no longer resolve\n"),
         "{preview}"
@@ -1257,7 +1257,7 @@ fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
     assert_eq!(
         preview,
         [
-            "Record that you reviewed ONE Journal in \"Books\"",
+            "Record that you reviewed ONE \"Journal\" in \"Books\"",
             "ComplyEaze Bridge posted it, but these ledgers no longer resolve",
             "to the master you approved:",
             r#"  Line break  "Cash\r\n""#,
@@ -1300,16 +1300,19 @@ fn a_review_shows_a_line_break_at_the_end_of_a_ledger_name() {
     }
     let both = review_preview(BATCH, MARKER, "Books", &both, &voucher).unwrap();
     assert_eq!(both.matches(r#"Line break  "Ledger 0\r\n""#).count(), 2);
-    // The text passes the check every dialog text passes: a voucher type
-    // read back with the characters of a written-out break before a quote
-    // is not a marked name, and the text is refused.
+    // A voucher type is shown quoted, as every value read from Tally is, so
+    // its characters are escaped and the text carries no mark and no line
+    // about one.
     let mut typed = row_json(2, "Paid");
     typed["voucher_type"] = json!(r#"Journal\r\n""#);
     let typed: ReadVoucher = serde_json::from_value(typed).unwrap();
-    assert_eq!(
-        review_preview(BATCH, MARKER, "Books", &doubt(), &typed),
-        Err("ack_review_layout_text".to_string())
+    let typed = review_preview(BATCH, MARKER, "Books", &doubt(), &typed).unwrap();
+    assert!(
+        typed.starts_with(r#"Record that you reviewed ONE "Journal\\r\\n\"" in "Books""#),
+        "{typed}"
     );
+    assert!(!typed.contains("Line break"), "{typed}");
+    assert!(!typed.contains(post::LINE_BREAK_NOTE), "{typed}");
     let mut numbered = row_json(2, "Paid");
     numbered["voucher_number"] = json!("2\r\n");
     let numbered: ReadVoucher = serde_json::from_value(numbered).unwrap();

@@ -54,9 +54,9 @@ use super::{
 // the test, or Windows fails on an unused import under `-D warnings`.
 #[cfg(unix)]
 use super::require_utf8_destination;
+use crate::tally::connection::TallyProduct;
 use crate::tally::{
     ConnectionStatus, OutstandingsLoadResult, TallyCompany, TallyLedger, TallyProbeResult,
-    TallyProduct,
 };
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;

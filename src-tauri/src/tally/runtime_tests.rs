@@ -1102,7 +1102,6 @@ async fn a_read_whose_response_body_fails_is_sent_once() {
                     host: "localhost".to_string(),
                     port,
                 },
-                ReadOperation::VoucherExport,
                 ReadRetryPolicy::new(3, std::time::Duration::ZERO, std::time::Duration::ZERO, 0)
                     .unwrap(),
                 move |_client| {
@@ -1474,15 +1473,10 @@ async fn cancellation_registry_cancels_and_releases_requests() {
     let runtime_task = Arc::clone(&runtime);
     let task = tokio::spawn(async move {
         runtime_task
-            .execute(
-                config,
-                ReadOperation::OtherRead,
-                ReadRetryPolicy::SINGLE_ATTEMPT,
-                |_client| async {
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    Ok::<_, anyhow::Error>(())
-                },
-            )
+            .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, |_client| async {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                Ok::<_, anyhow::Error>(())
+            })
             .await
     });
     tokio::task::yield_now().await;

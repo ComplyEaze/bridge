@@ -684,35 +684,6 @@ async fn tally_requests_ignore_configured_proxy() {
     );
 }
 
-/// A later, smaller response must not lower the largest response body a read
-/// observed: the runtime reports that figure as the read's evidence, and a
-/// closing bracket read (a small company-extent response) comes after the
-/// large payload it brackets. This was first asserted inside the legacy
-/// voucher-scan paired-read test (a voucher payload followed by a closing
-/// extent); it holds for the shipped recorder itself.
-#[test]
-fn observed_body_bytes_keep_the_largest_response_until_reset() {
-    let client = TallyClient::new(TallyConfig {
-        host: "127.0.0.1".to_string(),
-        port: 9,
-    })
-    .expect("build Tally client");
-    assert_eq!(client.observed_body_bytes(), None);
-    client.record_observed_body_bytes(1_000);
-    client.record_observed_body_bytes(40);
-    assert_eq!(
-        client.observed_body_bytes(),
-        Some(1_000),
-        "a smaller later response must not overwrite the larger payload"
-    );
-    client.record_observed_body_bytes(2_000);
-    assert_eq!(client.observed_body_bytes(), Some(2_000));
-    client.reset_observed_body_bytes();
-    assert_eq!(client.observed_body_bytes(), None);
-    client.record_observed_body_bytes(40);
-    assert_eq!(client.observed_body_bytes(), Some(40));
-}
-
 /// The outstandings bracket (`fetch_company_book_extent`, feeding both the
 /// outstandings read and the ledger export) must fail closed with
 /// a typed error when both paired reads agree but neither carries

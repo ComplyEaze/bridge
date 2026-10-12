@@ -3,7 +3,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{
-    atomic::{AtomicU64, AtomicU8, Ordering},
+    atomic::{AtomicU8, Ordering},
     Arc,
 };
 
@@ -1036,11 +1036,9 @@ impl GatewayProductModeEvidence {
 #[derive(Clone)]
 pub struct TallyClient {
     http: TallyHttpTransport,
-    observed_body_bytes: Arc<AtomicU64>,
     observed_encoding: Arc<AtomicU8>,
 }
 
-const BODY_BYTES_UNAVAILABLE: u64 = u64::MAX;
 const ENCODING_UNAVAILABLE: u8 = 0;
 const ENCODING_UTF8: u8 = 1;
 const ENCODING_UTF8_BOM: u8 = 2;
@@ -1063,7 +1061,6 @@ impl TallyClient {
             .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
-            observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
     }
@@ -1108,7 +1105,6 @@ impl TallyClient {
         .with_send_observer(crate::request_trail::observer());
         Self {
             http,
-            observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         }
     }
@@ -1125,7 +1121,6 @@ impl TallyClient {
                 .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
-            observed_body_bytes: Arc::new(AtomicU64::new(BODY_BYTES_UNAVAILABLE)),
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
         })
     }
@@ -1146,7 +1141,6 @@ impl TallyClient {
             response_sha256: response.encoded_sha256().to_string(),
             bytes: response.encoded_bytes(),
         };
-        self.record_observed_body_bytes(response.encoded_bytes());
         self.record_observed_encoding(response.encoding());
         let response_text = response.into_text();
         let product = detect_product(&response_text);
@@ -1535,7 +1529,6 @@ impl TallyClient {
             response_sha256: response.encoded_sha256().to_string(),
             bytes: response.encoded_bytes(),
         };
-        self.record_observed_body_bytes(response.encoded_bytes());
         self.record_observed_encoding(response.encoding());
         *evidence = evidence.clone().combine(wire);
         Ok(response.into_text())
@@ -1554,7 +1547,6 @@ impl TallyClient {
         let response = self.http.post_xml_decoded(xml).await?;
         let encoded_bytes = response.encoded_bytes();
         let encoded_sha256 = response.encoded_sha256().to_string();
-        self.record_observed_body_bytes(encoded_bytes);
         self.record_observed_encoding(response.encoding());
         Ok((response.into_text(), encoded_bytes, encoded_sha256))
     }
@@ -2383,7 +2375,6 @@ impl TallyClient {
     /// The decoded text is returned beside it for admission.
     pub(crate) async fn post_xml_raw(&self, xml: String) -> anyhow::Result<RawTallyResponse> {
         let response = self.http.post_xml(xml).await?;
-        self.record_observed_body_bytes(response.encoded_bytes());
         self.record_observed_encoding(response.encoding());
         let encoded_body = response.encoded_body().to_vec();
         let encoded_sha256 = sha256_hex(&encoded_body);
@@ -2445,33 +2436,6 @@ impl TallyClient {
     pub(crate) async fn status_probe(&self) -> anyhow::Result<()> {
         self.http.get_status_decoded().await?;
         Ok(())
-    }
-
-    pub(crate) fn reset_observed_body_bytes(&self) {
-        self.observed_body_bytes
-            .store(BODY_BYTES_UNAVAILABLE, Ordering::Release);
-    }
-
-    pub(crate) fn observed_body_bytes(&self) -> Option<u64> {
-        match self.observed_body_bytes.load(Ordering::Acquire) {
-            BODY_BYTES_UNAVAILABLE => None,
-            bytes => Some(bytes),
-        }
-    }
-
-    fn record_observed_body_bytes(&self, bytes: usize) {
-        let bytes = u64::try_from(bytes).unwrap_or(u64::MAX - 1);
-        let _ = self.observed_body_bytes.fetch_update(
-            Ordering::AcqRel,
-            Ordering::Acquire,
-            |observed| {
-                Some(if observed == BODY_BYTES_UNAVAILABLE {
-                    bytes
-                } else {
-                    observed.max(bytes)
-                })
-            },
-        );
     }
 
     fn record_observed_encoding(&self, encoding: TallyTextEncoding) {

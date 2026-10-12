@@ -3,8 +3,7 @@
 //! Folded from the former standalone `bridge-tally-runtime` crate: it had exactly one consumer
 //! (`crate::tally::runtime`), so the crate boundary earned nothing except hiding this module's
 //! true dead code from the `dead_code` lint. This module still authenticates no endpoint and
-//! establishes no accounting or support claim -- it controls local execution and emits only
-//! fixed-cardinality, privacy-reduced observations.
+//! establishes no accounting or support claim -- it controls local execution only.
 
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
@@ -15,10 +14,6 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use crate::observability::{
-    AttemptObservation, ObservationSink, RequestClass, ResponseOutcome, TelemetryCollector,
-};
-use crate::observability::{BodyBytesObservation, CircuitRejectReason};
 use tokio::sync::{Mutex as AsyncMutex, MutexGuard};
 use tokio_util::sync::CancellationToken;
 
@@ -65,40 +60,6 @@ impl fmt::Debug for EndpointIdentity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "OtherRead is exercised by tests; no production call site issues it"
-    )
-)]
-pub(super) enum ReadOperation {
-    Status,
-    Capability,
-    CompanyList,
-    MasterExport,
-    VoucherExport,
-    ReportExport,
-    OtherRead,
-    Import,
-}
-
-impl ReadOperation {
-    pub(super) const fn request_class(self) -> RequestClass {
-        match self {
-            Self::Status => RequestClass::Status,
-            Self::Capability => RequestClass::Capability,
-            Self::CompanyList => RequestClass::CompanyList,
-            Self::MasterExport => RequestClass::MasterExport,
-            Self::VoucherExport => RequestClass::VoucherExport,
-            Self::ReportExport => RequestClass::ReportExport,
-            Self::OtherRead => RequestClass::OtherRead,
-            Self::Import => RequestClass::Import,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ReadFailureClass {
     Connection,
     RequestTimeout,
@@ -140,20 +101,6 @@ impl ReadFailureClass {
         )
     }
 
-    const fn response_outcome(self) -> ResponseOutcome {
-        match self {
-            Self::Connection | Self::RequestFailed | Self::ResponseBodyFailed => {
-                ResponseOutcome::Transport
-            }
-            Self::RequestTimeout => ResponseOutcome::Timeout,
-            Self::HttpServer | Self::RateLimited | Self::HttpClient => ResponseOutcome::HttpStatus,
-            Self::SizeLimit => ResponseOutcome::SizeLimit,
-            Self::Decode => ResponseOutcome::Decode,
-            Self::Application => ResponseOutcome::Application,
-            Self::Validation => ResponseOutcome::Validation,
-        }
-    }
-
     const fn circuit_outcome(self) -> CircuitOutcome {
         match self {
             Self::Connection
@@ -172,31 +119,8 @@ impl ReadFailureClass {
 }
 
 pub(super) enum ReadAttempt<T, E> {
-    Success {
-        value: T,
-        observed_body_bytes: BodyBytesObservation,
-    },
-    Failure {
-        error: E,
-        class: ReadFailureClass,
-        observed_body_bytes: BodyBytesObservation,
-    },
-}
-
-impl<T, E> ReadAttempt<T, E> {
-    fn observation(&self) -> (ResponseOutcome, BodyBytesObservation) {
-        match self {
-            Self::Success {
-                observed_body_bytes,
-                ..
-            } => (ResponseOutcome::Success, *observed_body_bytes),
-            Self::Failure {
-                class,
-                observed_body_bytes,
-                ..
-            } => (class.response_outcome(), *observed_body_bytes),
-        }
-    }
+    Success { value: T },
+    Failure { error: E, class: ReadFailureClass },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -348,6 +272,12 @@ impl fmt::Display for RuntimeConfigurationError {
 }
 
 impl std::error::Error for RuntimeConfigurationError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CircuitRejectReason {
+    Cooldown,
+    HalfOpenProbeInFlight,
+}
 
 #[derive(Debug)]
 pub(super) enum ReadExecutionError<E> {
@@ -535,7 +465,6 @@ struct SessionSlot {
 #[derive(Clone)]
 pub(super) struct PortableReadRuntime {
     sessions: Arc<Mutex<HashMap<EndpointIdentity, SessionSlot>>>,
-    collector: Arc<TelemetryCollector>,
     policy: RuntimePolicy,
 }
 
@@ -558,7 +487,6 @@ impl PortableReadRuntime {
     pub(super) fn new(policy: RuntimePolicy) -> Result<Self, RuntimeConfigurationError> {
         Ok(Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            collector: Arc::new(TelemetryCollector::new()),
             policy: policy.validate()?,
         })
     }
@@ -579,7 +507,6 @@ impl PortableReadRuntime {
     pub(super) async fn execute_read<T, E, F, Fut>(
         &self,
         endpoint: EndpointIdentity,
-        operation: ReadOperation,
         retry: ReadRetryPolicy,
         cancellation: CancellationToken,
         mut request: F,
@@ -595,19 +522,18 @@ impl PortableReadRuntime {
             .sequence
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             .saturating_add(1);
-        let class = operation.request_class();
         let mut attempt_number = 1_u8;
         loop {
             let attempt = match self
-                .run_queued(&session, class, &cancellation, || request(attempt_number))
+                .run_queued(&session, &cancellation, || request(attempt_number))
                 .await
             {
                 Ok(attempt) => attempt,
                 Err(error) => return Err(error),
             };
             match attempt {
-                ReadAttempt::Success { value, .. } => return Ok(value),
-                ReadAttempt::Failure { error, class, .. } => {
+                ReadAttempt::Success { value } => return Ok(value),
+                ReadAttempt::Failure { error, class } => {
                     if !class.retryable() || attempt_number >= retry.maximum_attempts {
                         return Err(ReadExecutionError::Attempt(error));
                     }
@@ -660,7 +586,6 @@ impl PortableReadRuntime {
     async fn run_queued<T, E, F, Fut>(
         &self,
         session: &EndpointSession,
-        class: RequestClass,
         cancellation: &CancellationToken,
         request: F,
     ) -> Result<ReadAttempt<T, E>, ReadExecutionError<E>>
@@ -670,27 +595,14 @@ impl PortableReadRuntime {
     {
         let queued_at = Instant::now();
         let state = tokio::select! {
-            _ = cancellation.cancelled() => {
-                self.collector.record_attempt(AttemptObservation::QueueCancelled {
-                    class,
-                    queue_wait: queued_at.elapsed(),
-                });
-                return Err(ReadExecutionError::Cancelled);
-            }
+            _ = cancellation.cancelled() => return Err(ReadExecutionError::Cancelled),
             result = tokio::time::timeout(self.policy.queue_deadline, session.gate.lock()) => {
                 match result {
                     Ok(state) => state,
-                    Err(_) => {
-                        self.collector.record_attempt(AttemptObservation::QueueDeadline {
-                            class,
-                            queue_wait: queued_at.elapsed(),
-                        });
-                        return Err(ReadExecutionError::QueueDeadline);
-                    }
+                    Err(_) => return Err(ReadExecutionError::QueueDeadline),
                 }
             }
         };
-        let queue_wait = queued_at.elapsed();
         if let Some(spacing_wait) = state
             .next_request_not_before
             .and_then(|not_before| not_before.checked_duration_since(Instant::now()))
@@ -699,25 +611,13 @@ impl PortableReadRuntime {
                 .policy
                 .queue_deadline
                 .checked_sub(queued_at.elapsed())
-                .ok_or_else(|| {
-                    self.collector
-                        .record_attempt(AttemptObservation::QueueDeadline { class, queue_wait });
-                    ReadExecutionError::QueueDeadline
-                })?;
+                .ok_or(ReadExecutionError::QueueDeadline)?;
             let wait = spacing_wait.min(remaining);
             tokio::select! {
-                _ = cancellation.cancelled() => {
-                    self.collector.record_attempt(AttemptObservation::QueueCancelled {
-                        class,
-                        queue_wait,
-                    });
-                    return Err(ReadExecutionError::Cancelled);
-                }
+                _ = cancellation.cancelled() => return Err(ReadExecutionError::Cancelled),
                 _ = tokio::time::sleep(wait) => {}
             }
             if wait < spacing_wait {
-                self.collector
-                    .record_attempt(AttemptObservation::QueueDeadline { class, queue_wait });
                 return Err(ReadExecutionError::QueueDeadline);
             }
         }
@@ -729,8 +629,6 @@ impl PortableReadRuntime {
             // operator is a real gap; wire it back through
             // when the UI can act on it rather than keeping an unread field.
             Err((reason, _retry_after_unix_ms)) => {
-                self.collector
-                    .record_attempt(AttemptObservation::CircuitRejected { class, reason });
                 return Err(ReadExecutionError::CircuitRejected { reason });
             }
         };
@@ -738,29 +636,13 @@ impl PortableReadRuntime {
             state,
             spacing: self.policy.request_spacing,
         };
-        let response_started = Instant::now();
         let attempt = tokio::select! {
             _ = cancellation.cancelled() => {
-                self.collector.record_attempt(AttemptObservation::Response {
-                    class,
-                    queue_wait,
-                    outcome: ResponseOutcome::Cancelled,
-                    response_pipeline_elapsed: response_started.elapsed(),
-                    observed_body_bytes: BodyBytesObservation::Unavailable,
-                });
                 permit.complete(CircuitOutcome::Cancelled, now_unix_ms());
                 return Err(ReadExecutionError::Cancelled);
             }
             attempt = request() => attempt,
         };
-        let (outcome, observed_body_bytes) = attempt.observation();
-        self.collector.record_attempt(AttemptObservation::Response {
-            class,
-            queue_wait,
-            outcome,
-            response_pipeline_elapsed: response_started.elapsed(),
-            observed_body_bytes,
-        });
         let circuit_outcome = match &attempt {
             ReadAttempt::Success { .. } => CircuitOutcome::TransportSuccess,
             ReadAttempt::Failure { class, .. } => class.circuit_outcome(),

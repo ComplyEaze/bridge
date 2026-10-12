@@ -66,6 +66,16 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
+  differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
+  every other compared field matched and it read `posted_verified`, and a divergent voucher never
+  listed a narration difference. A narration edited in Tally after the post therefore leaves the
+  batch unsettled until it is reviewed. The read-back, the post's span binding and the amendment
+  check now share one comparison: the text as written (trimmed, with its `[BRIDGE:…]` tag for a
+  file imported by hand) against the text read, byte for byte; a narration Tally holds none of
+  equals only an empty one written. Whether Tally changes trailing spaces or line breaks on import
+  is unmeasured; the first live run will show it (#1608).
+
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
   Administrators, or that anyone but you, SYSTEM and Administrators can read or change
   (`statement_password_file_permissions`), as a Mac already refuses one that other users can read.

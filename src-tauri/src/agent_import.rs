@@ -74,7 +74,7 @@ use verification::{
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    Attribution, DeltaBasis, VerificationStatus,
+    Attribution, DeltaBasis, VerificationStatus, WrittenNarration,
 };
 #[cfg(test)]
 use verification::{
@@ -2915,10 +2915,11 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
             }
         }
         if let Some(number) = voucher.voucher_number.as_deref() {
-            // Unlike narration/reference, `voucher_diffs` compares the
-            // voucher number verbatim, so a value that would read back
-            // rewritten must be refused here — verification could never
-            // confirm it as posted.
+            // Unlike the reference, `voucher_diffs` compares the voucher
+            // number verbatim (and the narration, which
+            // `refuse_rewritten_narration` guards), so a value that would
+            // read back rewritten must be refused here — verification could
+            // never confirm it as posted.
             if number.is_empty()
                 || number.chars().count() > MAX_TEXT_CHARS
                 || number.chars().any(char::is_control)
@@ -3288,9 +3289,9 @@ fn cash_bank_refusals(
 /// Call this only on a field something compares as text: a ledger name
 /// (checked in `validate_payload`'s entry loop) and the voucher number
 /// (checked above), which `voucher_diffs` (agent_import_verification.rs)
-/// compares, and the narration, which a native post's span binding compares
-/// byte for byte (`agent_import_span_identity.rs`) and the build and a native
-/// post refuse (`refuse_rewritten_narration`). The reference is never
+/// compares, and the narration, which a native post's span binding and the
+/// read-back compare byte for byte (`narration_differs`, #1608) and the build
+/// and a native post refuse (`refuse_rewritten_narration`). The reference is never
 /// compared, so refusing it would refuse a value nothing downstream would
 /// ever notice as changed, and `validate_payload` does not.
 ///

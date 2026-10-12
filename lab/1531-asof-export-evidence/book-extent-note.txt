@@ -1,0 +1,1 @@
+summarise_by month 20260401-20270331 (Bridge MCP, 07:50:01Z, response_sha256 2c85d794d85d9a61ad8e81fa7fa42547eba3dee51bc0d2d25d239858e9f6c959, state complete): 2026-07 61 vouchers (first Receipt 1 on 20260701), 2026-08 17 vouchers; 78 summarised; no other month; voucher mark 87, master mark 224.

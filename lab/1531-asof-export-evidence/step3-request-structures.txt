@@ -1,0 +1,8 @@
+requests 41
+POST x7 first#1 req 2524B sha 9df2a53f085d type=['Collection', 'Company'] id=['BridgeCompanyExtent'] coll=['BridgeCompanyExtent'] dates=[] status=['200'] resp=['4002']
+POST x8 first#3 req 1094B sha 85e6659f6f55 type=['Collection', 'Company'] id=['BridgeCompanyBookExtentV2'] coll=['BridgeCompanyBookExtentV2'] dates=[] status=['200'] resp=['3838']
+GET x18 first#4 req 0B sha e3b0c44298fc type=[] id=[] coll=[] dates=[] status=['200'] resp=['51']
+POST x2 first#7 req 966B sha 51f38ca5350e type=['Collection', 'Currency'] id=['BridgeCompanyCurrencies'] coll=['BridgeCompanyCurrencies'] dates=[] status=['200'] resp=['3402']
+POST x2 first#23 req 1736B sha 4f2e1b0f61c4 type=['Collection'] id=['List of Ledgers'] coll=['List of Ledgers'] dates=[('SVFROMDATE', '20260401'), ('SVTODATE', '20260821')] status=['200'] resp=['23712']
+POST x2 first#27 req 1284B sha 34c3d9299feb type=['Collection'] id=['List of Ledgers'] coll=['List of Ledgers'] dates=[('SVFROMDATE', '20260401'), ('SVTODATE', '20260731')] status=['200'] resp=['16488']
+POST x2 first#31 req 1066B sha 4dc08b8c06e7 type=['Collection'] id=['List of Groups'] coll=['List of Groups'] dates=[] status=['200'] resp=['54282']

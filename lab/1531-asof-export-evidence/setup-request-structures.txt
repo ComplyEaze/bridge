@@ -1,0 +1,9 @@
+requests 62
+GET x27 first#1 req 0B sha e3b0c44298fc type=[] id=[] coll=[] dates=[] status=['200'] resp=['51']
+POST x11 first#2 req 2524B sha 9df2a53f085d type=['Collection', 'Company'] id=['BridgeCompanyExtent'] coll=['BridgeCompanyExtent'] dates=[] status=['200'] resp=['4002']
+POST x12 first#5 req 1094B sha 85e6659f6f55 type=['Collection', 'Company'] id=['BridgeCompanyBookExtentV2'] coll=['BridgeCompanyBookExtentV2'] dates=[] status=['200'] resp=['3838']
+POST x4 first#9 req 966B sha 51f38ca5350e type=['Collection', 'Currency'] id=['BridgeCompanyCurrencies'] coll=['BridgeCompanyCurrencies'] dates=[] status=['200'] resp=['3402']
+POST x2 first#40 req 764B sha b59886cc69b7 type=['Data'] id=['Bills Receivable'] coll=[] dates=[('SVFROMDATE', '20260401'), ('SVTODATE', '20261012')] status=['200'] resp=['46']
+POST x2 first#44 req 1066B sha 4dc08b8c06e7 type=['Collection'] id=['List of Groups'] coll=['List of Groups'] dates=[] status=['200'] resp=['54282']
+POST x2 first#48 req 758B sha 99c0fdb9aa2f type=['Data'] id=['Bills Payable'] coll=[] dates=[('SVFROMDATE', '20260401'), ('SVTODATE', '20261012')] status=['200'] resp=['46']
+POST x2 first#52 req 1284B sha 94c777398a02 type=['Collection'] id=['List of Ledgers'] coll=['List of Ledgers'] dates=[('SVFROMDATE', '20260401'), ('SVTODATE', '20261012')] status=['200'] resp=['16518']

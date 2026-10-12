@@ -1,0 +1,53 @@
+=== sheet Ledger master
+1 Company	BRIDGE BATCH LAB
+2 Company GUID	a30f23c3-4819-4334-96ab-ffa6fba70976
+3 Balances as of	20260731	The date chosen for this export, 20260715, is not a date Tally accepts as the end of a balance period. The balances end at the next date it accepts, 20260731 (the 1st, 2nd or 31st of a month), and include the vouchers dated 20260731. Vouchers dated after 20260731 (the book's last voucher date is 20260821) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after the date chosen for this export, 20260715.
+4 Opening period starts	20260401
+5 Master response SHA-256	063a54ce792d79d3368f45129549b0585f68d62e4577983b7fd7fd8f3b2af251
+6 Balance response SHA-256	cd5fe5d19f35efadd367b2d02cc87cb3297275873baf31f3ac73cfa738032fee
+7 Group response SHA-256	ca5e4a90cd90a11fc37bdd2ed1eb93f0a1f4977ce38cd04687cab3e31c55d2b8
+8 Repeated read agreement	Each source response was read twice and the paired wire bytes agreed before this workbook was enabled.
+9 Covered	Ledger identity, parent, Party GSTIN and requested party/master fields when returned, plus opening/closing balances over the named period.
+10 Not observed fields	“Not observed” means this Tally response did not return the requested field; it does not establish whether that field is unset in this book or unavailable in this Tally build. Bridge never manufactures master data.
+11 Currency	INR
+12 Currency decimal places	2
+13 Source bytes	master=23712 balance=16488 groups=54282
+14 Ledger / party	Parent	Party GSTIN (as returned)	Income Tax number (as returned)	Name on PAN (as returned)	PIN code (as returned)	GST PIN code (as returned)	MSME registration (as returned)	Udyam registration (as returned)	Bank account holder (as returned)	Bank details (as returned)	IFSC (as returned)	Email (as returned)	Phone (as returned)	State (as returned)	Address (as returned)	GUID	Master ID	Alter ID	Opening balance	Closing balance	Opening balance (exact text)	Closing balance (exact text)
+15 Cash	Cash-in-Hand	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-0000001f	31	32	0	-19545	0.00	-19545.00
+16 Lab Capital	Capital Account	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d4	212	217	0	Not established	0.00	Not established
+17 Lab Charges	Indirect Expenses	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d2	210	215	0	-18286.25	0.00	-18286.25
+18 Lab Sales	Sales Accounts	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d5	213	218	0	Not established	0.00	Not established
+19 Lab Seed Income	Indirect Incomes	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d3	211	216	0	1000	0.00	1000.00
+20 Party A	Sundry Debtors	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000cf	207	212	0	21200.1	0.00	21200.10
+21 Party B	Sundry Debtors	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d0	208	213	0	19920.39	0.00	19920.39
+22 Party C	Sundry Creditors	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d1	209	214	0	-19440.25	0.00	-19440.25
+23 Profit & Loss A/c	�#4; Primary	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-0000001e	30	31	0	-17286.25	0.00	-17286.25
+24 Suspense	Suspense A/c	Not observed	Not observed	Not observed	Not observed	BRIDGE BATCH LAB	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000ce	206	211	0	Not established	0.00	Not established
+25 Synthetic Bank Ledger	Bank Accounts	Not observed	Not observed	Not observed	Not observed	BRIDGE BATCH LAB	Not observed	Not observed	Not observed	Not observed	Not observed	a30f23c3-4819-4334-96ab-ffa6fba70976-000000cd	205	210	0	15151.01	0.00	15151.01
+=== sheet Group subtotal trace
+1 Derived group subtotal view	Tally group identity and balance polarity only; Schedule III mapping is withheld for a CA decision.
+2 Currency	INR
+3 Currency decimal places	2
+4 Read period	Read period: 20260401 to 20260731. No prior-year values were requested or inferred. The date chosen for this export, 20260715, is not a date Tally accepts as the end of a balance period. The balances end at the next date it accepts, 20260731 (the 1st, 2nd or 31st of a month), and include the vouchers dated 20260731. Vouchers dated after 20260731 (the book's last voucher date is 20260821) are not included in these balances. Review them in Tally before relying on this workbook. The balances end at the first month boundary (the 1st, 2nd or 31st of a month) on or after the date chosen for this export, 20260715.
+5 Debit total	74557.75
+6 Credit total	57271.5
+7 Dr=Cr difference	-17286.25
+8 Check interpretation	Difference 0 is the Tally-sign self-check over every captured ledger closing balance; it is evidence, not an assertion of statement completeness.
+10 Balance side	Group-derived subtotal	Closing balance	Closing balance (exact text)
+11 Debit-balance group subtotals	Cash-in-Hand group subtotal	-19545	-19545
+13 TRACE: every included ledger
+14 Subtotal	Ledger	Parent	GUID	Closing balance (exact text)
+15 Cash-in-Hand group subtotal	Cash	Cash-in-Hand	a30f23c3-4819-4334-96ab-ffa6fba70976-0000001f	-19545.00
+17 EXCLUSION LIST (loud)
+18 Ledger	Parent	GUID	Why no evidence-backed group subtotal was emitted
+19 Lab Capital	Capital Account	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d4	Tally returned an empty CLOSINGBALANCE; the balance is not established and was excluded from Schedule III totals.
+20 Lab Charges	Indirect Expenses	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d2	Group hierarchy does not determine a Schedule III head; client mapping decision required.
+21 Lab Sales	Sales Accounts	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d5	Tally returned an empty CLOSINGBALANCE; the balance is not established and was excluded from Schedule III totals.
+22 Lab Seed Income	Indirect Incomes	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d3	Group hierarchy does not determine a Schedule III head; client mapping decision required.
+23 Party A	Sundry Debtors	a30f23c3-4819-4334-96ab-ffa6fba70976-000000cf	A credit-balance Sundry Debtors ledger has the opposite polarity; its Schedule III head is not determined by the group and was excluded.
+24 Party B	Sundry Debtors	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d0	A credit-balance Sundry Debtors ledger has the opposite polarity; its Schedule III head is not determined by the group and was excluded.
+25 Party C	Sundry Creditors	a30f23c3-4819-4334-96ab-ffa6fba70976-000000d1	A debit-balance Sundry Creditors ledger has the opposite polarity; its Schedule III head is not determined by the group and was excluded.
+26 Profit & Loss A/c	�#4; Primary	a30f23c3-4819-4334-96ab-ffa6fba70976-0000001e	Group hierarchy does not determine a Schedule III head; client mapping decision required.
+27 Suspense	Suspense A/c	a30f23c3-4819-4334-96ab-ffa6fba70976-000000ce	Tally returned an empty CLOSINGBALANCE; the balance is not established and was excluded from Schedule III totals.
+28 Synthetic Bank Ledger	Bank Accounts	a30f23c3-4819-4334-96ab-ffa6fba70976-000000cd	A credit-balance Bank Accounts ledger has the opposite polarity; its Schedule III head is not determined by the group and was excluded.
+30 Read did not cover	Prior-year balances, voucher-level classification, maturity/current-vs-non-current split, note disclosures, share-capital reconciliation, reserves movement, and CA mapping decisions.

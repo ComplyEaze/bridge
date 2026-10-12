@@ -951,6 +951,7 @@ async fn core_window_bracket_fails_closed_when_altmstid_is_absent() {
         ),
         "unexpected error: {error:?}"
     );
+    wr2_core_window_sequence::assert_persisted_code(&error, "company_altmstid_missing");
     let methods = server.await.expect("join routed Tally server");
     assert_eq!(methods, ["POST", "POST"]);
 }
@@ -1017,6 +1018,15 @@ mod wr2_core_window_sequence {
         posts.extend(extent(5));
         assert_eq!(posts.len(), POSTS_IN_A_SUCCESSFUL_WINDOW);
         posts
+    }
+
+    /// The code a desktop snapshot records and shows for this refusal, never
+    /// the `response_parse_failed` catch-all. That the stored value is
+    /// persistable is asserted in the snapshot engine's own test.
+    pub(super) fn assert_persisted_code(error: &TallyError, expected: &str) {
+        let persisted = crate::sync::snapshot::tally_error_code(error);
+        assert_eq!(persisted, expected, "persisted code for {error:?}");
+        assert_ne!(persisted, "response_parse_failed");
     }
 
     pub(super) async fn run(
@@ -1105,6 +1115,7 @@ async fn core_window_refuses_a_book_that_changed_during_the_voucher_read() {
         ),
         "unexpected error: {error:?}"
     );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
     assert_eq!(methods, vec!["POST"; seq::POSTS_IN_A_SUCCESSFUL_WINDOW]);
 }
 
@@ -1134,6 +1145,7 @@ async fn core_window_refuses_a_book_that_changed_during_the_group_read() {
         ),
         "unexpected error: {error:?}"
     );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
     assert_eq!(methods, vec!["POST"; 6]);
 }
 
@@ -1163,6 +1175,7 @@ async fn core_window_refuses_a_book_that_changed_during_the_ledger_read() {
         ),
         "unexpected error: {error:?}"
     );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
     assert_eq!(methods, vec!["POST"; 12]);
 }
 
@@ -1191,17 +1204,14 @@ async fn core_window_refuses_two_extent_reads_of_one_bracket_that_differ() {
         ),
         "unexpected error: {error:?}"
     );
+    seq::assert_persisted_code(&error, "company_book_extent_drifted");
     assert_eq!(methods, ["POST", "POST"]);
 }
 
 /// An extent response whose GUID belongs to no row for the selected company
-/// (the captured WR2 row's GUID is edited to another company's). The
-/// connector's own response validator parses with the same
-/// `parse_company_book_extent_v2` and rejects the response at the transport
-/// seam, so the refusal an operator sees end to end is the typed protocol
-/// `application_response_rejected`, not `company_identity_mismatch`: the
-/// latter, in `read_pinned_company_book_extent`, cannot be reached through
-/// `extract_core_window` because that parse has already succeeded by then.
+/// (the captured WR2 row's GUID is edited to another company's). The response
+/// is well formed, so the transport seam accepts it and the connector's own
+/// parse names the refusal: a wrong company, not a generic protocol rejection.
 #[tokio::test]
 async fn core_window_refuses_an_extent_response_for_a_different_company() {
     use wr2_core_window_sequence as seq;
@@ -1217,6 +1227,33 @@ async fn core_window_refuses_an_extent_response_for_a_different_company() {
     responses.truncate(1);
     let (result, methods) = seq::run(responses).await;
     let error = result.expect_err("an extent for a different company must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_identity_mismatch"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "company_identity_mismatch");
+    assert_eq!(methods, ["POST"]);
+}
+
+/// A malformed extent response (the captured bytes without their closing
+/// envelope tag) is still rejected at the transport seam, as a protocol
+/// rejection: only a well-formed response for another company reaches the
+/// connector's identity parse.
+#[tokio::test]
+async fn core_window_rejects_a_malformed_extent_response_at_the_transport_seam() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let truncated = seq::extents_with("</ENVELOPE>", "");
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (&truncated, &truncated);
+    // The rejection lands on the first request; serve only that one.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(1);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a malformed extent response must be rejected");
     assert!(
         matches!(
             &error,

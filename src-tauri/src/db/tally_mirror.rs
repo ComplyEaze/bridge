@@ -3984,6 +3984,7 @@ async fn find_identity_matches(
     identity: &SourceIdentityInput,
 ) -> Result<Vec<IdentityRow>, MirrorError> {
     let rows = match (table, owner_column) {
+        #[cfg(test)]
         ("tally_companies", "endpoint_id") => {
             sqlx::query(
                 "SELECT id, company_guid AS guid, remote_id, master_id, fallback_fingerprint \

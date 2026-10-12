@@ -2518,144 +2518,6 @@ async fn observed_company_identity_constraint_rejects_incomplete_tuples_and_pres
         " \t\r\n",
         "a later observed tuple must not overwrite a legacy pin's identity"
     );
-
-    let generic = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Documented metadata only".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("documented-metadata-guid".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("generic metadata writer remains valid without an observed tuple");
-    assert_eq!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT identity_confidence FROM tally_companies WHERE id = ?1",
-        )
-        .bind(generic.id)
-        .fetch_one(&repository.pool)
-        .await
-        .expect("read documented generic company confidence"),
-        "documented"
-    );
-
-    for (label, confidence) in [
-        ("unknown", Confidence::Unknown),
-        ("inferred", Confidence::Inferred),
-    ] {
-        let identity_guid = format!("{label}-generic-metadata-guid");
-        let initial = repository
-            .upsert_company(CompanyInput {
-                endpoint_id: snapshot.endpoint_id.clone(),
-                display_name: format!("{label} generic metadata"),
-                identity: SourceIdentityInput {
-                    guid: Some(identity_guid.clone()),
-                    confidence: Some(confidence),
-                    ..Default::default()
-                },
-                observed_at_unix_ms: 2_100,
-            })
-            .await
-            .expect("save explicitly non-observed generic company");
-        let refreshed = repository
-            .upsert_company(CompanyInput {
-                endpoint_id: snapshot.endpoint_id.clone(),
-                display_name: format!("{label} generic metadata refresh"),
-                identity: SourceIdentityInput {
-                    guid: Some(identity_guid),
-                    confidence: Some(confidence),
-                    ..Default::default()
-                },
-                observed_at_unix_ms: 2_200,
-            })
-            .await
-            .expect("refresh explicitly non-observed generic company");
-        assert_eq!(refreshed.id, initial.id);
-        assert_eq!(
-            sqlx::query_scalar::<_, String>(
-                "SELECT identity_confidence FROM tally_companies WHERE id = ?1",
-            )
-            .bind(initial.id)
-            .fetch_one(&repository.pool)
-            .await
-            .expect("read preserved generic confidence"),
-            confidence.as_str(),
-            "a generic {label} refresh must preserve its explicit confidence"
-        );
-    }
-
-    let reviewed = repository
-        .save_reviewed_setup(reviewed_setup_input(HASH_B))
-        .await
-        .expect("save independently reviewed observed company");
-    let pin_before_refresh = repository
-        .snapshot_source_pin(&reviewed.company.id)
-        .await
-        .expect("reviewed company supplies a durable source pin");
-    let profile_before_refresh = repository
-        .persisted_company_profiles()
-        .await
-        .expect("load reviewed company profile before generic refresh")
-        .profiles
-        .into_iter()
-        .find(|profile| profile.mirror_company_id == reviewed.company.id)
-        .expect("find reviewed company profile before generic refresh");
-    let refreshed = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: reviewed.snapshot.endpoint_id,
-            display_name: "Synthetic reviewed metadata refresh".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("reviewed-company-guid".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 3_000,
-        })
-        .await
-        .expect("generic metadata refresh remains valid");
-    assert_eq!(refreshed.id, reviewed.company.id);
-    let pin_after_refresh = repository
-        .snapshot_source_pin(&reviewed.company.id)
-        .await
-        .expect("generic metadata refresh preserves the observed source pin");
-    assert_eq!(pin_after_refresh.company_id, pin_before_refresh.company_id);
-    assert_eq!(
-        pin_after_refresh.display_name,
-        pin_before_refresh.display_name
-    );
-    assert_eq!(
-        pin_after_refresh.endpoint_id,
-        pin_before_refresh.endpoint_id
-    );
-    assert_eq!(
-        pin_after_refresh.company_guid,
-        pin_before_refresh.company_guid
-    );
-    assert_eq!(
-        pin_after_refresh.company_number,
-        pin_before_refresh.company_number
-    );
-    assert_eq!(
-        pin_after_refresh.books_from_yyyymmdd,
-        pin_before_refresh.books_from_yyyymmdd
-    );
-    let profile_after_refresh = repository
-        .persisted_company_profiles()
-        .await
-        .expect("load reviewed company profile after generic refresh")
-        .profiles
-        .into_iter()
-        .find(|profile| profile.mirror_company_id == reviewed.company.id)
-        .expect("find reviewed company profile after generic refresh");
-    assert_eq!(profile_after_refresh.name, profile_before_refresh.name);
-    assert_eq!(
-        profile_after_refresh.correlation_key,
-        profile_before_refresh.correlation_key
-    );
 }
 
 #[tokio::test]
@@ -2758,49 +2620,6 @@ async fn observed_identity_migration_revokes_demoted_fixture_enrollment() {
                 .expect("read v25 migration revocation timestamp"),
         )
         .expect("compute canonical v25 migration revocation payload")
-    );
-}
-
-#[tokio::test]
-async fn generic_guid_upsert_maps_observed_to_documented_before_tuple_constraint() {
-    let (repository, snapshot, _) = seeded_repository().await;
-    sqlx::query(
-        "INSERT INTO tally_companies(\
-           id, endpoint_id, display_name, company_guid, remote_id, master_id, \
-           fallback_fingerprint, identity_confidence, first_observed_at_unix_ms, \
-           last_observed_at_unix_ms, company_number, books_from_yyyymmdd\
-         ) VALUES ('legacy-incomplete-generic', ?1, 'Legacy generic metadata', \
-                   'generic-constraint-guid', NULL, NULL, NULL, 'unknown', 1, 1, NULL, NULL)",
-    )
-    .bind(&snapshot.endpoint_id)
-    .execute(&repository.pool)
-    .await
-    .expect("seed incomplete non-observed legacy company");
-
-    let saved = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Generic metadata refresh".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("generic-constraint-guid".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("generic GUID metadata must not claim observed without a tuple");
-
-    assert_eq!(saved.id, "legacy-incomplete-generic");
-    assert_eq!(
-        sqlx::query_scalar::<_, String>(
-            "SELECT identity_confidence FROM tally_companies WHERE id = ?1",
-        )
-        .bind(saved.id)
-        .fetch_one(&repository.pool)
-        .await
-        .expect("read generic confidence after refresh"),
-        "documented"
     );
 }
 
@@ -3219,66 +3038,63 @@ async fn recovery_migration_fails_closed_on_duplicate_legacy_run_ids() {
 }
 
 #[tokio::test]
-async fn stable_company_identity_survives_rename() {
-    let (repository, snapshot, original) = seeded_repository().await;
-    let renamed = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Synthetic Bridge Test Renamed".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("company-guid-1".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("rename company by stable identity");
-    assert_eq!(original.id, renamed.id);
-    assert_eq!(renamed.display_name, "Synthetic Bridge Test Renamed");
-}
-
-#[tokio::test]
 async fn company_guid_casing_resolves_to_one_stable_pin() {
-    let (repository, snapshot, _) = seeded_repository().await;
-    let uppercase = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic Case Company".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("CASE-GUID-2".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
+    let repository = repository().await;
+    let first = repository
+        .save_reviewed_setup(reviewed_setup_input(HASH_A))
         .await
-        .expect("save uppercase GUID");
-    let lowercase = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic Case Company Renamed".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("case-guid-2".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 3_000,
-        })
+        .expect("save reviewed setup with the observed GUID casing");
+    let mut recased = reviewed_setup_input(HASH_B);
+    let guid = recased
+        .company_identity
+        .guid
+        .clone()
+        .expect("reviewed setup carries a GUID");
+    let uppercase = guid.to_ascii_uppercase();
+    assert_ne!(uppercase, guid, "the variant must differ in casing");
+    recased.company_identity.guid = Some(uppercase);
+    let second = repository
+        .save_reviewed_setup(recased)
         .await
-        .expect("save lowercase GUID");
+        .expect("save reviewed setup with a re-cased GUID");
 
-    assert_eq!(uppercase.id, lowercase.id);
+    assert_eq!(first.company.id, second.company.id);
     let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM tally_companies \
-         WHERE endpoint_id = ?1 AND company_guid = ?2 COLLATE NOCASE",
+        "SELECT COUNT(*) FROM tally_companies WHERE company_guid = ?1 COLLATE NOCASE",
     )
-    .bind(&snapshot.endpoint_id)
-    .bind("case-guid-2")
+    .bind(&guid)
     .fetch_one(&repository.pool)
     .await
     .expect("count case-folded company pins");
     assert_eq!(count, 1);
+}
+
+#[tokio::test]
+async fn renamed_reviewed_setup_gets_a_distinct_company_pin() {
+    let repository = repository().await;
+    let original = repository
+        .save_reviewed_setup(reviewed_setup_input(HASH_A))
+        .await
+        .expect("save reviewed setup");
+    let mut renamed = reviewed_setup_input(HASH_B);
+    renamed.company_display_name = "Synthetic Reviewed Company Renamed".to_string();
+    let renamed = repository
+        .save_reviewed_setup(renamed)
+        .await
+        .expect("save reviewed setup under a new display name");
+
+    assert_ne!(
+        original.company.id, renamed.company.id,
+        "a rename is a different pin, so the old pin's evidence is never reattributed"
+    );
+    let count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM tally_companies WHERE company_guid = ?1 COLLATE NOCASE",
+    )
+    .bind("reviewed-company-guid")
+    .fetch_one(&repository.pool)
+    .await
+    .expect("count company pins for the GUID");
+    assert_eq!(count, 2);
 }
 
 #[test]
@@ -3650,48 +3466,54 @@ async fn composite_identity_schema_rejects_legacy_v7_runner() {
 
 #[tokio::test]
 async fn fallback_identity_is_not_silently_upgraded() {
-    let repository = repository().await;
-    let snapshot = repository
-        .save_capability_snapshot(CapabilitySnapshotInput {
-            canonical_origin: "http://127.0.0.1:9000".to_string(),
-            observed_at_unix_ms: 1,
-            profile_version: 1,
-            product: "TallyPrime".to_string(),
-            release: None,
-            license_tier: None,
-            mode: None,
-            mode_confidence: Confidence::Unknown,
-            items: vec![],
-        })
-        .await
-        .expect("save snapshot");
+    let (repository, snapshot, company) = seeded_repository().await;
+    let batch_id = begin_batch(&repository, &snapshot, &company, "fallback-upgrade-run").await;
+    let attempt = begin_window_attempt(&repository, &batch_id, 3_000).await;
+    let mut fallback_only = replayable_observation(&batch_id);
+    fallback_only.identity = SourceIdentityInput {
+        fallback_fingerprint: Some("fp-1".to_string()),
+        confidence: Some(Confidence::Inferred),
+        ..Default::default()
+    };
     repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic".to_string(),
-            identity: SourceIdentityInput {
-                fallback_fingerprint: Some("fallback-1".to_string()),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 1,
-        })
+        .stage_snapshot_window_memberships(
+            &attempt,
+            vec![SnapshotWindowMembershipInput::Observed {
+                record_key: "ledger\0fp-1".to_string(),
+                observation: Box::new(fallback_only.clone()),
+            }],
+        )
         .await
-        .expect("save fallback identity");
+        .expect("stage a record known only by its fallback fingerprint");
+    let counts = || async {
+        (
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_source_records")
+                .fetch_one(&repository.pool)
+                .await
+                .expect("count source records"),
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_record_observations")
+                .fetch_one(&repository.pool)
+                .await
+                .expect("count observations"),
+        )
+    };
+    let before = counts().await;
+    assert_eq!(before, (1, 1));
+
+    let mut upgraded = fallback_only;
+    upgraded.identity.guid = Some("new-guid".to_string());
     let error = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Synthetic".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("new-guid".to_string()),
-                fallback_fingerprint: Some("fallback-1".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2,
-        })
+        .stage_snapshot_window_memberships(
+            &attempt,
+            vec![SnapshotWindowMembershipInput::Observed {
+                record_key: "ledger\0fp-1".to_string(),
+                observation: Box::new(upgraded),
+            }],
+        )
         .await
         .expect_err("identity upgrade must require an audit event");
     assert!(matches!(error, MirrorError::IdentityUpgradeRequiresAudit));
+    assert_eq!(counts().await, before, "the refused upgrade stores nothing");
 }
 
 #[tokio::test]

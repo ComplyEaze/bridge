@@ -690,11 +690,13 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// and how its name matched, never another client's name.
     #[error("master_name_taken")]
     MasterNameTaken { kind: MasterKind, via: Via },
-    /// The ledger name index has no parser yet: no V3 ledger answer has been
-    /// captured from a real Tally (AGENTS.md P1), so a master post cannot show
-    /// a ledger name absent and is refused before the intent.
+    /// The ledger name index answer could not be read, so a master post
+    /// cannot show a ledger name absent and is refused before the intent.
+    /// `cause` is the parser's code, which carries no book data
+    /// (`StandardLedgerCatalogError::safe_code`),
+    /// so a foreign company's answer is told apart from a malformed one.
     #[error("master_ledger_index_unavailable")]
-    MasterLedgerIndexUnavailable,
+    MasterLedgerIndexUnavailable { cause: &'static str },
 }
 
 /// The data-free code a group snapshot refusal carries as its `cause`, for

@@ -676,6 +676,9 @@ impl Server {
                 let group = error.chain().find_map(|cause| {
                     match cause.downcast_ref::<ApprovedImportAdmissionError>() {
                         Some(ApprovedImportAdmissionError::GroupExportInvalid { cause }) => *cause,
+                        Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable {
+                            cause,
+                        }) => Some(*cause),
                         _ => None,
                     }
                 });
@@ -1034,6 +1037,9 @@ fn name_check_failure(error: &anyhow::Error) -> ToolFailure {
     let group = error.chain().find_map(|cause| {
         match cause.downcast_ref::<ApprovedImportAdmissionError>() {
             Some(ApprovedImportAdmissionError::GroupExportInvalid { cause }) => *cause,
+            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable { cause }) => {
+                Some(*cause)
+            }
             _ => None,
         }
     });

@@ -20,7 +20,7 @@
 //!    resolves to a pre-image master: `posted_into_existing_master`;
 //! 3. another loaded company's `ALTMSTID` moved:
 //!    `master_write_located_elsewhere`;
-//! 4. on a reconcile only, the name absent under either fold, no pre-image
+//! 4. on a reconcile only, the name absent under every key of the index, no pre-image
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`;
 //! 5. every check of [`Checks`] passed: `posted_verified`;
@@ -203,6 +203,9 @@ struct Located {
     /// The lower-case GUID of the one ledger whose stored name is the item
     /// name, when the item name collides with that ledger alone.
     sole_exact_ledger: Option<String>,
+    /// How many masters the item name collides with: masters, not spellings,
+    /// since one ledger can match through two of its own spellings.
+    masters_hit: usize,
 }
 
 fn locate(item: &LedgerCreateItem, masters: &[IndexedMaster]) -> Option<Located> {
@@ -216,7 +219,12 @@ fn locate(item: &LedgerCreateItem, masters: &[IndexedMaster]) -> Option<Located>
                 && hit.name == item.name().as_str()
         })
         .collect::<Vec<_>>();
-    let sole_exact_ledger = match (collisions.len(), exact.as_slice()) {
+    let masters_hit = collisions
+        .iter()
+        .map(|hit| hit.guid.to_ascii_lowercase())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len();
+    let sole_exact_ledger = match (masters_hit, exact.as_slice()) {
         (1, [hit]) => Some(hit.guid.to_ascii_lowercase()),
         _ => None,
     };
@@ -224,6 +232,7 @@ fn locate(item: &LedgerCreateItem, masters: &[IndexedMaster]) -> Option<Located>
         index,
         collisions,
         sole_exact_ledger,
+        masters_hit,
     })
 }
 
@@ -510,7 +519,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     if facts.moment == Moment::JustPosted && located.collisions.is_empty() {
         reasons.push("ledger_absent_after_post");
     }
-    if located.collisions.len() > 1 {
+    if located.masters_hit > 1 {
         reasons.push("name_collides_with_more_than_one_master");
     }
     if reasons.is_empty() {

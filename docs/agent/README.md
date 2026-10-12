@@ -1763,8 +1763,10 @@ be shown; it writes nothing to Tally. `post_ledger_creates` takes that
 its approval, pending and approved answers behave as `post_import`'s do. A batch
 already sent is never sent again: a later call only reports what was recorded.
 With the setting off or posting off, neither tool is listed and a call to either
-is refused `master_writes_disabled`. Until a ledger-name answer captured from a
-real TallyPrime can be parsed, `prepare_ledger_creates` refuses
+is refused `master_writes_disabled`. A name that differs from an existing one
+only in case, spaces or symbols is refused too, because TallyPrime can take such
+a Create for the existing ledger and change it. If the ledger names TallyPrime
+returns cannot be read, `prepare_ledger_creates` refuses
 `master_ledger_index_unavailable` and nothing is created. After the one send
 ComplyEaze Bridge reads the book back (every loaded company's master mark, the
 paired ledger and group names, and the new ledger's parent, tax fields, GSTIN and

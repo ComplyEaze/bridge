@@ -1112,3 +1112,18 @@ fn a_contradictory_duty_head_keeps_its_raw_text_and_a_tax_free_row_has_none() {
     assert_eq!(view.duty_head, None);
     assert_eq!(view.party_gstin, None);
 }
+
+/// One ledger that matches the item name through two of its own spellings
+/// (its stored name and a spelling that folds alike) is still one ledger, so
+/// the create verifies.
+#[test]
+fn one_ledger_matching_through_two_of_its_spellings_is_still_verified() {
+    let mut world = World::clean(suspense());
+    let new = world
+        .masters()
+        .iter_mut()
+        .find(|master| master.guid == NEW)
+        .unwrap();
+    new.names.push(NAME.to_uppercase());
+    assert_verified(&world, "two spellings");
+}

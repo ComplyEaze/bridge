@@ -1,8 +1,7 @@
 //! The master post's queue recheck. The index and mark inputs to
 //! `admit_master_create` are constructed values, not captures: it is a pure
-//! decision over parsed indexes, and the ledger index parser it would read
-//! from does not exist yet. The group answer used for `recheck_master_admission`
-//! is a committed live capture.
+//! decision over parsed indexes. The group answers and the ledger index answers
+//! read through `check_name_free` are committed live captures.
 use super::super::post::refusal_code;
 use super::*;
 use bridge_tally_core::master_name_index::Via;
@@ -254,7 +253,7 @@ fn recheck(queued: QueuedAdmission<'_>) -> ApprovedImportAdmissionError {
 }
 
 #[test]
-fn there_is_no_ledger_index_parser_so_a_valid_group_answer_still_refuses() {
+fn an_unparsable_ledger_answer_refuses_beside_a_valid_group_answer() {
     let groups = group_capture();
     let marks = marks(7);
     assert_eq!(
@@ -264,30 +263,163 @@ fn there_is_no_ledger_index_parser_so_a_valid_group_answer_still_refuses() {
             &marks,
             &marks
         )),
-        ApprovedImportAdmissionError::MasterLedgerIndexUnavailable
+        ApprovedImportAdmissionError::MasterLedgerIndexUnavailable {
+            cause: "ledger_catalogue_malformed_response"
+        }
     );
 }
 
 #[test]
-fn the_ledger_parser_refuses_every_input_with_its_own_typed_error() {
+fn the_ledger_parse_refuses_what_is_not_a_ledger_index() {
     assert_eq!(
-        parse_ledger_name_index("<ENVELOPE/>", GUID),
-        Err(LedgerIndexNotCaptured)
+        ledger_masters("<ENVELOPE/>", GUID),
+        Err(StandardLedgerCatalogError::MalformedResponse)
+    );
+    // The group answer of the company `GUID` names: right company, wrong rows.
+    assert_eq!(
+        ledger_masters(&group_capture(), GUID),
+        Err(StandardLedgerCatalogError::MalformedResponse)
+    );
+    let masters = ledger_masters(&masters_lab(MASTERS_LAB_LEDGERS), MASTERS_LAB_GUID).unwrap();
+    assert_eq!(masters.len(), 8);
+    assert!(masters
+        .iter()
+        .all(|master| master.kind == MasterKind::Ledger));
+}
+
+const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
+const MASTERS_LAB_LEDGERS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml"
+);
+const MASTERS_LAB_LEDGERS_AFTER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-after-name-cases.utf16le.xml"
+);
+const MASTERS_LAB_LEDGERS_FOLDED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-ledger-index-after-fold-cases.utf16le.xml"
+);
+const MASTERS_LAB_GROUPS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml"
+);
+
+fn masters_lab(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The name check over one book's captured ledger and group answers.
+fn name_check(ledgers: &[u8], candidate: &str) -> Option<ApprovedImportAdmissionError> {
+    check_name_free(
+        &masters_lab(ledgers),
+        &masters_lab(MASTERS_LAB_GROUPS),
+        &item(candidate),
+        MASTERS_LAB_GUID,
+    )
+    .err()
+    .map(|error| {
+        error
+            .downcast::<ApprovedImportAdmissionError>()
+            .expect("a typed admission error")
+    })
+}
+
+/// Every Create name recorded in `masters-lab.PROVENANCE.md`, checked against
+/// the captured book before those writes: each one Tally altered, refused or
+/// (for a group's name) created beside the group is refused here, and only the
+/// new name is admitted. The doubled-space name is not in the list: `MasterName`
+/// refuses it before any check, as the last assertion shows.
+#[test]
+fn every_create_the_lab_sent_is_refused_against_the_captured_book_but_the_new_name() {
+    let taken = |kind, via| Some(ApprovedImportAdmissionError::MasterNameTaken { kind, via });
+    for (candidate, expected) in [
+        ("MLab Exact Target", taken(MasterKind::Ledger, Via::Name)),
+        ("MLab Alias Name", taken(MasterKind::Ledger, Via::Alias)),
+        ("MLAB CASE TARGET", taken(MasterKind::Ledger, Via::Name)),
+        ("MLab Dash Target", taken(MasterKind::Ledger, Via::Name)),
+        ("MLab Slash Target", taken(MasterKind::Ledger, Via::Name)),
+        ("MLab Group Target", taken(MasterKind::Group, Via::Name)),
+        ("MLab Fresh Party", None),
+    ] {
+        assert_eq!(
+            name_check(MASTERS_LAB_LEDGERS, candidate),
+            expected,
+            "{candidate}"
+        );
+    }
+    assert!(MasterName::new("MLab  Space Target").is_err());
+}
+
+/// After those writes the book holds ledgers whose stored name changed: the
+/// old spelling is still refused, and so is a spelling that differs only by a
+/// removed space.
+#[test]
+fn an_old_spelling_and_a_removed_space_are_refused_after_the_writes() {
+    assert_eq!(
+        name_check(MASTERS_LAB_LEDGERS_AFTER, "MLab Slash/Target"),
+        Some(ApprovedImportAdmissionError::MasterNameTaken {
+            kind: MasterKind::Ledger,
+            via: Via::Name,
+        })
+    );
+    let row_spelling_kept =
+        ledger_masters(&masters_lab(MASTERS_LAB_LEDGERS_AFTER), MASTERS_LAB_GUID)
+            .unwrap()
+            .into_iter()
+            .find(|master| master.names[0] == "MLab Slash Target")
+            .unwrap();
+    assert_eq!(
+        row_spelling_kept.names,
+        ["MLab Slash Target", "MLab Slash/Target"]
     );
     assert_eq!(
-        parse_ledger_name_index(&group_capture(), GUID),
-        Err(LedgerIndexNotCaptured)
+        name_check(MASTERS_LAB_LEDGERS_AFTER, "MLab FreshParty"),
+        Some(ApprovedImportAdmissionError::MasterNameTaken {
+            kind: MasterKind::Ledger,
+            via: Via::Name,
+        })
+    );
+    assert_eq!(
+        name_check(MASTERS_LAB_LEDGERS_AFTER, "MLab Probe Pvt Ltd"),
+        None
     );
 }
 
+/// A removed space and removed full stops, against the captured book after
+/// those Creates: both the old and the new spelling of each ledger are refused.
+#[test]
+fn a_removed_space_and_removed_full_stops_are_refused_against_the_folded_book() {
+    for candidate in [
+        "MLab Fresh Party",
+        "MLab FreshParty",
+        "MLab Probe Pvt. Ltd.",
+        "MLab Probe Pvt Ltd",
+        "MLab Probe PvtLtd",
+    ] {
+        assert!(
+            matches!(
+                name_check(MASTERS_LAB_LEDGERS_FOLDED, candidate),
+                Some(ApprovedImportAdmissionError::MasterNameTaken {
+                    kind: MasterKind::Ledger,
+                    ..
+                })
+            ),
+            "{candidate}"
+        );
+    }
+}
+
 #[tokio::test]
-async fn the_readback_parse_has_the_same_missing_parser_unless_a_seam_scopes_it() {
+async fn the_readback_parse_refuses_alike_unless_a_seam_scopes_it() {
     let groups = group_capture();
     let unavailable = |result: anyhow::Result<(Vec<IndexedMaster>, Vec<IndexedMaster>)>| {
         refusal_code(&result.unwrap_err()).to_string()
     };
-    // No parser: the same typed refusal as the queue's, so a shipped build
-    // reads nothing back and says so.
+    // An answer that does not parse: the same typed refusal as the queue's,
+    // so the read-back says it read nothing.
     assert_eq!(
         unavailable(parse_readback_indexes("<ENVELOPE/>", &groups, GUID)),
         "master_ledger_index_unavailable"
@@ -326,7 +458,7 @@ async fn the_readback_parse_has_the_same_missing_parser_unless_a_seam_scopes_it(
         .scope(
             before.clone(),
             TEST_LEDGER_INDEX_AFTER_POST.scope(after, async {
-                parse_ledger_name_index("<ENVELOPE/>", GUID).unwrap()
+                ledger_masters("<ENVELOPE/>", GUID).unwrap()
             }),
         )
         .await;
@@ -569,11 +701,11 @@ mod queue {
         }
     }
 
-    /// The ledger index has no parser, so a master post is refused after every
-    /// read and before the intent, whatever the books hold. The POST (a 33rd
-    /// request) never arrives.
+    /// A ledger index answer that does not parse refuses a master post after
+    /// every read and before the intent, whatever the books hold. The POST (a
+    /// 33rd request) never arrives.
     #[tokio::test]
-    async fn a_master_post_is_refused_for_want_of_a_ledger_index_before_intent_and_post() {
+    async fn an_unreadable_ledger_index_refuses_a_master_post_before_intent_and_post() {
         let companies = companies();
         let groups = decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
@@ -637,4 +769,24 @@ mod queue {
         assert_eq!(run.observed, 32, "no POST follows the refused intent");
         assert!(run.intent_recorded, "the intent closure was reached");
     }
+}
+
+/// A renamed reserved ledger's built-in name, carried in `RESERVEDNAME`, is
+/// one more name the check refuses (one attribute changed in the capture).
+#[test]
+fn a_reserved_ledgers_built_in_name_is_refused() {
+    let renamed = masters_lab(MASTERS_LAB_LEDGERS).replacen(
+        "<LEDGER NAME=\"MLab Alias Target\" RESERVEDNAME=\"\">",
+        "<LEDGER NAME=\"MLab Alias Target\" RESERVEDNAME=\"Synthetic Reserved\">",
+        1,
+    );
+    let masters = ledger_masters(&renamed, MASTERS_LAB_GUID).unwrap();
+    let alias = masters
+        .iter()
+        .find(|master| master.names[0] == "MLab Alias Target")
+        .unwrap();
+    assert_eq!(
+        alias.names.last().map(String::as_str),
+        Some("Synthetic Reserved")
+    );
 }

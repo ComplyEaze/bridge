@@ -6,9 +6,10 @@
 //! between the all-company mark read as the binding reads begin and the aim
 //! snapshot read last before the POST. This module takes those answers and
 //! refuses unless they are consistent, parse, show the proposed name resolves
-//! to no existing ledger or group (stored name or alias, ledgers and groups
-//! sharing one namespace), and the company's master mark (ALTMSTID) did not
-//! move across the reads.
+//! to no existing ledger or group (stored name, alias or the row's own
+//! spelling; a ledger named like a group is refused by choice, though Tally
+//! would create it), and the company's master mark (ALTMSTID) did not move
+//! across the reads.
 //!
 //! Why a new file: the voucher recheck in `agent_import_post.rs` is a pinned
 //! admission file already over three thousand lines, and shares nothing with
@@ -29,7 +30,7 @@ use bridge_tally_core::master_name_index::{
 use bridge_tally_protocol::native_outstandings::{
     parse_group_name_index, GroupNameIndexError, GroupNameRow,
 };
-use bridge_tally_protocol::StandardLedgerCatalogError;
+use bridge_tally_protocol::{parse_ledger_name_index, StandardLedgerCatalogError};
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -66,36 +67,41 @@ impl MasterPostRequest {
     }
 }
 
-/// There is no parser for the ledger name index answer. The request exists
-/// (the V3 catalogue profile), but no V3 answer has been captured from a real
-/// Tally, so a parser would be written against a shape nobody has seen
-/// (AGENTS.md P1). Until the capture exists a master post is always refused
-/// here, before the intent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct LedgerIndexNotCaptured;
-
-/// Parses a V3 ledger catalogue answer into the ledgers of the name index.
-/// Always [`LedgerIndexNotCaptured`] today; see its documentation.
-pub(super) fn parse_ledger_name_index(
-    _xml: &str,
-    _expected_company_guid: &str,
-) -> Result<Vec<IndexedMaster>, LedgerIndexNotCaptured> {
-    // The one seam: a unit test that must get past the missing parser scopes
-    // the ledgers it wants the book to hold. It is compiled under bare
-    // `cfg(test)`, so no shipped build holds it (`scripts/check-no-test-seam.mjs`
-    // scans the executables).
+/// Parses a V3 ledger catalogue answer into the ledgers of the name index,
+/// with [`parse_ledger_name_index`]'s strict reading: an answer it refuses is
+/// no index, and the post is refused before the intent.
+pub(super) fn ledger_masters(
+    xml: &str,
+    expected_company_guid: &str,
+) -> Result<Vec<IndexedMaster>, StandardLedgerCatalogError> {
+    // The one seam: a tool test scopes the ledgers the book holds, until the
+    // tool tests read captured answers of one company end to end. It is
+    // compiled under bare `cfg(test)`, so no shipped build holds it.
     #[cfg(test)]
     if let Ok(injected) = TEST_LEDGER_INDEX.try_with(Clone::clone) {
         return Ok(injected);
     }
-    Err(LedgerIndexNotCaptured)
+    Ok(parse_ledger_name_index(xml, expected_company_guid)?
+        .into_iter()
+        .map(|row| IndexedMaster {
+            kind: MasterKind::Ledger,
+            guid: row.guid,
+            alter_id: row.alter_id,
+            names: row
+                .names
+                .into_iter()
+                .chain(row.row_spelling)
+                .chain(row.reserved_name)
+                .collect(),
+        })
+        .collect())
 }
 
 #[cfg(test)]
 tokio::task_local! {
-    /// The ledgers a test says the book holds, standing in for the parser that
-    /// does not exist yet. Scoped around the call under test; absent, the
-    /// parser refuses as it does in a shipped build.
+    /// The ledgers a test says the book holds, standing in for a captured
+    /// answer. Scoped around the call under test; absent, the answer is
+    /// parsed as it is in a shipped build.
     pub(super) static TEST_LEDGER_INDEX: Vec<IndexedMaster>;
 }
 
@@ -138,8 +144,7 @@ fn group_cause(error: &GroupNameIndexError) -> Option<&'static str> {
 /// this recheck is [`ApprovedImportAdmissionError::AdmissionInconsistent`]; a
 /// pair of reads that differ, or an index that cannot be built, is
 /// `CatalogueUnreadable`; an unparsable group answer is `GroupExportInvalid`;
-/// the ledger index is always `MasterLedgerIndexUnavailable` until its parser
-/// exists.
+/// an unparsable ledger answer is `MasterLedgerIndexUnavailable`.
 pub(super) fn recheck_master_admission(
     queued: QueuedAdmission<'_>,
 ) -> anyhow::Result<BTreeMap<String, u64>> {
@@ -175,17 +180,18 @@ pub(super) fn recheck_master_admission(
 }
 
 /// Parses the two index answers of `company_guid`: the groups first, so an
-/// unusable group answer is named before the missing ledger parser is.
+/// unusable group answer is named before an unusable ledger answer is.
 pub(super) fn parse_indexes(
     ledgers_xml: &str,
     groups_xml: &str,
     company_guid: &str,
 ) -> anyhow::Result<(Vec<IndexedMaster>, Vec<IndexedMaster>)> {
     let groups = parse_groups(groups_xml, company_guid)?;
-    let ledgers =
-        parse_ledger_name_index(ledgers_xml, company_guid).map_err(|LedgerIndexNotCaptured| {
-            ApprovedImportAdmissionError::MasterLedgerIndexUnavailable
-        })?;
+    let ledgers = ledger_masters(ledgers_xml, company_guid).map_err(|error| {
+        ApprovedImportAdmissionError::MasterLedgerIndexUnavailable {
+            cause: error.safe_code(),
+        }
+    })?;
     Ok((ledgers, groups))
 }
 
@@ -274,8 +280,8 @@ pub(super) fn aim_master_marks(company_marks: &str) -> anyhow::Result<Vec<Master
         .collect())
 }
 
-/// The decision, over parsed indexes: no master holds the name in the one namespace
-/// ledgers and groups share, then the company's master mark did not move
+/// The decision, over parsed indexes: no ledger or group holds the name,
+/// then the company's master mark did not move
 /// between the binding snapshot and the aim snapshot (`admit_queued_aim`).
 /// The first collision, in ledger-then-group order, names the refusal.
 pub(super) fn admit_master_create(
@@ -299,8 +305,8 @@ pub(super) fn admit_master_create(
     Ok(index.pre_image())
 }
 
-/// The name decision over parsed indexes: the one namespace ledgers and groups
-/// share holds no master the item's name could resolve to. Returns the index,
+/// The name decision over parsed indexes: no ledger or group holds a spelling
+/// the item's name could resolve to. Returns the index,
 /// whose pre-image the dispatch records.
 fn admit_free_name(
     ledgers: Vec<IndexedMaster>,

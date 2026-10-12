@@ -492,6 +492,11 @@ test("a test file outside the roots is excluded by the path rule, not by a liste
   assert.deepEqual(checkSourceCoverage(tracked, { exclusions: new Map() }), ["src-tauri/src/a.rs"]);
 });
 
+test("a test file under a root is excluded by the path rule from the files to scan", () => {
+  const tracked = ["src-tauri/src/a.rs", "src-tauri/src/a_tests.rs", "src-tauri/crates/x/tests/y.rs"];
+  assert.deepEqual(checkSourceCoverage(tracked, { exclusions: new Map() }), ["src-tauri/src/a.rs"]);
+});
+
 test("an exclusion with no reason is refused", () => {
   for (const reason of ["", "  ", undefined]) {
     assert.throws(

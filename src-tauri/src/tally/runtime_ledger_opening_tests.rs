@@ -519,3 +519,125 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
         }
     }
 }
+
+/// An invalid BOOKSFROM in the company extent stops the ledger read after the
+/// paired extent reads, before the currency read and before any native ledger
+/// request, and no other date stands in for it (#1148, J). Fault injection into
+/// the captured extent: the target row's BOOKSFROM is removed or replaced.
+///
+/// The refusal for a malformed value is the identity check, not a date parse:
+/// the row's name and GUID match the verified identity, so a BOOKSFROM that is
+/// not the identity's own fails the equality in `parse_company_book_extent_v2`
+/// first, whether it is malformed or merely a different valid date.
+#[tokio::test]
+async fn an_invalid_book_extent_stops_the_ledger_read_before_any_ledger_request() {
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let company_xml = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"));
+    let captured_extent = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    );
+    let companies = parse_companies_from_collection(&company_xml).unwrap();
+    let observed = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some("61c6de69-1748-461c-ad3f-162cb949df9f"))
+        .unwrap();
+    let identity = VerifiedCompanyIdentity::from_observed_companies(
+        observed.name.clone(),
+        observed.guid.clone().unwrap(),
+        observed.company_number.clone().unwrap(),
+        observed.books_from.clone().unwrap(),
+        &companies,
+    )
+    .unwrap();
+    // The identity's own row of the extent, and its BOOKSFROM element within it.
+    let row = captured_extent
+        .find(&format!("<COMPANY NAME=\"{}\"", identity.display_name()))
+        .unwrap();
+    let element = row
+        + captured_extent[row..]
+            .find("<BOOKSFROM TYPE=\"Date\">")
+            .unwrap();
+    let element_end =
+        element + captured_extent[element..].find("</BOOKSFROM>").unwrap() + "</BOOKSFROM>".len();
+    let with_books_from = |replacement: &str| {
+        let faulty = format!(
+            "{}{}{}",
+            &captured_extent[..element],
+            replacement,
+            &captured_extent[element_end..]
+        );
+        assert_ne!(faulty, captured_extent);
+        faulty
+    };
+    let xml = |text: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(text))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let company = xml(company_xml.clone());
+    for (extent, expected) in [
+        (with_books_from(""), "company_extent_xml_invalid"),
+        (
+            with_books_from(r#"<BOOKSFROM TYPE="Date">notadate</BOOKSFROM>"#),
+            "company_identity_presentation_collision",
+        ),
+        (
+            with_books_from(r#"<BOOKSFROM TYPE="Date">2026-13-45</BOOKSFROM>"#),
+            "company_identity_presentation_collision",
+        ),
+        (
+            with_books_from(r#"<BOOKSFROM TYPE="Date">20250401</BOOKSFROM>"#),
+            "company_identity_presentation_collision",
+        ),
+    ] {
+        let extent = xml(extent);
+        // Status probe, the identity bracket's two company reads, then the paired
+        // extent read: two POSTs, each followed by a status check. The currency
+        // read and the ledger export are not scripted, so any further request
+        // would be a request this sequence cannot answer.
+        let plans = vec![
+            status.clone(),
+            company.clone(),
+            company.clone(),
+            extent.clone(),
+            status.clone(),
+            extent,
+            status.clone(),
+        ];
+        let expected_requests = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let result = TallyRuntime::default()
+            .fetch_ledgers_with_opening_as_of_evidence(
+                TallyConfig {
+                    host: simulator.address().ip().to_string(),
+                    port: simulator.address().port(),
+                },
+                &identity,
+            )
+            .await;
+        let observations = simulator.finish().unwrap();
+        assert_eq!(observations.len(), expected_requests, "{expected}");
+        let error = result.unwrap_err();
+        assert_eq!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<OutstandingsError>()),
+            Some(&OutstandingsError::InvalidResponse(expected)),
+            "unexpected error: {error:#}"
+        );
+    }
+}

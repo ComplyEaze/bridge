@@ -6,7 +6,7 @@ Tally Education, and the expectations a live-read run is checked against. Both
 were added in `56409e62` (2026-07-16).
 
 - `education-small-v1.json` — the `synthetic_small` tier: company marker,
-  ledger and voucher sentinels, date ranges and count bounds. Read by
+  ledger sentinel and ledger count bounds. Read by
   `tools/bridge-tally-live-read` as `SyntheticFixtureManifest`; the operator
   steps are in `../live-education-runbook.md`.
 - `education-native-outstandings-v0.json` — the accounting facts an operator
@@ -33,5 +33,5 @@ repeats only what this note says above.
 
 | Fixture | Bytes | SHA-256 (integrity digest) | Capture |
 | --- | ---: | --- | --- |
-| `education-small-v1.json` | 677 | `4783d8ae7c0ce81ed63f4dbead855b81b792890f7ea2d5ab49c44b2e78366553` | not a capture: an authored manifest, as above |
+| `education-small-v1.json` | 318 | `91101d17e9b165a6c0aafc3326966b59eb8b11e1ae57dbb4b4bc0dbe03af21b1` | not a capture: an authored manifest, as above |
 | `education-native-outstandings-v0.json` | 6,273 | `b07c10850ed2294c216687dd227b9ab3ae0a6bcc9fadf369402d4994e07b6a4d` | not a capture: an authored manifest, as above |

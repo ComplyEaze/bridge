@@ -27,19 +27,8 @@ fn fixture() -> SyntheticFixtureManifest {
         dataset_tier: DatasetTier::SyntheticSmall,
         company_marker: "BRIDGE-PR14-SYNTHETIC-019f605f-e6cf-77b2-ac95-31722887a911".to_string(),
         ledger_sentinel: "BRIDGE-LEDGER-019f605f-e6cf-77b2-ac95-31722887a911".to_string(),
-        voucher_number_sentinel: "BRIDGE-VOUCHER-019f605f-e6cf-77b2-ac95-31722887a911".to_string(),
-        empty_voucher_range: DateWindow {
-            from_yyyymmdd: "20260403".to_string(),
-            to_yyyymmdd: "20260403".to_string(),
-        },
-        populated_voucher_range: DateWindow {
-            from_yyyymmdd: "20260401".to_string(),
-            to_yyyymmdd: "20260402".to_string(),
-        },
         minimum_ledger_count: 1,
         maximum_ledger_count: 100,
-        minimum_populated_voucher_count: 1,
-        maximum_populated_voucher_count: 20,
     }
 }
 
@@ -57,7 +46,6 @@ fn metadata() -> RunMetadata {
 
 fn receipt() -> LiveCompatibilityReceipt {
     let company = ValidatedCompanyName::new(fixture().company_marker).unwrap();
-    let range = ValidatedDateRange::new("20260403", "20260403").unwrap();
     let profile = ReadOnlyProfile::CompanyListV1;
     let mut operations = vec![not_attempted(
         ReadProfileId::XmlCompanyEnumerationV1,
@@ -69,7 +57,7 @@ fn receipt() -> LiveCompatibilityReceipt {
         profile.template_sha256(),
         "endpoint_not_queried",
     ));
-    append_company_reads_not_attempted(&mut operations, &company, &range);
+    append_company_reads_not_attempted(&mut operations, &company);
     seal_receipt(
         &config(9001),
         &fixture(),
@@ -95,17 +83,11 @@ fn inputs(port: u16, binding: &str, expires_at_unix_ms: i64) -> LiveRunInputs {
 }
 
 #[test]
-fn fixture_requires_reviewed_sentinels_bounded_counts_and_disjoint_ranges() {
+fn fixture_requires_reviewed_sentinels_and_bounded_counts() {
     assert!(validate_fixture(&fixture()).is_ok());
     let mut invalid = fixture();
     invalid.company_marker = "synthetic".to_string();
     assert_eq!(validate_fixture(&invalid), Err(error("fixture_invalid")));
-    let mut overlap = fixture();
-    overlap.empty_voucher_range = overlap.populated_voucher_range.clone();
-    assert_eq!(
-        validate_fixture(&overlap),
-        Err(error("fixture_ranges_overlap"))
-    );
     let mut invalid_bounds = fixture();
     invalid_bounds.maximum_ledger_count = 0;
     assert_eq!(
@@ -132,7 +114,6 @@ fn unknown_profile_fields_are_rejected_before_network_and_cannot_be_laundered() 
     config.locale = LocaleProfile::Unknown;
     assert_eq!(validate_config(&config), Err(error("config_invalid")));
     let company = ValidatedCompanyName::new(fixture().company_marker).unwrap();
-    let range = ValidatedDateRange::new("20260403", "20260403").unwrap();
     let profile = ReadOnlyProfile::CompanyListV1;
     let mut operations = vec![not_attempted(
         ReadProfileId::XmlCompanyEnumerationV1,
@@ -144,7 +125,7 @@ fn unknown_profile_fields_are_rejected_before_network_and_cannot_be_laundered() 
         profile.template_sha256(),
         "endpoint_not_queried",
     ));
-    append_company_reads_not_attempted(&mut operations, &company, &range);
+    append_company_reads_not_attempted(&mut operations, &company);
     let receipt = seal_receipt(
         &config,
         &fixture(),
@@ -319,9 +300,8 @@ fn public_save_consumes_a_repository_bound_target_and_rechecks_no_overwrite() {
 }
 
 #[tokio::test]
-async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_them() {
+async fn an_education_run_refuses_the_ledger_read_before_sending_it() {
     let company = ValidatedCompanyName::new("Synthetic Co").unwrap();
-    let range = ValidatedDateRange::new("20260401", "20260430").unwrap();
     let simulator = tally_protocol_simulator::SequenceSimulator::spawn(vec![ScenarioPlan::new(
         Fixture::EmptyExport,
     )
@@ -329,16 +309,11 @@ async fn an_education_run_refuses_the_ledger_and_voucher_reads_before_sending_th
     .unwrap();
     let port = simulator.address().port();
     let education = read_transport(&config(port)).unwrap();
-    for profile in [
-        ReadOnlyProfile::LedgersV1 { company: &company },
-        ReadOnlyProfile::VouchersV2 {
-            company: &company,
-            range: &range,
-        },
-    ] {
-        let refused = education.send(profile).await.unwrap_err();
-        assert_eq!(refused.safe_code(), "education_report_family_unsupported");
-    }
+    let refused = education
+        .send(ReadOnlyProfile::LedgersV1 { company: &company })
+        .await
+        .unwrap_err();
+    assert_eq!(refused.safe_code(), "education_report_family_unsupported");
     assert_eq!(simulator.received(), 0);
     let mut licensed = config(port);
     licensed.mode = TallyMode::Licensed;

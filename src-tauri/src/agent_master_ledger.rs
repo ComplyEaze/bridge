@@ -32,8 +32,14 @@
 //!   names may be one master, inside a batch and against an open dispatch, is
 //!   computed from the names every time ([`NameKeys::may_be_one_master`]), so a
 //!   journal written before a fold widened is judged by the wider fold. Against
-//!   an open dispatch an equal recorded key also refuses, so a fold narrowed by
-//!   a later build cannot release one: a key on disk can only add a refusal.
+//!   an open dispatch an equal recorded key also refuses: a key on disk can only
+//!   add a refusal. That keeps a fold narrowed by a later build from releasing an
+//!   overlap between two lines written before it; a new intent's keys come from
+//!   the narrower fold, so it does not cover a new batch.
+//! - Widening a fold can make an existing journal unreadable: a batch or a pair
+//!   of open intents admitted before may now match, and the whole file is then
+//!   refused, which stops every master write until the journal is repaired. That
+//!   failure is closed and loud, and a fold change has to weigh it.
 //! - An intent with no terminal verdict blocks every overlapping batch for good.
 //!   The read-back-absent terminal state and the rules for it belong to the
 //!   dispatch slice; until then, recovering such a batch is an operator decision.

@@ -8,7 +8,7 @@ Book: synthetic BRIDGE PILOT LAB, company number 100033, GUID 6b43e498-430c-4d5c
 - Accept As Is was used on **BP/26-27/0005 only**. No other voucher or master was altered by hand.
 - Fresh backup before any change: `<lab>\w13\backup-pre\TDBK1800_100033.001`, 79,079 B, sha256 037e04e82c5d13b262c7c2c2d2880bab85f398bebe825e180f662ba501e28633, 12:27Z. It stays on the lab PC.
 - Screenshots stay on the lab PC, listed by hash in `SHA256-screenshots.txt`. This differs from the README, which asks for screens in `workorder/`.
-- Sends: 14, one at a time, each with curl exit 0 and printed `200 <bytes>`. Every answer is a complete ENVELOPE with a COLLECTION element and no LINEERROR. `send-log.txt` holds every line.
+- Sends: 15, one at a time, each with curl exit 0 and printed `200 <bytes>`. Every answer is a complete ENVELOPE with a COLLECTION element and no LINEERROR. `send-log.txt` holds every line.
 
 ## Answers
 | When | Answer | Bytes | sha256 (first 8) | Note |

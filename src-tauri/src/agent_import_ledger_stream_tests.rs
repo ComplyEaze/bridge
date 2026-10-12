@@ -780,3 +780,34 @@ fn an_unreadable_candidate_amount_fails_closed() {
     );
     assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
 }
+
+/// The batch size the tool descriptions and the README tell a caller (#865) is
+/// the code's own batch-post limit, so a change of the constant cannot leave
+/// the text stale.
+#[test]
+fn the_batch_size_the_texts_state_is_the_batch_post_limit() {
+    let phrase =
+        format!("cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers");
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    for tool in ["build_import_xml", "parse_bank_statement"] {
+        let description = definitions
+            .as_array()
+            .expect("tool list")
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition["description"].as_str())
+            .unwrap_or_else(|| panic!("{tool} has no description"));
+        assert!(
+            description.contains(&phrase),
+            "{tool}'s description does not say {phrase:?}"
+        );
+    }
+    let readme = include_str!("../../docs/agent/README.md");
+    let sentence = format!(
+        "cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers (the batch-post limit)"
+    );
+    assert!(
+        readme.contains(&sentence),
+        "the README does not say {sentence:?}"
+    );
+}

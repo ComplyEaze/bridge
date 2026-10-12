@@ -9,7 +9,9 @@ use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 
 #[path = "agent_import.rs"]
 mod agent_import;
-pub use crate::tally::approved_import::{run_confirmation, run_review_confirmation};
+pub use crate::tally::approved_import::{
+    run_confirmation, run_masters_confirmation, run_review_confirmation,
+};
 pub(crate) use agent_import::desktop_journal_review as desktop_journal;
 
 // LAB-ONLY additive surface (audit-sprint 2026-09-14, Phase 3). Compiled only

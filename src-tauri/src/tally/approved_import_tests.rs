@@ -1,38 +1,8 @@
 use super::*;
 
-// The only constructors of the masters kind. They live in this test module, not
-// in the shipped file, so no production path can build one (AGENTS.md P2): the
-// dialog slice adds the real constructor beside the masters dialog.
-
-impl MasterAdmission {
-    /// Renders the request once, with the two index reads for the company.
-    fn new(
-        item: LedgerCreateItem,
-        company: &VerifiedCompanyIdentity,
-    ) -> Result<Self, super::super::agent_read_request::AgentReadRequestError> {
-        use super::super::agent_read_request::AgentReadRequestError;
-        use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
-        let validated =
-            ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
-        let rendered = item.render_import(company);
-        Ok(Self {
-            item,
-            rendered,
-            ledger_index_request: AgentReadRequest::parse(
-                ReadOnlyProfile::StandardLedgerCatalogV3 {
-                    company: &validated,
-                }
-                .render(),
-            )?,
-            group_index_request: AgentReadRequest::parse(
-                bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
-                    company.display_name(),
-                ),
-            )?,
-            company: company.clone(),
-        })
-    }
-}
+// The production constructor of the masters kind is `confirm_masters`, which
+// asks the person first. This module also builds one without a dialog, from the
+// same admission, for the queue's tests.
 
 impl ApprovedImport {
     /// The masters twin of `approved_for_test`: an approval without a dialog,
@@ -309,21 +279,209 @@ fn a_master_post_refuses_education_and_accepts_a_mode_that_is_not() {
     );
 }
 
-/// A master approval redeemed against a voucher binding can never match its
-/// count: it is refused as a changed binding.
+/// A master post has no voucher count at all: whether an approval is for the
+/// right kind is `post_kind`, which differs between the kinds (the voucher
+/// side is held in the approval slot's tests).
 #[test]
-fn a_master_post_counts_no_vouchers() {
-    assert_eq!(approved_masters("Queue Test Suspense").voucher_count(), 0);
+fn a_master_post_has_no_voucher_count_and_its_own_kind() {
+    let masters = approved_masters("Queue Test Suspense");
+    assert_eq!(masters.voucher_count(), None);
+    assert_eq!(masters.post_kind(), PostKind::Masters);
+}
+
+use test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+
+const LEDGER_PREVIEW: &str = "Create ledger \"Queue Test Suspense\" under Suspense A/c";
+
+async fn confirm_masters_under(
+    scripted: &ScriptedApproval,
+    name: &str,
+) -> Result<ApprovedImport, String> {
+    SCRIPTED_APPROVAL
+        .scope(
+            scripted.clone(),
+            ApprovedImport::confirm_masters(
+                masters_item(name),
+                &masters_identity(),
+                LEDGER_PREVIEW,
+                marks_request(),
+            ),
+        )
+        .await
+}
+
+/// The person's approval makes the masters kind, from the same admission the
+/// queue tests build, and the one-ledger dialog is asked with the preview as
+/// given. The post and review dialogs are not asked.
+#[tokio::test]
+async fn an_approved_ledger_create_holds_the_masters_kind() {
+    let scripted = ScriptedApproval::approving();
+    let approved = confirm_masters_under(&scripted, "Queue Test Suspense")
+        .await
+        .unwrap();
+    assert_eq!(approved.post_kind(), PostKind::Masters);
+    assert_eq!(approved.voucher_count(), None);
+    assert_eq!(
+        masters_of(&approved).item(),
+        &masters_item("Queue Test Suspense")
+    );
+    assert_eq!(masters_of(&approved).company(), &masters_identity());
+    assert_eq!(
+        approved.xml(),
+        approved_masters("Queue Test Suspense").xml(),
+        "the same item and company render the same bytes"
+    );
+    assert_eq!(scripted.masters(), vec![LEDGER_PREVIEW.to_string()]);
+    assert!(scripted.previews().is_empty());
+    assert!(scripted.reviews().is_empty());
+}
+
+/// A decline, and an unscoped call, approve nothing and hold no kind.
+#[tokio::test]
+async fn a_declined_or_unscoped_ledger_create_approves_nothing() {
+    let declining = ScriptedApproval::declining();
+    assert_eq!(
+        confirm_masters_under(&declining, "Queue Test Suspense")
+            .await
+            .err(),
+        Some("master_approval_declined".to_string())
+    );
+    assert_eq!(declining.masters(), vec![LEDGER_PREVIEW.to_string()]);
+    assert_eq!(
+        ApprovedImport::confirm_masters(
+            masters_item("Queue Test Suspense"),
+            &masters_identity(),
+            LEDGER_PREVIEW,
+            marks_request(),
+        )
+        .await
+        .err(),
+        Some("master_approval_declined".to_string())
+    );
+}
+
+/// A voucher dialog's scripted answer is not a master approval: the post and
+/// review dialogs record to their own lists, and a ledger create records to
+/// its own.
+#[tokio::test]
+async fn the_scripted_dialogs_record_apart() {
+    let scripted = ScriptedApproval::approving();
+    SCRIPTED_APPROVAL
+        .scope(scripted.clone(), async {
+            super::approve(VoucherCount::new(1).unwrap(), "Post")
+                .await
+                .unwrap();
+            super::approve_review(VoucherCount::new(1).unwrap(), "Review")
+                .await
+                .unwrap();
+            super::approve_masters("Create").await.unwrap();
+        })
+        .await;
+    assert_eq!(scripted.previews(), vec!["Post".to_string()]);
+    assert_eq!(scripted.reviews(), vec!["Review".to_string()]);
+    assert_eq!(scripted.masters(), vec!["Create".to_string()]);
+}
+
+/// A master dialog on its own task, as a held approval runs it, answers as a
+/// voucher dialog does.
+#[tokio::test]
+async fn a_ledger_create_dialog_can_be_held_on_its_own_task() {
+    let scripted = ScriptedApproval::approving();
+    let pending = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), async {
+            PendingPostApproval::ask_masters(
+                masters_item("Queue Test Suspense"),
+                masters_identity(),
+                LEDGER_PREVIEW.to_string(),
+                marks_request(),
+            )
+        })
+        .await;
+    let (answer, answered) = pending
+        .answer_within(Duration::from_secs(5))
+        .await
+        .ok()
+        .expect("answered");
+    assert!(answered.approved);
+    assert_eq!(answer.unwrap().post_kind(), PostKind::Masters);
+    assert_eq!(scripted.masters(), vec![LEDGER_PREVIEW.to_string()]);
+
+    let declined = ScriptedApproval::declining();
+    let pending = SCRIPTED_APPROVAL
+        .scope(declined, async {
+            PendingPostApproval::ask_masters(
+                masters_item("Queue Test Suspense"),
+                masters_identity(),
+                LEDGER_PREVIEW.to_string(),
+                marks_request(),
+            )
+        })
+        .await;
+    let (answer, answered) = pending
+        .answer_within(Duration::from_secs(5))
+        .await
+        .ok()
+        .expect("answered");
+    assert!(!answered.approved);
+    assert_eq!(answer.err(), Some("master_approval_declined".to_string()));
+}
+
+// The one-ledger child's own answer.
+
+#[test]
+fn an_approved_ledger_dialog_writes_exactly_its_own_token() {
+    let (approved, output) = answer_as(
+        MASTERS_TOKEN_PREFIX,
+        |_, _| true,
+        &format!("{NONCE}\n1\nCreate one ledger"),
+    );
+    assert!(approved);
+    assert_eq!(
+        output,
+        format!("bridge-create-ledger:{NONCE}\n").into_bytes()
+    );
+    assert_ne!(MASTERS_TOKEN_PREFIX, POST_TOKEN_PREFIX);
+    assert_ne!(MASTERS_TOKEN_PREFIX, REVIEW_TOKEN_PREFIX);
+    assert!(!MASTERS_TOKEN_PREFIX.starts_with(POST_TOKEN_PREFIX));
+    assert!(!MASTERS_TOKEN_PREFIX.starts_with(REVIEW_TOKEN_PREFIX));
 }
 
 #[test]
-fn the_masters_approval_does_not_exist_yet() {
-    assert_eq!(
-        ApprovedImport::confirm_masters().err(),
-        Some(MasterApprovalUnavailable)
+fn a_declined_ledger_dialog_writes_no_token() {
+    static SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let (approved, output) = answer_as(
+        MASTERS_TOKEN_PREFIX,
+        |_, _| {
+            SHOWN.store(true, std::sync::atomic::Ordering::SeqCst);
+            false
+        },
+        &format!("{NONCE}\n1\nCreate one ledger"),
     );
-    assert_eq!(
-        MasterApprovalUnavailable.to_string(),
-        "master_approval_unavailable"
-    );
+    assert!(SHOWN.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(!approved);
+    assert!(output.is_empty(), "{output:?}");
+}
+
+/// The one-ledger dialog is about one item: a count of two is not the parent's
+/// shape for it, so it shows nothing and does not approve. (It returns before
+/// any window opens.)
+#[test]
+fn the_ledger_dialog_is_shown_for_one_item_only() {
+    assert!(!show_create_ledger(VoucherCount::new(2).unwrap(), "Create"));
+    assert!(!show_create_ledger(
+        VoucherCount::new(200).unwrap(),
+        "Create"
+    ));
+}
+
+/// The words the person reads: the title asks the question, and the button
+/// names what it does and is not the decline's label.
+#[test]
+fn the_ledger_dialog_words_name_what_the_button_does() {
+    assert_eq!(MASTERS_TITLE, "ComplyEaze Bridge — create one ledger?");
+    #[cfg(not(windows))]
+    {
+        assert_eq!(MASTERS_BUTTON, "Create ledger");
+        assert_ne!(MASTERS_BUTTON, "Cancel");
+    }
 }

@@ -1,6 +1,6 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
 //! subsequent calls only reconcile its identity.
-use super::approval::{self, ApprovalBinding, Begin, Joined};
+use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::tally::approved_import::{
@@ -976,9 +976,16 @@ impl Server {
                             }
                         }
                     }
-                    let (taken, request, native) =
+                    let (taken, request, held) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;
                     redemption = Some(taken);
+                    // The binding was a voucher binding, so only a voucher
+                    // request can come back; a master request here is a wiring
+                    // fault, refused as a changed binding with the approval
+                    // unspent (the redemption lapses as this returns).
+                    let HeldRequest::Vouchers(native) = held else {
+                        return Err("import_approval_binding_changed".to_string().into());
+                    };
                     (request, native)
                 }
             };

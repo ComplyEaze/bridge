@@ -25,6 +25,16 @@ const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
 /// The same for the post dialog (#635). Distinct from the review's, so a
 /// subprocess in one mode can never answer the other.
 const POST_TOKEN_PREFIX: &str = "bridge-post-approved:";
+/// The same for the one-ledger dialog. Distinct from both others, so a
+/// subprocess in one mode can never answer another.
+const MASTERS_TOKEN_PREFIX: &str = "bridge-create-ledger:";
+/// The one-ledger dialog's title. The Windows box has no custom labels, so the
+/// title asks the question there as well.
+const MASTERS_TITLE: &str = "ComplyEaze Bridge — create one ledger?";
+#[cfg(not(windows))]
+const MASTERS_BUTTON: &str = "Create ledger";
+/// What a one-ledger dialog is told as its count: always one item.
+const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -67,13 +77,18 @@ pub(crate) struct ApprovedImport {
 #[derive(Clone)]
 pub(super) enum ApprovedKind {
     Vouchers(VoucherAdmission),
-    #[allow(
-        dead_code,
-        reason = "staged: built only in test builds until the dialog slice"
-    )]
+    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
     /// Boxed: a master admission carries a rendered request and two reads, and
     /// every `ApprovedImport` moves by value through the approval path.
     Masters(Box<MasterAdmission>),
+}
+
+/// Which request an approval, a binding or a held request is for. Compared by
+/// kind, never by a count that happens to differ between kinds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PostKind {
+    Vouchers,
+    Masters,
 }
 
 /// A voucher post's admission: every field the voucher path carried before
@@ -122,14 +137,11 @@ impl VoucherAdmission {
 ///
 /// `rendered` is produced once, when the admission is built, and never again,
 /// so the bytes the POST sends are the bytes whose digest the dispatch intent
-/// records. The only constructor today is a test-only one in
-/// `approved_import_tests.rs`: none is compiled into a shipped build until the
-/// masters dialog exists, so no production code can hold this kind (P2).
+/// records. The only production constructor is [`ApprovedImport::confirm_masters`],
+/// which builds it before the dialog and holds it only if the person approves,
+/// so no code holds an approved masters kind without that answer (P2).
 #[derive(Clone)]
-#[allow(
-    dead_code,
-    reason = "staged: built only in test builds until the dialog slice"
-)]
+#[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
 pub(super) struct MasterAdmission {
     item: LedgerCreateItem,
     rendered: RenderedLedgerCreate,
@@ -141,6 +153,34 @@ pub(super) struct MasterAdmission {
 }
 
 impl MasterAdmission {
+    /// Renders the request once, with the two index reads for the company.
+    fn new(
+        item: LedgerCreateItem,
+        company: &VerifiedCompanyIdentity,
+    ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
+        use super::agent_read_request::AgentReadRequestError;
+        use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+        let validated =
+            ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
+        let rendered = item.render_import(company);
+        Ok(Self {
+            item,
+            rendered,
+            ledger_index_request: AgentReadRequest::parse(
+                ReadOnlyProfile::StandardLedgerCatalogV3 {
+                    company: &validated,
+                }
+                .render(),
+            )?,
+            group_index_request: AgentReadRequest::parse(
+                bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
+                    company.display_name(),
+                ),
+            )?,
+            company: company.clone(),
+        })
+    }
+
     pub(super) fn item(&self) -> &LedgerCreateItem {
         &self.item
     }
@@ -232,16 +272,40 @@ impl ApprovedImport {
         })
     }
 
-    /// The master post's approval: not available. The masters dialog does not
-    /// exist yet, and the one dialog that does asks about vouchers, so no
-    /// answer to it can approve a master. Until that dialog and its own token
-    /// exist this refuses every time, and the only code that builds a
-    /// [`MasterAdmission`] is in the unit-test module alone, so no production
-    /// path holds an `ApprovedImport` of the masters kind (AGENTS.md P2). The
-    /// dialog slice replaces this body and the test-only constructors together.
-    #[allow(dead_code, reason = "staged: the masters dispatch has no caller yet")]
-    pub(crate) fn confirm_masters() -> Result<Self, MasterApprovalUnavailable> {
-        Err(MasterApprovalUnavailable)
+    /// The master post's approval: the one-ledger dialog, answered only by its
+    /// own token. On the person's approval this holds `item` as the masters
+    /// kind; any other answer is a typed refusal and holds nothing. The
+    /// request and the two index reads are built before the dialog, so a
+    /// fault there asks no one.
+    ///
+    /// `preview` is what the person is shown. It is built from `item` and
+    /// `company` by the caller's review builder, and bound with them in the
+    /// approval binding.
+    ///
+    /// NOT called from any production tool path yet: the masters tools that
+    /// ask it, and the dispatch that spends its approval, are the next piece.
+    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
+    pub(crate) async fn confirm_masters(
+        item: LedgerCreateItem,
+        company: &VerifiedCompanyIdentity,
+        preview: &str,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, String> {
+        let admission = MasterAdmission::new(item, company)
+            .map_err(|_| "master_request_invalid".to_string())?;
+        approve_masters(preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }
+
+    /// Which request this approval is for.
+    pub(crate) fn post_kind(&self) -> PostKind {
+        match &self.kind {
+            ApprovedKind::Vouchers(_) => PostKind::Vouchers,
+            ApprovedKind::Masters(_) => PostKind::Masters,
+        }
     }
 
     /// The bytes the one POST sends, whatever the kind. For masters they are
@@ -252,6 +316,11 @@ impl ApprovedImport {
             ApprovedKind::Vouchers(vouchers) => &vouchers.xml,
             ApprovedKind::Masters(masters) => masters.rendered.xml(),
         }
+    }
+
+    /// Whether the one POST would send exactly `xml`.
+    pub(crate) fn sends_exactly(&self, xml: &str) -> bool {
+        self.xml() == xml
     }
 
     pub(super) fn company_marks_request(&self) -> AgentReadRequest {
@@ -315,12 +384,6 @@ impl ApprovedImport {
     }
 }
 
-/// The masters approval does not exist yet; see
-/// [`ApprovedImport::confirm_masters`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("master_approval_unavailable")]
-pub(crate) struct MasterApprovalUnavailable;
-
 /// How long a post dialog stays open before it approves nothing: the limit
 /// [`nonce_bound_dialog`] applies. Used only to tell a caller how much of it
 /// remains; the dialog enforces its own.
@@ -363,7 +426,7 @@ pub(crate) struct PendingPostApproval {
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
     /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there.
+    /// task. Nothing else can be run there but the masters twin below.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -376,10 +439,8 @@ impl PendingPostApproval {
         currency_request: AgentReadRequest,
         company_marks_request: AgentReadRequest,
     ) -> Self {
-        let answered = std::sync::Arc::new(std::sync::OnceLock::new());
-        let stamp = std::sync::Arc::clone(&answered);
-        let dialog = async move {
-            let answer = ApprovedImport::confirm_vouchers(
+        Self::stamped(async move {
+            ApprovedImport::confirm_vouchers(
                 xml,
                 &preview,
                 voucher_dates,
@@ -390,7 +451,33 @@ impl PendingPostApproval {
                 currency_request,
                 company_marks_request,
             )
-            .await;
+            .await
+        })
+    }
+
+    /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
+    /// with exactly these arguments, on its own task. Not called from any
+    /// production tool path yet.
+    #[allow(dead_code, reason = "staged: the masters tools have no caller yet")]
+    pub(crate) fn ask_masters(
+        item: LedgerCreateItem,
+        company: VerifiedCompanyIdentity,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        Self::stamped(async move {
+            ApprovedImport::confirm_masters(item, &company, &preview, company_marks_request).await
+        })
+    }
+
+    /// Run `confirm` on its own task, stamping its answer as it ends.
+    fn stamped(
+        confirm: impl std::future::Future<Output = Result<ApprovedImport, String>> + Send + 'static,
+    ) -> Self {
+        let answered = std::sync::Arc::new(std::sync::OnceLock::new());
+        let stamp = std::sync::Arc::clone(&answered);
+        let dialog = async move {
+            let answer = confirm.await;
             // Stamped before the task ends, never after: a task seen finished
             // with no stamp is one that ended without an answer. A refusal's
             // code is stamped with it, so it can be read without the task.
@@ -468,13 +555,12 @@ impl ApprovedImport {
     /// taken from these dates (#746), so a redeemed approval can be held to the
     /// batch it is redeemed for.
     ///
-    /// A master post has no vouchers: it counts as none, which no voucher
-    /// binding does, so a master approval redeemed for a voucher batch is
-    /// refused as a changed binding rather than posted.
-    pub(crate) fn voucher_count(&self) -> usize {
+    /// A master post has no vouchers and no count: `None`. Whether an approval
+    /// is for the right kind is decided by [`Self::post_kind`], never by this.
+    pub(crate) fn voucher_count(&self) -> Option<usize> {
         match &self.kind {
-            ApprovedKind::Vouchers(vouchers) => vouchers.voucher_dates.len(),
-            ApprovedKind::Masters(_) => 0,
+            ApprovedKind::Vouchers(vouchers) => Some(vouchers.voucher_dates.len()),
+            ApprovedKind::Masters(_) => None,
         }
     }
 }
@@ -695,6 +781,14 @@ use confirm_review as approve_review;
 #[cfg(test)]
 use test_seam::approve_review;
 
+/// The native one-ledger dialog every master approval goes through, gated
+/// exactly as [`approve`] is.
+#[cfg(not(test))]
+use confirm_masters_dialog as approve_masters;
+
+#[cfg(test)]
+use test_seam::approve_masters;
+
 /// What a post dialog's own task runs under (#725). Outside this crate's unit
 /// tests it is the dialog alone: nothing is carried into the task.
 #[cfg(not(test))]
@@ -735,6 +829,9 @@ pub(crate) mod test_seam {
         /// Every preview the review dialog was asked about, kept apart from
         /// the post dialog's so a test can tell which dialog a person saw.
         reviews: Arc<Mutex<Vec<String>>>,
+        /// Every preview the one-ledger dialog was asked about, kept apart
+        /// from the other two so a test can tell which dialog a person saw.
+        masters: Arc<Mutex<Vec<String>>>,
         /// The voucher count each dialog was asked about, in the same order
         /// as `previews` and `reviews` (#746).
         counts: Arc<Mutex<Vec<usize>>>,
@@ -813,6 +910,7 @@ pub(crate) mod test_seam {
                 approve,
                 previews: Arc::default(),
                 reviews: Arc::default(),
+                masters: Arc::default(),
                 counts: Arc::default(),
                 review_counts: Arc::default(),
                 while_pending: None,
@@ -827,6 +925,10 @@ pub(crate) mod test_seam {
 
         pub(crate) fn reviews(&self) -> Vec<String> {
             self.reviews.lock().unwrap().clone()
+        }
+
+        pub(crate) fn masters(&self) -> Vec<String> {
+            self.masters.lock().unwrap().clone()
         }
 
         pub(crate) fn counts(&self) -> Vec<usize> {
@@ -845,13 +947,13 @@ pub(crate) mod test_seam {
         pub(crate) static SCRIPTED_APPROVAL: ScriptedApproval;
     }
 
-    /// The test-build approval. Unscoped, it declines at once and starts no
-    /// process, so no test can reach a real dialog or approve by default.
-    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
+    /// What the scripted decision is for a dialog that records itself with
+    /// `record`: the decision, once a held dialog has been answered. Unscoped
+    /// it declines at once and starts no process.
+    async fn scripted_decision(record: impl FnOnce(&ScriptedApproval)) -> bool {
         let decision = SCRIPTED_APPROVAL
             .try_with(|scripted| {
-                scripted.previews.lock().unwrap().push(preview.to_string());
-                scripted.counts.lock().unwrap().push(count.0.get());
+                record(scripted);
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
@@ -867,20 +969,43 @@ pub(crate) mod test_seam {
             .unwrap_or(Ok(false));
         let decision = match decision {
             Ok(decision) => decision,
-            Err(mut held) => {
-                let answered = held
-                    .wait_for(Option::is_some)
-                    .await
-                    .map(|answer| *answer == Some(true))
-                    .unwrap_or(false);
-                answered
-            }
+            Err(mut held) => held
+                .wait_for(Option::is_some)
+                .await
+                .map(|answer| *answer == Some(true))
+                .unwrap_or(false),
         };
         std::hint::black_box(SEAM_MARKER);
+        decision
+    }
+
+    /// The test-build approval. Unscoped, it declines at once and starts no
+    /// process, so no test can reach a real dialog or approve by default.
+    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
+        let decision = scripted_decision(|scripted| {
+            scripted.previews.lock().unwrap().push(preview.to_string());
+            scripted.counts.lock().unwrap().push(count.0.get());
+        })
+        .await;
         if decision {
             Ok(())
         } else {
             Err("import_approval_declined".into())
+        }
+    }
+
+    /// The test-build one-ledger dialog, scripted by the same decision
+    /// (including a held dialog a test answers) and declining the same way
+    /// when unscoped.
+    pub(super) async fn approve_masters(preview: &str) -> Result<(), String> {
+        let decision = scripted_decision(|scripted| {
+            scripted.masters.lock().unwrap().push(preview.to_string());
+        })
+        .await;
+        if decision {
+            Ok(())
+        } else {
+            Err("master_approval_declined".into())
         }
     }
 
@@ -948,6 +1073,24 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::confirm_review(ONE, &oversized).await,
             Err("ack_review_too_large".to_string())
+        );
+    }
+
+    /// The same for the one-ledger dialog, which has its own limit code.
+    #[tokio::test]
+    async fn the_real_masters_approval_refuses_an_oversized_preview_before_starting_a_process() {
+        let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
+        assert_eq!(
+            super::confirm_masters_with(
+                std::path::Path::new("/nonexistent/never-started"),
+                &oversized
+            )
+            .await,
+            Err("master_review_too_large".to_string())
+        );
+        assert_eq!(
+            super::confirm_masters_dialog(&oversized).await,
+            Err("master_review_too_large".to_string())
         );
     }
 
@@ -1088,6 +1231,12 @@ pub(crate) mod test_seam {
                 Err("ack_review_unavailable"),
             ),
             (
+                "the one-ledger dialog's token for this nonce",
+                0,
+                "bridge-create-ledger:{NONCE}\n",
+                Err("ack_review_unavailable"),
+            ),
+            (
                 "a log line, then the token",
                 0,
                 "starting\nbridge-review-acknowledged:{NONCE}\n",
@@ -1167,6 +1316,10 @@ pub(crate) mod test_seam {
                 "the review dialog's token for this nonce",
                 "bridge-review-acknowledged:{NONCE}\n",
             ),
+            (
+                "the one-ledger dialog's token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
             // The answer is matched byte for byte, so any stray output, such
             // as a log line, is refused. That is fail-closed on purpose: do
             // not trim or search the output to "fix" it.
@@ -1217,6 +1370,133 @@ pub(crate) mod test_seam {
         assert!(nonces
             .iter()
             .all(|nonce| uuid::Uuid::parse_str(nonce).is_ok()));
+        assert_ne!(nonces[0], nonces[1]);
+    }
+
+    /// The one-ledger dialog is approved only by the token echoing this call's
+    /// nonce and a clean exit, as the post dialog is. Anything else is refused,
+    /// never approved: a clean exit without the token is an executable that is
+    /// not this dialog (unavailable), and the post and review dialogs' tokens
+    /// are not this one's.
+    #[tokio::test]
+    async fn a_ledger_create_is_approved_only_by_the_token_for_its_nonce() {
+        let directory = standin_directory();
+        for (name, exit_code, answer) in [
+            ("a person's decline: no token, exit 1", 1, ""),
+            (
+                "the token, but a failing exit",
+                1,
+                "bridge-create-ledger:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), exit_code, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, "Create").await,
+                Err("master_approval_declined".to_string()),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        for (name, answer) in [
+            ("an executable ignoring the flag exits 0", ""),
+            ("an echo of the input", "{NONCE}\n1\nCreate"),
+            (
+                "a token for another nonce",
+                "bridge-create-ledger:00000000-0000-4000-8000-000000000000\n",
+            ),
+            (
+                "the post dialog's token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review dialog's token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+            (
+                "a log line, then the token",
+                "starting\nbridge-create-ledger:{NONCE}\n",
+            ),
+            (
+                "the token, then more output",
+                "bridge-create-ledger:{NONCE}\nmore\n",
+            ),
+            ("the token with CRLF", "bridge-create-ledger:{NONCE}\r\n"),
+            (
+                "the token without its newline",
+                "bridge-create-ledger:{NONCE}",
+            ),
+        ] {
+            let path = standin(directory.path(), 0, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, "Create").await,
+                Err("master_approval_unavailable".to_string()),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_masters_with(&approves, "Create").await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&approves, "Create", "the control");
+    }
+
+    /// The one-ledger token does not approve the post or the review dialog.
+    #[tokio::test]
+    async fn the_ledger_create_token_approves_neither_the_post_nor_the_review() {
+        let directory = standin_directory();
+        let answers = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_with(&answers, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+        assert_eq!(
+            super::confirm_review_with(&answers, ONE, "Review").await,
+            Err("ack_review_unavailable".to_string())
+        );
+    }
+
+    /// Each dialog is started in its own mode, so the one-ledger preview is
+    /// never shown by the post dialog or the reverse.
+    #[tokio::test]
+    async fn each_dialog_is_started_in_its_own_mode() {
+        let directory = standin_directory();
+        let sent = |path: &std::path::Path| {
+            std::fs::read_to_string(beside(path, ".args")).expect("the stand-in ran")
+        };
+        let masters = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        super::confirm_masters_with(&masters, "Create")
+            .await
+            .unwrap();
+        assert_eq!(sent(&masters), "--confirm-masters");
+        let post = standin(directory.path(), 0, "bridge-post-approved:{NONCE}\n");
+        super::confirm_with(&post, ONE, "Post").await.unwrap();
+        assert_eq!(sent(&post), "--confirm-journal");
+        let review = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
+        super::confirm_review_with(&review, ONE, "Review")
+            .await
+            .unwrap();
+        assert_eq!(sent(&review), "--confirm-review");
+    }
+
+    /// The one-ledger dialog is told it is about one item, on the count line,
+    /// and each call sends a nonce of its own.
+    #[tokio::test]
+    async fn the_ledger_create_dialog_is_told_one_item_with_a_fresh_nonce() {
+        let directory = standin_directory();
+        let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        let mut nonces = Vec::new();
+        for _ in 0..2 {
+            assert_eq!(
+                super::confirm_masters_with(&approves, "Create").await,
+                Ok(())
+            );
+            let input = standin_input(&approves).expect("the stand-in ran");
+            let (nonce, shown, text) = super::dialog_input(&input).expect("the parent's shape");
+            assert_eq!((shown, text), (ONE, "Create"));
+            nonces.push(nonce.to_string());
+        }
         assert_ne!(nonces[0], nonces[1]);
     }
 
@@ -1413,6 +1693,37 @@ async fn confirm_review_with(
     }
 }
 
+/// The one-ledger dialog: its own subprocess mode, title, button and token,
+/// answered exactly as the post dialog is, by the token for this call's nonce
+/// and a clean exit together. Always asked about one item.
+async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
+    confirm_masters_with(&executable, preview).await
+}
+
+async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err("master_review_too_large".into());
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-masters",
+        MASTERS_TOKEN_PREFIX,
+        ONE_ITEM,
+        preview,
+    )
+    .await
+    {
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err("master_approval_unavailable".into()),
+        Ok(_) => Err("master_approval_declined".into()),
+        Err(DialogFailure::Unavailable) => Err("master_approval_unavailable".into()),
+        Err(DialogFailure::TimedOut) => Err("master_approval_timed_out".into()),
+    }
+}
+
 /// What a dialog subprocess answered: whether it printed exactly the token
 /// for this call's nonce, and whether it exited cleanly.
 struct DialogAnswer {
@@ -1501,6 +1812,16 @@ pub fn run_review_confirmation() -> bool {
     answer_with_token(
         REVIEW_TOKEN_PREFIX,
         show_review_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the one-ledger dialog's subprocess, under the same rules.
+pub fn run_masters_confirmation() -> bool {
+    answer_with_token(
+        MASTERS_TOKEN_PREFIX,
+        show_create_ledger,
         std::io::stdin(),
         std::io::stdout(),
     )
@@ -1668,6 +1989,50 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     // Win32 dependency so No is the default and Escape/close remain Cancel.
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
+    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
+    // no parent HWND is borrowed. No application state is exposed to callbacks.
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            text.as_ptr(),
+            title.as_ptr(),
+            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND,
+        ) == IDYES
+    }
+}
+
+/// The one-ledger dialog. It is shown for one item only: a count other than
+/// one is not the parent's shape and shows nothing.
+#[cfg(not(windows))]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    if count != ONE_ITEM {
+        return false;
+    }
+    rfd::MessageDialog::new()
+        .set_title(MASTERS_TITLE)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            MASTERS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+}
+
+#[cfg(windows)]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_YESNOCANCEL,
+    };
+    // As for the post dialog: No is the default, Escape and close are Cancel.
+    if count != ONE_ITEM {
+        return false;
+    }
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
     // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
     // no parent HWND is borrowed. No application state is exposed to callbacks.
     unsafe {

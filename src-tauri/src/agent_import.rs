@@ -66,6 +66,10 @@ mod master_ledger;
 #[cfg_attr(not(test), allow(dead_code))]
 #[path = "agent_master_post.rs"]
 mod master_post;
+// The one-ledger dialog's preview; no caller reaches it until the masters tools.
+#[cfg_attr(not(test), allow(dead_code))]
+#[path = "agent_master_review.rs"]
+mod master_review;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]

@@ -21,7 +21,7 @@ use super::post::admit_queued_aim;
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, BeforeDispatchError, QueuedAdmission, UnderLockRefusal,
 };
-use crate::tally::ledger_create_item::LedgerCreateItem;
+use crate::tally::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError,
@@ -31,6 +31,38 @@ use bridge_tally_protocol::native_outstandings::{
 };
 use bridge_tally_protocol::StandardLedgerCatalogError;
 use std::collections::BTreeMap;
+
+/// The request a master approval is held with: the item and the request
+/// rendered from it, once. It is the masters twin of `NativePostRequest` in the
+/// approval slot, and carries no company: the rendered bytes name it, and the
+/// approval binding holds the verified tuple.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MasterPostRequest {
+    item: LedgerCreateItem,
+    rendered: RenderedLedgerCreate,
+}
+
+impl MasterPostRequest {
+    /// Renders `item` for `company`, once.
+    pub(super) fn render(item: LedgerCreateItem, company: &VerifiedCompanyIdentity) -> Self {
+        let rendered = item.render_import(company);
+        Self { item, rendered }
+    }
+
+    pub(super) fn item(&self) -> &LedgerCreateItem {
+        &self.item
+    }
+
+    /// The rendered request, as the POST will send it.
+    pub(super) fn xml(&self) -> &str {
+        self.rendered.xml()
+    }
+
+    /// Lowercase hex digest of [`Self::xml`].
+    pub(super) fn sha256(&self) -> &str {
+        self.rendered.sha256()
+    }
+}
 
 /// There is no parser for the ledger name index answer. The request exists
 /// (the V3 catalogue profile), but no V3 answer has been captured from a real

@@ -219,7 +219,8 @@ fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
         voucher["invoice"]["observed"] = json!({
             "voucher_type_guid": format!("{LAB_GUID}-00000106"),
             "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-            "party_bill_wise":false, "company_state":"Rajasthan"
+            "party_bill_wise":false, "company_state":"Rajasthan",
+            "sales_ledgers":["Sales - Goods"]
         });
     }
     serde_json::from_value(voucher).unwrap()
@@ -500,13 +501,14 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
     ] {
         let lab = lab("emsmseeNsNse".chars().map(plan).collect());
         let saved = invoice_to("Counter Sales - Unregistered", "Sales Manual", observed);
-        let (differences, alter_id, guid, _) = lab
+        let (differences, alter_id, guid, lines, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
             .await
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, [difference]);
         assert_eq!((alter_id, guid), (None, None));
+        assert!(lines.is_empty());
         assert_eq!(sent(lab.simulator), requests, "{difference}");
     }
 }

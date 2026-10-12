@@ -5637,6 +5637,11 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     assert_eq!(result["vouchers"][0]["alter_id"], 17);
     assert_eq!(result["vouchers"][0]["voucher_number"], "BP/26-27/0010");
     assert_eq!(
+        result["vouchers"][0]["invoice_lines"],
+        pilot_invoice_lines(),
+        "{response}"
+    );
+    assert_eq!(
         result["dispatch"]["response"]["request_sha256"],
         PILOT_REQUEST_SHA256
     );
@@ -5727,7 +5732,8 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
     assert_eq!(
         serde_json::to_value(observed_facts).unwrap(),
         json!({"voucher_type_guid":format!("{PILOT_GUID}-000000ce"),"party_state":"Rajasthan",
-               "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,"company_state":"Rajasthan"})
+               "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,"company_state":"Rajasthan",
+               "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]})
     );
     assert_eq!(
         (
@@ -5810,6 +5816,20 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     assert_eq!(result["refusals"].as_array().unwrap().len(), 1);
     assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+/// What Tally used as the HSN/SAC of the two sales lines of `BP/26-27/0010`,
+/// as its read-back says and the response shows it: each line's code from its
+/// own ledger.
+fn pilot_invoice_lines() -> Value {
+    let line = |ledger: &str, code: &str| {
+        json!({"ledger":ledger,"hsn_code":code,"hsn_source_type":"Ledger",
+               "hsn_ledger_source":ledger,"hsn_group_source":null,"hsn_resolved":true})
+    };
+    json!([
+        line("BRIDGE Svc 998313 5%", "998313"),
+        line("BRIDGE Svc 998314 5%", "998314")
+    ])
 }
 
 /// The one `tag` element of `xml`, from its open tag to its close tag.
@@ -5921,6 +5941,7 @@ async fn an_invoice_the_gstr_1_lists_as_uncertain_ends_divergent_and_stops_the_n
         voucher["diffs"],
         json!([{"invoice_fields": ["gst_status_uncertain"]}])
     );
+    assert_eq!(voucher["invoice_lines"], pilot_invoice_lines());
     assert_eq!(
         voucher["next_step"],
         crate::agent::agent_import::verification::INVOICE_DIVERGENT_NEXT_STEP

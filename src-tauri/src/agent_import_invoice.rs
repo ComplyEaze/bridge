@@ -67,6 +67,12 @@ pub(super) struct InvoiceObserved {
     /// The company's own state, which the supply must be made in (v0 posts
     /// only the intra-state CGST plus state-tax shape).
     pub(super) company_state: String,
+    /// The ledgers the build classified as the invoice's sales lines, in entry
+    /// order: the read-back judges the HSN/SAC Tally used on these legs only.
+    /// A batch saved before they were recorded has none, which the read-back
+    /// reports as `invoice_not_observed`.
+    #[serde(default)]
+    pub(super) sales_ledgers: Vec<String>,
 }
 
 /// The tax head a ledger carries, as the compliance read reports it.
@@ -1088,6 +1094,7 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
             party_registration_type,
             party_bill_wise,
             company_state,
+            sales_ledgers,
         }) => {
             field(b"1");
             field(voucher_type_guid.as_bytes());
@@ -1102,6 +1109,10 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
             field(party_registration_type.as_bytes());
             field(if *party_bill_wise { b"1" } else { b"0" });
             field(company_state.as_bytes());
+            field(sales_ledgers.len().to_string().as_bytes());
+            for ledger in sales_ledgers {
+                field(ledger.as_bytes());
+            }
         }
     }
 }
@@ -1130,7 +1141,8 @@ fn invoice_readback_differences(
         expected
             .invoice
             .as_ref()
-            .and_then(|detail| detail.observed.as_ref()),
+            .and_then(|detail| detail.observed.as_ref())
+            .filter(|observed| !observed.sales_ledgers.is_empty()),
     ) else {
         return vec!["invoice_not_observed".to_string()];
     };
@@ -1222,12 +1234,72 @@ fn invoice_readback_differences(
     if !allocation_ok {
         diffs.push("bill_allocation".to_string());
     }
+    // Each sales line names the HSN/SAC Tally used and the kind of master it
+    // took it from (§9.16); the code itself is not judged here.
+    if sales_legs(observed, read).any(|leg| !leg.hsn.resolved()) {
+        diffs.push("invoice_line_hsn_unresolved".to_string());
+    }
     diffs.extend(
         gst_status_differences(&read.fields)
             .into_iter()
             .map(|difference| difference.code().to_string()),
     );
     diffs
+}
+
+/// The read-back's legs on the ledgers the build classified as sales lines.
+fn sales_legs<'a>(
+    observed: &'a InvoiceObserved,
+    read: &'a wire::ReadInvoice,
+) -> impl Iterator<Item = &'a wire::ReadLeg> + 'a {
+    read.legs
+        .iter()
+        .filter(|leg| observed.sales_ledgers.contains(&leg.ledger))
+}
+
+/// What Tally used as the HSN/SAC of each sales line, as a caller reads it: the
+/// ledger, the code and the master it came from, null where Tally gave no
+/// value, and whether the line is resolved (`invoice_line_hsn_unresolved` names
+/// the lines that are not). Ledger and group names are marked as party names,
+/// so the response's redaction applies to them.
+fn sales_line_evidence(
+    voucher: &ImportVoucher,
+    read: &wire::ReadInvoice,
+) -> Vec<serde_json::Value> {
+    let Some(observed) = voucher
+        .invoice
+        .as_ref()
+        .and_then(|detail| detail.observed.as_ref())
+    else {
+        return Vec::new();
+    };
+    let text = |value: &wire::EntryText| match value {
+        wire::EntryText::Text(text) => Some(text.clone()),
+        wire::EntryText::Absent | wire::EntryText::Empty => None,
+    };
+    let name = |value: &wire::EntryText| text(value).map(super::super::party_name);
+    sales_legs(observed, read)
+        .map(|leg| {
+            serde_json::json!({
+                "ledger": super::super::party_name(leg.ledger.as_str()),
+                "hsn_code": text(&leg.hsn.code),
+                "hsn_source_type": text(&leg.hsn.source_type),
+                "hsn_ledger_source": name(&leg.hsn.ledger_source),
+                "hsn_group_source": name(&leg.hsn.group_source),
+                "hsn_resolved": leg.hsn.resolved(),
+            })
+        })
+        .collect()
+}
+
+/// The sales-line evidence of one read-back answer, for the tests of the
+/// verification result that carries it.
+#[cfg(test)]
+pub(super) fn sales_line_evidence_of(voucher: &ImportVoucher, xml: &str) -> Vec<serde_json::Value> {
+    match wire::parse_invoice_readback(xml) {
+        Ok(wire::Readback::One(read)) => sales_line_evidence(voucher, &read),
+        other => panic!("one voucher expected, got {other:?}"),
+    }
 }
 
 /// A state of Tally's GSTR-1 status of a posted invoice other than the one
@@ -1318,6 +1390,7 @@ impl super::super::Server {
             Vec<String>,
             Option<String>,
             Option<String>,
+            Vec<serde_json::Value>,
             super::super::Evidence,
         ),
         super::super::ToolFailure,
@@ -1331,13 +1404,21 @@ impl super::super::Server {
                 vec!["invoice_not_observed".to_string()],
                 None,
                 None,
+                Vec::new(),
                 super::local_evidence("invoice_readback"),
             ));
         };
         // Once a post is in the book, nothing here is an error that would hide
         // the post's own verification: each failure is a difference.
-        let only =
-            |difference: &str, evidence| Ok((vec![difference.to_string()], None, None, evidence));
+        let only = |difference: &str, evidence| {
+            Ok((
+                vec![difference.to_string()],
+                None,
+                None,
+                Vec::new(),
+                evidence,
+            ))
+        };
         let local = || super::local_evidence("invoice_readback");
         let Ok((mark, mark_evidence)) = self.pre_import_mark(company, identity).await else {
             return only("invoice_readback_failed", local());
@@ -1363,20 +1444,26 @@ impl super::super::Server {
             return only("invoice_readback_failed", mark_evidence);
         };
         let evidence = super::super::combine_evidence(mark_evidence, evidence);
-        let (differences, alter_id, guid) =
+        let (differences, alter_id, guid, lines) =
             readback_outcome(wire::parse_invoice_readback(&xml), voucher, date);
-        Ok((differences, alter_id, guid, evidence))
+        Ok((differences, alter_id, guid, lines, evidence))
     }
 }
 
 /// What a read-back answer means for the posted invoice: its differences from
-/// the saved batch, and the AlterID and GUID of the one voucher found.
+/// the saved batch, the AlterID and GUID of the one voucher found, and what
+/// Tally used as each sales line's HSN/SAC (`sales_line_evidence`).
 fn readback_outcome(
     parsed: Result<wire::Readback, &'static str>,
     voucher: &ImportVoucher,
     date: &str,
-) -> (Vec<String>, Option<String>, Option<String>) {
-    let only = |difference: &str| (vec![difference.to_string()], None, None);
+) -> (
+    Vec<String>,
+    Option<String>,
+    Option<String>,
+    Vec<serde_json::Value>,
+) {
+    let only = |difference: &str| (vec![difference.to_string()], None, None, Vec::new());
     match parsed {
         // Two vouchers of this type and number: the number is not unique,
         // which a post must surface, never hide behind a generic error.
@@ -1387,6 +1474,7 @@ fn readback_outcome(
             invoice_readback_differences(voucher, &read, date),
             read.fields.get("ALTERID").cloned(),
             read.fields.get("GUID").cloned(),
+            sales_line_evidence(voucher, &read),
         ),
     }
 }
@@ -1788,7 +1876,18 @@ impl super::super::Server {
         let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
             .map_err(InvoiceAdmission::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
-        let observed = observe(&facts[party].gstin, resolved.guid, bill_wise, company_state);
+        let sales_ledgers = roles
+            .sales
+            .iter()
+            .map(|&index| voucher.entries[index].ledger.clone())
+            .collect();
+        let observed = observe(
+            &facts[party].gstin,
+            resolved.guid,
+            bill_wise,
+            company_state,
+            sales_ledgers,
+        );
         if let Some(detail) = voucher.invoice.as_mut() {
             detail.observed = Some(observed);
         }
@@ -1804,6 +1903,7 @@ fn observe(
     voucher_type_guid: String,
     party_bill_wise: bool,
     company_state: String,
+    sales_ledgers: Vec<String>,
 ) -> InvoiceObserved {
     let party_gstin = match party {
         GstinEvidence::InForce(gstin) => Some(gstin.clone()),
@@ -1823,6 +1923,7 @@ fn observe(
         party_gstin,
         party_bill_wise,
         company_state,
+        sales_ledgers,
     }
 }
 

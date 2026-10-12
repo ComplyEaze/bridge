@@ -4539,6 +4539,44 @@ fn marked_paths(value: &Value, path: &str, found: &mut std::collections::BTreeSe
 fn the_name_field_list_covers_every_name_a_verification_marks() {
     let mut result = divergent_verification();
     result["masters_after_post"] = json!({"state":"posted_under_changed_masters","trigger":"masters_moved","ledgers":["Private Changed Ledger"]});
+    // An invoice row with the HSN/SAC evidence of its sales line, made by the
+    // read-back's own code from the lab's read-back of BP/26-27/0010, edited
+    // in one place: its first sales line names a group source, which no
+    // capture fills.
+    let readback = String::from_utf16(
+        &include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+        )
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let group =
+        "<HSNLEDGERSOURCE>BRIDGE Svc 998313 5%</HSNLEDGERSOURCE>\r\n      <HSNGROUPSOURCE/>";
+    assert_eq!(readback.matches(group).count(), 1);
+    let readback = readback.replacen(
+        group,
+        "<HSNLEDGERSOURCE>BRIDGE Svc 998313 5%</HSNLEDGERSOURCE>\r\n      <HSNGROUPSOURCE>Private Group</HSNGROUPSOURCE>",
+        1,
+    );
+    let invoice: ImportVoucher = serde_json::from_value(json!({
+        "bridge_txn_id":"invoice-1","date":"20260801","voucher_type":"Sales",
+        "voucher_number":"BP/26-27/0010",
+        "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan",
+            "observed":{"voucher_type_guid":"g","party_state":"Rajasthan",
+                "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,
+                "company_state":"Rajasthan","sales_ledgers":["BRIDGE Svc 998313 5%"]}},
+        "entries":[{"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"}]
+    }))
+    .unwrap();
+    let lines = super::invoice::sales_line_evidence_of(&invoice, &readback);
+    assert_eq!(lines.len(), 1);
+    result["vouchers"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"bridge_txn_id":"invoice-1","status":"posted_verified"}));
+    verification::mark_invoice_readback(&mut result, "invoice-1", &[], &lines);
     let mut marked = std::collections::BTreeSet::new();
     marked_paths(&result, "", &mut marked);
     assert!(!marked.is_empty(), "the verifier marks its names");

@@ -32,6 +32,9 @@ pub(super) struct Row {
     /// Each direct child whose tag ends in `.LIST`, as its own row (its fields
     /// are relative to it): the ledger entries of a voucher.
     pub(super) lists: Vec<(String, Row)>,
+    /// In a list's row, the path of each element that came back with no text
+    /// (`<GSTHSNNAME/>`): present, unlike an element that did not come back.
+    pub(super) empties: Vec<String>,
 }
 
 impl Row {
@@ -50,6 +53,21 @@ impl Row {
             .iter()
             .filter(move |(key, _)| key == path)
             .map(|(_, value)| value.as_str())
+    }
+
+    /// The one element at `path` of a list's row, told apart as absent, empty
+    /// or text (cleaned as `clean` does); an error when repeated.
+    pub(super) fn entry_text(&self, path: &str) -> Result<EntryText, &'static str> {
+        let empty = self.empties.iter().filter(|key| *key == path).count();
+        match (self.one(path)?, empty) {
+            (None, 0) => Ok(EntryText::Absent),
+            (None, 1) => Ok(EntryText::Empty),
+            (Some(text), 0) => Ok(match clean(text) {
+                cleaned if cleaned.is_empty() => EntryText::Empty,
+                cleaned => EntryText::Text(cleaned),
+            }),
+            _ => Err("invoice_read_field_repeated"),
+        }
     }
 }
 
@@ -89,11 +107,14 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
     let mut text = String::new();
     let mut status: Option<String> = None;
     let mut collection = false;
+    // Whether the element being closed has had no child element: a leaf.
+    let mut leaf = false;
     loop {
         match reader.read_event().map_err(|_| "invoice_read_malformed")? {
             Event::Start(start) => {
                 let name = start.name().as_ref().to_string();
                 text.clear();
+                leaf = true;
                 collection |= name == "COLLECTION";
                 // Only a direct child of the COLLECTION is a row: the answer's
                 // CMPINFO block carries counters named like the rows
@@ -156,6 +177,8 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                             let value = text.trim();
                             if !value.is_empty() {
                                 sub.fields.push((inner, value.to_string()));
+                            } else if leaf {
+                                sub.empties.push(inner);
                             }
                         }
                         // A leaf: record its text under the path below the row.
@@ -172,9 +195,21 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                     }
                 }
                 text.clear();
+                leaf = false;
             }
             Event::Empty(empty) => {
                 collection |= empty.name().as_ref() == "COLLECTION";
+                leaf = false;
+                if let (Some(_), Some(list)) = (row_depth, list_depth) {
+                    sub.empties.push(
+                        path[list + 1..]
+                            .iter()
+                            .cloned()
+                            .chain(std::iter::once(empty.name().as_ref().to_string()))
+                            .collect::<Vec<_>>()
+                            .join("/"),
+                    );
+                }
                 // A row written as an empty element is still a row, with no
                 // fields and no attributes: its reader refuses it or reports
                 // every field as different, and never counts it as "no rows".
@@ -463,6 +498,56 @@ pub(super) struct ReadLeg {
     pub(super) deemed_positive: Option<String>,
     /// Bill allocations of the leg: name, type, amount.
     pub(super) allocations: Vec<(Option<String>, Option<String>, String)>,
+    pub(super) hsn: LegHsn,
+}
+
+/// One element of a ledger entry as Tally answered it. Tally writes an element
+/// it holds no value for as an empty one (`<GSTHSNNAME/>`), which is not the
+/// element missing from the answer; neither is a value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum EntryText {
+    Absent,
+    Empty,
+    Text(String),
+}
+
+/// The HSN/SAC Tally used for a ledger entry, and where it took it from, as
+/// the read-back returns them inside every `ALLLEDGERENTRIES.LIST` (§9.16).
+/// Tally fills them from the masters when the voucher is saved: Bridge writes
+/// none.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct LegHsn {
+    /// `GSTHSNNAME`: the code.
+    pub(super) code: EntryText,
+    /// `HSNSOURCETYPE`: the kind of master it came from (`Ledger`).
+    pub(super) source_type: EntryText,
+    /// `HSNLEDGERSOURCE`: the ledger it came from.
+    pub(super) ledger_source: EntryText,
+    /// `HSNGROUPSOURCE`: the group it came from.
+    pub(super) group_source: EntryText,
+    /// `GSTHSNINFERAPPLICABILITY`: how Tally was to find it.
+    pub(super) applicability: EntryText,
+}
+
+impl LegHsn {
+    fn read(entry: &Row) -> Result<Self, &'static str> {
+        Ok(Self {
+            code: entry.entry_text("GSTHSNNAME")?,
+            source_type: entry.entry_text("HSNSOURCETYPE")?,
+            ledger_source: entry.entry_text("HSNLEDGERSOURCE")?,
+            group_source: entry.entry_text("HSNGROUPSOURCE")?,
+            applicability: entry.entry_text("GSTHSNINFERAPPLICABILITY")?,
+        })
+    }
+
+    /// Tally names a code and the kind of master it took it from. The code's
+    /// digits are not judged.
+    pub(super) fn resolved(&self) -> bool {
+        matches!(
+            (&self.code, &self.source_type),
+            (EntryText::Text(_), EntryText::Text(_))
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -530,6 +615,7 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
                 .to_string(),
             deemed_positive: entry.one("ISDEEMEDPOSITIVE")?.map(str::to_string),
             allocations,
+            hsn: LegHsn::read(entry)?,
         });
     }
     Ok(Readback::One(ReadInvoice { fields, legs }))

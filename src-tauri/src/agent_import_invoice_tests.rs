@@ -670,6 +670,7 @@ fn observed() -> InvoiceObserved {
         party_registration_type: "Regular".to_string(),
         party_bill_wise: true,
         company_state: RAJ.to_string(),
+        sales_ledgers: vec!["Sales".to_string()],
     }
 }
 
@@ -829,11 +830,21 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// attributes Tally adds, wrapped as a collection response. Built from the
 /// renderer, so what is written and what is compared cannot drift apart. Its
 /// four GSTR-1 status elements are the lab's, copied as Tally wrote them for an
-/// invoice it lists as included (`included_status_elements`).
+/// invoice it lists as included (`included_status_elements`), and so are the
+/// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`).
 fn readback_xml(v: &ImportVoucher) -> String {
     let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
-    let rendered =
+    let mut rendered =
         render_sales_invoice_xml(v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
+    let sales = v
+        .invoice
+        .as_ref()
+        .and_then(|detail| detail.observed.as_ref());
+    for ledger in sales.iter().flat_map(|observed| &observed.sales_ledgers) {
+        let name = format!("<LEDGERNAME>{}</LEDGERNAME>", xml_escape(ledger));
+        assert_eq!(rendered.matches(&name).count(), 1, "{ledger}");
+        rendered = rendered.replacen(&name, &format!("{name}{}", resolved_hsn_elements()), 1);
+    }
     let voucher = rendered
         .replace("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\">", "")
         .replace("</TALLYMESSAGE>", "")
@@ -1007,7 +1018,7 @@ fn an_absent_repeated_or_unreadable_voucher_is_never_a_pass() {
         wire::parse_invoice_readback(empty),
         Ok(wire::Readback::Absent)
     );
-    let none = |difference: &str| (vec![difference.to_string()], None, None);
+    let none = |difference: &str| (vec![difference.to_string()], None, None, Vec::new());
     assert_eq!(
         readback_outcome(wire::parse_invoice_readback(empty), &v, "20260310"),
         none("invoice_not_found")
@@ -1043,7 +1054,7 @@ fn an_absent_repeated_or_unreadable_voucher_is_never_a_pass() {
         none("invoice_number_not_unique")
     );
     // The one voucher: its differences (none), and its AlterID and GUID as read.
-    let (differences_found, alter_id, guid) =
+    let (differences_found, alter_id, guid, _) =
         readback_outcome(wire::parse_invoice_readback(&good), &v, "20260310");
     assert_eq!(differences_found, Vec::<String>::new());
     assert_eq!(
@@ -1065,7 +1076,7 @@ fn a_matched_invoice_whose_fields_differ_stops_being_posted_verified() {
         "vouchers":[{"bridge_txn_id":"t1","status":"posted_verified","alter_id":77}],
         "counts":{"posted_verified":1,"posted_divergent":0}
     });
-    crate::agent::agent_import::verification::mark_invoice_readback(&mut result, "t1", &[]);
+    crate::agent::agent_import::verification::mark_invoice_readback(&mut result, "t1", &[], &[]);
     assert_eq!(
         result["vouchers"][0]["status"], "posted_verified",
         "no difference leaves it"
@@ -1074,6 +1085,7 @@ fn a_matched_invoice_whose_fields_differ_stops_being_posted_verified() {
         &mut result,
         "t2",
         &["PARTYGSTIN".into()],
+        &[],
     );
     assert_eq!(
         result["vouchers"][0]["status"], "posted_verified",
@@ -1083,6 +1095,7 @@ fn a_matched_invoice_whose_fields_differ_stops_being_posted_verified() {
         &mut result,
         "t1",
         &["PARTYGSTIN".into()],
+        &[],
     );
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
     assert_eq!(
@@ -1138,7 +1151,7 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
         Box::new(|v| v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into())),
         Box::new(|v| v.invoice.as_mut().unwrap().observed = None),
     ];
-    for field in 0..6 {
+    for field in 0..8 {
         changes.push(Box::new(move |v| {
             let seen = v.invoice.as_mut().unwrap().observed.as_mut().unwrap();
             match field {
@@ -1147,6 +1160,8 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
                 2 => seen.party_state = "Haryana".into(),
                 3 => seen.party_registration_type = "Unregistered/Consumer".into(),
                 4 => seen.party_bill_wise = false,
+                5 => seen.sales_ledgers.clear(),
+                6 => seen.sales_ledgers[0] = "Output CGST".into(),
                 _ => seen.company_state = "Haryana".into(),
             }
         }));
@@ -1181,6 +1196,7 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
 #[test]
 fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
     let status = included_status_elements();
+    let hsn = resolved_hsn_elements();
     let xml = format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
 <VOUCHER REMOTEID=\"22222222-2222-2222-2222-222222222222\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
@@ -1191,7 +1207,7 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
 <ISINVOICE>Yes</ISINVOICE><ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><ISOPTIONAL TYPE=\"Logical\">No</ISOPTIONAL><ALTERID TYPE=\"Number\"> 77</ALTERID>{status}\
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Customer A</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">Yes</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT>\
 <BILLALLOCATIONS.LIST><NAME TYPE=\"String\">278</NAME><BILLTYPE TYPE=\"String\">New Ref</BILLTYPE><AMOUNT TYPE=\"Amount\">-11800.00</AMOUNT></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
-<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
+<ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME>{hsn}<ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">900.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 <ALLLEDGERENTRIES.LIST><LEDGERNAME TYPE=\"String\">Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">900.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST></ALLLEDGERENTRIES.LIST>\
 </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
@@ -1205,7 +1221,8 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
     );
     assert_eq!(differences(&v, &no_amount), vec!["bill_allocation"]);
     // A stray allocation name on a leg that should carry none shows too.
-    let stray = xml.replace("<LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>", "<LEDGERNAME TYPE=\"String\">Sales</LEDGERNAME><ISDEEMEDPOSITIVE TYPE=\"Logical\">No</ISDEEMEDPOSITIVE><AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST><NAME TYPE=\"String\">X</NAME></BILLALLOCATIONS.LIST>");
+    let stray = xml.replace("<AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>", "<AMOUNT TYPE=\"Amount\">10000.00</AMOUNT><BILLALLOCATIONS.LIST><NAME TYPE=\"String\">X</NAME></BILLALLOCATIONS.LIST>");
+    assert_ne!(stray, xml);
     assert_eq!(differences(&v, &stray), vec!["bill_allocation"]);
 }
 
@@ -1283,6 +1300,7 @@ fn rehearsal_invoice(
                 .to_string(),
                 party_bill_wise: registered_bill_wise,
                 company_state: RAJ.to_string(),
+                sales_ledgers: vec!["Sales - Goods".to_string()],
             }),
         }),
         entries,
@@ -1292,9 +1310,12 @@ fn rehearsal_invoice(
 /// The two invoices the rehearsal posted (7 Oct 2026, the synthetic lab
 /// company), each written from its build plan, against Tally's answer to the
 /// read-back request sent raw after the post (not the binary's own read of
-/// it): no difference. The invoice keyed by hand to the registered customer
-/// differs from what a build would write only by the reference and its date,
-/// which a keyed invoice of that book does not carry.
+/// it): no difference in what the build wrote. The invoice keyed by hand to
+/// the registered customer differs from what a build would write only by the
+/// reference and its date, which a keyed invoice of that book does not carry.
+/// In all three answers the sales line `Sales - Goods` carries the five HSN/SAC
+/// elements empty (Tally filled in no code from that book's masters), so each
+/// reads `invoice_line_hsn_unresolved` as well.
 #[test]
 fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers() {
     let registered = rehearsal_invoice(
@@ -1315,7 +1336,7 @@ fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers()
             include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml"),
             "20260311",
         ),
-        Vec::<String>::new()
+        vec!["invoice_line_hsn_unresolved"]
     );
     let ten_thousand_at_18_percent: &[(&str, &str)] = &[
         ("Sales - Goods", "10000.00"),
@@ -1335,7 +1356,7 @@ fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers()
             include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml"),
             "20260311",
         ),
-        Vec::<String>::new()
+        vec!["invoice_line_hsn_unresolved"]
     );
     // Each read-back is that invoice's own: against the other invoice it
     // differs in every field the two do not share.
@@ -1352,7 +1373,8 @@ fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers()
             "PARTYGSTIN",
             "GSTREGISTRATIONTYPE",
             "legs",
-            "bill_allocation"
+            "bill_allocation",
+            "invoice_line_hsn_unresolved"
         ]
     );
     let keyed = rehearsal_invoice(
@@ -1368,7 +1390,7 @@ fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers()
             include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml"),
             "20260310",
         ),
-        vec!["REFERENCE", "REFERENCEDATE"]
+        vec!["REFERENCE", "REFERENCEDATE", "invoice_line_hsn_unresolved"]
     );
 }
 
@@ -1543,6 +1565,7 @@ fn what_the_build_records_follows_the_customers_evidence() {
         "ab-01".into(),
         true,
         RAJ.into(),
+        vec!["Sales".into()],
     );
     assert_eq!(
         registered,
@@ -1553,6 +1576,7 @@ fn what_the_build_records_follows_the_customers_evidence() {
             party_registration_type: "Regular".into(),
             party_bill_wise: true,
             company_state: RAJ.into(),
+            sales_ledgers: vec!["Sales".into()],
         }
     );
     let unregistered = observe(
@@ -1560,6 +1584,7 @@ fn what_the_build_records_follows_the_customers_evidence() {
         "ab-01".into(),
         false,
         RAJ.into(),
+        vec!["Sales".into()],
     );
     assert_eq!(
         (
@@ -2612,4 +2637,338 @@ fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place()
         status_codes(&with_flag(&included, "ISGSTOVERRIDDEN", "Unknown")),
         ["gst_status_unreadable"]
     );
+}
+
+// ---- The HSN/SAC Tally used for each sales line (10 Oct 2026, the pilot lab) ----
+
+/// The five elements of a ledger entry that say which HSN/SAC Tally used and
+/// where it took it from.
+const HSN_TAGS: [&str; 5] = [
+    "HSNSOURCETYPE",
+    "HSNLEDGERSOURCE",
+    "HSNGROUPSOURCE",
+    "GSTHSNNAME",
+    "GSTHSNINFERAPPLICABILITY",
+];
+
+/// The one ledger entry of `xml` on `ledger`, from its open tag to its close tag.
+fn leg_of<'a>(xml: &'a str, ledger: &str) -> &'a str {
+    let name = format!(">{ledger}</LEDGERNAME>");
+    assert_eq!(xml.matches(&name).count(), 1, "one leg on {ledger}");
+    let at = xml.find(&name).unwrap();
+    let start = xml[..at].rfind("<ALLLEDGERENTRIES.LIST>").unwrap();
+    let close = "</ALLLEDGERENTRIES.LIST>";
+    &xml[start..at + xml[at..].find(close).unwrap() + close.len()]
+}
+
+/// The one `tag` element of `leg`, written empty (`<TAG/>`) or with its text.
+fn leg_element<'a>(leg: &'a str, tag: &str) -> &'a str {
+    let empty = format!("<{tag}/>");
+    let open = format!("<{tag}>");
+    match (leg.matches(&empty).count(), leg.matches(&open).count()) {
+        (1, 0) => &leg[leg.find(&empty).unwrap()..][..empty.len()],
+        (0, 1) => {
+            let start = leg.find(&open).unwrap();
+            let close = format!("</{tag}>");
+            &leg[start..start + leg[start..].find(&close).unwrap() + close.len()]
+        }
+        other => panic!("one {tag} expected, found {other:?}"),
+    }
+}
+
+/// `xml` with the `tag` element of the leg on `ledger` replaced by `element`
+/// (empty text to remove it), nothing else changed.
+fn with_leg_element(xml: &str, ledger: &str, tag: &str, element: &str) -> String {
+    let leg = leg_of(xml, ledger);
+    let edited = leg.replacen(leg_element(leg, tag), element, 1);
+    assert_ne!(edited, leg, "{ledger} {tag}");
+    xml.replacen(leg, &edited, 1)
+}
+
+/// The five HSN/SAC elements of the first sales line of the lab's read-back of
+/// `BP/26-27/0010`, as Tally wrote them: code 998313, from its own ledger.
+fn resolved_hsn_elements() -> String {
+    let xml = utf16le(STATUS_INCLUDED);
+    let leg = leg_of(&xml, SVC_998313);
+    HSN_TAGS.iter().map(|tag| leg_element(leg, tag)).collect()
+}
+
+/// A Sales invoice of the pilot lab's `BRIDGE Sales` type to its walk-in
+/// customer, as a build records it, written from what the lab's read-back says
+/// the voucher holds.
+fn pilot_invoice(
+    (number, date): (&str, &str),
+    total: &str,
+    credits: &[(&str, &str)],
+    sales: &[&str],
+) -> ImportVoucher {
+    let mut entries = vec![entry("BRIDGE Walk-in", total, EntrySide::Dr)];
+    entries.extend(
+        credits
+            .iter()
+            .map(|(ledger, amount)| entry(ledger, amount, EntrySide::Cr)),
+    );
+    ImportVoucher {
+        bridge_txn_id: "pilot".to_string(),
+        date: bridge_tally_core::TallyDate::parse(date).expect("a pilot date"),
+        voucher_type: VoucherType::Sales,
+        narration: None,
+        reference: None,
+        voucher_number: Some(number.to_string()),
+        invoice: Some(InvoiceDetail {
+            voucher_type_name: "BRIDGE Sales".to_string(),
+            place_of_supply: RAJ.to_string(),
+            round_off_ledger: credits
+                .iter()
+                .find(|(ledger, _)| *ledger == "BRIDGE Round Off")
+                .map(|(ledger, _)| ledger.to_string()),
+            observed: Some(InvoiceObserved {
+                voucher_type_guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce".to_string(),
+                party_gstin: None,
+                party_state: RAJ.to_string(),
+                party_registration_type: "Unregistered/Consumer".to_string(),
+                party_bill_wise: false,
+                company_state: RAJ.to_string(),
+                sales_ledgers: sales.iter().map(|ledger| ledger.to_string()).collect(),
+            }),
+        }),
+        entries,
+    }
+}
+
+const SVC_998313: &str = "BRIDGE Svc 998313 5%";
+const SVC_998314: &str = "BRIDGE Svc 998314 5%";
+const SVC_998315: &str = "BRIDGE Svc 998315 5%";
+
+/// `BP/26-27/0010` as the pilot replay builds and posts it.
+fn pilot_0010() -> ImportVoucher {
+    pilot_invoice(
+        ("BP/26-27/0010", "20260801"),
+        "1051.00",
+        &[
+            (SVC_998313, "600.40"),
+            (SVC_998314, "400.40"),
+            ("BRIDGE CGST 2.5%", "25.02"),
+            ("BRIDGE SGST 2.5%", "25.02"),
+            ("BRIDGE Round Off", "0.16"),
+        ],
+        &[SVC_998313, SVC_998314],
+    )
+}
+
+/// `BP/26-27/0021`, three sales lines on three sibling ledgers. Its read-backs
+/// carry no reference, so a build's expectation differs there as well.
+fn pilot_0021() -> ImportVoucher {
+    pilot_invoice(
+        ("BP/26-27/0021", "20260805"),
+        "315.30",
+        &[
+            (SVC_998313, "100.10"),
+            (SVC_998314, "100.10"),
+            (SVC_998315, "100.10"),
+            ("BRIDGE CGST 2.5%", "7.50"),
+            ("BRIDGE SGST 2.5%", "7.50"),
+        ],
+        &[SVC_998313, SVC_998314, SVC_998315],
+    )
+}
+
+/// The differences and the sales-line evidence of a read-back answer, as a
+/// post reads them.
+fn hsn_outcome(v: &ImportVoucher, xml: &str) -> (Vec<String>, Vec<serde_json::Value>) {
+    let date = v.date.as_str().to_string();
+    let (differences, _, _, lines) = readback_outcome(wire::parse_invoice_readback(xml), v, &date);
+    (differences, lines)
+}
+
+/// One sales line's evidence: Tally used `code` from the line's own ledger, or
+/// gave no code and no source.
+fn line_evidence(ledger: &str, code: Option<&str>) -> serde_json::Value {
+    let name = |text: &str| json!(crate::agent::party_name(text));
+    json!({
+        "ledger": name(ledger),
+        "hsn_code": code,
+        "hsn_source_type": code.map(|_| "Ledger"),
+        "hsn_ledger_source": code.map(|_| name(ledger)),
+        "hsn_group_source": null,
+        "hsn_resolved": code.is_some(),
+    })
+}
+
+/// The leg of a parsed read-back on `ledger`.
+fn read_leg(xml: &str, ledger: &str) -> wire::ReadLeg {
+    match wire::parse_invoice_readback(xml).unwrap() {
+        wire::Readback::One(read) => read
+            .legs
+            .into_iter()
+            .find(|leg| leg.ledger == ledger)
+            .unwrap(),
+        other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// #691: `BP/26-27/0021` read while Tally's GSTR-1 listed it as uncertain: its
+/// third sales line carries the HSN/SAC elements empty (the applicability alone
+/// filled), the other two carry their codes from their own ledgers. It is
+/// divergent with `invoice_line_hsn_unresolved`, and the evidence names the
+/// line: `BRIDGE Svc 998315 5%`, with no code.
+#[test]
+fn a_sales_line_tally_filled_no_hsn_for_is_divergent_and_named() {
+    let uncertain = utf16le(STATUS_UNCERTAIN);
+    let (differences, lines) = hsn_outcome(&pilot_0021(), &uncertain);
+    assert_eq!(
+        differences,
+        [
+            "REFERENCE",
+            "REFERENCEDATE",
+            "invoice_line_hsn_unresolved",
+            "gst_status_uncertain"
+        ]
+    );
+    assert_eq!(
+        lines,
+        [
+            line_evidence(SVC_998313, Some("998313")),
+            line_evidence(SVC_998314, Some("998314")),
+            line_evidence(SVC_998315, None),
+        ]
+    );
+    // What the parse read on that line: present and empty, never absent.
+    let empty = wire::EntryText::Empty;
+    assert_eq!(
+        read_leg(&uncertain, SVC_998315).hsn,
+        wire::LegHsn {
+            code: empty.clone(),
+            source_type: empty.clone(),
+            ledger_source: empty.clone(),
+            group_source: empty,
+            applicability: wire::EntryText::Text("As per Masters/Company".into()),
+        }
+    );
+}
+
+/// The same voucher once it was saved again (AlterID 35), and `BP/26-27/0010`:
+/// every sales line names its code and its ledger, and nothing differs for
+/// this check. The party, tax and round-off legs carry the elements empty and
+/// are not judged.
+#[test]
+fn every_sales_line_with_a_code_and_a_source_is_clean_and_shown() {
+    let (differences, lines) = hsn_outcome(&pilot_0021(), &utf16le(STATUS_RESAVED));
+    assert_eq!(differences, ["REFERENCE", "REFERENCEDATE"]);
+    assert_eq!(
+        lines,
+        [
+            line_evidence(SVC_998313, Some("998313")),
+            line_evidence(SVC_998314, Some("998314")),
+            line_evidence(SVC_998315, Some("998315")),
+        ]
+    );
+    let included = utf16le(STATUS_INCLUDED);
+    let (differences, lines) = hsn_outcome(&pilot_0010(), &included);
+    assert_eq!(differences, Vec::<String>::new());
+    assert_eq!(
+        lines,
+        [
+            line_evidence(SVC_998313, Some("998313")),
+            line_evidence(SVC_998314, Some("998314")),
+        ]
+    );
+    for ledger in ["BRIDGE Walk-in", "BRIDGE CGST 2.5%", "BRIDGE Round Off"] {
+        assert!(!read_leg(&included, ledger).hsn.resolved(), "{ledger}");
+    }
+}
+
+/// The states no capture shows, each from the re-saved read-back of
+/// `BP/26-27/0021` edited in one place on its third sales line: a source with
+/// no code, a code with no source, the five elements not returned at all, and
+/// a code behind a control-character reference (cleaned as every other
+/// value). Only a code and a source together are clean.
+#[test]
+fn a_sales_line_missing_its_code_or_its_source_is_unresolved() {
+    let resaved = utf16le(STATUS_RESAVED);
+    let unresolved = |xml: &str| {
+        let (differences, lines) = hsn_outcome(&pilot_0021(), xml);
+        assert_eq!(lines[2]["hsn_resolved"], false, "{lines:?}");
+        differences
+    };
+    let expected = ["REFERENCE", "REFERENCEDATE", "invoice_line_hsn_unresolved"];
+    let no_code = with_leg_element(&resaved, SVC_998315, "GSTHSNNAME", "<GSTHSNNAME/>");
+    assert_eq!(unresolved(&no_code), expected);
+    assert_eq!(
+        read_leg(&no_code, SVC_998315).hsn.source_type,
+        wire::EntryText::Text("Ledger".into())
+    );
+    let no_source = with_leg_element(&resaved, SVC_998315, "HSNSOURCETYPE", "<HSNSOURCETYPE/>");
+    assert_eq!(unresolved(&no_source), expected);
+    assert_eq!(
+        read_leg(&no_source, SVC_998315).hsn.code,
+        wire::EntryText::Text("998315".into())
+    );
+    let absent = HSN_TAGS.iter().fold(resaved.clone(), |xml, tag| {
+        with_leg_element(&xml, SVC_998315, tag, "")
+    });
+    assert_eq!(unresolved(&absent), expected);
+    let gone = wire::EntryText::Absent;
+    assert_eq!(
+        read_leg(&absent, SVC_998315).hsn,
+        wire::LegHsn {
+            code: gone.clone(),
+            source_type: gone.clone(),
+            ledger_source: gone.clone(),
+            group_source: gone.clone(),
+            applicability: gone,
+        }
+    );
+    // A control-character reference alone is no value; before a code it is
+    // not part of it.
+    let marked_empty = with_leg_element(
+        &resaved,
+        SVC_998315,
+        "GSTHSNNAME",
+        "<GSTHSNNAME>&#4;</GSTHSNNAME>",
+    );
+    assert_eq!(unresolved(&marked_empty), expected);
+    let marked = with_leg_element(
+        &resaved,
+        SVC_998315,
+        "GSTHSNNAME",
+        "<GSTHSNNAME>&#4; 998315</GSTHSNNAME>",
+    );
+    assert_eq!(
+        read_leg(&marked, SVC_998315).hsn.code,
+        wire::EntryText::Text("998315".into())
+    );
+    assert_eq!(
+        hsn_outcome(&pilot_0021(), &marked).0,
+        ["REFERENCE", "REFERENCEDATE"]
+    );
+    // An element Tally wrote twice on a leg fails the read, never picks one.
+    let twice = with_leg_element(
+        &resaved,
+        SVC_998315,
+        "GSTHSNNAME",
+        "<GSTHSNNAME>998315</GSTHSNNAME><GSTHSNNAME/>",
+    );
+    assert_eq!(
+        wire::parse_invoice_readback(&twice),
+        Err("invoice_read_field_repeated")
+    );
+}
+
+/// A batch saved before the build recorded its sales lines cannot say which
+/// legs to judge: its read-back is `invoice_not_observed`, never a pass.
+#[test]
+fn an_invoice_whose_sales_lines_were_not_recorded_is_not_observed() {
+    let mut v = pilot_0010();
+    v.invoice
+        .as_mut()
+        .unwrap()
+        .observed
+        .as_mut()
+        .unwrap()
+        .sales_ledgers
+        .clear();
+    let (differences, lines) = hsn_outcome(&v, &utf16le(STATUS_INCLUDED));
+    assert_eq!(differences, ["invoice_not_observed"]);
+    assert_eq!(lines, Vec::<serde_json::Value>::new());
 }

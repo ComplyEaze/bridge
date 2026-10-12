@@ -23,6 +23,8 @@ use crate::parse::{Cells, Row};
 use crate::refusal::Refusal;
 use crate::text::{is_alnum, is_upper, remove_space, squash, strip};
 use regex::Regex;
+use serde::Serialize;
+use std::fmt;
 use std::sync::LazyLock;
 
 /// A statement layout.
@@ -331,6 +333,61 @@ impl Bank {
             Self::Ubi => ubi_reference(row),
             Self::Bob => bob_reference(row),
         }
+    }
+}
+
+/// The reference a network transfer carries on both banks' statements: a UPI or
+/// IMPS reference of twelve digits, or a NEFT or RTGS UTR. It can be built only
+/// by [`Bank::transfer_reference`], so a cheque number, a bank's own transaction
+/// id or an all-zero placeholder is never mistaken for one.
+///
+/// Upper case and without whitespace by construction: a UPI or IMPS value is
+/// ASCII digits, and a NEFT or RTGS one passed [`looks_like_utr`], which
+/// requires alphanumeric upper case.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct BankReference(String);
+
+impl fmt::Display for BankReference {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl Bank {
+    /// The row's network-transfer reference, when it carries one, read from
+    /// what [`Bank::reference`] names. Every other mode (cheque, internal
+    /// transfer, net banking, ATM, ACH, clearing, cash, mobile banking) and any
+    /// empty or all-zero value gives `None`.
+    pub fn transfer_reference(self, row: &Row) -> Option<BankReference> {
+        let (mode, value) = self.reference(row);
+        // SBI prints a UPI reference as `<digits> (<vpa>)`
+        let value = match (self, mode.as_str()) {
+            (Self::Sbi, "UPI") => value
+                .split_once(" (")
+                .map_or(value.as_str(), |(head, _)| head),
+            _ => value.as_str(),
+        };
+        let value = remove_space(value);
+        let admitted = match mode.as_str() {
+            "UPI" | "IMPS" => value.len() == 12 && value.bytes().all(|byte| byte.is_ascii_digit()),
+            "NEFT" | "RTGS" => looks_like_utr(&value),
+            _ => false,
+        };
+        (admitted && !value.chars().all(|character| character == '0'))
+            .then_some(BankReference(value))
+    }
+
+    /// The cheque or transaction number the statement prints in its own column,
+    /// trimmed: `ref` for State Bank of India, HDFC Bank and Union Bank,
+    /// `chq` for Bank of Baroda. `None` when it is empty or all zeros.
+    pub fn instrument(self, row: &Row) -> Option<String> {
+        let column = match self {
+            Self::Sbi | Self::Hdfc | Self::Ubi => "ref",
+            Self::Bob => "chq",
+        };
+        let value = strip(row.get(column));
+        (!value.chars().all(|character| character == '0')).then(|| value.to_string())
     }
 }
 

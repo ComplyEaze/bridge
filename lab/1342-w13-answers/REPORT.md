@@ -3,8 +3,8 @@
 Book: synthetic BRIDGE PILOT LAB, company number 100033, GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85. It was loaded alone. TallyPrime 7.1 Silver.
 - Request set: lab/1342-capture-requests @ 99e750ac. W13-README.md sha256 9b8cfa22….
 - Every request matched SHA256.txt or SHA256-top.txt before it was sent. The two extra baseline requests are W12 request files, checked against the W12 SHA256.txt (copied here as `SHA256-w12.txt`).
-- CLICK MODE: lane. Every button and Yes was clicked with the mouse. "S: Send (Online)" was never used.
-- **Starting state:** the book as W12 left it, per the orchestrator's instruction (no restore). 0003 was uncertain after its amount edit, and 0006 was accepted.
+- Mouse-click mode. Every button and Yes was clicked with the mouse. "S: Send (Online)" was never used.
+- **Starting state:** the book as W12 left it, per the run's decision record (no restore). 0003 was uncertain after its amount edit, and 0006 was accepted.
 - Accept As Is was used on **BP/26-27/0005 only**. No other voucher or master was altered by hand.
 - Fresh backup before any change: `<lab>\w13\backup-pre\TDBK1800_100033.001`, 79,079 B, sha256 037e04e82c5d13b262c7c2c2d2880bab85f398bebe825e180f662ba501e28633, 12:27Z. It stays on the lab PC.
 - Screenshots stay on the lab PC, listed by hash in `SHA256-screenshots.txt`. This differs from the README, which asks for screens in `workorder/`.
@@ -44,17 +44,17 @@ Full hashes are in `SHA256-answers.txt`, which also gives published-copy hashes;
 2. **Export > GST Returns** opened "Upload GSTR-1" for Aug.
    - Pending to Upload (Voucher Count 0; Summary Count 4): Rajasthan 5% 8,805.70; Rajasthan 18% 700.00; HSN Summary; Document Summary.
    - Buttons: X: Export (Offline) and S: Send (Online), which was not used.
-3. X: Export (Offline) showed this **observed dialog (not listed in the README; a STOP, resolved by the orchestrator)**:
+3. X: Export (Offline) showed this **observed dialog (not listed in the README; a STOP, resolved per the run's decision record)**:
    > "There are transactions having potential conflicts between the master and the transaction.You can check conflicts in GSTR-1 report. Still, GSTR-1 data will be exported to the portal as per the transaction." [X: Export (Offline)] [B: Back]
 
    Screenshot s3-STOP-conflicts-warning.jpg, sha256 28a386adb50046089e124fe0105aebcf94db18b336f0621983bd4c0f7d587359.
    - First I clicked Back.
-   - On the orchestrator's decision I then clicked X: Export (Offline). The same warning appeared before export b and was answered the same way.
+   - On decision (a) I then clicked X: Export (Offline). The same warning appeared before export b and was answered the same way.
 4. **Export dialog:**
    - Defaults: File Format "Excel (Spreadsheet)" and Folder Path "C:\Program Files\TallyPrime". Right panel: F6 Folder Path, F8 File Format, F9 "Export Section wise files".
    - The F8 list offers CSV (Comma Delimited), Excel (Spreadsheet) and JSON (Data Interchange). I chose **JSON (Data Interchange)**.
    - The dialog then also showed **"Export separate files for each Section: No"**. That option is not in the README, so I stopped (screenshot s3a-STOP-export-dialog-json.jpg, cdd17e35…).
-   - On the orchestrator's decision I left it at its default (No) and kept the default folder. I did not touch C: Configure, then clicked E: Export.
+   - On decision (a) I left it at its default (No) and kept the default folder. I did not touch C: Configure, then clicked E: Export.
    - **The dialog has no option to include or leave out uncertain transactions.**
 5. **Export a written:** `C:\Program Files\TallyPrime\<gstin>_GSTR1_AUG-2026_12102026_180154.json`, 2,199 B, at 12:31:55Z.
    - sha256 6f5d5c6fceb4bd354847e937daaa24381b64286b606cb72b0450780bc5d16607, identical before and after the byte copy to `gstr1-aug-2026-a.json`.
@@ -65,7 +65,7 @@ Full hashes are in `SHA256-answers.txt`, which also gives published-copy hashes;
 - The GSTR-1 summary changed from "Ready for Upload 23 / Not Uploaded 23" to "Included 23 / **No Action Required** 23". Totals were unchanged.
 - An extra marks read showed **ALTVCHID 50 → 53**, with ALTMSTID 243 unchanged.
 - An extra window read showed **no field change** in the 28 August Sales vouchers.
-- Three voucher alter ids were therefore used by objects outside that window, which were not identified. The orchestrator assigned identifying them to a later item.
+- Three voucher alter ids were therefore used by objects outside that window, which were not identified. Identifying them is left to a later item.
 
 ## Steps 4–5: Accept As Is on 0005
 - Path: GSTR-1, Uncertain, then the tax-mismatch list. I highlighted the single row BP/26-27/0005 and clicked "J: Accept As Is".
@@ -80,7 +80,7 @@ Full hashes are in `SHA256-answers.txt`, which also gives published-copy hashes;
   - Included 24, with "Ready for Upload 24" and "**Modified in Books After Upload/Export 24**"; uncertain 5.
   - B2C (Small) 24 (2): 10,506.70, CGST 308.20, SGST 308.20, tax 616.40.
 - Upload GSTR-1 before F8 showed Pending (Voucher 0; **Summary 3**): Rajasthan 5% 9,806.70; HSN Summary; Document Summary. The 18% row was not pending.
-- **DEVIATION (orchestrator's decision):** I pressed **F8 "Include Uploaded"**, because it is the only way to export everything after a.
+- **DEVIATION (decision record):** I pressed **F8 "Include Uploaded"**, because it is the only way to export everything after a.
   - Pending became Summary 4: 5% 9,806.70; 18% 700.00; HSN; Document. The F8 label changed to "Exclude Uploaded".
 - Then the same conflicts warning, answered with X: Export (Offline), and the same dialog with the remembered settings: JSON, separate files No, default folder. I clicked E: Export.
 - **Export b written:** `C:\Program Files\TallyPrime\<gstin>_GSTR1_AUG-2026_12102026_180637.json`, 2,199 B, at 12:36:37Z.
@@ -109,7 +109,7 @@ So **the JSON leaves the uncertain 0005 out entirely, including from the documen
 ## Differences from the README, and what was not measured
 - The book started from W12's end state, as instructed. There were extra baseline reads of 0003 and 0006, and extra marks and window reads around each export.
 - The XML report export was opened and cancelled.
-- Both exports showed the unlisted conflicts warning and the unlisted "separate files" option. Both were answered as the orchestrator decided.
+- Both exports showed the unlisted conflicts warning and the unlisted "separate files" option. Both were answered per the run's decision record.
 - Export b used F8 "Include Uploaded" (a deviation). Export c was not applicable.
 - **Each JSON export advanced the company voucher alter id by 3** and changed the upload state. The objects altered were not identified.
 - Screenshots and the backup stay on the lab PC, listed by hash.

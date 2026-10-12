@@ -1,5 +1,5 @@
 # Build the public W13 push folder: answers and JSON exports (synthetic GSTIN replaced by a same-length marker),
-# send log, report, notes (lane ids and GSTIN masked), tools, and hash lists for screenshots and backup
+# send log, report, notes (run ids and GSTIN masked), tools, and hash lists for screenshots and backup
 # (which stay on the lab PC). Usage: python -I build_push.py <dst>
 import hashlib, os, re, shutil, sys
 SRC = 'C:/bridge-lab/w13'
@@ -33,7 +33,7 @@ with open(os.path.join(dst, 'SHA256-exports.txt'), 'w', encoding='utf-8', newlin
         f.write('%s  %s  export/%s  %d  %d\n' % (sha(p), sha(q), n, sz, k))
 def text(src, out):
     t = open(src, encoding='utf-8').read()
-    t = GSTIN.sub(MARK, re.sub(r'\bD3\d\b', '<lane>', t))
+    t = GSTIN.sub(MARK, re.sub(r'\bD3\d\b', '<run>', t))
     open(out, 'w', encoding='utf-8', newline='\n').write(t)
 text(SRC + '/answers/log.txt', os.path.join(dst, 'send-log.txt'))
 text(SRC + '/REPORT.md', os.path.join(dst, 'REPORT.md'))

@@ -414,6 +414,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bridge-approval-standin"
+version = "0.1.0"
+
+[[package]]
 name = "bridge-bank-statement"
 version = "0.1.0"
 dependencies = [

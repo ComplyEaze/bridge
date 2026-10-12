@@ -10,6 +10,7 @@ const checkFrontend = modes.size === 0 || modes.has("--frontend");
 const checkRust = modes.size === 0 || modes.has("--rust");
 const firstPartyRustPackages = new Set([
   "bridge",
+  "bridge-approval-standin",
   "bridge-bank-statement",
   "bridge-tally-core",
   "bridge-tally-primitives",

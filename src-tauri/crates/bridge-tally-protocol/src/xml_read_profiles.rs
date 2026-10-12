@@ -11,14 +11,7 @@ use bridge_tally_primitives::TallyDate;
 use sha2::{Digest, Sha256};
 
 use crate::encode_tally_xml_request_utf16le;
-#[cfg(feature = "voucher-scan")]
-use crate::outstandings::{
-    render_empty_partition_witness_template, render_ledger_opening_coverage,
-    render_outstandings_template, render_outstandings_vouchers, AlterIdRange, NarrowDateWindow,
-};
-#[cfg(feature = "voucher-scan")]
-use crate::outstandings_shared::PinnedCompany;
-use crate::outstandings_shared::{render_company_book_extent, render_company_book_extent_v2};
+use crate::outstandings_shared::render_company_book_extent_v2;
 use crate::xml_text::escape_text as xml_escape;
 
 const TEMPLATE_COMPANY: &str = "BRIDGE TEMPLATE COMPANY";
@@ -31,10 +24,6 @@ const TEMPLATE_TO: &str = "20000102";
 fn template_date(value: &'static str) -> TallyDate {
     TallyDate::parse(value).expect("template dates are fixed valid YYYYMMDD constants")
 }
-#[cfg(feature = "voucher-scan")]
-const TEMPLATE_ALTER_ID_START: u64 = 0;
-#[cfg(feature = "voucher-scan")]
-const TEMPLATE_ALTER_ID_END: u64 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadProfileValidationError {
@@ -122,19 +111,11 @@ impl ValidatedDateRange {
 pub enum ReadOnlyProfileId {
     CompanyListV1,
     CompanyListV2,
-    CompanyBookExtentV1,
     CompanyBookExtentV2,
-    #[cfg(feature = "voucher-scan")]
-    LedgerOpeningCoverageV1,
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
     StandardLedgerCatalogV2,
     LedgersV1,
-    VouchersV2,
-    #[cfg(feature = "voucher-scan")]
-    VoucherOutstandingsV1,
-    #[cfg(feature = "voucher-scan")]
-    VoucherEmptyPartitionWitnessV1,
     AuditCompanyObjectV1,
     AuditLedgersV1,
     AuditVouchersV1,
@@ -146,19 +127,11 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV1 => "company_list_v1",
             Self::CompanyListV2 => "company_list_v2",
-            Self::CompanyBookExtentV1 => "company_book_extent_v1",
             Self::CompanyBookExtentV2 => "company_book_extent_v2",
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 => "ledger_opening_coverage_v1",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
             Self::StandardLedgerCatalogV2 => "standard_ledger_catalog_v2",
             Self::LedgersV1 => "ledgers_v1",
-            Self::VouchersV2 => "vouchers_v2",
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 => "voucher_outstandings_v1",
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 => "voucher_empty_partition_witness_v1",
             Self::AuditCompanyObjectV1 => "audit_company_object_v1",
             Self::AuditLedgersV1 => "audit_ledgers_v1",
             Self::AuditVouchersV1 => "audit_vouchers_v1",
@@ -173,18 +146,17 @@ impl ReadOnlyProfileId {
         sha256_hex(&encode_tally_xml_request_utf16le(&self.template()))
     }
 
-    /// Whether this profile must not be sent to an Education-mode Tally. Each
-    /// of these is a custom report (`TYPE=Data`) that passes a spaced
+    /// Whether this profile must not be sent to an Education-mode Tally. Only
+    /// `ledgers_v1` is: a custom report (`TYPE=Data`) that passes a spaced
     /// collection identifier to a `$$` function (`$$NumItems:BRIDGE Ledger
-    /// Collection V1`). Education answered `ledgers_v1` with a blocking "Bad
-    /// formula!" dialog on the Tally screen, which holds the XML gateway until
-    /// someone dismisses it (bridge#45). That the others, which carry the same
-    /// construct, do the same is inferred, not observed. A caller that knows the endpoint is in Education must
-    /// refuse such a read before sending it, with
+    /// Collection V1`). Education answered it with a blocking "Bad formula!"
+    /// dialog on the Tally screen, which holds the XML gateway until someone
+    /// dismisses it (bridge#45). A caller that knows the endpoint is in
+    /// Education must refuse such a read before sending it, with
     /// [`EDUCATION_REPORT_FAMILY_UNSUPPORTED`]. A test renders every profile
     /// and checks this against [`first_spaced_function_argument`].
     pub fn education_refuses_report_formula(self) -> bool {
-        matches!(self, Self::LedgersV1 | Self::VouchersV2)
+        matches!(self, Self::LedgersV1)
     }
 
     /// The exact request rendered with fixed safe sentinels in every dynamic
@@ -193,29 +165,11 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV1 => render_company_book_extent(TEMPLATE_COMPANY),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 => render_ledger_opening_coverage(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
-            Self::VouchersV2 => render_vouchers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 => render_outstandings_template(
-                TEMPLATE_COMPANY,
-                TEMPLATE_FROM,
-                TEMPLATE_TO,
-                TEMPLATE_ALTER_ID_START,
-                TEMPLATE_ALTER_ID_END,
-            ),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 => render_empty_partition_witness_template(
-                TEMPLATE_COMPANY,
-                TEMPLATE_FROM,
-                TEMPLATE_TO,
-            ),
             Self::AuditCompanyObjectV1 => render_audit_company_object(TEMPLATE_COMPANY),
             Self::AuditLedgersV1 => {
                 render_audit_ledgers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
@@ -288,13 +242,6 @@ pub enum ReadOnlyProfile<'a> {
     /// so it can satisfy the trust check instead of being parsed as an
     /// unverified direct report.
     CompanyListV2,
-    #[cfg(feature = "voucher-scan")]
-    LedgerOpeningCoverageV1 {
-        company: &'a ValidatedCompanyName,
-    },
-    CompanyBookExtentV1 {
-        company: &'a ValidatedCompanyName,
-    },
     /// A versioned Company collection that includes the observed company
     /// number required to distinguish year-split sibling books.
     CompanyBookExtentV2 {
@@ -323,21 +270,6 @@ pub enum ReadOnlyProfile<'a> {
     LedgersV1 {
         company: &'a ValidatedCompanyName,
     },
-    VouchersV2 {
-        company: &'a ValidatedCompanyName,
-        range: &'a ValidatedDateRange,
-    },
-    #[cfg(feature = "voucher-scan")]
-    VoucherOutstandingsV1 {
-        company: &'a PinnedCompany,
-        window: &'a NarrowDateWindow,
-        alter_id_range: AlterIdRange,
-    },
-    #[cfg(feature = "voucher-scan")]
-    VoucherEmptyPartitionWitnessV1 {
-        company: &'a PinnedCompany,
-        window: &'a NarrowDateWindow,
-    },
     /// The `company` part of a tally-read v1 read: a single-object export of
     /// the one named company. See [`AUDIT_COMPANY_FETCH`].
     AuditCompanyObjectV1 {
@@ -365,21 +297,11 @@ impl ReadOnlyProfile<'_> {
         match self {
             Self::CompanyListV1 => ReadOnlyProfileId::CompanyListV1,
             Self::CompanyListV2 => ReadOnlyProfileId::CompanyListV2,
-            Self::CompanyBookExtentV1 { .. } => ReadOnlyProfileId::CompanyBookExtentV1,
             Self::CompanyBookExtentV2 { .. } => ReadOnlyProfileId::CompanyBookExtentV2,
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 { .. } => ReadOnlyProfileId::LedgerOpeningCoverageV1,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
             Self::StandardLedgerCatalogV2 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV2,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
-            Self::VouchersV2 { .. } => ReadOnlyProfileId::VouchersV2,
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 { .. } => ReadOnlyProfileId::VoucherOutstandingsV1,
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 { .. } => {
-                ReadOnlyProfileId::VoucherEmptyPartitionWitnessV1
-            }
             Self::AuditCompanyObjectV1 { .. } => ReadOnlyProfileId::AuditCompanyObjectV1,
             Self::AuditLedgersV1 { .. } => ReadOnlyProfileId::AuditLedgersV1,
             Self::AuditVouchersV1 { .. } => ReadOnlyProfileId::AuditVouchersV1,
@@ -395,13 +317,8 @@ impl ReadOnlyProfile<'_> {
         match self {
             Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
-            Self::CompanyBookExtentV1 { company } => render_company_book_extent(company.as_str()),
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
-            }
-            #[cfg(feature = "voucher-scan")]
-            Self::LedgerOpeningCoverageV1 { company } => {
-                render_ledger_opening_coverage(company.as_str())
             }
             Self::StandardLedgerIdentityV1 { company } => {
                 render_standard_ledger_identity(company.as_str())
@@ -413,20 +330,6 @@ impl ReadOnlyProfile<'_> {
                 render_standard_ledger_catalog_v2(company.as_str())
             }
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
-            Self::VouchersV2 { company, range } => {
-                render_vouchers(company.as_str(), range.from_yyyymmdd(), range.to_yyyymmdd())
-            }
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherOutstandingsV1 {
-                company,
-                window,
-                alter_id_range,
-            } => render_outstandings_vouchers(company, window, alter_id_range),
-            #[cfg(feature = "voucher-scan")]
-            Self::VoucherEmptyPartitionWitnessV1 { company, window } => {
-                crate::outstandings::voucher_empty_partition_witness_request(company, window)
-                    .into_xml()
-            }
             Self::AuditCompanyObjectV1 { company } => render_audit_company_object(company.as_str()),
             Self::AuditLedgersV1 { company, period } => render_audit_ledgers(
                 company.as_str(),
@@ -464,10 +367,6 @@ pub mod compatibility {
 
     pub fn standard_ledger_catalog_request(company: &str) -> String {
         super::render_standard_ledger_identity(company)
-    }
-
-    pub fn vouchers_request(company: &str, from: &str, to: &str) -> String {
-        super::render_vouchers(company, from, to)
     }
 }
 
@@ -724,158 +623,22 @@ fn render_ledgers(company: &str) -> String {
     .to_string()
 }
 
-fn render_vouchers(company: &str, from: &str, to: &str) -> String {
-    format!(
-        r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>DATA</TYPE>
-        <ID>BRIDGE Voucher Export V2</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-                <SVFROMDATE TYPE="Date">{}</SVFROMDATE>
-                <SVTODATE TYPE="Date">{}</SVTODATE>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="BRIDGE Voucher Export V2">
-                        <FORMS>BRIDGE Voucher Export Form V2</FORMS>
-                        <PLAINXML>Yes</PLAINXML>
-                    </REPORT>
-                    <FORM NAME="BRIDGE Voucher Export Form V2">
-                        <TOPPARTS>BRIDGE Voucher Context Part V1, BRIDGE Voucher Rows Part V1</TOPPARTS>
-                    </FORM>
-                    <PART NAME="BRIDGE Voucher Context Part V1">
-                        <TOPLINES>BRIDGE Voucher Context Line V1</TOPLINES>
-                    </PART>
-                    <PART NAME="BRIDGE Voucher Rows Part V1">
-                        <TOPLINES>BRIDGE Voucher Row Line V1</TOPLINES>
-                        <REPEAT>BRIDGE Voucher Row Line V1 : BRIDGE Voucher Collection V1</REPEAT>
-                    </PART>
-                    <LINE NAME="BRIDGE Voucher Context Line V1">
-                        <LEFTFIELDS>BRIDGE Voucher Schema V1, BRIDGE Voucher Object Type V1, BRIDGE Voucher Company Name V1, BRIDGE Voucher Company GUID V1, BRIDGE Voucher Record Count V1</LEFTFIELDS>
-                        <XMLTAG>"COMPANYCONTEXT"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Voucher Schema V1">
-                        <SET>"bridge.tally.vouchers/2"</SET>
-                        <XMLTAG>"SCHEMA"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Object Type V1">
-                        <SET>"VOUCHER"</SET>
-                        <XMLTAG>"OBJECTTYPE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Company Name V1">
-                        <SET>##SVCurrentCompany</SET>
-                        <XMLTAG>"NAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Company GUID V1">
-                        <SET>$GUID:Company:##SVCurrentCompany</SET>
-                        <XMLTAG>"GUID"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Record Count V1">
-                        <SET>$$NumItems:BRIDGE Voucher Collection V1</SET>
-                        <XMLTAG>"RECORDCOUNT"</XMLTAG>
-                    </FIELD>
-                    <LINE NAME="BRIDGE Voucher Row Line V1">
-                        <LEFTFIELDS>BRIDGE Voucher Date V1, BRIDGE Voucher Type V1, BRIDGE Voucher Number V1, BRIDGE Voucher Cancelled V1, BRIDGE Voucher Optional V2, BRIDGE Voucher Ledger Entry Count V1</LEFTFIELDS>
-                        <XMLTAG>"VOUCHER"</XMLTAG>
-                        <XMLATTR>"REMOTEID" : $RemoteID</XMLATTR>
-                        <XMLATTR>"GUID" : $GUID</XMLATTR>
-                        <XMLATTR>"MASTERID" : $MasterID</XMLATTR>
-                        <XMLATTR>"ALTERID" : $AlterID</XMLATTR>
-                        <EXPLODE>BRIDGE Voucher Ledger Entries Part V1 : Yes</EXPLODE>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Voucher Date V1">
-                        <SET>$Date</SET>
-                        <XMLTAG>"DATE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Type V1">
-                        <SET>$VoucherTypeName</SET>
-                        <XMLTAG>"VOUCHERTYPENAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Number V1">
-                        <SET>$VoucherNumber</SET>
-                        <XMLTAG>"VOUCHERNUMBER"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Cancelled V1">
-                        <SET>$IsCancelled</SET>
-                        <XMLTAG>"ISCANCELLED"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Optional V2">
-                        <SET>$IsOptional</SET>
-                        <TYPE>Logical</TYPE>
-                        <XMLTAG>"ISOPTIONAL"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Count V1">
-                        <SET>$$NumItems:AllLedgerEntries</SET>
-                        <XMLTAG>"LEDGERENTRYCOUNT"</XMLTAG>
-                    </FIELD>
-                    <PART NAME="BRIDGE Voucher Ledger Entries Part V1">
-                        <TOPLINES>BRIDGE Voucher Ledger Entry Row V1</TOPLINES>
-                        <REPEAT>BRIDGE Voucher Ledger Entry Row V1 : AllLedgerEntries</REPEAT>
-                        <XMLTAG>"LEDGERENTRIES"</XMLTAG>
-                    </PART>
-                    <LINE NAME="BRIDGE Voucher Ledger Entry Row V1">
-                        <LEFTFIELDS>BRIDGE Voucher Ledger Entry Index V1, BRIDGE Voucher Ledger Entry Name V1, BRIDGE Voucher Ledger Entry Amount V1, BRIDGE Voucher Ledger Entry Deemed Positive V1</LEFTFIELDS>
-                        <XMLTAG>"LEDGERENTRY"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Index V1">
-                        <SET>$$Line</SET>
-                        <XMLTAG>"ENTRYINDEX"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Name V1">
-                        <SET>$LedgerName</SET>
-                        <XMLTAG>"LEDGERNAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Amount V1">
-                        <SET>$Amount</SET>
-                        <TYPE>Amount</TYPE>
-                        <FORMAT>"No Symbol, No Comma"</FORMAT>
-                        <XMLTAG>"AMOUNT"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Voucher Ledger Entry Deemed Positive V1">
-                        <SET>$IsDeemedPositive</SET>
-                        <TYPE>Logical</TYPE>
-                        <XMLTAG>"ISDEEMEDPOSITIVE"</XMLTAG>
-                    </FIELD>
-                    <COLLECTION NAME="BRIDGE Voucher Collection V1" ISMODIFY="No" ISFIXED="No" ISINITIALIZE="No" ISOPTION="No" ISINTERNAL="No">
-                        <TYPE>Voucher</TYPE>
-                        <FETCH>RemoteID, GUID, MasterID, AlterID, Date, VoucherTypeName, VoucherNumber, IsCancelled, AllLedgerEntries.*</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#,
-        xml_escape(company),
-        xml_escape(from),
-        xml_escape(to)
-    )
-    .trim()
-    .to_string()
-}
-
 /// FETCHLIST of the tally-read v1 `company` part (`AuditCompanyObjectV1`).
 ///
 /// A `Company` *collection* returns every loaded company whatever
 /// `SVCURRENTCOMPANY` says (protocol reference §12a.7), and both consumers
 /// take the first `COMPANY` carrying a GUID, so the part is a single-object
-/// export instead (protocol reference §9.11a). That shape was measured with
-/// `FETCH *` only (565 tags). This explicit list is narrower on purpose: the
+/// export instead (protocol reference §9.11a). That shape was first measured
+/// with `FETCH *` (565 tags). This explicit list is narrower on purpose: the
 /// part is stored, and nothing else in the company definition is read:
 /// `GUID` and `BOOKSFROM` (both engines), `ISINTEGRATED` (the Python stock
 /// test), and `NAME`, which no engine reads but which evidences which company
 /// Tally resolved the `ID` to. Each was present in the `FETCH *` captures of
-/// the audit books; whether an explicit `FETCHLIST` narrows an Object export
-/// is unmeasured, so admission checks the fields the consumers need, not the
-/// absence of the rest.
+/// the audit books. On the one Company object export measured with this list,
+/// the answer was far narrower than a `FETCH *` answer from another book, but
+/// Tally also sent three children the list does not name (protocol reference
+/// §9.11e, measured 2026-10-12), so admission checks the fields the consumers
+/// need, not the absence of the rest.
 ///
 /// Never add `ORIGINALNAME` or any field outside this list without a new
 /// profile id.

@@ -618,6 +618,64 @@ class MergeGateControls(unittest.TestCase):
 
 
 
+class PrivacySpacedPanWordBoundary(unittest.TestCase):
+    """The spaced PAN shape (five letters, four digits, one letter, with spaces or hyphens) is read only where its letters are not
+    part of a longer word, so the end of one word and the start of the next are not taken for it. The test texts are built from
+    parts, because this file is scanned like any other added text and must hold no identifier-shaped text."""
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def blocked(self, text):
+        return any("identifier shape" in b for b in self.blockers(text))
+
+    def pan(self, first=" ", second=" "):
+        return "ABCDE" + first + "1234" + second + "F"
+
+    def test_a_spaced_or_hyphenated_pan_shape_is_still_blocked(self):
+        for text in (
+            "PAN " + self.pan(),
+            "PAN: " + self.pan("-", "-") + ".",
+            self.pan().lower(),
+            "(" + self.pan() + ")",
+            self.pan("-", " "),
+            "ref_" + self.pan(),
+            "id9" + self.pan(),
+            self.pan() + "9",
+        ):
+            self.assertTrue(self.blocked(text), text)
+
+    def test_a_spaced_gstin_is_still_blocked(self):
+        self.assertTrue(self.blocked("GSTIN 07 " + self.pan() + " 1Z5"))
+
+    def test_letters_of_neighbouring_words_do_not_make_the_shape(self):
+        for text in (
+            "migration 0003 job",
+            "Run migration 0003 jobs in order.",
+            "The reconciliation 2024 report",
+            "ABCDEF 1234 G",
+            self.pan() + "x",
+        ):
+            self.assertFalse(self.blocked(text), text)
+
+    def test_a_real_shape_beside_a_false_one_counts_once(self):
+        found = self.privacy.IDENTIFIER_RE.findall("migration 0003 job and " + self.pan())
+        self.assertEqual(len(found), 1, found)
+
+    def test_the_redaction_masks_the_shape_and_leaves_the_words(self):
+        self.assertEqual(self.privacy.redact_shapes("see " + self.pan() + " here"), "see <identifier> here")
+        self.assertEqual(self.privacy.redact_shapes("migration 0003 job"), "migration 0003 job")
+
+    def test_the_unspaced_shapes_are_unchanged(self):
+        pan = "PAN " + "ABCDE" + "1234" + "F"
+        gstin = "GSTIN " + "07" + "ABCDE" + "1234" + "F" + "1Z5"
+        for text in (pan, gstin):
+            self.assertIsNotNone(self.privacy.IDENTIFIER_RE.search(text), text)
+            self.assertTrue(self.blocked(text), text)
+
 class PrivacyScannerFindingsPR335(unittest.TestCase):
     """Direct unit coverage of scripts/merge_gate_privacy.py, one pair of
     tests (positive + negative) per surviving PR #335 review finding against

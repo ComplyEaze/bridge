@@ -61,9 +61,6 @@ let simulator = Simulator::spawn(plan)?;
 - Keep transport failure separate from application failure. HTTP 200 plus
   `STATUS=0` is an application rejection, not a successful empty collection.
 - Add a deterministic assertion whenever a fixture is added.
-- Use `Fixture::InconsistentDateFilter` when a test needs a declared July
-  window whose synthetic response improperly contains a June voucher; accepting
-  that row as canonical state is always a defect.
 
 UTF-16 fixtures are derived byte-for-byte from their UTF-8 source by
 `ScenarioPlan::response_bytes`; binary duplicates are intentionally not checked

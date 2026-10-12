@@ -30,7 +30,7 @@ fn zero_complete(source_bytes: usize, unallocated_known: bool) -> OutstandingsLo
             source_voucher_count: 0,
             source_bytes,
         }),
-        read_strategy: crate::tally::OutstandingsReadStrategy::NativeBills,
+        read_strategy: crate::tally::runtime::OutstandingsReadStrategy::NativeBills,
         currency_assertion: crate::tally::OutstandingsCurrencyAssertion::Inr,
         ageing_anchor: crate::tally::OutstandingsAgeingAnchor::DueDate,
         synced_at_unix_ms: 1,
@@ -58,7 +58,7 @@ fn handle_is_one_use_and_rejects_forgery() {
         unallocated_by_party: Vec::new(),
     };
     let id = store
-        .replace_for_company("synthetic-guid", Some(source))
+        .replace_shared_for_company("synthetic-guid", Some(Arc::new(source)))
         .expect("handle issued")
         .expect("source produces a handle");
     assert!(store.take(&id).is_ok());
@@ -79,7 +79,7 @@ fn a_new_company_snapshot_revokes_its_superseded_handle() {
         .unwrap()
         .unwrap();
     let first = store
-        .replace_for_company("synthetic-guid", Some(first_source))
+        .replace_shared_for_company("synthetic-guid", Some(Arc::new(first_source)))
         .unwrap()
         .unwrap();
 
@@ -87,7 +87,7 @@ fn a_new_company_snapshot_revokes_its_superseded_handle() {
         .unwrap()
         .unwrap();
     let replacement = store
-        .replace_for_company("synthetic-guid", Some(replacement_source))
+        .replace_shared_for_company("synthetic-guid", Some(Arc::new(replacement_source)))
         .unwrap()
         .unwrap();
 
@@ -106,12 +106,14 @@ fn an_ineligible_refresh_revokes_the_previous_company_snapshot() {
         .unwrap()
         .unwrap();
     let id = store
-        .replace_for_company("synthetic-guid", Some(source))
+        .replace_shared_for_company("synthetic-guid", Some(Arc::new(source)))
         .unwrap()
         .unwrap();
 
     assert_eq!(
-        store.replace_for_company("synthetic-guid", None).unwrap(),
+        store
+            .replace_shared_for_company("synthetic-guid", None)
+            .unwrap(),
         None
     );
     assert_eq!(
@@ -127,13 +129,13 @@ fn composite_refresh_revokes_a_prior_export_even_when_the_source_keeps_the_raw_g
         .unwrap()
         .unwrap();
     let id = store
-        .replace_for_company("opaque-composite-company-key", Some(source))
+        .replace_shared_for_company("opaque-composite-company-key", Some(Arc::new(source)))
         .unwrap()
         .unwrap();
 
     assert_eq!(
         store
-            .replace_for_company("opaque-composite-company-key", None)
+            .replace_shared_for_company("opaque-composite-company-key", None)
             .unwrap(),
         None
     );

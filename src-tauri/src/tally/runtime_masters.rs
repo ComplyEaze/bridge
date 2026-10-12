@@ -211,73 +211,64 @@ impl TallyRuntime {
     ) -> anyhow::Result<(MastersRead, CompanyBookExtent)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::MasterExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        let (profile, mode_evidence) = observe_read_boundary(&client).await?;
-                        evidence = mode_evidence;
-                        if profile == DateBoundaryProfile::EducationRestricted {
-                            return Err(MastersReadError::EducationUnqualified.into());
-                        }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        // A response Bridge cannot read refuses at once. Only a
-                        // broken size premise, the numbering's included, and a
-                        // numbering that does not join are held until the closing
-                        // extent is read: a book that moved mid-read is reported
-                        // as moved, not as the rows its new masters added.
-                        let held: Result<MastersRows, MastersReadError> = match kind {
-                            MastersKind::Native(native) => {
-                                let mark = extent
-                                    .master_alter_id_high_water()
-                                    .ok_or(OutstandingsError::MasterWitnessAbsent)?
-                                    .get();
-                                let estimate = sized_before_the_read(native)
-                                    .then(|| admit_masters_size(native, mark))
-                                    .transpose()?;
-                                let limit = limit_for(native, estimate);
-                                let request =
-                                    render_native_masters_request(native, identity.display_name());
-                                let (xml, bytes, hash) = client
-                                    .fetch_native_report_paired(request.clone())
-                                    .await?
-                                    .require_stable(PairedReadValidationError::MastersCollection)?;
-                                evidence = evidence
-                                    .clone()
-                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                let masters =
-                                    parse_native_masters(native, &xml, identity.company_guid())?;
-                                match check_masters_premise(&masters.rows, mark, bytes, limit) {
-                                    Err(violated) => Err(violated),
-                                    // Voucher types only: the series-level numbering is
-                                    // a second collection, read and compared the same
-                                    // way, inside the same opening and closing extents.
-                                    Ok(()) if native == NativeMasterKind::VoucherTypes => {
-                                        let request = render_voucher_type_numbering_request(
-                                            identity.display_name(),
-                                        );
-                                        let (xml, bytes, hash) = client
-                                            .fetch_native_report_paired(request.clone())
-                                            .await?
-                                            .require_stable(
-                                                PairedReadValidationError::MastersNumberingCollection,
-                                            )?;
-                                        evidence = evidence.clone().combine(
-                                            RuntimeReadEvidence::paired(&request, hash, bytes),
-                                        );
-                                        let numbering = parse_voucher_type_numbering(&xml)?;
-                                        check_numbering_premise(
-                                            &numbering,
-                                            mark,
-                                            bytes,
-                                            budget_bytes(),
-                                        )
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    let (profile, mode_evidence) = observe_read_boundary(&client).await?;
+                    evidence = mode_evidence;
+                    if profile == DateBoundaryProfile::EducationRestricted {
+                        return Err(MastersReadError::EducationUnqualified.into());
+                    }
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let extent = client.fetch_company_book_extent(&identity).await?;
+                    // A response Bridge cannot read refuses at once. Only a
+                    // broken size premise, the numbering's included, and a
+                    // numbering that does not join are held until the closing
+                    // extent is read: a book that moved mid-read is reported
+                    // as moved, not as the rows its new masters added.
+                    let held: Result<MastersRows, MastersReadError> = match kind {
+                        MastersKind::Native(native) => {
+                            let mark = extent
+                                .master_alter_id_high_water()
+                                .ok_or(OutstandingsError::MasterWitnessAbsent)?
+                                .get();
+                            let estimate = sized_before_the_read(native)
+                                .then(|| admit_masters_size(native, mark))
+                                .transpose()?;
+                            let limit = limit_for(native, estimate);
+                            let request =
+                                render_native_masters_request(native, identity.display_name());
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::MastersCollection)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            let masters =
+                                parse_native_masters(native, &xml, identity.company_guid())?;
+                            match check_masters_premise(&masters.rows, mark, bytes, limit) {
+                                Err(violated) => Err(violated),
+                                // Voucher types only: the series-level numbering is
+                                // a second collection, read and compared the same
+                                // way, inside the same opening and closing extents.
+                                Ok(()) if native == NativeMasterKind::VoucherTypes => {
+                                    let request = render_voucher_type_numbering_request(
+                                        identity.display_name(),
+                                    );
+                                    let (xml, bytes, hash) = client
+                                        .fetch_native_report_paired(request.clone())
+                                        .await?
+                                        .require_stable(
+                                            PairedReadValidationError::MastersNumberingCollection,
+                                        )?;
+                                    evidence = evidence.clone().combine(
+                                        RuntimeReadEvidence::paired(&request, hash, bytes),
+                                    );
+                                    let numbering = parse_voucher_type_numbering(&xml)?;
+                                    check_numbering_premise(&numbering, mark, bytes, budget_bytes())
                                         .and_then(|()| {
                                             join_series_numbering(&masters.rows, &numbering)
                                                 .map_err(MastersReadError::NumberingJoin)
@@ -288,50 +279,49 @@ impl TallyRuntime {
                                                 masters.rows.into_iter().zip(joined).collect(),
                                             )
                                         })
-                                    }
-                                    Ok(()) => Ok(MastersRows::Native(masters)),
                                 }
+                                Ok(()) => Ok(MastersRows::Native(masters)),
                             }
-                            // The group snapshot as the statements read it: no
-                            // size admission of its own.
-                            MastersKind::Groups => {
-                                let request =
-                                    render_native_group_snapshot_request(identity.display_name());
-                                let (xml, bytes, hash) = client
-                                    .fetch_native_report_paired(request.clone())
-                                    .await?
-                                    .require_stable(PairedReadValidationError::MastersCollection)?;
-                                evidence = evidence
-                                    .clone()
-                                    .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                                Ok(MastersRows::Groups(parse_native_group_snapshot(
-                                    &xml,
-                                    identity.company_guid(),
-                                )?))
-                            }
-                        };
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
-                            return Err(PairedReadValidationError::MastersExtent.into());
                         }
-                        let rows = held?;
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        evidence = evidence
-                            .clone()
-                            .combine(confirm_read_boundary(&client, profile).await?);
-                        Ok((
-                            MastersRead {
-                                rows,
-                                evidence: evidence.clone(),
-                            },
-                            extent,
-                        ))
+                        // The group snapshot as the statements read it: no
+                        // size admission of its own.
+                        MastersKind::Groups => {
+                            let request =
+                                render_native_group_snapshot_request(identity.display_name());
+                            let (xml, bytes, hash) = client
+                                .fetch_native_report_paired(request.clone())
+                                .await?
+                                .require_stable(PairedReadValidationError::MastersCollection)?;
+                            evidence = evidence
+                                .clone()
+                                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                            Ok(MastersRows::Groups(parse_native_group_snapshot(
+                                &xml,
+                                identity.company_guid(),
+                            )?))
+                        }
+                    };
+                    let closing_extent = client.fetch_company_book_extent(&identity).await?;
+                    if closing_extent != extent {
+                        return Err(PairedReadValidationError::MastersExtent.into());
                     }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+                    let rows = held?;
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    evidence = evidence
+                        .clone()
+                        .combine(confirm_read_boundary(&client, profile).await?);
+                    Ok((
+                        MastersRead {
+                            rows,
+                            evidence: evidence.clone(),
+                        },
+                        extent,
+                    ))
                 }
-            },
-        )
+                .await;
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
         .await
     }
 }

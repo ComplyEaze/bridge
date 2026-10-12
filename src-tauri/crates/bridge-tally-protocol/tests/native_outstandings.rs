@@ -31,15 +31,18 @@ const BILLS_PAYABLE_VALIDATION_LAB: &str =
 const LEDGER_SNAPSHOT_VALIDATION_LAB: &str =
     include_str!("fixtures/native/ledger_snapshot_validation_lab.xml");
 
-/// `BOOKSFROM` for "Bridge Billwise Lab", from `company_extent_9000.xml`
+/// `BOOKSFROM` for "Bridge Billwise Lab", from
+/// `agent/native-company-book-extents-with-number.utf8.xml`
 /// (`<BOOKSFROM TYPE="Date">20240401</BOOKSFROM>`).
 const BILLWISE_LAB_BOOKS_FROM: &str = "20240401";
-/// `BOOKSFROM` for "Bridge Ageing Lab", from `company_extent_9000.xml`
+/// `BOOKSFROM` for "Bridge Ageing Lab", from
+/// `agent/native-company-book-extents-with-number.utf8.xml`
 /// (`<BOOKSFROM TYPE="Date">20260401</BOOKSFROM>`).
 const AGEING_LAB_BOOKS_FROM: &str = "20260401";
 const NATIVE_CAPTURE_AS_OF: &str = "20260731";
 /// `BOOKSFROM` for the purpose-built `Bridge Validation Lab`, observed via
-/// the paired `CompanyBookExtentV1` read that bracketed the 2026-08-17 capture.
+/// the paired `CompanyBookExtentV1` read (a profile since removed) that
+/// bracketed the 2026-08-17 capture.
 const VALIDATION_LAB_BOOKS_FROM: &str = "20250401";
 const VALIDATION_CAPTURE_AS_OF: &str = "20260817";
 

@@ -59,19 +59,9 @@ impl WorkingPaperExportStore {
     }
 
     /// Replaces every older approval for `company_revocation_key` with the source from
-    /// the newest completed read. Passing `None` still revokes the older
-    /// approval: a partial or otherwise ineligible refresh must not leave a
-    /// now-hidden snapshot exportable by a stale webview capability.
-    pub fn replace_for_company(
-        &self,
-        company_revocation_key: &str,
-        source: Option<OutstandingsWorkingPaperSource>,
-    ) -> Result<Option<String>, WorkingPaperExportStoreError> {
-        self.replace_shared_for_company(company_revocation_key, source.map(Arc::new))
-    }
-
-    /// As [`Self::replace_for_company`], holding a source another store also
-    /// holds, so one completed read is kept once in memory.
+    /// the newest completed read, held shared so one completed read is kept once in memory.
+    /// Passing `None` still revokes the older approval: a partial or otherwise ineligible
+    /// refresh must not leave a now-hidden snapshot exportable by a stale webview capability.
     pub fn replace_shared_for_company(
         &self,
         company_revocation_key: &str,
@@ -185,8 +175,9 @@ impl PartyStatementSourceStore {
 }
 
 /// Copies a working-paper source only after the completed result passes
-/// cardinality, source-byte, and text-size budgets. `None` is the legacy path,
-/// whose missing unallocated control cannot substantiate an all-party paper.
+/// cardinality, source-byte, and text-size budgets. `None` when the result is
+/// not complete or carries no unallocated control, which cannot substantiate an
+/// all-party paper.
 pub fn source_from_complete_result(
     result: &OutstandingsLoadResult,
     company_guid: &str,

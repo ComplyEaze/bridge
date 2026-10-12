@@ -3,6 +3,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use crate::tally::ConnectionStatus;
 use std::collections::BTreeMap;
 
 #[test]
@@ -137,7 +138,7 @@ fn scoped_opening_requires_observed_mode_and_does_not_infer_unknown_as_licensed(
 
 #[tokio::test]
 async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cache() {
-    use crate::tally::TallyProduct;
+    use crate::tally::connection::TallyProduct;
     use bridge_tally_core::CapabilityProfile;
     use tokio::io::AsyncReadExt;
     for (cached, scoped) in [(false, false), (true, false), (false, true), (true, true)] {
@@ -150,13 +151,13 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
         let runtime = TallyRuntime::default();
         let company = TallyCompany {
             name: "Synthetic Company".into(),
-            guid: Some("synthetic-guid".into()),
+            guid: Some("9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27".into()),
             company_number: Some("100001".into()),
             books_from: Some("20260401".into()),
         };
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             company.name.clone(),
-            company.guid.clone().unwrap(),
+            crate::tally::test_company_guid(&company.guid.clone().unwrap()),
             "100001".into(),
             "20260401".into(),
             std::slice::from_ref(&company),
@@ -199,7 +200,6 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
                     &identity,
                     scoped.then(|| TallyDate::parse("20260815").unwrap()),
                     false,
-                    LedgerCurrencyGate::None,
                     ReadRetryPolicy::transient_default(),
                 )
                 .await
@@ -237,6 +237,23 @@ async fn all_ledger_openings_probe_before_export_even_with_a_stale_licensed_cach
         );
         assert!(body.is_empty());
     }
+}
+
+/// A 200 response whose Tally STATUS is 0 is a refusal, not an empty ledger list.
+#[test]
+fn native_ledger_opening_admission_refuses_a_tally_status_of_zero() {
+    let error = admit_native_ledger_opening_rows(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY /></ENVELOPE>",
+        "56359347-3976-4d01-b44e-56fa0f6a422c",
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.chain().find_map(|cause| {
+            cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+        }),
+        Some(&bridge_tally_protocol::NativeCollectionError::NotSuccess),
+        "unexpected error: {error:#}"
+    );
 }
 
 #[test]
@@ -341,6 +358,9 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
     let captured_ledger = decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
     ));
+    let captured_currency = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
     let xml = |text: String| {
         ScenarioPlan::new(Fixture::SyntheticXml(text))
             .with_encoding(WireEncoding::Utf16Le)
@@ -378,7 +398,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             .unwrap();
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             observed.name.clone(),
-            observed.guid.clone().unwrap(),
+            crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
             observed.company_number.clone().unwrap(),
             observed.books_from.clone().unwrap(),
             &companies,
@@ -387,6 +407,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
         let company = xml(company_xml);
         let extent = xml(extent_xml);
         let ledger = xml(captured_ledger.clone());
+        let currency = xml(captured_currency.clone());
         let mut plans = vec![
             status.clone(),
             company.clone(),
@@ -394,6 +415,11 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             extent.clone(),
             status.clone(),
             extent.clone(),
+            status.clone(),
+            // The single-INR check precedes the ledger request and the period admission.
+            currency.clone(),
+            status.clone(),
+            currency,
             status.clone(),
         ];
         if !unsafe_book_start {
@@ -418,7 +444,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
         if unsafe_book_start {
             // Education reaches the native period admission. Its invalid
             // BOOKSFROM must refuse before the ledger report is dispatched.
-            plans.truncate(7);
+            plans.truncate(11);
         }
         let expected_requests = plans.len();
         let responses = plans
@@ -427,7 +453,7 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             .collect::<Vec<_>>();
         let simulator = SequenceSimulator::spawn(plans).unwrap();
         let result = TallyRuntime::default()
-            .fetch_ledgers_with_evidence(
+            .fetch_ledgers_with_opening_as_of_evidence(
                 TallyConfig {
                     host: simulator.address().ip().to_string(),
                     port: simulator.address().port(),
@@ -456,7 +482,9 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
                 Some(&OpeningBoundaryObservationError::Changed)
             );
         } else {
-            let (ledgers, evidence) = result.unwrap();
+            let LedgerListing {
+                ledgers, evidence, ..
+            } = result.unwrap();
             assert!(!ledgers.is_empty());
             let join = |left: &str, right: &str| sha256_hex(format!("{left}:{right}").as_bytes());
             let request = |index: usize| observations[index].request_body_sha256.as_str();
@@ -464,24 +492,152 @@ async fn book_start_opening_requires_stable_mode_and_commits_probe_sources() {
             assert_eq!(
                 evidence.request_sha256,
                 join(
-                    &join(&join(request(0), request(1)), request(7)),
-                    &join(request(16), request(17))
+                    &join(
+                        &join(&join(request(0), request(1)), request(7)),
+                        request(11)
+                    ),
+                    &join(request(20), request(21))
                 )
             );
             assert_eq!(
                 evidence.response_sha256,
                 join(
-                    &join(&join(&response(0), &response(1)), &response(7)),
-                    &join(&response(16), &response(17))
+                    &join(
+                        &join(&join(&response(0), &response(1)), &response(7)),
+                        &response(11)
+                    ),
+                    &join(&response(20), &response(21))
                 )
             );
             assert_eq!(
                 evidence.bytes,
-                [0, 1, 7, 9, 16, 17]
+                [0, 1, 7, 9, 11, 13, 20, 21]
                     .iter()
                     .map(|i| responses[*i].len())
                     .sum::<usize>()
             );
         }
+    }
+}
+
+/// An invalid BOOKSFROM in the company extent stops the ledger read after the
+/// paired extent reads, before the currency read and before any native ledger
+/// request, and no other date stands in for it (#1148, J). Fault injection into
+/// the captured extent: the target row's BOOKSFROM is removed or replaced.
+///
+/// The refusal for a malformed value is the identity check, not a date parse:
+/// the row's name and GUID match the verified identity, so a BOOKSFROM that is
+/// not the identity's own fails the equality in `parse_company_book_extent_v2`
+/// first, whether it is malformed or merely a different valid date.
+#[tokio::test]
+async fn an_invalid_book_extent_stops_the_ledger_read_before_any_ledger_request() {
+    use bridge_tally_protocol::outstandings_shared::OutstandingsError;
+    use tally_protocol_simulator::{
+        Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+    let decode = |bytes: &[u8]| {
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    };
+    let company_xml = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"));
+    let captured_extent = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    );
+    let companies = parse_companies_from_collection(&company_xml).unwrap();
+    let observed = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some("61c6de69-1748-461c-ad3f-162cb949df9f"))
+        .unwrap();
+    let identity = VerifiedCompanyIdentity::from_observed_companies(
+        observed.name.clone(),
+        crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
+        observed.company_number.clone().unwrap(),
+        observed.books_from.clone().unwrap(),
+        &companies,
+    )
+    .unwrap();
+    // The identity's own row of the extent, and its BOOKSFROM element within it.
+    let row = captured_extent
+        .find(&format!("<COMPANY NAME=\"{}\"", identity.display_name()))
+        .unwrap();
+    let element = row
+        + captured_extent[row..]
+            .find("<BOOKSFROM TYPE=\"Date\">")
+            .unwrap();
+    let element_end =
+        element + captured_extent[element..].find("</BOOKSFROM>").unwrap() + "</BOOKSFROM>".len();
+    let with_books_from = |replacement: &str| {
+        let faulty = format!(
+            "{}{}{}",
+            &captured_extent[..element],
+            replacement,
+            &captured_extent[element_end..]
+        );
+        assert_ne!(faulty, captured_extent);
+        faulty
+    };
+    let xml = |text: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(text))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let company = xml(company_xml.clone());
+    for (extent, expected) in [
+        (with_books_from(""), "company_extent_xml_invalid"),
+        (
+            with_books_from(r#"<BOOKSFROM TYPE="Date">notadate</BOOKSFROM>"#),
+            "company_identity_presentation_collision",
+        ),
+        (
+            with_books_from(r#"<BOOKSFROM TYPE="Date">2026-13-45</BOOKSFROM>"#),
+            "company_identity_presentation_collision",
+        ),
+        (
+            with_books_from(r#"<BOOKSFROM TYPE="Date">20250401</BOOKSFROM>"#),
+            "company_identity_presentation_collision",
+        ),
+    ] {
+        let extent = xml(extent);
+        // Status probe, the identity bracket's two company reads, then the paired
+        // extent read: two POSTs, each followed by a status check. The currency
+        // read and the ledger export are not scripted, so any further request
+        // would be a request this sequence cannot answer.
+        let plans = vec![
+            status.clone(),
+            company.clone(),
+            company.clone(),
+            extent.clone(),
+            status.clone(),
+            extent,
+            status.clone(),
+        ];
+        let expected_requests = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let result = TallyRuntime::default()
+            .fetch_ledgers_with_opening_as_of_evidence(
+                TallyConfig {
+                    host: simulator.address().ip().to_string(),
+                    port: simulator.address().port(),
+                },
+                &identity,
+            )
+            .await;
+        let observations = simulator.finish().unwrap();
+        assert_eq!(observations.len(), expected_requests, "{expected}");
+        let error = result.unwrap_err();
+        assert_eq!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<OutstandingsError>()),
+            Some(&OutstandingsError::InvalidResponse(expected)),
+            "unexpected error: {error:#}"
+        );
     }
 }

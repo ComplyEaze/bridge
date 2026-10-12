@@ -471,10 +471,10 @@ book's path (from the code); a larger book's census cost was not measured here.
 - The `vouchers` call on the census book sent the same requests as a build without #1020, in the
   same order, with the same request hashes and response sizes.
 - On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
-  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
-  code, not the run: that reason is returned when the read widened by a day on each side finds
-  rows, none inside the window, so it names the neighbouring days, not the window, which returned
-  no row; the wording is a separate matter.
+  `empty_uncorroborated` on the census book, and, on the other, `nonempty_uncorroborated`
+  (the reason as observed; since renamed `empty_window_wider_read_nonempty`). From the code, not the run: that reason is returned when
+  the read widened by a day on each side finds rows, none inside the window, so it names the
+  neighbouring days, not the window, which returned no row; the name says so.
 
 **The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
 `post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
@@ -523,8 +523,9 @@ export to the same instance returned `STATUS 1` promptly, with no dialog.
 
 Only `ledgers_v1` was observed. Two things are **inferred**: that the other builders using the same
 construct raise it too, and that the space in the argument is the cause. Those builders are every
-`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`:
-`vouchers_v2`/`v3`, the ledger canary and the period-balance report.
+`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`: the
+ledger canary and the period-balance report. (`vouchers_v2`, which this list once named, was
+deleted 2026-10-12, Part of #1570.)
 
 All of them are refused **before sending** once Bridge knows the endpoint is in Education, with
 `education_report_family_unsupported`. Admission is unchanged: nothing is sent, and nothing is
@@ -537,15 +538,17 @@ promoted.
 - **Selected-ledger and selected-voucher qualifiers.** Deleted with the rest of their runtime
   path (bridge#732; ADR 0015's 2026-09-26 amendment): no command or tool reached them.
 - **The live-read tool.** Takes its mode from its configuration; it does not observe it. In
-  Education, the ledger step is recorded as failed with `education_report_family_unsupported`, and
-  the voucher steps as not attempted.
+  Education, the ledger step is recorded as failed with `education_report_family_unsupported`. Its
+  two voucher steps were deleted 2026-10-12 (Part of #1570), so the run ends after the ledger step.
   - **Residual:** a run configured as `Licensed` against an endpoint that is actually in Education
     still sends `ledgers_v1`. The tool's company read (`CompanyListV1`) carries no `EDUMODE`. Moving
     it to an observed mode means changing its profile sequence, which is not done here.
 - **The native-outstandings qualification.** Accepts only an Education configuration, and its
   identity brackets read through `ledgers_v1`. It therefore refuses on load, so the tool **cannot
   run** until Phase 2 Unit A.
-- **`groups_request`.** Has no production caller, and compiles only for tests.
+- **`groups_request`.** Had no production caller and compiled only for tests. Deleted 2026-10-12
+  together with the Bridge-schema group and voucher-type parsers that read its
+  answer; core groups come from the native group collection.
 
 Reading ledgers and vouchers in Education waits for the Collection-based profiles (Phase 2 Unit A,
 `IMPROVEMENT_PLAN_2026H2.md` §8.12).
@@ -843,7 +846,7 @@ will not take ten times a 10K load.
 | --- | --- | --- |
 | Curated voucher payload | **3,142 B/voucher** | 6 vouchers, curated FETCH |
 | Wildcard voucher payload | **19,658 B/voucher** | same window, `ALLLEDGERENTRIES.*` |
-| Response cap | 32 MiB general; 40 MiB only for the closed wildcard outstandings request | Bridge-side limits; guide §2.5b |
+| Response cap | 32 MiB for every read (the 40 MiB exception for the wildcard outstandings request was deleted with that request, October 2026) | Bridge-side limits; guide §2.5b |
 | Segmentation ceiling | **Profile-specific; derived at runtime** | ~10,600 applies only to the older curated shape, not wildcard outstandings |
 | Independent corroboration | 10,000 vouchers/batch | `tally-database-loader` caps here to avoid hangs |
 | Whole demo book, wildcard | 2.94 MB / 150 vouchers | wide filter |
@@ -1026,15 +1029,13 @@ Tally silently discards a day count above `9999` to an **empty** credit period.
 That is not neutral: due-date ageing then uses the bill date as the due date,
 which can move the bill to a different ageing bucket. The parser therefore
 rejects day counts above the measured `9999` ceiling, but does not invent a
-matching weeks or months ceiling; those units are constrained by checked
-resulting-date arithmetic instead.
+matching weeks or months ceiling.
 
 The voucher parser accepts explicit `N Day(s)`, `N Week(s)`, and `N Month(s)` forms only. It
-does not guess a day count for an unknown unit: the voucher-scan boundary rejects it, and the
+does not guess a day count for an unknown unit: the shared parser rejects it, and the
 agent `vouchers` read carries the text as `unrecognised` instead (so `10000 Days`, above the
-ceiling, is carried, not refused). Weeks add exactly seven days each;
-months use a calendar-month operation that preserves the day of month when possible and otherwise
-clamps to the target month's last day. The same licensed-gateway evidence measured:
+ceiling, is carried, not refused). Bridge does not compute a due date from a credit period: the
+voucher scan that did was removed. The same licensed-gateway evidence measured Tally's own due dates:
 
 | bill date and period | due date |
 | --- | --- |
@@ -1043,8 +1044,7 @@ clamps to the target month's last day. The same licensed-gateway evidence measur
 | 31-Jan-26 + 1 Month | 28-Feb-26 |
 | 31-Mar-26 + 2 Months | 31-May-26 |
 
-2026 is not a leap year. The 29-Feb clamp is implemented from the Gregorian calendar rule but was
-not directly observed in this capture.
+2026 is not a leap year; the 29-Feb case was not observed in this capture.
 
 **`BILLOVERDUE` in the native report is not usable as an ageing oracle.** Its as-of is
 Tally's own period date, not the caller's, and it does **not** follow the `F6` setting:

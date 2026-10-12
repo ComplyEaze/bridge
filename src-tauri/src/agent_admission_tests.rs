@@ -91,6 +91,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "changed_since",
         "company_features",
         "egress_log",
+        "gst_status",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -101,6 +102,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "purchase_register",
         "read_evidence",
         "sales_register",
+        "statement_tie_out",
         "stock_summary",
         "tally_status",
         "trial_balance",
@@ -1118,6 +1120,26 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "an unverified hand import does not stop a duplicate",
         ),
         (
+            "build_import_xml",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "build_import_xml",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
+        ),
+        (
             "tally_status",
             "only repeat it when the refusal says attempt_recorded is false",
             "a refused post may be repeated only when no attempt was recorded",
@@ -1261,6 +1283,21 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "company_features",
             "not_reported, never no",
             "a setting Tally did not send is not a setting that is off",
+        ),
+        (
+            "gst_status",
+            "not a judgement of ComplyEaze Bridge",
+            "a status is Tally's own flag, not a finding about the voucher",
+        ),
+        (
+            "gst_status",
+            "never as included",
+            "a voucher whose flags were not read is not reported as in the return",
+        ),
+        (
+            "gst_status",
+            "The reason for a status is not available",
+            "the tool names no reason for a status",
         ),
     ];
     let definitions = registered_tool_definitions(true, true);

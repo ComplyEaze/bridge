@@ -630,9 +630,7 @@ fn days_between(from: &TallyDate, to: &TallyDate) -> Result<u32, NativeOutstandi
         .map_err(|_| NativeOutstandingsError::InvalidDate("native_date_after_as_of"))
 }
 
-/// Days-since-epoch via Howard Hinnant's `days_from_civil` algorithm — the
-/// same computation `outstandings::compute` uses, duplicated here because
-/// that module's helper is private to its own subtree.
+/// Days-since-epoch via Howard Hinnant's `days_from_civil` algorithm.
 fn civil_day(date: &TallyDate) -> Result<i64, NativeOutstandingsError> {
     let value = date.as_str();
     let year = value[0..4]

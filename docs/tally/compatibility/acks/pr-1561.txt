@@ -1,0 +1,23 @@
+scripts/check-tally-live-read-boundary.mjs
+src-tauri/src/db/encrypted.rs
+src-tauri/src/lib.rs
+src-tauri/src/reports/bulk_party_statement.rs
+src-tauri/src/reports/bulk_party_statement_tests.rs
+src-tauri/src/reports/outstandings_working_paper_store.rs
+src-tauri/src/reports/outstandings_working_paper_store_tests.rs
+src-tauri/src/reports/party_statement.rs
+src-tauri/src/reports/party_statement_pdf_tests.rs
+src-tauri/src/reports/party_statement_tests.rs
+src-tauri/src/reports/party_statement_xlsx_tests.rs
+src-tauri/src/sync/coordinator.rs
+src-tauri/src/sync/reconciliation.rs
+src-tauri/src/sync/snapshot.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/mod.rs
+src-tauri/src/tally/runtime.rs
+src-tauri/src/tally/runtime_trial_balance.rs
+src-tauri/src/tally/runtime_trial_balance_tests.rs
+src-tauri/src/tally/tdl_engine.rs
+src-tauri/src/tally/validators.rs
+removed-pin: src-tauri/src/tally/capability_packs.rs
+reviewer: lamemustafa

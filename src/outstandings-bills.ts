@@ -41,10 +41,9 @@ export type PartyBillsState =
 /// exceeds the limit is ever capped, and that party is marked `not_loaded`
 /// rather than silently rendered as zero.
 ///
-/// Returns null when statement rows are absent entirely (the voucher-scan
-/// path never sends them) -- that null is what tells a row it must not be
-/// expandable at all, distinct from a present map that simply has no entry
-/// for a given party.
+/// Returns null when statement rows are absent entirely -- that null is what
+/// tells a row it must not be expandable at all, distinct from a present map
+/// that simply has no entry for a given party.
 export function groupOpenBillsByParty(
   openBills: Array<OpenBill> | undefined,
   displayLimitPerParty: number,

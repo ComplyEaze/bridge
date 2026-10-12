@@ -165,6 +165,42 @@ without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PRE
   `Automatic (Manual Override)` is kept raw and never read as `Manual`
   (`native_voucher_type_numbering.rs`).
 
+**Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
+observation.**
+- Setup: a licensed TallyPrime on Windows, a synthetic company. Its Payment type, holding 32
+  Payments numbered 1 to 32, was altered from Automatic to Manual on the screen.
+- Tally asked twice before saving:
+  - "Changing the method of voucher numbering will affect voucher numbers of existing
+    transactions. Continue?"
+  - then, on saving, "Are you sure you want to update the voucher numbers of existing vouchers?
+    Y: Accept Master & Update Vouchers / N: Back".
+- **VERIFIED:** after Y, all 32 stored voucher numbers read back blank (`""`).
+  - Unchanged: every voucher's `MASTERID`, `ALTERID`, `GUID`, date, amounts and narration.
+  - The company's voucher mark (`ALTVCHID`) did not move, at 87.
+  - Only the master mark (`ALTMSTID`) moved, 224 to 226.
+  - Restoring the backup taken before the change brought the numbers back. The read after the
+    restore was byte-identical to the read before the change.
+- **VERIFIED, this sitting only:** on that type the screen showed "Prevent creating duplicate
+  Voucher Nos." as No, and the field never took focus (keyboard or mouse). So Manual with
+  duplicates prevented could not be set by hand there. The capture above shows the same field
+  set on a Payment screen elsewhere, so this is not a rule.
+- **Consequence:** a stored voucher field can change while neither the voucher's `ALTERID` nor
+  `ALTVCHID` moves.
+  - **Checked in the code, 2026-10-12:** no ComplyEaze Bridge read reuses a number across such a
+    change. The held `vouchers` pages compare both company marks, so this switch's `ALTMSTID`
+    move refuses or re-reads them; the mirror re-reads and hashes content; and the
+    `changed_since` cursor is disabled.
+  - A change that moves neither mark would still be served from held pages until they expire,
+    as already documented for them.
+  - A native post is unaffected: it supplies no voucher number, and its read-back compares the
+    number only when the batch supplied one.
+  - **Known limit:** an amendment's build-time check treats an unchanged `ALTERID` as "not
+    altered since verified", and compares the number only when the batch supplied one. So a
+    blanked number does not stop such a build. Posting an amendment natively is refused, so no
+    post follows from it.
+- Evidence: the never-merged branch `lab/1c-numbering-evidence` (`s1c-RESULT.md`,
+  `s1c-pre-payment-numbers.txt`, `s1c-after-manual-payment-numbers.txt`).
+
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
 **VERIFIED 2026-09-10 (licensed TallyPrime 7.1 Gold; five files imported by hand through
@@ -790,3 +826,36 @@ The bound GUIDs are journaled and verified first. Content and `LASTVCHID` only r
 - a `$GUID` filter without a date clause;
 - any other release or licence tier;
 - whether a restore or a data rewrite reuses AlterIDs or MasterIDs.
+
+### 9.20 The GSTR-1 status of one voucher type in a window, read by the type's name with a narrow field list
+
+**PARTIAL: one synthetic company, licensed TallyPrime 7.1 Silver, one run per request, the unregistered buyer of
+its Sales invoices.** This is the read that §9.17's flags can be taken through without fetching whole vouchers.
+The answers are committed byte for byte with their hashes (the `gst-status` fixtures and their provenance file).
+
+- **VERIFIED: a request that selects the vouchers of one type by the type's name, in a window of two days,
+  with only the date, number, type name, `MASTERID`, `ALTERID`, the three status flags
+  (`VCHGSTSTATUSISINCLUDED`, `VCHGSTSTATUSISUNCERTAIN`, `VCHGSTSTATUSISEXCLUDED`) and `ISGSTOVERRIDDEN`,
+  returns those fields without the ledger entries.** An answer cost about 3.0 KB per voucher and 3.2 KB once;
+  the full voucher export of the same book is 78 to 94 KB per voucher.
+- **VERIFIED: selecting the type by its name and by its GUID gave byte-identical answers, and neither
+  selected another type.** The by-GUID answer is `aw8-status-narrow-window-sales.xml` on the lab's answers branch
+  (commit `313f5439b`), with the same SHA-256 as the by-name answer committed as a fixture, so it is not committed
+  twice. A second Sales type (`Z1`) in the same window was not selected by the first type's name.
+- **VERIFIED: the three flags read No, No, No on the four Receipts in the window.** For Receipts that is
+  Tally not listing the voucher in the return. It is **not measured** for any other type, and the two keyed Purchase
+  invoices of §9.19 read uncertain, so "all three No" is not a general meaning.
+- **VERIFIED: the flags were read as No, Yes, No on an uncertain voucher (the tax figure of §9.17 that differed),
+  and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The uncertain voucher is dated 1-Aug-2026,
+  outside the narrow two-day window, so it was shown by the wider voucher read-back (the `three-vouchers` fixture),
+  not by the narrow request; the narrow request has **not** been seen to answer an uncertain voucher. The Accept As Is
+  voucher was read by both.
+- **NOT established:**
+  - a voucher flagged excluded (never observed);
+  - a registered buyer;
+  - the reason for a status: no field in the two lists tried carries it, which is a negative measured on those
+    lists only;
+  - cancelled, optional and post-dated vouchers (the request does not fetch them);
+  - the cost of the selection on a large book: it was timed on about thirty vouchers, so any size bound a
+    program applies is its own provisional choice and not a Tally limit;
+  - another release or licence tier.

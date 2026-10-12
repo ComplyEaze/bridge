@@ -3478,6 +3478,74 @@ async fn an_empty_window_beside_a_busy_day_is_partial_by_the_wider_reads_rows() 
         response["structuredContent"]["evidence"]["reason_code"],
         "empty_window_wider_read_nonempty"
     );
+    // The live answer for the same shape (an empty window beside a busy day),
+    // kept as the tool returned it by a build that still named the reason
+    // `nonempty_uncorroborated`: our result has the same keys and value kinds
+    // at every level (an array's elements are compared with the live array's
+    // first element; counts are not compared), and the same state, total and
+    // items. The reason is asserted above against the current name; the live
+    // file's is not compared.
+    let live: Value = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-empty-window-beside-busy-day.live-answer.json"
+    ))
+    .unwrap();
+    let mut differences = Vec::new();
+    shape_differences(
+        "",
+        &live["output"],
+        &response["structuredContent"],
+        &mut differences,
+    );
+    assert_eq!(differences, Vec::<String>::new(), "{response}");
+    assert_eq!(live["output"]["result"]["state"], result["state"]);
+    assert_eq!(live["output"]["result"]["total"], result["total"]);
+    assert_eq!(live["output"]["result"]["items"], result["items"]);
+}
+
+/// Where `ours` differs from `live` in shape: an object's key set, a value's
+/// JSON kind, and an array being empty or not, each at its path. A value is
+/// never compared, only what kind it is and which keys it has; every element
+/// of an array of ours is compared with the first element of the live array,
+/// and the arrays' lengths are not compared.
+fn shape_differences(path: &str, live: &Value, ours: &Value, out: &mut Vec<String>) {
+    let kind = |value: &Value| match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    };
+    if kind(live) != kind(ours) {
+        out.push(format!("{path}: live {} ours {}", kind(live), kind(ours)));
+        return;
+    }
+    match (live, ours) {
+        (Value::Object(live), Value::Object(ours)) => {
+            for key in live.keys().filter(|key| !ours.contains_key(*key)) {
+                out.push(format!("{path}/{key}: only in the live answer"));
+            }
+            for key in ours.keys().filter(|key| !live.contains_key(*key)) {
+                out.push(format!("{path}/{key}: only in ours"));
+            }
+            for (key, live) in live {
+                if let Some(ours) = ours.get(key) {
+                    shape_differences(&format!("{path}/{key}"), live, ours, out);
+                }
+            }
+        }
+        (Value::Array(live), Value::Array(ours)) => {
+            if live.is_empty() != ours.is_empty() {
+                out.push(format!("{path}: emptiness differs"));
+            }
+            for (index, ours) in ours.iter().enumerate() {
+                if let Some(live) = live.first() {
+                    shape_differences(&format!("{path}/{index}"), live, ours, out);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 /// A divided plan is refused whole, before its first part (bridge#581). The

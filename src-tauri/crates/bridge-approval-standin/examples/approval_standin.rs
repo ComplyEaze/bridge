@@ -24,6 +24,11 @@ use std::io::{Read, Write};
 /// Present in this example's executable, and in no other.
 const STANDIN_MARKER: &str = "bridge-test-approval-standin-1b1f4e18";
 
+/// The most input this stand-in reads. The dialog's input is a nonce line and a preview of at most
+/// 8,000 bytes; reading one byte past this limit lets an over-limit input fail the stand-in loudly
+/// instead of filling memory (`scripts/check-unbounded-reads.mjs` scans this package).
+const MAX_INPUT_BYTES: u64 = 1 << 20;
+
 fn beside_me(extension: &str) -> OsString {
     let mut path = std::env::args_os().next().expect("argv[0]");
     path.push(extension);
@@ -36,7 +41,14 @@ fn main() {
     let script = std::fs::read_to_string(beside_me(".answer")).expect("a scripted answer");
     let (code, answer) = script.split_once('\n').expect("an exit code line");
     let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).unwrap();
+    std::io::stdin()
+        .take(MAX_INPUT_BYTES + 1)
+        .read_to_string(&mut input)
+        .unwrap();
+    assert!(
+        input.len() as u64 <= MAX_INPUT_BYTES,
+        "the dialog input is over the stand-in's limit"
+    );
     let nonce = input.split('\n').next().unwrap_or_default();
     let code: i32 = code.parse().unwrap();
     let mut stdout = std::io::stdout();

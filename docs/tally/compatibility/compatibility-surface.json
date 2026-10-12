@@ -203,9 +203,6 @@
       "path": "src-tauri/crates/bridge-tally-core/src/report_tie_out.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-core/src/transport_qualification.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-primitives/Cargo.toml"
     },
     {

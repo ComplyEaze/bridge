@@ -47,10 +47,13 @@ const NUMERIC_UNITS: [&str; 4] = ["paise", "bp", "count", "days"];
 /// block existing, which a real client book is never guaranteed to have (a services business with
 /// no fixed assets at all is a legitimate, quiet book, not a broken dump). 2 is still high enough
 /// that an empty or near-empty dump cannot pass.
-/// `financial_statements` always emits these 18, whatever the book: 15 statement figures (the six
-/// P&L group totals, opening stock, closing stock, the TB closing field, the stale-field count,
-/// gross profit and its ratio, the stock-to-turnover ratio, net profit and its ratio) and 3
-/// voucher-population counts. Partner, report-tie and per-exclusion figures come on top.
+/// `financial_statements` always emits these 10, whatever the book: the six P&L group totals, the
+/// report-tie status and 3 voucher-population counts. What it shows of stock depends on the stock
+/// basis (#1505): on a ledger basis, opening and closing stock, the TB closing field, the
+/// stale-field count, gross profit and its ratio, the stock-to-turnover ratio, and net profit and
+/// its ratio; on a book whose stock sits on the stock items, the known stock terms and the profit
+/// figures only when both terms are known. Partner, report-tie and per-exclusion figures come on
+/// top.
 /// `applicability_44ab` always emits these 9: the applicable threshold, the turnover definition,
 /// turnover (a value or "not supplied"), the audit-required call, the s.44ADA flag, three due dates
 /// and the presumptive-history status. Comparison-source figures come on top.

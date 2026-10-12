@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Clippy configuration for the tools workspace (the standalone Tally
-# qualification/compatibility/read-transport crates). Paired with the
+# compatibility/live-read/read-transport crates). Paired with the
 # `[workspace.lints.clippy]` table in Cargo.toml, which turns on the
 # `pedantic` group at `warn` (never `deny` — see that table's comment for why).
 #

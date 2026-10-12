@@ -1190,6 +1190,13 @@ that evidence.
 evidence needed to qualify an exact scope against XML. No comparator result
 enables JSONEX by itself.
 
+**Amended 2026-10-12:** the parser, the request builder and the comparator
+described under "Current implementation boundary", "Implemented qualification
+boundary" and "Acceptance" below were deleted in
+[#1574](https://github.com/ComplyEaze/bridge/pull/1574), because they were
+exercised only against synthetic fixtures and no shipped build used them. The
+text below is kept as the design record and no longer describes the repository.
+
 #### Current implementation boundary
 
 The repository contains the v1 qualification comparator plus an optional,

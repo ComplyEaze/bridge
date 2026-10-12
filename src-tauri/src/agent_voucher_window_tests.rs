@@ -2324,9 +2324,12 @@ fn a_census_refuses_on_an_oversized_response_and_on_a_deadline() {
 
 #[tokio::test]
 async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
-    // Takes the transport's 20 s deadline. The census never answers; the read
-    // is refused as unestimated and nothing else is sent. Spare responses are
-    // queued so that a retry, if one were made, would be served and seen.
+    // The census never answers within the transport's deadline, shortened here
+    // to 2 s through the runtime's test seam (production keeps 20 s, pinned in
+    // the transport's own tests); the delivery is 10 s, so the deadline, not
+    // the delivery, ends the request. The read is refused as unestimated and
+    // nothing else is sent. Spare responses are queued so that a retry, if one
+    // were made, would be served and seen.
     let limits = WindowReadLimits {
         budget_bytes: 16 * 1024,
         default_bytes_per_voucher: 16 * 1024,
@@ -2336,7 +2339,7 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
     let mut plans = vec![
         company_plan(),
         xml_plan(empty_collection()).with_delivery(
-            tally_protocol_simulator::Delivery::SlowHeaders(std::time::Duration::from_secs(25)),
+            tally_protocol_simulator::Delivery::SlowHeaders(std::time::Duration::from_secs(10)),
         ),
     ];
     for _ in 0..4 {
@@ -2344,7 +2347,13 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
     }
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: std::time::Duration::from_millis(2_000),
+            ..Default::default()
+        },
+    );
     let identity = identity();
     let failure = server
         .read_voucher_window(
@@ -2372,7 +2381,9 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         .expect("a failed window read carries its timings");
     assert_eq!(timings.marks, RequestTally::default());
     assert_eq!(timings.census.requests, 1);
-    assert!(timings.census.ms >= 19_000, "{timings:?}");
+    assert!(timings.census.ms >= 1_900, "{timings:?}");
+    // Ended by the deadline, not by the 10 s delivery arriving.
+    assert!(timings.census.ms < 10_000, "{timings:?}");
     assert!(timings.parts.is_empty());
     assert_eq!(
         timings.failed,

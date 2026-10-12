@@ -1,0 +1,10 @@
+src-tauri/crates/bridge-tally-core/src/master_binding.rs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import_post.rs
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/tally/approved_import.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/standard_ledger_catalog.rs
+reviewer: lamemustafa

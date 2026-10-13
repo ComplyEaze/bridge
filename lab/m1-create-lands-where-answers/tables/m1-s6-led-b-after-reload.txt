@@ -1,0 +1,4 @@
+﻿# 2 LEDGER rows of m1-s6-led-b-after-reload.xml, sorted by GUID; company GUID|name computed on the rows: [7f7dc35e-4696-44b8-9fcf-276ae0550194|BRIDGE M1 LAB B]; LINEERROR elements 0
+# NAME (length) | GUID | PARENT | ISBILLWISEON | ALTERID
+"Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | " Primary" (8) | No | 31
+"Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | "Cash-in-Hand" (12) | No | 32

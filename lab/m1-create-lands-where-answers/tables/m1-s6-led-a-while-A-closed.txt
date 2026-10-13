@@ -1,0 +1,2 @@
+﻿# 0 LEDGER rows of m1-s6-led-a-while-A-closed.xml, sorted by GUID; company GUID|name computed on the rows: []; LINEERROR elements 0
+# NAME (length) | GUID | PARENT | ISBILLWISEON | ALTERID

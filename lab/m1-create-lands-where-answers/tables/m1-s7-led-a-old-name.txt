@@ -1,0 +1,2 @@
+﻿# 0 LEDGER rows of m1-s7-led-a-old-name.xml, sorted by GUID; company GUID|name computed on the rows: []; LINEERROR elements 0
+# NAME (length) | GUID | PARENT | ISBILLWISEON | ALTERID

@@ -1,0 +1,5 @@
+﻿# 3 LEDGER rows of m1-s3-led-a.xml, sorted by GUID; company GUID|name computed on the rows: [36c6a453-024f-4d6a-b2e5-27784d393e8f|BRIDGE M1 LAB A]; LINEERROR elements 0
+# NAME (length) | GUID | PARENT | ISBILLWISEON | ALTERID
+"Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | " Primary" (8) | No | 31
+"Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | "Cash-in-Hand" (12) | No | 32
+"ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | "Sundry Creditors" (16) | Yes | 209

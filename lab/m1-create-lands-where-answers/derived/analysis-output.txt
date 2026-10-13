@@ -1,0 +1,196 @@
+== m1-s2-led-a.xml | 5600 bytes | sha256 a57f80e84e0066da48588c4f66b39b0c64bad3a9cf970012138b22edf46d5b81
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s2-led-b.xml | 5600 bytes | sha256 9d356304b345a1ec175ce4e92876fd4725db492cdaf5be3e14a357e85e98d779
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s2-marks.xml | 3674 bytes | sha256 9839ca2586f4e026fa6d9cd0ba1e184d310c5ecdbc1870681cfe30a903e4cc62
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 208
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s3-led-a.xml | 6890 bytes | sha256 e9a08cf87b82773c7923e0f7397051e8312da97f2ce03d513c184f3b19069239
+   rows under COLLECTION: COMPANY 0, LEDGER 3, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+
+== m1-s3-led-b.xml | 5600 bytes | sha256 9d356304b345a1ec175ce4e92876fd4725db492cdaf5be3e14a357e85e98d779
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s3-marks-after.xml | 3674 bytes | sha256 29448ee6b232f848135c2a881e2486976758c4eed3971f4c66dbcc4a6ca25941
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 209
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s3-marks-before.xml | 3674 bytes | sha256 9839ca2586f4e026fa6d9cd0ba1e184d310c5ecdbc1870681cfe30a903e4cc62
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 208
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s3-w00.xml | 538 bytes | sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010
+   import answer: CREATED 1, ALTERED 0, DELETED 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LASTVCHID 0, LASTMID 0; LINEERROR elements: 0
+
+== m1-s4-led-a.xml | 8180 bytes | sha256 e275ee45519449f5c6f9dc176e2f1b25c61d00cc960f4691ec30096286dcf820
+   rows under COLLECTION: COMPANY 0, LEDGER 4, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+   LEDGER "ZZ M1 PROBE 01" (14) | NAME elements: "ZZ M1 PROBE 01" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000ce | parent "Sundry Creditors" (16) | ALTERID 210
+
+== m1-s4-led-b.xml | 5600 bytes | sha256 9d356304b345a1ec175ce4e92876fd4725db492cdaf5be3e14a357e85e98d779
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s4-marks-after.xml | 3674 bytes | sha256 ad6aef211a3a902b46e54949ba6afcab5e4a9a45f08c58e546b2ac20a108c635
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 210
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s4-marks-before.xml | 3674 bytes | sha256 29448ee6b232f848135c2a881e2486976758c4eed3971f4c66dbcc4a6ca25941
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 209
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s4-w01.xml | 538 bytes | sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010
+   import answer: CREATED 1, ALTERED 0, DELETED 0, COMBINED 0, IGNORED 0, ERRORS 0, CANCELLED 0, EXCEPTIONS 0, LASTVCHID 0, LASTMID 0; LINEERROR elements: 0
+
+== m1-s5-marks-A-reloaded.xml | 3674 bytes | sha256 ad6aef211a3a902b46e54949ba6afcab5e4a9a45f08c58e546b2ac20a108c635
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 210
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s5-marks-A-shut.xml | 3302 bytes | sha256 7e55de38c0df34b35b5ee9aa01e9ef56049b84cce46994efd3b2c6a66d9e18d9
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s6-led-a-after-reload.xml | 8180 bytes | sha256 8fd1a5642b23d490685dcf8fad509522aa3fa452b247a1b449e310b0189ea56a
+   rows under COLLECTION: COMPANY 0, LEDGER 4, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+   LEDGER "ZZ M1 PROBE 01" (14) | NAME elements: "ZZ M1 PROBE 01" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000ce | parent "Sundry Creditors" (16) | ALTERID 210
+
+== m1-s6-led-a-while-A-closed.xml | 2994 bytes | sha256 6e9e95e8dc9645f69e0794b10a9aac68daff14b259c9f5ba7abad57a75a52c6f
+   rows under COLLECTION: COMPANY 0, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+
+== m1-s6-led-b.xml | 5600 bytes | sha256 9d356304b345a1ec175ce4e92876fd4725db492cdaf5be3e14a357e85e98d779
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s6-led-b-after-reload.xml | 5600 bytes | sha256 9d356304b345a1ec175ce4e92876fd4725db492cdaf5be3e14a357e85e98d779
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s6-marks-after.xml | 3302 bytes | sha256 7e55de38c0df34b35b5ee9aa01e9ef56049b84cce46994efd3b2c6a66d9e18d9
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s6-marks-before.xml | 3302 bytes | sha256 7e55de38c0df34b35b5ee9aa01e9ef56049b84cce46994efd3b2c6a66d9e18d9
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s6-reload-marks-after.xml | 3674 bytes | sha256 ad6aef211a3a902b46e54949ba6afcab5e4a9a45f08c58e546b2ac20a108c635
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 210
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s6-w02.xml | 248 bytes | sha256 0c8d50d6bb3bba41d687e11e6c7fbd86abd9b2c464694ebd1d0f91e3f800b094
+   import answer: CREATED (absent), ALTERED (absent), DELETED (absent), COMBINED (absent), IGNORED (absent), ERRORS (absent), CANCELLED (absent), EXCEPTIONS (absent), LASTVCHID (absent), LASTMID (absent); LINEERROR elements: 1
+   LINEERROR "Could not set 'SVCurrentCompany' to 'BRIDGE M1 LAB A'" (53)
+
+== m1-s7-led-a2.xml | 8188 bytes | sha256 c9b31681ea0355d4f3f39da60368ad56e2e3680593906a54a209a2da3368d0ec
+   rows under COLLECTION: COMPANY 0, LEDGER 4, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+   LEDGER "ZZ M1 PROBE 01" (14) | NAME elements: "ZZ M1 PROBE 01" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000ce | parent "Sundry Creditors" (16) | ALTERID 210
+
+== m1-s7-led-a2-after-w03.xml | 8188 bytes | sha256 c9b31681ea0355d4f3f39da60368ad56e2e3680593906a54a209a2da3368d0ec
+   rows under COLLECTION: COMPANY 0, LEDGER 4, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+   LEDGER "ZZ M1 PROBE 01" (14) | NAME elements: "ZZ M1 PROBE 01" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000ce | parent "Sundry Creditors" (16) | ALTERID 210
+
+== m1-s7-led-a-old-name.xml | 2994 bytes | sha256 6e9e95e8dc9645f69e0794b10a9aac68daff14b259c9f5ba7abad57a75a52c6f
+   rows under COLLECTION: COMPANY 0, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+
+== m1-s7-marks-a2.xml | 3304 bytes | sha256 68f43c9d420c7535edb5ed29c53c4dbaa499b5cdacbf69ddfb2163f25902c216
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A2" (16) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 211
+
+== m1-s7-marks-after.xml | 3304 bytes | sha256 68f43c9d420c7535edb5ed29c53c4dbaa499b5cdacbf69ddfb2163f25902c216
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A2" (16) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 211
+
+== m1-s7-marks-before.xml | 3304 bytes | sha256 68f43c9d420c7535edb5ed29c53c4dbaa499b5cdacbf69ddfb2163f25902c216
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A2" (16) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 211
+
+== m1-s7-w03.xml | 248 bytes | sha256 0c8d50d6bb3bba41d687e11e6c7fbd86abd9b2c464694ebd1d0f91e3f800b094
+   import answer: CREATED (absent), ALTERED (absent), DELETED (absent), COMBINED (absent), IGNORED (absent), ERRORS (absent), CANCELLED (absent), EXCEPTIONS (absent), LASTVCHID (absent), LASTMID (absent); LINEERROR elements: 1
+   LINEERROR "Could not set 'SVCurrentCompany' to 'BRIDGE M1 LAB A'" (53)
+
+== m1-s8-led-a2-after-w04.xml | 8188 bytes | sha256 c9b31681ea0355d4f3f39da60368ad56e2e3680593906a54a209a2da3368d0ec
+   rows under COLLECTION: COMPANY 0, LEDGER 4, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+   LEDGER "ZZ M1 PROBE 01" (14) | NAME elements: "ZZ M1 PROBE 01" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000ce | parent "Sundry Creditors" (16) | ALTERID 210
+
+== m1-s8-led-a2-baseline.xml | 8188 bytes | sha256 c9b31681ea0355d4f3f39da60368ad56e2e3680593906a54a209a2da3368d0ec
+   rows under COLLECTION: COMPANY 0, LEDGER 4, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-0000001e | parent " Primary" (8) | ALTERID 31
+   LEDGER "ZZ M1 PROBE 00" (14) | NAME elements: "ZZ M1 PROBE 00" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000cd | parent "Sundry Creditors" (16) | ALTERID 209
+   LEDGER "ZZ M1 PROBE 01" (14) | NAME elements: "ZZ M1 PROBE 01" (14) | 36c6a453-024f-4d6a-b2e5-27784d393e8f-000000ce | parent "Sundry Creditors" (16) | ALTERID 210
+
+== m1-s8-led-b-after-w04.xml | 5600 bytes | sha256 c00cd33a932cdbb76c150e97299b28d62cc4f755f784fdf414ce548336fc4d13
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s8-led-b-baseline.xml | 5600 bytes | sha256 c00cd33a932cdbb76c150e97299b28d62cc4f755f784fdf414ce548336fc4d13
+   rows under COLLECTION: COMPANY 0, LEDGER 2, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 7f7dc35e-4696-44b8-9fcf-276ae0550194-0000001e | parent " Primary" (8) | ALTERID 31
+
+== m1-s8-marks-after.xml | 3676 bytes | sha256 6daf9f5bea6b0528a83d5d9d279d1ec471df4148dc9fb5b8c3a6c18619c4ba5e
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A2" (16) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 211
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s8-marks-baseline.xml | 3676 bytes | sha256 6daf9f5bea6b0528a83d5d9d279d1ec471df4148dc9fb5b8c3a6c18619c4ba5e
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A2" (16) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 211
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s8-marks-before.xml | 3676 bytes | sha256 6daf9f5bea6b0528a83d5d9d279d1ec471df4148dc9fb5b8c3a6c18619c4ba5e
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A2" (16) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 211
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s8-w04.xml | 248 bytes | sha256 0c8d50d6bb3bba41d687e11e6c7fbd86abd9b2c464694ebd1d0f91e3f800b094
+   import answer: CREATED (absent), ALTERED (absent), DELETED (absent), COMBINED (absent), IGNORED (absent), ERRORS (absent), CANCELLED (absent), EXCEPTIONS (absent), LASTVCHID (absent), LASTMID (absent); LINEERROR elements: 1
+   LINEERROR "Could not set 'SVCurrentCompany' to 'BRIDGE M1 LAB A'" (53)
+
+== m1-s9-marks-after-backups.xml | 3674 bytes | sha256 05a16aab2cdab60b9b5f4c5fef1abb9e3541273761aecb7b7e13906619120fbe
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 212
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+
+== m1-s9-marks-after-rename-back.xml | 3674 bytes | sha256 05a16aab2cdab60b9b5f4c5fef1abb9e3541273761aecb7b7e13906619120fbe
+   rows under COLLECTION: COMPANY 2, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE M1 LAB A" (15) | GUID 36c6a453-024f-4d6a-b2e5-27784d393e8f | ALTVCHID  | ALTMSTID 212
+   COMPANY "BRIDGE M1 LAB B" (15) | GUID 7f7dc35e-4696-44b8-9fcf-276ae0550194 | ALTVCHID  | ALTMSTID 208
+

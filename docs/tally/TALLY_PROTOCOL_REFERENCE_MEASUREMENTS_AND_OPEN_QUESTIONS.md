@@ -471,10 +471,10 @@ book's path (from the code); a larger book's census cost was not measured here.
 - The `vouchers` call on the census book sent the same requests as a build without #1020, in the
   same order, with the same request hashes and response sizes.
 - On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
-  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
-  code, not the run: that reason is returned when the read widened by a day on each side finds
-  rows, none inside the window, so it names the neighbouring days, not the window, which returned
-  no row; the wording is a separate matter.
+  `empty_uncorroborated` on the census book, and, on the other, `nonempty_uncorroborated`
+  (the reason as observed; since renamed `empty_window_wider_read_nonempty`). From the code, not the run: that reason is returned when
+  the read widened by a day on each side finds rows, none inside the window, so it names the
+  neighbouring days, not the window, which returned no row; the name says so.
 
 **The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
 `post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
@@ -523,8 +523,9 @@ export to the same instance returned `STATUS 1` promptly, with no dialog.
 
 Only `ledgers_v1` was observed. Two things are **inferred**: that the other builders using the same
 construct raise it too, and that the space in the argument is the cause. Those builders are every
-`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`:
-`vouchers_v2`/`v3`, the ledger canary and the period-balance report.
+`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`: the
+ledger canary. (`vouchers_v2`, which this list once named, was deleted 2026-10-12, Part of #1570.
+The period-balance report it named: this read was removed by #1643; see #1642.)
 
 All of them are refused **before sending** once Bridge knows the endpoint is in Education, with
 `education_report_family_unsupported`. Admission is unchanged: nothing is sent, and nothing is
@@ -533,19 +534,22 @@ promoted.
 - **Sync period-balance tie-out.** Reads the mode from the `CompanyListV2` identity read that
   already precedes it, or from the run's own probe. The run carries on and records
   `report_tie_out_unavailable` and `education_report_family_unsupported`. A later window's
-  successful report clears the second code, as it does the other tie-out codes.
+  successful report clears the second code, as it does the other tie-out codes. (2026-10-12: this
+  read was removed by #1643; see #1642.)
 - **Selected-ledger and selected-voucher qualifiers.** Deleted with the rest of their runtime
   path (bridge#732; ADR 0015's 2026-09-26 amendment): no command or tool reached them.
 - **The live-read tool.** Takes its mode from its configuration; it does not observe it. In
-  Education, the ledger step is recorded as failed with `education_report_family_unsupported`, and
-  the voucher steps as not attempted.
+  Education, the ledger step is recorded as failed with `education_report_family_unsupported`. Its
+  two voucher steps were deleted 2026-10-12 (Part of #1570), so the run ends after the ledger step.
   - **Residual:** a run configured as `Licensed` against an endpoint that is actually in Education
     still sends `ledgers_v1`. The tool's company read (`CompanyListV1`) carries no `EDUMODE`. Moving
     it to an observed mode means changing its profile sequence, which is not done here.
 - **The native-outstandings qualification.** Accepts only an Education configuration, and its
   identity brackets read through `ledgers_v1`. It therefore refuses on load, so the tool **cannot
   run** until Phase 2 Unit A.
-- **`groups_request`.** Has no production caller, and compiles only for tests.
+- **`groups_request`.** Had no production caller and compiled only for tests. Deleted 2026-10-12
+  together with the Bridge-schema group and voucher-type parsers that read its
+  answer; core groups come from the native group collection.
 
 Reading ledgers and vouchers in Education waits for the Collection-based profiles (Phase 2 Unit A,
 `IMPROVEMENT_PLAN_2026H2.md` §8.12).

@@ -19,8 +19,6 @@
 
 use std::collections::BTreeMap;
 
-use sha1::{Digest, Sha1};
-
 use crate::book::{Book, Ledger};
 use crate::error::{AuditError, Result};
 
@@ -48,7 +46,7 @@ pub fn guid_tag(guid: &str, what: &str) -> Result<String> {
     if normalized.is_empty() {
         return Err(missing_guid(what));
     }
-    Ok(crate::canonical::hex(&Sha1::digest(normalized.as_bytes()))[..8].to_string())
+    Ok(crate::support::hash8(&normalized))
 }
 
 /// See [`guid_tag`]. A ledger with a blank (post-normalisation) GUID falls back to hashing the
@@ -59,7 +57,7 @@ pub fn guid_tag(guid: &str, what: &str) -> Result<String> {
 /// because there is no Tally identity left to anchor it to.
 pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
     if normalize_guid(&ledger.guid).is_empty() {
-        return Ok(crate::canonical::hex(&Sha1::digest(ledger.name.as_bytes()))[..8].to_string());
+        return Ok(crate::support::hash8(&ledger.name));
     }
     guid_tag(&ledger.guid, &format!("ledger {:?}", ledger.name))
 }
@@ -67,7 +65,7 @@ pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
 /// A guid-based tag when `name` names a real ledger in `book.ledgers` (the case at risk of the
 /// read-shape rename churn this module exists to fix); the plain sha1 hash of `name` itself
 /// otherwise -- for a `name` that is NOT a Book ledger: a client-config alias, a synthetic
-/// sentinel bucket (e.g. `cash_payments_40a3::UNIDENTIFIED_PARTY`), or a Trial Balance row with no
+/// sentinel bucket (e.g. `high_value_register::UNIDENTIFIED_PARTY`), or a Trial Balance row with no
 /// matching ledger master. None of those is itself read fresh from Tally's ledger export on every
 /// capture, so none of them carries this module's rename-churn risk; hashing the string itself is
 /// already stable for them, and refusing would drop a real row for no benefit. When `name` DOES
@@ -76,7 +74,7 @@ pub fn ledger_tag(ledger: &Ledger) -> Result<String> {
 pub fn stable_ledger_tag(book: &Book, name: &str) -> Result<String> {
     match book.ledgers.get(name) {
         Some(ledger) => ledger_tag(ledger),
-        None => Ok(crate::canonical::hex(&Sha1::digest(name.as_bytes()))[..8].to_string()),
+        None => Ok(crate::support::hash8(name)),
     }
 }
 

@@ -68,7 +68,8 @@ vouchers is off by default. This page is the short path; the
   first two and last two characters (`mask_parties`; four or fewer become “…”),
   or drop narrations (`drop_narration`). Neither hides amounts, company names,
   PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or
-  references, and a shortened name can still be identified, not least from the
+  references, or the last four digits of a bank
+  statement's account number, and a shortened name can still be identified, not least from the
   GSTIN or PAN sent beside it. It starts at `none`.
 - **Posting is off by default** for a new install; an earlier version may
   have saved it on, so check the setting. If you turn it on, each voucher waits

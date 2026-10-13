@@ -86,6 +86,8 @@ use voucher_summary::{SummaryGroup, SummaryRequest};
 mod movement;
 #[path = "agent_register.rs"]
 mod register;
+#[path = "agent_statement_tie_out.rs"]
+mod statement_tie_out;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -109,6 +111,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
+#[path = "agent_read_cost_preview.rs"]
+mod read_cost_preview;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -942,6 +946,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "`as_of` selects the date `party_gstin` is read as of, which only \
              fields=compliance returns. Pass fields=compliance, or drop `as_of`: a basic \
              read's opening balance is dated by `opening_balance_as_of`, not by `as_of`.",
+        ),
+        "ledger_masters_gst_details_requires_compliance" => Some(
+            "`include_gst_details` adds each ledger's dated GST rate details, which only \
+             fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
         ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
@@ -2393,6 +2401,7 @@ impl Server {
             "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "sales_register" => self.register(register::RegisterKind::Sales, args).await,
+            "statement_tie_out" => self.statement_tie_out(args).await,
             "stock_summary" => self.stock_summary(args).await,
             "tally_status" => {
                 let (result, evidence) = self.status().await?;
@@ -2407,6 +2416,7 @@ impl Server {
             "validate_masters" => self.validate_masters(args).await,
             "verify_import" => self.verify_import(args).await,
             "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_read_cost" => self.voucher_read_cost(args).await,
             "voucher_schema" => self.voucher_schema().map_err(Into::into),
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
@@ -2847,8 +2857,10 @@ fn corroborate_empty_voucher_window(
     if !widened_rows.is_empty() {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
-        // response, so they cannot promote the original empty window.
-        return Ok((true, Some("nonempty_uncorroborated")));
+        // response, so they cannot promote the original empty window. The
+        // reason names the wider read as the nonempty one: the window's own
+        // read found nothing.
+        return Ok((true, Some("empty_window_wider_read_nonempty")));
     }
     match company_high_water {
         Some(0) => Ok((false, Some("company_has_no_vouchers"))),
@@ -2950,6 +2962,15 @@ fn optional_string(args: &Value, key: &str) -> Result<Option<String>, String> {
     match args.get(key) {
         None => Ok(None),
         Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("argument_invalid:{key}")),
+    }
+}
+/// An optional argument that must be a real JSON boolean: a string or a number
+/// is `argument_invalid:<key>`, never read as true or false.
+fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
+    match args.get(key) {
+        None => Ok(None),
+        Some(Value::Bool(value)) => Ok(Some(*value)),
         Some(_) => Err(format!("argument_invalid:{key}")),
     }
 }

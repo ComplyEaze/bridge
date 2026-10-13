@@ -257,7 +257,7 @@ async fn concurrent_sends_take_turns() {
 }
 
 /// While a send is in flight (its response headers delayed), the lock is held: each
-/// of the four send paths, watched across the whole send, so that a guard dropped
+/// of the three send paths, watched across the whole send, so that a guard dropped
 /// before the send (a `let _ = ...` in place of a bound guard), or once the request is
 /// written but before the headers arrive, shows as 0 (#1255).
 #[tokio::test]
@@ -266,7 +266,6 @@ async fn every_send_path_holds_the_lock_while_the_send_is_in_flight() {
     let simulator = SequenceSimulator::spawn(vec![
         xml().with_delivery(Delivery::SlowHeaders(slow)),
         xml().with_delivery(Delivery::SlowHeaders(slow)),
-        status().with_delivery(Delivery::SlowHeaders(slow)),
         status().with_delivery(Delivery::SlowHeaders(slow)),
     ])
     .unwrap();
@@ -278,14 +277,11 @@ async fn every_send_path_holds_the_lock_while_the_send_is_in_flight() {
         lowest_held_while(&record, transport.post_xml_decoded("<ENVELOPE/>".into())).await;
     sent.unwrap();
     assert_eq!(lowest, 1, "post_xml_decoded");
-    let (sent, lowest) = lowest_held_while(&record, transport.get_status()).await;
-    sent.unwrap();
-    assert_eq!(lowest, 1, "get_status");
     let (sent, lowest) = lowest_held_while(&record, transport.get_status_decoded()).await;
     sent.unwrap();
     assert_eq!(lowest, 1, "get_status_decoded");
     assert_eq!(record.held.load(Ordering::SeqCst), 0);
-    assert_eq!(simulator.finish().unwrap().len(), 4);
+    assert_eq!(simulator.finish().unwrap().len(), 3);
 }
 
 /// Runs `send` and watches the held count every 5 ms from the first sample
@@ -334,9 +330,7 @@ async fn every_send_path_holds_the_lock_until_the_body_is_read() {
             delay: Duration::from_millis(120),
         })
     };
-    let simulator =
-        SequenceSimulator::spawn(vec![slow_xml(), slow_xml(), slow_status(), slow_status()])
-            .unwrap();
+    let simulator = SequenceSimulator::spawn(vec![slow_xml(), slow_xml(), slow_status()]).unwrap();
     let (transport, record) = gated(&simulator, quick(0));
     let (sent, lowest) = lowest_held_while(&record, transport.post_xml("<ENVELOPE/>".into())).await;
     sent.unwrap();
@@ -345,14 +339,11 @@ async fn every_send_path_holds_the_lock_until_the_body_is_read() {
         lowest_held_while(&record, transport.post_xml_decoded("<ENVELOPE/>".into())).await;
     sent.unwrap();
     assert_eq!(lowest, 1, "post_xml_decoded");
-    let (sent, lowest) = lowest_held_while(&record, transport.get_status()).await;
-    sent.unwrap();
-    assert_eq!(lowest, 1, "get_status");
     let (sent, lowest) = lowest_held_while(&record, transport.get_status_decoded()).await;
     sent.unwrap();
     assert_eq!(lowest, 1, "get_status_decoded");
     assert_eq!(record.held.load(Ordering::SeqCst), 0);
-    assert_eq!(simulator.finish().unwrap().len(), 4);
+    assert_eq!(simulator.finish().unwrap().len(), 3);
 }
 
 /// A lock taken ahead of a send is held until that one send has been read,

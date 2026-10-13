@@ -616,43 +616,6 @@ impl TallyHttpTransport {
             .map_err(|refusal| TallyTransportError::WireRefused { refusal })
     }
 
-    pub fn canonical_origin(&self) -> Result<String, TallyTransportError> {
-        canonical_loopback_origin(&self.config)
-    }
-
-    pub async fn get_status(&self) -> Result<TallyHttpResponse, TallyTransportError> {
-        let url = endpoint_url(&self.config, "/status")?;
-        // Held until this function returns: the response read to its end, or
-        // the send failed.
-        let _wire = self.wire_lock_observed(SendKind::Status, None).await?;
-        let started = std::time::Instant::now();
-        let flight = InFlight::begin(self, SendKind::Status, None, started);
-        let result = self.get_status_locked(url).await;
-        flight.finish();
-        self.observe_result(SendKind::Status, None, started, &result, answered_raw);
-        result
-    }
-
-    async fn get_status_locked(&self, url: Url) -> Result<TallyHttpResponse, TallyTransportError> {
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
-        )]
-        let response = self
-            .client
-            .get(url)
-            .header(CONTENT_TYPE, TALLY_STATUS_CONTENT_TYPE)
-            .send()
-            .await
-            .map_err(classify_request_error)?;
-        read_response(
-            response,
-            self.policy.status_response_max_bytes,
-            TALLY_STATUS_RESPONSE_ENCODING,
-        )
-        .await
-    }
-
     pub async fn get_status_decoded(
         &self,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {

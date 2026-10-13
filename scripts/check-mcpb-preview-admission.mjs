@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
@@ -44,4 +45,4 @@ async function main() {
   });
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) await main();

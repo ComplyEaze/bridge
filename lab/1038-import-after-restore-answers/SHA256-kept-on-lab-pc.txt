@@ -1,0 +1,26 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+81c31cefb3e247c0e473e040b01c35b066dfc4fc73c76eb722261fd3cee5b0e7  58511  screenshots/01-s0.png
+3bdf4d79a31baca3d10383172a705eae86fd16d14ccd8ce7bf2e1b6370b2237c  60633  screenshots/02-r0.png
+81c31cefb3e247c0e473e040b01c35b066dfc4fc73c76eb722261fd3cee5b0e7  58511  screenshots/03-r0.png
+aa004538df95a2120fbb2256a8e3eae6d382b700e3ef1d060d70e27c56cbe567  45703  screenshots/04-r1.png
+09904992c7245f035ee4b5f4792d8dba0b5814ef154d3e68b984e06fd04afcb2  51848  screenshots/05-r1.png
+f1a9fc9bbad84dc4970a29bb44e1c90ab0057851103e63bc26d51b24c7fd10b9  58665  screenshots/06-r1.png
+f1a9fc9bbad84dc4970a29bb44e1c90ab0057851103e63bc26d51b24c7fd10b9  58665  screenshots/07-r2.png
+f1a9fc9bbad84dc4970a29bb44e1c90ab0057851103e63bc26d51b24c7fd10b9  58665  screenshots/08-r3.png
+b7e6d621f2812d6fb71a1aac275c349baa6b0463a2b8684a285ddcd7db8f2455  45708  screenshots/09-end.png
+c1b4842572c41cc9af02042c1d6d10d7e25466b8ec718e6f4de801768412a4e3  51864  screenshots/10-end.png
+81c31cefb3e247c0e473e040b01c35b066dfc4fc73c76eb722261fd3cee5b0e7  58511  screenshots/11-end.png
+79bd091916b6715045a0736baa009eebd18f5adcd6700ad9e5be37437b5937da  96375  screenshots/12-close.png
+880bcf8f13663fa9c6c38b1d6f8bbaed9671a60b87a1b08fd45a0175978c3c6d  3767  working-summary.txt
+19816445ec4be43b0a4cc2310902e9144b79cc50c1587c1ad2698693145f9197  26492  backups/Z0/TDBK1800_100056.001
+3e97c5a650e94727fa1bc5dea1f16710d9d16c44d4e52013c5e10f2b532780de  977  end-datafolder-after-restore.txt
+bb1ff43585429f75cffd8f501201cae807c062ac30a183a76c0653ac2788fb13  926  end-datafolder-before-restore.txt
+9ab2693e4fecdbc6cf72db2a0edabd4bda29d6d0945bf2d4b034002298830aa4  20963  working-log.txt
+915d431d8b0eb2e168d7c0737fd6dfa0d16ba02b4060c2deeafe008dbbe672ce  888  r1-datafolder-after-restore.txt
+3088f557b7b17b79da596ca5e15f8add33d47cc10a12455c48c71d366c2937ae  976  r1-datafolder-before-restore.txt
+67ff2b403aa34c81850c1f164fd575a99c30d0a9fd52de34d0d018e7bbbfd045  1401  restore-plan.txt
+bf04ac4588ac4beeb35ba13c7fc139d3b9b84a98e0802aa4dcbb1aecebdbe293  11276  step0/1038r-s0-close-netstat.txt
+dbc25df51eb9978163e943effa0a257b9a36d8d5b498b39001bc4ac5a6b53087  48  step0/1038r-s0-close-tasklist.txt
+e0d44e08470175a87f3b47655feed3930c38f9c0c7694d73eb7f44539d18dec7  13631  step0/1038r-s0-start-netstat.txt
+19fd694d6a3dde6191bfdfc806a15a86be5aa387b66ddf4726328652fe7a654b  48  step0/1038r-s0-start-tasklist.txt

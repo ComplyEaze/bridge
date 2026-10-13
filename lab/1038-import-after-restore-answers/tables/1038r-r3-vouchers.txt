@@ -1,0 +1,5 @@
+﻿# 4 VOUCHER rows; DATE, VOUCHERTYPENAME, VOUCHERNUMBER, MASTERID, ALTERID, GUID, NARRATION || LEDGERNAME, AMOUNT, ISDEEMEDPOSITIVE per entry
+20260701, Receipt, 1, 1, 1, dcac52b6-2168-43fa-be2a-95b1488c11b4-00000001, "Seed voucher" (12) || "Lab Seed Income" (15), 1000.00, No || "Cash" (4), -1000.00, Yes
+20260710, Receipt, 2, 2, 2, dcac52b6-2168-43fa-be2a-95b1488c11b4-00000002, "Lab identity probe 1" (20) || "Synthetic Bank Ledger" (21), -301.00, Yes || "Party A" (7), 301.00, No
+20260712, Receipt, 3, 3, 3, dcac52b6-2168-43fa-be2a-95b1488c11b4-00000003, "1038-R probe C" (14) || "Synthetic Bank Ledger" (21), -303.00, Yes || "Party A" (7), 303.00, No
+20260711, Receipt, 4, 4, 4, dcac52b6-2168-43fa-be2a-95b1488c11b4-00000004, "1038-R probe B" (14) || "Synthetic Bank Ledger" (21), -302.00, Yes || "Party A" (7), 302.00, No

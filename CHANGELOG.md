@@ -164,6 +164,14 @@ These changes are in source and not yet in a published build.
   reconciled with `verify_import`. The steps the post already gave (a busy port, a row another
   batch posted) are unchanged (#1573).
 
+- **A batch approval now shows its totals first.** The window for a batch keeps every line and
+  its wording and changes their order: the count and company, the company number, the count by
+  type, the dates, the total debit and credit and the money lines come first; then the company
+  GUID and the Tally address, the voucher lines or the sentence in their place, the per-ledger
+  lines, the batch id and the cautions. Before, the totals came after every voucher line and
+  every per-ledger line. The window for one voucher is unchanged. The new order has not yet
+  been seen in a running window on Windows or macOS (#746).
+
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
   its first debit ledger, so the person could not see what each Journal credited; it now shows

@@ -1638,7 +1638,7 @@ Tauri/runtime path, and native runtime tests cannot execute locally because
 database/reconcile/resume/UI cost, comparable performance baselines, and a
 read-only live Education compatibility receipt remain follow-on work. The
 existing PR13B1 receipt is not retroactively granted runtime-cap authority.
-(2026-10-13 note: that receipt was deleted; see the note under "Implemented
+(2026-10-12 note: that receipt was deleted; see the note under "Implemented
 PR13B1 boundary".)
 
 ---
@@ -1691,7 +1691,7 @@ A release may not broaden its support claim unless the matrix has current eviden
 
 - `bridge-tally-compatibility` now owns a separate, closed, privacy-reduced
   live-read receipt schema. It does not broaden the parser-only qualification
-  receipt and cannot itself emit a support claim. (2026-10-13 note: that
+  receipt and cannot itself emit a support claim. (2026-10-12 note: that
   receipt was deleted; see the note under "Implemented PR13B1 boundary".)
 - Eleven exact machine-readable Windows/Tally cells cover the initial release, mode,
   transport, ODBC, company-state, locale/encoding, data-tier, and platform

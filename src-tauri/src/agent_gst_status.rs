@@ -354,8 +354,8 @@ pub(super) fn parse_rows_with<T>(
                 }
                 _ => None,
             };
-            // A voucher Tally marks deleted is not accepted as it stands in any return: its
-            // acceptance flag is as unread as its state.
+            // A voucher Tally marks deleted has no state, and a Yes on its acceptance flag was
+            // never measured on such a voucher: the flag is as unread as the state.
             let overridden = match deleted_check {
                 Err(code @ "gst_status_voucher_deleted") => Err(code),
                 _ => overridden_of(flag("ISGSTOVERRIDDEN")?.as_deref()),

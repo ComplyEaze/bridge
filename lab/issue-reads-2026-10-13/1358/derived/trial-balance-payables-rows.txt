@@ -1,0 +1,44 @@
+﻿Cash | Cash-in-Hand | open 0.00 | dr  | cr  | close 
+PAY Bank | Bank Accounts | open 0.00 | dr  | cr 10976476.80 | close 10976476.80
+PAY Creditor 01 | Sundry Creditors | open 0.00 | dr -1045812.00 | cr 1045812.00 | close 0.00
+PAY Creditor 02 | Sundry Creditors | open 0.00 | dr -344330.70 | cr 983802.30 | close 639471.60
+PAY Creditor 03 | Sundry Creditors | open 0.00 | dr  | cr 985392.60 | close 985392.60
+PAY Creditor 04 | Sundry Creditors | open 0.00 | dr  | cr 986982.90 | close 986982.90
+PAY Creditor 05 | Sundry Creditors | open 0.00 | dr  | cr 988573.20 | close 988573.20
+PAY Creditor 06 | Sundry Creditors | open 0.00 | dr -990163.50 | cr 990163.50 | close 0.00
+PAY Creditor 07 | Sundry Creditors | open 0.00 | dr -347113.80 | cr 991753.80 | close 644640.00
+PAY Creditor 08 | Sundry Creditors | open 0.00 | dr  | cr 993344.10 | close 993344.10
+PAY Creditor 09 | Sundry Creditors | open 0.00 | dr  | cr 994934.40 | close 994934.40
+PAY Creditor 10 | Sundry Creditors | open 0.00 | dr  | cr 996524.70 | close 996524.70
+PAY Creditor 11 | Sundry Creditors | open 0.00 | dr -998115.00 | cr 998115.00 | close 0.00
+PAY Creditor 12 | Sundry Creditors | open 0.00 | dr -349896.90 | cr 999705.30 | close 649808.40
+PAY Creditor 13 | Sundry Creditors | open 0.00 | dr  | cr 1001295.60 | close 1001295.60
+PAY Creditor 14 | Sundry Creditors | open 0.00 | dr  | cr 1002885.90 | close 1002885.90
+PAY Creditor 15 | Sundry Creditors | open 0.00 | dr  | cr 1004476.20 | close 1004476.20
+PAY Creditor 16 | Sundry Creditors | open 0.00 | dr -1006066.50 | cr 1006066.50 | close 0.00
+PAY Creditor 17 | Sundry Creditors | open 0.00 | dr -352680.00 | cr 1007656.80 | close 654976.80
+PAY Creditor 18 | Sundry Creditors | open 0.00 | dr  | cr 1009247.10 | close 1009247.10
+PAY Creditor 19 | Sundry Creditors | open 0.00 | dr  | cr 1010837.40 | close 1010837.40
+PAY Creditor 20 | Sundry Creditors | open 0.00 | dr  | cr 1012427.70 | close 1012427.70
+PAY Creditor 21 | Sundry Creditors | open 0.00 | dr -1014012.00 | cr 1014012.00 | close 0.00
+PAY Creditor 22 | Sundry Creditors | open 0.00 | dr -355460.70 | cr 1015602.30 | close 660141.60
+PAY Creditor 23 | Sundry Creditors | open 0.00 | dr  | cr 1017192.60 | close 1017192.60
+PAY Creditor 24 | Sundry Creditors | open 0.00 | dr  | cr 1018782.90 | close 1018782.90
+PAY Creditor 25 | Sundry Creditors | open 0.00 | dr  | cr 1020373.20 | close 1020373.20
+PAY Creditor 26 | Sundry Creditors | open 0.00 | dr -1021963.50 | cr 1021963.50 | close 0.00
+PAY Creditor 27 | Sundry Creditors | open 0.00 | dr -358243.80 | cr 1023553.80 | close 665310.00
+PAY Creditor 28 | Sundry Creditors | open 0.00 | dr  | cr 1025144.10 | close 1025144.10
+PAY Creditor 29 | Sundry Creditors | open 0.00 | dr  | cr 1026734.40 | close 1026734.40
+PAY Creditor 30 | Sundry Creditors | open 0.00 | dr  | cr 1028324.70 | close 1028324.70
+PAY Creditor 31 | Sundry Creditors | open 0.00 | dr -1029915.00 | cr 1029915.00 | close 0.00
+PAY Creditor 32 | Sundry Creditors | open 0.00 | dr -361026.90 | cr 1031505.30 | close 670478.40
+PAY Creditor 33 | Sundry Creditors | open 0.00 | dr  | cr 1033095.60 | close 1033095.60
+PAY Creditor 34 | Sundry Creditors | open 0.00 | dr  | cr 1034685.90 | close 1034685.90
+PAY Creditor 35 | Sundry Creditors | open 0.00 | dr  | cr 1036276.20 | close 1036276.20
+PAY Creditor 36 | Sundry Creditors | open 0.00 | dr -1037866.50 | cr 1037866.50 | close 0.00
+PAY Creditor 37 | Sundry Creditors | open 0.00 | dr -363810.00 | cr 1039456.80 | close 675646.80
+PAY Creditor 38 | Sundry Creditors | open 0.00 | dr  | cr 1041047.10 | close 1041047.10
+PAY Creditor 39 | Sundry Creditors | open 0.00 | dr  | cr 1042637.40 | close 1042637.40
+PAY Creditor 40 | Sundry Creditors | open 0.00 | dr  | cr 1044227.70 | close 1044227.70
+PAY Purchases | Purchase Accounts | open 0.00 | dr -40592394.00 | cr  | close -40592394.00
+Profit & Loss A/c |  Primary | open 0.00 | dr  | cr  | close 0.00

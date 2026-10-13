@@ -1,0 +1,2 @@
+# 1 VOUCHER rows of pilot-vouchers-day-0915.xml: GUID|ALTERID|DATE
+6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000019|33|20260915

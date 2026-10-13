@@ -1,0 +1,18 @@
+﻿BRIDGE CGST 2.5% | Duties & Taxes | open 0.00 | dr -50.00 | cr 405.34 | close 355.34
+BRIDGE CGST 9% | Duties & Taxes | open 0.00 | dr  | cr 63.00 | close 63.00
+BRIDGE Goods 18% | Sales Accounts | open 0.00 | dr  | cr 700.00 | close 700.00
+BRIDGE Output CGST XML | Duties & Taxes | open 0.00 | dr  | cr  | close 
+BRIDGE Purchase Svc 5% | Purchase Accounts | open 0.00 | dr -2000.00 | cr  | close -2000.00
+BRIDGE Round Off | Indirect Expenses | open 0.00 | dr -0.01 | cr 0.17 | close 0.16
+BRIDGE SGST 2.5% | Duties & Taxes | open 0.00 | dr -50.00 | cr 405.30 | close 355.30
+BRIDGE SGST 9% | Duties & Taxes | open 0.00 | dr  | cr 63.00 | close 63.00
+BRIDGE Supplier RJ | Sundry Creditors | open 0.00 | dr  | cr 2100.00 | close 2100.00
+BRIDGE Svc 4D 5% | Sales Accounts | open 0.00 | dr  | cr 100.00 | close 100.00
+BRIDGE Svc 998313 5% | Sales Accounts | open 0.00 | dr  | cr 13410.20 | close 13410.20
+BRIDGE Svc 998314 5% | Sales Accounts | open 0.00 | dr  | cr 1701.60 | close 1701.60
+BRIDGE Svc 998315 5% | Sales Accounts | open 0.00 | dr  | cr 100.10 | close 100.10
+BRIDGE Svc INH2 5% | BRIDGE Sales Sub | open 0.00 | dr  | cr 400.00 | close 400.00
+BRIDGE Svc INH 5% | Sales Accounts | open 0.00 | dr  | cr 500.00 | close 500.00
+BRIDGE Walk-in | Sundry Debtors | open 0.00 | dr -17848.70 | cr 700.00 | close -17148.70
+Cash | Cash-in-Hand | open 0.00 | dr -700.00 | cr  | close -700.00
+Profit & Loss A/c |  Primary | open 0.00 | dr  | cr  | close 0.00

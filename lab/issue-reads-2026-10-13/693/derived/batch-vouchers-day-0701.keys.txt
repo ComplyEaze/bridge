@@ -1,0 +1,2 @@
+# 1 VOUCHER rows of batch-vouchers-day-0701.xml: GUID|ALTERID|DATE
+a30f23c3-4819-4334-96ab-ffa6fba70976-00000001|1|20260701

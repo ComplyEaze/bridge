@@ -5,8 +5,9 @@
 //! the company's GST registration. Nothing here guesses: a missing element, a repeated
 //! one, or a name two rows claim is an error, never a default.
 //!
-//! What each read was measured to return (TallyPrime 7.1 Silver, lab, 6 Oct
-//! 2026, one book on the lab): the voucher-type collection with no field
+//! What each read was observed to return (TallyPrime 7.1 Silver, 6 Oct 2026,
+//! one real book, not a lab book; its answers are held privately and are not
+//! in this repository): the voucher-type collection with no field
 //! list returns every type, with the
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level

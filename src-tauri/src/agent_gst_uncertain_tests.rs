@@ -44,9 +44,10 @@ const LAB_TYPE: &str = "BRIDGE Sales";
 const LAB_PARTY: &str = "BRIDGE Walk-in";
 
 /// The pre-filing line for five vouchers of the type `BRIDGE Sales` dated the whole of August 2026:
-/// the owner's line with the product's full name, "return" for "screen" and the voucher type named
-/// in place of "Sales" (the type's class is not read).
-const LINE_FOR_FIVE: &str = "Tally marks 5 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain and leaves them out of its GSTR-1 return. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.";
+/// the wording that says only what the capture shows (the screen lists them as Uncertain, apart from
+/// the included ones), the product's full name, and the voucher type named in place of "Sales" (the
+/// type's class is not read).
+const LINE_FOR_FIVE: &str = "Tally's GSTR-1 screen lists 5 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain, apart from the ones it shows as included. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.";
 
 fn decode_utf16(bytes: &[u8]) -> String {
     assert_eq!(bytes.len() % 2, 0, "whole UTF-16 code units");
@@ -939,7 +940,7 @@ async fn after_the_accept_the_third_voucher_is_overridden_and_included_with_the_
     assert!(result["pre_filing_line"]
         .as_str()
         .unwrap()
-        .starts_with("Tally marks 4 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain"));
+        .starts_with("Tally's GSTR-1 screen lists 4 vouchers of the type BRIDGE Sales dated 2026-08-01 to 2026-08-31 as Uncertain"));
     // Nothing but that voucher changed lists: the vouchers the earlier run listed, but the
     // third, are listed as they were.
     let find = |response: &Value, list: &str, number: &str| {
@@ -1140,7 +1141,7 @@ async fn the_line_names_the_voucher_type_and_one_uncertain_voucher_is_enough_to_
     assert_eq!(result["counts"]["uncertain"], 1);
     assert_eq!(
         result["pre_filing_line"],
-        LINE_FOR_FIVE.replace("marks 5 vouchers", "marks 1 vouchers")
+        LINE_FOR_FIVE.replace("lists 5 vouchers", "lists 1 vouchers")
     );
     // The line names the type read and never says the type is a Sales type.
     assert!(result["pre_filing_line"]
@@ -1167,7 +1168,7 @@ async fn a_post_dated_voucher_is_decided_before_its_flags_and_is_not_counted_unc
     assert!(result["pre_filing_line"]
         .as_str()
         .unwrap()
-        .starts_with("Tally marks 4 vouchers of the type BRIDGE Sales"));
+        .starts_with("Tally's GSTR-1 screen lists 4 vouchers of the type BRIDGE Sales"));
     assert!(listing(items(&call.response))
         .iter()
         .all(|(_, number)| number != "BP/26-27/0002"));

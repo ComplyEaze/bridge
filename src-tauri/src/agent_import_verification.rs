@@ -489,6 +489,7 @@ pub(super) fn verify_batch_as(
                             matched,
                             "post_span_binding",
                             entries_match(expected, matched),
+                            WrittenNarration::Untagged,
                             &mut counts,
                         )?;
                         if value["status"] == "posted_verified" {
@@ -550,13 +551,21 @@ pub(super) fn verify_batch_as(
             }
             let matched = &observed[matched_index];
             let effective_date_unobserved = effective_date_not_observed(expected, matched);
-            let diffs = voucher_diffs(expected, matched, entries_match(expected, matched));
+            // A row found by its tag, or any row of a batch tags attribute,
+            // was written with the tag; a native post's row was not.
+            let written = if !fingerprint_fallback || tags_attribute {
+                WrittenNarration::Tagged(marker_identity.as_str())
+            } else {
+                WrittenNarration::Untagged
+            };
+            let diffs = voucher_diffs(expected, matched, entries_match(expected, matched), written);
             let mut matched_value = if !fingerprint_fallback {
                 let value = attributed_status(
                     expected,
                     matched,
                     marker,
                     entries_match(expected, matched),
+                    written,
                     &mut counts,
                 )?;
                 if value["status"] == "posted_verified" {
@@ -689,9 +698,10 @@ fn attributed_status(
     matched: &ReadVoucher,
     marker: &str,
     entries_match: bool,
+    narration: WrittenNarration<'_>,
     counts: &mut BTreeMap<&'static str, u64>,
 ) -> Result<Value, String> {
-    let diffs = voucher_diffs(expected, matched, entries_match);
+    let diffs = voucher_diffs(expected, matched, entries_match, narration);
     let mut count = |key: &'static str| {
         counts.entry(key).and_modify(|count| *count += 1);
     };
@@ -708,7 +718,7 @@ fn attributed_status(
         // cannot see a cancelled row whose entries were dropped:
         // with no entries, no build's fingerprint matches.
         count("posted_not_effective");
-        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
+        json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_not_effective","marker":marker,"reason":"voucher_cancelled","diffs":voucher_diffs(expected, matched, true, narration),"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
     } else if diffs.is_empty() && voucher_is_accounting_effective(matched)? {
         count("posted_verified");
         json!({"bridge_txn_id":expected.bridge_txn_id,"status":"posted_verified","marker":marker,"voucher_number":matched.voucher_number,"guid":matched.guid,"master_id":matched.master_id,"alter_id":matched.alter_id})
@@ -751,6 +761,16 @@ pub(super) enum UnmatchedCause {
     /// voucher Tally rejected, and twins in one batch defeat matching by
     /// content.
     ReportedNotCreated,
+    /// A later verification, reading the saved answer of the batch's own
+    /// post: it reported every counter, `CREATED 0`, `EXCEPTIONS` equal to
+    /// the vouchers sent and every other counter zero; for a batch of two
+    /// or more, the post itself also recorded that the company's voucher
+    /// mark moved by what Tally reported creating. That is all that is
+    /// claimed. The voucher may since have been entered by hand in another
+    /// form, so it is never read as not created: it stays
+    /// `sent_not_attributed`, and its next step says what Tally reported
+    /// when it was sent (bridge#1108).
+    ReportedNotCreatedWhenSent,
     /// Anything else, including no recorded answer: an edit in Tally is as
     /// likely as absence, so the voucher is `sent_not_attributed`.
     NotEstablished,
@@ -775,8 +795,21 @@ pub(super) fn unmatched_cause(
         return UnmatchedCause::NotEstablished;
     };
     let step_confirms = sent == 1 || voucher_step == Some(0);
-    if sent >= 1
-        && step_confirms
+    if step_confirms && answer_reported_none_created(counters, sent) && unmatched == sent {
+        UnmatchedCause::ReportedNotCreated
+    } else {
+        UnmatchedCause::NotEstablished
+    }
+}
+
+/// Whether a post's answer has the captured shape of a post Tally rejected
+/// whole: every counter reported, `CREATED 0`, `EXCEPTIONS` equal to the
+/// `sent` vouchers and every other counter zero (§9.2; bridge#1108).
+fn answer_reported_none_created(
+    counters: &bridge_tally_protocol::TallyImportResult,
+    sent: u64,
+) -> bool {
+    sent >= 1
         && counters.counter_presence.all_reported()
         && counters.created == 0
         && counters.altered == 0
@@ -785,11 +818,27 @@ pub(super) fn unmatched_cause(
         && counters.errors == 0
         && counters.cancelled == 0
         && counters.exceptions == sent
-        && unmatched == sent
-    {
-        UnmatchedCause::ReportedNotCreated
-    } else {
-        UnmatchedCause::NotEstablished
+}
+
+/// The cause for vouchers a LATER verification of a post of `sent` cannot
+/// find, from what that post left on record: the saved answer's shape and,
+/// for a batch of two or more, `step_matched`, the post's own verdict that
+/// the company's voucher mark moved by what Tally reported creating (the
+/// same guard the post's own readback applies, read from its record because
+/// the mark may have moved since for other reasons). A voucher may have been
+/// entered by hand since, so nothing here is read as not created.
+pub(super) fn later_unmatched_cause(
+    counters: Option<&bridge_tally_protocol::TallyImportResult>,
+    sent: usize,
+    step_matched: bool,
+) -> UnmatchedCause {
+    match (counters, u64::try_from(sent)) {
+        (Some(counters), Ok(sent))
+            if (sent == 1 || step_matched) && answer_reported_none_created(counters, sent) =>
+        {
+            UnmatchedCause::ReportedNotCreatedWhenSent
+        }
+        _ => UnmatchedCause::NotEstablished,
     }
 }
 
@@ -895,13 +944,34 @@ pub(super) fn invoice_readback_due<'a>(
     Some((voucher, matched))
 }
 
+/// The next step of a voucher a later verification cannot find when the saved
+/// answer of its post reported it as not created
+/// (`UnmatchedCause::ReportedNotCreatedWhenSent`).
+pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.";
+
+/// Rewrites a later verification of a post whose saved answer reported its
+/// vouchers as not created: a voucher not found by its content stays
+/// `sent_not_attributed`, never `not_found`, with the next step that says
+/// what Tally reported when it was sent.
+pub(super) fn mark_sent_after_reported_not_created(result: &mut Value) {
+    mark_not_found_with(
+        result,
+        "sent_not_attributed",
+        Some(REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP),
+    );
+}
+
 fn mark_not_found_as(result: &mut Value, status: &str) {
+    mark_not_found_with(result, status, plain_next_step(status));
+}
+
+fn mark_not_found_with(result: &mut Value, status: &str, next_step: Option<&str>) {
     let mut moved = 0_u64;
     if let Some(vouchers) = result["vouchers"].as_array_mut() {
         for voucher in vouchers {
             if voucher["status"] == "not_found" || voucher["status"] == "bound_not_in_window" {
                 voucher["status"] = json!(status);
-                voucher["next_step"] = json!(plain_next_step(status));
+                voucher["next_step"] = json!(next_step);
                 moved += 1;
             }
         }
@@ -1119,10 +1189,44 @@ fn effective_date_not_observed(expected: &ImportVoucher, actual: &ReadVoucher) -
     expected.voucher_type != VoucherType::Journal && actual.effective_date.is_none()
 }
 
+/// How Bridge wrote a voucher's narration into Tally (`render_voucher_xml`):
+/// with the batch's `[BRIDGE:…]` tag, for a file a person imports and for a
+/// native post made before posts went untagged, or untagged, for a native post
+/// attributed by its own AlterID span.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum WrittenNarration<'a> {
+    Tagged(&'a str),
+    Untagged,
+}
+
+/// Whether the narration Tally holds differs from the one Bridge wrote for
+/// `expected` (#1608): the one comparison the read-back, the span binding and
+/// the amendment check share. The written side is the posted text (trimmed,
+/// as sent), with the tag when it carried one; the read side is compared byte
+/// for byte, as the span binding always did, so nothing Tally changes is
+/// hidden. A narration Tally holds none of equals only an empty one written:
+/// an absent narration is never taken for written text.
+pub(super) fn narration_differs(
+    expected: &ImportVoucher,
+    written: WrittenNarration<'_>,
+    read: Option<&str>,
+) -> bool {
+    let text = super::posted_narration(expected).unwrap_or("");
+    let written = match written {
+        WrittenNarration::Tagged(tag) => format!("{text} [BRIDGE:{tag}]").trim().to_string(),
+        WrittenNarration::Untagged => text.to_string(),
+    };
+    match read {
+        None => !written.is_empty(),
+        Some(read) => read != written,
+    }
+}
+
 pub(super) fn voucher_diffs(
     expected: &ImportVoucher,
     actual: &ReadVoucher,
     entries_match: bool,
+    narration: WrittenNarration<'_>,
 ) -> Vec<Value> {
     let mut diffs = Vec::new();
     let expected_date = expected.date.as_str();
@@ -1148,6 +1252,9 @@ pub(super) fn voucher_diffs(
         && actual.voucher_number.as_deref() != expected.voucher_number.as_deref()
     {
         diffs.push(json!("voucher_number"));
+    }
+    if narration_differs(expected, narration, actual.narration.as_deref()) {
+        diffs.push(json!("narration"));
     }
     if !entries_match {
         let expected_entries = expected

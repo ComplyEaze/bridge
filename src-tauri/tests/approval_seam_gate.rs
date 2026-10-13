@@ -1268,7 +1268,6 @@ fn nothing_sets_cfg_test_for_a_build() {
         ".github/workflows/ci.yml",
         ".github/actions/setup-windows-native/action.yml",
         "src-tauri/build.rs",
-        "tools/bridge-tally-qualification/build.rs",
         "package.json",
         "scripts/check-no-test-seam.mjs",
         "scripts/package-mcpb.mjs",

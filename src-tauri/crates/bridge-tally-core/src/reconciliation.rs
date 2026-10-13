@@ -219,8 +219,7 @@ fn state_for_codes(issues: &[AccountingIssue], codes: &[&str]) -> CheckState {
 /// reported. On the same real book it occurs **zero** times.
 ///
 /// `polarity` itself is unchanged and still comes from the flag. It is read
-/// here and in `transport_qualification.rs`, which projects it into a transport
-/// parity fingerprint; no accounting total is derived from it.
+/// here; no accounting total is derived from it.
 fn inverted_voucher_entries(
     core: &CoreAccountingBatch,
     excluded_from_books: &BTreeSet<&str>,

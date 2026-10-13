@@ -454,8 +454,7 @@ corepack pnpm run license:all
    unless release notes or product copy claim that scope.
    Live Education collection, when legitimately available, must follow the
    [read-only runbook](./tally/compatibility/live-education-runbook.md). Never
-   upload `.bridge-live/` automatically or substitute the parser-only CI
-   receipt for reviewed live evidence.
+   upload `.bridge-live/` automatically.
 7. Confirm the release commit and tag contain no PII, machine paths, secrets,
    or unsigned third-party assets. The MCPB's PDFium library is fetched at build
    time, never committed, and admitted only against the SHA-256 digests in

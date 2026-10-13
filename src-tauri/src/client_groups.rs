@@ -91,14 +91,10 @@ pub enum ClientGroupLabelsError {
     Write(#[source] std::io::Error),
 }
 
-pub fn load(directory: &Path) -> ClientGroupLabels {
-    load_with_degradation(directory).labels
-}
-
 /// Best-effort display load which also retains why persisted labels degraded.
 ///
 /// Unlike [`try_load`], this never makes a caller handle an error merely to
-/// show a list. It intentionally preserves [`load`]'s historical normalization
+/// show a list. It intentionally preserves the historical normalization
 /// for colliding keys while making that collision observable to the caller.
 pub fn load_with_degradation(directory: &Path) -> ClientGroupLabelsLoad {
     let file = match read_client_group_labels_file(directory) {
@@ -144,7 +140,7 @@ pub fn load_sort_preference(directory: &Path) -> Option<ClientSortPreference> {
 
 /// Strictly loads labels for a workflow which must distinguish absent labels
 /// from labels that could not be read safely. The display path intentionally
-/// continues to use [`load`]'s best-effort behavior.
+/// continues to use [`load_with_degradation`]'s best-effort behavior.
 pub fn try_load(directory: &Path) -> Result<ClientGroupLabels, ClientGroupLabelsError> {
     let file = read_client_group_labels_file(directory)?;
     if file.version != SCHEMA_VERSION {
@@ -380,7 +376,7 @@ mod tests {
     #[test]
     fn missing_empty_and_corrupt_files_mean_no_groups() {
         let directory = tempfile::tempdir().expect("temporary config directory");
-        assert!(load(directory.path()).is_empty());
+        assert!(load_with_degradation(directory.path()).labels.is_empty());
         assert_eq!(
             load_with_degradation(directory.path()),
             ClientGroupLabelsLoad {
@@ -391,7 +387,7 @@ mod tests {
         );
 
         std::fs::write(directory.path().join(FILE_NAME), "  \n").expect("write empty file");
-        assert!(load(directory.path()).is_empty());
+        assert!(load_with_degradation(directory.path()).labels.is_empty());
         assert_eq!(
             load_with_degradation(directory.path()).degradation_reason,
             Some(ClientGroupLabelsDegradationReason::EmptyFile),
@@ -399,7 +395,7 @@ mod tests {
         );
 
         std::fs::write(directory.path().join(FILE_NAME), "not json").expect("write corrupt file");
-        assert!(load(directory.path()).is_empty());
+        assert!(load_with_degradation(directory.path()).labels.is_empty());
         assert!(matches!(
             load_with_degradation(directory.path()).degradation_reason,
             Some(ClientGroupLabelsDegradationReason::CorruptFile)
@@ -445,12 +441,14 @@ mod tests {
         save_label(directory.path(), "synthetic-company-guid", "North practice")
             .expect("save label");
         assert_eq!(
-            load(directory.path()).get("synthetic-company-guid"),
+            load_with_degradation(directory.path())
+                .labels
+                .get("synthetic-company-guid"),
             Some(&"North practice".to_string())
         );
 
         save_label(directory.path(), "synthetic-company-guid", "   ").expect("remove label");
-        assert!(load(directory.path()).is_empty());
+        assert!(load_with_degradation(directory.path()).labels.is_empty());
     }
 
     #[test]
@@ -467,7 +465,7 @@ mod tests {
         )
         .expect("atomically replace labels");
 
-        let labels = load(directory.path());
+        let labels = load_with_degradation(directory.path()).labels;
         assert!(!labels.contains_key("legacy-guid"));
         assert_eq!(labels.len(), 1);
     }
@@ -481,7 +479,9 @@ mod tests {
             .expect("replacement label");
 
         assert_eq!(
-            load(directory.path()).get("synthetic-company-guid"),
+            load_with_degradation(directory.path())
+                .labels
+                .get("synthetic-company-guid"),
             Some(&"South practice".to_string())
         );
         assert!(directory
@@ -503,7 +503,7 @@ mod tests {
         std::fs::write(&path, original).expect("write corrupt label bytes");
 
         assert!(
-            load(directory.path()).is_empty(),
+            load_with_degradation(directory.path()).labels.is_empty(),
             "display remains available"
         );
         assert!(matches!(
@@ -532,7 +532,7 @@ mod tests {
         std::fs::write(&path, original).expect("write future label schema");
 
         assert!(
-            load(directory.path()).is_empty(),
+            load_with_degradation(directory.path()).labels.is_empty(),
             "display remains available"
         );
         assert_eq!(
@@ -570,7 +570,9 @@ mod tests {
         let empty_directory = tempfile::tempdir().expect("temporary config directory");
         let empty_path = empty_directory.path().join(FILE_NAME);
         std::fs::write(&empty_path, b" \n").expect("write empty label file");
-        assert!(load(empty_directory.path()).is_empty());
+        assert!(load_with_degradation(empty_directory.path())
+            .labels
+            .is_empty());
         assert!(matches!(
             try_load(empty_directory.path()),
             Err(ClientGroupLabelsError::EmptyFile)
@@ -584,7 +586,9 @@ mod tests {
         let unreadable_directory = tempfile::tempdir().expect("temporary config directory");
         let unreadable_path = unreadable_directory.path().join(FILE_NAME);
         std::fs::create_dir(&unreadable_path).expect("create unreadable label path");
-        assert!(load(unreadable_directory.path()).is_empty());
+        assert!(load_with_degradation(unreadable_directory.path())
+            .labels
+            .is_empty());
         assert!(matches!(
             load_with_degradation(unreadable_directory.path()).degradation_reason,
             Some(ClientGroupLabelsDegradationReason::Read)
@@ -618,7 +622,9 @@ mod tests {
 
         assert_eq!(load_sort_preference(directory.path()), Some(sort));
         assert_eq!(
-            load(directory.path()).get("synthetic-company-guid"),
+            load_with_degradation(directory.path())
+                .labels
+                .get("synthetic-company-guid"),
             Some(&"North practice".to_string())
         );
     }

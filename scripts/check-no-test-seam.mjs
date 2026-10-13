@@ -38,7 +38,7 @@
 // its name, and also by its first bytes (a gzip, zip, zstd, xz, bzip2 or 7z
 // signature) wherever it sits, whatever it is called (#839).
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -279,7 +279,7 @@ function main(argumentsList) {
   console.log(`no test-only code in ${paths.length} path(s): ${paths.map((path) => basename(path)).join(", ")}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     main(process.argv.slice(2));
   } catch (error) {

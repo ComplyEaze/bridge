@@ -27,9 +27,6 @@ pub enum Fixture {
     ImportPartial,
     MalformedXml,
     TruncatedXml,
-    /// Bridge-shaped JSON used only to test semantic-reference plumbing. It
-    /// is not an official Tally JSONEX response envelope or a parity fixture.
-    SyntheticJsonSemanticReference,
     UnsupportedCapability,
     /// Caller-owned synthetic XML for qualification runner and transport tests.
     /// The simulator never treats this as a real Tally grammar fixture.
@@ -92,9 +89,6 @@ impl Fixture {
             }
             Self::MalformedXml => Cow::Borrowed(include_str!("../fixtures/malformed.xml")),
             Self::TruncatedXml => Cow::Borrowed(include_str!("../fixtures/truncated.xml")),
-            Self::SyntheticJsonSemanticReference => {
-                Cow::Borrowed(include_str!("../fixtures/synthetic_json_semantic_reference.json"))
-            }
             Self::UnsupportedCapability => Cow::Borrowed(
                 "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>BRIDGE_SYNTHETIC_CAPABILITY_UNSUPPORTED</LINEERROR></DATA></BODY></ENVELOPE>",
             ),
@@ -109,11 +103,7 @@ impl Fixture {
     }
 
     pub fn content_type(&self) -> &'static str {
-        if matches!(self, Self::SyntheticJsonSemanticReference) {
-            "application/json"
-        } else {
-            "text/xml"
-        }
+        "text/xml"
     }
 }
 

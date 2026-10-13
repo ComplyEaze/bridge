@@ -1,0 +1,13 @@
+﻿# 12 VOUCHER rows; DATE, VOUCHERTYPENAME, VOUCHERNUMBER (text in quotes, BLANK, ABSENT or SPACES), MASTERID, ALTERID, GUID, NUMBERINGSTYLE, VOUCHERRETAINKEY, ISOPTIONAL, ISCANCELLED || LEDGERNAME, AMOUNT, ISDEEMEDPOSITIVE per entry (narration: not read)
+20260701, Receipt, BLANK, M1, A1, c48f3906-7682-4828-9e87-2b660064b6f8-00000001, style Manual, retainkey 1, optional No, cancelled No || Lab Seed Income, 1.00, No || Cash, -1.00, Yes
+20260715, Payment, "1", M2, A2, c48f3906-7682-4828-9e87-2b660064b6f8-00000002, style Manual, retainkey 1, optional No, cancelled No || Lab Charges, -10.00, Yes || Lab Bank, 10.00, No
+20260716, Payment, "1", M3, A3, c48f3906-7682-4828-9e87-2b660064b6f8-00000003, style Manual, retainkey 5, optional No, cancelled No || Lab Charges, -11.00, Yes || Lab Bank, 11.00, No
+20260720, Journal, "1", M4, A4, c48f3906-7682-4828-9e87-2b660064b6f8-00000004, style Auto Retain, retainkey 1, optional No, cancelled No || Lab Charges, -12.00, Yes || Suspense, 12.00, No
+20260722, Journal, "2", M5, A5, c48f3906-7682-4828-9e87-2b660064b6f8-00000005, style Auto Retain, retainkey 5, optional No, cancelled No || Lab Charges, -13.00, Yes || Suspense, 13.00, No
+20260718, Journal, "3", M6, A6, c48f3906-7682-4828-9e87-2b660064b6f8-00000006, style Auto Retain, retainkey 9, optional No, cancelled No || Lab Charges, -14.00, Yes || Suspense, 14.00, No
+20260710, Receipt, BLANK, M7, A7, c48f3906-7682-4828-9e87-2b660064b6f8-00000007, style Manual, retainkey 5, optional No, cancelled No || Suspense, 41.00, No || Cash, -41.00, Yes
+20260720, Receipt, BLANK, M8, A8, c48f3906-7682-4828-9e87-2b660064b6f8-00000008, style Manual, retainkey 9, optional No, cancelled No || Suspense, 42.00, No || Cash, -42.00, Yes
+20260705, Receipt, BLANK, M9, A9, c48f3906-7682-4828-9e87-2b660064b6f8-00000009, style Manual, retainkey 13, optional No, cancelled No || Suspense, 43.00, No || Cash, -43.00, Yes
+20260703, Receipt, BLANK, M10, A10, c48f3906-7682-4828-9e87-2b660064b6f8-0000000a, style Manual, retainkey 17, optional No, cancelled No || Suspense, 44.00, No || Cash, -44.00, Yes
+20260725, Receipt, BLANK, M11, A11, c48f3906-7682-4828-9e87-2b660064b6f8-0000000b, style Manual, retainkey 21, optional No, cancelled No || Suspense, 45.00, No || Cash, -45.00, Yes
+20260702, Receipt, BLANK, M12, A12, c48f3906-7682-4828-9e87-2b660064b6f8-0000000c, style Manual, retainkey 25, optional No, cancelled No || Suspense, 46.00, No || Cash, -46.00, Yes

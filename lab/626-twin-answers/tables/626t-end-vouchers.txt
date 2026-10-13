@@ -1,0 +1,2 @@
+﻿# 1 VOUCHER rows; DATE, VOUCHERTYPENAME, VOUCHERNUMBER, MASTERID, ALTERID, GUID, NARRATION || LEDGERNAME, AMOUNT, ISDEEMEDPOSITIVE per entry
+20260803, Journal, 1, 2, 2, 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-00000002, "" (0) || "Lab Line Break Ledger\r\n" (23), -500.00, Yes || "Lab Plain Ledger" (16), 500.00, No

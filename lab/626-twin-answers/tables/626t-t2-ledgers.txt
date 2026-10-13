@@ -1,0 +1,7 @@
+﻿# 6 LEDGER rows; NAME attribute | NAME elements | GUID | PARENT | ALTERID
+"Cash" (4) | NAME elements: "Cash" (4) | 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-0000001f | "Cash-in-Hand" (12) | ALTERID 32
+"Lab Line Break Ledger" (21) | NAME elements: "Lab Line Break Ledger" (21) | 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-000000d1 | "Indirect Incomes" (16) | ALTERID 213
+"Lab Line Break Ledger\r\n" (23) | NAME elements: "Lab Line Break Ledger\r\n" (23) | 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-000000ce | "Indirect Expenses" (17) | ALTERID 210
+"Lab Plain Ledger" (16) | NAME elements: "Lab Plain Ledger" (16) | 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-000000cf | "Indirect Expenses" (17) | ALTERID 211
+"Lab Seed Income" (15) | NAME elements: "Lab Seed Income" (15) | 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-000000d0 | "Indirect Incomes" (16) | ALTERID 212
+"Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852-0000001e | " Primary" (8) | ALTERID 31

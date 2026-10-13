@@ -12,7 +12,10 @@
 //      expects the probe's result of step 1.
 // It also pins the `existsSync` clause (a program whose `process.argv[1]` is not a file can import a
 // script: the import neither throws nor runs `main`), and finds the next script: every direct-run
-// guard line in scripts/*.mjs is the one guard, with a probe above, or its file is named in EXEMPT.
+// guard line in a script of scripts/*.mjs is the one guard, at column 0, with a probe above, or its
+// file is named in EXEMPT. A guard line is any line that starts `if (process.argv[1]` (at any
+// indentation) or holds both `process.argv[1]` and `import.meta.url` (the comparison written the
+// other way round, or kept in a variable).
 // No probe starts cargo or reaches the network: each is a usage error or a refused argument.
 //
 // Where a symlink cannot be made (a Windows account without the privilege) the case is reported as
@@ -198,14 +201,19 @@ const EXEMPT = new Map([
 
 const GUARD_START = "if (process.argv[1]";
 
-// File name -> its lines that start a direct-run guard, for the scripts (not the tests) of this directory.
+// Whether a line of a script is, or builds, a direct-run guard.
+function isGuardLine(line) {
+  return line.trimStart().startsWith(GUARD_START) || (line.includes("process.argv[1]") && line.includes("import.meta.url"));
+}
+
+const guardLinesOf = (text) => text.split("\n").filter(isGuardLine);
+
+// File name -> its guard lines, for the scripts (not the tests) of this directory.
 function guardLinesByFile() {
   const found = new Map();
   for (const name of readdirSync(scriptsDirectory)) {
     if (!name.endsWith(".mjs") || name.endsWith(".test.mjs")) continue;
-    const lines = readFileSync(join(scriptsDirectory, name), "utf8")
-      .split("\n")
-      .filter((line) => line.startsWith(GUARD_START));
+    const lines = guardLinesOf(readFileSync(join(scriptsDirectory, name), "utf8"));
     if (lines.length) found.set(name, lines);
   }
   return found;
@@ -225,7 +233,7 @@ function guardProblems(found, { probed, exempt }) {
     }
   }
   for (const file of exempt.keys()) {
-    if (!found.has(file)) problems.push(`${file}: exempt, but it has no line starting ${GUARD_START}`);
+    if (!found.has(file)) problems.push(`${file}: exempt, but it has no direct-run guard line`);
   }
   return problems;
 }
@@ -250,9 +258,28 @@ test("the scan finds a guard that is not the one guard, a guard with no probe, a
     message: "EXEMPT: b.mjs has no reason; every exemption says why",
   });
   assert.deepEqual(guardProblems(new Map(), { probed, exempt: new Map([["b.mjs", "kept on purpose"]]) }), [
-    "b.mjs: exempt, but it has no line starting if (process.argv[1]",
+    "b.mjs: exempt, but it has no direct-run guard line",
   ]);
   for (const [file, reason] of EXEMPT) assert.ok(reason.trim() !== "", file);
+});
+
+test("a guard line is found wherever it sits and however it is written", () => {
+  const written = [
+    "if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {",
+    "    if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {",
+    "if (import.meta.url === pathToFileURL(process.argv[1]).href) {",
+    "const isMain = import.meta.url === pathToFileURL(process.argv[1]).href;",
+    "if (process.argv[1] && process.argv[1].endsWith(\"x.mjs\")) main();",
+    "  if (process.argv[1] && process.argv[1].endsWith(\"x.mjs\")) main();",
+  ];
+  assert.deepEqual(guardLinesOf(`${written.join("\n")}\nconst unrelated = 1;\nconsole.log(process.argv[2]);\n`), written);
+  // None but the one guard, at column 0, is accepted.
+  const problems = guardProblems(new Map([["a.mjs", written.slice(1, 4)]]), { probed: new Set(["a.mjs"]), exempt: new Map() });
+  assert.equal(problems.length, 3);
+  assert.deepEqual(
+    guardProblems(new Map([["a.mjs", [`  ${GUARD} {`]]]), { probed: new Set(["a.mjs"]), exempt: new Map() }),
+    [`a.mjs: a guard that is not the one guard:   ${GUARD} {`],
+  );
 });
 
 test("no symlink case was skipped where symlinks must work", () => {

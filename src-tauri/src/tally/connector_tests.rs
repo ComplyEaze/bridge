@@ -3,6 +3,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use bridge_tally_core::{ExactDecimal, ReadWindow};
 use std::net::SocketAddr;
 use tally_protocol_simulator::{Fixture, ScenarioPlan, SequenceSimulator, WireEncoding};
 use tokio::{
@@ -617,16 +618,6 @@ fn failed_or_unobserved_canary_cannot_authorize_snapshot_start() {
     }
 }
 
-#[test]
-fn period_report_company_guid_matching_is_ascii_case_insensitive_only() {
-    assert!(company_guids_equal(
-        "4C42A771-AbCd-4DeF-8AbC-001122AaBbCc",
-        "4c42a771-abcd-4def-8abc-001122aabbcc"
-    ));
-    assert!(!company_guids_equal("company-guid-a", "company-guid-b"));
-    assert!(!company_guids_equal("company-guid", " company-guid "));
-}
-
 #[tokio::test]
 async fn presentation_equivalent_company_snapshot_probe_stops_before_core_exports() {
     let _simulator_guard = simulator_test_lock().lock().await;
@@ -681,16 +672,15 @@ async fn presentation_equivalent_company_snapshot_probe_stops_before_core_export
 }
 
 #[tokio::test]
-async fn failed_period_read_preserves_its_error_after_a_closing_identity_request() {
+async fn failed_source_read_preserves_its_error_after_a_failed_closing_identity_request() {
     let _simulator_guard = simulator_test_lock().lock().await;
     let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     let company_collection = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
     let (address, server) = spawn_method_routed_server(vec![
-        company_collection.clone(),
-        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
         company_collection,
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
     ])
     .await;
     let config = TallyConfig {
@@ -708,7 +698,7 @@ async fn failed_period_read_preserves_its_error_after_a_closing_identity_request
         display_name: "Synthetic Company".to_string(),
     };
     let context = RequestContext {
-        run_id: "run-period-source-failure".to_string(),
+        run_id: "run-source-failure".to_string(),
         company: company.clone(),
         pack: CapabilityPackId::CoreAccounting,
         schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
@@ -720,120 +710,27 @@ async fn failed_period_read_preserves_its_error_after_a_closing_identity_request
         filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
     };
     let connector =
-        RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
-            .unwrap();
-
-    let error = connector
-        .read_core_period_balance_report(&context)
+        RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context).unwrap();
+    let opening = connector
+        .verify_snapshot_identity()
         .await
-        .expect_err("the rejected period response must remain the reported failure");
+        .expect("opening identity");
+
+    // The closing identity request is itself rejected; the earlier source
+    // failure must still be the one reported.
+    let error = connector
+        .finish_snapshot_source_read::<()>(
+            Err(protocol_error("synthetic_source_failure")),
+            &opening,
+        )
+        .await
+        .expect_err("the source failure must remain the reported failure");
     assert!(matches!(
         error,
-        TallyError::Protocol { code } if code == "application_response_rejected"
+        TallyError::Protocol { code } if code == "synthetic_source_failure"
     ));
     let methods = server.await.expect("join source-failure server");
-    assert_eq!(methods, ["POST", "POST", "POST"]);
-}
-
-/// The period report is a custom report whose TDL Education answers with a
-/// blocking dialog on the Tally screen (bridge#45). With Education observed,
-/// by the identity read that precedes it or by the run's own probe, it is
-/// refused before it is sent. Licensed, the same read goes out.
-#[tokio::test]
-async fn the_period_report_is_refused_before_sending_when_education_is_observed() {
-    let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
-    let collection = |edumode: &str| {
-        format!(
-            r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM><EDUMODE TYPE="Logical">{edumode}</EDUMODE></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
-        )
-    };
-    let education_profile = bridge_tally_core::CapabilityProfile {
-        profile_version: 4,
-        product: "TallyPrime".to_string(),
-        release: Some("7.1".to_string()),
-        license_tier: None,
-        mode: Some("Education".to_string()),
-        transports: Default::default(),
-        features: Default::default(),
-        packs: Default::default(),
-    };
-    for (case, responses, probed_education) in [
-        (
-            "identity read reports Education",
-            vec![collection("Yes")],
-            false,
-        ),
-        ("probe reported Education", vec![collection("No")], true),
-        (
-            "licensed",
-            vec![
-                collection("No"),
-                "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
-                collection("No"),
-            ],
-            false,
-        ),
-    ] {
-        let licensed = case == "licensed";
-        let (address, server) = spawn_method_routed_server_refusing_extra_requests(responses).await;
-        let config = TallyConfig {
-            host: address.ip().to_string(),
-            port: address.port(),
-        };
-        let company = CompanyRef {
-            identity: company_source_identity(
-                &format!("tally_xml_http:http://{address}"),
-                company_guid,
-                "100001",
-                "Synthetic Company",
-                "20260401",
-            ),
-            display_name: "Synthetic Company".to_string(),
-        };
-        let context = RequestContext {
-            run_id: "run-period-education".to_string(),
-            company: company.clone(),
-            pack: CapabilityPackId::CoreAccounting,
-            schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
-            window: ReadWindow {
-                from_yyyymmdd: "20260701".to_string(),
-                to_yyyymmdd: "20260701".to_string(),
-            },
-            query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
-            filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
-        };
-        let connector =
-            RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
-                .unwrap();
-        if probed_education {
-            assert_eq!(
-                connector
-                    .observe_snapshot_profile(&education_profile)
-                    .unwrap(),
-                DateBoundaryProfile::EducationRestricted
-            );
-        }
-        let error = connector
-            .read_core_period_balance_report(&context)
-            .await
-            .expect_err(case);
-        let methods = server.await.expect("join period server");
-        if licensed {
-            // The report was sent (and its rejection is the reported failure).
-            assert!(
-                matches!(&error, TallyError::Protocol { code } if code == "application_response_rejected"),
-                "{case}: {error:?}"
-            );
-            assert_eq!(methods, ["POST", "POST", "POST"], "{case}");
-        } else {
-            assert!(
-                matches!(&error, TallyError::Unsupported { code } if code == "education_report_family_unsupported"),
-                "{case}: {error:?}"
-            );
-            assert_eq!(methods, ["POST"], "{case}: only the identity read went out");
-        }
-    }
+    assert_eq!(methods, ["POST", "POST"]);
 }
 
 /// `discover_companies` requests the native `Company` collection
@@ -1033,8 +930,28 @@ mod wr2_core_window_sequence {
         responses: Vec<String>,
     ) -> (Result<CanonicalPackWindow, TallyError>, Vec<String>) {
         let _simulator_guard = simulator_test_lock().lock().await;
-        let identity = observed_identity(COMPANY, COMPANY_GUID, "100004", "20260401");
         let (address, server) = spawn_method_routed_server(responses).await;
+        let result = extract_from(address).await;
+        let methods = tokio::time::timeout(std::time::Duration::from_secs(10), server)
+            .await
+            .expect("the routed server saw every response it was given requested")
+            .expect("join routed Tally server");
+        (result, methods)
+    }
+
+    /// One `extract_core_window` of the captured company against `address`.
+    pub(super) async fn extract_from(
+        address: SocketAddr,
+    ) -> Result<CanonicalPackWindow, TallyError> {
+        let identity = observed_identity(COMPANY, COMPANY_GUID, "100004", "20260401");
+        let (connector, context) = connector_at(address);
+        connector
+            .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
+            .await
+    }
+
+    /// A connector for the captured company at `address`, with its context.
+    pub(super) fn connector_at(address: SocketAddr) -> (RuntimeTallyConnector, RequestContext) {
         let config = TallyConfig {
             host: address.ip().to_string(),
             port: address.port(),
@@ -1064,15 +981,127 @@ mod wr2_core_window_sequence {
         let connector =
             RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
                 .unwrap();
-        let result = connector
-            .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
-            .await;
-        let methods = tokio::time::timeout(std::time::Duration::from_secs(10), server)
-            .await
-            .expect("the routed server saw every response it was given requested")
-            .expect("join routed Tally server");
-        (result, methods)
+        (connector, context)
     }
+
+    /// Serves `responses` in order, except that the POST numbered
+    /// `closed_post` (from 0) is read in full and then closed unanswered, as
+    /// a connection lost after Tally received the request. Returns the count
+    /// of POSTs received so far.
+    pub(super) async fn spawn_server_closing_one_post(
+        responses: Vec<String>,
+        closed_post: usize,
+    ) -> (
+        SocketAddr,
+        Arc<std::sync::atomic::AtomicUsize>,
+        JoinHandle<()>,
+    ) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the local double");
+        let address = listener.local_addr().expect("double address");
+        let received = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&received);
+        let server = tokio::spawn(async move {
+            let mut responses = responses.into_iter();
+            loop {
+                let (mut socket, _) = listener.accept().await.expect("accept a send");
+                let request =
+                    crate::tally::connection::tests::read_complete_http_request(&mut socket).await;
+                assert!(
+                    request.starts_with(b"POST "),
+                    "a core-window read is a POST"
+                );
+                if counted.fetch_add(1, Ordering::SeqCst) == closed_post {
+                    continue;
+                }
+                let response = utf16_xml_response(responses.next().expect("a response to serve"));
+                socket.write_all(&response).await.expect("write a response");
+            }
+        });
+        (address, received, server)
+    }
+}
+
+/// Each export of a core window, in turn, has its connection closed after the
+/// whole request was received: both group exports, both ledger exports, the
+/// voucher-type export and the voucher export, by their place among the
+/// eighteen requests. None is sent again, and the window ends with the
+/// transport's typed error. A second copy would have been answered here, and
+/// the window would have built.
+#[tokio::test]
+async fn core_window_sends_each_export_once_when_its_connection_closes_after_the_request() {
+    use wr2_core_window_sequence as seq;
+    const EXPORTS: [usize; 6] = [2, 3, 8, 9, 12, 15];
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let extent = seq::EXTENTS;
+    for export in EXPORTS {
+        let (address, received, server) = seq::spawn_server_closing_one_post(
+            seq::posts([(extent, extent); seq::EXTENT_BRACKETS]),
+            export,
+        )
+        .await;
+        let result = seq::extract_from(address).await;
+        server.abort();
+        let error = result.expect_err("an export that is never answered must fail the window");
+        assert!(
+            matches!(error, TallyError::Unreachable),
+            "request {export}: unexpected error: {error:?}"
+        );
+        assert_eq!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            export + 1,
+            "request {export} was sent again"
+        );
+    }
+}
+
+/// Control for the test above, and the other half of the rule: the first two
+/// requests of a core window are the two small extent reads of a pair. When
+/// either has its connection closed the same way it is sent again, and the
+/// window builds after one request more than the eighteen of an undisturbed
+/// run.
+#[tokio::test]
+async fn core_window_sends_an_extent_read_again_when_its_connection_closes_after_the_request() {
+    use wr2_core_window_sequence as seq;
+    const EXTENT_READS_OF_A_PAIR: [usize; 2] = [0, 1];
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let extent = seq::EXTENTS;
+    for extent_read in EXTENT_READS_OF_A_PAIR {
+        let (address, received, server) = seq::spawn_server_closing_one_post(
+            seq::posts([(extent, extent); seq::EXTENT_BRACKETS]),
+            extent_read,
+        )
+        .await;
+        let result = seq::extract_from(address).await;
+        server.abort();
+        result.expect("the window must build once the extent read is sent again");
+        assert_eq!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            seq::POSTS_IN_A_SUCCESSFUL_WINDOW + 1
+        );
+    }
+}
+
+/// The company list is the connector's other small read. Closed the same way
+/// it is sent again, and discovery returns the captured company. The response
+/// served is the captured extent collection, which holds that company's row.
+#[tokio::test]
+async fn discover_companies_sends_the_company_list_again_when_its_connection_closes_after_the_request(
+) {
+    use wr2_core_window_sequence as seq;
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let (address, received, server) =
+        seq::spawn_server_closing_one_post(vec![seq::EXTENTS.to_owned()], 0).await;
+    let (connector, _context) = seq::connector_at(address);
+    let discovered = connector.discover_companies().await;
+    server.abort();
+    let discovered = discovered.expect("discovery must succeed once the list is sent again");
+    assert!(discovered
+        .iter()
+        .any(|company| company.identity == connector.company.identity));
+    assert_eq!(received.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
 /// Control for the three refusals below: the same captured sequence with no

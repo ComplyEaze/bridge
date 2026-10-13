@@ -2275,6 +2275,54 @@ fn census_spans_tile_the_mark_and_none_holds_more_than_one_census() {
     assert_eq!(census_spans(249_948, 8192).unwrap().count(), 31);
 }
 
+/// `voucher_read_cost` states a call's census before it runs from `census_read_count`;
+/// the read decides whether to count with `skips_census` and then walks `census_spans`.
+/// One rule, so the two agree on every mark, including the boundaries.
+#[test]
+fn the_census_a_read_sends_is_the_count_the_preview_states() {
+    let counting =
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).counting_small_books();
+    let skipping = WindowReadLimits::for_shape(VoucherReadShape::Movement);
+    // A book that never held a voucher sends none, whatever the limits say.
+    assert_eq!(census_read_count(0, counting), Ok(0));
+    assert_eq!(census_read_count(0, skipping), Ok(0));
+    // A counting read sends one census for the smallest book that has a voucher;
+    // a skipping one sends none while the mark times the default voucher fits.
+    assert_eq!(census_read_count(1, counting), Ok(1));
+    assert_eq!(census_read_count(170, skipping), Ok(0));
+    assert_eq!(census_read_count(171, skipping), Ok(1));
+    // The live book of §11c.1 is 31 census reads at the production width.
+    assert_eq!(census_read_count(249_948, counting), Ok(31));
+    let largest = MAX_CENSUS_READS as u64 * counting.census_capacity();
+    assert_eq!(census_read_count(largest, counting), Ok(256));
+    assert_eq!(
+        census_read_count(largest + 1, counting),
+        Err(BOOK_TOO_LARGE)
+    );
+    for limits in [counting, skipping] {
+        for mark in [
+            0,
+            1,
+            42,
+            43,
+            170,
+            171,
+            8_192,
+            8_193,
+            249_948,
+            largest,
+            largest + 1,
+        ] {
+            let expected = if skips_census(mark, limits) {
+                Ok(0)
+            } else {
+                census_spans(mark, limits.census_capacity()).map(|spans| spans.count() as u64)
+            };
+            assert_eq!(census_read_count(mark, limits), expected, "mark {mark}");
+        }
+    }
+}
+
 #[test]
 fn a_book_needing_more_census_spans_than_allowed_is_refused_before_any_is_made() {
     let largest = MAX_CENSUS_READS as u64 * 4096;
@@ -3478,6 +3526,74 @@ async fn an_empty_window_beside_a_busy_day_is_partial_by_the_wider_reads_rows() 
         response["structuredContent"]["evidence"]["reason_code"],
         "empty_window_wider_read_nonempty"
     );
+    // The live answer for the same shape (an empty window beside a busy day),
+    // kept as the lab recorded the tool's answer, from a build that still named the reason
+    // `nonempty_uncorroborated`: our result has the same keys and value kinds
+    // at every level (an array's elements are compared with the live array's
+    // first element; counts are not compared), and the same state, total and
+    // items. The reason is asserted above against the current name; the live
+    // file's is not compared.
+    let live: Value = serde_json::from_str(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-empty-window-beside-busy-day.live-answer.json"
+    ))
+    .unwrap();
+    let mut differences = Vec::new();
+    shape_differences(
+        "",
+        &live["output"],
+        &response["structuredContent"],
+        &mut differences,
+    );
+    assert_eq!(differences, Vec::<String>::new(), "{response}");
+    assert_eq!(live["output"]["result"]["state"], result["state"]);
+    assert_eq!(live["output"]["result"]["total"], result["total"]);
+    assert_eq!(live["output"]["result"]["items"], result["items"]);
+}
+
+/// Where `ours` differs from `live` in shape: an object's key set, a value's
+/// JSON kind, and an array being empty or not, each at its path. A value is
+/// never compared, only what kind it is and which keys it has; every element
+/// of an array of ours is compared with the first element of the live array,
+/// and the arrays' lengths are not compared.
+fn shape_differences(path: &str, live: &Value, ours: &Value, out: &mut Vec<String>) {
+    let kind = |value: &Value| match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    };
+    if kind(live) != kind(ours) {
+        out.push(format!("{path}: live {} ours {}", kind(live), kind(ours)));
+        return;
+    }
+    match (live, ours) {
+        (Value::Object(live), Value::Object(ours)) => {
+            for key in live.keys().filter(|key| !ours.contains_key(*key)) {
+                out.push(format!("{path}/{key}: only in the live answer"));
+            }
+            for key in ours.keys().filter(|key| !live.contains_key(*key)) {
+                out.push(format!("{path}/{key}: only in ours"));
+            }
+            for (key, live) in live {
+                if let Some(ours) = ours.get(key) {
+                    shape_differences(&format!("{path}/{key}"), live, ours, out);
+                }
+            }
+        }
+        (Value::Array(live), Value::Array(ours)) => {
+            if live.is_empty() != ours.is_empty() {
+                out.push(format!("{path}: emptiness differs"));
+            }
+            for (index, ours) in ours.iter().enumerate() {
+                if let Some(live) = live.first() {
+                    shape_differences(&format!("{path}/{index}"), live, ours, out);
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 /// A divided plan is refused whole, before its first part (bridge#581). The
@@ -5691,6 +5807,49 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
     let window = &small["structuredContent"]["result"]["window"];
     assert_eq!(window["census"]["requests"], 1, "{window}");
     assert!(window.get("read_cost").is_none(), "{window}");
+}
+
+/// bridge#1465: what `voucher_read_cost` states before a call is what a real
+/// `vouchers` call then sends. The same scripted book is read twice, once by the
+/// preview (the identity read and one marks read) and once by the real call
+/// (whose window reports the census requests it sent), at two sizes; the
+/// counts and, where the real call states one, the floor must be equal. A change
+/// to the census rule at the read that is not made at the preview fails here.
+#[tokio::test]
+async fn the_preview_states_the_census_reads_a_real_vouchers_call_then_sends() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    for reads in [3_u64, 18] {
+        let real = call_vouchers_over(census_plans_of(reads)).await;
+        assert_eq!(real["isError"], false, "{real}");
+        let window = &real["structuredContent"]["result"]["window"];
+        let sent = window["census"]["requests"].clone();
+        assert_eq!(
+            sent, reads,
+            "the real call sent {reads} census reads: {window}"
+        );
+
+        let mut plans = identity_plans();
+        plans.extend(paired(&mark(reads * capacity)));
+        let one = OneServer::spawn(plans);
+        let preview = one
+            .server
+            .call_tool("voucher_read_cost", json!({"company_guid": GUID}))
+            .await;
+        assert_eq!(preview["isError"], false, "{preview}");
+        let stated = &preview["structuredContent"]["result"]["per_call"]["vouchers"];
+        assert_eq!(stated["census_reads"], sent, "reads {reads}: {stated}");
+        // The real call states its floor from 16 reads on (not at 3); it is the same
+        // figure, and at 18 reads it is there, so a missing field fails the test.
+        if reads >= 16 {
+            let floor = &window["read_cost"]["floor_seconds"];
+            assert!(floor.is_u64(), "reads {reads}: {window}");
+            assert_eq!(&stated["floor_seconds"], floor, "reads {reads}: {stated}");
+        } else {
+            assert!(window.get("read_cost").is_none(), "reads {reads}: {window}");
+        }
+        // The preview sent the identity read and one marks read, and nothing else.
+        assert_eq!(one.requests(), 10);
+    }
 }
 
 /// A later page is served from the held window in about a second, so it must not

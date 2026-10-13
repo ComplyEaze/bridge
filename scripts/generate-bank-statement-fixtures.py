@@ -168,6 +168,25 @@ def path_glyphs(height, lines):
     return "\n".join(ops)
 
 
+def ocr_layer(height, lines):
+    """`lines` as a scanner app writes its OCR layer: real text in render mode 3
+    (`3 Tr`), which draws nothing, laid over the page image. The mode is graphics
+    state and outlives the text block, so it is set back to 0 before the block ends."""
+    ops = content(height, lines).decode("latin-1").split("\n")
+    return "\n".join([ops[0], "3 Tr"] + ops[1:-1] + ["0 Tr", ops[-1]])
+
+
+def with_hidden_cells(height, lines, after, top, cells):
+    """`lines` as real text, with `cells` on the line at `top` in render mode 3
+    inserted after the block's `after`-th text operator and the mode set back to
+    0, so the text after them in the same block is drawn."""
+    ops = content(height, lines).decode("latin-1").split("\n")
+    baseline = height - top - 0.629 * FONT_SIZE
+    hidden = ["3 Tr"] + [
+        f"1 0 0 1 {x:g} {baseline:.3f} Tm {pdf_string(text)} Tj" for x, text in cells] + ["0 Tr"]
+    return "\n".join(ops[:after + 1] + hidden + ops[after + 1:])
+
+
 def write_pdf(pages, width, height, user, owner, seed, rotate=0):
     file_id = hashlib.md5(seed.encode("ascii")).digest()
     owner_value = owner_entry(owner, user)
@@ -527,6 +546,12 @@ SCAN_STAMP = (
 )
 
 
+# A scanner app's stamp that prints a date and a page number.
+SCAN_STAMP_DATED = (
+    (820, [(28, "SCANNED 12/08/2026 PAGE 1 OF 1")]),
+)
+
+
 FIXTURES = {
     # opened with the user password
     "hdfc-synthetic.pdf": dict(
@@ -575,6 +600,27 @@ FIXTURES = {
                      image=True)],
         width=638, height=842,
         user="synthetic-user-4321", owner="synthetic-owner-unused-g", seed="logo"),
+    # A scan whose only text is a hidden OCR layer of the HDFC page 1 lines
+    "scan-with-ocr-layer.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842) + "\n" + ocr_layer(842, HDFC_PAGE_1),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-i", seed="ocr"),
+    # The same, with a visible stamp that prints a date and a page number
+    "scan-ocr-with-stamp.pdf": dict(
+        pages=[Drawn(full_page_image(638, 842) + "\n" + ocr_layer(842, HDFC_PAGE_1) + "\n"
+                     + content(842, SCAN_STAMP_DATED).decode("latin-1"),
+                     image=True)],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-j", seed="ocr-stamp"),
+    # The HDFC statement with hidden text in a row's narration and deposit
+    # columns, in the middle of page 1's text block: must read as hdfc-synthetic
+    "hdfc-hidden-cells.pdf": dict(
+        pages=[Drawn(with_hidden_cells(842, HDFC_PAGE_1, 12, 272,
+                                       [(180, "SHADOW-77"), (482, "9,999.00")])),
+               HDFC_PAGE_2, HDFC_PAGE_3],
+        width=638, height=842,
+        user="synthetic-user-4321", owner="synthetic-owner-unused-k", seed="hidden"),
 }
 
 

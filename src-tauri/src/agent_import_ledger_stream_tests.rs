@@ -982,3 +982,55 @@ fn an_invoice_that_cannot_be_read_never_switches_the_guard_off() {
         Err("import_invoice_figures_unreadable".to_string())
     );
 }
+
+/// The batch size the tool descriptions and the README tell a caller (#865) is
+/// the code's own batch-post limit, so a change of the constant cannot leave
+/// the text stale.
+#[test]
+fn the_batch_size_the_texts_state_is_the_batch_post_limit() {
+    let phrase =
+        format!("cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers");
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    for tool in ["build_import_xml", "parse_bank_statement"] {
+        let description = definitions
+            .as_array()
+            .expect("tool list")
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition["description"].as_str())
+            .unwrap_or_else(|| panic!("{tool} has no description"));
+        assert!(
+            description.contains(&phrase),
+            "{tool}'s description does not say {phrase:?}"
+        );
+    }
+    let clause = "Batch posting is off by default, and with it off each post takes one voucher, \
+         so same-day twins post together only with batch posting on or through a hand import \
+         of the built file.";
+    for tool in ["build_import_xml", "parse_bank_statement"] {
+        let description = definitions
+            .as_array()
+            .expect("tool list")
+            .iter()
+            .find(|definition| definition["name"] == tool)
+            .and_then(|definition| definition["description"].as_str())
+            .unwrap_or_else(|| panic!("{tool} has no description"));
+        assert!(
+            description.contains(clause),
+            "{tool}'s description lost the batch-posting clause"
+        );
+    }
+    let readme = include_str!("../../docs/agent/README.md");
+    let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        flat.contains(clause),
+        "the README lost the batch-posting clause"
+    );
+    let sentence = format!(
+        "cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers (the batch-post limit)"
+    );
+    assert!(
+        readme.contains(&sentence),
+        "the README does not say {sentence:?}"
+    );
+}

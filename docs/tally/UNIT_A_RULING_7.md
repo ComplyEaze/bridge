@@ -3,6 +3,8 @@
 **Date:** 2026-07-31. Answers Codex's re-proposal of initial `AlterID` width **252**
 (ruling 6 §"Consequence for calibration"; `UNIT_A_REPORT.md`).
 
+*October 2026: the voucher-scan outstandings read, its calibration harness and its 40 MiB response cap were deleted from the code (#1546). This document records that work; it does not describe current behaviour.*
+
 ## Rulings at a glance
 
 1. **Width 252 is REJECTED as a production initial width.** It is **ACCEPTED** as a

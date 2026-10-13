@@ -1,15 +1,30 @@
 # ADR 0009: Bound Tally observability before runtime instrumentation
 
 Status: accepted for the portable aggregation contract and PR15 read-runtime
-collection; persistence, support-bundle integration, and performance budgets
-are not yet enabled.
+collection; the collection was removed on 2026-10-12 (second amendment below).
+Persistence, support-bundle integration and performance budgets were never
+enabled.
 
 Amendment (2026-10-12): the privacy-reduced preview, its serialiser and its
 `tally_telemetry_preview` desktop command were deleted. No screen ever called
-the command and nothing exported the result. The collector still counts the
-read runtime's attempts into the fixed cells, and nothing reads them out; the
+the command and nothing exported the result. At that point the collector still
+counted the read runtime's attempts into the fixed cells and nothing read them
+out; the
 paragraphs below describing the preview record the contract as it was
 designed, not a capability the application offers.
+
+Amendment (2026-10-12): the collector and every type it aggregated
+(`TelemetryCollector`, the observation sink, the request-class, queue-outcome
+and response-outcome enums, and the attempt and body-byte observations) are
+removed, together with the observed-body-byte recorder on the Tally client that
+only fed them. Nothing read the counts, so they were unused code that still
+ran on every read. The read runtime keeps its circuit-breaker rejection
+reasons, which decide behaviour. The statement below that imports must not be
+wired into the collector is now moot: imports are not counted anywhere. A
+future reader, such as a support bundle, is designed from the request trail
+(`src-tauri/src/request_trail.rs`), which already records per-call sizes and
+outcomes within an agent tool call (a snapshot run or a desktop command records
+nothing there), and not from a revived collector.
 
 ## Decision
 

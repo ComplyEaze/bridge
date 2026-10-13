@@ -221,6 +221,15 @@ or an owner decision to amend the requirement instead:
    canary reservation, dispatch-attempt and final-verdict tables of migrations `0015`–`0021`
    (`db/tally_mirror.rs`), and the `agent-import-ledger.jsonl` journal. Only the journal has a
    runtime caller. Decide which one is authoritative, and retire or connect the others.
+   2026-10-12: the Rust code for migration `0003` (`db/tally_write_store.rs`) had no runtime
+   caller since it was added, and was removed. Migration `0003` still creates its tables, which
+   now have no reader or writer, including the legacy rows the Consequences section says remain
+   readable. Connecting `0003` later means restoring that code from history. Which contract is
+   authoritative stays open.
+   2026-10-12: the repository methods for the canary tables of migrations `0015`–`0021` had
+   no caller since #139 removed the canary coordinator, and were removed. The tables remain,
+   with no reader or writer. Row 11 stays Not met and follow-up 1 is unchanged; which contract
+   is authoritative stays open.
 7. **Write capability in the Passport (row 1).** Decide whether a verified post
    should become observed write evidence, and under what rule.
 8. **Concurrent external changes, #239. Narrowed.** Tally offers no conditional import, so
@@ -686,3 +695,52 @@ The owner approved this order on 8 Oct 2026: lab groundwork first, then each gua
 | Rollback inside ComplyEaze Bridge | No compensating Tally operation is implemented and verified (Decision, above). |
 
 **Not measured.** None of this has been measured against Tally: the native shape of a company's GST registration, the native shape of a sales ledger's dated GST rows, the transport of the GST status fields, and where GSTR-1 places a posted invoice.
+
+## Amendment — owner decision, 2026-10-10: master writes through the one approved path (dated deviation)
+
+The owner approved this direction on 10 Oct 2026: "yes to the direction for today, improve later". It reverses one row of the 8 Oct amendment's rejected table, "Creating masters through the approval window". The reason given there, a second dispatch path into the release, stays true of any second path. This amendment adds none. Nothing below is built yet. Every slice ships as a draft behind a setting that is off by default, and is measured on a lab company before it is switched on.
+
+**What changes.** Production may send three new write classes, each only through `post_approved_import`, the single dispatch path, with its queue, admission reads, all-company marks aim, wire lock, durable intent and native approval:
+
+- creating ledgers;
+- altering a ledger's GST, registration and state blocks, and renaming a ledger;
+- creating and altering voucher types.
+
+The request becomes a two-variant type, vouchers as today or a master batch. Each variant brings its own admission reads, approval binding, intent payload and verification. The two variants share no defaulted behaviour.
+
+**What still cannot be sent.**
+
+- Deletes of any master.
+- Openings.
+- Stock-in-Hand ledgers.
+- TDS and TCS ledgers where those features are on.
+- Caller-supplied XML. Requests are rendered by Bridge.
+- Any class not named above.
+
+**Rules that carry over unchanged.**
+
+- Every write is approved in the native dialog. A master dialog lists one master per item and refuses rather than cuts at the existing caps, so a large class is approved in parts.
+- The company is pinned by its full identity tuple. The company name in the import request is never treated as a guard.
+- Success is decided by reading back, never by Tally's counters. Counters and the company's master mark (`ALTMSTID`) are doubt signals only. Two master creates moved the mark by two (TALLY_PROTOCOL_REFERENCE §10, VERIFIED), and a gateway ledger rename by one (§11c.5, VERIFIED, synthetic company). On screen, a ledger create, regroup, opening change and delete each moved it by one (§11c.5, VERIFIED, one run each), and renaming the base currency and restoring it moved it by two, then one (§11c.5, PARTIAL). The earlier lines above that call a regroup's step not yet measured predate those screen runs. The step for a list alter and a voucher-type write is not measured, so a step other than the expected one is recorded as doubt, and only reading back decides.
+- An outcome unknown after bytes were sent is never re-sent. It is reconciled by reading back.
+
+**The dated deviation.** On 3 Oct 2026 the owner chose a different write shape, recorded here for the first time: a ledger was to be created in two requests, a Create carrying only the name and parent, then an Alter setting its other fields, subject to a lab run. That run has not been made. One reason for leaving it is measured: a ledger's GST duty head is settable at Create and silently not settable at Alter (TALLY_PROTOCOL_REFERENCE §8.3, measured both ways). Two are design judgements: it takes two writes where one approval covers one request, and it can leave a ledger half made. This amendment instead creates a ledger with one direct Create, under four conditions:
+
+1. **Before.** An absence check runs inside the queue, over every ledger and group name and alias.
+2. **Before.** The company's master mark must be unchanged from the binding read to the last read before the request.
+3. **After.** Each created name must resolve to a master that did not exist before, and the counters must show only creates. A name that resolves to an existing master, a counted `ALTERED`, or a mark step other than the expected one is reported for reconciliation, never as created. No import option such as `IMPORTDUPS` is sent: with `@@DupIgnoreCombine` an identical re-sent Create was still counted `ALTERED` (TALLY_PROTOCOL_REFERENCE §9.4g, PARTIAL, one run per envelope).
+4. **Owner's acceptance.** Between the last read and the request, no read can close the window. A ledger created there by someone else under the same name is not refused: it is overwritten in place. A Create on an existing name replaced that ledger's parent and bill-wise flag, changed together in one run, and was counted `CREATED 0, ALTERED 1`; an opening balance was replaced when one was supplied, and kept when omitted in a Create that changed nothing else (TALLY_PROTOCOL_REFERENCE §9.4g, PARTIAL, one Silver company, one run each; IMPLEMENTATION_GUIDE §3.6). An omitted opening alongside a parent or bill-wise change, which is what Bridge's Create would send, is not measured, nor are other fields. The overwrite keeps the other ledger's GUID, which the earlier read never saw, so the name check cannot tell it from a create. Only the `ALTERED` counter and a mark step larger than one create's (the other person's create also moves it) can show it, and both are signals, not proof. Its earlier values were never read, so nothing can restore them. The owner accepts that consequence, not an unnamed window.
+
+**List fields.** An Alter that carried a stock item's GST list replaced the whole list, on one book, once (TALLY_PROTOCOL_REFERENCE §9.4a); a ledger's lists are not measured and are treated the same. So a list is sent as exported, with any new dated entry added, under a check that the ledger is unchanged since it was read. The result is verified by comparing the whole ledger before and after.
+
+**Not measured.** All of these remain unmeasured:
+
+- How Tally resolves a new name against an existing alias, a case or space variant, or a group of the same name.
+- Whether a ledger's registration history is appended or replaced by an Alter.
+- Any write of a sales ledger's GST rate and HSN lists.
+- Every voucher-type write.
+- The class-batch dialog seen live.
+- The master mark's step for a list alter or a voucher type.
+- What else a Create on an existing name replaces (a GSTIN, a ledger's GST lists) beyond the three fields §9.4g measured.
+
+Each slice names the lab measurement it waits on.

@@ -54,6 +54,7 @@ fn source() -> PartyLedgerMasterSource {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").unwrap(),
         to: TallyDate::parse("20260731").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260731").unwrap()),
         last_voucher_date: TallyDate::parse("20260731").unwrap(),
         rows: vec![PartyLedgerMasterRow {
             name: "Customer".to_string(),
@@ -173,6 +174,7 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20250401").unwrap(),
         to: TallyDate::parse("20260331").unwrap(),
+        balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse("20260331").unwrap()),
         last_voucher_date: TallyDate::parse("20260331").unwrap(),
         rows,
         request_sha256: "0".repeat(64),
@@ -273,5 +275,67 @@ fn a_later_dated_voucher_note_names_both_dates_and_claims_neither_count_nor_caus
         let mut source = source();
         source.last_voucher_date = TallyDate::parse(last).unwrap();
         assert_eq!(source.later_dated_vouchers_note(), None, "{last}");
+    }
+}
+
+#[test]
+fn notes_carry_their_kind_the_moved_date_first_and_only_a_typed_date_can_move() {
+    let mut typed = source();
+    typed.to = TallyDate::parse("20260831").unwrap();
+    typed.last_voucher_date = TallyDate::parse("20260907").unwrap();
+    typed.balance_date_basis = BalanceDateBasis::Requested(TallyDate::parse("20260815").unwrap());
+    let kinds = |source: &PartyLedgerMasterSource| {
+        source
+            .notes()
+            .iter()
+            .map(|note| note.kind)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        kinds(&typed),
+        vec![SourceNoteKind::DateMoved, SourceNoteKind::LaterDatedVoucher]
+    );
+    let moved = typed.date_moved_note().unwrap();
+    assert!(
+        moved.contains("20260815") && moved.contains("20260831"),
+        "{moved}"
+    );
+    // The later-dated note names the chosen date, not this computer's.
+    let later = typed.later_dated_vouchers_note().unwrap();
+    assert!(
+        later.contains("20260815") && !later.contains("computer"),
+        "{later}"
+    );
+
+    // The host's own date is never "moved": its rule is the #875 one.
+    let mut host = typed.clone();
+    host.balance_date_basis = BalanceDateBasis::HostToday(TallyDate::parse("20260815").unwrap());
+    assert_eq!(kinds(&host), vec![SourceNoteKind::LaterDatedVoucher]);
+    assert!(host
+        .later_dated_vouchers_note()
+        .unwrap()
+        .contains("computer"));
+
+    // A chosen boundary date, with nothing dated after it, says nothing.
+    typed.balance_date_basis = BalanceDateBasis::Requested(typed.to.clone());
+    typed.last_voucher_date = typed.to.clone();
+    assert!(kinds(&typed).is_empty());
+    assert_eq!(typed.notes_text(), None);
+}
+
+#[test]
+fn a_note_serialises_with_the_kind_the_app_reads() {
+    for (kind, name) in [
+        (SourceNoteKind::LaterDatedVoucher, "later_dated_voucher"),
+        (SourceNoteKind::DateMoved, "date_moved"),
+    ] {
+        let note = SourceNote {
+            kind,
+            text: "synthetic".to_string(),
+        };
+        assert_eq!(
+            serde_json::to_value(&note).unwrap(),
+            serde_json::json!({ "kind": name, "text": "synthetic" })
+        );
     }
 }

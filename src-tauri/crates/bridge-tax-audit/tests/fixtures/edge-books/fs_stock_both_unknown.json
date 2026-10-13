@@ -1,0 +1,127 @@
+{
+ "comment": "financial_statements (#1505): integrated inventory, neither stock term known. No gross or net profit is shown, no stock figure either, and the book shows the fewest figures the test can emit (the registry's floor).",
+ "groups": {
+  "Bank Accounts": null,
+  "Capital Account": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts"
+   ],
+   "guid": "edge-bank"
+  },
+  {
+   "name": "Owner Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-owner-capital"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sales"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-purchases"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-rent"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 1200000,
+   "closing": 800000
+  },
+  {
+   "ledger": "Owner Capital",
+   "opening": -800000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -800000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 0,
+   "closing": 1000000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "fs-v1",
+   "date": "2025-06-02",
+   "base_type": "Sales",
+   "lines": [
+    [
+     "Bank",
+     2000000
+    ],
+    [
+     "Sales",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "fs-v2",
+   "date": "2025-06-09",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Purchases",
+     1000000
+    ],
+    [
+     "Rent",
+     200000
+    ],
+    [
+     "Bank",
+     -1200000
+    ]
+   ]
+  }
+ ],
+ "cash": [],
+ "bank": [],
+ "opening_stock": "not read",
+ "closing_stock": "not read",
+ "tests": [
+  "financial_statements"
+ ]
+}

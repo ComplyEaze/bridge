@@ -28,21 +28,43 @@ use tokio_util::sync::CancellationToken;
 
 use super::connection::DirectCompanyBootstrapError;
 use super::runtime::{TallyRuntimeControlError, TallyRuntimeReadError};
+use super::runtime_control::ReadRetryPolicy;
 use super::{
     TallyCompany, TallyConfig, TallyRuntime, VerifiedCompanyIdentity, VerifiedCompanyIdentityError,
 };
 
 const CORE_QUERY_PROFILE: &str = "core_accounting_v3";
 
-pub(super) struct SealedReadRequest(String);
+/// One connector read, sealed with whether it may be sent again. There is no
+/// default: each call site names which of the two it sends.
+pub(super) struct SealedReadRequest {
+    xml: String,
+    retry: ReadRetryPolicy,
+}
 
 impl SealedReadRequest {
-    fn from_connector_profile(xml: String) -> Self {
-        Self(xml)
+    /// A small read: the book-extent pair or the company list. It is cheap to
+    /// send again, and a snapshot run that fails on one cannot be resumed, so
+    /// it keeps the retry.
+    fn small_read(xml: String) -> Self {
+        Self {
+            xml,
+            retry: ReadRetryPolicy::transient_default(),
+        }
     }
 
-    pub(super) fn into_xml(self) -> String {
-        self.0
+    /// A collection export, whose answer grows with the book. It is sent once:
+    /// the gateway serialises, and a second copy would ask it while it may
+    /// still be building the first (IMPLEMENTATION_GUIDE rule I7).
+    fn export(xml: String) -> Self {
+        Self {
+            xml,
+            retry: ReadRetryPolicy::SINGLE_ATTEMPT,
+        }
+    }
+
+    pub(super) fn into_parts(self) -> (String, ReadRetryPolicy) {
+        (self.xml, self.retry)
     }
 }
 
@@ -111,7 +133,7 @@ impl RuntimeTallyConnector {
 
     async fn post_xml_validated<P>(
         &self,
-        request_xml: String,
+        request: SealedReadRequest,
         validate_application_response: P,
     ) -> Result<String, TallyError>
     where
@@ -120,7 +142,7 @@ impl RuntimeTallyConnector {
         self.runtime
             .post_xml_cancellable_validated(
                 self.config.clone(),
-                SealedReadRequest::from_connector_profile(request_xml),
+                request,
                 self.cancellation.clone(),
                 validate_application_response,
             )
@@ -168,7 +190,7 @@ impl RuntimeTallyConnector {
         let opening_extent = self.read_pinned_company_book_extent(identity).await?;
         let native_group_request = render_native_group_snapshot_request(&company_name);
         let first_group_xml = self
-            .post_xml_validated(native_group_request.clone(), {
+            .post_xml_validated(SealedReadRequest::export(native_group_request.clone()), {
                 let validation_guid = expected_guid.clone();
                 move |xml| {
                     parse_native_group_source_records_with_evidence(xml, &validation_guid).is_ok()
@@ -176,7 +198,7 @@ impl RuntimeTallyConnector {
             })
             .await?;
         let second_group_xml = self
-            .post_xml_validated(native_group_request, {
+            .post_xml_validated(SealedReadRequest::export(native_group_request), {
                 let validation_guid = expected_guid.clone();
                 move |xml| {
                     parse_native_group_source_records_with_evidence(xml, &validation_guid).is_ok()
@@ -208,15 +230,21 @@ impl RuntimeTallyConnector {
             render_native_ledger_export_request(&company_name, &ledger_period);
         let validation_guid = expected_guid.clone();
         let first_ledger_xml = self
-            .post_xml_validated(native_ledger_request.clone(), move |xml| {
-                parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
-            })
+            .post_xml_validated(
+                SealedReadRequest::export(native_ledger_request.clone()),
+                move |xml| {
+                    parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
+                },
+            )
             .await?;
         let validation_guid = expected_guid.clone();
         let second_ledger_xml = self
-            .post_xml_validated(native_ledger_request, move |xml| {
-                parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
-            })
+            .post_xml_validated(
+                SealedReadRequest::export(native_ledger_request),
+                move |xml| {
+                    parse_native_ledger_source_records_with_evidence(xml, &validation_guid).is_ok()
+                },
+            )
             .await?;
         if first_ledger_xml != second_ledger_xml {
             return Err(invalid_data("native_ledger_snapshot_drifted"));
@@ -232,7 +260,7 @@ impl RuntimeTallyConnector {
         let validation_guid = expected_guid.clone();
         let voucher_type_xml = self
             .post_xml_validated(
-                render_native_voucher_type_export_request(&company_name),
+                SealedReadRequest::export(render_native_voucher_type_export_request(&company_name)),
                 move |xml| {
                     parse_native_voucher_type_source_records_with_evidence(xml, &validation_guid)
                         .is_ok()
@@ -260,11 +288,11 @@ impl RuntimeTallyConnector {
         let validation_guid = expected_guid.clone();
         let voucher_xml = self
             .post_xml_validated(
-                render_native_voucher_export_request(
+                SealedReadRequest::export(render_native_voucher_export_request(
                     &company_name,
                     &voucher_window_from,
                     &voucher_window_to,
-                ),
+                )),
                 move |xml| {
                     parse_native_voucher_source_records_with_evidence(xml, &validation_guid).is_ok()
                 },
@@ -297,14 +325,14 @@ impl RuntimeTallyConnector {
         // Parse the first before asking again: a wrong company ends the read
         // without a second request.
         let first_xml = self
-            .post_xml_validated(request.clone(), |xml| {
+            .post_xml_validated(SealedReadRequest::small_read(request.clone()), |xml| {
                 extent_response_is_well_formed(xml, &expectation)
             })
             .await?;
         let first = parse_company_book_extent_v2(&first_xml, &expectation)
             .map_err(|_| invalid_data("company_identity_mismatch"))?;
         let second_xml = self
-            .post_xml_validated(request, |xml| {
+            .post_xml_validated(SealedReadRequest::small_read(request), |xml| {
                 extent_response_is_well_formed(xml, &expectation)
             })
             .await?;
@@ -475,9 +503,10 @@ impl TallyConnector for RuntimeTallyConnector {
         let lineage = source_lineage(&self.config)?;
         let companies = parse_companies_from_collection(
             &self
-                .post_xml_validated(ReadOnlyProfile::CompanyListV2.render(), |xml| {
-                    parse_companies_from_collection(xml).is_ok()
-                })
+                .post_xml_validated(
+                    SealedReadRequest::small_read(ReadOnlyProfile::CompanyListV2.render()),
+                    |xml| parse_companies_from_collection(xml).is_ok(),
+                )
                 .await?,
         )
         .map_err(|_| protocol_error("company_export_invalid"))?;

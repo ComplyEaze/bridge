@@ -302,8 +302,8 @@ against `CONTENT-LENGTH`).
   of vouchers; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post. A file
   of two vouchers and a voucher that carries a number were measured later the same day (next
   paragraph), and after them one numberless Journal dated 19 July, between the Journals of the
-  book, under "Renumber Vouchers" (the paragraph after that), which is all that is measured of a
-  Journal under that setting.
+  book, under "Renumber Vouchers" (the paragraph after that), which is all that is measured of an
+  imported Journal under that setting.
 
 **A file of two vouchers, and a voucher that carries a number, each changed numbers already in
 the book under "Renumber Vouchers", and neither supplied number was kept: verified 2026-10-13 on
@@ -342,11 +342,12 @@ supplied numbers were text with letters, not held by any voucher of the book.
   Receipt type screen, and that Tally asked the same two confirmations at each.
 - **Not established:** a file of more than two vouchers; a file that mixes numbered and numberless
   vouchers; a supplied number made of digits only; a number that an existing voucher already holds;
-  a supplied number under Manual with duplicates allowed; Journal, Payment and Contra (a numbered
-  Journal, or a file of two, under "Renumber Vouchers" included); a deletion; a type holding more
-  than a handful of vouchers; Gold; other releases; macOS; the same through ComplyEaze Bridge's
-  own post. A supplied number under Automatic (Manual Override), and one numberless Journal under
-  "Renumber Vouchers", were measured later the same day (next paragraph).
+  Journal, Payment and Contra (a numbered Journal, or a file of two, under "Renumber Vouchers"
+  included); a deletion; a type holding more than a handful of vouchers; Gold; other releases;
+  macOS; the same through ComplyEaze Bridge's own post. A supplied number under Automatic (Manual
+  Override), and one numberless Journal under "Renumber Vouchers", were measured later the same day
+  (next paragraph), and a supplied number under Manual with duplicates allowed in a later run (the
+  paragraph after that).
 
 **"Automatic (Manual Override)" kept a supplied number and gave a numberless voucher none, and a
 back-dated import renumbered Journals under "Renumber Vouchers": verified 2026-10-13 on one book
@@ -391,17 +392,73 @@ are from that branch's notes. This method is a value of its own in the series an
   blanked the numbers of that type's three vouchers, as the switch to Manual blanked a type's
   numbers on 12 October (below). The renumbering under "Renumber Vouchers" also happened on the
   Journal type.
-- From that branch's notes, not from an answer: that Tally asked the same two confirmations at
-  each of the three saves; and that at the first save, once the method was chosen, the type
-  screen no longer showed "Numbering behaviour on insertion/deletion", showed "Prevent creating
-  duplicate Voucher Nos." with No in its place, and showed "Show unused vch nos. in transactions
-  for Retain Original Voucher No. behaviour" gone from Yes to greyed out, reading No.
-- **Not established:** a back-dated voucher under "Automatic (Manual Override)"; a supplied number
-  made of digits only; a number that an existing voucher already holds, with duplicates allowed or
-  prevented; a voucher entered by hand under that method; under "Renumber Vouchers", a Journal
-  that carries a number, a Journal dated after every other, and a file of several; a Journal
-  imported under `Auto Retain` with an earlier date; Multi-user Auto; Payment and Contra; a
-  deletion; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post.
+- From that branch's notes, not from an answer: that Tally asked the same two confirmations at each
+  of the three saves; and that at the first save, once the method was chosen, the type screen no
+  longer showed "Numbering behaviour on insertion/deletion", showed "Prevent creating duplicate
+  Voucher Nos." with No in its place, and showed "Show unused vch nos. in transactions for Retain
+  Original Voucher No. behaviour" gone from Yes to greyed out, reading No. - **Not established:** a
+  back-dated voucher WITHOUT a number under "Automatic (Manual Override)"; a supplied number made
+  of digits only; a number that an existing voucher already holds, with duplicates prevented; a
+  voucher entered by hand under that method; under "Renumber Vouchers", a Journal that carries a
+  number, a Journal dated after every other, and a file of several; a Journal imported raw under
+  `Auto Retain` with an earlier date; Multi-user Auto; Payment and Contra; a deletion; Gold; other
+  releases; macOS; the same through ComplyEaze Bridge's own post. A back-dated numbered voucher,
+  and a number that another voucher already holds, were measured under this method in a later run,
+  with duplicates allowed (next paragraph).
+
+**A voucher's own number was kept under Manual with duplicates allowed and under "Automatic
+(Manual Override)", also when back-dated and when another voucher already held it: verified
+2026-10-14 on one book (PARTIAL).** On the same synthetic book, restored again, six vouchers were
+sent by import, one per step, each carrying one `VOUCHERNUMBER` element where ComplyEaze Bridge's
+builder places it (read in the builder's code) and a new `REMOTEID` (branch
+`lab/724-m9l-held-and-backdated-number-answers`, `8788d89f`, bridge#724; every figure was read
+from the marks, voucher, series and import answers with an XML parser, with each size checked
+against `CONTENT-LENGTH`). The first three were Payments, into the Payment type as it stood: its
+series read `Manual` with `PREVENTDUPLICATES` `No`, and it held two Payments that both read
+number 1. The last three were Journals, after the Journal type's series had been changed to
+`Automatic (Manual Override)`, also with `PREVENTDUPLICATES` `No`. That the change was a save of
+Tally's own Journal type screen, and that the book was put back between the halves and at the
+end by restoring one backup, are from that branch's notes; the answers show the marks, the series
+and the twelve vouchers reading as at the start both times.
+
+- **VERIFIED, Manual with duplicates allowed (Payment):** a Payment carrying `M9L-P1`, dated after
+  both Payments of the book, read back `M9L-P1`. One carrying `M9L-P2`, dated before both, read
+  back `M9L-P2`. One carrying `M9L-P1` again was created as a second voucher reading `M9L-P1`,
+  with its own `MASTERID`, and the first was unchanged. Each answer read `CREATED` 1, `ALTERED` 0.
+- **VERIFIED, "Automatic (Manual Override)" with duplicates allowed (Journal):** the same three
+  cases gave the same three results: `M9L-J1` was kept; `M9L-J2`, dated before every Journal of
+  the book, was kept; `M9L-J1` again was created as a second voucher beside the first. Each answer
+  read `CREATED` 1, `ALTERED` 0. As on the run above, the change of method left the three Journals
+  of the book with an empty `VOUCHERNUMBER` element.
+- **VERIFIED:** at no import did a voucher already in the book change its number, `ALTERID`,
+  `MASTERID` or GUID. `ALTVCHID` rose by one at each import. `ALTMSTID` moved at no import; it
+  moved by 2 at the change of method. All 24 series rows read the same before and after the three
+  Payment imports, and at every voucher read the vouchers of a type other than the one being
+  imported into read as at the start.
+- **VERIFIED, one entry in a series row:** after the three Journal imports the Journal type's
+  series held, inside `RESTARTFROMLIST.LIST/LASTNUMBERLIST.LIST`, a `DATE` reading `20260401` and a
+  `LASTNUMBER` reading `0`. The same request sent again returned the same bytes, and no other
+  element of the 24 rows differed from the read before the imports. That list was an empty element
+  in the series answer read after the change of method and before the imports, in the one read
+  straight after the three Payment imports under Manual, and in every series answer of the five
+  earlier runs on this book cited in this section; none of those earlier answers was read straight
+  after an import, so they do not show what an import under `Auto Retain` or `Auto Renumber` leaves
+  there. **Not established:** which of the three imports wrote it (no series answer was read
+  between them); whether a voucher without a number writes it (the run above read no series after
+  its imports under this method); what Tally uses it for.
+- So on this run, with duplicates allowed, both methods stored the number an import carried,
+  whether it was dated after or before every other voucher of its type, and a number that another
+  voucher already held gave a second voucher with the same number, with nothing in the import's
+  answer to show it.
+- From that branch's notes, not from an answer: that the save of the type screen asked the same two
+  confirmations as on the runs above, and that the same three lines of that screen changed with the
+  method as on the run above.
+- **Not established:** "Prevent creating duplicate Voucher Nos." set to Yes under either method,
+  with a number already held; a Journal under Manual and a Payment under "Automatic (Manual
+  Override)" (a supplied number was measured under each method on one voucher type); a supplied
+  number made of digits only; a voucher without a number under Manual with duplicates allowed, by a
+  raw import or back-dated; Multi-user Auto; a file of several vouchers; a deletion; Gold; other
+  releases; macOS; the same through ComplyEaze Bridge's own post.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**

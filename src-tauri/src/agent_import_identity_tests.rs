@@ -306,19 +306,46 @@ fn binding(guid_suffix: &str, master_id: u64) -> Vec<span_identity::PostedVouche
 }
 
 /// A bound voucher is found by its GUID first, ahead of the narration tag the
-/// capture also carries.
+/// capture also carries. The capture predates untagged native posts, so its
+/// row is given the narration an untagged post writes; kept as captured, with
+/// its tag, the bound row's narration differs from what this post wrote and
+/// reads divergent (#1608).
 #[test]
 fn a_bound_voucher_is_attributed_by_its_guid_first() {
-    let (source, line) = captured_journal_and_line();
+    let (captured, line) = captured_journal_and_line();
+    let untagged = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = line.vouchers[0].narration.clone();
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
     let result = verify_batch(
         &line,
-        &source,
+        &untagged,
         Attribution::Span(Some(&binding("00000005", 5))),
     )
     .unwrap();
-    assert_eq!(result["counts"]["posted_verified"], 1);
+    assert_eq!(result["counts"]["posted_verified"], 1, "{result}");
     assert_eq!(result["vouchers"][0]["marker"], "post_span_binding");
     assert_eq!(result["duplicates"], json!([]));
+    let tagged = verify_batch(
+        &line,
+        &captured,
+        Attribution::Span(Some(&binding("00000005", 5))),
+    )
+    .unwrap();
+    assert_eq!(
+        tagged["vouchers"][0]["status"], "posted_divergent",
+        "{tagged}"
+    );
+    assert_eq!(tagged["vouchers"][0]["diffs"], json!(["narration"]));
+    let source = untagged;
     // A binding whose GUID the window does not hold is `bound_not_in_window`,
     // even beside a matching tag: the binding ranks first and a tag never
     // overrides it, so the disagreement stays unverified (loud).
@@ -329,6 +356,102 @@ fn a_bound_voucher_is_attributed_by_its_guid_first() {
     )
     .unwrap();
     assert_eq!(elsewhere["vouchers"][0]["status"], "bound_not_in_window");
+}
+
+/// One narration comparison for the read-back, the span binding and the
+/// amendment check (#1608): the text as written (trimmed, with its tag when it
+/// carried one) against the text read, byte for byte. A narration Tally holds
+/// none of equals only an empty one written; it never equals written text.
+#[test]
+fn a_narration_is_compared_as_written() {
+    use verification::narration_differs as differs;
+    let (_, line) = captured_journal_and_line();
+    let mut voucher = line.vouchers[0].clone();
+    voucher.narration = Some("  Rent for July  ".into());
+    let untagged = WrittenNarration::Untagged;
+    let tagged = WrittenNarration::Tagged("tag-1");
+    assert!(!differs(&voucher, untagged, Some("Rent for July")));
+    assert!(differs(&voucher, untagged, Some("Rent for July ")));
+    assert!(differs(&voucher, untagged, Some("Rent for june")));
+    assert!(differs(&voucher, untagged, None));
+    assert!(!differs(
+        &voucher,
+        tagged,
+        Some("Rent for July [BRIDGE:tag-1]")
+    ));
+    assert!(differs(&voucher, tagged, Some("Rent for July")));
+    assert!(differs(
+        &voucher,
+        tagged,
+        Some("Rent for July [BRIDGE:tag-2]")
+    ));
+    voucher.narration = None;
+    assert!(!differs(&voucher, untagged, None));
+    assert!(!differs(&voucher, untagged, Some("")));
+    assert!(differs(&voucher, untagged, Some("Edited")));
+    assert!(!differs(&voucher, tagged, Some("[BRIDGE:tag-1]")));
+}
+
+/// A voucher whose narration was edited in Tally reads `posted_divergent`,
+/// with the narration named in its diffs, on the tag basis as on a binding
+/// (#1608). Before, every other field matched and it read verified.
+#[test]
+fn a_narration_edited_in_tally_reads_divergent() {
+    let (captured, line) = captured_journal_and_line();
+    let edited = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = row
+                    .narration
+                    .map(|text| text.replacen("qualification", "qualifying", 1));
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
+    let result = verify_batch(&line, &edited, Attribution::Tag).unwrap();
+    assert_eq!(
+        result["vouchers"][0]["status"], "posted_divergent",
+        "{result}"
+    );
+    assert_eq!(result["vouchers"][0]["diffs"], json!(["narration"]));
+    assert_eq!(result["counts"]["posted_verified"], 0);
+}
+
+/// A voucher matched by its content only is compared against the narration
+/// its batch wrote, and only reports it (#1608): an untagged row reads as a
+/// native post wrote it, so a native batch lists nothing, while a file's batch,
+/// which wrote the tag, lists the narration the row lacks.
+#[test]
+fn a_content_match_reports_the_narration_its_batch_wrote() {
+    let (captured, line) = captured_journal_and_line();
+    let untagged = ImportReadSource::admit(
+        captured
+            .rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.narration = line.vouchers[0].narration.clone();
+                row
+            })
+            .collect(),
+    )
+    .unwrap();
+    let native = verify_batch(&line, &untagged, Attribution::Span(None)).unwrap();
+    assert_eq!(
+        native["vouchers"][0]["status"], "matching_content_observed",
+        "{native}"
+    );
+    assert_eq!(native["vouchers"][0]["diffs"], json!([]));
+    let file = verify_batch(&line, &untagged, Attribution::Tag).unwrap();
+    assert_eq!(
+        file["vouchers"][0]["status"], "matching_content_observed",
+        "{file}"
+    );
+    assert_eq!(file["vouchers"][0]["diffs"], json!(["narration"]));
 }
 
 /// The GUID found the row, but its MasterID is not the one bound: refused,

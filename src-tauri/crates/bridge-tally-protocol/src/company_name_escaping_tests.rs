@@ -22,7 +22,7 @@ use crate::native_stock_summary::{
     render_company_inventory_flags_request, render_native_stock_summary_request,
 };
 use crate::native_trial_balance::render_native_trial_balance_request;
-use crate::outstandings_shared::{render_company_book_extent, DateBoundaryProfile};
+use crate::outstandings_shared::{render_company_book_extent_v2, DateBoundaryProfile};
 use crate::xml_read_profiles::compatibility::ledgers_request;
 use crate::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
 
@@ -105,8 +105,8 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
             render_native_trial_balance_request(NAME, &period),
         ),
         (
-            "outstandings_shared::render_company_book_extent",
-            render_company_book_extent(NAME),
+            "outstandings_shared::render_company_book_extent_v2",
+            render_company_book_extent_v2(NAME),
         ),
     ];
     for (label, request) in requests {

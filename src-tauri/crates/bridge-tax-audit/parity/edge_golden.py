@@ -68,7 +68,7 @@ meaning none supplied, and none supplied with the reader's reason when that read
 `[roles].counterparty_type_by_ledger`; default {}) and `s194n_recipient_type` (one of the module's two
 recipient constants or "unknown"; absent meaning derived from `entity_type` as pack.py derives it); and
 for `cash_payments_40a3`: `loan_ledgers` and `round_off_ledgers` (default []); for `entity_269st_gap`: `party_identity` (the engagement's own
-[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for any test, `opening_stock` (POP-3's opening-stock term: integer paise, debit positive, or the reason it is unknown; absent meaning none applies); for `books_examined`: `documents_read` (the
+[party_identity] table, default {}), `round_off_ledgers`, and per ledger `pan` and `gstin` (default ""); for `read_scope`: `currency_read` (default false); for any test, `opening_stock` (POP-3's opening-stock term: integer paise, debit positive, or the reason it is unknown; absent meaning none applies) and `closing_stock` (`financial_statements`' closing-stock term, the same shape); for `books_examined`: `documents_read` (the
 names of the documents the pack loaded, in its order: a list of text, default []); for `clause21a_candidates`:
 `clause21a_extra_terms` (the client's `[clause21a].extra_terms`, read by the reference's own reader; absent meaning
 none) and `partners` (as for `partners_40b_194t`; its interest and remuneration ledgers, as pack.py takes them); for `clause44`:
@@ -110,7 +110,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-                                 creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
+                                 creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules, related_parties_config
@@ -175,6 +175,16 @@ def main() -> int:
         from tae.model import OPENING_STOCK_NOT_AT_BOOKS_START, OPENING_STOCK_NOT_READ, OPENING_STOCK_UNREADABLE
         reasons = (OPENING_STOCK_NOT_READ, OPENING_STOCK_NOT_AT_BOOKS_START, OPENING_STOCK_UNREADABLE)
         extra["opening_stock"] = typed(spec, "opening_stock",
+                                       lambda x: (isinstance(x, int) and not isinstance(x, bool)) or x in reasons,
+                                       "integer paise or a reason", nullable=False)
+    # financial_statements' closing-stock term (#1505), passed only when the book names it, as opening_stock is.
+    if "closing_stock" in spec:
+        from tae.model import (CLOSING_STOCK_NO_STOCK_ITEMS, CLOSING_STOCK_NO_SUMMARY_AT_PERIOD_END,
+                               CLOSING_STOCK_NOT_READ, CLOSING_STOCK_SEVERAL_SUMMARIES_AT_PERIOD_END,
+                               CLOSING_STOCK_UNREADABLE)
+        reasons = (CLOSING_STOCK_NOT_READ, CLOSING_STOCK_NO_SUMMARY_AT_PERIOD_END, CLOSING_STOCK_UNREADABLE,
+                   CLOSING_STOCK_NO_STOCK_ITEMS, CLOSING_STOCK_SEVERAL_SUMMARIES_AT_PERIOD_END)
+        extra["closing_stock"] = typed(spec, "closing_stock",
                                        lambda x: (isinstance(x, int) and not isinstance(x, bool)) or x in reasons,
                                        "integer paise or a reason", nullable=False)
     book = Book(company_name="Invented edge book",
@@ -468,6 +478,8 @@ def main() -> int:
         "entity_269st_gap": lambda: (entity_269st_gap, entity_269st_gap.run(
             eng, rules, cash, bank, build_party_index(book, {"party_identity": spec.get("party_identity", {})}),
             round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
+        # As tests/edge_books.rs runs it: no partners' interest ledgers and no report totals.
+        "financial_statements": lambda: (financial_statements, financial_statements.run(eng, rules)),
         "high_value_register": high_value_register_run,
         "knock_off_candidates": knock_off_candidates_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),

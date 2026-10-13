@@ -18,14 +18,8 @@ const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[r
 const expected = new Set([
   "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_company_list|Company Report",
   "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|BRIDGE Ledger Export V1",
-  "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_vouchers|BRIDGE Voucher Export V2",
-  "custom-report|src-tauri/src/tally/tdl_engine.rs::groups_request|BRIDGE Group Export V1",
-  "custom-report|src-tauri/src/tally/tdl_engine.rs::ledger_period_balances_request|BRIDGE Ledger Period Balances V1",
   "custom-report|src-tauri/src/tally/tdl_engine.rs::legacy_company_list_request|Company Report",
   "function-argument-with-space|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|$$NumItems:BRIDGE Ledger Collection V1",
-  "function-argument-with-space|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_vouchers|$$NumItems:BRIDGE Voucher Collection V1",
-  "function-argument-with-space|src-tauri/src/tally/tdl_engine.rs::groups_request|$$NumItems:BRIDGE Group Collection V1",
-  "function-argument-with-space|src-tauri/src/tally/tdl_engine.rs::ledger_period_balances_request|$$NumItems:BRIDGE Ledger Period Collection V1",
 ]);
 
 // Method and function names whose value is money, by suffix. A money method

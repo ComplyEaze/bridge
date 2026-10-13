@@ -91,7 +91,7 @@ fn identity(xml: &str) -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        GUID.into(),
+        crate::tally::test_company_guid(GUID),
         company.company_number.clone().unwrap(),
         company.books_from.clone().unwrap(),
         &companies,

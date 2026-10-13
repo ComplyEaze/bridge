@@ -39,11 +39,6 @@ impl MirrorKeyStore for FakeKeyStore {
         *self.key.lock().expect("fake key store lock") = Some(key.to_vec());
         Ok(())
     }
-
-    fn delete(&self) -> anyhow::Result<()> {
-        *self.key.lock().expect("fake key store lock") = None;
-        Ok(())
-    }
 }
 
 fn mirror_artifacts(database: &Path) -> Vec<PathBuf> {
@@ -98,9 +93,14 @@ fn creates_a_key_only_for_a_new_mirror() {
     let database = directory.path().join("mirror.db");
     let store = FakeKeyStore::default();
     let resolved = resolve_mirror_key(&database, &store).expect("resolve new key");
-    assert!(resolved.created);
     assert_eq!(resolved.key.len(), MIRROR_KEY_BYTES);
     assert!(store.load().expect("reload key").is_some());
+    let reused = resolve_mirror_key(&database, &store).expect("resolve stored key");
+    assert_eq!(
+        reused.key.as_slice(),
+        resolved.key.as_slice(),
+        "a stored key is reused, not replaced"
+    );
 }
 
 #[test]

@@ -51,7 +51,8 @@ pub struct PartyLedgerMasterFields {
     pub gst_registrations: GstRegistrationHistory,
     /// The dated GST rate and taxability details (`GSTDETAILS.LIST`), when the
     /// request's FETCH names it. Not observed when the response carries no
-    /// such element. Nothing consumes it yet.
+    /// such element. Only the opt-in `include_gst_details` read of `ledger_masters`
+    /// returns it.
     #[serde(default)]
     pub gst_details: GstDetailsObservation,
 }

@@ -1803,6 +1803,11 @@ refused as `proposals_legacy` (parse the statement again).
   checks that Contra in Tally, because ComplyEaze Bridge cannot tell whether it
   is the row's other side: they keep the skip if it is, and may name the row in
   `withdraw_skips` if it is not.
+- **What `ambiguous` and `reversed_same_day` list.** The row is listed once
+  for each batch holding a Contra that could carry it, and ComplyEaze Bridge
+  does not choose among them: the person checks them in Tally. A
+  `reversed_same_day` row that no Contra matches is listed once, without a
+  `batch_id`.
 - **What `double_booked` compares.** Two Contras of one amount between the same
   two ledgers and the same way, one booked from each statement: where their
   references are equal, whatever their dates (the second build is refused as

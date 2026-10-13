@@ -107,7 +107,10 @@ fn summary_of(facts: &TransferFacts) -> TransferSummary {
     TransferSummary::of(facts, &view)
 }
 
-fn rows_of(summary: &TransferSummary) -> Vec<(String, String, &'static str, Option<String>)> {
+/// An open row as the summary lists it: id, date, state label and batch.
+type OpenListed = (String, String, &'static str, Option<String>);
+
+fn rows_of(summary: &TransferSummary) -> Vec<OpenListed> {
     let TransferSummary::Computed { open, .. } = summary else {
         panic!("a computed summary");
     };
@@ -212,7 +215,10 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
                 Some("batch-2")
             ),
             row("st-notfound", "20260107", "not_found", None),
-            row("st-ambiguous", "20260108", "ambiguous", None),
+            // one row for each batch that holds a Contra that could carry it
+            row("st-ambiguous", "20260108", "ambiguous", Some("batch-3")),
+            row("st-ambiguous", "20260108", "ambiguous", Some("batch-4")),
+            // nothing matches this one, so it names no batch
             row("st-reversed", "20260109", "reversed_same_day", None),
             // both Contras of the double booking, each naming the other batch
             row("t5", "20260110", "double_booked", Some("batch-6")),
@@ -239,6 +245,118 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
             ),
         ]
     );
+}
+
+fn open_count(summary: &TransferSummary) -> usize {
+    let TransferSummary::Computed { skips_open, .. } = summary else {
+        panic!("a computed summary");
+    };
+    *skips_open
+}
+
+fn listed(id: &str, day: &str, state: &'static str, batch: Option<&str>) -> OpenListed {
+    (
+        id.to_string(),
+        day.to_string(),
+        state,
+        batch.map(str::to_string),
+    )
+}
+
+#[test]
+fn a_row_more_than_one_contra_could_carry_is_listed_once_for_each_batch_holding_one() {
+    // three Contras of the row's day and amount, two of them in one batch
+    let facts = facts_of(
+        vec![skip("st-several", "20260108", "444.44")],
+        vec![
+            contra("batch-4", "t4", "20260108", "444.44"),
+            contra("batch-3", "t3", "20260108", "444.44"),
+            contra("batch-4", "t5", "20260108", "444.44"),
+        ],
+    );
+    let summary = summary_of(&facts);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed("st-several", "20260108", "ambiguous", Some("batch-3")),
+            listed("st-several", "20260108", "ambiguous", Some("batch-4")),
+        ]
+    );
+    // the row is one open skip, however many rows list it
+    assert_eq!(open_count(&summary), 1);
+}
+
+#[test]
+fn a_row_whose_amount_reverses_the_same_day_is_listed_once_for_each_batch_holding_a_candidate() {
+    let mut with_two = skip("st-reversed-two", "20260109", "555.55");
+    with_two.reversed_same_day = true;
+    let mut with_none = skip("st-reversed-none", "20260110", "556.55");
+    with_none.reversed_same_day = true;
+    let facts = facts_of(
+        vec![with_two, with_none],
+        vec![
+            contra("batch-6", "t6", "20260109", "555.55"),
+            contra("batch-5", "t5", "20260109", "555.55"),
+        ],
+    );
+    let summary = summary_of(&facts);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed(
+                "st-reversed-two",
+                "20260109",
+                "reversed_same_day",
+                Some("batch-5")
+            ),
+            listed(
+                "st-reversed-two",
+                "20260109",
+                "reversed_same_day",
+                Some("batch-6")
+            ),
+            // nothing matches this one: one row, and no batch
+            listed("st-reversed-none", "20260110", "reversed_same_day", None),
+        ]
+    );
+    assert_eq!(open_count(&summary), 2);
+}
+
+#[test]
+fn a_row_of_such_a_state_with_no_candidate_keeps_one_row_without_a_batch() {
+    let facts = facts_of(
+        vec![
+            skip("st-a", "20260108", "444.44"),
+            skip("st-b", "20260109", "555.55"),
+        ],
+        Vec::new(),
+    );
+    let view = TransferView {
+        skips: BTreeMap::from([
+            (
+                skip_key("st-a"),
+                SkipState::Ambiguous {
+                    candidates: Vec::new(),
+                },
+            ),
+            (
+                skip_key("st-b"),
+                SkipState::ReversedSameDay {
+                    candidates: Vec::new(),
+                },
+            ),
+        ]),
+        double_booked: Vec::new(),
+    };
+    let summary = TransferSummary::of(&facts, &view);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed("st-a", "20260108", "ambiguous", None),
+            listed("st-b", "20260109", "reversed_same_day", None),
+        ]
+    );
+    assert_eq!(open_count(&summary), 2);
 }
 
 #[test]

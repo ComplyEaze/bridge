@@ -1011,14 +1011,17 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
-        [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+            two_bank_plans(),
+        ]
+        .concat(),
     );
     // a row that pairs by reference, and one that two Contras could carry
-    rig.build(a_skips(
-        directory.path(),
-        &[(SKIPPED, None), (PAIRED, Some(REFERENCE))],
-    ))
-    .await;
+    let rows = [(SKIPPED, None), (PAIRED, Some(REFERENCE))];
+    rig.build(a_skips(directory.path(), &rows)).await;
     // bank B's statement books three equal Contras, all verified
     let built = rig
         .build(statement_v2(
@@ -1037,7 +1040,19 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
             ]),
         ))
         .await;
-    mark_found(directory.path(), built["batch_id"].as_str().unwrap());
+    let carrying = built["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrying);
+    // the row two Contras could carry is listed with the batch that holds them
+    let again = rig.build(a_skips(directory.path(), &rows)).await;
+    let section = &again["transfers"];
+    assert_eq!(section["skips_paired"], 1, "{again}");
+    assert_eq!(section["skips_open"], 1, "{again}");
+    assert_eq!(
+        open_rows(section),
+        vec![open_row(SKIPPED, "ambiguous", Some(&carrying))],
+        "{again}"
+    );
+    assert_nothing_secret(section);
     let built = rig.build(withdrawing(directory.path())).await;
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
@@ -1384,8 +1399,23 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
         } else {
             OTHER_BOOKED
         };
-        let second = rig.build(b_contras(directory.path(), &[second_row])).await;
-        let second = second["batch_id"].as_str().unwrap().to_string();
+        let second_built = rig.build(b_contras(directory.path(), &[second_row])).await;
+        let second = second_built["batch_id"].as_str().unwrap().to_string();
+        // the second build lists the row once for each of the two batches
+        let section = &second_built["transfers"];
+        let state = if case == "reversed" {
+            "reversed_same_day"
+        } else {
+            "ambiguous"
+        };
+        let mut listed = vec![
+            open_row(SKIPPED, state, Some(&first)),
+            open_row(SKIPPED, state, Some(&second)),
+        ];
+        listed.sort_by_key(|row| row["batch_id"].as_str().unwrap().to_string());
+        assert_eq!(open_rows(section), listed, "{case}: {second_built}");
+        assert_eq!(section["skips_open"], 1, "{case}: {second_built}");
+        assert_nothing_secret(section);
         if case != "two unsent" {
             mark_found(directory.path(), &first);
         }

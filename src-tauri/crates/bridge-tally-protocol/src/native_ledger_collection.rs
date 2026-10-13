@@ -1124,7 +1124,7 @@ fn read_mailing_details_entry(
                                 entry.address_lines = lines;
                             }
                         } else {
-                            let value = read_optional_text(reader, child.name())?;
+                            let value = read_mailing_scalar(reader, child.name())?;
                             if repeated {
                                 // A defect of this ledger's history, not of the read.
                                 entry.repeated_field = true;
@@ -1172,6 +1172,18 @@ fn read_mailing_details_entry(
     Ok(entry)
 }
 
+/// One mailing scalar's text, trimmed, empty as absent, as the sibling master
+/// fields read theirs; markup nested inside it fails the whole read instead of
+/// becoming part of an address line (`read_optional_text` would keep it as text).
+fn read_mailing_scalar(
+    reader: &mut Reader<&[u8]>,
+    name: QName<'_>,
+) -> anyhow::Result<Option<String>> {
+    let text = read_verbatim_text(reader, name)?;
+    let trimmed = text.trim();
+    Ok((!trimmed.is_empty()).then(|| trimmed.to_owned()))
+}
+
 /// The `ADDRESS` lines of one `ADDRESS.LIST`, in document order, and whether
 /// anything else was in it. A blank line is dropped; any other child, and any
 /// text directly in the list, is consumed and not kept (the flag is true).
@@ -1191,7 +1203,7 @@ fn read_mailing_address_lines(
                     .as_bytes()
                     .eq_ignore_ascii_case(b"ADDRESS")
                 {
-                    lines.extend(read_optional_text(reader, child.name())?);
+                    lines.extend(read_mailing_scalar(reader, child.name())?);
                 } else {
                     skipped = true;
                     let child_name = child.name().as_ref().to_owned();

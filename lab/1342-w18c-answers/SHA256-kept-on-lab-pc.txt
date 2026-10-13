@@ -1,0 +1,30 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+224302f5f125091916c4fa16d730348c6f945a423c123b9adfc447ec216ef639  95657  screenshots/01-w18c.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/02-w18c.png
+b4913abd026ce49aac59a3c641c00e7da5a541adb473482020bc6940049dc255  63278  screenshots/03-w18c.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/04-w18c.png
+63af633f84788db2c4c602175be1c7ba2c73233ac0bd9c90638a59de361cc146  45628  screenshots/05-w18c.png
+83c0691160a97f3e554c875b68abcf0142935490f24e48d2d306e4357f036082  51745  screenshots/06-w18c.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/07-w18c.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/08-w18c.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/09-w18c.png
+5e4655706f0b7a629c953e65a24c4d601a15978a5a1853068db5b1dd9f8dc7d2  45551  screenshots/10-w18c.png
+0b5b63fc415644792e6304f8168a2e85be7a874aa1f31c7ed33b72fad39527c9  51677  screenshots/11-w18c.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/12-w18c.png
+f427373a2f634a8b0df497d29f05d06b01a46693c1f1219ae8ce3cba08c16601  96291  screenshots/13-w18c.png
+af1ae8115f624423c297df8074192129ea8fdfb90394b65d34e2a8894d1e8bb7  226  backup-now.json
+cf9ae7e788b85d8a1b657d42378fc8bbfec49c6b3c230fe25152e1870e5bc279  90051  backups/W18C-NOW/TDBK1800_100033.001
+0eba92549fe985e5b7de5a4cfd52956a9cdebe41b6ef0ce02d86a85c1fb862c3  14804  working-log.txt
+1cd7ef6393908d47debc4ea6dbb67ebfdfe97c23119a14ad91c82b8a4dacc483  1696  restore-plan.txt
+e2da3f3fc0bcc9f98280866703c151d8e8e126ff20845d91bc846b91b1e7016d  1521  screenshots-list.txt
+e607c206d9a7d22acf0ee3f01a230898c9760e9f45620a5ec2fbf6b1aca525a2  990  step0/w18c-data-folder-100033-after-restore-NOW.txt
+254dc14385a5f9c6072bb750eadce8d1d6dd360929b3ef394fb39378a5481753  990  step0/w18c-data-folder-100033-after-restore-W19-C.txt
+254dc14385a5f9c6072bb750eadce8d1d6dd360929b3ef394fb39378a5481753  990  step0/w18c-data-folder-100033-before-restore-NOW.txt
+e43c73288cef868874c4a8cefc3391407c02d7a4d081e94cae662e4659112915  989  step0/w18c-data-folder-100033-before-restore-W19-C.txt
+c1bd36762cd33cfdf9206411bfee0fd730dea3b6799fa11e2dc073c506ebe224  11426  step0/w18c-s0-end-netstat.txt
+fa18a78ee5ca161b3079c8cfe9ce71988a44f06b5d60da9225bf56db89fab977  48  step0/w18c-s0-end-tasklist.txt
+bbad78fc799cb1ae5577bfd4ffd84ce0ef7908f398eb6758ca856c835fa41eea  12699  step0/w18c-s0-start-netstat.txt
+4694b78cc2cb981607210b5dac39817dc93193ed6f640fc4ca5eb6d30fba60a4  48  step0/w18c-s0-start-tasklist.txt
+7000879b504e64ee3079811e18e7daf58f53c812e52cbc0c2114f48f5e551039  4185  working-summary.txt
+d4d6e20044da22cd8be8b6807c03ee158cddcd42deb075a45242334456b85052  85468  backups/W19-C/TDBK1800_100033.001  (the earlier backup, restored at step 3)

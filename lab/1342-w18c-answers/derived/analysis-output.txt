@@ -1,0 +1,58 @@
+== aw18c-compliance.xml | 38278 bytes | sha256 4976bbece519394b53b37b616b169f12d3438b625445d90a3380994393e07216
+   rows under COLLECTION: COMPANY 0, LEDGER 18, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "BRIDGE CGST 2.5%" (16) | NAME elements: "BRIDGE CGST 2.5%" (16) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d4 | parent "Duties & Taxes" (14) | ALTERID 219
+   LEDGER "BRIDGE CGST 9%" (14) | NAME elements: "BRIDGE CGST 9%" (14) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5 | parent "Duties & Taxes" (14) | ALTERID 220
+   LEDGER "BRIDGE Goods 18%" (16) | NAME elements: "BRIDGE Goods 18%" (16) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3 | parent "Sales Accounts" (14) | ALTERID 218
+   LEDGER "BRIDGE Output CGST XML" (22) | NAME elements: "BRIDGE Output CGST XML" (22) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d9 | parent "Duties & Taxes" (14) | ALTERID 224
+   LEDGER "BRIDGE Purchase Svc 5%" (22) | NAME elements: "BRIDGE Purchase Svc 5%" (22) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000df | parent "Purchase Accounts" (17) | ALTERID 232
+   LEDGER "BRIDGE Round Off" (16) | NAME elements: "BRIDGE Round Off" (16) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8 | parent "Indirect Expenses" (17) | ALTERID 223
+   LEDGER "BRIDGE SGST 2.5%" (16) | NAME elements: "BRIDGE SGST 2.5%" (16) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d6 | parent "Duties & Taxes" (14) | ALTERID 221
+   LEDGER "BRIDGE SGST 9%" (14) | NAME elements: "BRIDGE SGST 9%" (14) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7 | parent "Duties & Taxes" (14) | ALTERID 222
+   LEDGER "BRIDGE Supplier RJ" (18) | NAME elements: "BRIDGE Supplier RJ" (18) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000de | parent "Sundry Creditors" (16) | ALTERID 231
+   LEDGER "BRIDGE Svc 4D 5%" (16) | NAME elements: "BRIDGE Svc 4D 5%" (16) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e5 | parent "Sales Accounts" (14) | ALTERID 243
+   LEDGER "BRIDGE Svc 998313 5%" (20) | NAME elements: "BRIDGE Svc 998313 5%" (20) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d1 | parent "Sales Accounts" (14) | ALTERID 216
+   LEDGER "BRIDGE Svc 998314 5%" (20) | NAME elements: "BRIDGE Svc 998314 5%" (20) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d2 | parent "Sales Accounts" (14) | ALTERID 217
+   LEDGER "BRIDGE Svc 998315 5%" (20) | NAME elements: "BRIDGE Svc 998315 5%" (20) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e1 | parent "Sales Accounts" (14) | ALTERID 234
+   LEDGER "BRIDGE Svc INH2 5%" (18) | NAME elements: "BRIDGE Svc INH2 5%" (18) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e4 | parent "BRIDGE Sales Sub" (16) | ALTERID 237
+   LEDGER "BRIDGE Svc INH 5%" (17) | NAME elements: "BRIDGE Svc INH 5%" (17) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e3 | parent "Sales Accounts" (14) | ALTERID 242
+   LEDGER "BRIDGE Walk-in" (14) | NAME elements: "BRIDGE Walk-in" (14) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0 | parent "Sundry Debtors" (14) | ALTERID 215
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001e | parent " Primary" (8) | ALTERID 31
+
+== aw18c-marks-0.xml | 3394 bytes | sha256 0a2d7f088c55bd6c1d0e827e040b62e88a28f242b7e7388c11259ecce7763a6d
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE PILOT LAB" (16) | GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85 | ALTVCHID 60 | ALTMSTID 243
+
+== aw18c-marks-1.xml | 3394 bytes | sha256 0a2d7f088c55bd6c1d0e827e040b62e88a28f242b7e7388c11259ecce7763a6d
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE PILOT LAB" (16) | GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85 | ALTVCHID 60 | ALTMSTID 243
+
+== aw18c-marks-2.xml | 3394 bytes | sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE PILOT LAB" (16) | GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85 | ALTVCHID 68 | ALTMSTID 245
+
+== aw18c-marks-now.xml | 3394 bytes | sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE PILOT LAB" (16) | GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85 | ALTVCHID 68 | ALTMSTID 245
+
+== aw18c-paired.xml | 25518 bytes | sha256 fc6f1d6c04ebb4d912113d6c6db1499a014869a2fbbcf992ba63abf7482a84ce
+   rows under COLLECTION: COMPANY 0, LEDGER 18, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "BRIDGE CGST 2.5%" (16) | NAME elements: "BRIDGE CGST 2.5%" (16) |  | parent "Duties & Taxes" (14) | ALTERID 
+   LEDGER "BRIDGE CGST 9%" (14) | NAME elements: "BRIDGE CGST 9%" (14) |  | parent "Duties & Taxes" (14) | ALTERID 
+   LEDGER "BRIDGE Goods 18%" (16) | NAME elements: "BRIDGE Goods 18%" (16) |  | parent "Sales Accounts" (14) | ALTERID 
+   LEDGER "BRIDGE Output CGST XML" (22) | NAME elements: "BRIDGE Output CGST XML" (22) |  | parent "Duties & Taxes" (14) | ALTERID 
+   LEDGER "BRIDGE Purchase Svc 5%" (22) | NAME elements: "BRIDGE Purchase Svc 5%" (22) |  | parent "Purchase Accounts" (17) | ALTERID 
+   LEDGER "BRIDGE Round Off" (16) | NAME elements: "BRIDGE Round Off" (16) |  | parent "Indirect Expenses" (17) | ALTERID 
+   LEDGER "BRIDGE SGST 2.5%" (16) | NAME elements: "BRIDGE SGST 2.5%" (16) |  | parent "Duties & Taxes" (14) | ALTERID 
+   LEDGER "BRIDGE SGST 9%" (14) | NAME elements: "BRIDGE SGST 9%" (14) |  | parent "Duties & Taxes" (14) | ALTERID 
+   LEDGER "BRIDGE Supplier RJ" (18) | NAME elements: "BRIDGE Supplier RJ" (18) |  | parent "Sundry Creditors" (16) | ALTERID 
+   LEDGER "BRIDGE Svc 4D 5%" (16) | NAME elements: "BRIDGE Svc 4D 5%" (16) |  | parent "Sales Accounts" (14) | ALTERID 
+   LEDGER "BRIDGE Svc 998313 5%" (20) | NAME elements: "BRIDGE Svc 998313 5%" (20) |  | parent "Sales Accounts" (14) | ALTERID 
+   LEDGER "BRIDGE Svc 998314 5%" (20) | NAME elements: "BRIDGE Svc 998314 5%" (20) |  | parent "Sales Accounts" (14) | ALTERID 
+   LEDGER "BRIDGE Svc 998315 5%" (20) | NAME elements: "BRIDGE Svc 998315 5%" (20) |  | parent "Sales Accounts" (14) | ALTERID 
+   LEDGER "BRIDGE Svc INH2 5%" (18) | NAME elements: "BRIDGE Svc INH2 5%" (18) |  | parent "BRIDGE Sales Sub" (16) | ALTERID 
+   LEDGER "BRIDGE Svc INH 5%" (17) | NAME elements: "BRIDGE Svc INH 5%" (17) |  | parent "Sales Accounts" (14) | ALTERID 
+   LEDGER "BRIDGE Walk-in" (14) | NAME elements: "BRIDGE Walk-in" (14) |  | parent "Sundry Debtors" (14) | ALTERID 
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) |  | parent "Cash-in-Hand" (12) | ALTERID 
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) |  | parent " Primary" (8) | ALTERID 
+

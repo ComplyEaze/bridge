@@ -1,0 +1,23 @@
+# sha256  bytes  file (every file of this folder except this one)
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+269b3be6b8ba975bb5a65522baf6ca592dc2195d49a02e656efe107f8e8dfd06  3643  NOTES.md
+9b32f66784576d075dee86d89efda335acedaf6337bb3ec778d679253e0b3676  3045  SHA256-kept-on-lab-pc.txt
+d2732231a93169cbf854629b5b2f854908587c3434a4d34521aca550c9c7a27f  135  answers/aw18c-compliance.headers.txt
+4976bbece519394b53b37b616b169f12d3438b625445d90a3380994393e07216  38278  answers/aw18c-compliance.xml
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  answers/aw18c-marks-0.headers.txt
+0a2d7f088c55bd6c1d0e827e040b62e88a28f242b7e7388c11259ecce7763a6d  3394  answers/aw18c-marks-0.xml
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  answers/aw18c-marks-1.headers.txt
+0a2d7f088c55bd6c1d0e827e040b62e88a28f242b7e7388c11259ecce7763a6d  3394  answers/aw18c-marks-1.xml
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  answers/aw18c-marks-2.headers.txt
+8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6  3394  answers/aw18c-marks-2.xml
+a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0  134  answers/aw18c-marks-now.headers.txt
+8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6  3394  answers/aw18c-marks-now.xml
+afb8084022c5eeb00cda14288a1d340534e0c41bf587553aab4df0e69298d93e  135  answers/aw18c-paired.headers.txt
+fc6f1d6c04ebb4d912113d6c6db1499a014869a2fbbcf992ba63abf7482a84ce  25518  answers/aw18c-paired.xml
+e5b3eb8cf7b5dcd7b9cc01145035564d6ab064bc0605a06056dbc85a62572db7  6892  derived/analysis-output.txt
+453f47bc2f69b0c960e1fc1924b18f4de66ec0bcdf0edb0218b8fc33096cfe62  1577  derived/paired-diff-against-w18.txt
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  976  requests/r02-marks.xml
+b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc  1736  requests/w18c-ledgers-compliance-to-20260915.xml
+41b2de3ed4488e5943d25fe36b2c2727f397ca01bae4082d7af36f787bb4b4b5  1284  requests/w18c-ledgers-paired-to-20261001.xml
+e47564457f5ed4ed6fc6f78a818f00c47fc0a0f697b5480b12ba9a15fd38461d  1976  send-log.txt
+03f2085b441bf48bbbccbbb0642780a005a22d867726251bd32eef39b444de05  5304  tools/read-answers.ps1

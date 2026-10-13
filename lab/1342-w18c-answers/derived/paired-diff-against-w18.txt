@@ -1,0 +1,16 @@
+﻿# aw18c-paired.xml (to-date 1 Oct 2026, 25,518 B, sha fc6f1d6c...) against W18's aw18-ledgers-paired.xml (to-date 1 Aug 2026, 25,480 B, sha ffe23742...), parsed as XML, LEDGER rows by NAME attribute
+# ledgers: W18 18, W18c 18; names only in W18: 0; names only in W18c: 0
+"BRIDGE CGST 2.5%" (16) | CLOSINGBALANCE | W18 (to 1 Aug): '265.19' | W18c (to 1 Oct): '280.28'
+"BRIDGE Purchase Svc 5%" (22) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '-2000.00'
+"BRIDGE SGST 2.5%" (16) | CLOSINGBALANCE | W18 (to 1 Aug): '265.17' | W18c (to 1 Oct): '280.26'
+"BRIDGE Supplier RJ" (18) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '2100.00'
+"BRIDGE Svc 4D 5%" (16) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '100.00'
+"BRIDGE Svc 998313 5%" (20) | CLOSINGBALANCE | W18 (to 1 Aug): '9406.40' | W18c (to 1 Oct): '10408.20'
+"BRIDGE Svc 998314 5%" (20) | CLOSINGBALANCE | W18 (to 1 Aug): '1200.40' | W18c (to 1 Oct): '1701.60'
+"BRIDGE Svc 998315 5%" (20) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '100.10'
+"BRIDGE Svc INH2 5%" (18) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '400.00'
+"BRIDGE Svc INH 5%" (17) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '500.00'
+"BRIDGE Walk-in" (14) | CLOSINGBALANCE | W18 (to 1 Aug): '-11963.32' | W18c (to 1 Oct): '-13996.60'
+"Cash" (4) | CLOSINGBALANCE | W18 (to 1 Aug): '0.00' | W18c (to 1 Oct): '-700.00'
+"Profit & Loss A/c" (17) | CLOSINGBALANCE | W18 (to 1 Aug): '11306.96' | W18c (to 1 Oct): '11910.06'
+# fields that differ: 13

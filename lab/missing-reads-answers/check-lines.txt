@@ -1,0 +1,21 @@
+# Every line the checker printed, with the command and its exit code, in the order run. In the one traceback the two directory paths are shortened to '.../' and the quoted source line of its print call to 'print(...)'; nothing else is changed. The lines that begin 'check.py' were run as 'python -I check.py ...'. A character outside ASCII is written <U+XXXX>.
+check.py a01 ans-a01.xml  -> exit 0 : PASS a01: 4000 B (cap 8000); companies ['BRIDGE SHAPE LAB']; EDUMODE ['No']
+check.py a02 ans-a02.xml  -> exit 0 : PASS a02: 3838 B (cap 6000); {'NAME': 'BRIDGE SHAPE LAB', 'GUID': '3a6bd6e1-b835', 'ALTVCHID': '112', 'ALTMSTID': '289', 'LASTVOUCHERDATE': '20260420', 'BOOKSFROM': '20250401'}
+check.py a04 ans-a04.xml --company ans-a02.xml  -> exit 0 : PASS a04: 5438 B (cap 24000); 1 vouchers (EXPECT 1)
+check.py a05 ans-a05.xml --census ans-a04.xml --company ans-a02.xml  -> exit 0 : PASS a05: 35860 B (cap 80000); 1 vouchers (census 1); cost-centre allocations [('Assembly', '-400.00'), ('Trading', '-600.00')]
+check.py a06 ans-a06.xml --company ans-a02.xml  -> exit 0 : PASS a06: 7844 B (cap 24000); 2 vouchers (EXPECT 2)
+check.py a07 ans-a07.xml --census ans-a06.xml --company ans-a02.xml  -> exit 0 : PASS a07: 110156 B (cap 160000); 2 vouchers (census 2); type Purchase, number 21; batch names ['H-2504-A', 'H-2504-B']; godowns ['Factory Floor', 'Main Location']
+check.py a08 ans-a08.xml --census ans-a06.xml --company ans-a02.xml --reference ans-a07.xml  -> exit 0 : PASS a08: 45562 B (cap 220312); 2 vouchers (census 2); type Purchase, number 21; batch names ['H-2504-A', 'H-2504-B']; godowns ['Factory Floor', 'Main Location']; inventory entries 1; accounting allocations 1
+check.py a09 ans-a09.xml --company ans-a02.xml  -> exit 0 : PASS a09: 21606 B (cap 60000); 11 rows; 0 with an HSN code; 1 with GST details content
+check.py a10 ans-a10.xml --company ans-a02.xml  -> exit 0 : PASS a10: 6730 B (cap 20000); 3 rows; 0 with an HSN code; 0 with GST details content
+check.py a11 ans-a11.xml --company ans-a02.xml  -> exit 0 : PASS a11: 22036 B (cap 60000); 2 tax units; type marker -2147483648
+check.py a13 ans-a13.xml --company ans-a02.xml  -> exit 1 : Traceback (most recent call last): |   File ".../check.py", line 206, in <module> |     sys.exit(main(sys.argv)) |   File ".../check.py", line 202, in main |     print(...) |   File ".../encodings/cp1252.py", line 19, in encode |     return codecs.charmap_encode(input,self.errors,encoding_table)[0] | UnicodeEncodeError: 'charmap' codec can't encode character '\u20b9' in position 52: character maps to <undefined>
+python -I -X utf8 check.py a13 ans-a13.xml --company ans-a02.xml  -> exit 0 : PASS a13: 7658 B (cap 40000); 2 currencies ['USD', '<U+20B9>']; rate elements ['DAILYBUYINGRATES.LIST', 'DAILYSELLINGRATES.LIST', 'DAILYSTDRATES.LIST']; 2 of 2 rows carry a GUID
+python -I -X utf8 check.py a12 ans-a12.xml  -> exit 0 : PASS a12: 3838 B (cap 6000); {'NAME': 'BRIDGE SHAPE LAB', 'GUID': '3a6bd6e1-b835', 'ALTVCHID': '112', 'ALTMSTID': '289', 'LASTVOUCHERDATE': '20260420', 'BOOKSFROM': '20250401'}
+python -I -X utf8 check.py same ans-a02.xml ans-a12.xml  -> exit 0 : PASS same: 3838 B vs 3838 B, identical
+python -I -X utf8 check.py b01 ans-b01.xml  -> exit 0 : PASS b01: 4012 B (cap 8000); companies ['BRIDGE CORPUS FOREX']; EDUMODE ['No']
+python -I -X utf8 check.py b02 ans-b02.xml  -> exit 0 : PASS b02: 3848 B (cap 6000); {'NAME': 'BRIDGE CORPUS FOREX', 'GUID': 'b14e9b2d-8a63', 'ALTVCHID': '19', 'ALTMSTID': '216', 'LASTVOUCHERDATE': '20260915', 'BOOKSFROM': '20250401'}
+python -I -X utf8 check.py b03 ans-b03.xml --company ans-b02.xml  -> exit 0 : PASS b03: 8818 B (cap 40000); 2 currencies ['$', '<U+20B9>']; rate elements ['DAILYBUYINGRATES.LIST', 'DAILYSELLINGRATES.LIST', 'DAILYSTDRATES.LIST', 'SPECIFIEDRATE', 'TRANSACTEDRATE']; 2 of 2 rows carry a GUID
+python -I -X utf8 check.py b04 ans-b04.xml --company ans-b02.xml  -> exit 0 : PASS b04: 22036 B (cap 60000); 2 tax units; type marker -2147483648
+python -I -X utf8 check.py b05 ans-b05.xml  -> exit 0 : PASS b05: 3848 B (cap 6000); {'NAME': 'BRIDGE CORPUS FOREX', 'GUID': 'b14e9b2d-8a63', 'ALTVCHID': '19', 'ALTMSTID': '216', 'LASTVOUCHERDATE': '20260915', 'BOOKSFROM': '20250401'}
+python -I -X utf8 check.py same ans-b02.xml ans-b05.xml  -> exit 0 : PASS same: 3848 B vs 3848 B, identical

@@ -5,10 +5,26 @@
 //! second voucher sent without a number took the number already used, or was
 //! refused whole with no Tally text; into a type numbered Automatic with
 //! "Retain Original Voucher No.", it took the next number (protocol reference
-//! §9.8). So a voucher type is admitted only when its one series reads
-//! Automatic, whatever its duplicate setting; every other reading, and a type
-//! the read does not hold, refuses. The read does not see the insertion
-//! setting, so Automatic set to renumber is admitted too, unmeasured. The
+//! §9.8). With a type numbered Automatic set to "Renumber Vouchers", numbers
+//! already in the book changed when a voucher with an earlier date was entered
+//! by hand, and again when one was sent by import without a number: no
+//! voucher's AlterID moved, the company's voucher mark rose by one only, and
+//! the import's answer read CREATED 1, ALTERED 0 (one book, one voucher type,
+//! `TallyPrime` 7.1 Silver: `VOUCHER_TYPE_NUMBERING_M8R_CAPTURE_PROVENANCE.md`
+//! in the protocol crate's fixtures says where each run is kept). Not
+//! measured: a batch of several vouchers, other voucher types, Gold, other
+//! releases, and the same through this crate's own post (the imports were sent
+//! raw, in the shape its builder sends).
+//!
+//! So a voucher type is admitted only when its one series reads Automatic with
+//! the sub-method `Auto Retain`, whatever its duplicate setting. Every other
+//! reading, and a type the read does not hold, refuses: a type that does not
+//! read Automatic as `import_voucher_numbering_not_automatic`, and an
+//! Automatic one whose sub-method reads `Auto Renumber`, is missing or is not
+//! recognised as `import_voucher_numbering_not_retain`. A batch that holds
+//! both is refused as `import_voucher_numbering_not_automatic`. The
+//! sub-method of a type that is not Automatic
+//! is not read: a Manual series printed `Auto Retain` too. The
 //! company's master mark is read first; the voucher-type masters rows must sit
 //! at or under it, and the post compares it again just before it is sent, so a
 //! master saved after it, a voucher type included, refuses the post
@@ -20,37 +36,161 @@ use crate::tally::approved_import::ApprovedImportAdmissionError;
 use crate::tally::runtime::VoucherNumberingRead;
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::native_voucher_type_numbering::{
-    DuplicateSetting, SeriesNumberingMethod, VoucherTypeNumbering,
+    DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
 
 /// The refusal of a voucher type whose voucher numbering is not Automatic.
 pub(in crate::agent) const NUMBERING_NOT_AUTOMATIC: &str = "import_voucher_numbering_not_automatic";
 
+/// The refusal of a voucher type whose voucher numbering is Automatic and
+/// whose sub-method did not read `Auto Retain`.
+pub(in crate::agent) const NUMBERING_NOT_RETAIN: &str = "import_voucher_numbering_not_retain";
+
+/// The reading that admits, as each next step names it.
+macro_rules! admitted {
+    () => {
+        "whose voucher numbering it read as Automatic with existing numbers retained (the series reads Auto Retain; on the voucher type's screen, Retain Original Voucher No.)."
+    };
+}
+
+/// What `observed` holds, then what was seen under each refused reading. One
+/// text for the three next steps, so a new measurement is written once.
+macro_rules! observed_and_seen {
+    () => {
+        "observed says what was read, and under automatic its sub_method is auto_renumber, absent (Tally printed none) or unrecognised. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Under Automatic set to Renumber Vouchers, a voucher sent by import without a number and dated before existing vouchers was seen to change the numbers of vouchers already in the book, while the import's answer reported nothing altered; a voucher entered by hand with an earlier date did the same (one book, one voucher type, TallyPrime 7.1 Silver)."
+    };
+}
+
+/// What no next step allows.
+macro_rules! never_to_get_past {
+    () => {
+        "Do not change a voucher to another voucher type, and do not change a voucher type's voucher numbering to get past this: that is the user's decision, and it can change the numbers of vouchers already entered."
+    };
+}
+
+/// The post's next step under either refusal code: a batch can hold a voucher
+/// type of each.
+pub(in crate::agent) const POST_NEXT_STEP: &str = concat!(
+    "Nothing was sent. ComplyEaze Bridge posts vouchers without a voucher number, so Tally numbers each one by its voucher type, and it posts only into voucher types ",
+    admitted!(),
+    " The voucher types in error.refused_types did not read so; ",
+    observed_and_seen!(),
+    " Ask the user to enter the vouchers of those voucher types in Tally's voucher entry screen (under Renumber Vouchers a hand entry was seen to change existing numbers too, so that is the user's to decide), and build the other vouchers again without them. ",
+    never_to_get_past!()
+);
+
+/// The build's next step under either refusal code, for vouchers that are not
+/// yet in the book.
+pub(in crate::agent) const BUILD_NEXT_STEP: &str = concat!(
+    "No file was written. ComplyEaze Bridge writes these vouchers without a voucher number, so Tally numbers each one by its voucher type, and it writes them only into voucher types ",
+    admitted!(),
+    " The voucher types in refused_types did not read so; ",
+    observed_and_seen!(),
+    " Ask the user to enter the vouchers of those voucher types in Tally's voucher entry screen (under Renumber Vouchers a hand entry was seen to change existing numbers too, so that is the user's to decide), and build the other vouchers again without them (from a parse_bank_statement proposals file, parse the statement again with from and to that leave out the days holding them; never rename a statement row). ",
+    never_to_get_past!()
+);
+
+/// The build's next step when the refused build is an amendment. The refusal
+/// comes before the amendment's own check of the book, so whether the earlier
+/// batch's vouchers are in the book is not known here: the step says so and
+/// sends the caller to `verify_import`, which decides between correcting a
+/// voucher and entering it.
+pub(in crate::agent) const BUILD_AMENDMENT_NEXT_STEP: &str = concat!(
+    "No file was written. This build amends an earlier batch (amends_batch_id), and whether that batch's vouchers are in the book was not checked before this refusal. Tally numbers the vouchers of this amendment that carry no number, each by its voucher type, and ComplyEaze Bridge writes those only into voucher types ",
+    admitted!(),
+    " The voucher types in refused_types did not read so; ",
+    observed_and_seen!(),
+    " Call verify_import for the batch this build amends. A voucher it finds in the book is corrected in Tally by the user and is never entered again: a second entry duplicates it. A voucher it does not find may still be in the book (its narration edited in Tally, for one): the user looks for it in Tally before deciding to enter it. ",
+    never_to_get_past!()
+);
+
+/// The least response budget at which a numbering refusal carries its next
+/// step and, on a post, the message that names the refused voucher types.
+/// The general floor holds a step of a few hundred bytes; these are longer,
+/// and an answer over its budget is replaced whole, so under this budget the
+/// refusal goes out with its code and refused types only. The budget tests
+/// hold an answer naming all four voucher types to it.
+pub(in crate::agent) const GUIDANCE_MIN_RESPONSE_BUDGET: usize =
+    2 * crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET;
+
 /// What one numbering read admitted: the voucher types every voucher of the
-/// batch goes into, each read Automatic, for one company, under one master
-/// mark. Neither `Clone` nor serialisable, so it cannot outlive the pass whose
-/// read made it.
+/// batch goes into, each read Automatic with `Auto Retain`, for one company,
+/// under one master mark. Neither `Clone` nor serialisable, so it cannot
+/// outlive the pass whose read made it.
 #[derive(Debug)]
 pub(in crate::agent) struct NumberingAdmission {
     company_guid: String,
     master_mark: u64,
 }
 
+/// Which of the two refusals a voucher type's reading is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::agent) enum RefusalReason {
+    /// Not read as Automatic at all, or not held by the read.
+    NotAutomatic,
+    /// Automatic, with a sub-method that is not `Auto Retain`.
+    NotRetain,
+}
+
 /// One refused voucher type and what the read said of it. `observed` states
-/// the reading, never a cause.
+/// the reading, never a cause; `reason` decides the refusal's code and is not
+/// returned, since `observed` already says it. `in_words` is the same reading
+/// for a person, to follow the voucher type's name, and `set_to_renumber`
+/// says whether the message tells that person what a hand entry was seen to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::agent) struct RefusedType {
     pub(in crate::agent) voucher_type: String,
+    pub(in crate::agent) reason: RefusalReason,
     pub(in crate::agent) observed: Value,
+    pub(in crate::agent) in_words: &'static str,
+    pub(in crate::agent) set_to_renumber: bool,
 }
 
-/// The voucher types that did not read Automatic, in batch order; never empty.
+/// The voucher types that were not admitted, in batch order; never empty.
 #[derive(Debug, PartialEq, Eq)]
 pub(in crate::agent) struct NumberingRefusal(pub(in crate::agent) Vec<RefusedType>);
 
 impl NumberingRefusal {
-    pub(in crate::agent) const fn code(&self) -> &'static str {
-        NUMBERING_NOT_AUTOMATIC
+    /// One code for the batch: `not_retain` only when every refused type is
+    /// refused for its sub-method.
+    pub(in crate::agent) fn code(&self) -> &'static str {
+        if self
+            .0
+            .iter()
+            .any(|row| row.reason == RefusalReason::NotAutomatic)
+        {
+            NUMBERING_NOT_AUTOMATIC
+        } else {
+            NUMBERING_NOT_RETAIN
+        }
+    }
+
+    /// The refusal for a person who is shown only a message (the desktop's
+    /// Journal screen): each refused voucher type with what was read of it,
+    /// then what the person does. Where a refused type is set to "Renumber
+    /// Vouchers" it also says what a hand entry was seen to do there, since
+    /// a hand entry is what it offers. The next steps above say the same to
+    /// an assistant, at length.
+    pub(in crate::agent) fn message(&self) -> String {
+        let read = self
+            .0
+            .iter()
+            .map(|row| format!("{} {}", row.voucher_type, row.in_words))
+            .collect::<Vec<_>>()
+            .join("; ");
+        let seen_by_hand = if self.0.iter().any(|row| row.set_to_renumber) {
+            " On a voucher type set to Renumber Vouchers, a voucher entered by hand with an \
+             earlier date was seen to change existing voucher numbers too."
+        } else {
+            ""
+        };
+        format!(
+            "Nothing was posted. ComplyEaze Bridge sends a voucher without a voucher number, so it \
+             posts only into a voucher type numbered Automatic with Retain Original Voucher No. \
+             Read from Tally: {read}. If you decide to, enter these vouchers in Tally's voucher \
+             entry screen yourself.{seen_by_hand} Do not change a voucher type's voucher \
+             numbering only to post them: that can change the numbers of vouchers already entered."
+        )
     }
 
     /// The refused voucher types as the result lists them.
@@ -64,38 +204,112 @@ impl NumberingRefusal {
     }
 }
 
-/// What the read said of one voucher type. A method Tally printed outside the
-/// measured set is named only as unrecognised: its raw text is Tally's, and
-/// nothing is read from it.
-fn observed_json(numbering: Option<&VoucherTypeNumbering>) -> Value {
+/// One reading in the three forms a refusal needs, with whether it is the
+/// reading of a type set to "Renumber Vouchers".
+struct Reading {
+    /// Why the reading refuses a voucher sent without a number, or `None`
+    /// where it admits one.
+    reason: Option<RefusalReason>,
+    /// What the read said, as a result lists it.
+    observed: Value,
+    /// The same for a person, to follow the voucher type's name.
+    in_words: &'static str,
+    set_to_renumber: bool,
+}
+
+/// What one voucher type's reading means: its verdict, what a result says of
+/// it and what a person is told. Every reading is named here once, so a
+/// reading added to the read's types does not compile until it is given all
+/// three, and none admits by default. The duplicate setting does not decide.
+/// A method or sub-method Tally printed outside the measured set is named
+/// only as unrecognised: its raw text is Tally's, and nothing is read from
+/// it. `sub_method` is given under `automatic` only, the one method it is
+/// read under.
+fn reading(numbering: Option<&VoucherTypeNumbering>) -> Reading {
+    let not_automatic = |observed: Value, in_words: &'static str| Reading {
+        reason: Some(RefusalReason::NotAutomatic),
+        observed,
+        in_words,
+        set_to_renumber: false,
+    };
     match numbering {
-        None => json!({"observation": "absent"}),
-        Some(VoucherTypeNumbering::Observed { method, duplicates }) => json!({
-            "observation": "observed",
-            "method": match method {
-                SeriesNumberingMethod::Automatic => "automatic",
-                SeriesNumberingMethod::Manual => "manual",
-                SeriesNumberingMethod::AutomaticManualOverride => "automatic_manual_override",
-                SeriesNumberingMethod::Unrecognised(_) => "unrecognised",
-            },
-            "duplicates": match duplicates {
+        None => not_automatic(
+            json!({"observation": "absent"}),
+            "was not among the voucher types Tally returned",
+        ),
+        Some(VoucherTypeNumbering::Observed { method, duplicates }) => {
+            let duplicates = match duplicates {
                 DuplicateSetting::Prevented => "prevented",
                 DuplicateSetting::NotPrevented => "not_prevented",
-            },
-        }),
-        Some(VoucherTypeNumbering::SeriesCount(count)) => {
-            json!({"observation": "series_count", "count": count})
+            };
+            let observed = |method: &str| json!({"observation": "observed", "method": method, "duplicates": duplicates});
+            match method {
+                SeriesNumberingMethod::Automatic(sub_method) => {
+                    let not_retain = Some(RefusalReason::NotRetain);
+                    let (reason, sub_method, in_words, set_to_renumber) = match sub_method {
+                        NumberingSubMethod::AutoRetain => (
+                            None,
+                            "auto_retain",
+                            "is numbered Automatic with Retain Original Voucher No",
+                            false,
+                        ),
+                        NumberingSubMethod::AutoRenumber => (
+                            not_retain,
+                            "auto_renumber",
+                            "is numbered Automatic with Renumber Vouchers",
+                            true,
+                        ),
+                        NumberingSubMethod::Unrecognised(_) => (
+                            not_retain,
+                            "unrecognised",
+                            "is numbered Automatic, with a setting for existing numbers that ComplyEaze Bridge does not recognise",
+                            false,
+                        ),
+                        NumberingSubMethod::Absent => (
+                            not_retain,
+                            "absent",
+                            "is numbered Automatic, and Tally did not say what it does with existing numbers",
+                            false,
+                        ),
+                    };
+                    let mut said = observed("automatic");
+                    said["sub_method"] = json!(sub_method);
+                    Reading {
+                        reason,
+                        observed: said,
+                        in_words,
+                        set_to_renumber,
+                    }
+                }
+                SeriesNumberingMethod::Manual => {
+                    not_automatic(observed("manual"), "is numbered Manual")
+                }
+                SeriesNumberingMethod::AutomaticManualOverride => not_automatic(
+                    observed("automatic_manual_override"),
+                    "is numbered Automatic (Manual Override)",
+                ),
+                SeriesNumberingMethod::Unrecognised(_) => not_automatic(
+                    observed("unrecognised"),
+                    "has a numbering method ComplyEaze Bridge does not recognise",
+                ),
+            }
         }
-        Some(VoucherTypeNumbering::FieldInvalid(code)) => {
-            json!({"observation": "field_invalid", "code": code})
-        }
+        Some(VoucherTypeNumbering::SeriesCount(count)) => not_automatic(
+            json!({"observation": "series_count", "count": count}),
+            "does not have exactly one number series",
+        ),
+        Some(VoucherTypeNumbering::FieldInvalid(code)) => not_automatic(
+            json!({"observation": "field_invalid", "code": code}),
+            "has numbering settings ComplyEaze Bridge could not read",
+        ),
     }
 }
 
 /// Admits `voucher_types`, the voucher types of the vouchers sent without a
 /// number, in batch order, against `read`: each must be held by the read (by
-/// ASCII case fold, as the read keys its names) and read Automatic. Every
-/// refused type is named once, in the order it first appears.
+/// ASCII case fold, as the read keys its names) and read Automatic with
+/// `Auto Retain`. Every refused type is named once, in the order it first
+/// appears.
 pub(in crate::agent) fn admit_numbering<'a>(
     read: VoucherNumberingRead,
     voucher_types: impl IntoIterator<Item = &'a str>,
@@ -115,16 +329,14 @@ pub(in crate::agent) fn admit_numbering<'a>(
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(voucher_type))
             .map(|(_, numbering)| numbering);
-        if !matches!(
-            numbering,
-            Some(VoucherTypeNumbering::Observed {
-                method: SeriesNumberingMethod::Automatic,
-                ..
-            })
-        ) {
+        let reading = reading(numbering);
+        if let Some(reason) = reading.reason {
             refused.push(RefusedType {
                 voucher_type: voucher_type.to_string(),
-                observed: observed_json(numbering),
+                reason,
+                observed: reading.observed,
+                in_words: reading.in_words,
+                set_to_renumber: reading.set_to_renumber,
             });
         }
     }

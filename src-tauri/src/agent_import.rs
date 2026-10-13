@@ -61,6 +61,8 @@ pub(super) mod local_data;
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
+/// The post's next step for a numbering refusal, for the refusal table.
+pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 pub(super) use approval::PostApprovals;
@@ -1037,10 +1039,15 @@ impl Server {
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
             // A voucher written without a number is numbered by its voucher
-            // type, so that type must be numbered Automatic (bridge#724). Read
-            // after the mark above. A numbered Journal keeps its own number and
-            // is not checked; a blank number counts as none, and an amendment
-            // resends its vouchers without numbers, so both are checked.
+            // type, so that type must be numbered Automatic with existing
+            // numbers retained (bridge#724). Read after the mark above. A
+            // Journal that carries its own number is not checked by this
+            // rule: under Automatic numbering Tally discards a supplied
+            // number and assigns its own (protocol reference, voucher
+            // writes), and what such a voucher does on a type set to
+            // "Renumber Vouchers" is not measured. A blank number counts as
+            // none, and an amendment's vouchers that carry no number are
+            // checked like any other.
             let numberless = payload
                 .vouchers
                 .iter()
@@ -1063,12 +1070,26 @@ impl Server {
                     Ok(_) => {}
                     Err(post::numbering::NumberingFailure::Read(failure)) => return Err(failure),
                     Err(post::numbering::NumberingFailure::Refused(refusal)) => {
+                        let mut result = json!({
+                            "state":"refused", "reason":refusal.code(),
+                            "refused_types":refusal.refused_types(),
+                        });
+                        // The next step goes out only under a budget that
+                        // holds it: an answer over its budget is replaced
+                        // whole, and the reason and the refused types are
+                        // what the caller needs most. An amendment has its
+                        // own: its book check has not run yet.
+                        if self.settings.max_bytes
+                            >= post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET
+                        {
+                            result["next_step"] = json!(if payload.amends_batch_id.is_some() {
+                                post::numbering::BUILD_AMENDMENT_NEXT_STEP
+                            } else {
+                                post::numbering::BUILD_NEXT_STEP
+                            });
+                        }
                         return Ok(ToolOutcome {
-                            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                                "state":"refused", "reason":refusal.code(),
-                                "refused_types":refusal.refused_types(),
-                                "next_step":BUILD_NUMBERING_NOT_AUTOMATIC_NEXT_STEP
-                            }}),
+                            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
                             evidence: accumulated.clone(),
                             company_guid: Some(payload.company_guid),
                             truncated: false,
@@ -2537,10 +2558,6 @@ const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
 const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. If Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
-
-/// The build's next step when a voucher type's voucher numbering is not read
-/// as Automatic (bridge#724); the post's is its refusal remediation.
-const BUILD_NUMBERING_NOT_AUTOMATIC_NEXT_STEP: &str = "No file was written. ComplyEaze Bridge writes these vouchers without a voucher number, so Tally numbers each one by its voucher type, and it writes them only into voucher types whose voucher numbering it read as Automatic. The voucher types in refused_types did not read so; observed says what was read. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Ask the user to enter the vouchers of those voucher types in Tally's voucher entry screen, and build the other vouchers again without them (from a parse_bank_statement proposals file, parse the statement again with from and to that leave out the days holding them; never rename a statement row). Do not change a voucher to another voucher type, and do not change a voucher type's voucher numbering to get past this: that is the user's decision, and it can change the numbers of vouchers already entered.";
 
 const AMENDMENT_NOT_POSTABLE: &str = "No import XML was sent to Tally. ComplyEaze Bridge does not post amendments (post_import refuses them), so import the written file by hand, promptly, then use verify_import; do not call post_import for this batch.";
 

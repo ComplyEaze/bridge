@@ -1155,6 +1155,20 @@ const ROWS: &[Row] = &[
         parser: "parse_voucher_type_numbering",
         parse: |_, text| typed(parse_voucher_type_numbering(text)),
     },
+    // The same read of a second synthetic book, before and after its Receipt type was set to
+    // renumber (13 October 2026).
+    Row {
+        fixture: "tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_voucher_type_numbering",
+        parse: |_, text| typed(parse_voucher_type_numbering(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_voucher_type_numbering",
+        parse: |_, text| typed(parse_voucher_type_numbering(text)),
+    },
     Row {
         fixture: "tests/fixtures/masters_godowns_shape_lab_live.utf16le.xml",
         source: Source::Captured,

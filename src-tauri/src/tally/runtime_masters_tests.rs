@@ -18,7 +18,7 @@ use bridge_tally_protocol::native_masters::{
 };
 use bridge_tally_protocol::native_voucher_type_numbering::{
     parse_voucher_type_numbering, render_voucher_type_numbering_request, DuplicateSetting,
-    NumberingJoinError, SeriesNumberingMethod, VoucherTypeNumbering,
+    NumberingJoinError, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
 use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
 
@@ -912,7 +912,7 @@ async fn each_type_gets_the_numbering_of_its_own_series() {
     assert_eq!(
         of("Journal"),
         &observed(
-            SeriesNumberingMethod::Automatic,
+            SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain),
             DuplicateSetting::NotPrevented
         )
     );
@@ -933,7 +933,7 @@ async fn each_type_gets_the_numbering_of_its_own_series() {
             .filter(|result| matches!(
                 result,
                 VoucherTypeNumbering::Observed {
-                    method: SeriesNumberingMethod::Automatic,
+                    method: SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain),
                     duplicates: DuplicateSetting::NotPrevented
                 }
             ))
@@ -1460,7 +1460,7 @@ async fn the_numbering_read_sends_the_masters_pair_then_the_numbering_pair_and_n
     assert_eq!(
         of("Journal"),
         VoucherTypeNumbering::Observed {
-            method: SeriesNumberingMethod::Automatic,
+            method: SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain),
             duplicates: DuplicateSetting::NotPrevented
         }
     );

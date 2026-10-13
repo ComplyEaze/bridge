@@ -4930,7 +4930,7 @@ fn a_masters_record_past_the_record_bound_reads_as_a_pending_check() {
 
 // bridge#724: a voucher written without a number is numbered by its voucher
 // type, so the build reads each such voucher's type after its mark and writes
-// nothing unless every one reads Automatic.
+// nothing unless every one reads Automatic with existing numbers retained.
 
 /// The requests a build sends up to and including its numbering read.
 fn through_build_numbering(manual: &[&str]) -> Vec<ScenarioPlan> {
@@ -5021,6 +5021,141 @@ async fn a_numberless_journal_into_a_manual_journal_type_is_refused_and_no_file_
         .starts_with("No file was written."));
     assert_eq!(simulator.finish().unwrap().len(), expected);
     assert_eq!(written_files(directory.path()), 0);
+}
+
+/// The Journal type reads Automatic with its series set to renumber: the
+/// build refuses under its own reason with the build's next step, sends
+/// nothing after the numbering read and writes no file.
+#[tokio::test]
+async fn a_numberless_journal_into_a_journal_type_set_to_renumber_is_refused_and_no_file_is_written(
+) {
+    let plans = super::numbering_fixtures::with_sub_method(
+        through_build_numbering(&[]),
+        "Journal",
+        "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+    );
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    let built = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+        .unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(result["reason"], "import_voucher_numbering_not_retain");
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}])
+    );
+    assert_eq!(result["next_step"], post::numbering::BUILD_NEXT_STEP);
+    assert_eq!(simulator.finish().unwrap().len(), expected);
+    assert_eq!(written_files(directory.path()), 0);
+}
+
+/// The Journal type reads Automatic and its series prints no sub-method: the
+/// build refuses under the same reason, says the sub-method was absent, and
+/// writes no file.
+#[tokio::test]
+async fn a_numberless_journal_into_an_automatic_type_that_prints_no_sub_method_is_refused() {
+    let plans =
+        super::numbering_fixtures::with_sub_method(through_build_numbering(&[]), "Journal", "");
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = numbering_server(directory.path(), simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    let built = server
+        .build_import_xml(&serde_json::to_value(input).unwrap())
+        .await
+        .unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(result["reason"], "import_voucher_numbering_not_retain");
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"automatic","sub_method":"absent","duplicates":"not_prevented"}}])
+    );
+    assert_eq!(simulator.finish().unwrap().len(), expected);
+    assert_eq!(written_files(directory.path()), 0);
+}
+
+/// A numberless Journal built through the tool into a Journal type set to
+/// renumber, under a response budget of `max_bytes`: the tool's whole answer,
+/// and that no file was written.
+async fn refused_build_under(max_bytes: usize) -> Value {
+    let plans = super::numbering_fixtures::with_sub_method(
+        through_build_numbering(&[]),
+        "Journal",
+        "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+    );
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = numbering_server(directory.path(), simulator.address().port());
+    server.settings.max_bytes = max_bytes;
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    let response = server
+        .call_tool("build_import_xml", serde_json::to_value(input).unwrap())
+        .await;
+    assert_eq!(written_files(directory.path()), 0);
+    response
+}
+
+/// The build's side of the budget: at the least budget that carries a
+/// numbering refusal's next step, a refused build is answered whole through
+/// the tool, and so is the same answer naming four voucher types.
+#[tokio::test]
+async fn a_refused_build_is_answered_whole_at_the_guidance_budget() {
+    const BUDGET: usize = post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET;
+    let response = refused_build_under(BUDGET).await;
+    let whole = |result: &Value, types: usize| {
+        assert_eq!(
+            result["reason"], "import_voucher_numbering_not_retain",
+            "{result}"
+        );
+        assert_eq!(
+            result["refused_types"].as_array().map(Vec::len),
+            Some(types),
+            "{result}"
+        );
+        assert_eq!(result["next_step"], post::numbering::BUILD_NEXT_STEP);
+    };
+    whole(&response["structuredContent"]["result"], 1);
+    let framed = super::numbering_fixtures::four_types_through_the_caps(
+        response["structuredContent"].clone(),
+        "/result",
+        BUDGET,
+    )
+    .expect("an answer naming four voucher types fits the budget");
+    whole(&framed["result"]["structuredContent"]["result"], 4);
+}
+
+/// Under that budget, down to the general floor of 4,096, a refused build is
+/// still the numbering refusal, with its reason and the refused voucher type
+/// and without the next step. It does not become `agent_response_too_large`.
+#[tokio::test]
+async fn a_refused_build_keeps_its_reason_and_types_at_the_general_floor() {
+    const FLOOR: usize = crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET;
+    const { assert!(FLOOR < post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET) };
+    let response = refused_build_under(FLOOR).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(
+        result["reason"], "import_voucher_numbering_not_retain",
+        "{response}"
+    );
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}]),
+        "{response}"
+    );
+    assert!(result.get("next_step").is_none(), "{response}");
+    assert!(response.to_string().len() <= FLOOR, "{response}");
 }
 
 #[tokio::test]

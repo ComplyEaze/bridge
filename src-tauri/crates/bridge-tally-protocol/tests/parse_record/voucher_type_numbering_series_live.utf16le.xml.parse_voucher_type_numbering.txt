@@ -6,7 +6,9 @@ Ok([
         name: "Attendance",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000004e",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -14,7 +16,9 @@ Ok([
         name: "Contra",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000020",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -22,7 +26,9 @@ Ok([
         name: "Credit Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000028",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -30,7 +36,9 @@ Ok([
         name: "Debit Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000002a",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -38,7 +46,9 @@ Ok([
         name: "Delivery Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000030",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -46,7 +56,9 @@ Ok([
         name: "Job Work In Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000052",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -54,7 +66,9 @@ Ok([
         name: "Job Work Out Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000054",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -62,7 +76,9 @@ Ok([
         name: "Journal",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000026",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -70,7 +86,9 @@ Ok([
         name: "Material In",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000058",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -78,7 +96,9 @@ Ok([
         name: "Material Out",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000056",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -86,7 +106,9 @@ Ok([
         name: "Memorandum",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000003c",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -102,7 +124,9 @@ Ok([
         name: "Payroll",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000050",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -110,7 +134,9 @@ Ok([
         name: "Physical Stock",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000038",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -118,7 +144,9 @@ Ok([
         name: "Purchase",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000002e",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -126,7 +154,9 @@ Ok([
         name: "Purchase Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000042",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -142,7 +172,9 @@ Ok([
         name: "Receipt Note",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000032",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -150,7 +182,9 @@ Ok([
         name: "Rejections In",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000036",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -158,7 +192,9 @@ Ok([
         name: "Rejections Out",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000034",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -166,7 +202,9 @@ Ok([
         name: "Reversing Journal",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000003e",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -174,7 +212,9 @@ Ok([
         name: "Sales",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000002c",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -182,7 +222,9 @@ Ok([
         name: "Sales Order",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-00000040",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },
@@ -190,7 +232,9 @@ Ok([
         name: "Stock Journal",
         guid: "3479ef95-3ecd-49b3-9349-d3a8e24b0db2-0000003a",
         numbering: Observed {
-            method: Automatic,
+            method: Automatic(
+                AutoRetain,
+            ),
             duplicates: NotPrevented,
         },
     },

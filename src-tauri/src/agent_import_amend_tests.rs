@@ -746,6 +746,52 @@ async fn an_amendment_of_a_voucher_edited_in_tally_writes_nothing() {
     );
 }
 
+/// An amendment refused for its voucher numbering, under either code. The
+/// refusal comes before the amendment's check of the book, so its next step
+/// is the amendment's own, which sends the caller to verify_import, and
+/// nothing is written.
+#[tokio::test]
+async fn an_amendment_refused_for_its_voucher_numbering_is_sent_to_verify_the_earlier_batch() {
+    use crate::agent::agent_import::numbering_fixtures::with_sub_method;
+    use crate::agent::agent_import::post::numbering::{BUILD_AMENDMENT_NEXT_STEP, BUILD_NEXT_STEP};
+    for (plans, code) in [
+        (
+            through_build_numbering(&["Journal"]),
+            "import_voucher_numbering_not_automatic",
+        ),
+        (
+            with_sub_method(
+                through_build_numbering(&[]),
+                "Journal",
+                "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+            ),
+            "import_voucher_numbering_not_retain",
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let expected = plans.len();
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let server = simulated_server(directory.path(), simulator.address().port());
+        seed_original(&server);
+        let imports = server.imports_dir().unwrap();
+        let files_before = std::fs::read_dir(&imports).unwrap().count();
+        let batches_before = server.import_ledger().unwrap().len();
+        let refused = server
+            .build_import_xml(&amendment_payload(ORIGINAL, "15.00"))
+            .await
+            .unwrap();
+        let result = &refused.payload["result"];
+        assert_eq!(result["state"], "refused", "{code}: {result}");
+        assert_eq!(result["reason"], code);
+        assert_eq!(result["next_step"], BUILD_AMENDMENT_NEXT_STEP, "{code}");
+        assert_ne!(result["next_step"], BUILD_NEXT_STEP, "{code}");
+        assert!(BUILD_AMENDMENT_NEXT_STEP.contains("verify_import"));
+        assert_eq!(std::fs::read_dir(&imports).unwrap().count(), files_before);
+        assert_eq!(server.import_ledger().unwrap().len(), batches_before);
+        assert_eq!(simulator.finish().unwrap().len(), expected, "{code}");
+    }
+}
+
 #[test]
 fn the_amendment_admission_module_stays_pinned() {
     // A pin the branch itself added and then lost in a merge resolution is a withdrawn pin:

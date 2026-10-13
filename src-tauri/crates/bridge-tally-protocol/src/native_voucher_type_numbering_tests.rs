@@ -1,10 +1,12 @@
-//! The series-level numbering parser and request against the live capture
-//! (`tests/fixtures/voucher_type_numbering_series_*`). Every parser test uses the
+//! The series-level numbering parser and request against the live captures
+//! (`tests/fixtures/voucher_type_numbering_series_*` and, for the sub-method,
+//! `tests/fixtures/voucher_type_numbering_m8r_*`). Every parser test uses the
 //! captured text, and every negative case is that text with one edit; none has a
 //! hand-written response. The `join` module parses the captured numbering rows and
 //! builds the masters rows by hand from their names and GUIDs (no masters answer
 //! of that book was captured), then edits those rows.
 use super::*;
+use crate::native_masters::MASTERS_ASSUMED_NAME_CHARS;
 use sha2::{Digest, Sha256};
 
 const COMPANY: &str = "Bridge Lab Win Numbering";
@@ -36,6 +38,45 @@ fn row<'a>(rows: &'a [VoucherTypeNumberingRow], name: &str) -> &'a VoucherTypeNu
 
 fn observed(method: SeriesNumberingMethod, duplicates: DuplicateSetting) -> VoucherTypeNumbering {
     VoucherTypeNumbering::Observed { method, duplicates }
+}
+
+/// Automatic with the sub-method the 9 October capture prints on every series.
+fn retain() -> SeriesNumberingMethod {
+    SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain)
+}
+
+/// The second book's answer before its Receipt type was changed.
+fn before_renumber() -> String {
+    utf16le(include_bytes!(
+        "../tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml"
+    ))
+}
+
+/// The second book's answer with its Receipt type set to renumber vouchers.
+fn set_to_renumber() -> String {
+    utf16le(include_bytes!(
+        "../tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml"
+    ))
+}
+
+const RENUMBER: &str = "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>";
+const RETAIN: &str = "<NUMBERINGSUBMETHOD>Auto Retain</NUMBERINGSUBMETHOD>";
+
+/// `text` with the first `from` in the row of the type named `name` replaced by `to`.
+fn edited_row(text: &str, name: &str, from: &str, to: &str) -> String {
+    let row = text
+        .find(&format!("<VOUCHERTYPE NAME=\"{name}\""))
+        .expect(name);
+    let end = row + text[row..].find("</VOUCHERTYPE>").unwrap();
+    let at = row + text[row..end].find(from).expect(from);
+    format!("{}{}{}", &text[..at], to, &text[at + from.len()..])
+}
+
+/// The Receipt row of the answer taken with the type set to renumber, its
+/// sub-method element replaced by `to`.
+fn receipt_sub_method(to: &str) -> Result<VoucherTypeNumbering, NativeMastersError> {
+    let text = edited_row(&set_to_renumber(), "Receipt", RENUMBER, to);
+    parse_voucher_type_numbering(&text).map(|rows| row(&rows, "Receipt").numbering.clone())
 }
 
 /// The Payment row of the capture, to edit one field of.
@@ -73,16 +114,33 @@ fn the_request_is_byte_for_byte_the_one_sent_live() {
 }
 
 #[test]
+fn the_request_of_the_second_book_is_byte_for_byte_the_one_sent_live() {
+    // The same renderer with the second book's name: the two answers of
+    // 13 October 2026 committed here answer the product's own request.
+    let rendered = render_voucher_type_numbering_request("BRIDGE MANUAL NUMBERING LAB 2");
+    let mut wire = vec![0xFF, 0xFE];
+    wire.extend(rendered.encode_utf16().flat_map(u16::to_le_bytes));
+    assert_eq!(
+        wire,
+        include_bytes!("../tests/fixtures/voucher_type_numbering_m8r_series_request.utf16le.xml")
+    );
+    assert_eq!(
+        Sha256::digest(&wire)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+        "caf423642547b7673624ddc9a5a400a10bae208fbb99fdaa643aec0e0dbc4c28"
+    );
+}
+
+#[test]
 fn the_capture_reads_each_type_at_the_series_level() {
     let rows = parse_voucher_type_numbering(&response()).unwrap();
     assert_eq!(rows.len(), 24);
     // The three types set on the screen: method and duplicate setting match it.
     assert_eq!(
         row(&rows, "Journal").numbering,
-        observed(
-            SeriesNumberingMethod::Automatic,
-            DuplicateSetting::NotPrevented
-        )
+        observed(retain(), DuplicateSetting::NotPrevented)
     );
     assert_eq!(
         row(&rows, "Payment").numbering,
@@ -103,10 +161,7 @@ fn the_capture_reads_each_type_at_the_series_level() {
     for row in others {
         assert_eq!(
             row.numbering,
-            observed(
-                SeriesNumberingMethod::Automatic,
-                DuplicateSetting::NotPrevented
-            ),
+            observed(retain(), DuplicateSetting::NotPrevented),
             "{}",
             row.name
         );
@@ -149,10 +204,7 @@ fn the_type_level_duplicate_setting_is_never_read_either() {
     let rows = parse_voucher_type_numbering(&flipped).unwrap();
     assert_eq!(
         row(&rows, "Journal").numbering,
-        observed(
-            SeriesNumberingMethod::Automatic,
-            DuplicateSetting::NotPrevented
-        )
+        observed(retain(), DuplicateSetting::NotPrevented)
     );
 }
 
@@ -173,6 +225,35 @@ fn a_field_nested_in_another_list_is_not_the_series_field() {
         assert_eq!(
             row(&rows, "Payment").numbering,
             observed(SeriesNumberingMethod::Manual, DuplicateSetting::Prevented)
+        );
+    }
+    // The same for the sub-method, on the row captured as `Auto Renumber`: one
+    // inside the series' restart list, or at the type's own level, neither
+    // replaces the series' own nor repeats it.
+    let renumber = set_to_renumber();
+    for (from, to) in [
+        (
+            "<RESTARTFROMLIST.LIST>",
+            format!("<RESTARTFROMLIST.LIST>{RETAIN}"),
+        ),
+        (
+            "<LANGUAGENAME.LIST>",
+            format!("{RETAIN}<LANGUAGENAME.LIST>"),
+        ),
+        (
+            "<LANGUAGENAME.LIST>",
+            format!("<LANGUAGENAME.LIST>{RETAIN}"),
+        ),
+    ] {
+        let rows =
+            parse_voucher_type_numbering(&edited_row(&renumber, "Receipt", from, &to)).unwrap();
+        assert_eq!(
+            row(&rows, "Receipt").numbering,
+            observed(
+                SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRenumber),
+                DuplicateSetting::NotPrevented
+            ),
+            "{to}"
         );
     }
 }
@@ -298,6 +379,164 @@ fn a_missing_blank_repeated_or_unrecognised_series_field_is_not_a_default() {
         assert_eq!(
             row(&rows, "Payment").numbering,
             VoucherTypeNumbering::FieldInvalid(code),
+            "{to}"
+        );
+    }
+}
+
+/// The second book (13 October 2026): 24 types, Payment numbered Manual, and the
+/// Receipt type's screen set to retain, then to renumber.
+#[test]
+fn the_sub_method_reads_as_the_receipt_screen_was_set_in_each_capture() {
+    for (text, receipt) in [
+        (before_renumber(), NumberingSubMethod::AutoRetain),
+        (set_to_renumber(), NumberingSubMethod::AutoRenumber),
+    ] {
+        let rows = parse_voucher_type_numbering(&text).unwrap();
+        assert_eq!(rows.len(), 24);
+        assert_eq!(
+            row(&rows, "Receipt").numbering,
+            observed(
+                SeriesNumberingMethod::Automatic(receipt.clone()),
+                DuplicateSetting::NotPrevented
+            ),
+            "{receipt:?}"
+        );
+        // Payment's series prints `Auto Retain` too, and is Manual: under
+        // Manual the sub-method is not read.
+        assert_eq!(
+            row(&rows, "Payment").numbering,
+            observed(
+                SeriesNumberingMethod::Manual,
+                DuplicateSetting::NotPrevented
+            )
+        );
+        let others = rows
+            .iter()
+            .filter(|row| !["Payment", "Receipt"].contains(&row.name.as_str()));
+        assert_eq!(others.clone().count(), 22);
+        for row in others {
+            assert_eq!(
+                row.numbering,
+                observed(retain(), DuplicateSetting::NotPrevented),
+                "{} {receipt:?}",
+                row.name
+            );
+        }
+    }
+}
+
+#[test]
+fn a_series_without_a_sub_method_reads_absent_and_never_retain() {
+    assert_eq!(
+        receipt_sub_method("").unwrap(),
+        observed(
+            SeriesNumberingMethod::Automatic(NumberingSubMethod::Absent),
+            DuplicateSetting::NotPrevented
+        )
+    );
+}
+
+#[test]
+fn a_sub_method_outside_the_two_measured_texts_is_kept_raw() {
+    let at_bound = "x".repeat(MASTERS_ASSUMED_NAME_CHARS);
+    for (element, raw) in [
+        // Neither trimmed nor case-folded into a measured text.
+        (
+            "<NUMBERINGSUBMETHOD>auto retain</NUMBERINGSUBMETHOD>",
+            "auto retain",
+        ),
+        (
+            "<NUMBERINGSUBMETHOD> Auto Retain</NUMBERINGSUBMETHOD>",
+            " Auto Retain",
+        ),
+        (
+            "<NUMBERINGSUBMETHOD>Auto Retain </NUMBERINGSUBMETHOD>",
+            "Auto Retain ",
+        ),
+        (
+            "<NUMBERINGSUBMETHOD>AUTO RENUMBER</NUMBERINGSUBMETHOD>",
+            "AUTO RENUMBER",
+        ),
+        (
+            "<NUMBERINGSUBMETHOD>Renumber</NUMBERINGSUBMETHOD>",
+            "Renumber",
+        ),
+        // Blank is a printed value, not a missing element.
+        ("<NUMBERINGSUBMETHOD/>", ""),
+        ("<NUMBERINGSUBMETHOD></NUMBERINGSUBMETHOD>", ""),
+        ("<NUMBERINGSUBMETHOD>  </NUMBERINGSUBMETHOD>", "  "),
+        (
+            &format!("<NUMBERINGSUBMETHOD>{at_bound}</NUMBERINGSUBMETHOD>"),
+            at_bound.as_str(),
+        ),
+    ] {
+        assert_eq!(
+            receipt_sub_method(element).unwrap(),
+            observed(
+                SeriesNumberingMethod::Automatic(NumberingSubMethod::Unrecognised(raw.to_string())),
+                DuplicateSetting::NotPrevented
+            ),
+            "{element}"
+        );
+    }
+}
+
+#[test]
+fn a_sub_method_longer_than_a_name_refuses_the_answer() {
+    let over = "x".repeat(MASTERS_ASSUMED_NAME_CHARS + 1);
+    assert_eq!(
+        receipt_sub_method(&format!("<NUMBERINGSUBMETHOD>{over}</NUMBERINGSUBMETHOD>"))
+            .unwrap_err(),
+        NativeMastersError::RowExceedsBound
+    );
+}
+
+#[test]
+fn a_repeated_sub_method_is_the_repeated_field_reading() {
+    for repeated in [
+        format!("{RENUMBER}{RENUMBER}"),
+        format!("{RENUMBER}{RETAIN}"),
+        format!("{RETAIN}<NUMBERINGSUBMETHOD/>"),
+        format!("<NUMBERINGSUBMETHOD/>{RETAIN}"),
+    ] {
+        assert_eq!(
+            receipt_sub_method(&repeated).unwrap(),
+            VoucherTypeNumbering::FieldInvalid("series_field_repeated"),
+            "{repeated}"
+        );
+    }
+    // Under Manual too: a repeat is refused before the method is looked at.
+    let text = edited_row(
+        &set_to_renumber(),
+        "Payment",
+        RETAIN,
+        &format!("{RETAIN}{RETAIN}"),
+    );
+    let rows = parse_voucher_type_numbering(&text).unwrap();
+    assert_eq!(
+        row(&rows, "Payment").numbering,
+        VoucherTypeNumbering::FieldInvalid("series_field_repeated")
+    );
+}
+
+#[test]
+fn the_sub_method_of_a_manual_series_is_not_read() {
+    let over = "x".repeat(MASTERS_ASSUMED_NAME_CHARS + 1);
+    for to in [
+        String::new(),
+        RENUMBER.to_string(),
+        "<NUMBERINGSUBMETHOD>Serial</NUMBERINGSUBMETHOD>".to_string(),
+        format!("<NUMBERINGSUBMETHOD>{over}</NUMBERINGSUBMETHOD>"),
+    ] {
+        let text = edited_row(&set_to_renumber(), "Payment", RETAIN, &to);
+        let rows = parse_voucher_type_numbering(&text).unwrap();
+        assert_eq!(
+            row(&rows, "Payment").numbering,
+            observed(
+                SeriesNumberingMethod::Manual,
+                DuplicateSetting::NotPrevented
+            ),
             "{to}"
         );
     }
@@ -525,10 +764,7 @@ mod join {
         let journal = index(&reversed, "Journal");
         assert_eq!(
             joined[journal],
-            observed(
-                SeriesNumberingMethod::Automatic,
-                DuplicateSetting::NotPrevented
-            )
+            observed(retain(), DuplicateSetting::NotPrevented)
         );
         let receipt = index(&reversed, "Receipt");
         assert_eq!(

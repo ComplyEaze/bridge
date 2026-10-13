@@ -1332,9 +1332,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
             Some(DATE_REMEDIATION)
         }
-        "import_voucher_numbering_not_automatic" => Some(
-            "Nothing was sent. ComplyEaze Bridge posts vouchers without a voucher number, so Tally numbers each one by its voucher type, and it posts only into voucher types whose voucher numbering it read as Automatic. The voucher types in error.refused_types did not read so; observed says what was read. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Ask the user to enter the vouchers of those voucher types in Tally's voucher entry screen, and build the other vouchers again without them. Do not change a voucher to another voucher type, and do not change a voucher type's voucher numbering to get past this: that is the user's decision, and it can change the numbers of vouchers already entered.",
-        ),
+        // One next step for both numbering refusals (bridge#724): a batch that
+        // holds a voucher type of each is named
+        // `import_voucher_numbering_not_automatic`.
+        "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
+            Some(agent_import::POST_NUMBERING_NEXT_STEP)
+        }
         _ => None,
     }
 }

@@ -433,6 +433,10 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
     );
     assert!(description.contains("a single series not named `Default`"));
     assert!(description.contains("has not yet been run on a live Tally"));
+    // The sub-method: where it is returned, and what was not measured.
+    assert!(description.contains("`sub_method`"));
+    assert!(description.contains("when one was sent by import without a number"));
+    assert!(description.contains("the same through ComplyEaze Bridge's own post are not measured"));
 }
 
 #[tokio::test]
@@ -1181,6 +1185,10 @@ async fn each_voucher_type_row_carries_the_numbering_of_its_own_series() {
     // Debit Note: a method Tally printed outside the measured set.
     // Delivery Note: the override method, seen on a real book but not captured.
     // Memorandum: a duplicate setting that is neither Yes nor No.
+    // Sales: edited to the sub-method a type set to renumber prints.
+    // Purchase: a series with no sub-method. Stock Journal: a sub-method
+    // outside the two measured texts. Payment: Manual, with its sub-method
+    // changed, which is not returned.
     let series_of = |name: &str| {
         let at = numbering
             .find(&format!("<VOUCHERTYPE NAME=\"{name}\""))
@@ -1224,16 +1232,62 @@ async fn each_voucher_type_row_carries_the_numbering_of_its_own_series() {
         "<PREVENTDUPLICATES>No</PREVENTDUPLICATES>",
         "<PREVENTDUPLICATES>Maybe</PREVENTDUPLICATES>",
     );
+    const RETAIN: &str = "<NUMBERINGSUBMETHOD>Auto Retain</NUMBERINGSUBMETHOD>";
+    let mut numbering = numbering;
+    for (name, to) in [
+        (
+            "Sales",
+            "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+        ),
+        ("Purchase", ""),
+        (
+            "Stock Journal",
+            "<NUMBERINGSUBMETHOD>Renumber &amp; Retain</NUMBERINGSUBMETHOD>",
+        ),
+        (
+            "Payment",
+            "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+        ),
+    ] {
+        numbering = edit_after(
+            &numbering,
+            &format!("<VOUCHERTYPE NAME=\"{name}\""),
+            RETAIN,
+            to,
+        );
+    }
     let one = OneServer::spawn(voucher_type_plans(masters, numbering, 14, MARK));
     let response = one.call(args("voucher_types", 0, 500, None)).await;
     let page = result(&response);
     let rows = page["masters"].as_array().unwrap();
     assert_eq!(rows.len(), 26);
-    // The three types the capture's book had set on the screen.
+    // The three types the capture's book had set on the screen. Under
+    // `automatic` the row says which sub-method the series printed.
     assert_eq!(
         series_numbering(rows, "Journal"),
-        &json!({"observation":"observed","method":"automatic","duplicates":"not_prevented"})
+        &json!({"observation":"observed","method":"automatic","sub_method":"auto_retain","duplicates":"not_prevented"})
     );
+    assert_eq!(
+        series_numbering(rows, "Sales"),
+        &json!({"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"})
+    );
+    assert_eq!(
+        series_numbering(rows, "Purchase"),
+        &json!({"observation":"observed","method":"automatic","sub_method":"absent","duplicates":"not_prevented"})
+    );
+    // Kept raw, as an unrecognised method is.
+    assert_eq!(
+        series_numbering(rows, "Stock Journal"),
+        &json!({"observation":"observed","method":"automatic","sub_method":{"unrecognised":"Renumber & Retain"},"duplicates":"not_prevented"})
+    );
+    // No other method carries one: Payment and Receipt below are Manual, and
+    // the two rows with another method follow them.
+    for name in ["Payment", "Receipt", "Debit Note", "Delivery Note"] {
+        assert!(
+            series_numbering(rows, name).get("sub_method").is_none(),
+            "{name}"
+        );
+    }
     assert_eq!(
         series_numbering(rows, "Payment"),
         &json!({"observation":"observed","method":"manual","duplicates":"prevented"})
@@ -1298,6 +1352,11 @@ async fn each_voucher_type_row_carries_the_numbering_of_its_own_series() {
     assert!(shipped("a voucher type created new"));
     assert!(shipped("An `unrecognised` series method is never `manual`"));
     assert!(shipped("has not yet been run on a live Tally"));
+    assert!(shipped(
+        "Under `automatic`, and under no other method, series_numbering carries `sub_method`"
+    ));
+    assert!(shipped("when one was sent by import without a number"));
+    assert!(shipped("the same through ComplyEaze Bridge's own post"));
     assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
 }
 

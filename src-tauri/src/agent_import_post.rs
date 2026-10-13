@@ -584,7 +584,7 @@ impl Server {
         // The batch's own transaction ids found already in the book (#901).
         let mut preexisting_txn_ids: Option<Vec<String>> = None;
         // The voucher types refused for their voucher numbering (bridge#724).
-        let mut numbering_refused: Option<Value> = None;
+        let mut numbering_refused: Option<(Value, String)> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -898,15 +898,15 @@ impl Server {
             let mode = self.qualified_import_profile().await?;
             validate_post_profile_with_evidence(&payload, &mode, &mut accumulated)?;
             // Every voucher goes without a number, so each voucher type must be
-            // numbered Automatic (bridge#724). Read on every pass, a redeem
-            // included, after the master mark it is bounded by; the queue
-            // compares that mark again before the POST.
+            // numbered Automatic with existing numbers retained (bridge#724).
+            // Read on every pass, a redeem included, after the master mark it
+            // is bounded by; the queue compares that mark again before the POST.
             let numbering_admission = self
                 .admit_numbering_for_post(&company, &identity, &payload, &mut accumulated)
                 .await
                 .map_err(|refusal| {
                     if let numbering::NumberingFailure::Refused(refused) = &refusal {
-                        numbering_refused = Some(refused.refused_types());
+                        numbering_refused = Some((refused.refused_types(), refused.message()));
                     }
                     ToolFailure::from(refusal)
                 })?;
@@ -1474,8 +1474,16 @@ impl Server {
                 }
                 // The code's next step, under the same rule, and only when the
                 // journal shows nothing was sent (#1573).
+                // A numbering refusal's step, and its message, need more
+                // room than the general floor gives.
+                let guidance_floor = if numbering_refused.is_some() {
+                    numbering::GUIDANCE_MIN_RESPONSE_BUDGET
+                } else {
+                    crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET
+                };
+                let guidance_fits = self.settings.max_bytes >= guidance_floor;
                 if let Some(nothing_sent) = NothingSent::observed(attempted) {
-                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                    if guidance_fits {
                         attach_next_step(&mut outcome.payload, cause, nothing_sent);
                     }
                 }
@@ -1505,8 +1513,9 @@ impl Server {
                 if let Some((refused, omitted)) = cash_in_hand_refused {
                     name_refused_cash_ledgers(&mut outcome.payload, refused, omitted);
                 }
-                if let Some(refused) = numbering_refused {
-                    outcome.payload["result"]["error"]["refused_types"] = refused;
+                if let Some((refused, message)) = numbering_refused {
+                    let message = guidance_fits.then_some(message);
+                    name_refused_voucher_types(&mut outcome.payload, refused, message);
                 }
                 // Withheld under the remediation budget, as `cause` is. That is
                 // not a guarantee against the oversize answer just above it.
@@ -2299,6 +2308,19 @@ fn explain_unbound_batch(payload: &mut Value) {
 
 /// How many Currency masters a refusal names; the rest are counted.
 const REFUSAL_CURRENCIES_NAMED: usize = 8;
+
+/// Names the voucher types a numbering refusal refused (bridge#724), and,
+/// while the journal shows nothing was sent, says so in the message: the
+/// desktop's Journal screen shows the message alone. `message` is `None`
+/// under a budget that does not hold it, and the refusal keeps its own.
+fn name_refused_voucher_types(payload: &mut Value, refused: Value, message: Option<String>) {
+    payload["result"]["error"]["refused_types"] = refused;
+    if payload["result"]["attempt_recorded"] == json!(false) {
+        if let Some(message) = message {
+            payload["result"]["error"]["message"] = json!(message);
+        }
+    }
+}
 
 /// Say plainly why a multi-currency book was refused, naming the masters seen.
 /// The message is replaced only where no attempt is recorded: any other state

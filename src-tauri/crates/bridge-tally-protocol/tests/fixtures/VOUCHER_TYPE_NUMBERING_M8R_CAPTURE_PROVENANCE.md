@@ -1,0 +1,32 @@
+# `voucher_type_numbering_m8r_*` — provenance
+
+One Collection request, the voucher-type export with the numbering fields at both levels, and two of its answers, read from one synthetic company on Windows while the Receipt voucher type's behaviour for insertion and deletion was changed on Tally's own screen. Every file is a live capture, never hand-written, and no byte of any was edited.
+
+## Provenance
+
+- **Host / gateway:** TallyPrime **Silver**, 7.1, on Windows.
+- **Date:** 2026-10-13. One run; every read was one raw HTTP request, sent one at a time.
+- **Book:** `BRIDGE MANUAL NUMBERING LAB 2`, a synthetic company. The company name, the GUIDs and every value are synthetic. Its Payment voucher type is numbered Manual and its other 23 voucher types Automatic, in both answers.
+- **Sender:** `curl`, by hand, one request at a time, sending the body whose bytes are committed here; no ComplyEaze Bridge build took part. The request text is the production `render_voucher_type_numbering_request` text with this company's name filled in; the test `the_request_of_the_second_book_is_byte_for_byte_the_one_sent_live` asserts that the renderer in `native_voucher_type_numbering.rs` produces exactly these bytes.
+- **Source:** the captures are the files `answers/m8r-x0-series.xml`, `answers/m8r-x4-series.xml` and `requests/n2-series-vt-request.xml` of the directory `lab/724-m8r-renumber-answers` on this repository's branch of the same name, at commit `6726047ad43b33f6646ee1dac8c3583a7f025c79` (bridge#724). The byte counts and hashes below equal that directory's own `SHA256.txt`.
+- **Encoding:** each response is **BOM-less UTF-16LE** with CRLF line ends, exactly as received (`Content-Type: text/xml; charset=utf-16`, `Unicode: Yes`, `RESPSTATUS: 1`). The request is UTF-16LE **with a BOM**, 1,116 bytes. `.gitattributes` marks this tree `-text`.
+- **What the two answers are:** every voucher in the run was entered by hand on Tally's Receipt screen, with no number typed.
+  - `x0`: before anything was entered or changed. The Receipt type was on "Retain Original Voucher No.".
+  - `x4`: after three Receipts were entered and the Receipt type was then set to "Renumber Vouchers" on its screen.
+  - Not committed: a third answer of the same run (`answers/m8r-x7-series.xml` in the source directory, 81,972 bytes, `1eec2b31ed572b32959f1067c7d7fa1a3970f14a35aa58cf3c062b70740db6e7`), taken after two more Receipts were entered and the Receipt type was set back to "Retain Original Voucher No.". It read `Auto Retain` on Receipt again and parses to the same rows as `x0`, so it covers nothing `x0` does not.
+- **What the captures show:**
+  - 24 `VOUCHERTYPE` rows in each answer; every row holds exactly one `VOUCHERNUMBERSERIES.LIST`, named `Default`, and every series holds exactly one `NUMBERINGSUBMETHOD`, a direct child of the series list.
+  - Receipt's series: `NUMBERINGMETHOD` `Automatic` and `PREVENTDUPLICATES` `No` in both; `NUMBERINGSUBMETHOD` `Auto Retain` (x0), `Auto Renumber` (x4). Receipt's own `ALTERID` reads 38 and 233.
+  - Payment's series: `NUMBERINGMETHOD` `Manual` and `NUMBERINGSUBMETHOD` `Auto Retain` in both. The sub-method of a Manual series is not read.
+  - The other 22 types' series read `Automatic` / `Auto Retain` / `No` in both.
+  - With the type on "Renumber Vouchers", the vouchers read after each step showed that numbers already in the book had changed, at the switch and on a back-dated entry; with it on "Retain Original Voucher No.", a back-dated Receipt took the next number and the others kept theirs. Those voucher answers are in the source directory and are not committed here.
+- **Also seen in the two runs of that day, and not committed here** (the marks and voucher answers are in the two source directories named in this file): under "Renumber Vouchers" a voucher dated after every other took the next number and changed no other number, entered by hand in the first run and sent by import in the second; each of the four saves of the Receipt type's screen moved the company's master mark by 2 (231, 233, 235 in the first run; 235, 237, 239 in the second); and the second run's three imports were sent raw by `curl`, in the shape ComplyEaze Bridge's builder sends, with no ComplyEaze Bridge build taking part.
+- **Not established by these captures:** a voucher that arrives by import, since every entry in this run was by hand (a later run on the same book the same day, on this repository's branch `lab/724-m9i-import-renumber-answers` at `e29cbb5f`, sent three Receipts by import without a number: under "Renumber Vouchers" the back-dated one took the number of its date and the five later-dated Receipts each moved up by one, with no AlterID moved, the company's voucher mark rising by one only (13 to 14) and the import's answer reading CREATED 1, ALTERED 0, and under "Retain Original Voucher No." a back-dated one took the next number and moved nothing; its answers are not added as fixtures here, because no code path reads them); a batch of several vouchers under "Renumber Vouchers"; the same through ComplyEaze Bridge's own post; a deletion; any voucher type other than Receipt under "Renumber Vouchers"; a type holding more than a handful of vouchers, or none; "Set/Alter additional numbering details"; more than one series on a type; other editions and releases; macOS; whether a release, an edition or a book exists whose series does not print `NUMBERINGSUBMETHOD` or words it differently.
+
+| file | bytes | sha256 | content |
+|---|---|---|---|
+| `voucher_type_numbering_m8r_series_request.utf16le.xml` | 1116 | `caf423642547b7673624ddc9a5a400a10bae208fbb99fdaa643aec0e0dbc4c28` | the request (UTF-16LE with a BOM) |
+| `voucher_type_numbering_m8r_x0_series.utf16le.xml` | 81974 | `92424366b701aec49f232764483afe0e8c165017b90c5518421c752848f8ef9f` | its answer at x0, 24 rows; Receipt `Auto Retain` |
+| `voucher_type_numbering_m8r_x4_series.utf16le.xml` | 81974 | `cbde80fdd13d1eb401e283b3a0980f9ce0aace6d5c81daede81b4385c91648b5` | its answer at x4, 24 rows; Receipt `Auto Renumber` |
+
+The response headers are in the source directory and are not committed here; only their hashes are recorded: 135 bytes each, `177c33ed9fc94d6073d63758a06a17c5b480ea1f4bd2f7cb503f5c247fff478a` for x0 and for x4 (identical).

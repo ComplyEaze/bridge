@@ -1,0 +1,2 @@
+Contra, children of VOUCHERNUMBERSERIES.LIST whose text differs between m6r-u0-series.xml and m6r-u6-series.xml:
+NUMBERINGSUBMETHOD : u0=[Auto Retain] u6=[Auto Renumber]

@@ -1,0 +1,22 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+a701b3c45d30072243caa90f14a498b9eb7088c38b23d7874e981cb70c0f692c  171516  screenshots/A1-restart-other-screen.png
+db768617626ea45deefb2b52a4f9b87ad1ae7f62794acc4b68b71778ec98f368  135767  screenshots/A5-gateway-pilot-lab-after-restart.png
+735aa117a1dae569317d7d293cf128205dafcba91ccae25afcadd8e8c50a7351  165829  screenshots/A6-pilot-lab-shut-select-company-list.png
+2b10a0d739c2d0db0a1b7faded4f84674f17afa7d99897a743e94dafa4895f78  181950  screenshots/end-contra-type-screen.png
+81f6e5c7d9e541b72a9f9d871ac94ea57c2887e9c4f918e3582ccab1585b488a  185311  screenshots/end-n2-shut-select-company-list.png
+6e6c15ab88ad4695681d1dc89f90805c889977b0993496796276ee632efdeca1  153831  screenshots/N2-loaded-gateway.png
+1ef33d73eeeb3a82b47a971a76c53785f5aa3e6e6f65a12a0143675b4b3bc9b8  150542  screenshots/stop-second-process.png
+a19a50d071f6a49d62aa11cbc58eb50bde368537c9bda180303b4566c2029155  181671  screenshots/u0-statistics-contra-0.png
+7ba5e8b20e72415d1b94e8f9f53acd2f74324c3b49d23c40cbfc363b53bf9840  185432  screenshots/u1-contra-before-accept-no-change.png
+bd58dbf8ac759b6201f1a958d3b11898d2982da4930f81de2d64b9fb8caa12ee  185359  screenshots/u2-contra-before-accept-manual.png
+f1b103592e8d478c321e134d470aa588836ccf23f1c8247637ef0953b3150a01  185584  screenshots/u2-contra-methods-list.png
+137807a6660d97a5ec7c6629fc75a2d2736eeaad9effab52d577b61c38e0b400  188151  screenshots/u3-contra-before-accept-automatic.png
+c904203099c0a49bbb8d0dd470613134f4df4aa4738bbb6747984a71f2680c74  183474  screenshots/u4b-contra-before-accept-automatic.png
+13eaa9bd24ea7bdf9633cb2014f0be5a6f68d05acf674d7d5fd454cde55b8e6b  185171  screenshots/u4-contra-before-accept-override.png
+654b1d4841f5211cb7a395d57a7146f64f9a2acb201db62b86ef4944bcd47d65  178907  screenshots/u5b-contra-before-accept-automatic.png
+c7359a82e5fa7c739e7fc45865315f85461de9edeb7b7da20907a463226b33e8  194889  screenshots/u5-contra-before-accept-multi-user-auto.png
+af88cd33a1d826c9c01fa9307e5c4bba6e3858dcd90049ba5f13e211fd1492ef  198612  screenshots/u6b-contra-before-accept-retain-original.png
+2207bb6d6b25641561f521a765bee5edad3c601f52073b8db5cb98692c244526  188955  screenshots/u6-contra-before-accept-renumber-vouchers.png
+f680bbf85da0f6ef6caafb2af3ef7135e972643db659f45f53516a278bc89b05  32154  backups/N2-B3/TDBK1800_100059.001
+c21081756060fd00cc2ce173c462664422c9de7b1b87b9e4a8a76ec93517c6bf  2353  cold-copy-100033-2026-10-13T0637Z.sha256.txt (hash list of the 20-file, 878,080-byte folder copy)
+2f74d5de16182686b489381c8c8475d76c7eede4d7828ee0c16f64f174f867d9  16056  working-log.txt

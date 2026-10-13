@@ -1,0 +1,113 @@
+== Marks of the numbering-lab company (COMPANY row with GUID c48f3906-7682-4828-9e87-2b660064b6f8)
+file | bytes | sha256 | COMPANY rows | ALTVCHID | ALTMSTID | ALTMSTID moved since the row above
+n2-identity-marks.xml | 3418 | b6585854a6cfc194b34ebf711b94ae00c75da67d7747353075a9ddf3d7fae514 | 1 | 6 | 213 | -
+m6r-u0-marks.xml | 3418 | b6585854a6cfc194b34ebf711b94ae00c75da67d7747353075a9ddf3d7fae514 | 1 | 6 | 213 | no
+m6r-u0-marks-after-backup.xml | 3418 | b6585854a6cfc194b34ebf711b94ae00c75da67d7747353075a9ddf3d7fae514 | 1 | 6 | 213 | no
+m6r-u1-marks.xml | 3418 | 83611000173334b8f7bb7892a1a09fe9b7a63319c912c710bac3da13bfcbcc68 | 1 | 6 | 215 | yes
+m6r-u2-marks.xml | 3418 | 928a17bea7506055f9bfc0adbc814b1eef507e4c8065a614def3d8fa2200df7f | 1 | 6 | 217 | yes
+m6r-u3-marks.xml | 3418 | ee7b701ce6e6c466bbb686da45497b35c1556a6021d6ab50defd0e485b944b0d | 1 | 6 | 219 | yes
+m6r-u4-marks.xml | 3418 | 92f526c495cd6e6340ee34e98fceb6171f7b2c44f9adc3d6ca35abc1ef72149a | 1 | 6 | 221 | yes
+m6r-u4b-marks.xml | 3418 | 3365bb4ee30b44cbd6c1eee43062c866188661407731b5cef9e7d45deb13741e | 1 | 6 | 223 | yes
+m6r-u5-marks.xml | 3418 | 9752bf69ccfbbca9db636b63486472f92f41f0b47108e93ae7049e49bbafcc25 | 1 | 6 | 225 | yes
+m6r-u5b-marks.xml | 3418 | 9c55698698bfdf11315e1317d53215840edc2009f63589bd6f7c0f5caacbc0da | 1 | 6 | 227 | yes
+m6r-u6-marks.xml | 3418 | b715712ed00e3a65f1d3ff7d5483ced71bab467f5d7f3f6f7b0c278687af9bc7 | 1 | 6 | 229 | yes
+m6r-u6b-marks.xml | 3418 | 09dc651716c8273ee6c7c51520c576f71261844efbb1aab16f137376a5b6a4f8 | 1 | 6 | 231 | yes
+m6r-end-marks.xml | 3418 | 09dc651716c8273ee6c7c51520c576f71261844efbb1aab16f137376a5b6a4f8 | 1 | 6 | 231 | no
+
+== Contra in each series answer
+file | bytes | sha256 | VOUCHERTYPE count | Contra ALTERID | Contra type-level NUMBERINGMETHOD | series lists | series NUMBERINGMETHOD (UTF-16LE hex) | PREVENTDUPLICATES | NUMBERINGSUBMETHOD
+m6r-u0-series.xml | 81978 | 51fbc399da8ff2b4ab738288334c138f98e2ff4f22452fc9243cc22772d43c21 | 24 | 34 | Default | 1 | Automatic (4100750074006f006d006100740069006300) | No | Auto Retain
+m6r-u2-series.xml | 81968 | 637d02276e59132207e57a70e60e6a85ba3deb5949e2e9963db63282c556bbf8 | 24 | 217 | None | 1 | Manual (4d0061006e00750061006c00) | No | Auto Retain
+m6r-u3-series.xml | 81974 | f3f5a3830053fbe8c15addc9542d468d274bc84625683745b1af56c1a8c45450 | 24 | 219 | None | 1 | Automatic (4100750074006f006d006100740069006300) | No | Auto Retain
+m6r-u4-series.xml | 82010 | 01c0b673273fb18827ac1424a5b5e99356ebaaa335ff2f1e9d69e19ca5f53b0c | 24 | 221 | None | 1 | Automatic (Manual Override) (4100750074006f006d006100740069006300200028004d0061006e00750061006c0020004f0076006500720072006900640065002900) | No | Auto Retain
+m6r-u5-series.xml | 81986 | 7a8597feba84b768bd828fc614b2cadc8abda2bdaa68d3869227ad2531091c88 | 24 | 225 | None | 1 | Multi-user Auto (4d0075006c00740069002d00750073006500720020004100750074006f00) | No | Auto Retain
+m6r-u6-series.xml | 81978 | 505e91f4833d45db0b6dd3313afe043370728b54ae47a3da2c94f9d17da1d4c2 | 24 | 229 | None | 1 | Automatic (4100750074006f006d006100740069006300) | No | Auto Renumber
+m6r-end-series.xml | 81974 | 854768704b69ea6440012ee69ad5ad9b8c309a70f530241370f61d35aac374a4 | 24 | 231 | None | 1 | Automatic (4100750074006f006d006100740069006300) | No | Auto Retain
+
+== Against m6r-u0-series.xml: types whose series NUMBERINGMETHOD or PREVENTDUPLICATES differ, children of the Contra series list whose text differs, and types whose ALTERID differs
+-- m6r-u2-series.xml
+   series values: now Contra|1|Manual|No
+   series values: u0  Contra|1|Automatic|No
+   Contra series child NUMBERINGMETHOD : u0 [Automatic] now [Manual]
+   ALTERID Contra: 34 -> 217
+-- m6r-u3-series.xml
+   series values: every type equal to u0
+   Contra series children: all equal to u0
+   ALTERID Contra: 34 -> 219
+-- m6r-u4-series.xml
+   series values: now Contra|1|Automatic (Manual Override)|No
+   series values: u0  Contra|1|Automatic|No
+   Contra series child NUMBERINGMETHOD : u0 [Automatic] now [Automatic (Manual Override)]
+   ALTERID Contra: 34 -> 221
+-- m6r-u5-series.xml
+   series values: now Contra|1|Multi-user Auto|No
+   series values: u0  Contra|1|Automatic|No
+   Contra series child NUMBERINGMETHOD : u0 [Automatic] now [Multi-user Auto]
+   ALTERID Contra: 34 -> 225
+-- m6r-u6-series.xml
+   series values: every type equal to u0
+   Contra series child NUMBERINGSUBMETHOD : u0 [Auto Retain] now [Auto Renumber]
+   ALTERID Contra: 34 -> 229
+-- m6r-end-series.xml
+   series values: every type equal to u0
+   Contra series children: all equal to u0
+   ALTERID Contra: 34 -> 231
+
+== All types in m6r-u0-series.xml (name | series index | NUMBERINGMETHOD | PREVENTDUPLICATES)
+Attendance|1|Automatic|No
+Contra|1|Automatic|No
+Credit Note|1|Automatic|No
+Debit Note|1|Automatic|No
+Delivery Note|1|Automatic|No
+Job Work In Order|1|Automatic|No
+Job Work Out Order|1|Automatic|No
+Journal|1|Automatic|No
+Material In|1|Automatic|No
+Material Out|1|Automatic|No
+Memorandum|1|Automatic|No
+Payment|1|Manual|No
+Payroll|1|Automatic|No
+Physical Stock|1|Automatic|No
+Purchase|1|Automatic|No
+Purchase Order|1|Automatic|No
+Receipt|1|Automatic|No
+Receipt Note|1|Automatic|No
+Rejections In|1|Automatic|No
+Rejections Out|1|Automatic|No
+Reversing Journal|1|Automatic|No
+Sales|1|Automatic|No
+Sales Order|1|Automatic|No
+Stock Journal|1|Automatic|No
+
+== Restart check on the pilot-lab company (GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85)
+restart-pilot-marks-before.xml | 3394 | 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | rows 1 | ALTVCHID 68 | ALTMSTID 245
+restart-pilot-marks-after.xml | 3394 | 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6 | rows 1 | ALTVCHID 68 | ALTMSTID 245
+restart-pilot-series.xml | 93546 | b2a1fd5593e2278d5a785ca602b0597da8a59be12bf1fc042af5ae75ae3e0825 | VOUCHERTYPE count 28
+Attendance|1|Automatic|No
+BRIDGE Sales|1|Manual|Yes
+BRIDGE Sales Two|1|Manual|No
+BRIDGE Sales Z0|1|Manual|Yes
+BRIDGE Sales Z1|1|Manual|Yes
+Contra|1|Automatic|No
+Credit Note|1|Automatic|No
+Debit Note|1|Automatic|No
+Delivery Note|1|Automatic|No
+Job Work In Order|1|Automatic|No
+Job Work Out Order|1|Automatic|No
+Journal|1|Automatic|No
+Material In|1|Automatic|No
+Material Out|1|Automatic|No
+Memorandum|1|Automatic|No
+Payment|1|Automatic|No
+Payroll|1|Automatic|No
+Physical Stock|1|Automatic|No
+Purchase|1|Automatic|No
+Purchase Order|1|Automatic|No
+Receipt|1|Automatic|No
+Receipt Note|1|Automatic|No
+Rejections In|1|Automatic|No
+Rejections Out|1|Automatic|No
+Reversing Journal|1|Automatic|No
+Sales|1|Automatic|No
+Sales Order|1|Automatic|No
+Stock Journal|1|Automatic|No

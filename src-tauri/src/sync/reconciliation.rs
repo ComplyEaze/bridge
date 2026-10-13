@@ -13,8 +13,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::db::tally_mirror::{
-    Confidence, ObservationStatus, ObservedRecordInput, RunOutcome, SourceIdentityInput,
-    VerificationState,
+    Confidence, ObservedRecordInput, RunOutcome, SourceIdentityInput, VerificationState,
 };
 use crate::warning_codes::WarningCode;
 
@@ -190,23 +189,14 @@ impl CanonicalObservation {
             identity,
             observed_at_unix_ms,
             raw_source_sha256: provenance.raw_source_sha256.as_str().to_string(),
-            canonical_sha256: Some(self.canonical_sha256.clone()),
-            canonical_payload: Some(self.canonical_payload.clone()),
+            canonical_sha256: self.canonical_sha256.clone(),
+            canonical_payload: self.canonical_payload.clone(),
             exact_decimals: self.exact_decimals.clone(),
             observed_alter_id: provenance
                 .alter_id
                 .as_ref()
                 .map(|alter_id| alter_id.as_str().to_string()),
-            status: ObservationStatus::Accepted,
-            safe_rejection_code: None,
         })
-    }
-
-    pub fn durable_key(&self) -> String {
-        format!(
-            "{}:{}:{}",
-            self.object_type, self.source_id, self.canonical_sha256
-        )
     }
 }
 
@@ -259,7 +249,6 @@ pub struct ReconciliationInput {
 pub struct ReconciliationDecision {
     pub proof: ProofManifest,
     pub mirror_commit: CommitBatchInput,
-    pub safe_mismatches: Vec<ReconciliationMismatch>,
 }
 
 /// Sealed commit authority. Production code can only obtain this value from
@@ -550,7 +539,6 @@ pub fn build_reconciliation(
         &mut gaps,
     );
     let warnings = input.warning_codes;
-    let mut mismatches = Vec::new();
     let completed_ids = input.completed_windows.keys().cloned().collect();
     if input.planned_window_ids != completed_ids {
         gaps.insert("missing_snapshot_window".to_string());
@@ -569,22 +557,14 @@ pub fn build_reconciliation(
         }
         if !evidence.mismatches.is_empty() {
             gaps.insert("reconciliation_mismatch".to_string());
-            mismatches.extend(evidence.mismatches.clone());
         }
         for (record_type, count) in &evidence.record_counts {
             *totals.record_counts.entry(record_type.clone()).or_insert(0) += count;
         }
         totals.add_object_counts(evidence, &mut gaps);
-        totals.add_canonical_records(evidence, &mut gaps, &mut mismatches);
+        totals.add_canonical_records(evidence, &mut gaps);
     }
     let record_counts = totals.finish(&mut gaps);
-
-    mismatches.sort_by(|left, right| {
-        left.safe_reason_code
-            .cmp(&right.safe_reason_code)
-            .then(left.safe_record_ids.cmp(&right.safe_record_ids))
-    });
-    mismatches.dedup();
 
     let verification = if gaps.is_empty() {
         CoreVerificationState::Verified
@@ -649,7 +629,6 @@ pub fn build_reconciliation(
     Ok(ReconciliationDecision {
         proof,
         mirror_commit,
-        safe_mismatches: mismatches,
     })
 }
 
@@ -816,12 +795,7 @@ impl SnapshotTotals {
     /// Records one window's canonical identities, flagging an identity seen in
     /// an earlier window with the same content (a duplicate, unless a complete
     /// repeatable master) or with different content (the source changed).
-    fn add_canonical_records(
-        &mut self,
-        evidence: &WindowEvidence,
-        gaps: &mut BTreeSet<String>,
-        mismatches: &mut Vec<ReconciliationMismatch>,
-    ) {
+    fn add_canonical_records(&mut self, evidence: &WindowEvidence, gaps: &mut BTreeSet<String>) {
         for (identity, content_sha256) in &evidence.canonical_records {
             let identity_parts = identity.split_once('\0');
             let object_scope = identity_parts
@@ -844,22 +818,10 @@ impl SnapshotTotals {
                             .is_some_and(|(object_type, _)| repeatable_complete_master(object_type))
                     {
                         gaps.insert("duplicate_record_across_windows".to_string());
-                        if let Some((_, source_id)) = identity_parts {
-                            mismatches.push(safe_mismatch(
-                                "duplicate_record_across_windows",
-                                vec![source_id.to_string()],
-                            ));
-                        }
                     }
                 }
                 Some(_) => {
                     gaps.insert("source_changed_during_snapshot".to_string());
-                    if let Some((_, source_id)) = identity_parts {
-                        mismatches.push(safe_mismatch(
-                            "source_changed_during_snapshot",
-                            vec![source_id.to_string()],
-                        ));
-                    }
                 }
                 None => {}
             }
@@ -975,7 +937,6 @@ pub fn build_terminal_proof(
                 .map(|warning| warning.as_str().to_string())
                 .collect(),
         }),
-        safe_mismatches: Vec::new(),
     }
 }
 

@@ -2,17 +2,9 @@ use super::*;
 
 #[test]
 fn company_book_extent_template_has_only_the_verified_fetch_list() {
-    let xml = render_company_book_extent("Synthetic & Company");
-    assert!(xml.contains("<ID>BridgeCompanyBookExtentV1</ID>"));
-    assert!(xml.contains("ALTVCHID"));
-    assert!(xml.contains("ALTMSTID"));
-    assert!(xml.contains("Synthetic &amp; Company"));
-    assert!(!xml.contains("CompanyNumber"));
-    assert!(!xml.contains("<COMPUTE>"));
-    assert!(!xml.contains("$$NumItems"));
-
     let v2 = render_company_book_extent_v2("Synthetic & Company");
     assert!(v2.contains("<ID>BridgeCompanyBookExtentV2</ID>"));
+    assert!(v2.contains("Synthetic &amp; Company"));
     assert!(v2.contains(
         "<FETCH>Name, GUID, CompanyNumber, BooksFrom, LastVoucherDate, ALTVCHID, ALTMSTID</FETCH>"
     ));

@@ -65,9 +65,10 @@ and a request failed with a 400 error; the published file, switched on, was not
 started either ("Unable to connect to extension server"). Neither error mentioned
 the Terms (section 4). From 0.5.1 the setting is not marked required, so Claude
 Desktop starts the extension and every tool answers `terms_not_accepted`, naming
-the setting (bridge#1413). That was seen on one Mac with a test package; it has
-not yet been checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
-or `1` is not asked.
+the setting (bridge#1413). The tools the assistant called gave that answer on one
+Mac with a test package and on one Windows computer with the build our checks
+made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
+`true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -93,7 +94,8 @@ or `1` is not asked.
   and bank account numbers to their first two and last two characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
-  MSME or Udyam registration numbers, contact details or references, and a
+  MSME or Udyam registration numbers, contact details or references, or the last
+  four digits of a bank statement's account number (`account_last4`), and a
   shortened name can still be identified, not least from the GSTIN or PAN sent
   beside it. The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the
@@ -112,8 +114,9 @@ or `1` is not asked.
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, and a name written inside a narration or reference stays
-    as it is.
+    addresses or IFSCs, or the last four digits of a bank statement's account
+    number (`account_last4`), and a name written inside a narration or reference
+    stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
@@ -126,6 +129,14 @@ or `1` is not asked.
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
+  - A bank-statement check over whole calendar months (`statement_tie_out`, in
+    source and not yet in a published build) can show, with the book's figures,
+    the statement's balance at the month ends and its net over those months,
+    under every setting: never a part of a month except the part-months at the
+    statement's own start and end (whose net a month-end balance gives together
+    with the opening and closing supplied to the parse), but a month in which
+    every other row's amount is already known (a single row, or one row beside open
+    cash lines, whose amounts the parse returns) gives that row's amount.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and
@@ -167,6 +178,10 @@ or `1` is not asked.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
   - **What the reads added since 0.5.0 send, under each setting.**
+    - The read-cost preview (`voucher_read_cost`) sends the company name,
+      its identifier, company number and books-from date, the company's voucher
+      mark, and counts and seconds derived from it, with constant text. It holds
+      no amounts and no narrations, and `mask_parties` has nothing to shorten in it.
     - The company settings read (`company_features`) sends the company name,
       its identifier, company number and books-from date, the cost-centre, GST
       and batch-wise settings as yes, no or not reported, and the currency
@@ -176,8 +191,8 @@ or `1` is not asked.
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and
       change number, and the voucher's GSTR-1 status (included, uncertain,
-      excluded or not in the return) and whether it was accepted as it
-      stands. It holds no amounts, no party or ledger names and no
+      excluded, not in the return, cancelled or optional) and whether it was
+      accepted as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
@@ -401,7 +416,10 @@ puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
 characters it cannot show safely, or do not fit, it refuses. A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
-and up to 40 characters of its narration, with no reference) and marks the
+and up to 40 characters of its narration, with no reference; from the next
+build a Journal's line names its first debit and first credit ledger and up to
+20 characters of its narration, fewer (never under 10) when that makes the line
+fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
 only, with a line saying why, and still asks for your approval, unless a ledger

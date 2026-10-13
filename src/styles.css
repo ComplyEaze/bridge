@@ -2555,6 +2555,12 @@ summary:focus-visible,
   text-decoration: underline;
 }
 
+.outstandings-export-notes {
+  flex-basis: 100%;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .outstandings-export-failures {
   flex-basis: 100%;
   margin: 0;

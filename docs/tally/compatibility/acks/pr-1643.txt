@@ -1,0 +1,8 @@
+scripts/check-tally-request-builder-hazards.mjs
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/sync/snapshot.rs
+src-tauri/src/tally/connector.rs
+src-tauri/src/tally/runtime.rs
+src-tauri/src/tally/tdl_engine.rs
+reviewer: lamemustafa

@@ -537,6 +537,17 @@ async fn refusals_name_a_category_and_a_row_never_the_statement() {
         .call_tool("parse_bank_statement", arguments(&scan, &scan_password))
         .await;
     assert_eq!(error_code(&scanned), Some("statement_no_readable_text"));
+    // so does a scan whose stamp draws a date over a hidden OCR layer, though its
+    // parse stops on the missing account-number line
+    let (stamped, stamped_password) =
+        statement_files(scan_directory.path(), "scan-ocr-with-stamp.pdf", PASSWORD);
+    let stamped = server
+        .call_tool(
+            "parse_bank_statement",
+            arguments(&stamped, &stamped_password),
+        )
+        .await;
+    assert_eq!(error_code(&stamped), Some("statement_no_readable_text"));
     for (key, value, expected) in [
         (
             "account_label",
@@ -1675,47 +1686,52 @@ async fn a_path_that_is_not_on_a_local_disk_is_refused_before_any_open() {
     }
 }
 
-/// A parse of three synthetic rows printed out of date order (so the earliest
-/// and latest dates are neither the first nor the last row printed), built
-/// without a PDF, optionally through a from/to window.
-fn windowed_parse(
+/// A synthetic debit-only row in the HDFC layout.
+fn upi_debit(
+    date: &str,
+    name: &str,
+    reference: &str,
+    dr: &str,
+    balance: &str,
+) -> bridge_bank_statement::parse::Row {
+    let narration = format!("UPI-{name}-9@x-ABCD0001-{reference}-P");
+    bridge_bank_statement::parse::Row::from_pairs([
+        ("date", date),
+        ("narr", narration.as_str()),
+        ("ref", "1"),
+        ("dr", dr),
+        ("cr", ""),
+        ("bal", balance),
+    ])
+}
+
+/// A parse of `rows`, built without a PDF, optionally through a from/to
+/// window: the request carries the same window the build used.
+fn parse_of(
     bank_ledger: &str,
+    rows: &[bridge_bank_statement::parse::Row],
+    (opening, closing, debits): (&str, &str, &str),
     date_from: Option<Date>,
     date_to: Option<Date>,
 ) -> (OwnedRequest, ParsedStatement) {
-    use bridge_bank_statement::parse::Row;
     use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
-    let upi = |date: &str, name: &str, reference: &str, dr: &str, balance: &str| {
-        let narration = format!("UPI-{name}-9@x-ABCD0001-{reference}-P");
-        Row::from_pairs([
-            ("date", date),
-            ("narr", narration.as_str()),
-            ("ref", "1"),
-            ("dr", dr),
-            ("cr", ""),
-            ("bal", balance),
-        ])
-    };
-    let rows = [
-        upi("05/08/26", "ALPHA", "111111111111", "10.00", "990.00"),
-        upi("09/08/26", "BRAVO", "222222222222", "10.00", "980.00"),
-        upi("01/08/26", "CHARLIE", "333333333333", "10.00", "970.00"),
-    ];
     let args = json!({
         "statement_path": never_opened("statement.pdf"),
         "password_file": never_opened("statement.password"),
         "bank": "hdfc",
         "account_label": "Synthetic CA xx4321",
-        "opening_balance": "1,000.00",
-        "closing_balance": "970.00",
-        "total_debits": "30.00",
+        "opening_balance": opening,
+        "closing_balance": closing,
+        "total_debits": debits,
         "total_credits": "0.00",
         "bank_ledger": bank_ledger,
         "suspense_ledger": "Suspense"
     });
-    let request = OwnedRequest::from_args(&args).unwrap();
+    let mut request = OwnedRequest::from_args(&args).unwrap();
+    request.date_from = date_from;
+    request.date_to = date_to;
     let build = build(
-        &rows,
+        rows,
         Bank::Hdfc,
         &Mapping::default(),
         &BuildOptions {
@@ -1732,13 +1748,65 @@ fn windowed_parse(
     let parsed = ParsedStatement {
         account_number: "00000000004321".into(),
         statement_rows: rows.len(),
-        closing: bridge_tally_core::ExactDecimal::parse("970.00").unwrap(),
-        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        closing: bridge_tally_core::ExactDecimal::parse(closing).unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(rows).unwrap(),
         check: selfcheck(&build, bank_ledger).unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
         build,
     };
     (request, parsed)
+}
+
+/// A parse of three synthetic rows printed out of date order (so the earliest
+/// and latest dates are neither the first nor the last row printed), built
+/// without a PDF, optionally through a from/to window.
+fn windowed_parse(
+    bank_ledger: &str,
+    date_from: Option<Date>,
+    date_to: Option<Date>,
+) -> (OwnedRequest, ParsedStatement) {
+    let rows = [
+        upi_debit("05/08/26", "ALPHA", "111111111111", "10.00", "990.00"),
+        upi_debit("09/08/26", "BRAVO", "222222222222", "10.00", "980.00"),
+        upi_debit("01/08/26", "CHARLIE", "333333333333", "10.00", "970.00"),
+    ];
+    parse_of(
+        bank_ledger,
+        &rows,
+        ("1,000.00", "970.00", "30.00"),
+        date_from,
+        date_to,
+    )
+}
+
+/// August of a statement that runs from 20 July to 3 September, parsed with
+/// from 1 August and to 31 August: one row before the month, two inside it,
+/// one after. The statement stands at 990.00 at the start of August and at
+/// 970.00 at its end.
+fn august_parse(bank_ledger: &str) -> (OwnedRequest, ParsedStatement) {
+    let rows = [
+        upi_debit("20/07/26", "ALPHA", "111111111111", "10.00", "990.00"),
+        upi_debit("05/08/26", "BRAVO", "222222222222", "10.00", "980.00"),
+        upi_debit("31/08/26", "CHARLIE", "333333333333", "10.00", "970.00"),
+        upi_debit("03/09/26", "DELTA", "444444444444", "10.00", "960.00"),
+    ];
+    parse_of(
+        bank_ledger,
+        &rows,
+        ("1,000.00", "960.00", "40.00"),
+        Date::new(2026, 8, 1),
+        Date::new(2026, 8, 31),
+    )
+}
+
+/// The id and digest of the proposals file `persist` writes for August of the
+/// statement above, in `data_dir`.
+pub(in crate::agent) fn persisted_august_of_a_longer_statement(
+    data_dir: &Path,
+    bank_ledger: &str,
+) -> (String, String) {
+    let (request, parsed) = august_parse(bank_ledger);
+    persist(data_dir, &request, &parsed, &"0".repeat(64)).unwrap()
 }
 
 /// The id and digest of a proposals file written by `persist`, the code
@@ -1766,9 +1834,22 @@ fn persisted_document(request: &OwnedRequest, parsed: &ParsedStatement) -> Value
 fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it() {
     let (request, parsed) = windowed_parse("Synthetic Bank Ledger", None, None);
     let document = persisted_document(&request, &parsed);
+    // The whole statement ties at its own row dates and the balances supplied.
     assert_eq!(
         document["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09", "whole_statement": true}),
+        json!({
+            "first_row_date": "2026-08-01",
+            "last_row_date": "2026-08-09",
+            "whole_statement": true,
+            "tie_out": {
+                "state": "established",
+                "first_date": "2026-08-01",
+                "last_date": "2026-08-09",
+                "opening_balance": "1000.00",
+                "closing_balance": "970.00",
+                "basis": "statement_rows_by_transaction_date",
+            },
+        }),
     );
     assert_eq!(
         document["schema"], PROPOSALS_SCHEMA,
@@ -1776,12 +1857,40 @@ fn the_file_records_the_statements_own_span_and_whether_the_window_was_all_of_it
     );
 
     // A window that drops a row: the span is still the statement's own, and
-    // the window is no longer the whole of it.
+    // the window is no longer the whole of it. It is not a whole calendar
+    // month, so no balance at its edges is written.
     let (request, parsed) = windowed_parse("Synthetic Bank Ledger", Date::new(2026, 8, 2), None);
     let document = persisted_document(&request, &parsed);
     assert_eq!(
         document["window"],
-        json!({"first_row_date": "2026-08-01", "last_row_date": "2026-08-09", "whole_statement": false}),
+        json!({
+            "first_row_date": "2026-08-01",
+            "last_row_date": "2026-08-09",
+            "whole_statement": false,
+            "tie_out": {"state": "not_established", "reason": "window_not_whole_calendar_months"},
+        }),
+    );
+}
+
+#[test]
+fn a_month_of_a_longer_statement_records_the_statements_balance_at_its_edges() {
+    let (request, parsed) = august_parse("Synthetic Bank Ledger");
+    let document = persisted_document(&request, &parsed);
+    assert_eq!(
+        document["window"],
+        json!({
+            "first_row_date": "2026-07-20",
+            "last_row_date": "2026-09-03",
+            "whole_statement": false,
+            "tie_out": {
+                "state": "established",
+                "first_date": "2026-08-01",
+                "last_date": "2026-08-31",
+                "opening_balance": "990.00",
+                "closing_balance": "970.00",
+                "basis": "statement_rows_by_transaction_date",
+            },
+        }),
     );
 }
 

@@ -133,7 +133,7 @@ impl Server {
                     .ok_or_else(|| "company_identity_incomplete".to_string())?;
                 let identity = VerifiedCompanyIdentity::from_observed_companies(
                     company.name.clone(),
-                    observed_guid.hyphenated().to_string(),
+                    observed_guid,
                     company_number,
                     books_from,
                     &observed_companies,
@@ -165,18 +165,13 @@ impl Server {
     }
 }
 
-pub(super) fn parse_native_company_guid(value: &str) -> Result<uuid::Uuid, String> {
-    // Native company GUIDs use hyphenated UUID spelling. Preserve case-insensitive
-    // matching without adding UUID aliases that the native identity bracket rejects.
-    let invalid = || "company_guid_invalid".to_string();
-    if value.len() != 36 {
-        return Err(invalid());
-    }
-    let guid = uuid::Uuid::parse_str(value).map_err(|_| invalid())?;
-    if !guid.hyphenated().to_string().eq_ignore_ascii_case(value) {
-        return Err(invalid());
-    }
-    Ok(guid)
+pub(super) fn parse_native_company_guid(
+    value: &str,
+) -> Result<bridge_tally_core::company_guid::CompanyGuid, String> {
+    // Native company GUIDs use hyphenated UUID spelling. Case is accepted and
+    // normalised; no UUID alias that the native identity bracket rejects is.
+    bridge_tally_core::company_guid::CompanyGuid::parse(value)
+        .map_err(|_| "company_guid_invalid".to_string())
 }
 
 pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Value {

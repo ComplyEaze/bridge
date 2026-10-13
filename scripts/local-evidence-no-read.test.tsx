@@ -44,6 +44,7 @@ function LocalEvidenceHarness() {
         liveReadNavigationLocked={false}
         liveReadSuppressed={isLocalEvidenceReadSuppressed(evidenceDrawerOpen, evidenceDrawerEntry)}
         asOf="20260731"
+        asOfOperatorSelected={false}
         onAsOfChange={() => {}}
         onTallyReadActivityChange={() => {}}
         onExportNoticeChange={() => {}}

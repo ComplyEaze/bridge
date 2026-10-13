@@ -958,7 +958,7 @@ fn identity() -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         observed.name.clone(),
-        observed.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&observed.guid.clone().unwrap()),
         observed.company_number.clone().unwrap(),
         observed.books_from.clone().unwrap(),
         &companies,
@@ -2273,6 +2273,54 @@ fn census_spans_tile_the_mark_and_none_holds_more_than_one_census() {
     // The live book of §11c.1 (a mark of about a quarter of a million) is 31
     // spans at the production width.
     assert_eq!(census_spans(249_948, 8192).unwrap().count(), 31);
+}
+
+/// `voucher_read_cost` states a call's census before it runs from `census_read_count`;
+/// the read decides whether to count with `skips_census` and then walks `census_spans`.
+/// One rule, so the two agree on every mark, including the boundaries.
+#[test]
+fn the_census_a_read_sends_is_the_count_the_preview_states() {
+    let counting =
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).counting_small_books();
+    let skipping = WindowReadLimits::for_shape(VoucherReadShape::Movement);
+    // A book that never held a voucher sends none, whatever the limits say.
+    assert_eq!(census_read_count(0, counting), Ok(0));
+    assert_eq!(census_read_count(0, skipping), Ok(0));
+    // A counting read sends one census for the smallest book that has a voucher;
+    // a skipping one sends none while the mark times the default voucher fits.
+    assert_eq!(census_read_count(1, counting), Ok(1));
+    assert_eq!(census_read_count(170, skipping), Ok(0));
+    assert_eq!(census_read_count(171, skipping), Ok(1));
+    // The live book of §11c.1 is 31 census reads at the production width.
+    assert_eq!(census_read_count(249_948, counting), Ok(31));
+    let largest = MAX_CENSUS_READS as u64 * counting.census_capacity();
+    assert_eq!(census_read_count(largest, counting), Ok(256));
+    assert_eq!(
+        census_read_count(largest + 1, counting),
+        Err(BOOK_TOO_LARGE)
+    );
+    for limits in [counting, skipping] {
+        for mark in [
+            0,
+            1,
+            42,
+            43,
+            170,
+            171,
+            8_192,
+            8_193,
+            249_948,
+            largest,
+            largest + 1,
+        ] {
+            let expected = if skips_census(mark, limits) {
+                Ok(0)
+            } else {
+                census_spans(mark, limits.census_capacity()).map(|spans| spans.count() as u64)
+            };
+            assert_eq!(census_read_count(mark, limits), expected, "mark {mark}");
+        }
+    }
 }
 
 #[test]
@@ -5691,6 +5739,49 @@ async fn vouchers_states_its_read_cost_from_eighteen_census_reads_and_not_from_o
     let window = &small["structuredContent"]["result"]["window"];
     assert_eq!(window["census"]["requests"], 1, "{window}");
     assert!(window.get("read_cost").is_none(), "{window}");
+}
+
+/// bridge#1465: what `voucher_read_cost` states before a call is what a real
+/// `vouchers` call then sends. The same scripted book is read twice, once by the
+/// preview (the identity read and one marks read) and once by the real call
+/// (whose window reports the census requests it sent), at two sizes; the
+/// counts and, where the real call states one, the floor must be equal. A change
+/// to the census rule at the read that is not made at the preview fails here.
+#[tokio::test]
+async fn the_preview_states_the_census_reads_a_real_vouchers_call_then_sends() {
+    let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
+    for reads in [3_u64, 18] {
+        let real = call_vouchers_over(census_plans_of(reads)).await;
+        assert_eq!(real["isError"], false, "{real}");
+        let window = &real["structuredContent"]["result"]["window"];
+        let sent = window["census"]["requests"].clone();
+        assert_eq!(
+            sent, reads,
+            "the real call sent {reads} census reads: {window}"
+        );
+
+        let mut plans = identity_plans();
+        plans.extend(paired(&mark(reads * capacity)));
+        let one = OneServer::spawn(plans);
+        let preview = one
+            .server
+            .call_tool("voucher_read_cost", json!({"company_guid": GUID}))
+            .await;
+        assert_eq!(preview["isError"], false, "{preview}");
+        let stated = &preview["structuredContent"]["result"]["per_call"]["vouchers"];
+        assert_eq!(stated["census_reads"], sent, "reads {reads}: {stated}");
+        // The real call states its floor from 16 reads on (not at 3); it is the same
+        // figure, and at 18 reads it is there, so a missing field fails the test.
+        if reads >= 16 {
+            let floor = &window["read_cost"]["floor_seconds"];
+            assert!(floor.is_u64(), "reads {reads}: {window}");
+            assert_eq!(&stated["floor_seconds"], floor, "reads {reads}: {stated}");
+        } else {
+            assert!(window.get("read_cost").is_none(), "reads {reads}: {window}");
+        }
+        // The preview sent the identity read and one marks read, and nothing else.
+        assert_eq!(one.requests(), 10);
+    }
 }
 
 /// A later page is served from the held window in about a second, so it must not

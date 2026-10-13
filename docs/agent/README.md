@@ -647,16 +647,22 @@ the same checks and refusals as `gst_status` (an exact type name, at most 93 day
 amount, and lists two things in one `items` list, each item carrying a `list`: `uncertain` (Tally's uncertain flag reads
 Yes once cancelled, optional and post-dated are decided first) and `overridden` (the acceptance flag, Accept As Is,
 reads Yes, with the `gst_status` the voucher reads now; a voucher that reads uncertain or excluded after it was
-accepted is the row to look at, and one voucher can be on both lists). An item holds `voucher_number`, `date`,
+accepted is the row to look at, and one voucher can be on both lists; that nothing but Accept As Is sets the flag to
+Yes is not measured, and the before-capture already held five vouchers with the flag Yes whose origin is not recorded). An item holds `voucher_number`, `date`,
 `party` (the party ledger), `amount` (the invoice total as Tally wrote it, without its sign, an exact decimal) with
 `party_side` (`debit` for a negative amount, `credit` for a positive one), `alter_id`, `master_id` and `gst_status`.
 A party or an amount that is empty, absent, repeated, zero or not a plain decimal (a foreign-currency amount) is
 `{"unread": code}`, never a name or a zero. `counts` are those of `gst_status` over the whole window. The result
 also holds `pre_filing_line`, the line a CA reads before filing, with the number of vouchers Tally marks Uncertain
-and the window's dates, and `filed_period_note`, which says the list may differ from a filed return and to check
-against it. The line and the note are left out, and the result is `partial` (`gst_uncertain_voucher_unread`), whenever any
-voucher was not read (its flags, its acceptance flag, or, for a listed voucher, its party or amount), so the number in
-the line is never short. A cancelled voucher reads an empty party and amount and is not listed.
+and the window's dates, ending with a sentence that names the voucher type it covers only, and `filed_period_note`,
+which says the list may differ from a filed return and to check against it. The line and the note are left out, and the
+result is `partial` (`gst_uncertain_voucher_unread`), when a voucher's flags or acceptance flag were not read or a
+listed voucher's party or amount was not, so the number in the line is never short. The line alone is withheld
+(`{"withheld": ...}`), the result staying `complete` with its counts, when no voucher was read in the window
+(`gst_uncertain_no_vouchers_in_window`, as a mistyped type name gives) or none is marked Uncertain
+(`gst_uncertain_none_marked_uncertain`), because a line of 0 would read as clearance. A cancelled voucher reads an
+empty party and amount and is not listed as uncertain; one whose acceptance flag reads Yes is listed under
+`overridden`, and its empty party and amount then make the result `partial` and withhold the line.
 
 Two reads are made. The first is `gst_status`'s own read, which counts the window's vouchers; a window above
 1,000 is refused with `gst_uncertain_window_too_large` (the count is in the refusal's `counts`), before the second
@@ -669,9 +675,11 @@ party names of this tool's answer and not its amounts, and the answer carries bo
 `gst_status` does not.
 
 The reason for uncertainty is not read, and bills missing an HSN/SAC are not split out from the others: they need
-re-saving with the code, not Accept As Is. To verify after someone accepts vouchers in Tally, run the tool again and
-compare by `master_id`: a voucher counts as verified only if an earlier run listed it uncertain and this run lists it
-overridden with `gst_status` included and the same amount. Nothing is kept between runs. Measured on one synthetic
+re-saving with the code, not Accept As Is. To confirm an acceptance after someone accepts vouchers in Tally, run the
+tool again and compare by `master_id`: the acceptance is confirmed only if an earlier run listed the voucher uncertain
+and this run lists it overridden with `gst_status` included and the same amount. That shows only that the acceptance
+flag was set and the voucher reads included with the same amount, not that the voucher is correct or complete. Nothing
+is kept between runs. Measured on one synthetic
 book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, which changed that voucher alone, for the
 unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
 Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,

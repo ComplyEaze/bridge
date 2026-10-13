@@ -21,10 +21,16 @@ test("a deadline explains the safe next step without exposing protocol jargon", 
 test("a missing or invalid mirror key says a retry does not help and points at the credential store, not at Tally", () => {
   const expected = {
     category: "The local Tally mirror cannot be opened",
-    action: "Retrying does not help. Restore this computer user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
+    action: "Retrying does not help. Open ComplyEaze Bridge as the same computer user and restore that user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
   };
   for (const code of ["tally_mirror_key_missing", "tally_mirror_key_invalid"]) {
     assert.deepEqual(classifyTallyError({ code, message: "The encrypted Tally mirror cannot be opened." }), expected, code);
+    // A command that reports a plain string leads with the code, and gets the same guidance.
+    assert.deepEqual(
+      classifyUnstructuredTallyError(`${code}: The encrypted Tally mirror exists, but its key is not available. Retrying does not help.`),
+      expected,
+      `${code} as a string`,
+    );
   }
   assert.notDeepEqual(
     classifyTallyError({ code: "tally_mirror_unavailable", message: "The encrypted Tally mirror could not be opened." }),

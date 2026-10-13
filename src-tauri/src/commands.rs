@@ -456,9 +456,10 @@ fn party_ledger_master_local_export_error(
     )
 }
 
-/// The two key states a retry cannot fix: the mirror file is there and the credential store
-/// holds no key for it, or holds a key that is not the mirror's length. Read from the typed
-/// error the key resolution returns, never from its message.
+/// The typed key error the key resolution returned, if the failure was one. Only the two key
+/// states (the mirror file is there and the credential store holds no key for it, or holds a
+/// key that is not the mirror's length) are told apart by the callers; read from the typed
+/// error, never from its message.
 fn mirror_key_state(error: &anyhow::Error) -> Option<&crate::db::MirrorKeyError> {
     error.downcast_ref::<crate::db::MirrorKeyError>()
 }
@@ -468,7 +469,7 @@ const MIRROR_KEY_INVALID_MESSAGE: &str = "The key stored for the encrypted Tally
 
 /// Produces the typed command error for the encrypted Tally mirror failing to initialise on
 /// first use. The mirror was never opened, so no local or Tally state changed. A missing or
-/// invalid key is permanent until the credential or the data folder is put back: retrying does
+/// invalid key is permanent until the credential is put back: retrying does
 /// not help, and the app deletes nothing. Any other failure (a denied credential prompt, a
 /// local disk or storage failure) is safe to retry once the operator has resolved it.
 fn mirror_unavailable_command_error(error: anyhow::Error) -> TallyCommandError {
@@ -506,10 +507,10 @@ fn mirror_unavailable_command_error(error: anyhow::Error) -> TallyCommandError {
 fn mirror_unavailable_string_error(error: anyhow::Error) -> String {
     match mirror_key_state(&error) {
         Some(crate::db::MirrorKeyError::MissingForExistingMirror) => format!(
-            "{MIRROR_KEY_MISSING_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
+            "tally_mirror_key_missing: {MIRROR_KEY_MISSING_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
         ),
         Some(crate::db::MirrorKeyError::StoredKeyInvalid) => format!(
-            "{MIRROR_KEY_INVALID_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
+            "tally_mirror_key_invalid: {MIRROR_KEY_INVALID_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
         ),
         _ => "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.".to_string(),
     }

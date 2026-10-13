@@ -37,8 +37,8 @@ What Bridge does today:
 - **The desktop app's Tally mirror is encrypted.** It is SQLCipher with a random 32-byte key held
   in the OS credential store: service `com.complyeaze.bridge.tally-mirror`, account
   `database-key-v1:<sha256(path)>`. It runs an integrity check and sets `cipher_memory_security`
-  and `secure_delete` (`src-tauri/src/db/encrypted.rs:9-127,179-235`), and fails closed, with a typed
-  error (`MirrorKeyError`), when the database exists but its key is missing or is not a valid key;
+  and `secure_delete` (`src-tauri/src/db/encrypted.rs`), and fails closed, with a typed error (`MirrorKeyError`),
+  when the database exists but its key is missing, or when the stored key is not a valid key;
   no reset exists yet (#1563). The key store is constructed only in the desktop entry point
   (`src-tauri/src/lib.rs:64-70`, specifically `:68`).
 - **The MCP binary never touches the credential store today.** `OsMirrorKeyStore` is constructed

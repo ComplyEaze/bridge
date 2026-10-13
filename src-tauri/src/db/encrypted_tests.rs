@@ -160,6 +160,22 @@ fn a_credential_store_that_cannot_be_read_is_not_a_missing_key() {
     ));
 }
 
+/// A leftover write-ahead file beside no database and no key is not a mirror: a first-run user
+/// gets a key. (SQLite's own handling of that stale file is not measured here.)
+#[test]
+fn a_leftover_write_ahead_file_alone_does_not_stop_a_first_run() {
+    for suffix in ["-wal", "-shm"] {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let database = directory.path().join("mirror.db");
+        let mut leftover = database.as_os_str().to_os_string();
+        leftover.push(suffix);
+        fs::write(&leftover, b"leftover").expect("create leftover file");
+        let store = FakeKeyStore::default();
+        resolve_mirror_key(&database, &store).expect("a first run makes its key");
+        assert!(store.load().expect("reload").is_some(), "{suffix}");
+    }
+}
+
 /// A path whose existence cannot be read is not "no database": no key is made
 /// beside a database that may be there.
 #[cfg(unix)]

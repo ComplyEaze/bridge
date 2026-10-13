@@ -17,10 +17,7 @@ export function classifyTallyError({ code, message }: TallyErrorDetails) {
     return localProfileStoreUnavailable();
   }
   if (code === "tally_mirror_key_missing" || code === "tally_mirror_key_invalid") {
-    return {
-      category: "The local Tally mirror cannot be opened",
-      action: "Retrying does not help. Restore this computer user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
-    };
+    return localMirrorKeyUnavailable();
   }
   if (code === "tally_request_deadline_exceeded") {
     return {
@@ -49,8 +46,19 @@ export function classifyTallyError({ code, message }: TallyErrorDetails) {
   return classifyUnstructuredTallyError(message);
 }
 
+function localMirrorKeyUnavailable() {
+  return {
+    category: "The local Tally mirror cannot be opened",
+    action: "Retrying does not help. Open ComplyEaze Bridge as the same computer user and restore that user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
+  };
+}
+
 export function classifyUnstructuredTallyError(message: string) {
   const value = message.toLowerCase();
+  // A command that reports its error as a plain string leads with the code.
+  if (value.includes("tally_mirror_key_missing") || value.includes("tally_mirror_key_invalid")) {
+    return localMirrorKeyUnavailable();
+  }
   if (value.includes("persisted_tally_company_profiles_unavailable")) {
     return localProfileStoreUnavailable();
   }

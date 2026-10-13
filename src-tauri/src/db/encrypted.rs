@@ -34,7 +34,7 @@ pub enum EncryptedOpenError {
 }
 
 /// Why the mirror's key could not be resolved. The two key states are permanent
-/// until the credential or the data folder is put back, so a retry cannot fix
+/// until the credential is put back, so a retry cannot fix
 /// them; every other failure is the credential store's or the file system's own.
 #[derive(Debug, thiserror::Error)]
 pub enum MirrorKeyError {

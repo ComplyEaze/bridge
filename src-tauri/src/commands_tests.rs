@@ -635,8 +635,11 @@ fn a_string_error_tells_the_two_key_states_from_the_rest() {
     let missing = text(anyhow::Error::new(MirrorKeyError::MissingForExistingMirror));
     let invalid = text(anyhow::Error::new(MirrorKeyError::StoredKeyInvalid));
     let other = text(anyhow::anyhow!("a disk error"));
-    assert!(missing.starts_with(MIRROR_KEY_MISSING_MESSAGE));
-    assert!(invalid.starts_with(MIRROR_KEY_INVALID_MESSAGE));
+    // A string carries no code field, so the text leads with it: the app's banner reads it there.
+    assert!(missing.starts_with("tally_mirror_key_missing: "));
+    assert!(invalid.starts_with("tally_mirror_key_invalid: "));
+    assert!(missing.contains(MIRROR_KEY_MISSING_MESSAGE));
+    assert!(invalid.contains(MIRROR_KEY_INVALID_MESSAGE));
     assert_ne!(missing, invalid);
     assert_ne!(missing, other);
     assert_ne!(invalid, other);

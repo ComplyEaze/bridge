@@ -208,6 +208,123 @@ pub struct Build {
     /// How many rows the date window left out. Zero means the window is the
     /// whole statement.
     pub rows_outside_window: usize,
+    /// The net (credits less debits) of the rows dated before the window's
+    /// `from`, and of those dated after its `to`. Zero when none is left out.
+    pub net_before_window: ExactDecimal,
+    pub net_after_window: ExactDecimal,
+}
+
+/// Why a parse cannot be tied to the book over its window. Not a refusal of
+/// the parse: the proposals stand, and `statement_tie_out` answers
+/// `not_established` with this code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TieOutWindowRefusal {
+    /// A window that leaves rows out must run from the 1st of a month to the
+    /// last day of a month, so a tie-out shows the statement's totals per
+    /// calendar month and never a part of a month, except the part-months at
+    /// the statement's own start and end (a month edge's balance with the
+    /// supplied opening or closing gives their net); a month in which every
+    /// other row's amount is already known still shows that row's amount.
+    NotWholeCalendarMonths,
+    /// The window starts before the statement's first row or ends after its
+    /// last: the statement does not prove its balance on those days.
+    BeyondStatementRows,
+}
+
+impl TieOutWindowRefusal {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::NotWholeCalendarMonths => "window_not_whole_calendar_months",
+            Self::BeyondStatementRows => "window_beyond_statement_rows",
+        }
+    }
+}
+
+/// The statement's balance at the start of `first` and at the end of `last`,
+/// worked out from its own rows by transaction date. Built only by
+/// [`tie_out_window`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TieOutEdges {
+    first: Date,
+    last: Date,
+    opening: ExactDecimal,
+    closing: ExactDecimal,
+}
+
+impl TieOutEdges {
+    pub fn first(&self) -> Date {
+        self.first
+    }
+    pub fn last(&self) -> Date {
+        self.last
+    }
+    pub fn opening(&self) -> &ExactDecimal {
+        &self.opening
+    }
+    pub fn closing(&self) -> &ExactDecimal {
+        &self.closing
+    }
+}
+
+/// Where a parse can be tied to the book, from the build and the balances the
+/// caller supplied (which `reconcile` proved against every row). For the whole
+/// statement that is its first and last row dates and those two balances. For
+/// a window that leaves rows out it is the window's own dates, with the
+/// opening plus the net of the rows before it and the closing less the net of
+/// the rows after it: sums by date, so the order the bank printed the rows in
+/// cannot move them. `None` when the build has no rows.
+pub fn tie_out_window(
+    build: &Build,
+    opening: &ExactDecimal,
+    closing: &ExactDecimal,
+    date_from: Option<Date>,
+    date_to: Option<Date>,
+) -> Option<Result<Result<TieOutEdges, TieOutWindowRefusal>, Refusal>> {
+    let (first_row, last_row) = build.span?;
+    if build.rows_outside_window == 0 {
+        return Some(Ok(Ok(TieOutEdges {
+            first: first_row,
+            last: last_row,
+            opening: opening.clone(),
+            closing: closing.clone(),
+        })));
+    }
+    let first = date_from.unwrap_or(first_row);
+    let last = date_to.unwrap_or(last_row);
+    if !is_whole_calendar_months(first, last) {
+        return Some(Ok(Err(TieOutWindowRefusal::NotWholeCalendarMonths)));
+    }
+    if first < first_row || last > last_row {
+        return Some(Ok(Err(TieOutWindowRefusal::BeyondStatementRows)));
+    }
+    let edges = opening
+        .checked_add(&build.net_before_window)
+        .and_then(|opening| {
+            closing
+                .checked_subtract(&build.net_after_window)
+                .map(|closing| (opening, closing))
+        })
+        .map_err(out_of_range);
+    Some(edges.map(|(opening, closing)| {
+        Ok(TieOutEdges {
+            first,
+            last,
+            opening,
+            closing,
+        })
+    }))
+}
+
+/// From the 1st of a month to the last day of a month (the same or a later one).
+pub fn is_whole_calendar_months(first: Date, last: Date) -> bool {
+    first.day == 1 && first <= last && Date::new(last.year, last.month, last.day + 1).is_none()
+}
+
+fn out_of_range(error: impl std::fmt::Debug) -> Refusal {
+    Refusal::new(
+        "arithmetic_out_of_range",
+        format!("a running total exceeded the exact-decimal bound ({error:?})"),
+    )
 }
 
 /// Everything `build` needs besides the rows and the mapping.
@@ -399,6 +516,8 @@ pub fn build(
     let mut window_ids = BTreeSet::new();
     let mut span: Option<(Date, Date)> = None;
     let mut rows_outside_window = 0;
+    let mut net_before_window = ExactDecimal::zero();
+    let mut net_after_window = ExactDecimal::zero();
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -417,10 +536,25 @@ pub fn build(
         span = Some(span.map_or((date, date), |(first, last)| {
             (first.min(date), last.max(date))
         }));
-        if options.date_from.is_some_and(|from| date < from)
-            || options.date_to.is_some_and(|to| date > to)
-        {
+        let before = options.date_from.is_some_and(|from| date < from);
+        if before || options.date_to.is_some_and(|to| date > to) {
             rows_outside_window += 1;
+            let net = match (
+                money(row.get(DEBIT), DEBIT, number)?,
+                money(row.get(CREDIT), CREDIT, number)?,
+            ) {
+                (Some(debit), None) => ExactDecimal::zero().checked_subtract(&debit),
+                (None, Some(credit)) => Ok(credit),
+                // `reconcile` refused a row with both; a row with neither moved nothing.
+                _ => Ok(ExactDecimal::zero()),
+            }
+            .map_err(out_of_range)?;
+            let sum = if before {
+                &mut net_before_window
+            } else {
+                &mut net_after_window
+            };
+            *sum = sum.checked_add(&net).map_err(out_of_range)?;
             continue;
         }
         window_ids.insert(txn_id.clone());
@@ -696,6 +830,8 @@ pub fn build(
         records,
         span,
         rows_outside_window,
+        net_before_window,
+        net_after_window,
     })
 }
 

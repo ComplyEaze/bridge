@@ -46,11 +46,20 @@ These changes are in source and not yet in a published build.
 - `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says whether the bank ledger in
   Tally stands where the statement says it stood at the start and at the end of the statement's dates, as three
   gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
-  after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
-  dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
-  parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
-  proved against a live book: one run on two synthetic companies by an outside contributor is only partly recorded (see
-  the pull request).
+  after one made by hand. It covers a whole statement, or whole calendar months of it, names no cause and writes
+  nothing. It returns the two dates and the gaps, not the balances, though a gap plus the statement's balance at
+  that date (for a whole statement, the balance you supplied) gives the book's. The parse's proposals file now also
+  records the statement's first and last dates (part of #1211). It is not yet proved against a live book: one run
+  on two synthetic companies by an outside contributor is only partly recorded (see the pull request).
+- `statement_tie_out` can check whole calendar months of a longer statement: a file parsed with `from` and `to` (or
+  one of them) from the 1st of a month to the last day of a month, within the statement's rows, is compared with the
+  book at those dates, against the statement's balance there as worked out from its own rows. Any other narrowed
+  window is `not_established` (`window_not_whole_calendar_months`, `window_beyond_statement_rows`). With the book's
+  figures, the gaps then give the statement's balance at those month ends and its net over those months: never a
+  part of a month except the part-months at the statement's own start and end (whose net a month-end balance gives
+  together with the opening and closing supplied to the parse), though a month in which every other row's amount is already known (one row alone, or one row
+  beside open cash lines, whose amounts the parse returns) gives that row's amount (part of #1211). No month window
+  has been run against a live book.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the

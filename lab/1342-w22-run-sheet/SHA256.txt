@@ -1,0 +1,4 @@
+# W22 run sheet: does Tally keep the narration of a Sales invoice byte for byte; steps in W22-README.md. r02-marks.xml is the marks request of the earlier captures (976 bytes); w22-window-0920.xml is workorder/w-window-0802.xml with its four dates 20260802 changed to 20260920 only.
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  r02-marks.xml
+7e2fca00d975b9c05b52ad1d8d6df900732e193ae8809604f4d04ad1a1c184dd  w22-window-0920.xml
+941766f1fef34fb326d191a9234003629aa97a0c7278d1cbb493f1c533df600e  W22-README.md

@@ -98,7 +98,7 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
                 name: item.name.clone(),
                 // A ledger confirmed absent has no GUID to name.
                 guid: (state != MasterVerdictState::ConfirmedAbsent)
-                    .then(|| format!("0000000{index}-aaaa-bbbb-cccc-000000000000")),
+                    .then(|| format!("0000000{index}-aaaa-bbbb-cccc-dddddddddddd")),
                 reason: None,
             })
             .collect(),

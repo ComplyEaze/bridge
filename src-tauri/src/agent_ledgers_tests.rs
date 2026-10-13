@@ -5519,17 +5519,34 @@ mod through_the_tool {
         /// returns the lines as Tally sent them. The control is the row's own name.
         #[tokio::test]
         async fn masking_parties_masks_the_mailing_address_lines_through_the_tool() {
-            let read = |redaction| async move {
-                let masters = mailing_masters();
-                let balances = balances_matching(&masters);
-                call_observed(
-                    compliance_plans(masters, balances),
-                    compliance_args(None),
-                    redaction,
-                    200_000,
+            // The captured answer gives the probe party no flat address (Tally 7.1 leaves it
+            // empty), so one is written into its row here: a first line that repeats its name.
+            let masters = {
+                let capture = mailing_masters();
+                let probe = capture
+                    .find("<LEDGER NAME=\"Lab Party Duplicate Probe\"")
+                    .expect("the probe row");
+                let empty = "<LEDADDRESS.LIST>     </LEDADDRESS.LIST>";
+                let at = probe + capture[probe..].find(empty).expect("its empty address");
+                format!(
+                    "{}<LEDADDRESS.LIST><LEDADDRESS>Lab Party Duplicate Probe</LEDADDRESS><LEDADDRESS>9 Test Lane</LEDADDRESS></LEDADDRESS.LIST>{}",
+                    &capture[..at],
+                    &capture[at + empty.len()..]
                 )
-                .await
-                .0
+            };
+            let read = |redaction| {
+                let masters = masters.clone();
+                async move {
+                    let balances = balances_matching(&masters);
+                    call_observed(
+                        compliance_plans(masters, balances),
+                        compliance_args(None),
+                        redaction,
+                        200_000,
+                    )
+                    .await
+                    .0
+                }
             };
             let probe = |response: &Value| {
                 items(response)
@@ -5564,6 +5581,21 @@ mod through_the_tool {
             for field in ["pin_code", "state", "country", "applicable_from"] {
                 assert_eq!(entry(&plain)[field], entry(&masked)[field], "{field}");
             }
+            // The mailing name and the flat address go through the tool the same way.
+            assert_eq!(
+                entry(&plain)["mailing_name"],
+                json!("Lab Party Duplicate Probe")
+            );
+            assert_eq!(
+                entry(&masked)["mailing_name"],
+                json!(crate::agent::mask("Lab Party Duplicate Probe"))
+            );
+            let flat = "Lab Party Duplicate Probe\n9 Test Lane";
+            assert_eq!(plain["compliance"]["address"], json!(flat));
+            assert_eq!(
+                masked["compliance"]["address"],
+                json!(crate::agent::mask(flat))
+            );
         }
 
         // -- admission: the details read is sized by its own estimate --------

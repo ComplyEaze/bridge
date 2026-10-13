@@ -96,8 +96,8 @@ whose ledger now points to a different master.
   account numbers, IFSC, MSME or Udyam registration numbers, email, phone and
   address, and, when it builds a voucher file, that file's local path (which can
   include your computer user name). The setting takes one value, not both:
-  shorten party and ledger names and bank account numbers to their first two and
-  last two characters (four or fewer become “…”), or drop narrations. Neither
+  shorten party and ledger names, bank account numbers and a ledger's address
+  lines to their first two and last two characters (four or fewer become “…”), or drop narrations. Neither
   hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
   numbers, contact details or references, or the last four digits of a bank
   statement's account number, and a shortened name can still be

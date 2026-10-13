@@ -45,7 +45,7 @@ Before requesting financial data through an MCP client, the client may send the 
 Tally result to its AI provider, including company
 identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
-names and bank account numbers to their first two and last two characters (a name of
+names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,

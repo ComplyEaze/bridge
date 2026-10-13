@@ -134,21 +134,23 @@ pub(super) fn overridden_of(flag: Option<&str>) -> Result<bool, &'static str> {
 }
 
 #[derive(Debug, Default)]
-struct Node {
+pub(super) struct Node {
     name: String,
     text: String,
     children: Vec<Node>,
 }
 
 impl Node {
-    fn child_texts<'a>(&'a self, name: &'a str) -> impl Iterator<Item = String> + 'a {
+    pub(super) fn child_texts<'a>(&'a self, name: &'a str) -> impl Iterator<Item = String> + 'a {
         self.children
             .iter()
             .filter(move |child| child.name == name)
             .map(|child| clean(&child.text))
     }
 
-    fn one(&self, name: &str) -> Option<Option<String>> {
+    /// The text of the one direct child named `name`: `Some(None)` when there is
+    /// none, `None` when there are several. Nothing below a direct child is read.
+    pub(super) fn one(&self, name: &str) -> Option<Option<String>> {
         let mut found = self.child_texts(name);
         let first = found.next();
         match (first, found.next()) {
@@ -176,7 +178,7 @@ impl Node {
 /// (`&#4;`), which `mark_forbidden_numeric_references` turns into the
 /// replacement character and `#4;`, and the whitespace around it, are not
 /// part of it.
-fn clean(text: &str) -> String {
+pub(super) fn clean(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(at) = rest.find('\u{fffd}') {
@@ -265,7 +267,19 @@ pub(super) struct StatusRow {
 /// voucher whose status fields are absent, repeated, nested in another element
 /// or spelled another way keeps its row with the code that says so; it is
 /// never read as included.
+#[cfg(test)]
 pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static str> {
+    parse_rows_with(xml, |_| ()).map(|rows| rows.into_iter().map(|(row, ())| row).collect())
+}
+
+/// [`parse_status_rows`], with `extra` read from each voucher's node beside its
+/// status. `extra` sees the voucher's direct children and whatever lies below
+/// them; it is not part of the nesting check, which covers only the fields the
+/// status is read from.
+pub(super) fn parse_rows_with<T>(
+    xml: &str,
+    extra: impl Fn(&Node) -> T,
+) -> Result<Vec<(StatusRow, T)>, &'static str> {
     let envelope = parse_tree(xml)?;
     let data = envelope
         .children
@@ -356,25 +370,33 @@ pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static st
                 Err("gst_status_unreadable"),
             ),
         };
-        rows.push(StatusRow {
-            voucher_number: field("VOUCHERNUMBER")?,
-            date: field("DATE")?,
-            voucher_type: field("VOUCHERTYPENAME")?,
-            master_id,
-            alter_id: field("ALTERID")?,
-            status,
-            status_flags,
-            overridden,
-        });
+        rows.push((
+            StatusRow {
+                voucher_number: field("VOUCHERNUMBER")?,
+                date: field("DATE")?,
+                voucher_type: field("VOUCHERTYPENAME")?,
+                master_id,
+                alter_id: field("ALTERID")?,
+                status,
+                status_flags,
+                overridden,
+            },
+            extra(voucher),
+        ));
     }
     Ok(rows)
 }
 
-fn row_json(row: &StatusRow) -> Value {
-    let status = match row.status {
+/// A voucher's state as a result carries it: the state, or `{"unread": code}`.
+pub(super) fn gst_status_item_status(row: &StatusRow) -> Value {
+    match row.status {
         Ok(status) => json!(status),
         Err(code) => json!({"unread": code}),
-    };
+    }
+}
+
+fn row_json(row: &StatusRow) -> Value {
+    let status = gst_status_item_status(row);
     let overridden = match row.overridden {
         Ok(value) => json!(value),
         Err(code) => json!({"unread": code}),
@@ -394,29 +416,98 @@ fn row_json(row: &StatusRow) -> Value {
     item
 }
 
-impl Server {
-    pub(super) async fn gst_status(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
-        let guid = required_string(args, "company_guid")?;
-        let from = normalized_date(required_string(args, "from")?)?;
-        let to = normalized_date(required_string(args, "to")?)?;
-        let Some(days) = window_span_days(&from, &to) else {
-            return Err("invalid_date_range".to_string().into());
-        };
-        let type_name = required_string(args, "voucher_type_name")?;
-        // Argument refusals cost no read.
-        if !read_profiles::gst_status_type_name_literal_safe(type_name) {
-            return Err("gst_status_type_name_invalid".to_string().into());
+/// The vouchers of a window counted by what each one's flags state, and how many
+/// of them are unread. A voucher whose status or whose acceptance flag was not
+/// read is unread: the state of the answer is partial then. `unread` is a count
+/// within the others, not apart from them.
+pub(super) fn status_counts<'a>(
+    rows: impl Iterator<Item = &'a StatusRow>,
+) -> (BTreeMap<&'static str, u64>, u64) {
+    let mut counts = BTreeMap::<&'static str, u64>::new();
+    let mut unread = 0_u64;
+    for row in rows {
+        if row.status.is_err() || row.overridden.is_err() {
+            unread += 1;
         }
-        if days > STATUS_MAX_WINDOW_DAYS {
-            return Err("gst_status_window_too_long".to_string().into());
+        match row.status {
+            Ok(GstStatus::Included) => *counts.entry("included").or_default() += 1,
+            Ok(GstStatus::Uncertain) => *counts.entry("uncertain").or_default() += 1,
+            Ok(GstStatus::Excluded) => *counts.entry("excluded").or_default() += 1,
+            Ok(GstStatus::NotInReturn) => *counts.entry("not_in_return").or_default() += 1,
+            Ok(GstStatus::Cancelled) => *counts.entry("cancelled").or_default() += 1,
+            Ok(GstStatus::Optional) => *counts.entry("optional").or_default() += 1,
+            Ok(GstStatus::PostDated) => *counts.entry("post_dated").or_default() += 1,
+            Err(_) => {}
         }
-        let offset = arg_usize(args, "offset", 0)?;
-        let limit =
-            arg_positive_usize(args, "limit", self.settings.max_rows)?.min(self.settings.max_rows);
-        let (company, identity, prior) = self.verified_company(guid).await?;
+        if row.overridden == Ok(true) {
+            *counts.entry("accepted_as_it_stands").or_default() += 1;
+        }
+    }
+    (counts, unread)
+}
 
-        // The formula that selects the type and the window is evaluated on
-        // every voucher of the book: the voucher mark bounds the read.
+/// The counts a status result reports, every key present.
+pub(super) fn counts_json(counts: &BTreeMap<&'static str, u64>, unread: u64) -> Value {
+    let count = |key: &str| counts.get(key).copied().unwrap_or(0);
+    json!({
+        "included": count("included"),
+        "uncertain": count("uncertain"),
+        "excluded": count("excluded"),
+        "not_in_return": count("not_in_return"),
+        "cancelled": count("cancelled"),
+        "optional": count("optional"),
+        "post_dated": count("post_dated"),
+        "unread": unread,
+        "accepted_as_it_stands": count("accepted_as_it_stands"),
+    })
+}
+
+/// The arguments every status read takes, checked before any read is made.
+pub(super) struct StatusArguments<'a> {
+    pub(super) guid: &'a str,
+    pub(super) from: bridge_tally_core::TallyDate,
+    pub(super) to: bridge_tally_core::TallyDate,
+    pub(super) type_name: &'a str,
+}
+
+/// The company, its verified identity and what has been read so far, once the
+/// book's voucher mark has passed the gate.
+pub(super) struct StatusGate {
+    pub(super) company: TallyCompany,
+    identity: VerifiedCompanyIdentity,
+    pub(super) evidence: Evidence,
+}
+
+/// The arguments of a status read: `company_guid`, the window and the voucher
+/// type's name. Argument refusals cost no read.
+pub(super) fn status_arguments(args: &Value) -> Result<StatusArguments<'_>, ToolFailure> {
+    let guid = required_string(args, "company_guid")?;
+    let from = normalized_date(required_string(args, "from")?)?;
+    let to = normalized_date(required_string(args, "to")?)?;
+    let Some(days) = window_span_days(&from, &to) else {
+        return Err("invalid_date_range".to_string().into());
+    };
+    let type_name = required_string(args, "voucher_type_name")?;
+    if !read_profiles::gst_status_type_name_literal_safe(type_name) {
+        return Err("gst_status_type_name_invalid".to_string().into());
+    }
+    if days > STATUS_MAX_WINDOW_DAYS {
+        return Err("gst_status_window_too_long".to_string().into());
+    }
+    Ok(StatusArguments {
+        guid,
+        from,
+        to,
+        type_name,
+    })
+}
+
+impl Server {
+    /// Verifies the company, then reads its voucher marks: the formula that
+    /// selects the type and the window is evaluated on every voucher of the
+    /// book, so the voucher mark bounds the read.
+    pub(super) async fn status_gate(&self, guid: &str) -> Result<StatusGate, ToolFailure> {
+        let (company, identity, prior) = self.verified_company(guid).await?;
         let (marks_xml, marks_evidence) = self
             .post_read(&identity, company_high_water_read(&company.name))
             .await
@@ -430,66 +521,78 @@ impl Server {
             return Err(ToolFailure::from("gst_status_book_too_large".to_string())
                 .with_prior_evidence(evidence));
         }
+        Ok(StatusGate {
+            company,
+            identity,
+            evidence,
+        })
+    }
 
-        let request = gst_status_read(&company.name, &from, &to, type_name).map_err(|code| {
-            ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone())
-        })?;
+    /// One status window read: the request, its parse and the window and the
+    /// type honoured by Tally or the answer refused. The rows come back sorted
+    /// by date, number and master id, each with what `extra` read from its
+    /// voucher, and with the evidence of the gate's reads and this one.
+    pub(super) async fn read_status_window<T>(
+        &self,
+        gate: &StatusGate,
+        arguments: &StatusArguments<'_>,
+        request: read_profiles::ReadRequest,
+        evidence: Evidence,
+        extra: impl Fn(&Node) -> T,
+    ) -> Result<(Vec<(StatusRow, T)>, Evidence), ToolFailure> {
         let (xml, read_evidence) = self
-            .post_read(&identity, request)
+            .post_read(&gate.identity, request)
             .await
             .map_err(|failure| failure.with_prior_evidence(evidence.clone()))?;
-        let mut evidence = combine_evidence(evidence, read_evidence);
-        let mut rows = parse_status_rows(&xml).map_err(|code| {
+        let evidence = combine_evidence(evidence, read_evidence);
+        let mut rows = parse_rows_with(&xml, extra).map_err(|code| {
             ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone())
         })?;
         // The window and the type are honoured by Tally or the answer is
         // refused: a voucher outside either is never reported.
-        for row in &rows {
+        for (row, _) in &rows {
             let day = bridge_tally_core::TallyDate::parse(row.date.as_str()).map_err(|_| {
                 ToolFailure::from("gst_status_read_voucher_unidentified".to_string())
                     .with_prior_evidence(evidence.clone())
             })?;
-            if day < from || day > to {
+            if day < arguments.from || day > arguments.to {
                 return Err(ToolFailure::from("window_not_honoured".to_string())
                     .with_prior_evidence(evidence));
             }
-            if row.voucher_type != type_name {
+            if row.voucher_type != arguments.type_name {
                 return Err(
                     ToolFailure::from("gst_status_type_not_honoured".to_string())
                         .with_prior_evidence(evidence),
                 );
             }
         }
-        rows.sort_by(|a, b| {
+        rows.sort_by(|(a, _), (b, _)| {
             (&a.date, &a.voucher_number, &a.master_id).cmp(&(
                 &b.date,
                 &b.voucher_number,
                 &b.master_id,
             ))
         });
+        Ok((rows, evidence))
+    }
 
-        let mut counts = BTreeMap::<&str, u64>::new();
-        let mut unread = 0_u64;
-        for row in &rows {
-            // A voucher whose status or whose acceptance flag was not read is
-            // unread: the state of the answer is partial then.
-            if row.status.is_err() || row.overridden.is_err() {
-                unread += 1;
-            }
-            match row.status {
-                Ok(GstStatus::Included) => *counts.entry("included").or_default() += 1,
-                Ok(GstStatus::Uncertain) => *counts.entry("uncertain").or_default() += 1,
-                Ok(GstStatus::Excluded) => *counts.entry("excluded").or_default() += 1,
-                Ok(GstStatus::NotInReturn) => *counts.entry("not_in_return").or_default() += 1,
-                Ok(GstStatus::Cancelled) => *counts.entry("cancelled").or_default() += 1,
-                Ok(GstStatus::Optional) => *counts.entry("optional").or_default() += 1,
-                Ok(GstStatus::PostDated) => *counts.entry("post_dated").or_default() += 1,
-                Err(_) => {}
-            }
-            if row.overridden == Ok(true) {
-                *counts.entry("accepted_as_it_stands").or_default() += 1;
-            }
-        }
+    pub(super) async fn gst_status(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
+        let arguments = status_arguments(args)?;
+        let (from, to, type_name) = (&arguments.from, &arguments.to, arguments.type_name);
+        let offset = arg_usize(args, "offset", 0)?;
+        let limit =
+            arg_positive_usize(args, "limit", self.settings.max_rows)?.min(self.settings.max_rows);
+        let gate = self.status_gate(arguments.guid).await?;
+        let request = gst_status_read(&gate.company.name, from, to, type_name).map_err(|code| {
+            ToolFailure::from(code.to_string()).with_prior_evidence(gate.evidence.clone())
+        })?;
+        let (rows, mut evidence) = self
+            .read_status_window(&gate, &arguments, request, gate.evidence.clone(), |_| ())
+            .await?;
+        let rows: Vec<StatusRow> = rows.into_iter().map(|(row, ())| row).collect();
+        let (counts, unread) = status_counts(rows.iter());
+        let company = gate.company;
+        let guid = arguments.guid;
         let total = rows.len();
         let page: Vec<Value> = rows.iter().skip(offset).take(limit).map(row_json).collect();
         let next_offset = (offset + page.len() < total).then_some(offset + page.len());
@@ -507,17 +610,7 @@ impl Server {
             "voucher_type_name": type_name,
             "total": total,
             "offset": offset,
-            "counts": {
-                "included": counts.get("included").copied().unwrap_or(0),
-                "uncertain": counts.get("uncertain").copied().unwrap_or(0),
-                "excluded": counts.get("excluded").copied().unwrap_or(0),
-                "not_in_return": counts.get("not_in_return").copied().unwrap_or(0),
-                "cancelled": counts.get("cancelled").copied().unwrap_or(0),
-                "optional": counts.get("optional").copied().unwrap_or(0),
-                "post_dated": counts.get("post_dated").copied().unwrap_or(0),
-                "unread": unread,
-                "accepted_as_it_stands": counts.get("accepted_as_it_stands").copied().unwrap_or(0),
-            },
+            "counts": counts_json(&counts, unread),
             "items": page,
             "limitations": [
                 "These are the status flags Tally holds on each voucher when it is read. Tally keeps the status a voucher was given when it was saved; on the lab's book, correcting a master afterwards did not change the status of a voucher already saved (one voucher, cause unverified)",

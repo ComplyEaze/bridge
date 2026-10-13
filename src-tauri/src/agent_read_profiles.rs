@@ -242,13 +242,12 @@ pub(super) fn render_gst_status_window(
     render_status_window(company, from, to, type_name, StatusFetch::Flags)
 }
 
-/// The uncertain-voucher read (Accept As Is, phase 1): the status read with
-/// the party and the voucher's amount added to its field list. It is the lab's
-/// file `w19-status-window-aug-wide.xml` (12 Oct 2026) with `,ISPOSTDATED`
-/// added after `ISOPTIONAL`; that exact request has not yet been sent to a
-/// real Tally (the W19 answers were to the request without it). Asking for
-/// `AMOUNT` makes Tally return each voucher's ledger entries as well (about
-/// 3.5 to 4.8 KB a voucher on the lab's book).
+/// The uncertain-voucher read: the status read with the party and the
+/// voucher's amount added to its field list. Since 13 Oct 2026 it is, character
+/// for character, the lab's file `w21d-status-window-aug-wide-postdated.xml`,
+/// which a synthetic TallyPrime 7.1 Silver book answered. Asking for `AMOUNT`
+/// makes Tally return each voucher's ledger entries as well (about 7.5 KB a
+/// voucher, UTF-16, on the lab's book).
 pub(super) fn render_gst_uncertain_window(
     company: &str,
     from: &TallyDate,
@@ -264,8 +263,7 @@ pub(super) fn render_gst_uncertain_window(
 enum StatusFetch {
     /// The cancelled, optional and post-dated flags (W21, `gst_status`).
     Flags,
-    /// The party, those flags and the voucher's amount (W19 without
-    /// `ISPOSTDATED`; the whole list is not yet measured).
+    /// The party, those flags and the voucher's amount (W21d).
     FlagsPartyAmount,
 }
 
@@ -273,7 +271,9 @@ impl StatusFetch {
     fn tail(self) -> &'static str {
         match self {
             StatusFetch::Flags => ",ISCANCELLED,ISOPTIONAL,ISPOSTDATED",
-            StatusFetch::FlagsPartyAmount => ",PARTYLEDGERNAME,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,AMOUNT",
+            StatusFetch::FlagsPartyAmount => {
+                ",PARTYLEDGERNAME,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,AMOUNT"
+            }
         }
     }
 }
@@ -300,6 +300,15 @@ fn render_status_window(
         xml_escape(company.as_str()),
         xml_escape(type_name)
     ))
+}
+
+pub(super) fn gst_uncertain_read(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    type_name: &str,
+) -> Result<ReadRequest, String> {
+    render_gst_uncertain_window(company, from, to, type_name).map(ReadRequest)
 }
 
 pub(super) fn gst_status_read(

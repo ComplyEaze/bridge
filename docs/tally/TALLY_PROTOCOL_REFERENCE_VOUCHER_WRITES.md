@@ -399,7 +399,8 @@ are from that branch's notes. This method is a value of its own in the series an
   Original Voucher No. behaviour" gone from Yes to greyed out, reading No.
 - **Not established:** a back-dated voucher WITHOUT a number under "Automatic (Manual Override)"; a
   supplied number made of digits only; a number that an existing voucher already holds, with
-  duplicates prevented; a voucher entered by hand under that method; under "Renumber Vouchers", a
+  duplicates prevented (both were measured under Manual in a later run, below, and not under this
+  method); a voucher entered by hand under that method; under "Renumber Vouchers", a
   Journal that carries a number, a Journal dated after every other, and a file of several; a
   Journal imported raw under `Auto Retain` with an earlier date; Multi-user Auto; Payment and
   Contra; a deletion; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post. A
@@ -453,10 +454,12 @@ and the twelve vouchers reading as at the start both times.
 - From that branch's notes, not from an answer: that the save of the type screen asked the same two
   confirmations as on the runs above, and that the same three lines of that screen changed with the
   method as on the run above.
-- **Not established:** "Prevent creating duplicate Voucher Nos." set to Yes under either method,
-  with a number already held; a Journal under Manual and a Payment under "Automatic (Manual
-  Override)" (a supplied number was measured under each method on one voucher type); a supplied
-  number made of digits only; a voucher without a number under Manual with duplicates allowed,
+- **Not established:** "Prevent creating duplicate Voucher Nos." set to Yes under "Automatic
+  (Manual Override)", with a number already held (under Manual it was measured on a Journal in a
+  later run, below, as was a number of digits only); a Journal under Manual with duplicates
+  allowed and a Payment under "Automatic (Manual Override)" (a supplied number was measured under
+  each method on one voucher type); a supplied number made of digits only under "Automatic
+  (Manual Override)"; a voucher without a number under Manual with duplicates allowed,
   back-dated; Multi-user Auto; a file of several vouchers; a deletion; Gold; other releases; macOS;
   the same through ComplyEaze Bridge's own post. A voucher without a number under Manual, by a raw
   import, was measured in a later run (next paragraph).
@@ -505,6 +508,49 @@ answers show the marks, the series and the twelve vouchers reading as at the sta
   a file of more than two vouchers; Payment and Journal by a raw import; Multi-user Auto; a
   deletion; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post on a
   Receipt or a Contra.
+
+**Under Manual numbering with duplicates prevented, an imported Journal kept the number it carried,
+and a number a Journal already held was refused whole by an answer that names no cause: verified
+2026-10-14 on one book and one voucher type (PARTIAL).** On a second synthetic book, four imports
+were sent raw, one per step, each of one Journal that carried a `VOUCHERNUMBER` element and a new
+`REMOTEID` (branch `lab/724-m9n-held-number-duplicates-prevented-answers`, `85fd51e5`, bridge#724;
+every figure was read from the marks, voucher, series and import answers with an XML parser, with
+each size checked against `CONTENT-LENGTH`). As found, the book held one Receipt, one Payment and
+one Journal, each numbered 1, and the series of its Journal type read `Manual`, `Auto Retain`,
+`PREVENTDUPLICATES` `Yes`. No type screen was saved in this run. A series answer was read after
+every import and compared, row by row, with the one read before it. That the book was put back at
+the end by restoring a backup is from that branch's notes; the marks, series and voucher answers
+read after it are byte-identical to the first ones.
+
+- **VERIFIED, a number no Journal held:** a Journal numbered `M9N-J1`, dated 20 July, read back
+  that number, and a Journal numbered `7`, dated 22 July, read back the one character `7`. Each
+  answer read `CREATED` 1, `LASTVCHID` the new voucher's `MASTERID`, and every other counter 0.
+  `NUMBERINGSTYLE` on both read `Manual`.
+- **VERIFIED, a number a Journal held:** a second Journal numbered `M9N-J1`, dated 21 July, sent
+  after the first had been created, and a Journal numbered `1`, dated 23 July, the number the
+  Journal of the book as found holds, were each refused whole: `CREATED` 0, `EXCEPTIONS` 1, every
+  other counter 0, no `LINEERROR`. After each, everything under `COLLECTION` in the voucher
+  answer equalled the answer before it, and `ALTVCHID` did not move.
+- **VERIFIED:** the two refusal answers are byte-identical: 538 bytes, SHA-256 `09a713e2…`, the
+  size and hash recorded below for the refused second numberless Journal of 12 October and for
+  whole refusals of zero-value vouchers. So the answer does not tell a number already held from
+  those causes; only the counters show the refusal.
+- **VERIFIED, the series rows:** after each of the four imports, the two refused ones included,
+  all 24 rows equalled the series answer read before that import. The Journal row's
+  `LASTNUMBERLIST.LIST` stayed an empty element.
+- **VERIFIED, the marks:** `ALTVCHID` read 3 as found, then 4, 4, 5 and 5 after the four imports;
+  `ALTMSTID` did not move. No voucher already in the book changed at any import.
+- So on this run a supplied number was kept under Manual with duplicates prevented, as it was
+  with duplicates allowed (above); with duplicates prevented, a number already held is refused
+  where, with duplicates allowed, a second voucher was created under it. A voucher sent with a
+  number its type already holds therefore comes back with nothing that says why.
+- From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
+  the four imports.
+- **Not established:** duplicates prevented under "Automatic (Manual Override)"; a back-dated
+  voucher with a number under Manual with duplicates prevented; a number with leading zeros or
+  spaces, or one that differs from a held number only in letter case; Payment, Receipt and
+  Contra; a file of several vouchers, one with a held number; Multi-user Auto; a deletion; Gold;
+  other releases; macOS; the same through ComplyEaze Bridge's own post.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**
@@ -561,7 +607,8 @@ numbers every voucher it creates.
   whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`. Tally's 538-byte answer
   has the same SHA-256 (`09a713e2…`) as earlier whole refusals of zero-value vouchers
   (`lab/1342-capture-answers`), so it names no cause; that the cause is the repeated number is
-  inferred.
+  inferred. On 2026-10-14 a Journal that carried a number already held drew an answer of the same
+  size and hash (above).
 - **VERIFIED, Automatic with "Retain Original Voucher No." on insertion and deletion (Journal):** a
   second numberless voucher was numbered `2`, and a third dated before both was numbered `3`. The
   first two kept their numbers and AlterIDs, and a later read-back still read them `posted_verified`.

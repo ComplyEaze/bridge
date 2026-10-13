@@ -2479,12 +2479,10 @@ fn the_ledger_index_seams_are_under_bare_cfg_test() {
     ] {
         assert_eq!(source.matches(declaration).count(), 1, "{declaration}");
     }
-    for forbidden in [
-        "cfg(any(test",
-        "cfg(feature",
-        "cfg(all(test",
-        "cfg(debug_assertions",
-    ] {
+    // The debug-assertions cfg is not listed here: the egress boundary check
+    // (`scripts/check-tally-egress-boundary.mjs`) refuses its name in every
+    // Rust file under `src-tauri`, this one included.
+    for forbidden in ["cfg(any(test", "cfg(feature", "cfg(all(test"] {
         assert!(!source.contains(forbidden), "{forbidden}");
     }
 }

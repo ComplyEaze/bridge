@@ -573,7 +573,7 @@ list is `observed`. `mask_parties` masks each `ledger` name.
 
 The report was captured for one whole financial year (1 April to 31 March) on one
 synthetic company: any other window is named in `unmeasured_in_this_answer` as
-`window_other_than_a_whole_financial_year`, and a book with GST, stock, several currencies
+`window_other_than_a_whole_financial_year`, and a book whose GST setting was read as on, a book with stock or several currencies,
 or optional or post-dated vouchers was not measured. A window starting before the book is
 `negative_ledgers_before_books`, a reversed window `invalid_date_range`, and Education mode
 `negative_ledgers_education_unqualified`. A refused answer fails the call as `negative_ledgers_read_failed`, with the specific code below in `error.cause`; `negative_ledgers_before_books`, `negative_ledgers_education_unqualified` and `negative_ledgers_period_not_honoured` are the error's own code. The answer is refused, never reinterpreted, when

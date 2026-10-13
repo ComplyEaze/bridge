@@ -10,8 +10,8 @@
 //!
 //! A debit closing is carried as a **negative** number in the debit column and a
 //! credit closing as a **positive** one in the credit column, the other column
-//! empty (the first book verified against Tally's screen and trial balance, two
-//! further books agreeing; protocol reference §12a.16). The list
+//! empty (the first book as reported against Tally's screen and trial balance, two
+//! further books agreeing on the credit half; protocol reference §12a.16). The list
 //! is Tally's own and is returned as it is: which ledgers Tally lists is not
 //! derived here (a Suspense ledger with a credit balance was not listed on the
 //! first book measured), and an **empty** answer cannot be told from a report that

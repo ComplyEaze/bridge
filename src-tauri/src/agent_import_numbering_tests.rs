@@ -707,6 +707,30 @@ fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
     }
     assert!(message.contains(SEEN_BY_HAND), "{message}");
     assert!(!manual_only.contains(SEEN_BY_HAND), "{manual_only}");
+
+    // Where the type's setting for existing numbers was not read, missing or
+    // not recognised, the message says a hand entry may change them; it says
+    // so of no other reading, and what was seen under renumber stays its own
+    // sentence.
+    const NOT_KNOWN: &str = "a hand entry may change existing voucher numbers";
+    assert!(message.contains(NOT_KNOWN), "{message}");
+    assert!(!manual_only.contains(NOT_KNOWN), "{manual_only}");
+    let only = |sub_method| {
+        admit_numbering(read_with_journal(automatic(sub_method)), ["Journal"])
+            .unwrap_err()
+            .message()
+    };
+    for not_read in [
+        NumberingSubMethod::Absent,
+        NumberingSubMethod::Unrecognised("x".to_string()),
+    ] {
+        let said = only(not_read.clone());
+        assert!(said.contains(NOT_KNOWN), "{not_read:?}: {said}");
+        assert!(!said.contains(SEEN_BY_HAND), "{not_read:?}: {said}");
+    }
+    let renumber = only(NumberingSubMethod::AutoRenumber);
+    assert!(renumber.contains(SEEN_BY_HAND), "{renumber}");
+    assert!(!renumber.contains(NOT_KNOWN), "{renumber}");
 }
 
 /// The three next steps share what they say was read and seen, and differ in
@@ -719,6 +743,7 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
             "sent by import without a number",
             "the import's answer reported nothing altered",
             "one book, one voucher type, TallyPrime 7.1 Silver",
+            "do not add a voucher number to it",
             "do not change a voucher type's voucher numbering to get past this",
         ] {
             assert!(step.contains(stated), "{stated}: {step}");
@@ -741,12 +766,22 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
         assert!(!build.contains("without a voucher number"), "{build}");
         assert!(build.contains("is also written into one read as Manual"));
     }
+    // A written file of a refused post is not to be imported by hand either;
+    // only the post's step can speak of one.
+    const NOT_BY_THE_MENU: &str = "imported through Tally's Import menu either";
+    assert!(POST_NEXT_STEP.contains(NOT_BY_THE_MENU));
+    assert!(!BUILD_NEXT_STEP.contains(NOT_BY_THE_MENU));
+    // An amendment alters vouchers in place: its step says they are written
+    // without a number where they carry none, and nothing of how Tally
+    // numbers them. The build of new vouchers says what was measured.
+    assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Tally numbers"));
+    assert!(BUILD_NEXT_STEP.contains("Tally numbers a voucher that carries no number"));
     assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Ask the user to enter"));
     for stated in [
         "was not checked before this refusal",
         "Call verify_import",
         "is never entered again",
-        "carries no number",
+        "that carry no number are written without one",
     ] {
         assert!(BUILD_AMENDMENT_NEXT_STEP.contains(stated), "{stated}");
     }

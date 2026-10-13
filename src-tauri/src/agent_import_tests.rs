@@ -5192,8 +5192,9 @@ async fn a_journal_carrying_its_own_number_is_built_into_a_manual_type_after_the
 /// The same numbered Journal into an Automatic type. Under Automatic
 /// numbering Tally discards the number, so the type must retain existing
 /// numbers, as for a voucher without one: `Auto Retain` builds, and a type set
-/// to renumber, one that prints no sub-method and Automatic (Manual Override)
-/// refuse under the same two codes, with nothing written.
+/// to renumber, one that prints no sub-method or one not recognised, and
+/// Automatic (Manual Override) refuse under the same two codes, with nothing
+/// written.
 #[tokio::test]
 async fn a_numbered_journal_into_an_automatic_type_is_held_to_auto_retain() {
     use super::numbering_fixtures::{with_series_text, with_sub_method};
@@ -5220,6 +5221,17 @@ async fn a_numbered_journal_into_an_automatic_type_is_held_to_auto_retain() {
             "import_voucher_numbering_not_retain",
             journal(
                 json!({"observation":"observed","method":"automatic","sub_method":"absent","duplicates":"not_prevented"}),
+            ),
+        ),
+        (
+            with_sub_method(
+                through_build_numbering(&[]),
+                "Journal",
+                "<NUMBERINGSUBMETHOD>Auto Renumber On Insert</NUMBERINGSUBMETHOD>",
+            ),
+            "import_voucher_numbering_not_retain",
+            journal(
+                json!({"observation":"observed","method":"automatic","sub_method":"unrecognised","duplicates":"not_prevented"}),
             ),
         ),
         (

@@ -277,16 +277,18 @@ against `CONTENT-LENGTH`).
 - **VERIFIED:** no voucher of another type changed, and the other 23 types' series read the same in
   all four series answers. After the book was restored from a backup taken at the start, the
   marks, the Receipt series and the twelve vouchers read as at the start.
-- **VERIFIED:** `NUMBERINGSTYLE` on every voucher row read as its type's series did at the four
-  voucher reads that had a series read beside them, and the same at the three between, where no
-  type was saved: `Auto Retain` or `Auto Renumber` on the Receipts as the series was switched,
-  `Manual` on the two Payments, `Auto Retain` on the three Journals. It is recorded as a possible
-  second reading of the setting. No ComplyEaze Bridge source names the field (checked in the
-  code, not in an answer).
+- **VERIFIED:** `NUMBERINGSTYLE` on a voucher row read the sub-method of its type's series where
+  the method was Automatic (`Auto Retain` or `Auto Renumber` on the Receipts as the series was
+  switched, `Auto Retain` on the three Journals), and `Manual` on the two Payments, whose series
+  reads the method `Manual` and the sub-method `Auto Retain`. This held at the four voucher reads
+  that had a series read beside them, and the rows read the same at the three between, where no
+  type was saved. It is recorded as a possible second reading of the setting. No ComplyEaze
+  Bridge source names the field (checked in the code, not in an answer).
 - So on this run nothing an import returns, and nothing in a voucher's `ALTERID` or in `ALTVCHID`,
   showed that the import had changed other vouchers' numbers. What read differently beforehand
   was the series' `NUMBERINGSUBMETHOD`, and `NUMBERINGSTYLE` on the voucher rows of that type (the
-  type's own `ALTERID` and `ALTMSTID` differed too, as after any measured save of a type).
+  type's own `ALTERID` and the company's `ALTMSTID` differed too, as after any measured save of a
+  type).
 - From that branch's notes, not from an answer: that Tally asked the same two confirmations at
   each switch, and that on the way to the behaviour field the row `Automatic`, already set, was
   selected again in "Method of Voucher Numbering".

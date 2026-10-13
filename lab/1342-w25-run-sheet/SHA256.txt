@@ -1,0 +1,5 @@
+# W25 run sheet: the wide GSTR-1 status read of one keyed Sales-side Debit Note, with the voucher types' series read before, after and after the restore; steps in W25-README.md. r02-marks.xml (976 bytes) and w23-series.xml (caf423642547... with its company name changed to BRIDGE PILOT LAB only) are W23's files byte for byte (lab/1342-w23-run-sheet dd821ff9); w25-wide-debit-note-0922.xml is w23-wide-credit-note-0921.xml (7a939dfe...) with its window changed to 20260922 and its type name to Debit Note only.
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  r02-marks.xml
+4af654e5a19946f1e3dc6905e0e3563de5be4d3a40389826627e60ef4a7c6fa1  w25-wide-debit-note-0922.xml
+e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276  w23-series.xml
+1c7792e69996e024b4c4468359dfd0e9857a4825d779c977d4b9961ae776ba1a  W25-README.md

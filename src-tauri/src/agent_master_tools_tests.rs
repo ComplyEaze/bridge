@@ -2149,7 +2149,7 @@ async fn an_answer_that_cannot_be_recorded_is_reported_as_answered_not_as_maybe_
             );
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
-        let lock = ExclusiveAdmission::acquire(&data_dir).expect("free while the POST is held");
+        let lock = ExclusiveAdmission::acquire(&data_dir).expect("unheld during the POST");
         tokio::time::sleep(Duration::from_secs(4)).await;
         drop(lock);
     };

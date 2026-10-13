@@ -47,7 +47,7 @@ const LAB_PARTY: &str = "BRIDGE Walk-in";
 /// vouchers dated the whole of August 2026, and the sentence that names the voucher type it
 /// covers.
 const LINE_FOR_FIVE: &str = concat!(
-    "Tally marks 5 Sales vouchers dated 2026-08-01 to 2026-08-31 as Uncertain and leaves them out of its GSTR-1 screen. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.",
+    "Tally marks 5 Sales vouchers dated 2026-08-01 to 2026-08-31 as Uncertain and leaves them out of its GSTR-1 return. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.",
     " This covers the voucher type BRIDGE Sales only."
 );
 

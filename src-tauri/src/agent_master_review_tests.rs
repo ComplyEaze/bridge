@@ -198,6 +198,31 @@ fn each_limit_refuses_at_its_boundary() {
     assert_eq!(BATCH_REVIEW_MAX_BYTES, 7_000);
 }
 
+/// The masked preview a tool result carries is refused exactly when the
+/// dialog's own text is: a name one character too long for its line is
+/// refused although its mask would fit, and the longest name that fits is
+/// returned masked.
+#[test]
+fn the_masked_preview_is_refused_whenever_the_dialogs_own_text_is() {
+    let fixed = "Create ledger \"\" under Suspense A/c".chars().count();
+    let lab = company("BRIDGE MASTERS LAB");
+    let fits = item(
+        &"n".repeat(BATCH_REVIEW_MAX_LINE_CHARS - fixed),
+        AdmittedLedgerKind::Suspense,
+    );
+    let masked = masked_review_text(&fits, &lab, ORIGIN).unwrap();
+    assert!(masked.contains("Create ledger \"nn…nn\" under Suspense A/c\n"));
+    let over = item(
+        &"n".repeat(BATCH_REVIEW_MAX_LINE_CHARS - fixed + 1),
+        AdmittedLedgerKind::Suspense,
+    );
+    assert_eq!(text(&over), Err(MasterReviewError::TooLarge));
+    assert_eq!(
+        masked_review_text(&over, &lab, ORIGIN),
+        Err(MasterReviewError::TooLarge)
+    );
+}
+
 /// The ladder: each refusal's code. `master_review_too_large` is the new rung;
 /// the other two are the voucher preview's own codes.
 #[test]

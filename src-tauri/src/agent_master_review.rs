@@ -62,30 +62,38 @@ pub(super) fn master_review_text(
     company: &VerifiedCompanyIdentity,
     origin: &str,
 ) -> Result<String, MasterReviewError> {
-    review_text(item, company, origin, item.name().as_str())
+    let lines = review_lines(item, company, origin, item.name().as_str())?;
+    if fits(&lines) {
+        Ok(lines.join("\n"))
+    } else {
+        Err(MasterReviewError::TooLarge)
+    }
 }
 
 /// The same preview with the ledger's name masked, for a tool result under
 /// `mask_parties`: the dialog shows the name whole, a result never does.
+///
+/// Refused exactly when the dialog's own text is: the fit is judged on the
+/// whole name, which is longer than its mask, so a batch is never prepared
+/// under masking that the dialog could not then show.
 pub(super) fn masked_review_text(
     item: &LedgerCreateItem,
     company: &VerifiedCompanyIdentity,
     origin: &str,
 ) -> Result<String, MasterReviewError> {
-    review_text(
-        item,
-        company,
-        origin,
-        &super::super::mask(item.name().as_str()),
-    )
+    master_review_text(item, company, origin)?;
+    let masked = super::super::mask(item.name().as_str());
+    Ok(review_lines(item, company, origin, &masked)?.join("\n"))
 }
 
-fn review_text(
+/// The preview's lines with the ledger shown as `name`; the layout and format
+/// checks read the ledger's real name whatever is shown.
+fn review_lines(
     item: &LedgerCreateItem,
     company: &VerifiedCompanyIdentity,
     origin: &str,
     name: &str,
-) -> Result<String, MasterReviewError> {
+) -> Result<Vec<String>, MasterReviewError> {
     let shown = [
         company.display_name(),
         company.company_guid(),
@@ -119,7 +127,7 @@ fn review_text(
             (format!("duty head {}", head.head().tally_spelling()), false)
         }
     };
-    let lines = vec![
+    Ok(vec![
         format!("Create ONE ledger in {}", quoted(company.display_name())),
         format!("Company GUID: {}", company.company_guid()),
         format!(
@@ -136,12 +144,7 @@ fn review_text(
         ),
         String::new(),
         MASTER_REVIEW_WARNING.to_string(),
-    ];
-    if fits(&lines) {
-        Ok(lines.join("\n"))
-    } else {
-        Err(MasterReviewError::TooLarge)
-    }
+    ])
 }
 
 #[cfg(test)]

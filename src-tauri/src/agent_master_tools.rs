@@ -23,7 +23,9 @@
 //! batch the journal shows dispatched runs the same read-back as a reconcile:
 //! it reads and never sends. Only when the read-back cannot be made at all
 //! (the company cannot be verified, the journal cannot describe the batch)
-//! does the answer fall back to the journal's own `posted_unverified`.
+//! does the answer fall back to the journal's own `posted_unverified`. When
+//! Tally's answer itself cannot be appended, the call stops there and answers
+//! `posted_unverified` with `answer_recorded` false and Tally's counters.
 use super::approval::{ApprovalBinding, HeldRequest};
 use super::master_ledger::{
     append, append_intent, read_journal, remove_pre_image, write_pre_image, BatchState,
@@ -60,9 +62,12 @@ use verify::{settled_alert, settled_next_step};
 /// What a caller is told after a ledger is prepared.
 const PREPARED_NEXT_STEP: &str = "Nothing was written to Tally. To create this ledger, call post_ledger_creates with this batch_id: the local user must approve it in a native dialog first.";
 
+/// What a caller is told after the one POST when Tally answered and the answer
+/// could not be appended to the journal, whatever stopped the append (its code
+/// is beside the note): the ledger is not verified.
+const ANSWER_UNRECORDED_NOTE: &str = "Tally answered the one create (any counters it gave are here), but ComplyEaze Bridge could not record that answer and has not read the ledger back. It is NOT verified. Never post this batch again: check the ledger in Tally before relying on it.";
 /// What a caller is told after the one POST when the read-back could not be
 /// attempted at all: the ledger is not verified.
-const ANSWER_UNRECORDED_NOTE: &str = "Tally answered the one create (its counters are here), but ComplyEaze Bridge could not record that answer: another ComplyEaze Bridge process held its record at that instant. It is NOT verified. Never post this batch again: check the ledger in Tally before relying on it.";
 const POSTED_UNVERIFIED_NOTE: &str = "Tally answered the one create and ComplyEaze Bridge recorded the answer, but has not read the ledger back: it is NOT verified. Check the ledger in Tally before relying on it. Never post this batch again.";
 
 /// What a caller is told when a batch has a recorded intent and no recorded
@@ -711,10 +716,11 @@ impl Server {
             };
             // Known limit, shared with the voucher path's response append: the
             // lock is tried once, never waited for, so another process holding
-            // it at this instant fails the append. The send is already recorded
-            // by its intent; only Tally's answer goes unrecorded. Tally did
-            // answer, so the call says so, with its counters, rather than that
-            // the create may have been sent.
+            // it at this instant fails the append, as does any failure of the
+            // append itself. The send is already recorded by its intent; only
+            // Tally's answer goes unrecorded. Tally did answer, so the call
+            // says so, with its counters and the failure's code, rather than
+            // that the create may have been sent.
             let answer_recorded =
                 ExclusiveAdmission::acquire(&self.settings.data_dir).and_then(|lock| {
                     append(

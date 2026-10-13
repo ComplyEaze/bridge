@@ -769,9 +769,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
     // constant text, and the company's own name; the two master tools return
-    // the batch id, the caller's own proposed ledger name inside the preview,
-    // the company's own name and Bridge's own states, and no name read from
-    // the book (a name that exists is refused by code).
+    // the batch id, the caller's own proposed ledger name inside the preview
+    // (masked there under `mask_parties`), the company's own name and Bridge's
+    // own states, and no name read from the book (a name that exists is
+    // refused by code).
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",

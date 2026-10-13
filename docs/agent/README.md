@@ -1911,11 +1911,13 @@ ledger as sent, nothing else changed), `posted_into_existing_master` or
 `confirmed_absent` (a later call found nothing created and no mark moved; a new
 batch needs a new approval), `masters_after_post_unconfirmed` (the book could
 not be read back; call again, which only reads), `posted_unverified` with
-`answer_recorded` false (Tally answered, with the counters given, but its answer
-could not be recorded; never send again, check Tally) or
-`reconciliation_required` (with reasons). A later call for a sent batch repeats the read-back and never
-sends. No PAN, bank detail, e-mail address or phone number is put in an answer
-or a record. The setting is a command-line setting only and is not in the MCPB
+`answer_recorded` false (Tally answered, with any counters it gave, but its
+answer could not be recorded, so this call read nothing back; never send again,
+check Tally) or `reconciliation_required` (with reasons). A later call for a sent batch repeats the read-back and never
+sends. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
+address or phone number is put in an answer or a record; a GSTIN the caller
+supplied, which contains the party's PAN, is in the preview and in the batch's
+local record. The setting is a command-line setting only and is not in the MCPB
 extension.
 
 All four switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls

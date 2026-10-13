@@ -1896,6 +1896,11 @@ pub async fn export_party_ledger_master(
     with_operation_wire_budget(export_party_ledger_master_once(app, request, runtime)).await
 }
 
+/// What the party/ledger master export asks Tally for: it shows each party's dated
+/// mailing details, so its request names them (bridge#1490).
+const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
+    crate::tally::connection::ComplianceRead::WithMailingDetails;
+
 async fn export_party_ledger_master_once(
     app: tauri::AppHandle,
     request: PartyLedgerMasterRequest,
@@ -1919,7 +1924,7 @@ async fn export_party_ledger_master_once(
             &identity,
             currency_assertion,
             basis,
-            crate::tally::connection::ComplianceRead::WithMailingDetails,
+            PARTY_LEDGER_MASTER_EXPORT_READ,
         )
         .await
         .map_err(party_ledger_master_runtime_command_error)?;

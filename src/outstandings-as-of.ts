@@ -127,6 +127,39 @@ export function allCompaniesOutstandingsInvokeArgument(
   };
 }
 
+/** What the ledger-master workbook says about its date, by kind, so the app
+ * never reads the words of a note (bridge#903). */
+export type PartyLedgerMasterNote = {
+  kind: "later_dated_voucher" | "date_moved";
+  text: string;
+};
+
+/** The saved ledger-master workbook and the notes the backend returned for it. */
+export type PartyLedgerMasterExport = {
+  path: string;
+  notes: PartyLedgerMasterNote[];
+};
+
+/**
+ * The ledger-master export's argument. The screen's date goes only when the
+ * operator chose it: an automatic date is the host's own, which the backend
+ * already uses, with the rule that has always applied to it. `null` when the
+ * operator chose a date this contract cannot carry, which must block the
+ * export rather than fall back to another date.
+ */
+export function partyLedgerMasterInvokeArgument(
+  config: OutstandingsConfig,
+  company: OutstandingsCompany,
+  asOf: string,
+  asOfOperatorSelected: boolean,
+) {
+  const request = { config, selected_company: selectedCompanyIdentity(company) };
+  if (!asOfOperatorSelected) return { request };
+  const asOfYyyymmddValue = asOfYyyymmdd(asOf);
+  if (!asOfYyyymmddValue) return null;
+  return { request: { ...request, as_of_yyyymmdd: asOfYyyymmddValue } };
+}
+
 type StatementExportSource = { party_statement_source_id?: string };
 
 /**

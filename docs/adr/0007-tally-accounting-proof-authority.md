@@ -30,7 +30,8 @@ Accepted for the first PR 08 implementation slice.
   are not Tally attestations. Signed semantics, ordinary-books applicability,
   identity stability, completeness, and Education-profile behavior remain
   live-unverified, so production evidence is `period_report_profile_unobserved`
-  and cannot establish `Verified`.
+  and cannot establish `Verified`. (2026-10-12: this read was removed by #1643;
+  see #1642.)
 - After report reads, the engine performs a full semantic reread and then a
   cache-bypassing capability probe. Reread equality is recorded as
   `bracketed_full_reread_v1`-style stability evidence, not as atomic isolation:

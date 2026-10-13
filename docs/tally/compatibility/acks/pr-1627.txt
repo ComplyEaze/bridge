@@ -1,0 +1,11 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-primitives/src/lib.rs
+src-tauri/src/agent_company.rs
+src-tauri/src/commands.rs
+src-tauri/src/tally/connector.rs
+src-tauri/src/tally/mod.rs
+src-tauri/src/tally/runtime_company_features_tests.rs
+src-tauri/src/tally/runtime_stock_summary_tests.rs
+src-tauri/src/tally/runtime_trial_balance_tests.rs
+reviewer: lamemustafa

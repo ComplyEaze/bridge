@@ -4,6 +4,8 @@
 
 Accepted for the portable PR13B1 correctness slice.
 
+**Amended 2026-10-12:** the crate that implemented this decision, `tools/bridge-tally-qualification`, was deleted in [#1566](https://github.com/ComplyEaze/bridge/pull/1566), because it checks parsing against simulator-generated data only and so proves nothing a live capture does not. The text below is kept as written.
+
 ## Decision
 
 Bridge uses a repository-owned deterministic generator and a separate fresh

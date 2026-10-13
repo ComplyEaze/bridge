@@ -6,7 +6,7 @@
 //! to the verified identity by what it carries, never by what was asked for.
 //! Both consumers read the first `COMPANY` element that has a `GUID`, anywhere
 //! in the document. A captured object export also carries a `CMPINFO/COMPANY`
-//! object counter (value `0`) with no GUID. Admission reads only
+//! object counter with no GUID and no children (§9.11e). Admission reads only
 //! `DATA/TALLYMESSAGE/COMPANY`, requires exactly one, and refuses any other
 //! `COMPANY` that carries a GUID, so the element admitted is the element both
 //! consumers will choose.

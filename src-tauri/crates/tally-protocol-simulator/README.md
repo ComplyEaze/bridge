@@ -23,12 +23,6 @@ The simulators always bind an ephemeral `127.0.0.1` port. Production code does
 not depend on this crate. `Simulator` handles exactly one request;
 `SequenceSimulator` handles an explicit ordered plan of 1–64 requests.
 
-The master generator produces up to 50,000 deterministic ledger masters with
-strict company/schema/count evidence. It preflights the selected UTF-8 or
-BOM-qualified UTF-16 wire representation against the same 32 MiB encoded-body
-ceiling before returning bytes. Its counts and hashes are repository-synthetic
-evidence, not a claim that a real Tally profile can export that size.
-
 ```rust
 use std::time::Duration;
 use tally_protocol_simulator::{Delivery, Fixture, ScenarioPlan, Simulator};

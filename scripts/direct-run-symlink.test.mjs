@@ -10,6 +10,9 @@
 //      runs `main`) exits 0 with no output, while the probe through the real path does not;
 //   2. starts the script through a symlink to its file, and through a symlink to its directory, and
 //      expects the probe's result of step 1.
+// It also pins the `existsSync` clause (a program whose `process.argv[1]` is not a file can import a
+// script: the import neither throws nor runs `main`), and finds the next script: every direct-run
+// guard line in scripts/*.mjs is the one guard, with a probe above, or its file is named in EXEMPT.
 // No probe starts cargo or reaches the network: each is a usage error or a refused argument.
 //
 // Where a symlink cannot be made (a Windows account without the privilege) the case is reported as
@@ -17,7 +20,7 @@
 // symlinks must work. A directory link on Windows is a junction, which needs no privilege.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
@@ -165,6 +168,92 @@ for (const probe of PROBES) {
     assert.match(ran.output, probe.pattern);
   });
 }
+
+// What `existsSync` is for: with it gone this import throws ENOENT out of `realpathSync`.
+test("a script imported by a program whose argv[1] is not a file neither throws nor runs main", () => {
+  const script = "check-pr-milestone.mjs";
+  assert.ok(PROBES.some((probe) => probe.script === script));
+  const missing = join(root, "no-such-file.mjs");
+  const result = outcome(
+    spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", "await import(process.env.DIRECT_RUN_TARGET)", missing],
+      {
+        cwd: workingDirectory,
+        env: environment({ DIRECT_RUN_TARGET: pathToFileURL(real(script)).href }),
+        encoding: "utf8",
+        timeout: 60_000,
+      },
+    ),
+  );
+  assert.deepEqual(result, { status: 0, output: "" });
+});
+
+// Scripts that start with `if (process.argv[1]` and are not the one guard, each with why. A new
+// script with the old comparison is therefore found here, not copied from one of these.
+const EXEMPT = new Map([
+  ["master-push-reuse.mjs", "its bytes are pinned by a digest in check-ci-workflow-consistency.mjs, so the maintainers change it"],
+  ["audit-tracking-issue.mjs", "it compares by file name (endsWith), a different form that is decided separately"],
+]);
+
+const GUARD_START = "if (process.argv[1]";
+
+// File name -> its lines that start a direct-run guard, for the scripts (not the tests) of this directory.
+function guardLinesByFile() {
+  const found = new Map();
+  for (const name of readdirSync(scriptsDirectory)) {
+    if (!name.endsWith(".mjs") || name.endsWith(".test.mjs")) continue;
+    const lines = readFileSync(join(scriptsDirectory, name), "utf8")
+      .split("\n")
+      .filter((line) => line.startsWith(GUARD_START));
+    if (lines.length) found.set(name, lines);
+  }
+  return found;
+}
+
+// The problems with `found`, given the scripts that have a probe and the exemptions.
+function guardProblems(found, { probed, exempt }) {
+  for (const [file, reason] of exempt) {
+    if (typeof reason !== "string" || reason.trim() === "") throw new Error(`EXEMPT: ${file} has no reason; every exemption says why`);
+  }
+  const problems = [];
+  for (const [file, lines] of found) {
+    if (exempt.has(file)) continue;
+    for (const line of lines) {
+      if (!line.startsWith(GUARD)) problems.push(`${file}: a guard that is not the one guard: ${line}`);
+      else if (!probed.has(file)) problems.push(`${file}: has the guard but no probe in this test`);
+    }
+  }
+  for (const file of exempt.keys()) {
+    if (!found.has(file)) problems.push(`${file}: exempt, but it has no line starting ${GUARD_START}`);
+  }
+  return problems;
+}
+
+test("every direct-run guard in scripts/*.mjs is the one guard, with a probe, or exempt with a reason", () => {
+  const probed = new Set(PROBES.map((probe) => probe.script));
+  assert.deepEqual(guardProblems(guardLinesByFile(), { probed, exempt: EXEMPT }), []);
+});
+
+test("the scan finds a guard that is not the one guard, a guard with no probe, an empty reason and a stale exemption", () => {
+  const probed = new Set(["a.mjs"]);
+  const old = "if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {";
+  assert.deepEqual(guardProblems(new Map([["b.mjs", [old]]]), { probed, exempt: new Map() }), [
+    `b.mjs: a guard that is not the one guard: ${old}`,
+  ]);
+  assert.deepEqual(guardProblems(new Map([["c.mjs", [`${GUARD} {`]]]), { probed, exempt: new Map() }), [
+    "c.mjs: has the guard but no probe in this test",
+  ]);
+  assert.deepEqual(guardProblems(new Map([["a.mjs", [`${GUARD} {`]]]), { probed, exempt: new Map() }), []);
+  assert.deepEqual(guardProblems(new Map([["b.mjs", [old]]]), { probed, exempt: new Map([["b.mjs", "kept on purpose"]]) }), []);
+  assert.throws(() => guardProblems(new Map(), { probed, exempt: new Map([["b.mjs", " "]]) }), {
+    message: "EXEMPT: b.mjs has no reason; every exemption says why",
+  });
+  assert.deepEqual(guardProblems(new Map(), { probed, exempt: new Map([["b.mjs", "kept on purpose"]]) }), [
+    "b.mjs: exempt, but it has no line starting if (process.argv[1]",
+  ]);
+  for (const [file, reason] of EXEMPT) assert.ok(reason.trim() !== "", file);
+});
 
 test("no symlink case was skipped where symlinks must work", () => {
   console.log(`direct-run symlink cases skipped: ${skipped.length}${skipped.length ? `\n  ${skipped.join("\n  ")}` : ""}`);

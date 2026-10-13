@@ -115,7 +115,7 @@ fn rows_of(summary: &TransferSummary) -> Vec<(String, String, &'static str, Opti
             (
                 row.id.clone(),
                 row.date.as_str().to_string(),
-                row.state,
+                row.state.label(),
                 row.batch.clone(),
             )
         })
@@ -131,6 +131,7 @@ fn every_state() -> TransferFacts {
         skip("st-ambiguous", "20260108", "444.44"),
         skip("st-reversed", "20260109", "555.55"),
         skip("st-outside", "20260301", "666.66"),
+        skip("st-matched", "20260302", "888.88"),
     ];
     skips[4].reversed_same_day = true;
     let mut unverified = contra("batch-2", "t2", "20260106", "222.22");
@@ -149,6 +150,8 @@ fn every_state() -> TransferFacts {
             other.statement_bank_ledger = LedgerGuid::new("b2");
             other
         },
+        // the one Contra of its day and amount, on a day no window holds
+        contra("batch-7", "t7", "20260302", "888.88"),
     ];
     let mut facts = facts_of(skips, contras);
     facts.held_elsewhere = vec![(
@@ -171,8 +174,8 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
     else {
         panic!("computed");
     };
-    // one pair; five skips and the held one are open; the three retired are counted
-    assert_eq!((*paired, *skips_open, *retired), (1, 6, 3));
+    // one pair; six skips and the held one are open; the three retired are counted
+    assert_eq!((*paired, *skips_open, *retired), (1, 7, 3));
     let row = |id: &str, day: &str, state, batch: Option<&str>| {
         (
             id.to_string(),
@@ -198,6 +201,12 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
             row("t5", "20260110", "double_booked", Some("batch-6")),
             row("t6", "20260110", "double_booked", Some("batch-5")),
             row("st-outside", "20260301", "not_established", None),
+            row(
+                "st-matched",
+                "20260302",
+                "matched_unconfirmed",
+                Some("batch-7")
+            ),
         ]
     );
 }
@@ -207,12 +216,12 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
     let section = summary_of(&every_state()).render(usize::MAX);
     assert_eq!(section["state"], "computed");
     assert_eq!(section["skips_paired"], 1);
-    assert_eq!(section["skips_open"], 6);
+    assert_eq!(section["skips_open"], 7);
     assert_eq!(section["retired"], 3);
     assert_eq!(section["open_omitted"], 0);
     let text = section.to_string();
     for secret in [
-        "111.11", "222.22", "333.33", "444.44", "555.55", "666.66", "777.77", "b1", "b2",
+        "111.11", "222.22", "333.33", "444.44", "555.55", "666.66", "777.77", "888.88", "b1", "b2",
     ] {
         assert!(!text.contains(secret), "{secret} in {text}");
     }
@@ -248,19 +257,49 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
             "reversed_same_day",
             "double_booked",
             "not_established",
+            "matched_unconfirmed",
         ])
+    );
+}
+
+const EVERY_OPEN_STATE: [OpenState; 8] = [
+    OpenState::NotFound,
+    OpenState::Ambiguous,
+    OpenState::OtherSideUnverified,
+    OpenState::NotEstablished,
+    OpenState::ReversedSameDay,
+    OpenState::MatchedUnconfirmed,
+    OpenState::HeldElsewhere,
+    OpenState::DoubleBooked,
+];
+
+#[test]
+fn every_open_state_has_its_own_label_and_its_own_step() {
+    let labels: BTreeSet<&str> = EVERY_OPEN_STATE.iter().map(|state| state.label()).collect();
+    let steps: BTreeSet<&str> = EVERY_OPEN_STATE.iter().map(|state| state.step()).collect();
+    assert_eq!(labels.len(), EVERY_OPEN_STATE.len());
+    assert_eq!(steps.len(), EVERY_OPEN_STATE.len());
+    // a refused withdrawal names a row by the label the section gives it
+    assert_eq!(Carrier::Paired.label(), "paired");
+    assert_eq!(
+        Carrier::OtherSideUnverified.label(),
+        OpenState::OtherSideUnverified.label()
+    );
+    assert_eq!(
+        Carrier::MatchedUnconfirmed.label(),
+        OpenState::MatchedUnconfirmed.label()
     );
 }
 
 #[test]
 fn each_next_step_says_what_was_decided() {
-    let step = |state| next_step(state);
-    assert!(step("other_side_unverified").contains("Run verify_import on that batch"));
-    assert!(step("other_side_unverified").contains("Do not build or post either statement"));
-    assert!(step("not_found").contains("withdraw the skip on exactly one side"));
-    assert!(step("not_found").contains("Do not enter this transfer in Tally by hand"));
-    assert!(step("ambiguous").contains("does not choose"));
-    let reversed = step("reversed_same_day");
+    let step = |state: OpenState| state.step();
+    assert!(step(OpenState::OtherSideUnverified).contains("Run verify_import on that batch"));
+    assert!(step(OpenState::OtherSideUnverified).contains("Do not build or post either statement"));
+    assert!(step(OpenState::NotFound).contains("withdraw the skip on exactly one side"));
+    assert!(step(OpenState::NotFound).contains("Do not enter this transfer in Tally by hand"));
+    assert!(step(OpenState::Ambiguous).contains("does not choose"));
+    let reversed = step(OpenState::ReversedSameDay);
     assert!(reversed.contains("a reversal and a pair of real transfers look alike"));
     assert!(reversed.contains("Check in Tally which rows are transfers"));
     assert!(reversed.contains(
@@ -268,20 +307,12 @@ fn each_next_step_says_what_was_decided() {
     ));
     // it never says the row is not a transfer
     assert!(!reversed.contains("not a transfer"), "{reversed}");
-    assert!(step("held_elsewhere").contains("once it is found posted the skip is retired"));
-    assert!(step("double_booked").contains("keep one"));
-    let open = step("not_established");
+    assert!(step(OpenState::HeldElsewhere).contains("once it is found posted the skip is retired"));
+    assert!(step(OpenState::DoubleBooked).contains("keep one"));
+    let open = step(OpenState::NotEstablished);
     assert!(open.contains("Verify any batch of the other account's statement for this date first"));
     assert!(open.contains("build that statement only if no batch of it exists"));
-    for state in [
-        "other_side_unverified",
-        "not_found",
-        "ambiguous",
-        "reversed_same_day",
-        "held_elsewhere",
-        "double_booked",
-        "not_established",
-    ] {
+    for state in EVERY_OPEN_STATE {
         // the product is never called by its short name
         let text = step(state);
         assert!(
@@ -313,7 +344,7 @@ fn many_open(count: usize) -> TransferSummary {
             .map(|n| OpenRow {
                 id: format!("st-20260105-{n:016x}"),
                 date: date("20260105"),
-                state: "not_found",
+                state: OpenState::NotFound,
                 batch: None,
             })
             .collect(),
@@ -513,20 +544,35 @@ fn trimming_a_section_adds_to_what_was_already_left_out() {
 
 #[test]
 fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
-    let row = |state: &str| json!({"bridge_txn_id": "st-x", "batch_id": "b", "state": state});
-    let paired = withdraw_paired_step(&[row("paired")]);
-    let waiting = withdraw_paired_step(&[row("other_side_unverified")]);
-    let both = withdraw_paired_step(&[row("paired"), row("other_side_unverified")]);
+    let step = |kinds: &[Carrier]| Carrier::refusal_step(&kinds.iter().copied().collect());
+    let paired = step(&[Carrier::Paired]);
+    let waiting = step(&[Carrier::OtherSideUnverified]);
+    let matched = step(&[Carrier::MatchedUnconfirmed]);
+    let both = step(&[Carrier::OtherSideUnverified, Carrier::Paired]);
+    let all = step(&[
+        Carrier::Paired,
+        Carrier::OtherSideUnverified,
+        Carrier::MatchedUnconfirmed,
+    ]);
     assert!(paired.contains("already carries this row as a Contra"));
     assert!(!paired.contains("not verified yet"));
     assert!(waiting.contains("which is not verified yet. Run verify_import on that batch first"));
     assert!(!waiting.contains("already carries"));
-    assert!(both.contains("state paired") && both.contains("state other_side_unverified"));
-    assert_ne!(paired, waiting);
-    assert_ne!(both, paired);
-    assert_ne!(both, waiting);
-    for step in [paired, waiting, both] {
+    assert_eq!(
+        both,
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. Do not post these rows."
+    );
+    // a mix says what each state among the rows needs, and one state alone is
+    // told in its own words
+    assert_eq!(
+        all,
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip, and enter the row in Tally by hand only if the person knows it is a different transfer from that Contra. Do not post these rows."
+    );
+    let texts = [&paired, &waiting, &matched, &both, &all];
+    assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());
+    for step in texts {
         assert!(step.contains("do not post this row") || step.contains("Do not post these rows"));
+        assert!(step.starts_with("No file was written and nothing was recorded. "));
     }
 }
 

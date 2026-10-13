@@ -25,7 +25,9 @@
 //!   reference, and the dates are within k days. A pair forms only where both
 //!   ends have exactly one such edge, and only when the other ledger's verified
 //!   windows hold the skip's date +/- k and the skip's own ledger's hold the
-//!   Contra's: a pair by date claims that nothing else exists. A row that took
+//!   Contra's: a pair by date claims that nothing else exists. Where a window
+//!   is missing the skip is `MatchedUnconfirmed` and keeps that Contra: the
+//!   Contra is known, and that it is the only one is not. A row that took
 //!   part in round 1 without pairing does not pair here, although it still
 //!   counts against the rows that could.
 //! * A row with an equal amount going the other way the same day on its own
@@ -255,6 +257,13 @@ pub(crate) enum SkipState {
         batch: BatchId,
     },
     NotEstablished,
+    /// One verified Contra matches the row by date and nothing competes with
+    /// it, and the verified windows of one of the two ledgers do not hold the
+    /// dates the match rests on: the Contra is known, and that it is the only
+    /// one is not.
+    MatchedUnconfirmed {
+        contra: ContraKey,
+    },
     /// The skipped row, or a row that could carry it, has an equal amount going
     /// the other way the same day on its own statement, so a reversal and two
     /// real transfers look alike and the date cannot pair it. Listed with the Contras
@@ -545,7 +554,9 @@ pub(crate) fn transfer_pairing_view(
                             k_days,
                         )) =>
                 {
-                    SkipState::NotEstablished
+                    SkipState::MatchedUnconfirmed {
+                        contra: contras[c].key.clone(),
+                    }
                 }
                 Some((round, c)) => SkipState::Paired {
                     round,

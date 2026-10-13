@@ -1083,6 +1083,98 @@ async fn every_key_a_withdrawn_row_is_skipped_under_is_read() {
     );
 }
 
+/// Bank B's statement booking the transfer as a Contra with no reference, read
+/// over `coverage`.
+fn b_contra_read_over(directory: &Path, coverage: Value) -> Value {
+    statement_v2(
+        directory,
+        BANK_B,
+        coverage,
+        json!([contra_voucher(BOOKED)]),
+        json!([contra_record(BOOKED, None)]),
+    )
+}
+
+const MATCHED_UNCONFIRMED_STEP: &str = "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip: the row needs no action. If the person knows this row is a different transfer from that Contra, enter it in Tally by hand.";
+
+#[tokio::test]
+async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_the_windows_cover() {
+    // the other statement read over a window that holds the day, and read with
+    // none: the Contra is verified and matches the row in both
+    for (coverage, state, step) in [
+        (
+            window(),
+            "paired",
+            "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.",
+        ),
+        (
+            Value::Null,
+            "matched_unconfirmed",
+            "No file was written and nothing was recorded. A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. If the person knows this row is a different transfer from that Contra, it is entered in Tally by hand.",
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let rig = Rig::new(
+            directory.path(),
+            [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
+        );
+        rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+            .await;
+        let built = rig
+            .build(b_contra_read_over(directory.path(), coverage))
+            .await;
+        assert_eq!(built["voucher_count"], 1, "{state}: {built}");
+        let carrying = built["batch_id"].as_str().unwrap().to_string();
+        mark_found(directory.path(), &carrying);
+        let refused = rig.build(withdrawing(directory.path())).await;
+        assert_eq!(refused["state"], "refused", "{state}: {refused}");
+        assert_eq!(refused["reason"], "withdraw_skip_paired", "{state}");
+        assert_eq!(
+            refused["paired_rows"],
+            json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying, "state": state}]),
+            "{state}"
+        );
+        assert_eq!(refused["paired_rows_omitted"], 0, "{state}");
+        assert_eq!(refused["next_step"], step, "{state}");
+        rig.finish();
+    }
+}
+
+#[tokio::test]
+async fn a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_contras_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    let built = rig
+        .build(b_contra_read_over(directory.path(), Value::Null))
+        .await;
+    let carrying = built["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrying);
+    let again = rig
+        .build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    rig.finish();
+    let section = &again["transfers"];
+    assert_eq!(section["state"], "computed", "{again}");
+    // open, not paired: the row is listed with the batch that holds the Contra
+    assert_eq!(section["skips_paired"], 0, "{again}");
+    assert_eq!(section["skips_open"], 1, "{again}");
+    assert_eq!(
+        open_rows(section),
+        vec![open_row(SKIPPED, "matched_unconfirmed", Some(&carrying))],
+        "{again}"
+    );
+    assert_eq!(
+        section["next_steps"],
+        json!({"matched_unconfirmed": MATCHED_UNCONFIRMED_STEP})
+    );
+    assert_nothing_secret(section);
+}
+
 /// Bank B's statement building `rows` as Contras, none with a reference.
 fn b_contras(directory: &Path, rows: &[&str]) -> Value {
     statement_v2(

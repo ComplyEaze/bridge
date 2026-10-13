@@ -135,6 +135,12 @@ fn paired(round: PairRound, batch: &str, txn: &str) -> SkipState {
     }
 }
 
+fn matched_unconfirmed(batch: &str, txn: &str) -> SkipState {
+    SkipState::MatchedUnconfirmed {
+        contra: contra_key(batch, txn),
+    }
+}
+
 fn ambiguous(candidates: &[(&str, &str)]) -> SkipState {
     SkipState::Ambiguous {
         candidates: candidates
@@ -451,9 +457,13 @@ fn transfer_pairing_without_coverage_an_absent_contra_is_not_established() {
     assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
     let view = view_of(&[skip("st-1")], &[], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
-    // a pair by date claims that nothing else exists, which needs coverage
+    // a pair by date claims that nothing else exists, which needs coverage:
+    // without it the skip is open, and still names the Contra that matches it
     let view = view_of(&[skip("st-1")], &[contra("batch-1", "t1")], &none, 0);
-    assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        matched_unconfirmed("batch-1", "t1")
+    );
     // a pair by reference stands on the reference alone
     let mut referenced = skip("st-1");
     referenced.reference = Some(reference("600000000001"));
@@ -496,7 +506,7 @@ fn transfer_pairing_a_date_pair_needs_both_ledgers_windows_around_its_dates() {
             ("b1", "20260101", "20260105"),
             ("b2", "20260106", "20260131")
         ])),
-        SkipState::NotEstablished
+        matched_unconfirmed("batch-1", "t1")
     );
     // b1 holds the skip's 5th-7th, but b2 starts on the 6th and misses the
     // Contra's 4th
@@ -505,7 +515,7 @@ fn transfer_pairing_a_date_pair_needs_both_ledgers_windows_around_its_dates() {
             ("b1", "20260101", "20260131"),
             ("b2", "20260106", "20260131")
         ])),
-        SkipState::NotEstablished
+        matched_unconfirmed("batch-1", "t1")
     );
     // b2 holds the Contra's 4th-6th, but b1 stops on the 5th and misses the
     // skip's 7th
@@ -514,7 +524,7 @@ fn transfer_pairing_a_date_pair_needs_both_ledgers_windows_around_its_dates() {
             ("b1", "20260101", "20260105"),
             ("b2", "20260101", "20260131")
         ])),
-        SkipState::NotEstablished
+        matched_unconfirmed("batch-1", "t1")
     );
     // both hold theirs
     assert_eq!(
@@ -825,7 +835,9 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
         let view = view_of(&skips, &kept, &coverage, 1);
         for state in view.skips.values() {
             match state {
-                SkipState::Paired { contra, .. } => assert_ne!(contra, &gone),
+                SkipState::Paired { contra, .. } | SkipState::MatchedUnconfirmed { contra } => {
+                    assert_ne!(contra, &gone);
+                }
                 SkipState::Ambiguous { candidates } | SkipState::ReversedSameDay { candidates } => {
                     assert!(!candidates.contains(&gone));
                 }

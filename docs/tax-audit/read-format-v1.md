@@ -257,13 +257,12 @@ rules above cover what that cannot: a read captured while only one of the pair w
 
 ## 9. Real-world validation
 
-This format and its consumer rules have been validated against real Tally exports from several
-client engagements, converted into this directory layout and read back through both the reference
-Python implementation and (for the rules `bridge-tax-audit` implements) this crate. Results are
-kept privately — no client name, figure or byte from that validation appears in this repository or
-its CI, per this project's rule that client data never enters a public repo. CI validates this
-format exclusively against synthetic, invented fixtures (see this crate's
-`tests/fixtures/PROVENANCE.md`).
+CI validates this format exclusively against synthetic, invented fixtures (see this crate's
+`tests/fixtures/PROVENANCE.md`). A local check read real Tally exports from several client
+engagements, converted into this directory layout, back through both the reference Python
+implementation and (for the rules `bridge-tax-audit` implements) this crate; no client name,
+figure or byte from it appears in this repository or its CI, per this project's rule that client
+data never enters a public repo, so that validation is UNVERIFIED here.
 
 One general protocol observation from that validation is worth recording here because it affects
 every consumer, not one client: a live group-master response can carry raw ASCII control

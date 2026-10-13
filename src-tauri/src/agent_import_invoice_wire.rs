@@ -6,8 +6,8 @@
 //! one, or a name two rows claim is an error, never a default.
 //!
 //! What each read was measured to return (TallyPrime 7.1 Silver, lab, 6 Oct
-//! 2026, a client sample book): the voucher-type collection with no field
-//! list returns every type in 0.1 s (26 types, about 12 KB each) with the
+//! 2026, one book on the lab): the voucher-type collection with no field
+//! list returns every type, with the
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
@@ -368,7 +368,7 @@ pub(super) fn guid_literal_safe(guid: &str) -> bool {
 /// type, each with the measured per-row class compute (`$$IsSales` of the row's
 /// voucher type, bridge#625). GST requires an invoice number to be unique within
 /// the year across every series, and a book can hold several Sales types, so the
-/// class is decided here, client-side, from that compute. Only measured
+/// class is decided here, in the program, from that compute. Only measured
 /// primitives reach Tally: a date formula on literal dates (SVFROMDATE and
 /// SVTODATE do not limit a collection), a voucher-number equality (the form the
 /// hand-keyed invoice read used) and the class compute.

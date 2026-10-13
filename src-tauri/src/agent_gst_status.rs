@@ -3,12 +3,14 @@
 //! Tally keeps, on each voucher, whether its GSTR-1 lists it as included,
 //! uncertain or excluded, and whether a person accepted it as it stands. The
 //! lab's TallyPrime 7.1 Silver book (10 Oct 2026, synthetic) returned those
-//! four fields on a short field list (six since #1655), with the voucher type selected by its
+//! four fields on a short field list (seven since #1664), with the voucher type selected by its
 //! name in the same request, at about 3 KB a voucher (protocol reference
 //! §9.17). This tool reads them and says, per voucher, which state it is in.
-//! It reads whether the voucher is cancelled or optional as well, and decides
-//! that first: a cancelled Sales voucher reads the included flag Yes and an
-//! optional one reads all three No (lab, 12 Oct 2026, one voucher each).
+//! It reads whether the voucher is cancelled, optional or post-dated as well,
+//! and decides that first: a cancelled Sales voucher reads the included flag
+//! Yes, an optional one reads all three No, and one marked post-dated by hand
+//! and dated the day Tally's current date had been set to reads the included
+//! flag Yes (lab, 12 Oct 2026, one voucher each).
 //! It reads nothing it does not report: Tally's reason for a status (a tax
 //! mismatch, a missing HSN/SAC) is on its screen only and no field carries it.
 use super::*;
@@ -25,13 +27,18 @@ const STATUS_MAX_VOUCHER_MARK: u64 = 25_000;
 /// The longest window, in days, one read covers.
 const STATUS_MAX_WINDOW_DAYS: i64 = 93;
 
-const STATUS_FIELDS: [&str; 6] = [
+/// The fields a voucher's state is read from: one below a direct child of the
+/// voucher is not the voucher's own.
+const STATUS_FIELDS: [&str; 9] = [
     "VCHGSTSTATUSISINCLUDED",
     "VCHGSTSTATUSISUNCERTAIN",
     "VCHGSTSTATUSISEXCLUDED",
     "ISGSTOVERRIDDEN",
     "ISCANCELLED",
     "ISOPTIONAL",
+    "ISPOSTDATED",
+    "ISDELETED",
+    "ISDELETEDVCHRETAINED",
 ];
 
 /// What a voucher's three status flags say. Tally answers exactly one flag Yes
@@ -49,6 +56,8 @@ pub(super) enum GstStatus {
     Cancelled,
     /// Tally's `ISOPTIONAL` Yes, whatever measured state its three flags state.
     Optional,
+    /// Tally's `ISPOSTDATED` Yes, whatever measured state its three flags state.
+    PostDated,
 }
 
 /// The state three flags state, or the code of why they state none: absent
@@ -70,26 +79,45 @@ pub(super) fn status_of_flags(
     }
 }
 
-/// The state of a voucher: cancelled or optional first, then its three status
-/// flags. A cancelled or optional voucher is so whatever measured state its
-/// flags state (the lab's cancelled voucher reads included and its optional one
-/// reads none), and is unread when they state none: an answer that cannot be
-/// read is not trusted for the two flags beside it either. A voucher whose two
-/// flags are both Yes (never measured), or one of them absent or spelled another
-/// way, has no state; both absent is not reported.
+/// The state of a voucher: cancelled, optional or post-dated first, then its
+/// three status flags. Such a voucher is so whatever measured state its flags
+/// state (the lab's cancelled and post-dated vouchers read included and its
+/// optional one reads none), and is unread when they state none: an answer that
+/// cannot be read is not trusted for the three flags beside it either. A
+/// voucher that reads more than one of the three Yes (never measured), or one
+/// of them absent or spelled another way, has no state; all three absent is not
+/// reported.
 pub(super) fn status_of_voucher(
     cancelled: Option<&str>,
     optional: Option<&str>,
+    post_dated: Option<&str>,
     included: Option<&str>,
     uncertain: Option<&str>,
     excluded: Option<&str>,
 ) -> Result<GstStatus, &'static str> {
     let flags = status_of_flags(included, uncertain, excluded);
-    match (cancelled, optional) {
-        (Some("Yes"), Some("No")) => flags.map(|_| GstStatus::Cancelled),
-        (Some("No"), Some("Yes")) => flags.map(|_| GstStatus::Optional),
-        (Some("No"), Some("No")) => flags,
-        (None, None) => Err("gst_status_not_reported"),
+    match (cancelled, optional, post_dated) {
+        (Some("Yes"), Some("No"), Some("No")) => flags.map(|_| GstStatus::Cancelled),
+        (Some("No"), Some("Yes"), Some("No")) => flags.map(|_| GstStatus::Optional),
+        (Some("No"), Some("No"), Some("Yes")) => flags.map(|_| GstStatus::PostDated),
+        (Some("No"), Some("No"), Some("No")) => flags,
+        (None, None, None) => Err("gst_status_not_reported"),
+        _ => Err("gst_status_unreadable"),
+    }
+}
+
+/// Refuses a state to a voucher Tally marks deleted. `ISDELETED` and
+/// `ISDELETEDVCHRETAINED` come back without being asked for (No on every
+/// voucher the lab read) and a Yes was never measured, so a voucher that reads
+/// one has no state (`gst_status_voucher_deleted`). Both absent is allowed: the
+/// request does not name them. One absent beside the other is never No.
+pub(super) fn not_deleted(
+    deleted: Option<&str>,
+    retained: Option<&str>,
+) -> Result<(), &'static str> {
+    match (deleted, retained) {
+        (None, None) | (Some("No"), Some("No")) => Ok(()),
+        (Some("No" | "Yes"), Some("No" | "Yes")) => Err("gst_status_voucher_deleted"),
         _ => Err("gst_status_unreadable"),
     }
 }
@@ -225,6 +253,9 @@ pub(super) struct StatusRow {
     pub(super) alter_id: String,
     /// The state the flags state, or the code of why they state none.
     pub(super) status: Result<GstStatus, &'static str>,
+    /// What the three status flags read on a cancelled, optional or post-dated
+    /// voucher: returned beside its state and never counted.
+    pub(super) status_flags: Option<GstStatus>,
     pub(super) overridden: Result<bool, &'static str>,
 }
 
@@ -277,39 +308,50 @@ pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static st
         }
         // A status field nested below a direct child is not the voucher's own.
         let nested = voucher.nests_any(&STATUS_FIELDS);
-        let flag = |name: &str| -> Result<Option<String>, &'static str> {
-            voucher.one(name).ok_or("gst_status_unreadable")
-        };
-        let flags = (
-            flag("ISCANCELLED"),
-            flag("ISOPTIONAL"),
-            flag("VCHGSTSTATUSISINCLUDED"),
-            flag("VCHGSTSTATUSISUNCERTAIN"),
-            flag("VCHGSTSTATUSISEXCLUDED"),
-            flag("ISGSTOVERRIDDEN"),
-        );
-        let (status, overridden) = match (nested, flags) {
-            (
-                false,
-                (
-                    Ok(cancelled),
-                    Ok(optional),
-                    Ok(included),
-                    Ok(uncertain),
-                    Ok(excluded),
-                    Ok(overridden),
-                ),
-            ) => (
+        // A flag repeated in the voucher leaves every value unread.
+        let read = || -> Result<_, &'static str> {
+            let flag = |name: &str| voucher.one(name).ok_or("gst_status_unreadable");
+            let deleted = (flag("ISDELETED")?, flag("ISDELETEDVCHRETAINED")?);
+            let kind = (
+                flag("ISCANCELLED")?,
+                flag("ISOPTIONAL")?,
+                flag("ISPOSTDATED")?,
+            );
+            let flags = (
+                flag("VCHGSTSTATUSISINCLUDED")?,
+                flag("VCHGSTSTATUSISUNCERTAIN")?,
+                flag("VCHGSTSTATUSISEXCLUDED")?,
+            );
+            let flags = (flags.0.as_deref(), flags.1.as_deref(), flags.2.as_deref());
+            let status = not_deleted(deleted.0.as_deref(), deleted.1.as_deref()).and_then(|()| {
                 status_of_voucher(
-                    cancelled.as_deref(),
-                    optional.as_deref(),
-                    included.as_deref(),
-                    uncertain.as_deref(),
-                    excluded.as_deref(),
-                ),
-                overridden_of(overridden.as_deref()),
+                    kind.0.as_deref(),
+                    kind.1.as_deref(),
+                    kind.2.as_deref(),
+                    flags.0,
+                    flags.1,
+                    flags.2,
+                )
+            });
+            let status_flags = match status {
+                Ok(GstStatus::Cancelled | GstStatus::Optional | GstStatus::PostDated) => {
+                    status_of_flags(flags.0, flags.1, flags.2).ok()
+                }
+                _ => None,
+            };
+            Ok((
+                status,
+                status_flags,
+                overridden_of(flag("ISGSTOVERRIDDEN")?.as_deref()),
+            ))
+        };
+        let (status, status_flags, overridden) = match (nested, read()) {
+            (false, Ok(read)) => read,
+            _ => (
+                Err("gst_status_unreadable"),
+                None,
+                Err("gst_status_unreadable"),
             ),
-            _ => (Err("gst_status_unreadable"), Err("gst_status_unreadable")),
         };
         rows.push(StatusRow {
             voucher_number: field("VOUCHERNUMBER")?,
@@ -318,6 +360,7 @@ pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static st
             master_id,
             alter_id: field("ALTERID")?,
             status,
+            status_flags,
             overridden,
         });
     }
@@ -333,7 +376,7 @@ fn row_json(row: &StatusRow) -> Value {
         Ok(value) => json!(value),
         Err(code) => json!({"unread": code}),
     };
-    json!({
+    let mut item = json!({
         "voucher_number": row.voucher_number,
         "date": row.date,
         "voucher_type": row.voucher_type,
@@ -341,7 +384,11 @@ fn row_json(row: &StatusRow) -> Value {
         "alter_id": row.alter_id,
         "gst_status": status,
         "accepted_as_it_stands": overridden,
-    })
+    });
+    if let Some(flags) = row.status_flags {
+        item["status_flags"] = json!(flags);
+    }
+    item
 }
 
 impl Server {
@@ -433,6 +480,7 @@ impl Server {
                 Ok(GstStatus::NotInReturn) => *counts.entry("not_in_return").or_default() += 1,
                 Ok(GstStatus::Cancelled) => *counts.entry("cancelled").or_default() += 1,
                 Ok(GstStatus::Optional) => *counts.entry("optional").or_default() += 1,
+                Ok(GstStatus::PostDated) => *counts.entry("post_dated").or_default() += 1,
                 Err(_) => {}
             }
             if row.overridden == Ok(true) {
@@ -463,6 +511,7 @@ impl Server {
                 "not_in_return": counts.get("not_in_return").copied().unwrap_or(0),
                 "cancelled": counts.get("cancelled").copied().unwrap_or(0),
                 "optional": counts.get("optional").copied().unwrap_or(0),
+                "post_dated": counts.get("post_dated").copied().unwrap_or(0),
                 "unread": unread,
                 "accepted_as_it_stands": counts.get("accepted_as_it_stands").copied().unwrap_or(0),
             },
@@ -471,12 +520,14 @@ impl Server {
                 "These are the status flags Tally holds on each voucher when it is read. Tally keeps the status a voucher was given when it was saved; on the lab's book, correcting a master afterwards did not change the status of a voucher already saved (one voucher, cause unverified)",
                 "The reason Tally gives for an uncertain voucher is on its screen only; no field carries it, so none is returned. The one reason measured on the lab's book is a tax figure that did not match Tally's own figure",
                 "included means exactly one flag Yes; it counts a voucher a person accepted as it stands as well (see accepted_as_it_stands), so included is not 'clean'. unread is a count within the other counts, not apart from them: a voucher whose acceptance flag was unread is counted under its status and under unread, and the answer is partial",
-                "not_in_return means all three flags No. The lab's Receipts read so (with the request before it fetched the cancelled and optional flags; the request as it is now is measured on Sales vouchers only), which supports 'Tally does not list the voucher in the return' for Receipts only; it is not measured for Sales in a company without GST or for any other type, and the lab's keyed Purchase invoices read uncertain",
+                "not_in_return means all three flags No. The lab's Receipts read so (with the request before it fetched the cancelled, optional and post-dated flags; the request as it is now is measured on Sales vouchers only), which supports 'Tally does not list the voucher in the return' for Receipts only; it is not measured for Sales in a company without GST or for any other type, and the lab's keyed Purchase invoices read uncertain",
                 "excluded has not been observed on the lab's book; it rests on the field's name",
                 "accepted_as_it_stands is Tally's flag ISGSTOVERRIDDEN. It was seen to go from No to Yes once, by Accept As Is; whether other actions set it is not measured",
-                "A voucher whose flags, or whose cancelled or optional flag, are absent, repeated, nested in another element or spelled another way is unread, never included",
-                "cancelled means Tally's ISCANCELLED reads Yes and optional that its ISOPTIONAL reads Yes. Each is decided before the three status flags and is never counted as included or not_in_return: on the lab's book a cancelled Sales voucher read the included flag Yes and an optional one read all three No (one voucher each). Whether Tally lists a cancelled voucher anywhere in the return, such as among the documents issued, is not measured. A voucher that reads both Yes is unread",
-                "Post-dated vouchers are not marked: the request does not fetch that field, and none was measured. A post-dated voucher of the type in the window is reported with its status flags",
+                "A voucher whose flags, or whose cancelled, optional or post-dated flag, are absent, repeated, nested in another element or spelled another way is unread, never included",
+                "cancelled means Tally's ISCANCELLED reads Yes and optional that its ISOPTIONAL reads Yes. Each is decided before the three status flags and is never counted as included, uncertain, excluded or not_in_return: on the lab's book a cancelled Sales voucher read the included flag Yes and an optional one read all three No (one voucher each). Whether Tally lists a cancelled voucher anywhere in the return, such as among the documents issued, is not measured",
+                "post_dated means Tally's ISPOSTDATED reads Yes, which is not the same as a date still ahead: on the lab's book the flag read Yes on a Sales voucher marked post-dated by hand (Ctrl+T) and dated the day Tally's current date (the date set with F2, not the calendar's) had been set to, and that voucher read the included flag Yes (one voucher). It is decided before the three status flags, as cancelled and optional are, and is never counted as included, uncertain, excluded or not_in_return. Whether Tally's return lists a post-dated voucher, while Tally's current date is before the voucher's date or once it has reached it, is not measured, and ComplyEaze Bridge states neither: look at the return in Tally. A voucher that reads more than one of cancelled, optional and post-dated Yes is unread",
+                "status_flags, on a cancelled, optional or post_dated voucher only, is what Tally's three status flags read on it (included, uncertain, excluded or not_in_return). It is returned so that nothing read is hidden, and it is not counted: it does not say that the return lists the voucher",
+                "A voucher whose ISDELETED or ISDELETEDVCHRETAINED flag reads Yes is unread (gst_status_voucher_deleted). Tally returns the two flags without being asked, No on every voucher the lab read; a Yes was never measured, and what ISDELETEDVCHRETAINED means rests on its name. On the lab's book, where no Edit Log was seen to be on, one deleted voucher left the answer altogether. Both flags absent is allowed; one absent beside the other is unread",
                 "A total of 0 may mean no voucher of that name in the window or a type name that matched nothing; the name is not checked against the book's voucher types, take it from masters",
                 "Each page is a new read of Tally: a voucher saved between two pages can shift the offsets, so a page may repeat or skip one. Read all the pages in one sitting, or narrow the window",
                 "Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured",

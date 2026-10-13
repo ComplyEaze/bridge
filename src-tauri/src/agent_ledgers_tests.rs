@@ -5513,6 +5513,59 @@ mod through_the_tool {
             assert!(ledger_names_masked > 0, "the control: names are masked");
         }
 
+        /// bridge#1490, through the handler: under `mask_parties` the probe party's
+        /// mailing address lines come back masked beside its masked name, the PIN
+        /// code, state and country stay readable, and under `none` the same call
+        /// returns the lines as Tally sent them. The control is the row's own name.
+        #[tokio::test]
+        async fn masking_parties_masks_the_mailing_address_lines_through_the_tool() {
+            let read = |redaction| async move {
+                let masters = mailing_masters();
+                let balances = balances_matching(&masters);
+                call_observed(
+                    compliance_plans(masters, balances),
+                    compliance_args(None),
+                    redaction,
+                    200_000,
+                )
+                .await
+                .0
+            };
+            let probe = |response: &Value| {
+                items(response)
+                    .iter()
+                    .find(|row| {
+                        row["name"] == json!("Lab Party Duplicate Probe")
+                            || row["name"] == json!(crate::agent::mask("Lab Party Duplicate Probe"))
+                    })
+                    .cloned()
+                    .expect("the probe row")
+            };
+            let plain = probe(&read(Redaction::None).await);
+            let masked = probe(&read(Redaction::MaskParties).await);
+            assert_eq!(plain["name"], json!("Lab Party Duplicate Probe"));
+            assert_eq!(
+                masked["name"],
+                json!(crate::agent::mask("Lab Party Duplicate Probe")),
+                "the control: the name is masked"
+            );
+            let entry = |row: &Value| row["compliance"]["mailing_details"]["entries"][0].clone();
+            assert_eq!(
+                entry(&plain)["address_lines"],
+                json!(["1 Test Street", "Test Area"])
+            );
+            assert_eq!(
+                entry(&masked)["address_lines"],
+                json!([
+                    crate::agent::mask("1 Test Street"),
+                    crate::agent::mask("Test Area")
+                ])
+            );
+            for field in ["pin_code", "state", "country", "applicable_from"] {
+                assert_eq!(entry(&plain)[field], entry(&masked)[field], "{field}");
+            }
+        }
+
         // -- admission: the details read is sized by its own estimate --------
 
         const BIG: &str = "Sundry Debtors";

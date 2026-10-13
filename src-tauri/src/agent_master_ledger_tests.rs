@@ -96,7 +96,7 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
             .enumerate()
             .map(|(index, item)| VerdictItem {
                 name: item.name.clone(),
-                guid: Some(format!("0000000{index}-aaaa-bbbb-cccc-000000000000")),
+                guid: Some(format!("0000000{index}-aaaa-bbbb-cccc-dddddddddddd")),
                 reason: None,
             })
             .collect(),

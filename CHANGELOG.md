@@ -28,8 +28,8 @@ These changes are in source and not yet in a published build.
   mailing details, none in force on that date, not observed, or unreadable). A second mailing entry with a later
   date, a party with two mailing rows and other releases are not measured. A party whose only entry starts after the
   Balances-as-of date shows the first date in its status, and an entry that held content the reader does not take
-  is flagged (`other_content_skipped`). The address, PIN code, state and country are returned under every redaction mode:
-  `mask_parties` masks only the mailing name. The request is longer by one element, so the per-ledger size estimate
+  is flagged (`other_content_skipped`). `mask_parties` masks the mailing name, every address line and the flat address field like a party's name;
+  the PIN code, state and country are returned under every redaction mode. The request is longer by one element, so the per-ledger size estimate
   of the reads that name it (`ledger_masters` and the workbook) is 4,700 bytes instead of 3,750 (8,950 instead of
   8,000 with the GST details), from the one growth measured (948 bytes for one populated party row); it was not
   measured on a book of many populated parties, so a large book may be read in more parts, or refused, sooner than

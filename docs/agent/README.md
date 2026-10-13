@@ -231,8 +231,9 @@ address lines may be incomplete; an empty list is a ledger with no mailing detai
 `defect`, for that ledger only). The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state`
 fields are Tally's older elements: TallyPrime 7.1 returned them empty or absent for a party that held an
 address in the one synthetic book measured, so read the address from `mailing_details`; other books may
-fill the flat fields. `mask_parties` masks the entry's `mailing_name` only: the address lines, PIN code,
-state and country reach the assistant's provider under every redaction mode. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
+fill the flat fields. `mask_parties` masks the entry's `mailing_name` and each of its address lines (and the flat
+`address`) like a party name; the PIN code, state and country reach the assistant's provider
+under every redaction mode. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
 releases are not measured.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,

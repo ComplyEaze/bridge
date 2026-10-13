@@ -3261,6 +3261,93 @@ mod through_the_tool {
         assert_eq!(entry(&unmasked)["mailing_name"], json!(name));
     }
 
+    /// bridge#1490: every mailing address line and the flat address are masked
+    /// under `mask_parties`, because a line can repeat the party's name. An empty
+    /// address stays empty and an address not observed stays null; the PIN code,
+    /// state and country stay readable; `none` returns every value as read.
+    #[test]
+    fn the_address_is_masked_line_by_line_and_empty_stays_empty() {
+        let lines = ["1 Test Street", "Test Area"];
+        let entry = |address_lines: Vec<String>| {
+            bridge_tally_protocol::mailing_details::MailingDetailsEntry {
+                applicable_from: bridge_tally_core::TallyDate::parse("20260401").unwrap(),
+                mailing_name: None,
+                address_lines,
+                state: Some("Karnataka".to_string()),
+                country: Some("India".to_string()),
+                pin_code: Some("560001".to_string()),
+                other_content_skipped: false,
+            }
+        };
+        let fields = |address: bridge_tally_protocol::PartyLedgerMasterFieldObservation,
+                      address_lines: Vec<String>| {
+            bridge_tally_protocol::PartyLedgerMasterFields {
+                address,
+                mailing_details:
+                    bridge_tally_protocol::mailing_details::MailingDetailsHistory::Entries {
+                        entries: vec![entry(address_lines)],
+                    },
+                ..bridge_tally_protocol::PartyLedgerMasterFields::default()
+            }
+        };
+        let returned = |text: &str| {
+            bridge_tally_protocol::PartyLedgerMasterFieldObservation::Returned(text.to_string())
+        };
+        let masked = |fields| {
+            crate::agent::redact_value(
+                compliance_json(fields, false),
+                crate::agent::Redaction::MaskParties,
+            )
+        };
+
+        let row = masked(fields(
+            returned("1 Test Street, Test Area"),
+            lines.iter().map(|line| line.to_string()).collect(),
+        ));
+        assert_eq!(
+            row["address"],
+            json!(crate::agent::mask("1 Test Street, Test Area"))
+        );
+        let masked_lines = &row["mailing_details"]["entries"][0]["address_lines"];
+        assert_eq!(
+            masked_lines,
+            &json!([crate::agent::mask(lines[0]), crate::agent::mask(lines[1])])
+        );
+        let entry_json = &row["mailing_details"]["entries"][0];
+        assert_eq!(entry_json["pin_code"], json!("560001"));
+        assert_eq!(entry_json["state"], json!("Karnataka"));
+        assert_eq!(entry_json["country"], json!("India"));
+        assert!(entry_json.get("mailing_name").is_none());
+
+        let empty = masked(fields(returned(""), vec![String::new()]));
+        assert_eq!(empty["address"], json!(""));
+        assert_eq!(
+            empty["mailing_details"]["entries"][0]["address_lines"],
+            json!([""])
+        );
+        let absent = masked(fields(
+            bridge_tally_protocol::PartyLedgerMasterFieldObservation::NotObserved,
+            Vec::new(),
+        ));
+        assert_eq!(absent["address"], Value::Null);
+
+        let unmasked = crate::agent::redact_value(
+            compliance_json(
+                fields(
+                    returned("1 Test Street, Test Area"),
+                    lines.iter().map(|line| line.to_string()).collect(),
+                ),
+                false,
+            ),
+            crate::agent::Redaction::None,
+        );
+        assert_eq!(unmasked["address"], json!("1 Test Street, Test Area"));
+        assert_eq!(
+            unmasked["mailing_details"]["entries"][0]["address_lines"],
+            json!(lines)
+        );
+    }
+
     /// bridge#653: `as_of` sets the date every row's `party_gstin` is read as
     /// of, in either spelling. Which entry is in force on a date is pinned over
     /// the live registration-history capture by

@@ -1,0 +1,24 @@
+# aw22-b.xml: the three Sales invoices of 20 Sep 2026. Each text is shown between the two | marks, with its length in
+# UTF-16 code units. typed = the keys pressed; answer = the text between the NARRATION tags as the answer holds it;
+# decoded = that text after XML decoding. Lengths count every character, spaces included.
+
+BP/26-27/0050  DATE 20260920  BRIDGE Sales  MASTERID 45  ALTERID 69
+  ledgers: BRIDGE Walk-in -1050.00; BRIDGE Svc 998313 5% 1000.00; BRIDGE CGST 2.5% 25.00; BRIDGE SGST 2.5% 25.00
+  typed   (48): |Probe one & two <three> "four" 'five' 6% [seven]|
+  answer  (78): |Probe one &amp; two &lt;three&gt; &quot;four&quot; &apos;five&apos; 6% [seven]|
+  decoded (48): |Probe one & two <three> "four" 'five' 6% [seven]|
+  decoded equals typed: True; decoded equals typed without its trailing space: True; runs of two spaces in decoded: 0
+
+BP/26-27/0051  DATE 20260920  BRIDGE Sales  MASTERID 46  ALTERID 70
+  ledgers: BRIDGE Walk-in -1050.00; BRIDGE Svc 998313 5% 1000.00; BRIDGE CGST 2.5% 25.00; BRIDGE SGST 2.5% 25.00
+  typed   (41): |Probe  two  spaces, and a trailing space |
+  answer  (40): |Probe  two  spaces, and a trailing space|
+  decoded (40): |Probe  two  spaces, and a trailing space|
+  decoded equals typed: False; decoded equals typed without its trailing space: True; runs of two spaces in decoded: 2
+
+BP/26-27/0052  DATE 20260920  BRIDGE Sales  MASTERID 47  ALTERID 71
+  ledgers: BRIDGE Walk-in -1050.00; BRIDGE Svc 998313 5% 1000.00; BRIDGE CGST 2.5% 25.00; BRIDGE SGST 2.5% 25.00
+  typed   (31): |Probe three [BRIDGE:probe-0052]|
+  answer  (31): |Probe three [BRIDGE:probe-0052]|
+  decoded (31): |Probe three [BRIDGE:probe-0052]|
+  decoded equals typed: True; decoded equals typed without its trailing space: True; runs of two spaces in decoded: 0

@@ -1,0 +1,20 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+224302f5f125091916c4fa16d730348c6f945a423c123b9adfc447ec216ef639  95657  screenshots/01-step0.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/02-step0.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/03-step1.png
+c6abcbab1029451f63775cba6f70cd9c336ccfa84fcf3d5563514d0e5e4e0c84  64914  screenshots/04-step4.png
+3442f1b04f2e563bbeca17aebf88a42b665022aa7ec716091f71d2865fe868c7  64390  screenshots/05-step4.png
+70e39988a95d400049827130e2be48d00fe7abd7e5fa13c68f281ed0c9f2c84a  64303  screenshots/06-step4.png
+6e735617326b6b9eaaf70466c1aec1f58c5bb26311eed34164d92634fab141c2  64561  screenshots/07-step4.png
+b513576922f42064e1a719cb717eafbbcd823915250fe849117a049a7b3535e4  61003  screenshots/08-step4.png
+83d13239ada89da15fff240055a559589cd4e981862f78f6e9865ad3b80c9162  51680  screenshots/09-step7.png
+aa4ca1a00e81595332bd40ba7fec67ae2be653ac694b532e16f85cbc7da5d93a  61138  screenshots/10-step7.png
+f427373a2f634a8b0df497d29f05d06b01a46693c1f1219ae8ce3cba08c16601  96291  screenshots/11-step9.png
+bf36dfbfa53927f8899d3bf30549e4b345e5f7b3c0f395ae46748cb6233eb8c3  90051  backups/W22-NOW/TDBK1800_100033.001
+2c5a0b95c11f28a653a3502ee775eae22dd92567578baae056571a291cd3e095  18555  working-log.txt
+17c9faf8d027518a37acd5383c379c2f3f9882b4d6fc6a73067ac1538313e190  11108  step0/w22-s0-end-netstat.txt
+13300aa6e061807fb9a9c6b4156a85975dc1c559ee606a140cabbc5645056a65  48  step0/w22-s0-end-tasklist.txt
+247c8e1baca07851622dd4470e10d9c5692a4c8a81425bce4eaba68cd5409b05  11948  step0/w22-s0-start-netstat.txt
+03d291cc322c58090b6e1a891facede9b8e309d3bdf5002a2903bb67a611eb25  48  step0/w22-s0-start-tasklist.txt
+fa68839bd4f4394e1068722bfe0ff19a24ad39d0a6e26bdcb6d0bb106e2bcf2d  3838  working-summary.txt

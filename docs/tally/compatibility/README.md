@@ -4,7 +4,6 @@
 | `erp9-6-6-3-windows-education-xml-one-company` | `tally_erp9` / `6.6.3` / `education` | `windows` / `x86_64` | `xml_http` / `ipv4` / `disabled` | `one` / `english_india` / `utf8` / `synthetic_small` | `unknown` | `true` | `missing` |
 | `prime-6-2-windows-education-xml-one-company` | `tally_prime` / `6.2` / `education` | `windows` / `x86_64` | `xml_http` / `ipv4` / `disabled` | `one` / `english_india` / `utf8` / `synthetic_small` | `unknown` | `true` | `missing` |
 | `prime-7-0-windows-education-xml-one-company` | `tally_prime` / `7.0` / `education` | `windows` / `x86_64` | `xml_http` / `ipv4` / `disabled` | `one` / `english_india` / `utf8` / `synthetic_small` | `unknown` | `true` | `missing` |
-| `prime-7-1-windows-education-jsonex-one-company` | `tally_prime` / `7.1` / `education` | `windows` / `x86_64` | `json_ex_shadow` / `ipv4` / `disabled` | `one` / `english_india` / `utf8` / `synthetic_small` | `unknown` | `false` | `missing` |
 | `prime-7-1-windows-education-xml-large` | `tally_prime` / `7.1` / `education` | `windows` / `x86_64` | `xml_http` / `ipv4` / `disabled` | `one` / `english_india` / `utf8` / `synthetic_large` | `unknown` | `false` | `missing` |
 | `prime-7-1-windows-education-xml-multiple-companies` | `tally_prime` / `7.1` / `education` | `windows` / `x86_64` | `xml_http` / `ipv4` / `disabled` | `multiple` / `english_india` / `utf8` / `synthetic_small` | `unknown` | `true` | `missing` |
 | `prime-7-1-windows-education-xml-no-company` | `tally_prime` / `7.1` / `education` | `windows` / `x86_64` | `xml_http` / `ipv4` / `disabled` | `none` / `english_india` / `utf8` / `synthetic_small` | `unknown` | `false` | `missing` |
@@ -78,7 +77,7 @@ sentinel mismatches; parser or malformed-response failures; transport failures;
 a missing or mismatched fixture; failure of the marker check itself; an
 unreachable port; and absent evidence are likewise not unsupported. Those
 observations remain fail-closed rather than being promoted into product
-incompatibility. JSONEX, large-dataset, no-company, and UTF-16 cells are
+incompatibility. Large-dataset, no-company, and UTF-16 cells are
 currently non-promotable and remain `unknown` until their qualification paths
 exist.
 

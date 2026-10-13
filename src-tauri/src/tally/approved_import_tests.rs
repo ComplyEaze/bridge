@@ -10,7 +10,7 @@ fn import_name_scope_must_select_one_observed_company() {
     };
     let identity = super::super::VerifiedCompanyIdentity::from_observed_companies(
         original.name.clone(),
-        original.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&original.guid.clone().unwrap()),
         "1".into(),
         "20260401".into(),
         std::slice::from_ref(&original),

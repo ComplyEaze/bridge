@@ -71,7 +71,7 @@ fn identity() -> VerifiedCompanyIdentity {
         .unwrap();
     VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        GUID.into(),
+        crate::tally::test_company_guid(GUID),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &companies,

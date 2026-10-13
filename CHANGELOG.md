@@ -102,6 +102,14 @@ These changes are in source and not yet in a published build.
   mobile-banking and internet-banking rows, interest and every other wording go to suspense. A statement that
   opens without a password needs `password_file` to be an empty file (on a Mac it must be owned by you with no group or other permission bits; on Windows it must be owned by you or Administrators, and no one but you, SYSTEM and Administrators may read or change it). Not measured: other
   account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
+- `vouchers` can keep only the vouchers of a ledger whose narration ends in a suspense
+  tag ComplyEaze Bridge writes (`suspense_tagged: true` with `ledger`, #810 slice 2):
+  "purpose not confirmed" for a cash line answered "don't know", or "UNIDENTIFIED -
+  reallocate from" the ledger for a party no mapping names; each item says which in
+  `matched.suspense_tag`. It reads the tag from the narration, so a voucher whose
+  narration was edited after the tag is not listed and the same text typed by hand
+  matches: read the ledger without the filter too. Not measured: a tagged narration
+  read back from a real Tally. The same tag test now also counts, in a build's `suspense_lines`, a voucher whose tag names its ledger in another case, spacing or hyphenation.
 
 **Changed**
 
@@ -463,14 +471,6 @@ counter Tally keeps that moves when vouchers or ledgers change.
   the group tree, and each call took 64 requests (the window's 34 and the group modes' 30, as counted from the code) and
   about 11 seconds. It did not cover a large book, a group renamed or moved while a window is
   read, or a held later page (#1230).
-- `vouchers` can keep only the vouchers of a ledger whose narration ends in a suspense
-  tag ComplyEaze Bridge writes (`suspense_tagged: true` with `ledger`, #810 slice 2):
-  "purpose not confirmed" for a cash line answered "don't know", or "UNIDENTIFIED -
-  reallocate from" the ledger for a party no mapping names; each item says which in
-  `matched.suspense_tag`. It reads the tag from the narration, so a voucher whose
-  narration was edited after the tag is not listed and the same text typed by hand
-  matches: read the ledger without the filter too. Not measured: a tagged narration
-  read back from a real Tally. The same tag test now also counts, in a build's `suspense_lines`, a voucher whose tag names its ledger in another case, spacing or hyphenation.
 
 **Safer or fixed**
 

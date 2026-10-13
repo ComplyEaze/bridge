@@ -396,15 +396,15 @@ are from that branch's notes. This method is a value of its own in the series an
   of the three saves; and that at the first save, once the method was chosen, the type screen no
   longer showed "Numbering behaviour on insertion/deletion", showed "Prevent creating duplicate
   Voucher Nos." with No in its place, and showed "Show unused vch nos. in transactions for Retain
-  Original Voucher No. behaviour" gone from Yes to greyed out, reading No. - **Not established:** a
-  back-dated voucher WITHOUT a number under "Automatic (Manual Override)"; a supplied number made
-  of digits only; a number that an existing voucher already holds, with duplicates prevented; a
-  voucher entered by hand under that method; under "Renumber Vouchers", a Journal that carries a
-  number, a Journal dated after every other, and a file of several; a Journal imported raw under
-  `Auto Retain` with an earlier date; Multi-user Auto; Payment and Contra; a deletion; Gold; other
-  releases; macOS; the same through ComplyEaze Bridge's own post. A back-dated numbered voucher,
-  and a number that another voucher already holds, were measured under this method in a later run,
-  with duplicates allowed (next paragraph).
+  Original Voucher No. behaviour" gone from Yes to greyed out, reading No.
+- **Not established:** a back-dated voucher WITHOUT a number under "Automatic (Manual Override)"; a
+  supplied number made of digits only; a number that an existing voucher already holds, with
+  duplicates prevented; a voucher entered by hand under that method; under "Renumber Vouchers", a
+  Journal that carries a number, a Journal dated after every other, and a file of several; a
+  Journal imported raw under `Auto Retain` with an earlier date; Multi-user Auto; Payment and
+  Contra; a deletion; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post. A
+  back-dated numbered voucher, and a number that another voucher already holds, were measured under
+  this method in a later run, with duplicates allowed (next paragraph).
 
 **A voucher's own number was kept under Manual with duplicates allowed and under "Automatic
 (Manual Override)", also when back-dated and when another voucher already held it: verified
@@ -438,14 +438,14 @@ and the twelve vouchers reading as at the start both times.
 - **VERIFIED, one entry in a series row:** after the three Journal imports the Journal type's
   series held, inside `RESTARTFROMLIST.LIST/LASTNUMBERLIST.LIST`, a `DATE` reading `20260401` and a
   `LASTNUMBER` reading `0`. The same request sent again returned the same bytes, and no other
-  element of the 24 rows differed from the read before the imports. That list was an empty element
-  in the series answer read after the change of method and before the imports, in the one read
-  straight after the three Payment imports under Manual, and in every series answer of the five
-  earlier runs on this book cited in this section; none of those earlier answers was read straight
-  after an import, so they do not show what an import under `Auto Retain` or `Auto Renumber` leaves
-  there. **Not established:** which of the three imports wrote it (no series answer was read
-  between them); whether a voucher without a number writes it (the run above read no series after
-  its imports under this method); what Tally uses it for.
+  element of the 24 rows differed from the read before the imports. The inner list,
+  `LASTNUMBERLIST.LIST`, was an empty element in the series answer read after the change of method
+  and before the imports, in the one read straight after the three Payment imports under Manual,
+  and in every series answer of the five earlier runs on this book cited in this section; none of
+  those earlier answers was read straight after an import, so they do not show what an import under
+  `Auto Retain` or `Auto Renumber` leaves there. **Not established:** which of the three imports
+  wrote it (no series answer was read between them); whether a voucher without a number writes it
+  (the run above read no series after its imports under this method); what Tally uses it for.
 - So on this run, with duplicates allowed, both methods stored the number an import carried,
   whether it was dated after or before every other voucher of its type, and a number that another
   voucher already held gave a second voucher with the same number, with nothing in the import's

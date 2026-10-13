@@ -99,8 +99,8 @@ whose ledger now points to a different master.
   account numbers, IFSC, MSME or Udyam registration numbers, email, phone and
   address, and, when it builds a voucher file, that file's local path (which can
   include your computer user name). The setting takes one value, not both:
-  shorten party and ledger names, bank account numbers and a ledger's address
-  lines to their first two and last two characters (four or fewer become “…”), or drop narrations. Neither
+  shorten party and ledger names and bank account numbers to their first two and
+  last two characters (four or fewer become “…”), or drop narrations. Neither
   hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
   numbers, contact details or references, or the last four digits of a bank
   statement's account number, and a shortened name can still be
@@ -481,8 +481,8 @@ registration numbers, email, phone and address, and, when it builds a voucher
 file, that file's local path (which can include your computer user name). Source
 installations default to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties`
 or `drop_narration` (one value, not both) before launch when that better fits
-the workflow. These settings shorten party and ledger names, bank account
-numbers and a ledger's address lines or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
+the workflow. These settings shorten party and ledger names and bank account
+numbers or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
 IFSC, MSME or Udyam registration numbers, contact details or references, or the
 last four digits of a bank statement's account number. The package installation
 settings expose the same choices.

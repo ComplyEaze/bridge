@@ -4164,6 +4164,8 @@ mod ack_tests;
 mod approval_tests;
 #[path = "agent_import_stop_tests.rs"]
 mod stop_tests;
+#[path = "agent_import_w18_replay_tests.rs"]
+mod w18_replay_tests;
 
 /// A post whose ledger no longer resolves to the master approved names the
 /// ledger only in the masters list, where the configured redaction applies:

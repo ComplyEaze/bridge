@@ -294,9 +294,9 @@ to and cannot, and ignores a name resolving to nothing. **That is a hypothesis.*
 box's company list was never enumerated, so "matches nothing" is inferred from the transposition,
 not established. Settling it needs one session: enumerate the companies, then import twice —
 once naming an existing-but-unloaded company, once naming a string known to match nothing.
-(2026-10-13: a run with a ledger `Create` in place of a voucher read the loaded companies before each
-request and sent both kinds of name, below; companies in the data folder that were not loaded were not
-listed. A voucher import naming a string known to match nothing is still open.)
+(2026-10-13: a run that used a ledger `Create` instead of a voucher import listed the loaded companies
+before each request and sent both kinds of name, below; companies in the data folder that were not loaded
+were not listed. A voucher import naming a string known to match nothing is still open.)
 
 **A ledger `Create` that named a company landed in that company or in neither. Measured 2026-10-13, licensed TallyPrime 7.1 Silver on Windows, two new synthetic companies, one run of each step. Confidence: PARTIAL.** Branch `lab/m1-create-lands-where-answers`, `7c2ff6a1` (not for merge), bridge#690. Every figure below was read from the branch's 43 answers (40 of them XML, read with an XML parser); each answer's size equals its `CONTENT-LENGTH` and its hash the one in the branch's send log. The release and licence, which company was active, and that a company was shut or renamed on Tally's screen, are from the branch's notes (its screenshots are not on the branch).
 

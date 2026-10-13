@@ -18,6 +18,12 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `negative_ledgers` (new tool; part of #1358): Tally's own Negative Ledgers list for a window, as
+  `ledger`, `side` and `amount` per listed ledger, returned as Tally lists it and compared with no other report
+  (`checks` says so). An empty list is `not_established`, never "no negative ledger": Tally's empty answer cannot be told
+  from a report that was not rendered. Measured on one synthetic book for one whole financial year (a creditor with a
+  debit balance and a debtor with a credit balance were listed, a Suspense ledger with a credit balance was not); any
+  other window is named as unmeasured, and the cost on a large book is not known. Not yet run against Tally.
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
   carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,

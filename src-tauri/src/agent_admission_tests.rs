@@ -97,6 +97,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "list_companies",
         "local_data_report",
         "masters",
+        "negative_ledgers",
         "outstandings",
         "profit_and_loss",
         "purchase_register",

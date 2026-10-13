@@ -26,6 +26,7 @@ DEFAULT_TOOLS = {
     "list_companies",
     "local_data_report",
     "masters",
+    "negative_ledgers",
     "outstandings",
     "profit_and_loss",
     "purchase_register",

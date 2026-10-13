@@ -5,8 +5,10 @@
 //! opposite to the one it expects (the rule is Tally's and is not derived here), so
 //! this read compares it with no other source: it is the report as returned, bound
 //! only by the company, mode and extent checks around it. The bracket is the
-//! stock summary's, written out again for the same reason: a separate error type
-//! and code, and nothing between the extents but one paired report.
+//! trial balance read's (the period before the identity bracket, the books-from
+//! check after the extent), written out again for the same reason as the stock
+//! summary's: a separate error type and code, and nothing between the extents
+//! but one paired report.
 use super::*;
 use bridge_tally_protocol::native_negative_ledgers::{
     parse_native_negative_ledgers, render_native_negative_ledgers_request, NativeNegativeLedgers,

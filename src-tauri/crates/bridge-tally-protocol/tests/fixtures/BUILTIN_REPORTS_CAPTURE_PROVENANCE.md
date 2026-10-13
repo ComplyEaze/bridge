@@ -1,6 +1,6 @@
 # `builtin_cash_flow_*`, `builtin_negative_ledgers_*`, `builtin_unknown_report_*` — provenance
 
-Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analysis, Negative Stock and Negative Ledgers reports, and of its answer to a report name it does not have, requested by report name (protocol reference §12a.1's envelope). Every response file is a live capture, never hand-written. Only Cash Flow, Funds Flow, Negative Stock, the empty Negative Ledgers answer and the unknown-name refusal are read by a parser and its tests; the Sales Register and Ratio Analysis files are kept as the evidence for protocol reference §12a.16, and no code reads them yet.
+Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analysis, Negative Stock and Negative Ledgers reports, and of its answer to a report name it does not have, requested by report name (protocol reference §12a.1's envelope). Every response file is a live capture, never hand-written. Only Cash Flow, Funds Flow, Negative Stock, the Negative Ledgers answers (empty, and with two ledgers) and the unknown-name refusal are read by a parser and its tests; the Sales Register and Ratio Analysis files are kept as the evidence for protocol reference §12a.16, and no code reads them yet.
 
 ## Provenance
 
@@ -12,7 +12,7 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 - **What the captures show:**
   - Cash Flow: no `HEADER` or `STATUS`, and one `DSPPERIOD` (a month name, **no year**) followed by one `DSPACCINFO` (`DSPDRAMT/DSPDRAMTA`, `DSPCRAMT/DSPCRAMTA`, `DSPCLAMT/DSPCLAMTA`) per month: 12 for the year, 3 for April to June, 1 for June. A month with no activity is a present row with empty amounts. A debit is negative. The year's request sent twice gave byte-identical answers (not kept twice).
   - **The Cash Flow rows tie to the native trial balance on this book, inflows only:** for each window the sum of the months' `DSPDRAMTA` equalled the sum of the debits of the ledgers under Cash-in-Hand and Bank Accounts read by `trial_balance` for the same window (17,975,981.22 for the year, 7,263,013.22 for April to June, 5,472,348.20 for June); no credit existed to compare, so the credit column is untested. The trial balance responses themselves are not kept.
-  - Negative Ledgers: an empty `<ENVELOPE>` on a book that holds no negative-signed ledger. This is **inconclusive**: an empty envelope cannot be told from a report that was not rendered (§12a.11). Its row shape is unseen.
+  - Negative Ledgers: an empty `<ENVELOPE>` on a book that holds no negative-signed ledger. This is **inconclusive**: an empty envelope cannot be told from a report that was not rendered (§12a.11). Its row shape was unseen on that date (seen on 2026-10-09: see the last section).
   - An unknown report name: `STATUS` 0 and a `LINEERROR` "Could not find Report '<name>'!", HTTP 200, no dialog. (§12a.1 measured a bare `RESPONSE` "Unknown Request" on another build.)
 - **Not established (as of 2026-10-06; the 2026-10-07 captures below add credits, a month with both columns and a Bank OD ledger):** any outflow, a contra, Bank OD, a month with both an inflow and an outflow, a window that is not whole months, a multi-currency book, optional or post-dated vouchers, Education mode, and any book other than this one.
 

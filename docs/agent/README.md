@@ -584,7 +584,7 @@ measured (a debit as a negative debit amount, a credit as a positive credit amou
 (`negative_ledgers_tally_reported_failure`) or does not know the report
 (`negative_ledgers_report_unknown`), when an amount is not a plain decimal
 (`negative_ledgers_amount_invalid`), or when the report or the book changed between the paired
-reads (`native_negative_ledgers_changed`, `native_ledger_extent_changed`). The report has no
+reads (`native_negative_ledgers_changed`), or the book's extent differed before and after the read (`native_ledger_extent_changed`). A window the read could not build a period for is `negative_ledgers_period_not_honoured`. The report has no
 size check and its cost on a large book is not known; the read is sent once. Measured on one
 synthetic TallyPrime 7.1 Silver book (the captures are in the protocol crate's fixtures);
 this tool has not yet been run against Tally.

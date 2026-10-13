@@ -195,7 +195,8 @@ pub fn parse_native_negative_ledgers(
                     let ledger = pending_name
                         .take()
                         .ok_or(invalid("negative_ledgers_entry_without_name"))?;
-                    if !seen.insert(ledger.clone()) {
+                    // Tally keeps ledger names unique regardless of case and padding.
+                    if !seen.insert(ledger.trim().to_lowercase()) {
                         return Err(NativeNegativeLedgersError::LedgerRepeated);
                     }
                     let balance = read_entry(&mut reader, &element)?;
@@ -212,9 +213,9 @@ pub fn parse_native_negative_ledgers(
                 if !root_seen {
                     // A self-closed root is the same empty list as an empty pair.
                     if name.as_slice() == b"ENVELOPE" {
-                        return Ok(NativeNegativeLedgers {
-                            entries: Vec::new(),
-                        });
+                        root_seen = true;
+                        envelope_closed = true;
+                        continue;
                     }
                     return Err(invalid("negative_ledgers_root_not_envelope"));
                 }

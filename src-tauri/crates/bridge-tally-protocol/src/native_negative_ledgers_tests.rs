@@ -385,6 +385,93 @@ fn a_cut_off_or_wrongly_rooted_answer_is_refused() {
 }
 
 #[test]
+fn a_self_closed_root_is_a_closed_envelope_and_nothing_may_follow_it() {
+    assert_eq!(
+        parse_native_negative_ledgers("<ENVELOPE/>"),
+        Ok(NativeNegativeLedgers {
+            entries: Vec::new()
+        })
+    );
+    assert_eq!(
+        parse_native_negative_ledgers("<ENVELOPE/>junk"),
+        invalid_response("negative_ledgers_stray_text")
+    );
+    assert_eq!(
+        parse_native_negative_ledgers("<ENVELOPE/><ENVELOPE></ENVELOPE>"),
+        invalid_response("negative_ledgers_trailing_content")
+    );
+}
+
+#[test]
+fn an_empty_input_is_an_unterminated_answer_not_an_empty_list() {
+    assert_eq!(
+        parse_native_negative_ledgers(""),
+        invalid_response("negative_ledgers_envelope_unterminated")
+    );
+}
+
+#[test]
+fn a_name_repeated_in_another_case_or_with_padding_is_refused() {
+    for repeated in ["synthetic creditor", "Synthetic Creditor "] {
+        let xml = mutate(
+            "<DSPDISPNAME>Synthetic Debtor</DSPDISPNAME>",
+            &format!("<DSPDISPNAME>{repeated}</DSPDISPNAME>"),
+        );
+        assert_eq!(
+            parse_native_negative_ledgers(&xml),
+            Err(NativeNegativeLedgersError::LedgerRepeated),
+            "{repeated:?}"
+        );
+    }
+}
+
+#[test]
+fn a_negative_zero_is_neither_side() {
+    for from_to in [
+        (
+            "<DSPCLDRAMTA>-2500.50</DSPCLDRAMTA>",
+            "<DSPCLDRAMTA>-0.00</DSPCLDRAMTA>",
+        ),
+        (
+            "<DSPCLCRAMTA>10000.00</DSPCLCRAMTA>",
+            "<DSPCLCRAMTA>-0</DSPCLCRAMTA>",
+        ),
+    ] {
+        assert_eq!(
+            parse_native_negative_ledgers(&mutate(from_to.0, from_to.1)),
+            Err(NativeNegativeLedgersError::BalanceUnexpected),
+            "{from_to:?}"
+        );
+    }
+}
+
+#[test]
+fn a_failure_signal_first_in_an_entry_is_a_reported_failure() {
+    assert_eq!(
+        parse_native_negative_ledgers(&mutate(
+            "<DSPACCINFO>",
+            "<DSPACCINFO><LINEERROR>x</LINEERROR>"
+        )),
+        Err(NativeNegativeLedgersError::TallyReportedFailure)
+    );
+}
+
+#[test]
+fn a_self_closed_amount_is_an_empty_column_and_a_second_name_element_is_refused() {
+    assert_eq!(
+        parse_native_negative_ledgers(&mutate("<DSPCLCRAMTA></DSPCLCRAMTA>", "<DSPCLCRAMTA/>")),
+        parse_native_negative_ledgers(&live())
+    );
+    assert_eq!(
+        parse_native_negative_ledgers(&mutate(
+            "<DSPDISPNAME>Synthetic Debtor</DSPDISPNAME>",
+            "<DSPDISPNAME>Synthetic Debtor</DSPDISPNAME><DSPDISPNAME>x</DSPDISPNAME>"
+        )),
+        invalid_response("negative_ledgers_name_shape")
+    );
+}
+
+#[test]
 fn every_error_has_its_own_stable_code() {
     let errors = [
         (

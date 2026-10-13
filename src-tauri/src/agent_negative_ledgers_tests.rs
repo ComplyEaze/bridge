@@ -256,7 +256,7 @@ async fn a_book_that_moves_during_the_read_is_reported_as_moved_not_as_what_its_
     let (response, _) = call(plans, "2026-04-01", "2027-03-31").await;
     assert_eq!(response["isError"], true, "{response}");
     let cause = &response["structuredContent"]["result"]["error"]["cause"];
-    assert_ne!(cause, "negative_ledgers_balance_unexpected", "{response}");
+    assert_eq!(cause, "native_ledger_extent_changed", "{response}");
 }
 
 #[tokio::test]

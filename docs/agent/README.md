@@ -1773,11 +1773,12 @@ which a build needs for this; a version 1 file holding a skip or a Contra is
 refused as `proposals_legacy` (parse the statement again).
 
 - **What a statement build records.** Beside its vouchers: the statement's bank
-  ledger GUID, the days it read in full, each Contra row's network reference,
-  and each skipped row's date, amount, direction, other ledger and reference,
-  with a flag on any row that has an equal amount going the other way the same
-  day on its own statement. A statement whose every row is skipped writes no
-  file: it appends one record to `agent-import-statement-skips.jsonl` and
+  ledger GUID, the days it read in full, each Contra row's network reference
+  and instrument (the cheque or number the statement prints), and each skipped
+  row's date, amount, direction, other ledger, reference and instrument, with a
+  flag on any row that has an equal amount going the other way the same day on
+  its own statement. A statement whose every row is skipped saves no
+  batch file: it appends one record to `agent-import-statement-skips.jsonl` and
   returns `state: skips_recorded`. No pairing is stored; the view is computed
   again from these records on every call.
 - **The section.** Every successful build, and the first page of

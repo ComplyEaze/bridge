@@ -652,10 +652,10 @@ Yes is not measured, and the before-capture already held five vouchers with the 
 `party` (the party ledger), `amount` (the invoice total as Tally wrote it, without its sign, an exact decimal) with
 `party_side` (`debit` for a negative amount, `credit` for a positive one), `alter_id`, `master_id` and `gst_status`.
 A party or an amount that is empty, absent, repeated, zero or not a plain decimal (a foreign-currency amount) is
-`{"unread": code}`, never a name or a zero. `counts` are those of `gst_status` over the whole window. The result
+`{"unread": code}`, never a name or a zero. `counts` are those of `gst_status` over the whole window, except that `unread` also counts a listed voucher whose party or amount was not read. The result
 also holds `pre_filing_line`, the line a CA reads before filing, with the number of vouchers Tally marks Uncertain
-and the window's dates, ending with a sentence that names the voucher type it covers only, and `filed_period_note`,
-which says the list may differ from a filed return and to check against it. The line and the note are left out, and the
+and the window's dates, naming the voucher type read (the type's class is not checked, so the line does not call it a Sales type), and `filed_period_note`,
+which says the list may differ from a filed return and to check against it. The line is withheld (`{"withheld": ...}`) and the note is left out, and the
 result is `partial` (`gst_uncertain_voucher_unread`), when a voucher's flags or acceptance flag were not read or a
 listed voucher's party or amount was not, so the number in the line is never short. The line alone is withheld
 (`{"withheld": ...}`), the result staying `complete` with its counts, when no voucher was read in the window

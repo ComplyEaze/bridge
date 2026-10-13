@@ -132,16 +132,15 @@ fn dashed(date: &bridge_tally_core::TallyDate) -> String {
 }
 
 /// The owner's line, with "return" for the owner's "screen" (the lab listed an uncertain voucher on
-/// the GSTR-1 screen, so only "out of the return" is what the evidence supports; the owner has not yet
-/// chosen), then one sentence naming the voucher type it covers: another Sales type in the book is
-/// not counted in it.
+/// the GSTR-1 screen, so only "out of the return" is what the evidence supports) and the voucher
+/// type named in place of "Sales" (the type's class is not read, so the line cannot say it is a Sales
+/// type, and another type in the book is not counted in it). The owner has not yet chosen the words.
 fn pre_filing_line(uncertain: u64, from: &str, to: &str, type_name: &str) -> String {
     format!(
-        "Tally marks {uncertain} Sales vouchers dated {from} to {to} as Uncertain and leaves \
-         them out of its GSTR-1 return. Amounts are from ComplyEaze Bridge's voucher read; \
-         Tally's JSON export and the portal are not checked. Resolve each in Tally before \
-         exporting; do not add them on the portal by hand. This covers the voucher type \
-         {type_name} only."
+        "Tally marks {uncertain} vouchers of the type {type_name} dated {from} to {to} as \
+         Uncertain and leaves them out of its GSTR-1 return. Amounts are from ComplyEaze \
+         Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve \
+         each in Tally before exporting; do not add them on the portal by hand."
     )
 }
 

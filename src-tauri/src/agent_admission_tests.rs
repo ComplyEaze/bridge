@@ -1137,7 +1137,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
-            "A withdrawal is refused while exactly one verified Contra matches the row.",
+            "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
             "a skip one verified Contra matches is not withdrawn",
         ),
         (

@@ -442,7 +442,10 @@ fn every_open_state_has_its_own_label_and_its_own_step() {
     let steps: BTreeSet<&str> = EVERY_OPEN_STATE.iter().map(|state| state.step()).collect();
     assert_eq!(labels.len(), EVERY_OPEN_STATE.len());
     assert_eq!(steps.len(), EVERY_OPEN_STATE.len());
-    // a refused withdrawal names a row by the label the section gives it
+    // a refused withdrawal uses the section's own labels, though not always the
+    // one the section gives the row: a row it reads ambiguous, reversed_same_day
+    // or reference_differs is listed in paired_rows as other_side_unverified
+    // when one of its candidates is not verified
     assert_eq!(Carrier::Paired.label(), "paired");
     assert_eq!(
         Carrier::OtherSideUnverified.label(),
@@ -729,7 +732,7 @@ fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
     // told in its own words
     assert_eq!(
         all,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip, and enter the row in Tally by hand only if the person knows it is a different transfer from that Contra. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided once the statement records of both accounts cover its date, which needs for each account a statement whose rows begin before that date and end after it (a statement that begins or ends on that date does not cover it). Do not post these rows."
     );
     let texts = [&paired, &waiting, &matched, &both, &all];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());

@@ -91,7 +91,7 @@ impl OpenState {
             Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day; a Contra dated another day is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
             Self::Ambiguous => "Each batch named holds a Contra that could carry this row: more than one Contra could, or the one that could is also claimed by another row or booked twice. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
-            Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip: the row needs no action. If the person knows this row is a different transfer from that Contra, enter it in Tally by hand.",
+            Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided once the statement records of both accounts cover this date, which needs for each account a statement whose rows begin before this date and end after it (a statement that begins or ends on this date does not cover it).",
             Self::ReferenceDiffers => "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.",
             Self::HeldElsewhere => "The batch named posts this row, which a statement skipped. Verify that batch; once it is found posted the skip is retired.",
             Self::DoubleBooked => "Two statements each booked this transfer as a Contra. Check both in Tally and keep one.",
@@ -433,7 +433,10 @@ const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and n
 
 /// What the batch named beside a withdrawn row holds for it, which is why the
 /// withdrawal is refused. The labels a refusal shares with the section are the
-/// section's own.
+/// section's own, and a row need not carry the same one in both: a row the
+/// section reads `ambiguous`, `reversed_same_day` or `reference_differs` is
+/// listed in `paired_rows` as `other_side_unverified` when one of its
+/// candidates is not verified.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Carrier {
     /// A verified Contra the row is paired with.
@@ -462,7 +465,7 @@ impl Carrier {
         match self {
             Self::Paired => "The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.",
             Self::OtherSideUnverified => "The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
-            Self::MatchedUnconfirmed => "A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. If the person knows this row is a different transfer from that Contra, it is entered in Tally by hand.",
+            Self::MatchedUnconfirmed => "A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. The row can be decided once the statement records of both accounts cover its date, which needs for each account a statement whose rows begin before that date and end after it (a statement that begins or ends on that date does not cover it).",
         }
     }
 
@@ -471,7 +474,7 @@ impl Carrier {
         match self {
             Self::Paired => "the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first.",
             Self::OtherSideUnverified => "the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it.",
-            Self::MatchedUnconfirmed => "a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip, and enter the row in Tally by hand only if the person knows it is a different transfer from that Contra.",
+            Self::MatchedUnconfirmed => "a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided once the statement records of both accounts cover its date, which needs for each account a statement whose rows begin before that date and end after it (a statement that begins or ends on that date does not cover it).",
         }
     }
 

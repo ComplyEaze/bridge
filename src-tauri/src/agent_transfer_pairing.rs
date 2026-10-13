@@ -58,11 +58,11 @@
 //!
 //! A skip with no candidate is not said to have no Contra while one of its
 //! day (+/- k), amount, ledgers and direction carries a reference that differs
-//! from the skip's and is paired with no row in either round: it is
-//! `ReferenceDiffers` with every such Contra. Which banks print one value on
-//! both statements of a transfer is not measured, so two references that
-//! differ neither pair two rows nor prove them apart. This changes no pair:
-//! the two rounds never read it.
+//! from the skip's and is neither paired with another row nor matched with one
+//! by date (`MatchedUnconfirmed`): it is `ReferenceDiffers` with every such
+//! Contra. Which banks print one value on both statements of a transfer is not
+//! measured, so two references that differ neither pair two rows nor prove
+//! them apart. This changes no pair: the two rounds never read it.
 //!
 //! Otherwise a skip with no candidate is `NotFound` only when the other bank
 //! ledger's verified parse windows cover its whole date +/- k interval; if
@@ -282,10 +282,10 @@ pub(crate) enum SkipState {
         candidates: Vec<ContraKey>,
     },
     /// Nothing matches the row by reference or by date, and at least one Contra
-    /// of its day, amount, ledgers and direction, paired with no other row,
-    /// carries a reference that differs from the row's: whether such a Contra
-    /// is the row's other side is not known, so it is listed and the row is
-    /// not said to have none.
+    /// of its day, amount, ledgers and direction, neither paired with another
+    /// row nor matched with one by date, carries a reference that differs from
+    /// the row's: whether such a Contra is the row's other side is not known,
+    /// so it is listed and the row is not said to have none.
     ReferenceDiffers {
         candidates: Vec<ContraKey>,
     },
@@ -656,7 +656,8 @@ fn dates_within<'g>(
 
 /// The Contras that stand where a skip's own would, with a reference that is
 /// not the skip's: of its group, within k days, an edge, a reference on both
-/// rows that differs, and paired with no skip in either round.
+/// rows that differs, and neither paired with a skip nor matched with one by
+/// date.
 fn differing_references(
     skip: &SkipFact,
     group: Option<&Group>,
@@ -671,6 +672,8 @@ fn differing_references(
         .iter()
         .copied()
         .filter(|&c| {
+            // The reference test states the rule. For a skip with no candidate it changes nothing:
+            // with no reference the edge is a date edge, with an equal reference a reference edge.
             !contra_paired[c]
                 && contras[c]
                     .reference

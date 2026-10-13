@@ -364,7 +364,7 @@ pub(super) fn guid_literal_safe(guid: &str) -> bool {
 /// type, each with the measured per-row class compute (`$$IsSales` of the row's
 /// voucher type, bridge#625). GST requires an invoice number to be unique within
 /// the year across every series, and a book can hold several Sales types, so the
-/// class is decided here, client-side, from that compute. Only measured
+/// class is decided here, in the program, from that compute. Only measured
 /// primitives reach Tally: a date formula on literal dates (SVFROMDATE and
 /// SVTODATE do not limit a collection), a voucher-number equality (the form the
 /// hand-keyed invoice read used) and the class compute.

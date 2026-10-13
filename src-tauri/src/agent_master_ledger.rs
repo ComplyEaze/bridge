@@ -452,6 +452,18 @@ impl MasterRecord {
         }
     }
 
+    /// The `record_type` this record is written under, for a test to name the
+    /// append it fails.
+    #[cfg(test)]
+    fn record_type(&self) -> &'static str {
+        match self {
+            Self::Batch(_) => "master_batch",
+            Self::DispatchIntent(_) => "master_dispatch_intent",
+            Self::DispatchResponse(_) => "master_dispatch_response",
+            Self::Verdict(_) => "master_verdict",
+        }
+    }
+
     pub(super) fn batch_id(&self) -> &str {
         match self {
             Self::Batch(record) => &record.batch_id,
@@ -534,7 +546,7 @@ pub(super) enum MasterLedgerError {
 }
 
 impl MasterLedgerError {
-    pub(super) fn code(self) -> &'static str {
+    pub(super) const fn code(self) -> &'static str {
         match self {
             Self::Unavailable => "master_ledger_unavailable",
             Self::RecordTooLarge => "master_ledger_record_too_large",
@@ -765,6 +777,15 @@ impl BatchState {
     }
 }
 
+/// A dispatched batch whose outcome is not settled and whose ledger names block
+/// a new dispatch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct BlockingBatch {
+    pub(super) batch_id: String,
+    /// The company the blocking batch was prepared for.
+    pub(super) company_guid: String,
+}
+
 /// The admitted journal: per-batch state, built record by record.
 #[derive(Debug, Default)]
 pub(super) struct MasterJournal {
@@ -821,10 +842,11 @@ impl MasterJournal {
         Ok(state)
     }
 
-    /// Whether another batch was dispatched, has no terminal verdict, and names
-    /// a ledger that may be one master with a ledger `items` names, or that
-    /// recorded an equal key.
-    fn overlaps_open_dispatch(&self, batch_id: &str, items: &[IntentItem]) -> bool {
+    /// The other batches that were dispatched, have no terminal verdict, and
+    /// name a ledger that may be one master with a ledger `items` names, or that
+    /// recorded an equal key. Every company's batches are compared: a batch is
+    /// listed whatever company it belongs to.
+    fn overlaps_open_dispatch(&self, batch_id: &str, items: &[IntentItem]) -> Vec<BlockingBatch> {
         let new_items: Vec<(&IntentItem, NameKeys)> = items
             .iter()
             .map(|item| (item, NameKeys::of(&item.name)))
@@ -832,17 +854,37 @@ impl MasterJournal {
         self.batches
             .values()
             .filter(|state| !state.is_settled())
-            .filter_map(|state| state.intent.as_ref())
-            .filter(|open| open.batch_id != batch_id)
-            .flat_map(|open| open.items.iter())
-            .any(|held| {
-                let held_keys = NameKeys::of(&held.name);
-                new_items.iter().any(|(new, new_keys)| {
-                    new.canonical_key == held.canonical_key
-                        || new.absence_key == held.absence_key
-                        || new_keys.may_be_one_master(&held_keys)
+            .filter(|state| {
+                state.intent.as_ref().is_some_and(|open| {
+                    open.batch_id != batch_id
+                        && open.items.iter().any(|held| {
+                            let held_keys = NameKeys::of(&held.name);
+                            new_items.iter().any(|(new, new_keys)| {
+                                new.canonical_key == held.canonical_key
+                                    || new.absence_key == held.absence_key
+                                    || new_keys.may_be_one_master(&held_keys)
+                            })
+                        })
                 })
             })
+            .map(|state| BlockingBatch {
+                batch_id: state.batch.batch_id.clone(),
+                company_guid: state.batch.company.guid.clone(),
+            })
+            .collect()
+    }
+
+    /// The batches that would block a dispatch of `batch` now, by the rule the
+    /// journal applies when the intent is appended. The post refuses on it
+    /// before the dialog and names the batches from it; the refusal that
+    /// decides is the one under the exclusive lock.
+    pub(super) fn open_dispatch_blockers(&self, batch: &MasterBatch) -> Vec<BlockingBatch> {
+        let items = batch
+            .items
+            .iter()
+            .map(|item| IntentItem::of(&item.name))
+            .collect::<Vec<_>>();
+        self.overlaps_open_dispatch(&batch.batch_id, &items)
     }
 
     /// Every refusal the journal would raise for a dispatch intent of the batch
@@ -881,7 +923,7 @@ impl MasterJournal {
         {
             return Err(MasterLedgerError::Invalid(Invalid::MarksMissing));
         }
-        if self.overlaps_open_dispatch(batch_id, items) {
+        if !self.overlaps_open_dispatch(batch_id, items).is_empty() {
             return Err(MasterLedgerError::OpenDispatchOverlaps);
         }
         Ok(())
@@ -1076,7 +1118,52 @@ pub(super) fn append(
     if record.is_dispatch_intent() {
         return Err(MasterLedgerError::UseAppendIntent);
     }
-    append_syncing(data_dir, lock, record, sync_directory)
+    #[cfg(test)]
+    if test_fault_fires(record.record_type()) {
+        return Err(MasterLedgerError::Unavailable);
+    }
+    #[cfg(test)]
+    let lost_after_write = test_fault_fires(&format!("{}_lost_after_write", record.record_type()));
+    let appended = append_syncing(data_dir, lock, record, sync_directory);
+    #[cfg(test)]
+    if lost_after_write && appended.is_ok() {
+        return Err(MasterLedgerError::Unavailable);
+    }
+    appended
+}
+
+#[cfg(test)]
+tokio::task_local! {
+    /// The faults a test arms around the call under test: each entry names one
+    /// point, a `record_type` whose next [`append`] fails (or, with
+    /// `_lost_after_write`, is written and then reported as failed) or a read
+    /// the answered call makes, and is used up by the first time that point is
+    /// reached.
+    /// Absent, nothing fails.
+    pub(super) static TEST_FAULTS: std::cell::RefCell<Vec<&'static str>>;
+    /// Run by the post just before it reads the journal again for the check
+    /// that precedes the dialog, as a holder settling or a rival's send
+    /// landing in the seconds of reads before it would.
+    pub(super) static BEFORE_HOLD_CHECK: std::sync::Arc<dyn Fn() + Send + Sync>;
+    /// Run by a post refused under the journal's lock just before it reads the
+    /// journal to say why, as a holder settling or another call's send landing
+    /// in that moment would.
+    pub(super) static BEFORE_FAILURE_READ: std::sync::Arc<dyn Fn() + Send + Sync>;
+}
+
+/// Whether `point` is armed in the task running this, using the arming up.
+#[cfg(test)]
+pub(super) fn test_fault_fires(point: &str) -> bool {
+    TEST_FAULTS
+        .try_with(|armed| {
+            let mut armed = armed.borrow_mut();
+            armed
+                .iter()
+                .position(|armed| *armed == point)
+                .map(|at| armed.remove(at))
+                .is_some()
+        })
+        .unwrap_or(false)
 }
 
 pub(super) use crate::tally::approved_import::RecordedIntent;

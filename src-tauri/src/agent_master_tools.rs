@@ -24,12 +24,18 @@
 //! it reads and never sends. Only when the read-back cannot be made at all
 //! (the company cannot be verified, the journal cannot describe the batch)
 //! does the answer fall back to the journal's own `posted_unverified`. When
-//! Tally's answer itself cannot be appended, the call stops there and answers
-//! `posted_unverified` with `answer_recorded` false and Tally's counters.
+//! Tally's answer itself cannot be appended, the read-back and the verdict go
+//! on with the counters the call holds: the answer is appended again under the
+//! verdict's lock, before the verdict, and no verdict is written without it.
+//! Where the journal cannot be read after the POST, the call answers
+//! `posted_unverified` with Tally's counters and `answer_recorded` saying
+//! whether the answer is on file. The call that got Tally's answer never says
+//! the create may have been sent; a later call that finds an intent and no
+//! recorded answer cannot know Tally answered, and says so.
 use super::approval::{ApprovalBinding, HeldRequest};
 use super::master_ledger::{
     append, append_intent, read_journal, remove_pre_image, write_pre_image, BatchState,
-    ExclusiveAdmission, MasterBatch, MasterClass, MasterCompany, MasterCounters,
+    BlockingBatch, ExclusiveAdmission, MasterBatch, MasterClass, MasterCompany, MasterCounters,
     MasterDispatchIntent, MasterDispatchResponse, MasterJournal, MasterLedgerError, MasterRecord,
     PreImage, RecordedIntent, StoredLedgerCreate, StoredLedgerKind,
 };
@@ -57,7 +63,10 @@ mod verdict;
 #[path = "agent_master_verify.rs"]
 mod verify;
 use verdict::Moment;
-use verify::{settled_alert, settled_next_step};
+use verify::{
+    not_read_back_next_step, settled_alert, settled_next_step, settled_note, PostedAnswer,
+    NEXT_ANSWER_NOT_RECORDED, NEXT_NOT_READ_BACK_AFTER_ANSWER, NEXT_UNCONFIRMED,
+};
 
 /// What a caller is told after a ledger is prepared.
 const PREPARED_NEXT_STEP: &str = "Nothing was written to Tally. To create this ledger, call post_ledger_creates with this batch_id: the local user must approve it in a native dialog first.";
@@ -327,6 +336,51 @@ impl Server {
     fn read_master_journal(&self) -> Result<MasterJournal, String> {
         let _lock = self.lock_import_admission_shared()?;
         read_journal(&self.settings.data_dir).map_err(|error| error.code().to_string())
+    }
+
+    /// The journal read of the check that precedes the dialog.
+    fn read_master_journal_for_hold_check(&self) -> Result<MasterJournal, String> {
+        #[cfg(test)]
+        if super::master_ledger::test_fault_fires("hold_check_read_busy") {
+            return Err("import_admission_busy".to_string());
+        }
+        self.read_master_journal()
+    }
+
+    /// The one journal read of a failed post, which says whether a send was
+    /// recorded and names the batches holding a name. A busy or unreadable
+    /// journal is an answer too: the fields it would fill are left out.
+    fn read_master_journal_for_failure(&self) -> Result<MasterJournal, String> {
+        #[cfg(test)]
+        if super::master_ledger::test_fault_fires("failure_read_busy") {
+            return Err("import_admission_busy".to_string());
+        }
+        self.read_master_journal()
+    }
+
+    /// The masters journal after Tally answered the one create: the shared read
+    /// as [`Self::read_master_journal`], and, when another process holds the
+    /// admission lock, the read with no lock. A lockless read of an append in
+    /// progress fails closed on a torn last line. Nothing here may fail the
+    /// call: the caller answers from what it cannot read.
+    fn read_master_journal_after_answer(&self) -> Result<MasterJournal, String> {
+        #[cfg(test)]
+        if super::master_ledger::test_fault_fires("answer_read_failed") {
+            return Err("master_journal_unavailable".to_string());
+        }
+        let shared = self.read_master_journal();
+        #[cfg(test)]
+        let shared = if super::master_ledger::test_fault_fires("answer_read_busy") {
+            Err("import_admission_busy".to_string())
+        } else {
+            shared
+        };
+        match shared {
+            Err(code) if code == "import_admission_busy" => {
+                read_journal(&self.settings.data_dir).map_err(|error| error.code().to_string())
+            }
+            other => other,
+        }
     }
 
     /// Whether the masters journal records a dispatch for the batch `args`
@@ -612,6 +666,35 @@ impl Server {
             require_licensed_mode(profile)?;
             check_name_free(&ledgers, &groups, &item, identity.company_guid())
                 .map_err(|error| name_check_failure(&error))?;
+            // A name an open dispatch holds is refused before the person is
+            // asked, whether this pass asks or redeems an approval given
+            // earlier. The journal is read again here, after the Tally reads
+            // above, which take seconds: a holder that settled since the pass
+            // began does not refuse, and one that appeared does. It is an answer
+            // of its own, never the failure path below. Nothing is recorded for
+            // the batch. The check under the lock in `record_master_intent`
+            // stays, and can still refuse after an approval.
+            #[cfg(test)]
+            let _ = super::master_ledger::BEFORE_HOLD_CHECK.try_with(|before| before());
+            // A read that fails here skips this check and goes on as the post
+            // did before it existed: the check under the lock decides, and this
+            // read adds no failure and withdraws no approval.
+            if let Ok(fresh) = self.read_master_journal_for_hold_check() {
+                let view = overlap_view(Some(&fresh), batch_id, &guid);
+                if !matches!(view, OverlapView::Settled) {
+                    self.post_approvals.revoke_unredeemed_of(
+                        PostKind::Masters,
+                        batch_id,
+                        "post_refused_before_intent",
+                    );
+                    return Ok(Step::Done(Box::new(overlap_refusal_outcome(
+                        batch_id,
+                        &guid,
+                        accumulated.clone(),
+                        &view,
+                    ))));
+                }
+            }
             let preview = master_review_text(&item, &identity, &origin)
                 .map_err(|error| ToolFailure::from(error.code().to_string()))?;
             let company_marks_request = crate::tally::agent_read_request::AgentReadRequest::parse(
@@ -714,66 +797,64 @@ impl Server {
                 response_sha256: posted.response_evidence.response_sha256.clone(),
                 counters,
             };
-            // Known limit, shared with the voucher path's response append: the
-            // lock is tried once, never waited for, so another process holding
-            // it at this instant fails the append, as does any failure of the
-            // append itself. The send is already recorded by its intent; only
-            // Tally's answer goes unrecorded. Tally did answer, so the call
-            // says so, with its counters and the failure's code, rather than
-            // that the create may have been sent.
-            let answer_recorded =
-                ExclusiveAdmission::acquire(&self.settings.data_dir).and_then(|lock| {
-                    append(
-                        &self.settings.data_dir,
-                        &lock,
-                        MasterRecord::DispatchResponse(response.clone()),
-                    )
-                    .map_err(|error| error.code().to_string())
-                });
-            if let Err(code) = answer_recorded {
-                return Ok(Step::Done(Box::new(ToolOutcome {
-                    payload: json!({"result":{
-                        "batch_id": batch.batch_id,
-                        "state": "posted_unverified",
-                        "attempt_recorded": true,
-                        "answer_recorded": false,
-                        "dispatch": {"state": "dispatched", "resent": false},
-                        "counters": counters_json(response.counters.as_ref()),
-                        "verification": {"attempted": false, "error": {"code": code}},
-                        "note": ANSWER_UNRECORDED_NOTE,
-                    }}),
-                    evidence: accumulated.clone(),
-                    company_guid: Some(guid.clone()),
-                    truncated: false,
-                })));
-            }
-            // The book as it stands now, with the intent and the answer just
-            // recorded: read back and judged. Only a read-back that cannot be
-            // attempted at all falls back to the journal's own account.
-            let recorded = self.read_master_journal()?;
-            let payload = match recorded.state(batch_id) {
-                Some(fresh) => {
-                    self.verify_master_batch(
-                        fresh,
-                        Moment::JustPosted,
-                        &identity,
-                        call_started,
-                        &mut accumulated,
-                    )
-                    .await
-                }
-                None => Err("master_batch_not_found".to_string()),
+            // The answer is tried once, here. Known limit, shared with the
+            // voucher path's response append: the lock is tried and never
+            // waited for, so another process holding it at this instant fails
+            // the append, as does any failure of the append itself. The send is
+            // already recorded by its intent. Tally did answer, so whatever
+            // happens below the call says so, never that the create may have
+            // been sent: an answer that failed here is appended again, under
+            // the verdict's own lock, before the verdict.
+            let appended = ExclusiveAdmission::acquire(&self.settings.data_dir).and_then(|lock| {
+                append(
+                    &self.settings.data_dir,
+                    &lock,
+                    MasterRecord::DispatchResponse(response.clone()),
+                )
+                .map_err(|error| error.code().to_string())
+            });
+            // The book as it stands now, with the intent recorded and, when the
+            // append worked, the answer: read back and judged. A journal that
+            // cannot be read, or has no intent for the batch, falls back to
+            // the account of what Tally answered.
+            let journal = self.read_master_journal_after_answer();
+            let payload = match &journal {
+                Ok(journal) => match journal.state(batch_id).filter(|fresh| fresh.intent.is_some())
+                {
+                    Some(fresh) => {
+                        self.verify_master_batch(
+                            fresh,
+                            Moment::JustPosted,
+                            &identity,
+                            call_started,
+                            &mut accumulated,
+                            PostedAnswer {
+                                counters,
+                                unrecorded: appended.is_err().then_some(&response),
+                            },
+                        )
+                        .await
+                    }
+                    None => Err("master_batch_not_found".to_string()),
+                },
+                Err(code) => Err(code.clone()),
             };
             let payload = payload.unwrap_or_else(|code| {
-                json!({"result":{
+                let mut result = json!({
                     "batch_id": batch.batch_id,
                     "state": "posted_unverified",
                     "attempt_recorded": true,
+                    "answer_recorded": appended.is_ok(),
                     "dispatch": {"state": "dispatched", "resent": false},
                     "counters": counters_json(response.counters.as_ref()),
                     "verification": {"attempted": false, "error": {"code": code}},
-                    "note": POSTED_UNVERIFIED_NOTE,
-                }})
+                    "note": if appended.is_ok() { POSTED_UNVERIFIED_NOTE } else { ANSWER_UNRECORDED_NOTE },
+                    "next_step": fallback_next_step(appended.is_ok()),
+                });
+                if let Err(code) = &appended {
+                    result["verification"]["answer_record_error"] = json!(code);
+                }
+                json!({ "result": result })
             });
             Ok(Step::Done(Box::new(ToolOutcome {
                 payload,
@@ -809,11 +890,24 @@ impl Server {
             Ok(result) => Ok(Pass::Done(result)),
             Err(failure) => {
                 // Whether a send was recorded decides what the caller is told:
-                // an unreadable journal is not "not sent".
-                let attempted = self
-                    .read_master_journal()
-                    .ok()
-                    .map(|journal| journal.dispatched(batch_id));
+                // an unreadable journal is not "not sent". One read serves
+                // both that and, for the check under the lock, the batches
+                // that hold the name.
+                #[cfg(test)]
+                let _ = super::master_ledger::BEFORE_FAILURE_READ.try_with(|before| before());
+                let journal = self.read_master_journal_for_failure().ok();
+                if failure.code == OVERLAP_CODE {
+                    // The typed refusal: this call recorded nothing and sent
+                    // nothing, whatever the journal shows now.
+                    let view = overlap_view(journal.as_ref(), batch_id, &guid);
+                    return Ok(Pass::Done(overlap_refusal_outcome(
+                        batch_id,
+                        &guid,
+                        accumulated,
+                        &view,
+                    )));
+                }
+                let attempted = journal.as_ref().map(|journal| journal.dispatched(batch_id));
                 Ok(Pass::Done(master_failure_outcome(
                     batch_id,
                     &guid,
@@ -963,6 +1057,7 @@ impl Server {
                     &identity,
                     started,
                     &mut evidence,
+                    PostedAnswer::recorded(state),
                 )
                 .await
             }
@@ -1006,16 +1101,28 @@ impl Server {
                 ),
                 "verdict": verdict.map(|verdict| verdict_state_code(verdict.state)),
             },
-            "note": if state.response.is_some() { ALREADY_SENT_NOTE } else { MAY_HAVE_BEEN_SENT_NOTE },
+            // The verdict first: it is what the read-back concluded, and a
+            // verdict with no answer on file is not "may have been sent".
+            "note": match (verdict, &state.response) {
+                (Some(verdict), _) => settled_note(verdict.state),
+                (None, Some(_)) => ALREADY_SENT_NOTE,
+                (None, None) => MAY_HAVE_BEEN_SENT_NOTE,
+            },
         });
         if let Some(verdict) = verdict {
-            result["next_step"] = json!(settled_next_step(verdict.state));
             if let Some(alert) = settled_alert(verdict.state) {
                 result["alert"] = json!(alert);
             }
         }
-        if let Some(code) = not_read_back {
-            result["verification"] = json!({"attempted": false, "error": {"code": code}});
+        // A book that was not read back says what stopped it and what to do:
+        // the verdict, when there is one, was judged by an earlier call.
+        match (&not_read_back, verdict) {
+            (Some(code), _) => {
+                result["next_step"] = json!(not_read_back_next_step(code));
+                result["verification"] = json!({"attempted": false, "error": {"code": code}});
+            }
+            (None, Some(verdict)) => result["next_step"] = json!(settled_next_step(verdict.state)),
+            (None, None) => {}
         }
         ToolOutcome {
             payload: json!({ "result": result }),
@@ -1043,13 +1150,210 @@ fn journal_refusal(error: MasterLedgerError) -> Result<UnderLockRefusal, String>
     }
 }
 
+/// The refusal code of a dispatch that an unsettled batch's ledger name blocks.
+const OVERLAP_CODE: &str = MasterLedgerError::OpenDispatchOverlaps.code();
+
+/// What a caller does after the answer Tally gave could not be followed by a
+/// read-back: a later call reads and sends nothing, and nothing is keyed meanwhile.
+fn fallback_next_step(answer_recorded: bool) -> String {
+    if answer_recorded {
+        NEXT_NOT_READ_BACK_AFTER_ANSWER.to_string()
+    } else {
+        format!("{NEXT_NOT_READ_BACK_AFTER_ANSWER}{NEXT_ANSWER_NOT_RECORDED}")
+    }
+}
+
+/// The batches that hold a name, as a refusal tells them: those of the refused
+/// batch's own company by id, and those of other companies with the company
+/// they belong to, so the person can load that company and read that batch
+/// back. The list is not capped, for this reason: the journal admits an open
+/// dispatch only when it overlaps no other open dispatch
+/// (`MasterJournal::intent_refusal`, on every append and on every read). A
+/// batch's name is ASCII (`MasterName`), and for such a name an open dispatch
+/// can overlap it in three ways: by the canonical key its intent recorded, by
+/// the absence key it recorded, or by its name (for ASCII names, equal letters
+/// and digits). Open dispatches that agree on one of these overlap each other,
+/// so at most one is listed per way, three in all, and one for a journal this
+/// build wrote, whose keys are computed from the names. A fourth holder would
+/// have to agree with the new name by one of the three ways and with none of
+/// the other three holders, which two holders that agree by the same way
+/// already rule out; no journal the reader admits has one.
+#[derive(Debug, PartialEq, Eq)]
+struct BlockerReport {
+    ids: Vec<String>,
+    other_companies: Vec<BlockingBatch>,
+}
+
+impl BlockerReport {
+    fn of(blockers: &[BlockingBatch], company_guid: &str) -> Self {
+        let (own, others): (Vec<_>, Vec<_>) = blockers
+            .iter()
+            .cloned()
+            .partition(|blocker| blocker.company_guid.eq_ignore_ascii_case(company_guid));
+        Self {
+            ids: own.into_iter().map(|blocker| blocker.batch_id).collect(),
+            other_companies: others,
+        }
+    }
+
+    fn add_to(&self, error: &mut Value) {
+        error["blocking_batch_ids"] = json!(self.ids);
+        error["blocking_batches_other_companies"] = json!(self
+            .other_companies
+            .iter()
+            .map(|blocker| json!({"batch_id": blocker.batch_id, "company_guid": blocker.company_guid}))
+            .collect::<Vec<_>>());
+    }
+}
+
+/// What a read of the journal showed of a batch refused for its ledger name.
+#[derive(Debug, PartialEq, Eq)]
+enum OverlapView {
+    /// Batches hold the name.
+    Held(BlockerReport),
+    /// The journal was read and no batch holds the name now.
+    Settled,
+    /// The journal was read and shows a send of this batch recorded since the
+    /// call began, by another call.
+    SendRecordedSince,
+    /// The journal could not be read.
+    Unread,
+}
+
+impl OverlapView {
+    /// The name of the case, in the answer.
+    fn code(&self) -> &'static str {
+        match self {
+            Self::Held(_) => "held",
+            Self::Settled => "settled_meanwhile",
+            Self::SendRecordedSince => "send_of_this_batch_recorded_since",
+            Self::Unread => "journal_unread",
+        }
+    }
+}
+
+/// What `journal` shows of `batch_id` refused for its ledger name. `None` is a
+/// journal that could not be read.
+fn overlap_view(
+    journal: Option<&MasterJournal>,
+    batch_id: &str,
+    company_guid: &str,
+) -> OverlapView {
+    let Some(current) = journal.and_then(|journal| journal.state(batch_id)) else {
+        return OverlapView::Unread;
+    };
+    if current.intent.is_some() {
+        return OverlapView::SendRecordedSince;
+    }
+    let held = journal
+        .map(|journal| journal.open_dispatch_blockers(&current.batch))
+        .unwrap_or_default();
+    if held.is_empty() {
+        OverlapView::Settled
+    } else {
+        OverlapView::Held(BlockerReport::of(&held, company_guid))
+    }
+}
+
+const OVERLAP_HOLD: &str = "A create ComplyEaze Bridge sent earlier for this ledger name, or for a name that may be the same ledger, is not settled. An unsettled create holds its name in every company this data folder holds batches for. Nothing was sent.";
+const OVERLAP_OWN: &str = " Call post_ledger_creates with each batch id in blocking_batch_ids: it reads the book back and sends nothing.";
+const OVERLAP_OTHER: &str = " A batch of another company holds the name too: blocking_batches_other_companies lists each with its company_guid. list_companies shows only the companies loaded in Tally, so a company_guid you cannot find there belongs to a company that is not loaded. Call post_ledger_creates with that batch_id: if its company is loaded it reads that book back and sends nothing, and if not the answer says to load the same companies and call again.";
+/// The step when a send of this batch was recorded since the call began.
+const NEXT_SEND_RECORDED_SINCE: &str = "Call post_ledger_creates with this batch_id again later: it reads the book back and sends nothing. Do not create the ledger in Tally by hand meanwhile, because the send may still be waiting in Tally and would overwrite it. Never post this batch again.";
+const OVERLAP_THEN: &str = " When those batches are settled, call post_ledger_creates with this batch_id again. Do not create the ledger in Tally by hand meanwhile: the earlier create may still be waiting in Tally and would overwrite it.";
+const OVERLAP_SETTLED: &str = "Nothing was sent. The create that held this ledger name has been settled since this call began. Call post_ledger_creates with this batch_id again to post it.";
+const OVERLAP_UNREAD: &str = "Nothing was sent by this call. ComplyEaze Bridge could not read its journal just now to say which batch holds this ledger name. Call post_ledger_creates with this batch_id again: it names the batches, or, if this batch was sent by another call, reads it back and sends nothing. Do not create the ledger in Tally by hand meanwhile: an earlier create may still be waiting in Tally and would overwrite it.";
+
+/// What a caller does after the refusal for a held name, by what the journal
+/// showed.
+fn overlap_next_step(view: &OverlapView) -> String {
+    match view {
+        OverlapView::Held(held) => {
+            let mut step = OVERLAP_HOLD.to_string();
+            if !held.ids.is_empty() {
+                step.push_str(OVERLAP_OWN);
+            }
+            if !held.other_companies.is_empty() {
+                step.push_str(OVERLAP_OTHER);
+            }
+            step.push_str(OVERLAP_THEN);
+            step
+        }
+        OverlapView::Settled => OVERLAP_SETTLED.to_string(),
+        OverlapView::SendRecordedSince => NEXT_SEND_RECORDED_SINCE.to_string(),
+        OverlapView::Unread => OVERLAP_UNREAD.to_string(),
+    }
+}
+
+/// The answer to a dispatch refused for its ledger name, before the person is
+/// asked or under the journal's lock. This call sent nothing in any case; what
+/// the journal shows decides the rest.
+fn overlap_refusal_outcome(
+    batch_id: &str,
+    company_guid: &str,
+    accumulated: Evidence,
+    view: &OverlapView,
+) -> ToolOutcome {
+    // A send of this batch recorded since is the answer the check under the lock
+    // gives a batch already attempted, not the answer for a held name.
+    let code = match view {
+        OverlapView::SendRecordedSince => UnderLockRefusal::AlreadyAttempted.code(),
+        _ => OVERLAP_CODE,
+    };
+    let mut evidence = accumulated;
+    evidence.state = "partial";
+    evidence.reason_code = Some(code.to_string());
+    let (attempted, dispatch, message) = match view {
+        OverlapView::Held(_) => (
+            json!(false),
+            "not_dispatched",
+            "Nothing was sent. An earlier create holds this ledger name.",
+        ),
+        OverlapView::Settled => (
+            json!(false),
+            "not_dispatched",
+            "Nothing was sent. The create that held this ledger name has been settled since.",
+        ),
+        OverlapView::SendRecordedSince => (
+            json!(true),
+            "reconciliation_required",
+            "This call sent nothing. A send of this batch has been recorded since by another call; it may have been sent.",
+        ),
+        // The typed refusal means this call recorded nothing, and `dispatch`
+        // says so; whether another call recorded a send is not known, so
+        // `attempt_recorded` is not claimed either way.
+        OverlapView::Unread => (
+            Value::Null,
+            "not_dispatched",
+            "This call sent nothing. The journal could not be read just now.",
+        ),
+    };
+    let mut error = json!({
+        "code": code,
+        "message": message,
+        "hold": view.code(),
+        "next_step": overlap_next_step(view),
+    });
+    if let OverlapView::Held(held) = view {
+        held.add_to(&mut error);
+    }
+    ToolOutcome {
+        payload: json!({"result":{
+            "batch_id": batch_id,
+            "attempt_recorded": attempted,
+            "dispatch": {"state": dispatch, "resent": false},
+            "error": error,
+        }}),
+        evidence,
+        company_guid: Some(company_guid.to_string()),
+        truncated: false,
+    }
+}
+
 /// What a caller does after a refusal that has a remedy of its own, where the
 /// generic message would send them to the wrong one.
 fn master_next_step(code: &str) -> Option<&'static str> {
     match code {
-        "master_ledger_open_dispatch_overlaps" => Some(
-            "Another batch for the same ledger name was sent and its outcome is not settled. Nothing was sent. Check the company's ledgers in Tally, then call prepare_ledger_creates for a new batch; this one cannot be sent.",
-        ),
         "master_ledger_invalid" | "master_pre_image_write_failed" | "master_pre_image_unrecorded" => Some(
             "Nothing was sent and nothing was recorded for this batch. Call prepare_ledger_creates for a new batch and ask for approval again.",
         ),
@@ -1119,6 +1423,10 @@ fn master_failure_outcome(
         if let Some(next_step) = master_next_step(&failure.code) {
             error["next_step"] = json!(next_step);
         }
+    } else {
+        // The create may have been sent: a later call reads the book back and
+        // sends nothing, and nothing is keyed by hand meanwhile.
+        error["next_step"] = json!(NEXT_UNCONFIRMED);
     }
     ToolOutcome {
         payload: json!({"result":{

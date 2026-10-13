@@ -388,6 +388,14 @@ fn recovery_error_with_dispatch(
         data["dispatch"] = json!({"state":"reconciliation_required","resent":false});
         data["dispatch_response"] = dispatch;
     }
+    // A ledger create keeps Tally's counters in `counters`. This keeps them when
+    // the egress record of the answer could not be written. It is not the cap
+    // on the answer's size: an answer over the cap is withheld as
+    // `agent_response_too_large` with the batch id alone, and its counters,
+    // state and alert are dropped.
+    if let Some(counters) = compact_master_counters(&result["counters"]) {
+        data["counters"] = counters;
+    }
     response["error"]["data"] = data;
     if response.to_string().len() < max_bytes {
         response
@@ -410,6 +418,22 @@ pub(super) fn compact_dispatch_response(response: &Value) -> Option<Value> {
         "response_sha256":response_sha256,
         "bytes":bytes,
         "outcome":outcome,
+    }))
+}
+
+/// Tally's counters as a ledger create reports them: all seven, each a number.
+/// Anything else (null included) is not kept.
+fn compact_master_counters(counters: &Value) -> Option<Value> {
+    let counters = counters.as_object()?;
+    let counter = |name| counters.get(name).and_then(Value::as_u64);
+    Some(json!({
+        "created":counter("created")?,
+        "altered":counter("altered")?,
+        "deleted":counter("deleted")?,
+        "ignored":counter("ignored")?,
+        "errors":counter("errors")?,
+        "cancelled":counter("cancelled")?,
+        "exceptions":counter("exceptions")?
     }))
 }
 

@@ -35,12 +35,22 @@ use std::collections::BTreeMap;
 
 /// The next step after each state. The two loud ones tell the person to check
 /// Tally and not to retry.
-const NEXT_VERIFIED: &str = "The ledger exists as sent and nothing else changed. Nothing more is needed for this batch; never post it again.";
-const NEXT_INTO_EXISTING: &str = "Open the company in Tally now and check the ledger of this name, its group and the ledgers around it: a ledger that existed before may have been changed. Do not retry and do not post this batch again.";
-const NEXT_ELSEWHERE: &str = "Open Tally now and check every loaded company: the change may have landed in a company other than the one approved. Do not retry and do not post this batch again.";
-const NEXT_ABSENT: &str = "Nothing was created in the book and this batch is closed. Nothing is sent again automatically. To create the ledger, call prepare_ledger_creates for a new batch: it needs a new approval.";
-const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again to read it back (it sends nothing), or check the company's ledgers in Tally. Never post this batch again.";
-const NEXT_RECONCILE: &str = "The read-back did not settle the outcome. Check the ledger in Tally against the reasons given, then call post_ledger_creates with this batch_id again to read it back (it sends nothing). Never post this batch again.";
+pub(super) const NEXT_VERIFIED: &str = "The ledger exists as sent and nothing else changed. Nothing more is needed for this batch; never post it again.";
+pub(super) const NEXT_INTO_EXISTING: &str = "Open the company in Tally now and check the ledger of this name, its group and the ledgers around it: a ledger that existed before may have been changed. Do not retry and do not post this batch again.";
+pub(super) const NEXT_ELSEWHERE: &str = "Open Tally now and check every loaded company: the change may have landed in a company other than the one approved. Do not retry and do not post this batch again.";
+pub(super) const NEXT_ABSENT: &str = "Nothing was created in the book and this batch is closed. Nothing is sent again automatically. To create the ledger, call prepare_ledger_creates for a new batch: it needs a new approval.";
+pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again later to read it back (it sends nothing), or look at the company's ledgers in Tally. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it. Never post this batch again.";
+/// The read-back found no ledger of this name, and the outcome is still open.
+/// The only step that tells the person to create the ledger by hand.
+pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, but the outcome of this batch is not settled. If the ledger is still needed, first look in Tally for what else changed in this company's masters (see the reasons), and make sure Tally is idle and answering; then create it in Tally by hand. A create ComplyEaze Bridge sent that is still waiting in Tally would overwrite a ledger keyed by hand. Keying it by hand may not settle this batch, and ComplyEaze Bridge will not create this ledger name again, in any company this data folder holds batches for, while it stays open. Never post this batch again.";
+/// A ledger of this name is in the book and the read-back could not verify it.
+pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
+/// The book was not compared: the batch's company is not loaded, was renamed,
+/// or the set of loaded companies is not the one the create was recorded under.
+pub(super) const NEXT_LOAD_SAME_COMPANIES: &str = "The book could not be compared with the one the create was recorded under: the batch's company is not loaded in Tally, was renamed, or the set of loaded companies has changed. Load the same companies, under the same names, then call post_ledger_creates with this batch_id again: it reads the book back and sends nothing. Do not create the ledger in Tally by hand meanwhile. Never post this batch again.";
+/// The batch's record is not one the read-back can describe.
+pub(super) const NEXT_RECORD_NOT_READABLE: &str = "ComplyEaze Bridge cannot read this batch back: its record is not one it can describe. Nothing was sent now. Compare the ledger in Tally with what was approved, by eye, and do not create it by hand from this batch. Never post this batch again.";
+pub(super) const NEXT_RECONCILE: &str = "The read-back did not settle the outcome. Check the ledger in Tally against the reasons given, then call post_ledger_creates with this batch_id again to read it back (it sends nothing). Do not create the ledger in Tally by hand meanwhile. Never post this batch again.";
 const NOTE_VERIFIED: &str = "ComplyEaze Bridge read the book back after the one create: exactly one ledger of this name, new, with the parent, tax fields and GSTIN as sent and no opening balance, and no other master or company changed.";
 const NOTE_ALERT_EXISTING: &str =
     "ATTENTION: the read-back shows an existing master may have been changed by this create.";
@@ -49,7 +59,19 @@ const NOTE_ABSENT: &str = "The read-back found no ledger of this name, no existi
 const NOTE_UNCONFIRMED: &str = "The book could not be read back, so the create is NOT verified.";
 const NOTE_RECONCILE: &str =
     "The read-back did not settle the outcome: the create is NOT verified.";
-const COUNTERS_ABSENT_NOTE: &str = "Tally's counters were not available for this create, so it cannot be verified: a ledger of the same name made by someone else just before this create could have been overwritten with every other check still passing. Check the ledger in Tally.";
+/// The step added when the verdict could not be written to the journal, after
+/// the step the state has of its own. A later call reads the book back again
+/// and sends nothing; that is not posting the batch again.
+pub(super) const NEXT_VERDICT_NOT_RECORDED: &str = "ComplyEaze Bridge could not record this verdict, so this batch is not settled. Call post_ledger_creates with this batch_id again to read the book back and record it: that call sends nothing and is not posting the batch again, which must never be done.";
+/// Added to that step when Tally's answer is not recorded either: a later call
+/// may have no counters, so this answer's are the only record to rely on.
+pub(super) const NEXT_ANSWER_NOT_RECORDED: &str = " Tally's answer is not on file either (if its bytes reached the journal after all, a later call will have the counters, but do not rely on it): keep the counters this answer reports, which are the only record to rely on, and check the ledger in Tally.";
+/// The step when Tally answered and the call could not go on to read the book
+/// back, or to read the journal at all. A later call reads and sends nothing.
+pub(super) const NEXT_NOT_READ_BACK_AFTER_ANSWER: &str = "Tally answered the one create and the book was not read back. Call post_ledger_creates with this batch_id again later: it reads the book back and sends nothing. Do not create the ledger in Tally by hand meanwhile. Posting this batch again must never be done.";
+/// What a read-back that has no recorded answer to take counters from says.
+pub(super) const NO_ANSWER_RECORDED_NOTE: &str = "ComplyEaze Bridge holds no record of Tally's answer for this batch, so this read-back has no counters and cannot verify the create. If an earlier call reported counters for it, those counters stand. Check the ledger in Tally.";
+pub(super) const COUNTERS_ABSENT_NOTE: &str = "Tally's counters were not available for this create, so it cannot be verified: a ledger of the same name made by someone else just before this create could have been overwritten with every other check still passing. Check the ledger in Tally.";
 
 /// What a caller does next, by verdict.
 pub(super) fn settled_next_step(state: MasterVerdictState) -> &'static str {
@@ -63,6 +85,75 @@ pub(super) fn settled_next_step(state: MasterVerdictState) -> &'static str {
     }
 }
 
+/// What a caller does next, by what the read-back judged. Only a read that
+/// found the name absent and did not settle says the ledger may be created by
+/// hand; a state that was not read, or that holds a ledger, never does.
+pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'static str {
+    if judgement.state != MasterVerdictState::ReconciliationRequired {
+        return settled_next_step(judgement.state);
+    }
+    if judgement.reasons.contains(&"company_scope_changed") {
+        NEXT_LOAD_SAME_COMPANIES
+    } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book {
+        NEXT_ABSENT_NOT_SETTLED
+    } else if judgement.guid.is_some() {
+        NEXT_PRESENT_NOT_VERIFIED
+    } else {
+        NEXT_RECONCILE
+    }
+}
+
+/// What a caller does next when the book could not be read back at all, by the
+/// code of what stopped it.
+pub(super) fn not_read_back_next_step(code: &str) -> &'static str {
+    match code {
+        "company_identity_not_found"
+        | "company_identity_ambiguous"
+        | "company_identity_incomplete"
+        | "company_identity_mismatch"
+        | "company_number_invalid" => NEXT_LOAD_SAME_COMPANIES,
+        "master_batch_invalid" | "master_intent_missing" => NEXT_RECORD_NOT_READABLE,
+        _ => NEXT_UNCONFIRMED,
+    }
+}
+
+/// What the read-back says about the outcome, by verdict.
+pub(super) fn settled_note(state: MasterVerdictState) -> &'static str {
+    match state {
+        MasterVerdictState::PostedVerified => NOTE_VERIFIED,
+        MasterVerdictState::PostedIntoExistingMaster => NOTE_ALERT_EXISTING,
+        MasterVerdictState::MasterWriteLocatedElsewhere => NOTE_ALERT_ELSEWHERE,
+        MasterVerdictState::ConfirmedAbsent => NOTE_ABSENT,
+        MasterVerdictState::MastersAfterPostUnconfirmed => NOTE_UNCONFIRMED,
+        MasterVerdictState::ReconciliationRequired => NOTE_RECONCILE,
+    }
+}
+
+/// What a caller does next when the verdict was judged but not written. A loud
+/// state keeps its own step first: the person still has to look at Tally.
+pub(super) fn unrecorded_next_step(
+    judgement: &Judgement,
+    moment: Moment,
+    answer_recorded: bool,
+) -> String {
+    // A state that is open, or loud, has a step of its own that is true whether
+    // or not its verdict was written: the check to make in Tally. A quiet final
+    // state (verified, absent) has none that is true while unsettled.
+    let own = !judgement.state.is_terminal() || settled_alert(judgement.state).is_some();
+    let mut step = if own {
+        format!(
+            "{} {NEXT_VERDICT_NOT_RECORDED}",
+            judged_next_step(judgement, moment)
+        )
+    } else {
+        NEXT_VERDICT_NOT_RECORDED.to_string()
+    };
+    if moment == Moment::JustPosted && !answer_recorded {
+        step.push_str(NEXT_ANSWER_NOT_RECORDED);
+    }
+    step
+}
+
 /// The loud states lead the answer with an alert.
 pub(super) fn settled_alert(state: MasterVerdictState) -> Option<&'static str> {
     match state {
@@ -73,6 +164,38 @@ pub(super) fn settled_alert(state: MasterVerdictState) -> Option<&'static str> {
         | MasterVerdictState::MastersAfterPostUnconfirmed
         | MasterVerdictState::ReconciliationRequired => None,
     }
+}
+
+/// Tally's answer to the one create, as the call that made the POST holds it.
+pub(super) struct PostedAnswer<'a> {
+    /// The counters to judge on and to report.
+    pub(super) counters: Option<MasterCounters>,
+    /// The answer, when appending it to the journal did not succeed: the verdict
+    /// is written only after it, under the one lock.
+    pub(super) unrecorded: Option<&'a MasterDispatchResponse>,
+}
+
+impl PostedAnswer<'_> {
+    /// What the journal holds: a later call has nothing but this to go on.
+    pub(super) fn recorded(state: &BatchState) -> Self {
+        Self {
+            counters: state
+                .response
+                .as_ref()
+                .and_then(|response| response.counters),
+            unrecorded: None,
+        }
+    }
+}
+
+/// What one verification left in the journal.
+struct Recording {
+    /// `Ok(true)`: this call appended the verdict. `Ok(false)`: the journal
+    /// already held it in the same words. `Err`: it is not recorded, with the
+    /// code of what stopped it.
+    verdict: Result<bool, String>,
+    /// Whether the journal holds Tally's answer for the batch.
+    answer_recorded: bool,
 }
 
 fn marks_failure(error: &anyhow::Error) -> String {
@@ -269,16 +392,14 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         call_started: std::time::Instant,
         evidence: &mut Evidence,
+        answer: PostedAnswer<'_>,
     ) -> Result<Value, String> {
         let item = item_from_batch(&state.batch)?;
         let intent = state
             .intent
             .as_ref()
             .ok_or_else(|| "master_intent_missing".to_string())?;
-        let counters = state
-            .response
-            .as_ref()
-            .and_then(|response| response.counters);
+        let counters = answer.counters;
         let pre_image = read_pre_image(
             &self.settings.data_dir,
             &state.batch.batch_id,
@@ -293,6 +414,7 @@ impl Server {
                     guid: None,
                     checks: super::verdict::Checks::none(),
                     reasons: vec!["pre_image_unreadable"],
+                    name_absent_in_read_book: false,
                 },
                 json!({"state": "not_attempted"}),
             ),
@@ -321,9 +443,9 @@ impl Server {
                 (judgement, back.status)
             }
         };
-        let recorded = self.record_master_verdict(state, &judgement);
+        let recorded = self.record_master_verdict(state, &judgement, answer.unrecorded);
         Ok(verification_result(
-            state, &item, &judgement, status, &recorded, moment,
+            state, &item, &judgement, status, &recorded, moment, counters,
         ))
     }
 
@@ -342,8 +464,9 @@ impl Server {
             guid: None,
             checks: super::verdict::Checks::none(),
             reasons: vec!["endpoint_dispatch_busy"],
+            name_absent_in_read_book: false,
         };
-        let recorded = self.record_master_verdict(state, &judgement);
+        let recorded = self.record_master_verdict(state, &judgement, None);
         Ok(verification_result(
             state,
             &item,
@@ -351,16 +474,22 @@ impl Server {
             json!({"state": "not_attempted", "observation_lease": unavailable(lease_code)}),
             &recorded,
             Moment::Reconcile,
+            PostedAnswer::recorded(state).counters,
         ))
     }
 
-    /// Appends the verdict to the masters journal. An open verdict the journal
-    /// already holds in the same words is not written again.
+    /// Appends the verdict to the masters journal, under the one exclusive lock
+    /// that is tried and never waited for. An open verdict the journal already
+    /// holds in the same words is not written again. When Tally's answer is
+    /// still unrecorded and the journal holds none, it is appended first, and a
+    /// verdict is never written without it: the journal never holds a verdict
+    /// judged on counters it does not hold.
     fn record_master_verdict(
         &self,
         state: &BatchState,
         judgement: &Judgement,
-    ) -> Result<bool, String> {
+        unrecorded: Option<&MasterDispatchResponse>,
+    ) -> Recording {
         let reason = (judgement.state != MasterVerdictState::PostedVerified)
             .then(|| judgement.reasons.join(","));
         let verdict = MasterVerdict {
@@ -378,16 +507,61 @@ impl Server {
                 })
                 .collect(),
         };
-        if state.verdict.as_ref() == Some(&verdict) {
+        let mut answer_recorded = state.response.is_some();
+        let verdict = self.append_under_lock(state, verdict, unrecorded, &mut answer_recorded);
+        Recording {
+            verdict,
+            answer_recorded,
+        }
+    }
+
+    /// The appends of [`Self::record_master_verdict`]. `answer_recorded` ends as
+    /// what the journal read under the lock holds, once the answer is appended.
+    pub(super) fn append_under_lock(
+        &self,
+        state: &BatchState,
+        verdict: MasterVerdict,
+        unrecorded: Option<&MasterDispatchResponse>,
+        answer_recorded: &mut bool,
+    ) -> Result<bool, String> {
+        let data_dir = &self.settings.data_dir;
+        // An open verdict the journal already held, in the same words, stays
+        // recorded when the lock cannot be taken or the journal cannot be read:
+        // nothing is left to write. Only a failure before the journal is read
+        // under the lock is taken so; a failed append is never.
+        let held_in_state = unrecorded.is_none() && state.verdict.as_ref() == Some(&verdict);
+        let locked = (|| {
+            #[cfg(test)]
+            if super::super::master_ledger::test_fault_fires("verdict_lock_busy") {
+                return Err("import_admission_busy".to_string());
+            }
+            let lock = ExclusiveAdmission::acquire(data_dir)?;
+            let journal = read_journal(data_dir).map_err(|error| error.code().to_string())?;
+            Ok((lock, journal))
+        })();
+        let (lock, journal) = match locked {
+            Ok(locked) => locked,
+            Err(_) if held_in_state => return Ok(false),
+            Err(code) => return Err(code),
+        };
+        let held = journal
+            .state(&state.batch.batch_id)
+            .ok_or_else(|| "master_batch_not_found".to_string())?;
+        *answer_recorded = held.response.is_some();
+        if let (Some(response), false) = (unrecorded, *answer_recorded) {
+            append(
+                data_dir,
+                &lock,
+                MasterRecord::DispatchResponse(response.clone()),
+            )
+            .map_err(|error| error.code().to_string())?;
+            *answer_recorded = true;
+        }
+        if held.verdict.as_ref() == Some(&verdict) {
             return Ok(false);
         }
-        let lock = ExclusiveAdmission::acquire(&self.settings.data_dir)?;
-        append(
-            &self.settings.data_dir,
-            &lock,
-            MasterRecord::Verdict(verdict),
-        )
-        .map_err(|error| error.code().to_string())?;
+        append(data_dir, &lock, MasterRecord::Verdict(verdict))
+            .map_err(|error| error.code().to_string())?;
         Ok(true)
     }
 }
@@ -400,34 +574,33 @@ fn verification_result(
     item: &LedgerCreateItem,
     judgement: &Judgement,
     read_back: Value,
-    recorded: &Result<bool, String>,
+    recorded: &Recording,
     moment: Moment,
+    counters: Option<MasterCounters>,
 ) -> Value {
-    let next_step = settled_next_step(judgement.state);
     let alert = settled_alert(judgement.state);
-    let note = match judgement.state {
-        MasterVerdictState::PostedVerified => NOTE_VERIFIED,
-        MasterVerdictState::PostedIntoExistingMaster => NOTE_ALERT_EXISTING,
-        MasterVerdictState::MasterWriteLocatedElsewhere => NOTE_ALERT_ELSEWHERE,
-        MasterVerdictState::ConfirmedAbsent => NOTE_ABSENT,
-        MasterVerdictState::MastersAfterPostUnconfirmed => NOTE_UNCONFIRMED,
-        MasterVerdictState::ReconciliationRequired => NOTE_RECONCILE,
+    let counters = counters.as_ref();
+    let verdict_recorded = recorded.verdict.is_ok();
+    let next_step = if verdict_recorded {
+        judged_next_step(judgement, moment).to_string()
+    } else {
+        unrecorded_next_step(judgement, moment, recorded.answer_recorded)
     };
-    let counters = state
-        .response
-        .as_ref()
-        .and_then(|response| response.counters.as_ref());
     let mut result = json!({
         "batch_id": state.batch.batch_id,
         "state": verdict_state_code(judgement.state),
         "attempt_recorded": true,
+        // Whether the journal holds Tally's answer for this batch.
+        "answer_recorded": recorded.answer_recorded,
         "dispatch": {"state": "dispatched", "resent": false},
         "verification": {
             "moment": match moment {
                 Moment::JustPosted => "after_post",
                 Moment::Reconcile => "reconcile",
             },
-            "settled": judgement.state.is_terminal(),
+            // Settled is the journal's word: a terminal state whose verdict is
+            // not recorded is judged, and not yet settled.
+            "settled": judgement.state.is_terminal() && verdict_recorded,
             "guid": judgement.guid,
             "checks": judgement.checks,
             "reasons": judgement.reasons,
@@ -435,18 +608,25 @@ fn verification_result(
             // Recorded: the journal holds this verdict. Written: this call
             // appended it (an open verdict already held in the same words is not
             // written again).
-            "verdict_recorded": recorded.is_ok(),
-            "verdict_written": matches!(recorded, Ok(true)),
+            "verdict_recorded": verdict_recorded,
+            "verdict_written": matches!(recorded.verdict, Ok(true)),
         },
         "counters": counters_json(counters),
         "next_step": next_step,
-        "note": note,
+        "note": settled_note(judgement.state),
     });
-    if let Err(code) = recorded {
+    if let Err(code) = &recorded.verdict {
         result["verification"]["verdict_record_error"] = json!(code);
     }
     if counters.is_none() {
-        result["verification"]["counters_note"] = json!(COUNTERS_ABSENT_NOTE);
+        // A read-back with no recorded answer has no counters of its own, and
+        // an earlier call may have reported them.
+        result["verification"]["counters_note"] =
+            if moment == Moment::Reconcile && !recorded.answer_recorded {
+                json!(NO_ANSWER_RECORDED_NOTE)
+            } else {
+                json!(COUNTERS_ABSENT_NOTE)
+            };
     }
     if let AdmittedLedgerKind::Party {
         bill_wise: true, ..

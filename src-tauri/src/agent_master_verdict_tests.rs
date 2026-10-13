@@ -958,6 +958,174 @@ fn an_unavailable_read_back_is_not_absence() {
     );
 }
 
+// --- the read fact the next step is chosen by ------------------------------
+
+/// Every scenario the verdict tests above build, with the state and reasons it
+/// gave before `name_absent_in_read_book` was added and still gives, and what
+/// the new fact says of its read.
+#[test]
+fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact() {
+    type Change = fn(&mut World);
+    use MasterVerdictState::{
+        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
+        PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
+    };
+    type Case = (
+        &'static str,
+        World,
+        Change,
+        MasterVerdictState,
+        Vec<&'static str>,
+        bool,
+    );
+    let cases: [Case; 12] = [
+        (
+            "clean",
+            World::clean(suspense()),
+            |_| {},
+            PostedVerified,
+            vec![],
+            false,
+        ),
+        (
+            "untouched reconcile",
+            World::untouched(suspense()),
+            |_| {},
+            ConfirmedAbsent,
+            vec!["not_in_book"],
+            true,
+        ),
+        (
+            "untouched just posted",
+            World::untouched(suspense()),
+            |world| world.moment = Moment::JustPosted,
+            ReconciliationRequired,
+            vec![
+                "name_not_one_ledger_in_book",
+                "target_mark_not_moved",
+                "counters_unavailable",
+                "ledger_absent_after_post",
+            ],
+            true,
+        ),
+        (
+            "absent, target mark moved",
+            World::untouched(suspense()),
+            |world| world.marks()[0] = mark(TARGET, 8),
+            ReconciliationRequired,
+            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
+            true,
+        ),
+        (
+            "absent, other mark moved",
+            World::untouched(suspense()),
+            |world| world.marks()[1] = mark(OTHER, 4),
+            MasterWriteLocatedElsewhere,
+            vec!["other_company_mark_moved"],
+            true,
+        ),
+        (
+            "absent, companies changed",
+            World::untouched(suspense()),
+            |world| {
+                world.marks().pop();
+            },
+            ReconciliationRequired,
+            vec![
+                "company_scope_changed",
+                "name_not_one_ledger_in_book",
+                "target_mark_not_moved",
+                "counters_unavailable",
+            ],
+            true,
+        ),
+        (
+            "present, no counters",
+            World::clean(suspense()),
+            |world| world.counters = None,
+            ReconciliationRequired,
+            vec!["counters_unavailable"],
+            false,
+        ),
+        (
+            "altered",
+            World::clean(suspense()),
+            |world| world.counters = Some(counters(1, 1, 0, 0)),
+            PostedIntoExistingMaster,
+            vec!["tally_reported_altered"],
+            false,
+        ),
+        (
+            "pre-image master missing",
+            World::clean(suspense()),
+            |world| world.masters().retain(|entry| entry.guid != CASH),
+            ReconciliationRequired,
+            vec!["pre_image_master_missing"],
+            false,
+        ),
+        (
+            "index not usable",
+            World::clean(suspense()),
+            |world| {
+                let duplicate = world.masters()[0].clone();
+                world.masters().push(duplicate);
+            },
+            ReconciliationRequired,
+            vec!["master_index_not_usable"],
+            false,
+        ),
+        (
+            "marks unavailable",
+            World::untouched(suspense()),
+            |world| world.read.marks = None,
+            MastersAfterPostUnconfirmed,
+            vec!["company_marks_unavailable"],
+            false,
+        ),
+        (
+            "index unavailable",
+            World::untouched(suspense()),
+            |world| world.read.masters = None,
+            MastersAfterPostUnconfirmed,
+            vec!["master_index_unavailable"],
+            false,
+        ),
+    ];
+    for (label, mut world, change, state, reasons, absent) in cases {
+        change(&mut world);
+        let judgement = world.judge();
+        assert_eq!(judgement.state, state, "{label}: {judgement:?}");
+        assert_eq!(judgement.reasons, reasons, "{label}");
+        assert_eq!(judgement.name_absent_in_read_book, absent, "{label}");
+    }
+}
+
+/// The fact is about the name in the index that was read, and nothing else.
+#[test]
+fn the_name_absent_fact_follows_the_index_whatever_the_moment_or_the_marks() {
+    for (label, item) in items() {
+        for moment in [Moment::JustPosted, Moment::Reconcile] {
+            let mut absent = World::untouched(item.clone());
+            absent.moment = moment;
+            assert!(
+                absent.judge().name_absent_in_read_book,
+                "{label} {moment:?}"
+            );
+            let mut found = World::clean(item.clone());
+            found.moment = moment;
+            assert!(
+                !found.judge().name_absent_in_read_book,
+                "{label} {moment:?}"
+            );
+        }
+    }
+    // A name present under another spelling is a collision, not an absence.
+    let mut twin = World::untouched(suspense());
+    twin.masters()
+        .push(master(MasterKind::Ledger, NEW, 11, &["zeta test ledger"]));
+    assert!(!twin.judge().name_absent_in_read_book);
+}
+
 // --- the boundary helpers --------------------------------------------------
 
 #[test]

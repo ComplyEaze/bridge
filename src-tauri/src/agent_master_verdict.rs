@@ -194,6 +194,10 @@ pub(super) struct Judgement {
     pub(super) checks: Checks,
     /// Static reasons, carrying no book data, for any verdict other than `posted_verified`.
     pub(super) reasons: Vec<&'static str>,
+    /// A fact about the read, not a verdict: the paired index was read and was
+    /// usable, and the item name collides with no master in it under any key.
+    /// False where the index was not read or not usable.
+    pub(super) name_absent_in_read_book: bool,
 }
 
 /// Where the item name stands in the paired index.
@@ -352,6 +356,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             guid: None,
             checks,
             reasons,
+            name_absent_in_read_book: false,
         };
     };
 
@@ -394,8 +399,10 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             guid: None,
             checks,
             reasons,
+            name_absent_in_read_book: false,
         };
     };
+    let name_absent = located.collisions.is_empty();
     let current = located.index.pre_image();
     let mut changed = false;
     let mut missing = false;
@@ -441,6 +448,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
                 .filter(|guid| is_canonical_guid(guid)),
             checks,
             reasons,
+            name_absent_in_read_book: name_absent,
         };
     }
 
@@ -452,6 +460,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             guid: None,
             checks,
             reasons,
+            name_absent_in_read_book: name_absent,
         };
     }
 
@@ -460,7 +469,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         .counters
         .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
     if facts.moment == Moment::Reconcile
-        && located.collisions.is_empty()
+        && name_absent
         && !changed
         && !missing
         && same_companies
@@ -473,6 +482,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             guid: None,
             checks,
             reasons: vec!["not_in_book"],
+            name_absent_in_read_book: name_absent,
         };
     }
 
@@ -508,6 +518,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             guid: found,
             checks,
             reasons: Vec::new(),
+            name_absent_in_read_book: name_absent,
         };
     }
 
@@ -516,7 +527,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     if checks.counters == Check::NotChecked {
         reasons.push("counters_unavailable");
     }
-    if facts.moment == Moment::JustPosted && located.collisions.is_empty() {
+    if facts.moment == Moment::JustPosted && name_absent {
         reasons.push("ledger_absent_after_post");
     }
     if located.masters_hit > 1 {
@@ -530,6 +541,7 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         guid: found.filter(|guid| is_canonical_guid(guid)),
         checks,
         reasons,
+        name_absent_in_read_book: name_absent,
     }
 }
 

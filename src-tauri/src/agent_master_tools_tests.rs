@@ -8,14 +8,19 @@
 //! that must get past it scopes the ledgers the book holds into
 //! `TEST_LEDGER_INDEX`; the group answer is a committed live capture. The queue's request sequence is the one
 //! `agent_master_post_tests::queue` documents.
-use super::super::master_ledger::{read_pre_image, MasterVerdictState};
+use super::super::master_ledger;
+use super::super::master_ledger::{
+    read_pre_image, MasterVerdict, MasterVerdictState, VerdictItem, TEST_FAULTS,
+};
 use super::super::master_post::{TEST_LEDGER_INDEX, TEST_LEDGER_INDEX_AFTER_POST};
+use super::verify::{judged_next_step, not_read_back_next_step};
 use super::*;
 use crate::agent::master_writes_effective;
 use crate::agent::{Redaction, Settings};
 use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 use crate::tally::approved_import::{ApprovedImport, DispatchLicense};
 use crate::tally::VerifiedCompanyIdentity;
+use bridge_tally_core::master_binding::{absence_key, canonical_master_key};
 use bridge_tally_core::master_name_index::{IndexedMaster, MasterKind};
 use bridge_tally_transport::TallyEndpointConfig;
 use std::time::Duration;
@@ -253,6 +258,17 @@ fn server_with(
 
 fn server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
     server_with(address, directory, true)
+}
+
+/// A server whose answer cap is `max_bytes`.
+fn server_capped(
+    address: std::net::SocketAddr,
+    directory: &std::path::Path,
+    max_bytes: usize,
+) -> Server {
+    let mut server = server_at(address, directory);
+    server.settings.max_bytes = max_bytes;
+    server
 }
 
 fn identity() -> VerifiedCompanyIdentity {
@@ -1034,11 +1050,12 @@ async fn an_already_dispatched_batch_is_reported_and_never_sent_again() {
     assert_eq!(result(&second)["journal"]["verdict"], "posted_verified");
     assert_eq!(result(&second)["dispatch"]["resent"], false);
     assert_eq!(result(&second)["journal"]["response_recorded"], true);
-    let note = result(&second)["note"].as_str().unwrap();
-    assert!(
-        note.starts_with("This batch was sent to Tally once"),
-        "{note}"
+    // The note is the verdict's own, not "sent once, NOT verified".
+    assert_eq!(
+        result(&second)["note"],
+        settled_note(MasterVerdictState::PostedVerified)
     );
+    assert_ne!(result(&second)["note"], ALREADY_SENT_NOTE);
     assert_eq!(
         result(&second)["journal"]["counters"]["created"],
         1,
@@ -1076,6 +1093,15 @@ async fn a_dispatched_batch_with_no_response_is_reported_for_reconciliation() {
     assert_eq!(result(&response)["verification"]["attempted"], false);
     assert_eq!(result(&response)["attempt_recorded"], true);
     assert_eq!(result(&response)["dispatch"]["resent"], false);
+    // A book that was not read back says what to do, by what stopped it.
+    let stopped = result(&response)["verification"]["error"]["code"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        result(&response)["next_step"],
+        not_read_back_next_step(stopped),
+        "{response}"
+    );
     assert!(scripted.masters().is_empty());
     assert_eq!(journal_bytes(directory.path()), before);
     // With an intent and no answer recorded the batch "may have been" sent.
@@ -1083,9 +1109,680 @@ async fn a_dispatched_batch_with_no_response_is_reported_for_reconciliation() {
     assert!(note.contains("may have been sent"), "{note}");
 }
 
+/// A sent batch whose company is not among the loaded ones is not read back:
+/// the answer says to load the same companies and call again, and it sends and
+/// writes nothing.
+#[tokio::test]
+async fn a_sent_batch_whose_company_is_not_loaded_says_to_load_the_same_companies() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(verified_company())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let sent_batch = dispatched_batch_in(directory.path(), LEDGER, OTHER_UNLOADED_GUID);
+    let before = journal_bytes(directory.path());
+    let response = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool(
+            "post_ledger_creates",
+            json!({"batch_id": sent_batch.batch_id}),
+        ),
+    )
+    .await;
+    let observed = sent(simulator);
+    assert!(!create_was_sent(&observed, &expected_request()));
+    let answered = result(&response);
+    assert_eq!(answered["state"], "reconciliation_required", "{response}");
+    assert_eq!(answered["verification"]["attempted"], false);
+    assert_eq!(
+        answered["verification"]["error"]["code"],
+        "company_identity_not_found"
+    );
+    assert_eq!(answered["next_step"], verify::NEXT_LOAD_SAME_COMPANIES);
+    assert_eq!(journal_bytes(directory.path()), before);
+}
+
+/// One row of the table of next steps: the step a path gives, the one it should
+/// give, and whether it may tell the person to create the ledger by hand or must
+/// tell them to create nothing by hand meanwhile.
+struct StepRow {
+    path: String,
+    given: String,
+    expected: String,
+    may_key_by_hand: bool,
+    keys_nothing: bool,
+}
+
+/// Every state and path an answer can take after a send, with its next step:
+/// the verdicts judged and recorded, the verdicts judged and not recorded (with
+/// and without Tally's answer on file), a book that was not read back, the
+/// fallback after Tally answered, the failure answers, and the refusals for a
+/// held name. Only the row marked may be the step that creates by hand; the
+/// rows marked say to create nothing by hand meanwhile do say so.
+#[test]
+fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand() {
+    use super::verdict::{Checks, Judgement};
+    use super::verify::unrecorded_next_step;
+    use MasterVerdictState::{
+        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
+        PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
+    };
+    let judgement = |state: MasterVerdictState, found: bool, scope: bool, absent: bool| Judgement {
+        state,
+        guid: found.then(|| NEW_GUID.to_string()),
+        checks: Checks::none(),
+        reasons: if scope {
+            vec!["company_scope_changed"]
+        } else {
+            vec!["counters_unavailable"]
+        },
+        name_absent_in_read_book: absent,
+    };
+    let mut rows: Vec<StepRow> = Vec::new();
+    let mut row = |path: &str, given: String, expected: &str, may: bool, nothing: bool| {
+        rows.push(StepRow {
+            path: path.to_string(),
+            given,
+            expected: expected.to_string(),
+            may_key_by_hand: may,
+            keys_nothing: nothing,
+        });
+    };
+    // Judged and recorded.
+    let judged = |j: &Judgement, moment| judged_next_step(j, moment).to_string();
+    let r = Moment::Reconcile;
+    let p = Moment::JustPosted;
+    row(
+        "verified",
+        judged(&judgement(PostedVerified, true, false, false), p),
+        verify::NEXT_VERIFIED,
+        false,
+        false,
+    );
+    row(
+        "into existing",
+        judged(&judgement(PostedIntoExistingMaster, false, false, false), r),
+        verify::NEXT_INTO_EXISTING,
+        false,
+        false,
+    );
+    row(
+        "elsewhere",
+        judged(
+            &judgement(MasterWriteLocatedElsewhere, false, false, true),
+            r,
+        ),
+        verify::NEXT_ELSEWHERE,
+        false,
+        false,
+    );
+    row(
+        "confirmed absent",
+        judged(&judgement(ConfirmedAbsent, false, false, true), r),
+        verify::NEXT_ABSENT,
+        false,
+        false,
+    );
+    row(
+        "unconfirmed",
+        judged(
+            &judgement(MastersAfterPostUnconfirmed, false, false, false),
+            r,
+        ),
+        verify::NEXT_UNCONFIRMED,
+        false,
+        true,
+    );
+    row(
+        "scope changed",
+        judged(&judgement(ReconciliationRequired, false, true, true), r),
+        verify::NEXT_LOAD_SAME_COMPANIES,
+        false,
+        true,
+    );
+    row(
+        "reconcile, name absent",
+        judged(&judgement(ReconciliationRequired, false, false, true), r),
+        verify::NEXT_ABSENT_NOT_SETTLED,
+        true,
+        false,
+    );
+    row(
+        "reconcile, ledger present",
+        judged(&judgement(ReconciliationRequired, true, false, false), r),
+        verify::NEXT_PRESENT_NOT_VERIFIED,
+        false,
+        false,
+    );
+    row(
+        "just posted, present",
+        judged(&judgement(ReconciliationRequired, true, false, false), p),
+        verify::NEXT_PRESENT_NOT_VERIFIED,
+        false,
+        false,
+    );
+    row(
+        "just posted, name absent",
+        judged(&judgement(ReconciliationRequired, false, false, true), p),
+        verify::NEXT_RECONCILE,
+        false,
+        true,
+    );
+    row(
+        "reconcile, index not usable",
+        judged(&judgement(ReconciliationRequired, false, false, false), r),
+        verify::NEXT_RECONCILE,
+        false,
+        true,
+    );
+    // Judged and not recorded: the quiet final states say only that the verdict
+    // is not recorded; the others keep their own step first.
+    let unrecorded = |j: &Judgement, moment, answer| unrecorded_next_step(j, moment, answer);
+    let not_recorded = verify::NEXT_VERDICT_NOT_RECORDED;
+    row(
+        "unrecorded verified",
+        unrecorded(&judgement(PostedVerified, true, false, false), p, true),
+        not_recorded,
+        false,
+        false,
+    );
+    row(
+        "unrecorded confirmed absent",
+        unrecorded(&judgement(ConfirmedAbsent, false, false, true), r, true),
+        not_recorded,
+        false,
+        false,
+    );
+    row(
+        "unrecorded into existing",
+        unrecorded(
+            &judgement(PostedIntoExistingMaster, false, false, false),
+            p,
+            true,
+        ),
+        &format!("{} {not_recorded}", verify::NEXT_INTO_EXISTING),
+        false,
+        false,
+    );
+    row(
+        "unrecorded unconfirmed",
+        unrecorded(
+            &judgement(MastersAfterPostUnconfirmed, false, false, false),
+            p,
+            true,
+        ),
+        &format!("{} {not_recorded}", verify::NEXT_UNCONFIRMED),
+        false,
+        true,
+    );
+    row(
+        "unrecorded, name absent",
+        unrecorded(
+            &judgement(ReconciliationRequired, false, false, true),
+            r,
+            false,
+        ),
+        &format!("{} {not_recorded}", verify::NEXT_ABSENT_NOT_SETTLED),
+        true,
+        false,
+    );
+    row(
+        "unrecorded, answer not on file",
+        unrecorded(
+            &judgement(MastersAfterPostUnconfirmed, false, false, false),
+            p,
+            false,
+        ),
+        &format!(
+            "{} {not_recorded}{}",
+            verify::NEXT_UNCONFIRMED,
+            verify::NEXT_ANSWER_NOT_RECORDED
+        ),
+        false,
+        true,
+    );
+    // The book was not read back.
+    row(
+        "not read back, company",
+        not_read_back_next_step("company_identity_not_found").to_string(),
+        verify::NEXT_LOAD_SAME_COMPANIES,
+        false,
+        true,
+    );
+    row(
+        "not read back, record",
+        not_read_back_next_step("master_batch_invalid").to_string(),
+        verify::NEXT_RECORD_NOT_READABLE,
+        false,
+        false,
+    );
+    row(
+        "not read back, tally",
+        not_read_back_next_step("tally_endpoint_busy").to_string(),
+        verify::NEXT_UNCONFIRMED,
+        false,
+        true,
+    );
+    // Tally answered and the call went no further.
+    row(
+        "fallback, answer on file",
+        fallback_next_step(true),
+        NEXT_NOT_READ_BACK_AFTER_ANSWER,
+        false,
+        true,
+    );
+    row(
+        "fallback, answer not on file",
+        fallback_next_step(false),
+        &format!("{NEXT_NOT_READ_BACK_AFTER_ANSWER}{NEXT_ANSWER_NOT_RECORDED}"),
+        false,
+        true,
+    );
+    // The failure answers.
+    let failure = |attempted| {
+        master_failure_outcome(
+            "bridge-x",
+            GUID,
+            ToolFailure::from("master_pre_image_write_failed".to_string()),
+            empty_evidence(),
+            attempted,
+        )
+        .payload["result"]["error"]["next_step"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    };
+    row(
+        "failure, may have been sent",
+        failure(Some(true)),
+        NEXT_UNCONFIRMED,
+        false,
+        true,
+    );
+    row(
+        "failure, journal unread",
+        failure(None),
+        NEXT_UNCONFIRMED,
+        false,
+        true,
+    );
+    row(
+        "failure, nothing sent",
+        failure(Some(false)),
+        master_next_step("master_pre_image_write_failed").unwrap(),
+        false,
+        false,
+    );
+    // The refusals for a held name.
+    let one = BlockingBatch {
+        batch_id: "bridge-0001".into(),
+        company_guid: OTHER_LOADED_GUID.into(),
+    };
+    let held_own = OverlapView::Held(BlockerReport {
+        ids: vec!["bridge-0000".into()],
+        other_companies: vec![],
+    });
+    let held_other = OverlapView::Held(BlockerReport {
+        ids: vec![],
+        other_companies: vec![one],
+    });
+    let held_both = OverlapView::Held(BlockerReport {
+        ids: vec!["bridge-0000".into()],
+        other_companies: vec![BlockingBatch {
+            batch_id: "bridge-0001".into(),
+            company_guid: OTHER_LOADED_GUID.into(),
+        }],
+    });
+    for (path, view, expected, keys) in [
+        (
+            "held, own company",
+            held_own,
+            format!("{OVERLAP_HOLD}{OVERLAP_OWN}{OVERLAP_THEN}"),
+            true,
+        ),
+        (
+            "held, other company",
+            held_other,
+            format!("{OVERLAP_HOLD}{OVERLAP_OTHER}{OVERLAP_THEN}"),
+            true,
+        ),
+        (
+            "held, both",
+            held_both,
+            format!("{OVERLAP_HOLD}{OVERLAP_OWN}{OVERLAP_OTHER}{OVERLAP_THEN}"),
+            true,
+        ),
+        (
+            "settled meanwhile",
+            OverlapView::Settled,
+            OVERLAP_SETTLED.to_string(),
+            false,
+        ),
+        (
+            "send recorded since",
+            OverlapView::SendRecordedSince,
+            NEXT_SEND_RECORDED_SINCE.to_string(),
+            true,
+        ),
+        (
+            "journal unread",
+            OverlapView::Unread,
+            OVERLAP_UNREAD.to_string(),
+            true,
+        ),
+    ] {
+        row(path, overlap_next_step(&view), &expected, false, keys);
+        // The step is what the answer carries.
+        let carried = overlap_refusal_outcome("bridge-x", GUID, empty_evidence(), &view).payload
+            ["result"]["error"]["next_step"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(carried, expected, "{path}");
+    }
+    // The journal's own report of a batch, with and without a book read back.
+    // (The answer to a call cancelled before its intent carries no next step,
+    // only its note, and so is not a row.)
+    let directory = tempfile::tempdir().unwrap();
+    let held_batch = dispatched_batch_in(directory.path(), LEDGER, GUID);
+    let open_state = state_of(directory.path(), &held_batch.batch_id);
+    let settled_state = BatchState {
+        verdict: Some(MasterVerdict {
+            batch_id: held_batch.batch_id.clone(),
+            batch_sha256: held_batch.batch_sha256.clone(),
+            state: ConfirmedAbsent,
+            items: vec![],
+        }),
+        ..open_state.clone()
+    };
+    let report_step = |state: &BatchState, code: Option<&str>| {
+        Server::journal_report(state, empty_evidence(), code.map(str::to_string)).payload["result"]
+            ["next_step"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    };
+    rows.push(StepRow {
+        path: "journal report, settled".into(),
+        given: report_step(&settled_state, None),
+        expected: verify::NEXT_ABSENT.into(),
+        may_key_by_hand: false,
+        keys_nothing: false,
+    });
+    rows.push(StepRow {
+        path: "journal report, company not loaded".into(),
+        given: report_step(&open_state, Some("company_identity_not_found")),
+        expected: verify::NEXT_LOAD_SAME_COMPANIES.into(),
+        may_key_by_hand: false,
+        keys_nothing: true,
+    });
+    rows.push(StepRow {
+        path: "journal report, no verdict, nothing stopped it".into(),
+        given: report_step(&open_state, None),
+        expected: String::new(),
+        may_key_by_hand: false,
+        keys_nothing: false,
+    });
+    assert!(rows.len() >= 34, "{} rows", rows.len());
+    for row in &rows {
+        assert_eq!(row.given, row.expected, "{}", row.path);
+        assert_eq!(
+            row.given.contains("create it in Tally by hand"),
+            row.may_key_by_hand,
+            "{}",
+            row.path
+        );
+        assert_eq!(
+            row.given
+                .contains("Do not create the ledger in Tally by hand meanwhile"),
+            row.keys_nothing,
+            "{}",
+            row.path
+        );
+    }
+    assert_eq!(rows.iter().filter(|row| row.may_key_by_hand).count(), 2);
+}
+
+/// The README and the tool description of `post_ledger_creates` say the same
+/// corrected things, and not the sentences they replaced.
+#[test]
+fn the_readme_and_the_tool_description_carry_the_corrected_sentences() {
+    let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let readme = flat(include_str!("../../docs/agent/README.md"));
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "post_ledger_creates")
+        .and_then(|tool| tool["description"].as_str())
+        .map(flat)
+        .expect("the tool is listed");
+    for sentence in [
+        "is not read back until the same companies are loaded under the same names; the next call then reads the book back and judges it.",
+        "a failure answer does not. False means ComplyEaze Bridge has no record of Tally's answer on file",
+        "A later call that finds no answer on file shows no counters.",
+        "A later call judges the book as it then is, so a state stays unsettled only while the book stays as it was read.",
+        "send_of_this_batch_recorded_since",
+        "so a company_guid not found there belongs to a company that is not loaded",
+    ] {
+        let readme_sentence = sentence.replace("company_guid", "`company_guid`");
+        assert!(
+            readme.contains(sentence) || readme.contains(&readme_sentence),
+            "README: {sentence}"
+        );
+        assert!(
+            description.contains(sentence) || description.contains(&readme_sentence),
+            "description: {sentence}"
+        );
+    }
+    for replaced in [
+        "is settled by loading the same companies and calling again",
+        "and every answer that reads the book back, carries",
+        "The answer to the call that sent the create",
+        "Load that company in Tally",
+    ] {
+        assert!(!readme.contains(replaced), "README: {replaced}");
+        assert!(!description.contains(replaced), "description: {replaced}");
+    }
+}
+
+/// What a book that could not be read back is told to do, by what stopped it.
+#[test]
+fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
+    for code in [
+        "company_identity_not_found",
+        "company_identity_ambiguous",
+        "company_identity_incomplete",
+        "company_identity_mismatch",
+        "company_number_invalid",
+    ] {
+        assert_eq!(
+            not_read_back_next_step(code),
+            verify::NEXT_LOAD_SAME_COMPANIES,
+            "{code}"
+        );
+    }
+    for code in ["master_batch_invalid", "master_intent_missing"] {
+        assert_eq!(
+            not_read_back_next_step(code),
+            verify::NEXT_RECORD_NOT_READABLE,
+            "{code}"
+        );
+    }
+    for code in [
+        "tally_endpoint_busy",
+        "read_failed",
+        "import_admission_busy",
+    ] {
+        assert_eq!(
+            not_read_back_next_step(code),
+            verify::NEXT_UNCONFIRMED,
+            "{code}"
+        );
+    }
+    // None of them tells the person to key the ledger.
+    for code in [
+        "company_identity_mismatch",
+        "master_batch_invalid",
+        "read_failed",
+    ] {
+        assert!(!not_read_back_next_step(code).contains("create it in Tally by hand"));
+    }
+}
+
+/// The step that tells the person to create the ledger by hand appears for one
+/// kind of answer only: a read-back that read the book, found the name absent
+/// and did not settle. It is never given for an answer that was not read, one
+/// that holds the ledger, or one the loaded companies cannot be compared for.
+#[test]
+fn the_hand_key_step_appears_only_for_a_read_that_found_the_name_absent_and_did_not_settle() {
+    use super::verdict::{Checks, Judgement};
+    const STATES: [MasterVerdictState; 6] = [
+        MasterVerdictState::PostedVerified,
+        MasterVerdictState::ReconciliationRequired,
+        MasterVerdictState::PostedIntoExistingMaster,
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+        MasterVerdictState::MasterWriteLocatedElsewhere,
+        MasterVerdictState::ConfirmedAbsent,
+    ];
+    let mut seen = std::collections::BTreeSet::new();
+    for state in STATES {
+        for moment in [Moment::JustPosted, Moment::Reconcile] {
+            for absent in [false, true] {
+                for found in [false, true] {
+                    for scope_changed in [false, true] {
+                        let judgement = Judgement {
+                            state,
+                            guid: found.then(|| NEW_GUID.to_string()),
+                            checks: Checks::none(),
+                            reasons: if scope_changed {
+                                vec!["company_scope_changed"]
+                            } else {
+                                vec!["counters_unavailable"]
+                            },
+                            name_absent_in_read_book: absent,
+                        };
+                        let step = judged_next_step(&judgement, moment);
+                        let label =
+                            format!("{state:?} {moment:?} {absent} {found} {scope_changed}");
+                        let hand = step == verify::NEXT_ABSENT_NOT_SETTLED;
+                        let expected = state == MasterVerdictState::ReconciliationRequired
+                            && moment == Moment::Reconcile
+                            && absent
+                            && !scope_changed;
+                        assert_eq!(hand, expected, "{label}");
+                        seen.insert(step);
+                    }
+                }
+            }
+        }
+    }
+    // The states that were not judged on a read, or that hold the ledger, or
+    // that were settled, have the step of their own.
+    let step = |state: MasterVerdictState,
+                found: bool,
+                scope_changed: bool,
+                absent: bool,
+                moment: Moment| {
+        judged_next_step(
+            &Judgement {
+                state,
+                guid: found.then(|| NEW_GUID.to_string()),
+                checks: Checks::none(),
+                reasons: if scope_changed {
+                    vec!["company_scope_changed"]
+                } else {
+                    vec![]
+                },
+                name_absent_in_read_book: absent,
+            },
+            moment,
+        )
+    };
+    use MasterVerdictState::{MastersAfterPostUnconfirmed, ReconciliationRequired};
+    assert_eq!(
+        step(
+            MastersAfterPostUnconfirmed,
+            false,
+            false,
+            true,
+            Moment::Reconcile
+        ),
+        verify::NEXT_UNCONFIRMED
+    );
+    assert_eq!(
+        step(
+            ReconciliationRequired,
+            true,
+            false,
+            false,
+            Moment::Reconcile
+        ),
+        verify::NEXT_PRESENT_NOT_VERIFIED
+    );
+    assert_eq!(
+        step(
+            ReconciliationRequired,
+            true,
+            false,
+            false,
+            Moment::JustPosted
+        ),
+        verify::NEXT_PRESENT_NOT_VERIFIED
+    );
+    assert_eq!(
+        step(ReconciliationRequired, false, true, true, Moment::Reconcile),
+        verify::NEXT_LOAD_SAME_COMPANIES
+    );
+    assert_eq!(
+        step(
+            ReconciliationRequired,
+            false,
+            false,
+            true,
+            Moment::JustPosted
+        ),
+        verify::NEXT_RECONCILE
+    );
+    assert_eq!(
+        step(
+            ReconciliationRequired,
+            false,
+            false,
+            false,
+            Moment::Reconcile
+        ),
+        verify::NEXT_RECONCILE
+    );
+    for state in [
+        MasterVerdictState::PostedVerified,
+        MasterVerdictState::PostedIntoExistingMaster,
+        MasterVerdictState::MasterWriteLocatedElsewhere,
+        MasterVerdictState::ConfirmedAbsent,
+    ] {
+        assert_eq!(
+            step(state, false, false, true, Moment::Reconcile),
+            settled_next_step(state)
+        );
+    }
+    // Of every step any of them gives, one tells the person to key it by hand,
+    // and it carries the warning that comes with that.
+    let by_hand = seen
+        .iter()
+        .filter(|step| step.contains("create it in Tally by hand"))
+        .collect::<Vec<_>>();
+    assert_eq!(by_hand, [&verify::NEXT_ABSENT_NOT_SETTLED]);
+    let warned = verify::NEXT_ABSENT_NOT_SETTLED;
+    assert!(warned.contains("idle and answering") && warned.contains("overwrite"));
+    assert!(warned.contains("would overwrite a ledger keyed by hand"));
+}
+
 /// Records an intent for `batch` as an earlier call would have.
 fn record_intent_for_test(server: &Server, batch: &MasterBatch) {
-    let dir = &server.settings.data_dir;
+    record_intent_in(&server.settings.data_dir, batch);
+}
+
+/// As [`record_intent_for_test`], for the journal in `dir`.
+fn record_intent_in(dir: &std::path::Path, batch: &MasterBatch) {
     let lock = ExclusiveAdmission::acquire(dir).unwrap();
     let pre_image =
         PreImage::new([("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb".to_string(), 1)]).unwrap();
@@ -1235,40 +1932,768 @@ async fn an_intent_recorded_while_the_dialog_is_open_stops_the_post() {
     );
 }
 
-/// Another batch of the same ledger is sent and unsettled: the post is refused
-/// under the lock after the queue's reads, the approval is not spent, no
-/// sidecar is written, no POST is sent, and the answer says to prepare a new
-/// batch.
+// --- post: a name an open dispatch holds -----------------------------------
+
+const OTHER_LOADED_GUID: &str = "22222222-2222-4222-8222-222222222222";
+const OTHER_UNLOADED_GUID: &str = "33333333-3333-4333-8333-333333333333";
+
+/// A batch of `name` prepared for the company `company_guid`, left as a call
+/// that sent it would leave it: its intent is recorded and it has no verdict.
+fn dispatched_batch_in(dir: &std::path::Path, name: &str, company_guid: &str) -> MasterBatch {
+    let identity = identity();
+    let item = item(name);
+    let request = MasterPostRequest::render(item.clone(), &identity);
+    let batch = MasterBatch {
+        batch_id: format!("bridge-{}", Uuid::new_v4()),
+        batch_sha256: request.sha256().to_string(),
+        class: MasterClass::LedgerCreate,
+        company: MasterCompany {
+            guid: company_guid.to_string(),
+            name: identity.display_name().to_string(),
+            number: identity.company_number().to_string(),
+            books_from: identity.books_from_yyyymmdd().to_string(),
+        },
+        items: vec![stored_from_item(&item)],
+    };
+    let lock = ExclusiveAdmission::acquire(dir).unwrap();
+    append(dir, &lock, MasterRecord::Batch(batch.clone())).unwrap();
+    let pre_image =
+        PreImage::new([("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb".to_string(), 1)]).unwrap();
+    let written = write_pre_image(dir, &lock, &batch, &pre_image).unwrap();
+    let intent = MasterDispatchIntent::new(
+        &batch,
+        "c".repeat(64),
+        written,
+        vec![super::super::master_ledger::MasterMark {
+            company_guid: company_guid.into(),
+            altmstid: 7,
+        }],
+    )
+    .unwrap();
+    let _ = append_intent(dir, &lock, intent).unwrap();
+    batch
+}
+
+/// Rewrites the keys the journal recorded on a batch's intent, as an older
+/// build's fold would have left them: a later fold never releases a name an
+/// earlier one recorded.
+fn rekey_intent(directory: &std::path::Path, batch_id: &str, canonical: &str, absence: &str) {
+    let text = journal_text(directory);
+    let rewritten: String = text
+        .lines()
+        .map(|line| {
+            let mut record: Value = serde_json::from_str(line).unwrap();
+            if record["record_type"] == "master_dispatch_intent" && record["batch_id"] == batch_id {
+                record["items"][0]["canonical_key"] = json!(canonical);
+                record["items"][0]["absence_key"] = json!(absence);
+            }
+            format!("{record}\n")
+        })
+        .collect();
+    std::fs::write(journal_path(directory), rewritten).unwrap();
+}
+
+/// What a refusal shows when `own` hold the name in the refused batch's company
+/// and `others` hold it in the company beside each.
+fn held(own: &[&MasterBatch], others: &[(&MasterBatch, &str)]) -> OverlapView {
+    OverlapView::Held(BlockerReport {
+        ids: own.iter().map(|batch| batch.batch_id.clone()).collect(),
+        other_companies: others
+            .iter()
+            .map(|(batch, company)| BlockingBatch {
+                batch_id: batch.batch_id.clone(),
+                company_guid: company.to_string(),
+            })
+            .collect(),
+    })
+}
+
+/// Posts `args` with nothing but the reads before the dialog scripted: the
+/// answer, how many requests reached the wire, whether any reached it with the
+/// create's bytes, and the dialogs asked.
+async fn refused_before_the_dialog(
+    server: &Server,
+    simulator: SequenceSimulator,
+    args: Value,
+) -> (Value, usize, bool, usize) {
+    let scripted = ScriptedApproval::approving();
+    let response = posting(&scripted, server.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(simulator);
+    let create = create_was_sent(&observed, &expected_request());
+    (response, observed.len(), create, scripted.masters().len())
+}
+
+/// A batch of the same ledger is sent and unsettled in the same company: the
+/// post is refused before anyone is asked, on the journal it read just before the check,
+/// as an answer of its own that names the batch.
 #[tokio::test]
-async fn an_open_dispatch_of_the_same_ledger_refuses_the_post_and_says_what_to_do() {
+async fn a_name_held_by_an_open_dispatch_of_the_same_company_is_refused_before_anyone_is_asked() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let holder = dispatched_batch_in(directory.path(), LEDGER, GUID);
+    let (second, args) = saved_batch(&server, LEDGER);
+    let before = journal_bytes(directory.path());
+    let (response, wire, create, dialogs) =
+        refused_before_the_dialog(&server, simulator, args).await;
+    assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], false, "{response}");
+    assert_eq!(answered["dispatch"]["state"], "not_dispatched");
+    assert_eq!(answered["dispatch"]["resent"], false);
+    let error = &answered["error"];
+    assert_eq!(error["blocking_batch_ids"], json!([holder.batch_id]));
+    assert_eq!(error["blocking_batches_other_companies"], json!([]));
+    assert_eq!(error["hold"], "held");
+    assert_eq!(
+        error["next_step"],
+        overlap_next_step(&held(&[&holder], &[]))
+    );
+    assert_eq!(dialogs, 0, "nobody was asked");
+    assert_eq!(
+        wire,
+        before_approval().len(),
+        "only the reads before the dialog"
+    );
+    assert!(!create, "nothing reached the wire with the create's bytes");
+    assert_eq!(
+        journal_bytes(directory.path()),
+        before,
+        "nothing was recorded"
+    );
+    assert!(!sidecar_of(directory.path(), &second.batch_id).exists());
+}
+
+/// A batch of another company holds the name too, loaded or not: it is listed
+/// with its company, so the person can load that company and read it back, and
+/// the refusal still comes before the dialog.
+#[tokio::test]
+async fn a_name_held_in_another_company_is_listed_with_its_company_loaded_or_not() {
+    for other in [OTHER_LOADED_GUID, OTHER_UNLOADED_GUID] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let holder = dispatched_batch_in(directory.path(), LEDGER, other);
+        let (_, args) = saved_batch(&server, LEDGER);
+        let (response, wire, create, dialogs) =
+            refused_before_the_dialog(&server, simulator, args).await;
+        assert_eq!(error_code(&response), OVERLAP_CODE, "{other}: {response}");
+        let error = &result(&response)["error"];
+        assert_eq!(error["blocking_batch_ids"], json!([]), "{other}");
+        assert_eq!(
+            error["blocking_batches_other_companies"],
+            json!([{"batch_id": holder.batch_id, "company_guid": other}]),
+            "{other}"
+        );
+        assert_eq!(
+            error["next_step"],
+            overlap_next_step(&held(&[], &[(&holder, other)])),
+            "{other}"
+        );
+        assert_eq!(result(&response)["attempt_recorded"], false);
+        assert_eq!(dialogs, 0, "{other}: nobody was asked");
+        assert_eq!(wire, before_approval().len(), "{other}");
+        assert!(!create, "{other}");
+    }
+}
+
+/// Three batches hold the name, the most the journal admits for one name, by
+/// the three ways a name is held: those of this company are all named, in batch
+/// id order, and one of another company is listed apart with its company.
+#[tokio::test]
+async fn three_open_dispatches_holding_a_name_are_told_apart_by_company() {
+    let alpha = "Holder Alpha";
+    let beta = "Holder Beta";
+    for (second_company, ids_of_both) in [(GUID, true), (OTHER_LOADED_GUID, false)] {
+        let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let first = dispatched_batch_in(directory.path(), alpha, GUID);
+        let second = dispatched_batch_in(directory.path(), beta, second_company);
+        // Held by its name alone: the same letters and digits as the new name.
+        let third = dispatched_batch_in(directory.path(), "ZetaTestLedger", GUID);
+        // The first two recorded one of the two keys the new name has; none of
+        // the three overlaps another by name or by key, so the journal admits
+        // all three.
+        rekey_intent(
+            directory.path(),
+            &first.batch_id,
+            &canonical_master_key(LEDGER),
+            "alpha-absence",
+        );
+        rekey_intent(
+            directory.path(),
+            &second.batch_id,
+            "beta-canonical",
+            &absence_key(LEDGER),
+        );
+        assert!(read_journal(directory.path()).is_ok());
+        let (_, args) = saved_batch(&server, LEDGER);
+        let (response, wire, _, dialogs) =
+            refused_before_the_dialog(&server, simulator, args).await;
+        assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
+        let error = &result(&response)["error"];
+        let mut expected = vec![first.batch_id.clone(), third.batch_id.clone()];
+        if ids_of_both {
+            expected.push(second.batch_id.clone());
+        }
+        expected.sort();
+        assert_eq!(error["blocking_batch_ids"], json!(expected), "{response}");
+        let others = if ids_of_both {
+            json!([])
+        } else {
+            json!([{"batch_id": second.batch_id, "company_guid": second_company}])
+        };
+        assert_eq!(error["blocking_batches_other_companies"], others);
+        assert_eq!(dialogs, 0);
+        assert_eq!(wire, before_approval().len());
+    }
+}
+
+/// The ids a refusal names are the same company's, and those of other companies
+/// are listed apart with their company, whichever case the guid is written in.
+#[test]
+fn the_ids_a_refusal_names_are_the_same_companys_and_the_rest_are_listed_apart() {
+    let blocking = |n: usize, company: &str| BlockingBatch {
+        batch_id: format!("bridge-{n:04}"),
+        company_guid: company.to_string(),
+    };
+    let held = [
+        blocking(0, GUID),
+        blocking(1, OTHER_LOADED_GUID),
+        blocking(2, GUID),
+        blocking(3, OTHER_UNLOADED_GUID),
+    ];
+    let told = BlockerReport::of(&held, GUID);
+    assert_eq!(told.ids, ["bridge-0000", "bridge-0002"]);
+    let mut error = json!({});
+    told.add_to(&mut error);
+    assert_eq!(
+        error,
+        json!({"blocking_batch_ids": ["bridge-0000", "bridge-0002"],
+               "blocking_batches_other_companies": [
+                   {"batch_id": "bridge-0001", "company_guid": OTHER_LOADED_GUID},
+                   {"batch_id": "bridge-0003", "company_guid": OTHER_UNLOADED_GUID}]})
+    );
+    let shouted = BlockerReport::of(&held[..1], &GUID.to_uppercase());
+    assert_eq!(shouted.ids, ["bridge-0000"]);
+    assert!(shouted.other_companies.is_empty());
+}
+
+/// The next step of each case of the refusal, by what the journal showed.
+#[test]
+fn each_case_of_the_refusal_for_a_held_name_says_what_to_do_for_what_it_found() {
+    let batch = |n: usize| BlockingBatch {
+        batch_id: format!("bridge-{n:04}"),
+        company_guid: OTHER_LOADED_GUID.into(),
+    };
+    let own = OverlapView::Held(BlockerReport {
+        ids: vec!["bridge-0000".into()],
+        other_companies: Vec::new(),
+    });
+    let others = OverlapView::Held(BlockerReport {
+        ids: Vec::new(),
+        other_companies: vec![batch(1)],
+    });
+    let both = OverlapView::Held(BlockerReport {
+        ids: vec!["bridge-0000".into()],
+        other_companies: vec![batch(1)],
+    });
+    let views = [
+        own,
+        others,
+        both,
+        OverlapView::Settled,
+        OverlapView::SendRecordedSince,
+        OverlapView::Unread,
+    ];
+    let steps: Vec<String> = views.iter().map(overlap_next_step).collect();
+    for (n, step) in steps.iter().enumerate() {
+        assert!(!step.contains("machine-wide"), "{n}");
+        assert!(
+            !step.contains("create it in Tally by hand"),
+            "{n}: no hand step for a held name"
+        );
+        for other in &steps[n + 1..] {
+            assert_ne!(step, other, "{n}");
+        }
+    }
+    // The held name: settle the holders, this batch again, and key nothing.
+    for held in &steps[..3] {
+        assert!(held.contains("every company this data folder holds batches for"));
+        assert!(held.contains("call post_ledger_creates with this batch_id again"));
+        assert!(held.contains("Do not create the ledger in Tally by hand meanwhile"));
+    }
+    assert!(steps[0].contains("blocking_batch_ids") && !steps[0].contains("another company"));
+    assert!(steps[1].contains("list_companies shows only the companies loaded in Tally"));
+    assert!(steps[1].contains("company_guid") && !steps[1].contains("blocking_batch_ids"));
+    assert!(steps[2].contains("blocking_batch_ids") && steps[2].contains("list_companies"));
+    // The other cases.
+    assert_eq!(steps[3], OVERLAP_SETTLED);
+    assert_eq!(steps[4], NEXT_SEND_RECORDED_SINCE);
+    assert_eq!(steps[5], OVERLAP_UNREAD);
+    assert!(steps[5].contains("Do not create the ledger in Tally by hand meanwhile"));
+}
+
+/// The approval a person gave to an earlier call is withdrawn when the name is
+/// held at the call that redeems it: the second dialog is never asked and the
+/// POST is never sent.
+#[tokio::test]
+async fn an_approval_given_earlier_is_withdrawn_when_the_name_is_held_at_the_redeeming_call() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let scripted = ScriptedApproval::held();
+    let pending = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    scripted.answer(true);
+    until_answered(&server, &batch.batch_id).await;
+    assert!(server.post_approvals.holds(&batch.batch_id));
+    // A rival's create of the same ledger is sent before the click is redeemed.
+    let holder = dispatched_batch_in(directory.path(), LEDGER, GUID);
+    let refused = posting(&scripted, server.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(simulator);
+    assert_eq!(error_code(&refused), OVERLAP_CODE, "{refused}");
+    assert_eq!(result(&refused)["attempt_recorded"], false);
+    assert_eq!(
+        result(&refused)["error"]["blocking_batch_ids"],
+        json!([holder.batch_id])
+    );
+    assert_eq!(scripted.masters().len(), 1, "one dialog, asked once");
+    assert!(
+        !server.post_approvals.holds(&batch.batch_id),
+        "the held approval was withdrawn"
+    );
+    assert_eq!(
+        observed.len(),
+        2 * before_approval().len(),
+        "no queue read, no POST"
+    );
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_none());
+}
+
+/// A rival's create is sent while the dialog is open: the check before the
+/// dialog could not see it, and the one under the lock refuses. The approval is
+/// not spent, no sidecar is written, no POST is sent, and the answer names the
+/// batch from one read of the journal.
+#[tokio::test]
+async fn an_open_dispatch_recorded_while_the_dialog_is_open_refuses_under_the_lock_and_names_it() {
     let mut plans = before_approval();
     let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
     plans.extend(after_approval(xml(created_one())));
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let (first, _) = saved_batch(&server, LEDGER);
-    record_intent_for_test(&server, &first);
     let (second, args) = saved_batch(&server, LEDGER);
-    let response = posting(
-        &ScriptedApproval::approving(),
-        server.call_tool("post_ledger_creates", args),
-    )
-    .await;
+    let data_dir = directory.path().to_path_buf();
+    let holder = std::sync::Arc::new(std::sync::Mutex::new(None::<MasterBatch>));
+    let recorded = holder.clone();
+    let scripted = ScriptedApproval::approving_after(move || {
+        *recorded.lock().unwrap() = Some(dispatched_batch_in(&data_dir, LEDGER, GUID));
+    });
+    let response = posting(&scripted, server.call_tool("post_ledger_creates", args)).await;
     let observed = sent(simulator);
+    let holder = holder
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("the rival was recorded");
+    assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], false, "{response}");
+    assert_eq!(answered["dispatch"]["state"], "not_dispatched");
+    let error = &answered["error"];
+    assert_eq!(error["blocking_batch_ids"], json!([holder.batch_id]));
+    assert_eq!(error["blocking_batches_other_companies"], json!([]));
+    assert_eq!(error["hold"], "held");
     assert_eq!(
-        error_code(&response),
-        "master_ledger_open_dispatch_overlaps",
-        "{response}"
+        error["next_step"],
+        overlap_next_step(&held(&[&holder], &[]))
     );
-    assert_eq!(result(&response)["attempt_recorded"], false, "{response}");
-    let next = result(&response)["error"]["next_step"].as_str().unwrap();
-    assert!(next.contains("prepare_ledger_creates"), "{next}");
+    assert_eq!(scripted.masters().len(), 1, "the person was asked once");
     assert_eq!(observed.len(), post_at, "every queue read, and no POST");
     assert!(!sidecar_of(directory.path(), &second.batch_id).exists());
     assert!(state_of(directory.path(), &second.batch_id)
         .intent
         .is_none());
+}
+
+/// The same refusal under the lock when the journal cannot be read for the
+/// lookup that names the batches: the fields are left out, and the next step is
+/// the one that is true without them.
+#[tokio::test]
+async fn the_refusal_under_the_lock_leaves_the_batches_out_when_its_lookup_finds_the_journal_busy()
+{
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server, LEDGER);
+    let data_dir = directory.path().to_path_buf();
+    let scripted = ScriptedApproval::approving_after(move || {
+        dispatched_batch_in(&data_dir, LEDGER, GUID);
+    });
+    let (response, unused) = faulting(
+        vec!["failure_read_busy"],
+        posting(&scripted, server.call_tool("post_ledger_creates", args)),
+    )
+    .await;
+    sent(simulator);
+    assert!(unused.is_empty(), "the lookup was reached");
+    assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
+    let answered = result(&response);
+    // The journal could not be read, so it is not known to be unsent; the call
+    // itself sent nothing, and the answer does not say the create may have been.
+    assert!(answered["attempt_recorded"].is_null(), "{response}");
+    assert_eq!(answered["dispatch"]["state"], "not_dispatched");
+    let error = &answered["error"];
+    assert_eq!(error["hold"], "journal_unread");
+    for field in ["blocking_batch_ids", "blocking_batches_other_companies"] {
+        assert!(error.get(field).is_none(), "{field}: {response}");
+    }
+    assert_eq!(error["next_step"], overlap_next_step(&OverlapView::Unread));
+    assert!(!error["message"]
+        .as_str()
+        .unwrap()
+        .contains("may have been sent"));
+}
+
+/// Settles `holder` as a read-back that found nothing does.
+fn settle_holder(dir: &std::path::Path, holder: &MasterBatch) {
+    let lock = ExclusiveAdmission::acquire(dir).unwrap();
+    append(
+        dir,
+        &lock,
+        MasterRecord::Verdict(MasterVerdict {
+            batch_id: holder.batch_id.clone(),
+            batch_sha256: holder.batch_sha256.clone(),
+            state: MasterVerdictState::ConfirmedAbsent,
+            items: vec![VerdictItem {
+                name: LEDGER.into(),
+                guid: None,
+                reason: Some("not_in_book".into()),
+            }],
+        }),
+    )
+    .unwrap();
+}
+
+/// Runs a post whose dialog is approved while a holder is recorded, and in
+/// which `before_read` runs just before the refusal under the lock reads the
+/// journal to say why. Returns the answer, the dialogs asked and the requests
+/// that reached the wire, with the number the queue's reads come to.
+async fn refused_under_the_lock(
+    before_read: impl Fn(&std::path::Path, &MasterBatch, &MasterBatch) + Send + Sync + 'static,
+) -> (Value, usize, usize, usize) {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server, LEDGER);
+    let holder = std::sync::Arc::new(std::sync::Mutex::new(None::<MasterBatch>));
+    let (data_dir, recorded) = (directory.path().to_path_buf(), holder.clone());
+    let scripted = ScriptedApproval::approving_after(move || {
+        *recorded.lock().unwrap() = Some(dispatched_batch_in(&data_dir, LEDGER, GUID));
+    });
+    let (data_dir, seen) = (directory.path().to_path_buf(), holder.clone());
+    let hook: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
+        let holder = seen
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("the holder was recorded");
+        before_read(&data_dir, &batch_for_hook(&data_dir), &holder);
+    });
+    let response = master_ledger::BEFORE_FAILURE_READ
+        .scope(
+            hook,
+            posting(&scripted, server.call_tool("post_ledger_creates", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    (response, scripted.masters().len(), observed.len(), post_at)
+}
+
+/// The one prepared batch of the journal in `dir` that has no intent.
+fn batch_for_hook(dir: &std::path::Path) -> MasterBatch {
+    let journal = read_journal(dir).unwrap();
+    let text = journal_text(dir);
+    let id = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|record| record["record_type"] == "master_batch")
+        .filter_map(|record| record["batch_id"].as_str().map(str::to_string))
+        .find(|id| {
+            journal
+                .state(id)
+                .is_some_and(|state| state.intent.is_none())
+        })
+        .expect("a batch without an intent");
+    journal.state(&id).unwrap().batch.clone()
+}
+
+/// The holder that made the lock refuse settles before the answer reads the
+/// journal: the answer says so and to post this batch again, with no batch named.
+#[tokio::test]
+async fn a_holder_that_settles_before_the_failure_read_says_to_post_again() {
+    let (response, dialogs, wire, post_at) =
+        refused_under_the_lock(|dir, _, holder| settle_holder(dir, holder)).await;
+    assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], false, "{response}");
+    assert_eq!(answered["dispatch"]["state"], "not_dispatched");
+    let error = &answered["error"];
+    assert_eq!(error["hold"], "settled_meanwhile");
+    assert_eq!(error["next_step"], OVERLAP_SETTLED);
+    for field in ["blocking_batch_ids", "blocking_batches_other_companies"] {
+        assert!(error.get(field).is_none(), "{field}");
+    }
+    assert_eq!((dialogs, wire), (1, post_at), "asked once, no POST");
+}
+
+/// The refusal under the lock, and a send of this batch is recorded by the time
+/// the answer reads the journal: it is answered as the check under the lock
+/// answers a batch already attempted, the call sent nothing, the send may have
+/// happened, and the step is to read it back later.
+#[tokio::test]
+async fn a_refusal_when_a_send_of_this_batch_was_recorded_since_is_the_already_attempted_answer() {
+    let (response, dialogs, wire, post_at) = refused_under_the_lock(|dir, batch, holder| {
+        settle_holder(dir, holder);
+        record_intent_in(dir, batch);
+    })
+    .await;
+    assert_eq!(
+        error_code(&response),
+        "import_already_attempted",
+        "{response}"
+    );
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], true, "{response}");
+    assert_eq!(answered["dispatch"]["state"], "reconciliation_required");
+    let error = &answered["error"];
+    assert_eq!(error["hold"], "send_of_this_batch_recorded_since");
+    assert_eq!(error["next_step"], NEXT_SEND_RECORDED_SINCE);
+    assert_eq!(
+        error["message"],
+        "This call sent nothing. A send of this batch has been recorded since by another call; it may have been sent."
+    );
+    assert!(error.get("blocking_batch_ids").is_none());
+    assert_eq!((dialogs, wire), (1, post_at), "asked once, no POST");
+}
+
+/// The same before the dialog: a send of this batch lands while the pass reads
+/// Tally. It is answered as already attempted (not as a held name), the person
+/// is not asked, and nothing reaches the wire after the reads.
+#[tokio::test]
+async fn a_send_of_this_batch_recorded_while_the_pass_reads_is_refused_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let data_dir = directory.path().to_path_buf();
+    let sent_batch = batch.clone();
+    let hook: std::sync::Arc<dyn Fn() + Send + Sync> =
+        std::sync::Arc::new(move || record_intent_in(&data_dir, &sent_batch));
+    let scripted = ScriptedApproval::approving();
+    let response = master_ledger::BEFORE_HOLD_CHECK
+        .scope(
+            hook,
+            posting(&scripted, server.call_tool("post_ledger_creates", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        error_code(&response),
+        "import_already_attempted",
+        "{response}"
+    );
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], true);
+    assert_eq!(answered["dispatch"]["state"], "reconciliation_required");
+    assert_eq!(
+        answered["error"]["hold"],
+        "send_of_this_batch_recorded_since"
+    );
+    assert_eq!(answered["error"]["next_step"], NEXT_SEND_RECORDED_SINCE);
+    assert!(scripted.masters().is_empty(), "nobody was asked");
+    assert_eq!(observed.len(), before_approval().len());
+    assert!(!create_was_sent(&observed, &expected_request()));
+}
+
+/// The read before the dialog fails: the check is skipped, as the post went
+/// before it existed, and the check under the lock decides. The call adds no
+/// failure, and the approval given earlier is not withdrawn by that read: the
+/// redeeming call goes on to the queue and is refused under the lock.
+#[tokio::test]
+async fn a_failed_read_before_the_dialog_skips_that_check_and_the_lock_decides() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let scripted = ScriptedApproval::held();
+    let pending = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    scripted.answer(true);
+    until_answered(&server, &batch.batch_id).await;
+    let holder = dispatched_batch_in(directory.path(), LEDGER, GUID);
+    let (refused, unused) = faulting(
+        vec!["hold_check_read_busy"],
+        posting(&scripted, server.call_tool("post_ledger_creates", args)),
+    )
+    .await;
+    let observed = sent(simulator);
+    assert!(unused.is_empty(), "the read before the dialog was reached");
+    // Not a failure of that read: the redeem went on to the queue's reads, and
+    // the check under the lock refused it, naming the holder.
+    assert_eq!(error_code(&refused), OVERLAP_CODE, "{refused}");
+    assert_eq!(result(&refused)["error"]["hold"], "held");
+    assert_eq!(
+        result(&refused)["error"]["blocking_batch_ids"],
+        json!([holder.batch_id])
+    );
+    assert_eq!(observed.len(), post_at, "every queue read, and no POST");
+    assert_eq!(scripted.masters().len(), 1, "one dialog, asked once");
+}
+
+/// A rival's send lands while the pass reads Tally, after it first read the
+/// journal: the person is not asked.
+#[tokio::test]
+async fn a_rival_that_appears_while_the_pass_reads_is_refused_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server, LEDGER);
+    let data_dir = directory.path().to_path_buf();
+    let rival = std::sync::Arc::new(std::sync::Mutex::new(None::<MasterBatch>));
+    let recorded = rival.clone();
+    let hook: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
+        *recorded.lock().unwrap() = Some(dispatched_batch_in(&data_dir, LEDGER, GUID));
+    });
+    let scripted = ScriptedApproval::approving();
+    let response = master_ledger::BEFORE_HOLD_CHECK
+        .scope(
+            hook,
+            posting(&scripted, server.call_tool("post_ledger_creates", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    let rival = rival.lock().unwrap().clone().expect("the hook ran");
+    assert_eq!(error_code(&response), OVERLAP_CODE, "{response}");
+    assert_eq!(
+        result(&response)["error"]["blocking_batch_ids"],
+        json!([rival.batch_id])
+    );
+    assert!(scripted.masters().is_empty(), "nobody was asked");
+    assert_eq!(observed.len(), before_approval().len());
+}
+
+/// A holder settles while the pass reads Tally: the check is made on the journal
+/// as it is then, so the person is asked.
+#[tokio::test]
+async fn a_holder_that_settles_while_the_pass_reads_does_not_refuse() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let holder = dispatched_batch_in(directory.path(), LEDGER, GUID);
+    let (_, args) = saved_batch(&server, LEDGER);
+    let data_dir = directory.path().to_path_buf();
+    let hook: std::sync::Arc<dyn Fn() + Send + Sync> =
+        std::sync::Arc::new(move || settle_holder(&data_dir, &holder));
+    let scripted = ScriptedApproval::declining();
+    let response = master_ledger::BEFORE_HOLD_CHECK
+        .scope(
+            hook,
+            posting(&scripted, server.call_tool("post_ledger_creates", args)),
+        )
+        .await;
+    sent(simulator);
+    assert_eq!(
+        error_code(&response),
+        "master_approval_declined",
+        "{response}"
+    );
+    assert_eq!(scripted.masters().len(), 1, "the person was asked");
+}
+
+/// A holder that settles lets the same batch post: the refusal was about the
+/// holder, not the batch.
+#[tokio::test]
+async fn a_holder_that_settles_lets_the_same_batch_post() {
+    let (plans, post_at) = pending_then_posted_plans();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let holder = dispatched_batch_in(directory.path(), LEDGER, GUID);
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let scripted = ScriptedApproval::approving();
+    let refused = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(error_code(&refused), OVERLAP_CODE, "{refused}");
+    assert!(scripted.masters().is_empty());
+    // The holder's outcome is settled, as a read-back that found nothing does.
+    {
+        let lock = ExclusiveAdmission::acquire(directory.path()).unwrap();
+        append(
+            directory.path(),
+            &lock,
+            MasterRecord::Verdict(MasterVerdict {
+                batch_id: holder.batch_id.clone(),
+                batch_sha256: holder.batch_sha256.clone(),
+                state: MasterVerdictState::ConfirmedAbsent,
+                items: vec![VerdictItem {
+                    name: LEDGER.into(),
+                    guid: None,
+                    reason: Some("not_in_book".into()),
+                }],
+            }),
+        )
+        .unwrap();
+    }
+    let posted = posting_then(
+        &scripted,
+        book_after(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    let observed = sent(simulator);
+    assert_eq!(result(&posted)["state"], "posted_verified", "{posted}");
+    assert!(observed.len() > post_at, "the POST was sent");
+    assert_eq!(
+        scripted.masters().len(),
+        1,
+        "asked once, after the holder settled"
+    );
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_some());
 }
 
 /// A journal that cannot be read under the lock refuses before the intent: the
@@ -1370,6 +2795,8 @@ async fn a_dispatch_error_after_the_intent_is_an_unknown_outcome_never_resent() 
         "reconciliation_required"
     );
     assert_eq!(result(&response)["dispatch"]["resent"], false);
+    // The create may have been sent: a later call reads, and nothing is keyed.
+    assert_eq!(result(&response)["error"]["next_step"], NEXT_UNCONFIRMED);
     assert!(state_of(directory.path(), &batch.batch_id).intent.is_some());
     assert!(first > 0);
     // A later call reports the journal and sends no create.
@@ -2090,10 +3517,30 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
 #[tokio::test]
 async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appeared() {
     // The mark of the target moved since the intent: not absent, a doubt.
-    for (target, other, held, expect) in [
-        (8, 3, book(), "reconciliation_required"),
-        (7, 4, book(), "master_write_located_elsewhere"),
-        (7, 3, book_after(), "reconciliation_required"),
+    for (target, other, held, expect, next_step) in [
+        // Read, the name absent, and not settled: the one hand-key step.
+        (
+            8,
+            3,
+            book(),
+            "reconciliation_required",
+            verify::NEXT_ABSENT_NOT_SETTLED,
+        ),
+        (
+            7,
+            4,
+            book(),
+            "master_write_located_elsewhere",
+            verify::NEXT_ELSEWHERE,
+        ),
+        // A ledger of the name is there, without counters: nothing to key.
+        (
+            7,
+            3,
+            book_after(),
+            "reconciliation_required",
+            verify::NEXT_PRESENT_NOT_VERIFIED,
+        ),
     ] {
         let plans = through_post(xml(created_one()).with_delivery(
             Delivery::ResetAfterRequestProcessed {
@@ -2119,14 +3566,17 @@ async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appe
         sent(reads);
         assert_eq!(result(&response)["state"], expect, "{response}");
         assert_ne!(result(&response)["state"], "confirmed_absent");
+        assert_eq!(result(&response)["next_step"], next_step, "{response}");
         let _ = batch;
     }
 }
 
 #[tokio::test]
 async fn an_answer_that_cannot_be_recorded_is_reported_as_answered_not_as_maybe_sent() {
-    // Tally answers, but another process holds the journal's lock when the
-    // answer is recorded: the call says Tally answered, with its counters.
+    // Tally answers, and another process holds the journal's lock from the POST
+    // until the call is over: neither the answer nor a verdict can be recorded.
+    // The read-back is still made, from the journal read without its lock, and
+    // the call says Tally answered, with its counters.
     let plans = through_post(
         xml(created_one()).with_delivery(Delivery::SlowHeaders(Duration::from_secs(2))),
     );
@@ -2137,11 +3587,16 @@ async fn an_answer_that_cannot_be_recorded_is_reported_as_answered_not_as_maybe_
     let (batch, args) = saved_batch(&server, LEDGER);
     let data_dir = directory.path().to_path_buf();
     let approving = ScriptedApproval::approving();
-    let post = posting(&approving, server.call_tool("post_ledger_creates", args));
+    let (finished, over) = tokio::sync::oneshot::channel::<()>();
+    let post = async {
+        let response = posting(&approving, server.call_tool("post_ledger_creates", args)).await;
+        let _ = finished.send(());
+        response
+    };
     let hold_lock = async {
         let started = std::time::Instant::now();
         // Once the POST has arrived the intent's use of the lock is over: hold
-        // it while the answer is recorded.
+        // it until the call has answered.
         while simulator.received() <= post_at {
             assert!(
                 started.elapsed() < Duration::from_secs(20),
@@ -2150,18 +3605,40 @@ async fn an_answer_that_cannot_be_recorded_is_reported_as_answered_not_as_maybe_
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
         let lock = ExclusiveAdmission::acquire(&data_dir).expect("unheld during the POST");
-        tokio::time::sleep(Duration::from_secs(4)).await;
+        let _ = over.await;
         drop(lock);
     };
     let (response, ()) = tokio::join!(post, hold_lock);
-    sent(simulator);
+    let observed = sent(simulator);
+    assert_eq!(create_count(&observed), 1, "one POST on the wire");
     let answered = result(&response);
-    assert_eq!(answered["state"], "posted_unverified", "{response}");
+    assert!(answered.get("error").is_none(), "{response}");
+    assert_eq!(
+        answered["state"], "masters_after_post_unconfirmed",
+        "{response}"
+    );
     assert_eq!(answered["answer_recorded"], false, "{response}");
     assert_eq!(answered["counters"]["created"], 1, "{response}");
-    assert!(
-        !response.to_string().contains("may have been sent"),
-        "{response}"
+    assert_eq!(answered["verification"]["verdict_recorded"], false);
+    assert_eq!(answered["verification"]["settled"], false);
+    assert_eq!(
+        answered["verification"]["verdict_record_error"],
+        "import_admission_busy"
+    );
+    // The state is open, so it keeps its own step, then what was not recorded.
+    assert_eq!(
+        answered["next_step"],
+        format!(
+            "{} {}{}",
+            verify::NEXT_UNCONFIRMED,
+            verify::NEXT_VERDICT_NOT_RECORDED,
+            verify::NEXT_ANSWER_NOT_RECORDED
+        )
+    );
+    assert_ne!(answered["note"], MAY_HAVE_BEEN_SENT_NOTE, "{response}");
+    assert_eq!(
+        answered["note"],
+        settled_note(MasterVerdictState::MastersAfterPostUnconfirmed)
     );
     // Only the intent is in the journal: a later call reconciles it.
     assert_eq!(
@@ -2451,6 +3928,841 @@ fn every_verdict_state_has_its_code_and_only_the_loud_ones_carry_an_alert() {
         let next = settled_next_step(state);
         assert_eq!(next.contains("Do not retry"), loud, "{code}: {next}");
         assert!(!next.is_empty());
+    }
+}
+
+// --- the answered call: Tally's answer and the verdict, whatever the journal does ---
+
+/// `call` with the journal faults `points` armed (see [`TEST_FAULTS`]), and the
+/// ones it never reached.
+async fn faulting<F: std::future::Future>(
+    points: Vec<&'static str>,
+    call: F,
+) -> (F::Output, Vec<&'static str>) {
+    TEST_FAULTS
+        .scope(std::cell::RefCell::new(points), async {
+            let output = call.await;
+            (output, TEST_FAULTS.with(|armed| armed.borrow().clone()))
+        })
+        .await
+}
+
+/// One approved post of `LEDGER` that Tally answers with `answer`, then
+/// `read_back` plans, the book holding `after` once it is done, with `points`
+/// armed.
+struct Answered {
+    response: Value,
+    directory: tempfile::TempDir,
+    batch: MasterBatch,
+    args: Value,
+    /// The armed faults the call never reached.
+    unused: Vec<&'static str>,
+    /// How many times the create's bytes reached the wire.
+    posts: usize,
+}
+
+async fn answered_post(
+    points: Vec<&'static str>,
+    answer: String,
+    read_back: Vec<ScenarioPlan>,
+    after: Vec<IndexedMaster>,
+) -> Answered {
+    let mut plans = through_post(xml(answer));
+    plans.extend(read_back);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let (response, unused) = faulting(
+        points,
+        posting_then(
+            &ScriptedApproval::approving(),
+            after,
+            server.call_tool("post_ledger_creates", args.clone()),
+        ),
+    )
+    .await;
+    let posts = create_count(&sent(simulator));
+    Answered {
+        response,
+        directory,
+        batch,
+        args,
+        unused,
+        posts,
+    }
+}
+
+/// A later call for the batch of `earlier`: the identity and the read-back,
+/// the book holding `after`. Returns the answer and how many creates it sent.
+async fn later_call(
+    earlier: &Answered,
+    read_back: Vec<ScenarioPlan>,
+    after: Vec<IndexedMaster>,
+) -> (Value, usize) {
+    let reads = SequenceSimulator::spawn(with_sentinel(read_back)).unwrap();
+    let server = server_at(reads.address(), earlier.directory.path());
+    let response = reconciling(
+        after,
+        server.call_tool("post_ledger_creates", earlier.args.clone()),
+    )
+    .await;
+    (response, create_count(&sent(reads)))
+}
+
+fn clean_read_back() -> Vec<ScenarioPlan> {
+    read_back(8, 3, Some(suspense_answer()))
+}
+
+#[tokio::test]
+async fn a_failed_first_append_of_the_answer_is_recorded_under_the_verdicts_lock() {
+    let done = answered_post(
+        vec!["master_dispatch_response"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], true);
+    assert_eq!(answered["verification"]["settled"], true);
+    assert_eq!(answered["counters"]["created"], 1);
+    // The answer is journaled before the verdict that was judged on it.
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict"
+        ]
+    );
+    let state = state_of(done.directory.path(), &done.batch.batch_id);
+    assert_eq!(state.response.unwrap().counters.unwrap().created, 1);
+    assert_eq!(
+        state.verdict.unwrap().state,
+        MasterVerdictState::PostedVerified
+    );
+}
+
+#[tokio::test]
+async fn an_answer_that_cannot_be_recorded_twice_is_judged_and_a_second_call_has_no_counters() {
+    let done = answered_post(
+        vec!["master_dispatch_response", "master_dispatch_response"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "both faults were reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert!(answered.get("error").is_none(), "{}", done.response);
+    // Judged on the counters this call holds, and said not to be recorded.
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["counters"]["created"], 1);
+    assert_eq!(answered["answer_recorded"], false);
+    assert_eq!(answered["verification"]["verdict_recorded"], false);
+    assert_eq!(answered["verification"]["settled"], false);
+    assert_eq!(
+        answered["verification"]["verdict_record_error"],
+        "master_ledger_unavailable"
+    );
+    assert_eq!(
+        answered["next_step"],
+        format!(
+            "{}{}",
+            verify::NEXT_VERDICT_NOT_RECORDED,
+            verify::NEXT_ANSWER_NOT_RECORDED
+        )
+    );
+    assert_eq!(
+        record_types(done.directory.path()),
+        ["master_batch", "master_dispatch_intent"],
+        "no verdict is written without its answer"
+    );
+    // A second call reads the book back, sends nothing and has no counters.
+    let (later, creates) = later_call(
+        &done,
+        reconcile_reads(8, 3, Some(suspense_answer())),
+        book_after(),
+    )
+    .await;
+    let second = result(&later);
+    assert_eq!(creates, 0, "a later call sends nothing");
+    assert_eq!(second["state"], "reconciliation_required", "{later}");
+    assert_eq!(second["answer_recorded"], false);
+    assert_eq!(second["counters"], Value::Null);
+    assert_eq!(second["verification"]["moment"], "reconcile");
+    assert_eq!(second["verification"]["verdict_recorded"], true);
+    assert_eq!(second["verification"]["settled"], false);
+    assert!(second["verification"]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason == "counters_unavailable"));
+    // The ledger is in the book without counters: nothing to key.
+    assert_eq!(second["next_step"], verify::NEXT_PRESENT_NOT_VERIFIED);
+    assert_eq!(
+        second["note"],
+        settled_note(MasterVerdictState::ReconciliationRequired)
+    );
+    assert_ne!(second["note"], MAY_HAVE_BEEN_SENT_NOTE);
+    assert_ne!(
+        second["verification"]["counters_note"],
+        verify::COUNTERS_ABSENT_NOTE
+    );
+    assert_eq!(
+        second["verification"]["counters_note"],
+        verify::NO_ANSWER_RECORDED_NOTE
+    );
+    assert_eq!(
+        record_types(done.directory.path()),
+        ["master_batch", "master_dispatch_intent", "master_verdict"]
+    );
+}
+
+#[tokio::test]
+async fn a_failed_first_append_does_not_hide_an_altered_count() {
+    let altered = created_one().replace("<ALTERED>0</ALTERED>", "<ALTERED>1</ALTERED>");
+    let done = answered_post(
+        vec!["master_dispatch_response"],
+        altered,
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        answered["state"], "posted_into_existing_master",
+        "{}",
+        done.response
+    );
+    assert_eq!(first_key(&done.response), "alert");
+    assert_eq!(answered["counters"]["altered"], 1);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["settled"], true);
+    assert!(state_of(done.directory.path(), &done.batch.batch_id).is_settled());
+}
+
+#[tokio::test]
+async fn a_loud_state_whose_verdict_is_not_recorded_keeps_its_alert_and_its_own_step() {
+    let altered = created_one().replace("<ALTERED>0</ALTERED>", "<ALTERED>1</ALTERED>");
+    let done = answered_post(
+        vec!["master_dispatch_response", "master_verdict"],
+        altered,
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "a fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        answered["state"], "posted_into_existing_master",
+        "{}",
+        done.response
+    );
+    assert_eq!(first_key(&done.response), "alert");
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], false);
+    assert_eq!(answered["verification"]["settled"], false);
+    assert_eq!(
+        answered["next_step"],
+        format!(
+            "{} {}",
+            settled_next_step(MasterVerdictState::PostedIntoExistingMaster),
+            verify::NEXT_VERDICT_NOT_RECORDED
+        )
+    );
+    assert!(!state_of(done.directory.path(), &done.batch.batch_id).is_settled());
+}
+
+#[tokio::test]
+async fn a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict() {
+    let done = answered_post(
+        vec!["answer_read_busy"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the busy read was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert!(answered.get("error").is_none(), "{}", done.response);
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], true);
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict"
+        ]
+    );
+    assert!(state_of(done.directory.path(), &done.batch.batch_id).is_settled());
+}
+
+#[tokio::test]
+async fn a_busy_journal_lock_right_after_the_answer_is_recorded_gives_a_verdict_not_an_error() {
+    // The lock is held by another process from the answer's append on: the
+    // shared read is busy, so the journal is read without it, and the verdict
+    // cannot be written.
+    let done = answered_post(
+        vec!["answer_read_busy", "verdict_lock_busy"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "a fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert!(answered.get("error").is_none(), "{}", done.response);
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], false);
+    assert_eq!(answered["verification"]["settled"], false);
+    assert_eq!(
+        answered["verification"]["verdict_record_error"],
+        "import_admission_busy"
+    );
+    assert_eq!(answered["next_step"], verify::NEXT_VERDICT_NOT_RECORDED);
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_later_call_whose_verdict_is_not_recorded_does_not_claim_counters_it_lacks() {
+    // No answer on file, and the verdict of a second call cannot be written.
+    let done = answered_post(
+        vec!["master_dispatch_response", "master_dispatch_response"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    assert!(done.unused.is_empty(), "both faults were reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    let ((later, creates), unused) = faulting(
+        vec!["verdict_lock_busy"],
+        later_call(
+            &done,
+            reconcile_reads(8, 3, Some(suspense_answer())),
+            book_after(),
+        ),
+    )
+    .await;
+    assert!(unused.is_empty(), "the busy lock was not reached");
+    assert_eq!(creates, 0, "a later call sends nothing");
+    let second = result(&later);
+    assert_eq!(second["state"], "reconciliation_required", "{later}");
+    assert_eq!(second["answer_recorded"], false);
+    assert_eq!(second["verification"]["verdict_recorded"], false);
+    assert_eq!(second["verification"]["settled"], false);
+    // It claims no counters it lacks, and says there is no answer on file.
+    assert_eq!(second["counters"], Value::Null);
+    assert_eq!(
+        second["verification"]["counters_note"],
+        verify::NO_ANSWER_RECORDED_NOTE
+    );
+    // The state is open and present without counters: its own step comes first.
+    assert_eq!(
+        second["next_step"],
+        format!(
+            "{} {}",
+            verify::NEXT_PRESENT_NOT_VERIFIED,
+            verify::NEXT_VERDICT_NOT_RECORDED
+        )
+    );
+    assert_eq!(
+        record_types(done.directory.path()),
+        ["master_batch", "master_dispatch_intent"]
+    );
+}
+
+/// An open verdict the journal already holds, in the same words, stays recorded
+/// when the lock is busy on a repeat reconcile: there is nothing left to write.
+#[tokio::test]
+async fn a_repeat_reconcile_of_an_open_verdict_stays_recorded_when_the_lock_is_busy() {
+    // The first call's read-back is unavailable: an open verdict is recorded.
+    let done = answered_post(Vec::new(), created_one(), Vec::new(), book()).await;
+    assert_eq!(
+        result(&done.response)["state"],
+        "masters_after_post_unconfirmed"
+    );
+    let before = journal_bytes(done.directory.path());
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict"
+        ]
+    );
+    let ((later, creates), unused) = faulting(
+        vec!["verdict_lock_busy"],
+        later_call(&done, verified_company(), book()),
+    )
+    .await;
+    assert!(unused.is_empty(), "the busy lock was reached");
+    assert_eq!(creates, 0, "a later call sends nothing");
+    let second = result(&later);
+    assert_eq!(second["state"], "masters_after_post_unconfirmed", "{later}");
+    assert_eq!(second["verification"]["verdict_recorded"], true, "{later}");
+    assert_eq!(second["verification"]["verdict_written"], false);
+    assert!(second["verification"].get("verdict_record_error").is_none());
+    // A recorded open verdict is not claimed unrecorded: its own step stands.
+    assert_eq!(second["next_step"], verify::NEXT_UNCONFIRMED);
+    assert_eq!(journal_bytes(done.directory.path()), before);
+}
+
+/// An open state whose verdict could not be written keeps the step it has of
+/// its own (the check to make in Tally) and adds that the verdict is not
+/// recorded and that calling again only reads.
+#[tokio::test]
+async fn an_open_state_whose_verdict_is_not_recorded_keeps_its_own_step() {
+    // Tally answered, the book shows no such ledger and no mark moved.
+    let done = answered_post(
+        vec!["master_verdict"],
+        created_one(),
+        read_back(7, 3, None),
+        book(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        answered["state"], "reconciliation_required",
+        "{}",
+        done.response
+    );
+    assert_eq!(answered["verification"]["verdict_recorded"], false);
+    assert_eq!(answered["verification"]["settled"], false);
+    assert_eq!(
+        answered["next_step"],
+        format!(
+            "{} {}",
+            verify::NEXT_RECONCILE,
+            verify::NEXT_VERDICT_NOT_RECORDED
+        )
+    );
+    // The step that is added says that calling again only reads: it does not
+    // tell the person both to never post again and to call again.
+    assert!(verify::NEXT_VERDICT_NOT_RECORDED
+        .contains("Call post_ledger_creates with this batch_id again"));
+    assert!(verify::NEXT_VERDICT_NOT_RECORDED
+        .contains("sends nothing and is not posting the batch again"));
+}
+
+/// A verdict append that fails is never taken for a recorded one. The state the
+/// call holds is stale: it shows the open verdict, while the journal now holds a
+/// terminal one, so the append of the same open verdict is refused.
+#[test]
+fn a_failed_verdict_append_is_an_error_even_when_the_state_held_the_same_words() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = unit_server(directory.path());
+    let (batch, _) = saved_batch(&server, LEDGER);
+    record_intent_for_test(&server, &batch);
+    let open = MasterVerdict {
+        batch_id: batch.batch_id.clone(),
+        batch_sha256: batch.batch_sha256.clone(),
+        state: MasterVerdictState::MastersAfterPostUnconfirmed,
+        items: vec![VerdictItem {
+            name: LEDGER.into(),
+            guid: None,
+            reason: Some("company_marks_unavailable".into()),
+        }],
+    };
+    {
+        let lock = ExclusiveAdmission::acquire(directory.path()).unwrap();
+        append(directory.path(), &lock, MasterRecord::Verdict(open.clone())).unwrap();
+    }
+    let stale = state_of(directory.path(), &batch.batch_id);
+    assert_eq!(stale.verdict.as_ref(), Some(&open));
+    settle_holder(directory.path(), &batch);
+    let before = journal_bytes(directory.path());
+    let mut answer_recorded = false;
+    let recorded = server.append_under_lock(&stale, open, None, &mut answer_recorded);
+    assert_eq!(recorded, Err("master_ledger_invalid".to_string()));
+    assert_eq!(journal_bytes(directory.path()), before);
+}
+
+/// The alert of a loud state under the answer cap. No tool refuses a cap below
+/// a floor: the smallest `BRIDGE_AGENT_MAX_BYTES` accepted is 256, and an answer
+/// over the cap is withheld as `agent_response_too_large`, alert and counters
+/// with it. The verdict and the counters are in the journal, and a later call
+/// under a cap that fits reports them. The sizes are measured, not assumed.
+#[tokio::test]
+async fn a_loud_answer_under_a_small_cap_is_withheld_and_the_journal_still_has_it() {
+    let altered = created_one().replace("<ALTERED>0</ALTERED>", "<ALTERED>1</ALTERED>");
+    let loud = |cap: usize| {
+        let altered = altered.clone();
+        async move {
+            let mut plans = through_post(xml(altered));
+            plans.extend(clean_read_back());
+            let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+            let directory = tempfile::tempdir().unwrap();
+            let server = server_capped(simulator.address(), directory.path(), cap);
+            let (batch, args) = saved_batch(&server, LEDGER);
+            let response = posting_then(
+                &ScriptedApproval::approving(),
+                book_after(),
+                server.call_tool("post_ledger_creates", args.clone()),
+            )
+            .await;
+            (response, directory, batch, args)
+        }
+    };
+    // Under a cap that fits: the loud answer, and the size it takes.
+    let (fits, directory, batch, args) = loud(200_000).await;
+    assert_eq!(
+        result(&fits)["state"],
+        "posted_into_existing_master",
+        "{fits}"
+    );
+    let loud_bytes = fits.to_string().len();
+    // The same batch reported by a later call, from the journal alone.
+    let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let later = server_at(silent.address(), directory.path());
+    let report = posting(
+        &ScriptedApproval::approving(),
+        later.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert!(result(&report).get("alert").is_some(), "{report}");
+    let report_bytes = report.to_string().len();
+    assert!(
+        (3_000..4_000).contains(&loud_bytes) && (1_800..2_600).contains(&report_bytes),
+        "loud answer {loud_bytes} bytes, its journal report {report_bytes}"
+    );
+    // At the smallest cap the setting accepts, the answer is withheld whole.
+    let (capped, directory, batch_capped, args) = loud(256).await;
+    assert_eq!(
+        capped["structuredContent"]["error"]["code"], "agent_response_too_large",
+        "{capped}"
+    );
+    assert!(capped.to_string().len() < loud_bytes);
+    assert!(!capped.to_string().contains("ATTENTION"), "{capped}");
+    // The journal holds the answer and the loud verdict all the same.
+    let state = state_of(directory.path(), &batch_capped.batch_id);
+    assert_eq!(state.response.unwrap().counters.unwrap().altered, 1);
+    assert_eq!(
+        state.verdict.unwrap().state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    // A later call under a cap that fits reports the alert.
+    let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let later = server_at(silent.address(), directory.path());
+    let report = posting(
+        &ScriptedApproval::approving(),
+        later.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    assert_eq!(result(&report)["state"], "posted_into_existing_master");
+    assert!(result(&report).get("alert").is_some(), "{report}");
+    let _ = batch;
+}
+
+#[tokio::test]
+async fn an_answer_written_but_reported_failed_is_not_appended_a_second_time() {
+    let done = answered_post(
+        vec!["master_dispatch_response_lost_after_write"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], true);
+    assert_eq!(answered["verification"]["settled"], true);
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn an_unavailable_read_back_after_a_failed_first_append_still_records_the_counters() {
+    // The POST answers and nothing after it does.
+    let done = answered_post(
+        vec!["master_dispatch_response"],
+        created_one(),
+        Vec::new(),
+        book(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        answered["state"], "masters_after_post_unconfirmed",
+        "{}",
+        done.response
+    );
+    assert_eq!(answered["counters"]["created"], 1);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], true);
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response",
+            "master_verdict"
+        ]
+    );
+    assert_eq!(
+        state_of(done.directory.path(), &done.batch.batch_id)
+            .response
+            .unwrap()
+            .counters
+            .unwrap()
+            .created,
+        1
+    );
+}
+
+#[tokio::test]
+async fn a_failed_verdict_append_leaves_the_answer_and_a_second_call_settles_with_counters() {
+    let done = answered_post(
+        vec!["master_verdict"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the fault was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], false);
+    assert_eq!(answered["verification"]["settled"], false);
+    // The answer is on file, so the step does not add that it is not.
+    assert_eq!(answered["next_step"], verify::NEXT_VERDICT_NOT_RECORDED);
+    assert_eq!(
+        record_types(done.directory.path()),
+        [
+            "master_batch",
+            "master_dispatch_intent",
+            "master_dispatch_response"
+        ]
+    );
+    // The company cannot be verified: the journal alone answers. It holds the
+    // answer and no verdict, so the answer-recorded note is the one.
+    let before = journal_bytes(done.directory.path());
+    let down = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let unreachable_server = server_at(down.address(), done.directory.path());
+    let report = reconciling(
+        book_after(),
+        unreachable_server.call_tool("post_ledger_creates", done.args.clone()),
+    )
+    .await;
+    sent(down);
+    assert_eq!(result(&report)["state"], "posted_unverified", "{report}");
+    assert_eq!(result(&report)["journal"]["response_recorded"], true);
+    assert_eq!(result(&report)["note"], ALREADY_SENT_NOTE);
+    assert_eq!(journal_bytes(done.directory.path()), before);
+    // The answer is on file, so the second call has the counters to settle on.
+    let (later, creates) = later_call(
+        &done,
+        reconcile_reads(8, 3, Some(suspense_answer())),
+        book_after(),
+    )
+    .await;
+    let second = result(&later);
+    assert_eq!(creates, 0, "a later call sends nothing");
+    assert_eq!(second["state"], "posted_verified", "{later}");
+    assert_eq!(second["answer_recorded"], true);
+    assert_eq!(second["counters"]["created"], 1);
+    assert_eq!(second["verification"]["verdict_recorded"], true);
+    assert_eq!(second["verification"]["settled"], true);
+    assert_eq!(
+        second["next_step"],
+        settled_next_step(MasterVerdictState::PostedVerified)
+    );
+}
+
+#[tokio::test]
+async fn a_journal_that_cannot_be_read_after_the_answer_is_answered_from_what_tally_said() {
+    for (points, recorded) in [
+        (vec!["answer_read_failed"], true),
+        (
+            vec!["master_dispatch_response", "answer_read_failed"],
+            false,
+        ),
+    ] {
+        let done = answered_post(points, created_one(), Vec::new(), book()).await;
+        let answered = result(&done.response);
+        assert!(done.unused.is_empty(), "a fault was not reached");
+        assert_eq!(done.posts, 1, "one POST on the wire");
+        assert!(answered.get("error").is_none(), "{}", done.response);
+        assert_eq!(answered["state"], "posted_unverified", "{}", done.response);
+        assert_eq!(answered["answer_recorded"], recorded);
+        assert_eq!(answered["counters"]["created"], 1);
+        assert_eq!(answered["verification"]["attempted"], false);
+        assert_eq!(
+            answered["verification"]["error"]["code"],
+            "master_journal_unavailable"
+        );
+        assert_eq!(
+            answered["verification"]
+                .get("answer_record_error")
+                .is_some(),
+            !recorded
+        );
+        assert_ne!(answered["note"], MAY_HAVE_BEEN_SENT_NOTE);
+        assert_eq!(
+            answered["note"],
+            if recorded {
+                POSTED_UNVERIFIED_NOTE
+            } else {
+                ANSWER_UNRECORDED_NOTE
+            }
+        );
+        // The fallback says what to do next: a later call reads and sends nothing.
+        assert_eq!(
+            answered["next_step"],
+            if recorded {
+                NEXT_NOT_READ_BACK_AFTER_ANSWER.to_string()
+            } else {
+                format!("{NEXT_NOT_READ_BACK_AFTER_ANSWER}{NEXT_ANSWER_NOT_RECORDED}")
+            }
+        );
+        // What the journal holds, and what a later call makes of it.
+        let mut expected = vec!["master_batch", "master_dispatch_intent"];
+        if recorded {
+            expected.push("master_dispatch_response");
+        }
+        assert_eq!(record_types(done.directory.path()), expected);
+        let (later, creates) = later_call(
+            &done,
+            reconcile_reads(8, 3, Some(suspense_answer())),
+            book_after(),
+        )
+        .await;
+        assert_eq!(creates, 0, "a later call sends nothing");
+        let second = result(&later);
+        if recorded {
+            // The answer is on file, so the later call has the counters.
+            assert_eq!(second["state"], "posted_verified", "{later}");
+            assert_eq!(second["counters"]["created"], 1);
+        } else {
+            assert_eq!(second["state"], "reconciliation_required", "{later}");
+            assert_eq!(second["counters"], Value::Null);
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_terminal_verdict_with_no_answer_on_file_is_not_reported_as_maybe_sent() {
+    // The answer is lost on its way, and a reconcile finds nothing created and
+    // no mark moved: a terminal verdict with no answer on file.
+    let plans = through_post(xml(created_one()).with_delivery(
+        Delivery::ResetAfterRequestProcessed {
+            delay: Duration::from_millis(0),
+        },
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server, LEDGER);
+    posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(create_count(&sent(simulator)), 1, "one POST on the wire");
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(7, 3, None))).unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let settled = reconciling(book(), later.call_tool("post_ledger_creates", args.clone())).await;
+    assert_eq!(create_count(&sent(reads)), 0);
+    assert_eq!(result(&settled)["state"], "confirmed_absent", "{settled}");
+    // Reported from the journal alone: it holds the verdict and no answer.
+    let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let later = server_at(silent.address(), directory.path());
+    let report = posting(
+        &ScriptedApproval::approving(),
+        later.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    assert_eq!(sent(silent).len(), 0);
+    let reported = result(&report);
+    assert_eq!(reported["state"], "confirmed_absent", "{report}");
+    assert_eq!(reported["journal"]["response_recorded"], false);
+    assert_ne!(reported["note"], MAY_HAVE_BEEN_SENT_NOTE);
+    assert_eq!(
+        reported["note"],
+        settled_note(MasterVerdictState::ConfirmedAbsent)
+    );
+    assert_eq!(
+        reported["next_step"],
+        settled_next_step(MasterVerdictState::ConfirmedAbsent)
+    );
+}
+
+#[test]
+fn the_fault_points_are_under_bare_cfg_test() {
+    let ledger = include_str!("agent_master_ledger.rs");
+    for needle in [
+        "#[cfg(test)]\ntokio::task_local! {",
+        "#[cfg(test)]\n    if test_fault_fires(record.record_type()) {",
+        "#[cfg(test)]\n    let lost_after_write =",
+        "#[cfg(test)]\n    if lost_after_write && appended.is_ok() {",
+        "#[cfg(test)]\npub(super) fn test_fault_fires(",
+        "#[cfg(test)]\n    fn record_type(&self)",
+    ] {
+        assert_eq!(ledger.matches(needle).count(), 1, "{needle}");
+    }
+    let tools = include_str!("agent_master_tools.rs");
+    for needle in [
+        "#[cfg(test)]\n        if super::master_ledger::test_fault_fires(\"answer_read_failed\") {",
+        "#[cfg(test)]\n        let shared = if super::master_ledger::test_fault_fires(\"answer_read_busy\") {",
+        "#[cfg(test)]\n        if super::master_ledger::test_fault_fires(\"failure_read_busy\") {",
+        "#[cfg(test)]\n        if super::master_ledger::test_fault_fires(\"hold_check_read_busy\") {",
+        "#[cfg(test)]\n            let _ = super::master_ledger::BEFORE_HOLD_CHECK.try_with(|before| before());",
+        "#[cfg(test)]\n                let _ = super::master_ledger::BEFORE_FAILURE_READ.try_with(|before| before());",
+    ] {
+        assert_eq!(tools.matches(needle).count(), 1, "{needle}");
+    }
+    let verify = include_str!("agent_master_verify.rs");
+    assert_eq!(
+        verify
+            .matches("#[cfg(test)]\n            if super::super::master_ledger::test_fault_fires(\"verdict_lock_busy\") {")
+            .count(),
+        1
+    );
+    for source in [ledger, tools, verify] {
+        for forbidden in ["cfg(any(test", "cfg(feature", "cfg(all(test"] {
+            assert!(!source.contains(forbidden), "{forbidden}");
+        }
     }
 }
 

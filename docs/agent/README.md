@@ -1882,6 +1882,9 @@ was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuil
 `acknowledge_post_review` records that review, one doubt at a time, and changes
 no verdict.
 
+`prepare_ledger_creates` and `post_ledger_creates` are in the source and are not in
+a published build yet.
+
 `BRIDGE_AGENT_ENABLE_MASTER_WRITES=true`, together with
 `BRIDGE_AGENT_ENABLE_WRITES=true`, lists two more tools, which are not among the
 ordinary default tools above: `prepare_ledger_creates` and `post_ledger_creates`.
@@ -1911,11 +1914,68 @@ ledger as sent, nothing else changed), `posted_into_existing_master` or
 `master_write_located_elsewhere` (loud: check Tally, do not retry),
 `confirmed_absent` (a later call found nothing created and no mark moved; a new
 batch needs a new approval), `masters_after_post_unconfirmed` (the book could
-not be read back; call again, which only reads), `posted_unverified` with
-`answer_recorded` false (Tally answered, with any counters it gave, but its
-answer could not be recorded, so this call read nothing back; never send again,
-check Tally) or `reconciliation_required` (with reasons). A later call for a sent batch repeats the read-back and never
-sends. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
+not be read back; call again, which only reads), plain `posted_unverified`
+(Tally answered, with any counters it gave, but the read-back could not be
+attempted, so nothing was judged; see its `next_step`, never send again, check
+Tally) or
+`reconciliation_required` (with reasons). The answer of the call in which Tally
+answered, and an answer that reports a read-back (it has `verification.moment`),
+carry `answer_recorded`; a failure answer does not. False means ComplyEaze Bridge
+has no record of Tally's answer on file (it could not be recorded, or Tally never
+answered). In the answer of the call in which Tally answered, the counters shown
+are then the only record to rely on, and a later call may have none and cannot
+reach `posted_verified`: keep them and check the ledger in Tally. A later call
+that finds no answer on file shows no counters.
+`verdict_recorded` says whether the verdict was written to the journal, and
+`settled` is true only when the state is final and the verdict is recorded. With
+`verdict_recorded` false the state was judged but is not settled: call
+`post_ledger_creates` with the same `batch_id` again, which reads the book back and
+sends nothing. A later call for a sent batch repeats the read-back and never
+sends.
+
+A create whose outcome is not settled holds its ledger name, and every name that
+may be the same ledger, against a new create in every company this data folder
+holds batches for, not only its own. `post_ledger_creates` refuses such a name
+with `master_ledger_open_dispatch_overlaps` before it asks the person when it can
+read its journal just before that check. When that read fails the check is
+skipped, and the refusal then comes from the check under the journal's lock: after
+the approval, and still before anything is sent. The check under the journal's
+lock stays in every case, so a refusal can still come after an approval, and then
+the approval lapses and the next call asks the person again. The refusal says this call sent
+nothing. Its `error.hold` says what the journal showed: `held` (it names
+`blocking_batch_ids`, the batches of the refused batch's own company that hold the
+name, and `blocking_batches_other_companies`, each with its `batch_id` and
+`company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
+holder settled since the call began: post this batch again), or `journal_unread`,
+which either check can give (the journal could not be read just now, or did not
+show this batch: call again). A send of this batch recorded
+since the call began by another call is answered as `import_already_attempted`,
+with `error.hold` `send_of_this_batch_recorded_since`: call again later, which only
+reads, and create nothing by hand. For a held name, call `post_ledger_creates` with
+each blocking `batch_id`. For a batch of another company, `list_companies` shows
+only the companies loaded in Tally, so a `company_guid` not found there belongs to a
+company that is not loaded; the call reads that book back and sends nothing if the
+company is loaded, and otherwise answers to load the same companies and call again.
+Post this batch again when they are settled, and create nothing in Tally by hand
+meanwhile, because the earlier create may still be waiting in Tally and would
+overwrite it.
+
+Later calls cannot settle these states, and their batches keep holding the name: a
+read that found the name absent while the company's master mark moved; a ledger
+present with no counters, or with a field that differs; a create Tally rejected,
+once the mark moves; and the reasons `pre_image_master_missing`,
+`pre_image_unreadable` and `master_index_not_usable`. A later call judges the book
+as it then is, so a state stays unsettled only while the book stays as it was read.
+A company that is not loaded, was renamed, or whose set of loaded companies changed
+is not read back until the same companies are loaded under the same names; the next
+call then reads the book back and judges it. Only a read-back that read the book,
+found the name absent and did not settle says to create the ledger in Tally by
+hand, and then it says to look at what else changed and to make sure Tally is idle
+and answering first, because a create still waiting in Tally would overwrite a
+ledger keyed by hand; keying it may not settle the batch. An unconfirmed answer,
+the answer given when the book could not be read back after Tally answered, and
+the failure answer that says the create may have been sent each say to call again
+later, which only reads, and to create nothing in Tally by hand meanwhile. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
 address or phone number is put in an answer or a record; a GSTIN the caller
 supplied, which contains the party's PAN, is in the preview and in the batch's
 local record. The setting is a command-line setting only and is not in the MCPB

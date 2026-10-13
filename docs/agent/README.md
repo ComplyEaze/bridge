@@ -457,9 +457,15 @@ set back. With the type on "Renumber Vouchers", numbers already in the book
 changed: at the switch, when a voucher with an earlier date was entered by
 hand, and when a voucher with an earlier date was sent by import without a
 number, where the import's answer read CREATED 1, ALTERED 0 and no voucher's
-AlterID moved; a voucher dated after every other changed nothing. A batch of
-several vouchers, other voucher types, Gold, other releases and the same
-through ComplyEaze Bridge's own post are not measured. Neither is any other
+AlterID moved; a voucher dated after every other changed nothing. Later runs
+on that book (protocol reference §9.8) found that a file of two Receipts
+without numbers was numbered by date and changed four numbers, that a
+Receipt carrying a number read back the number of its place in date order,
+and that a Journal imported without a number and dated between two others
+was numbered by its date and moved the later one. A file of more than two
+vouchers, a mixed file, a Journal that carries a number or is dated after
+every other, Payment and Contra, Gold, other releases and the same through
+ComplyEaze Bridge's own post are not measured. Neither is any other
 wording, or a series that prints no sub-method: on such a book every Automatic
 type would read `absent` or `unrecognised`.
 
@@ -2038,16 +2044,20 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    number there, and the type's duplicate setting decides. Under Automatic
    numbering Tally discards a supplied number and assigns its own, so such a
    Journal is held to `Auto Retain` like a voucher without a number; it is
-   refused on a voucher type set to "Renumber Vouchers" for that reason, and
-   a numbered voucher on such a type was not itself measured. With a
+   refused on a voucher type set to "Renumber Vouchers", where Tally was seen
+   to discard the number a Receipt carried and give it the number of its
+   place in date order (protocol reference §9.8). With a
    type set to "Renumber Vouchers", numbers already in the book were seen to
    change when a voucher with an earlier date was entered by hand, and again
    when a voucher with an earlier date was sent by import without a number:
    the import's answer read CREATED 1, ALTERED 0 and no voucher's AlterID
-   moved; a voucher dated after every other changed nothing (one book, one
-   voucher type, TallyPrime 7.1 Silver). A batch of several vouchers, other
-   voucher types, Gold, other releases and the same through ComplyEaze Bridge's
-   own post are not measured. On a release, an edition or a book whose series
+   moved; a voucher dated after every other changed nothing (one book,
+   TallyPrime 7.1 Silver, Receipts; a file of two Receipts, a Receipt that
+   carried a number and a Journal imported without a number were measured
+   there too, §9.8). A file of more than two vouchers, a mixed file, a
+   Journal that carries a number or is dated after every other, Payment and
+   Contra, Gold, other releases and the same through ComplyEaze Bridge's own
+   post are not measured. On a release, an edition or a book whose series
    prints no sub-method, or words it differently, every Automatic voucher type
    refuses this way; a `masters` read of `voucher_types` shows what a book
    prints. A voucher

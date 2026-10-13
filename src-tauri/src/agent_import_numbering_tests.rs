@@ -742,7 +742,7 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
             "Auto Retain",
             "sent by import without a number",
             "the import's answer reported nothing altered",
-            "one book, one voucher type, TallyPrime 7.1 Silver",
+            "one book, TallyPrime 7.1 Silver: by import on a Receipt and a Journal, by hand on a Receipt",
             "do not add a voucher number to it",
             "do not change a voucher type's voucher numbering to get past this",
         ] {
@@ -802,7 +802,7 @@ fn the_build_and_post_descriptions_name_both_refusals_and_what_was_not_measured(
         for stated in [
             NUMBERING_NOT_AUTOMATIC,
             NUMBERING_NOT_RETAIN,
-            "one book, one voucher type, TallyPrime 7.1 Silver",
+            "one book, TallyPrime 7.1 Silver: by import on a Receipt and a Journal, by hand on a Receipt",
             "sent by import without a number",
             "the import's answer reported nothing altered",
             "the same through ComplyEaze Bridge's own post are not measured",

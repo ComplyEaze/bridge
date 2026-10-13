@@ -148,16 +148,17 @@ These changes are in source and not yet in a published build.
   is checked by `build_import_xml` too: it is written into a voucher type that reads Manual, where Tally keeps the
   number and the type's duplicate setting decides, or Automatic with `Auto Retain`, where Tally discards the number
   and assigns the next, and it is refused otherwise under the same two codes. It is refused on a voucher type set
-  to "Renumber Vouchers" because under Automatic numbering Tally was seen to discard a supplied number (measured with Auto
-  Retain), which would leave it a voucher without one; a numbered
-  voucher on such a type was not itself measured. So a build that holds only Journals carrying their own numbers,
+  to "Renumber Vouchers": there Tally was seen to discard the number a Receipt carried and give it the number of its
+  place in date order, and the later-dated Receipts' numbers went up by one. So a build that holds only Journals carrying their own numbers,
   which made no numbering read before, now makes that read: it can fail with that read's own codes, or as `pre_import_mark_unobserved` when the
   company's master mark cannot be read, and it is
   refused on a book in Education mode, as a build of vouchers without numbers is. On the desktop's Journal
   screen the refusal names the voucher type and what was read of it. The next step, and a post's message naming
   the voucher types, are sent only where `BRIDGE_AGENT_MAX_BYTES` is at least 8,192; from 4,096 up to that a refused build
-  still returns its `reason` and `refused_types`, and a refused post its code and `refused_types`. A batch, other voucher types, Gold, other
-  releases, a series not named Default and the same through ComplyEaze Bridge's own post were not measured: on a
+  still returns its `reason` and `refused_types`, and a refused post its code and `refused_types`. On a type set to "Renumber Vouchers",
+  a file of more than two vouchers, a mixed file, a Journal that carries a number or is dated after every other,
+  Payment and Contra are not measured; nor are Gold, other releases, a series not named Default and the
+  same through ComplyEaze Bridge's own post: on a
   release, an edition or a book whose series prints no sub-method, or words it differently, every Automatic voucher
   type is refused.
 - Before approval a post now reads the company's master mark and then the voucher numbering, and compares the mark

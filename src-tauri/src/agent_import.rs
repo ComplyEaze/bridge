@@ -1045,7 +1045,7 @@ impl Server {
             // that carries its own number is also written into a type
             // numbered Manual, where Tally keeps the number; under Automatic
             // numbering Tally discards it and assigns its own (protocol
-            // reference, voucher writes), so there it is held to the same
+            // reference §9.8), so there it is held to the same
             // reading as a voucher without one. A blank number counts as
             // none, and an amendment's vouchers are checked like any other.
             let vouchers = payload.vouchers.iter().map(|voucher| {

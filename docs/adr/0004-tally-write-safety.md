@@ -249,8 +249,11 @@ or an owner decision to amend the requirement instead:
    Vouchers" was seen to change numbers already in the book when a voucher with an earlier date
    was entered by hand, and again when a voucher with an earlier date was sent by import without
    a number, where the import's answer read CREATED 1, ALTERED 0 and no voucher's AlterID
-   moved, on one book and one voucher type, TallyPrime 7.1 Silver; a batch, other voucher
-   types, Gold, other releases and ComplyEaze Bridge's own post are not measured, and an absent or
+   moved, on one book, TallyPrime 7.1 Silver, where a file of two Receipts, a Receipt that
+   carried a number and one Journal imported without a number were measured too
+   (TALLY_PROTOCOL_REFERENCE §9.8); a file of more than two vouchers, a mixed file, a Journal
+   that carries a number, Payment and Contra, Gold, other releases and ComplyEaze Bridge's own
+   post are not measured, and an absent or
    unrecognised sub-method refuses too); the queue then compares
    that mark with the one its binding reads begin with, so any
    master saved during the approval wait, a voucher type included, refuses as `post_masters_moved`

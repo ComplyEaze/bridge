@@ -11,23 +11,33 @@
 //! by hand, and again when one was sent by import without a number: no
 //! voucher's AlterID moved, the company's voucher mark rose by one only, and
 //! the import's answer read CREATED 1, ALTERED 0 (one book, one voucher type,
-//! `TallyPrime` 7.1 Silver: `VOUCHER_TYPE_NUMBERING_M8R_CAPTURE_PROVENANCE.md`
-//! in the protocol crate's fixtures says where each run is kept). Not
-//! measured: a batch of several vouchers, other voucher types, Gold, other
-//! releases, and the same through this crate's own post (the imports were sent
-//! raw, in the shape its builder sends).
+//! `TallyPrime` 7.1 Silver: protocol reference §9.8 records both runs, and
+//! `VOUCHER_TYPE_NUMBERING_M8R_CAPTURE_PROVENANCE.md` in the protocol crate's
+//! fixtures says where each is kept). A file of two such Receipts was numbered
+//! by date and changed the numbers of four, and a Journal imported without a
+//! number and dated between two others was numbered by its date and moved the
+//! later one (§9.8). Not measured on such a type: a file of more than two
+//! vouchers, a mixed file, a Journal that carries a number or is dated after
+//! every other, Payment and Contra, Gold, other releases, and the same through
+//! this crate's own post (the imports were sent raw, in the shape its builder
+//! sends).
 //!
 //! So a voucher without a number is admitted only into a voucher type whose
 //! one series reads Automatic with the sub-method `Auto Retain`, whatever its
 //! duplicate setting. A voucher that carries its own number (a build's
-//! Journal can) is admitted there too, since under Automatic numbering Tally
-//! discards a supplied number and assigns its own (protocol reference, voucher
-//! writes), which leaves it a voucher without one; and into a type that reads
-//! Manual, where Tally keeps the number and the type's duplicate setting then
-//! decides. That a numbered voucher changes existing numbers on a type set to
-//! "Renumber Vouchers" is not measured: it is refused there because under
-//! Automatic numbering Tally was seen to discard a supplied number (measured
-//! with `Auto Retain`), which would leave it a voucher without one. Every other
+//! Journal can) is admitted there too, since there Tally discards a supplied
+//! number and assigns its own (protocol reference §9.8),
+//! which leaves it a voucher without one; and into a type that reads Manual,
+//! where Tally kept the number a voucher carried under either duplicate
+//! setting (a Payment with duplicates allowed, a Journal with them prevented),
+//! and what Tally then does with a number already used depends on that
+//! setting: with duplicates prevented a Journal carrying a number that a
+//! Journal already held was refused whole, and Tally's answer gave no reason
+//! (§9.8). A numbered voucher is refused on a type set to "Renumber Vouchers":
+//! there Tally discarded the number a Receipt carried and gave it the number
+//! of its place in date order, and the later-dated Receipts' numbers went up
+//! by one (§9.8), as for a voucher sent without one.
+//! Every other
 //! reading, and a type the read does not hold, refuses: a type that does not
 //! read Automatic as `import_voucher_numbering_not_automatic`, and an
 //! Automatic one whose sub-method reads `Auto Renumber`, is missing or is not
@@ -80,7 +90,7 @@ macro_rules! written_into {
 /// text for the three next steps, so a new measurement is written once.
 macro_rules! observed_and_seen {
     () => {
-        "observed says what was read, and under automatic its sub_method is auto_renumber, absent (Tally printed none) or unrecognised. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Under Automatic set to Renumber Vouchers, a voucher sent by import without a number and dated before existing vouchers was seen to change the numbers of vouchers already in the book, while the import's answer reported nothing altered; a voucher entered by hand with an earlier date did the same (one book, one voucher type, TallyPrime 7.1 Silver)."
+        "observed says what was read, and under automatic its sub_method is auto_renumber, absent (Tally printed none) or unrecognised. Under Manual voucher numbering, a voucher sent without a number was seen to take a number already used, or to be refused. Under Automatic set to Renumber Vouchers, a voucher sent by import without a number and dated before existing vouchers was seen to change the numbers of vouchers already in the book, while the import's answer reported nothing altered; a voucher entered by hand with an earlier date did the same (one book, TallyPrime 7.1 Silver: by import on a Receipt and a Journal, by hand on a Receipt)."
     };
 }
 

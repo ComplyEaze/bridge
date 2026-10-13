@@ -963,8 +963,6 @@ fn lineage_facts(
                 // (the statement parser writes no Journal, and an amendment adds
                 // no row and changes no type); it guards a journal written
                 // otherwise.
-                // Reference §9.13 records Tally accepting a Journal between two bank
-                // ledgers (PARTIAL: one synthetic company, one voucher, one run).
                 unseen.insert(txn);
             }
             continue;

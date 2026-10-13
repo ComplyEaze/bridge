@@ -1817,10 +1817,12 @@ refused as `proposals_legacy` (parse the statement again).
 - **What `matched_unconfirmed` means.** The person sees the row listed with the
   batch whose verified Contra matches it by day and amount, where the statement
   records of the two accounts do not both cover that day, and keeps the skip.
-  The row can be decided once the statement records of both accounts cover
-  that day, which needs for each account a statement whose rows begin before
-  that day and end after it (a statement that begins or ends on that day does
-  not cover it).
+  The row can be decided only once statement records of both accounts cover
+  that day: for each account that needs a statement whose rows begin before
+  that day and end after it, built and, where it books a voucher, verified (a
+  statement that begins or ends on that day does not cover it, and a day
+  blocked by a batch that holds no statement records is covered by none).
+  Until then the row stays as it is.
 - **What the records cannot see.** A batch that holds no statement records
   (built from inline vouchers, or by a release before them) can still book a
   transfer. Each Contra and statement row it holds makes the days it names (its
@@ -1857,10 +1859,12 @@ refused as `proposals_legacy` (parse the statement again).
   person can confirm only what Tally holds. The refusal is
   `withdraw_skip_paired`, and its `paired_rows` names each such batch with the
   row's state there (`paired`, `matched_unconfirmed` or
-  `other_side_unverified`). A Contra matches by an equal reference, or by the
-  same date and amount; one dated another day, or with a third leg, does not
-  match and does not refuse: verify every batch of the other account's
-  statement before naming a row.
+  `other_side_unverified`). A Contra matches a row by an equal reference, or
+  by the same date and amount where one of the two carries no reference. One
+  of the same day and amount whose reference differs from the row's is a match
+  only for a row that nothing else matches. One dated another day, or with a
+  third leg, does not match and does not refuse: verify every batch of the
+  other account's statement before naming a row.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
   build that needs the view (`transfer_view_not_established`); builds that do

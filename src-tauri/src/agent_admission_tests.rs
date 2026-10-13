@@ -1383,6 +1383,36 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         );
     }
 
+    // build_import_xml states the withdrawal rule twice: in its description and
+    // on its withdraw_skips argument. Each sentence of the rule is pinned in
+    // both, so neither text can change and leave the other behind.
+    let build = description_of("build_import_xml");
+    let argument = definitions
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|entry| entry["name"] == "build_import_xml")
+        })
+        .and_then(|tool| tool.pointer("/inputSchema/properties/withdraw_skips/description"))
+        .and_then(Value::as_str)
+        .expect("the withdraw_skips description");
+    for sentence in [
+        "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+        "Where more than one verified Contra matches, the match is also claimed by another row or booked twice, the amount reverses the same day and the match is by date, or the only match carries a different reference and is verified, ComplyEaze Bridge cannot tell which entry the row belongs to: the withdrawal is then the person's explicit choice, and the batch of every matching Contra is listed on the row in the transfers section.",
+        "While the only match is not yet verified, the withdrawal is refused and the step says to verify that entry first.",
+        "So is one with any match in a batch not yet verified, whatever the row's state: a person can confirm only what Tally holds.",
+    ] {
+        assert!(
+            build.contains(sentence),
+            "build_import_xml lost a sentence of the withdrawal rule: {sentence:?}"
+        );
+        assert!(
+            argument.contains(sentence),
+            "withdraw_skips lost a sentence of the withdrawal rule: {sentence:?}"
+        );
+    }
+
     // The stock_summary pin needs its negation: the clause before "is a stock
     // value or a total" must say "neither", or "either"/"each" would invert it.
     // The clause runs back to the nearest `.`, `,`, `:` or `;`, which keeps both

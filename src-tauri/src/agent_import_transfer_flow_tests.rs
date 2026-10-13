@@ -1110,7 +1110,7 @@ fn b_contra_read_over(directory: &Path, coverage: Value) -> Value {
     )
 }
 
-const MATCHED_UNCONFIRMED_STEP: &str = "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided once the statement records of both accounts cover this date, which needs for each account a statement whose rows begin before this date and end after it (a statement that begins or ends on this date does not cover it).";
+const MATCHED_UNCONFIRMED_STEP: &str = "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.";
 
 #[tokio::test]
 async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_the_windows_cover() {
@@ -1125,7 +1125,7 @@ async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_th
         (
             Value::Null,
             "matched_unconfirmed",
-            "No file was written and nothing was recorded. A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. The row can be decided once the statement records of both accounts cover its date, which needs for each account a statement whose rows begin before that date and end after it (a statement that begins or ends on that date does not cover it).",
+            "No file was written and nothing was recorded. A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.",
         ),
     ] {
         let directory = tempfile::tempdir().unwrap();

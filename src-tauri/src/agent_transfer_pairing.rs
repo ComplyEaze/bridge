@@ -673,7 +673,8 @@ fn differing_references(
         .copied()
         .filter(|&c| {
             // The reference test states the rule. For a skip with no candidate it changes nothing:
-            // with no reference the edge is a date edge, with an equal reference a reference edge.
+            // a Contra in reach without a reference would be a date edge, and one whose reference
+            // equals the skip's a reference edge.
             !contra_paired[c]
                 && contras[c]
                     .reference

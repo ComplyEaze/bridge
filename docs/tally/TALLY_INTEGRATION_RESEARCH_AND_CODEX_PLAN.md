@@ -1621,6 +1621,13 @@ BOM-qualified UTF-16LE/BE. A deterministic master generator preflights up to
 10,000-ledger corpus traverses the production decoder and strict ledger parser;
 an independently derived digest proves every parsed identity and accounting
 field matches the generator expectation and remains identical across encodings.
+(2026-10-13 note: the master generator described here was deleted in #1690, and
+with it the digest and the "generator expectation" in the last sentence. The
+10,000-ledger test remains in
+`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`: it builds
+its rows itself, decodes them in UTF-8, UTF-16LE and UTF-16BE, and compares each
+parsed field with the row it built, with no digest. See item 12 of
+`docs/step-by-step-roadmap.md`.)
 
 Protocol hardening rejects duplicate/misplaced export header status fields and
 DTD/processing constructs. Import result parsing accepts Tally's documented

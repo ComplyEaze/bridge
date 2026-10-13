@@ -1,0 +1,11 @@
+# 724-M8R: one line per step. Receipts as date, number, MASTERID (M), ALTERID (A); marks as ALTVCHID/ALTMSTID before -> after
+x0 | baseline (backup N2-B5 first) | 01Jul no.1 M1 A1 | marks 6/231 -> 6/231
+x1 | Receipt A 10 Jul 41.00 (Retain) | 01Jul no.1 M1 A1; 10Jul no.2 M7 A7 | marks 6/231 -> 7/231
+x2 | Receipt B 20 Jul 42.00 (Retain) | 01Jul no.1 M1 A1; 10Jul no.2 M7 A7; 20Jul no.3 M8 A8 | marks 7/231 -> 8/231
+x3 | Receipt C 5 Jul 43.00 back-dated (Retain) | 01Jul no.1 M1 A1; 10Jul no.2 M7 A7; 20Jul no.3 M8 A8; 05Jul no.4 M9 A9 | marks 8/231 -> 9/231
+x4 | type switch Retain -> Renumber Vouchers | 01Jul no.1 M1 A1; 10Jul no.3 M7 A7; 20Jul no.4 M8 A8; 05Jul no.2 M9 A9 | marks 9/231 -> 9/233
+x5 | Receipt D 3 Jul 44.00 back-dated (Renumber) | 01Jul no.1 M1 A1; 10Jul no.4 M7 A7; 20Jul no.5 M8 A8; 05Jul no.3 M9 A9; 03Jul no.2 M10 A10 | marks 9/233 -> 10/233
+x6 | Receipt E 25 Jul 45.00 (Renumber) | 01Jul no.1 M1 A1; 10Jul no.4 M7 A7; 20Jul no.5 M8 A8; 05Jul no.3 M9 A9; 03Jul no.2 M10 A10; 25Jul no.6 M11 A11 | marks 10/233 -> 11/233
+x7 | type switch Renumber -> Retain | 01Jul no.1 M1 A1; 10Jul no.2 M7 A7; 20Jul no.3 M8 A8; 05Jul no.4 M9 A9; 03Jul no.5 M10 A10; 25Jul no.6 M11 A11 | marks 11/233 -> 11/235
+x8 | Receipt F 2 Jul 46.00 back-dated (Retain) | 01Jul no.1 M1 A1; 10Jul no.2 M7 A7; 20Jul no.3 M8 A8; 05Jul no.4 M9 A9; 03Jul no.5 M10 A10; 25Jul no.6 M11 A11; 02Jul no.7 M12 A12 | marks 11/235 -> 12/235
+end | End reads | 01Jul no.1 M1 A1; 10Jul no.2 M7 A7; 20Jul no.3 M8 A8; 05Jul no.4 M9 A9; 03Jul no.5 M10 A10; 25Jul no.6 M11 A11; 02Jul no.7 M12 A12 | marks 12/235 -> 12/235

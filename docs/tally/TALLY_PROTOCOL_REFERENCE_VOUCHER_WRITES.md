@@ -162,14 +162,50 @@ without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PRE
 - **VERIFIED:** the type-level `NUMBERINGMETHOD` reads `None` for the three types set by hand and
   `Default` for the rest, and the type-level `PREVENTDUPLICATES` reads `No` on all 24, including
   Payment, whose screen says Yes. The type level is not the method and is never read for it.
-- **Observed, meaning not established:** `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series,
-  Manual ones included; `DUPLICATECONTROL` is present and empty on all 24 series.
-- **Not established:** more than one series on a type; a single series not named `Default`; `Automatic (Manual Override)` on a captured
-  response (seen on a real book on 2026-09-28, not committed); Multi-user Auto; a type created new
-  rather than altered; other releases; macOS. A type with no series or several is a typed
-  observation, not a method, and a method outside `Automatic`, `Manual` and
+- **Observed, meaning not established:** `DUPLICATECONTROL` is present and empty on all 24 series.
+  `NUMBERINGSUBMETHOD` read `Auto Retain` on all 24 series, Manual ones included; what it carries
+  was measured on 2026-10-13 (next paragraph), as were the texts of `Automatic (Manual Override)`
+  (until then seen only on a real book on 2026-09-28, not committed) and Multi-user Auto.
+- **Not established:** more than one series on a type; a single series not named `Default`; a type
+  created new rather than altered; other releases; macOS. A type with no series or several is a
+  typed observation, not a method, and a method outside `Automatic`, `Manual` and
   `Automatic (Manual Override)` is kept raw and never read as `Manual`
   (`native_voucher_type_numbering.rs`).
+
+**A save of a voucher-type screen moved the master mark, and three more settings as exported:
+verified 2026-10-13 on one book and one voucher type (PARTIAL).** On a synthetic book on Silver 7.1
+on Windows, one voucher type that held no vouchers (Contra) was saved on Tally's own screen nine
+times: first with no field changed, then with one field changed per save and each change then
+undone. The company's marks (`ALTVCHID`, `ALTMSTID`) were read after every save, and the series
+request above (1,106 bytes; 1,116 as sent, with only the company name changed) once before the
+saves and after six of the nine (branch `lab/724-m6-master-mark-answers`, `b7761256`, bridge#724;
+every marks and series answer was read with an XML parser, with its size checked against
+`CONTENT-LENGTH`). The screen labels, the licence and release, which field each save changed or
+left at its offered default, and that the type held no vouchers are from that branch's notes; no
+screenshot is on the branch.
+
+- **VERIFIED:** each of the nine saves moved `ALTMSTID` by 2 (213 to 231) and left `ALTVCHID`
+  unchanged, including the save with no field changed. In every series answer read after a save,
+  the type's own `ALTERID` equals the `ALTMSTID` read with it, and no other type's `ALTERID` moved.
+  So on this book every save of that type's screen moved `ALTMSTID`; a save of another type was not
+  measured. A moved `ALTMSTID` does not show that a setting changed.
+- **VERIFIED:** the series `NUMBERINGMETHOD` prints `Automatic (Manual Override)` and
+  `Multi-user Auto` exactly as the screen names them, in plain ASCII; Multi-user Auto was offered
+  on this Silver licence. A type switched to `Manual` with the screen's default left reads
+  `PREVENTDUPLICATES` `No`.
+- **VERIFIED:** on this type, with the method Automatic, the series `NUMBERINGSUBMETHOD` followed
+  the screen's "Numbering behaviour on insertion/deletion": `Auto Retain` for "Retain Original
+  Voucher No." and `Auto Renumber` for "Renumber Vouchers". It was the only child of the series
+  list that differed, and `NUMBERINGMETHOD` stayed `Automatic`.
+- **VERIFIED:** the type-level `NUMBERINGMETHOD` of the saved type read `Default` before the saves
+  and `None` in every series answer after them, also with the method back at Automatic. Of the
+  other 23 types, 22 read `Default` throughout and Payment, whose series already read `Manual` at
+  the first read, reads `None` throughout. This agrees with the 9 October reading above. Not
+  established: whether the save that changed nothing flips it on its own (no series answer was
+  read between it and the next save).
+- **Not established:** the same on a type that holds vouchers; what `Auto Renumber` does to numbers
+  already in the book; Gold; other releases; macOS; the same answers through ComplyEaze Bridge's
+  own read.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**

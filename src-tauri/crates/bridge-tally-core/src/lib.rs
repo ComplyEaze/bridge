@@ -232,11 +232,6 @@ pub struct CoreAccountingBatch {
     pub foreign_master_text_diagnostics: Vec<ForeignMasterTextDiagnostic>,
 }
 
-/// Safe operator warning for a committed Core Accounting window that retains
-/// master text which may render badly in a document.
-pub const FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE: &str =
-    "foreign_master_text_rendering_degraded";
-
 impl CoreAccountingBatch {
     /// The diagnostic details intentionally remain in-process so source names
     /// and identifiers cannot enter the durable operator-proof surface.

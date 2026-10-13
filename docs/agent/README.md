@@ -565,16 +565,18 @@ listed and a ledger under Suspense A/c with a credit balance was not.
 It is **not compared with any other report**: `checks` says `list_complete` and
 `amounts_against_trial_balance` are `not_checked`, so a ledger Tally did not list is not
 shown to be absent, and a listed amount is not shown to equal the ledger's closing
-balance in the trial balance (on the first book measured both did; on two more books the one ledger listed on each did too). An empty list is
+balance in the trial balance (the contributor reported that on the first book both did; on two more books the one ledger listed on each did too, with the trial balances kept on the evidence branch). An empty list is
 returned with `state` `not_established` and `reason`
 `negative_ledgers_empty_answer_is_not_a_finding`: Tally's empty answer cannot be told from
 a report that was not rendered, so it never says that no ledger is negative. A non-empty
 list is `observed`. `mask_parties` masks each `ledger` name.
 
 The report was captured for one whole financial year (1 April to 31 March) on one
-synthetic company: any other window is named in `unmeasured_in_this_answer` as
-`window_other_than_a_whole_financial_year`, and a book whose GST setting was read as on, a book with stock or several currencies,
-or optional or post-dated vouchers was not measured. A window starting before the book is
+synthetic company, and read for a whole year on two more synthetic books: any other window
+is named in `unmeasured_in_this_answer` as `window_other_than_a_whole_financial_year`.
+What GST, stock, several currencies, or optional or post-dated vouchers do to the list was
+not measured: one of the two further books holds GST ledgers and, as the evidence branch records,
+one optional voucher, and neither book's settings were read. A window starting before the book is
 `negative_ledgers_before_books`, a reversed window `invalid_date_range`, and Education mode
 `negative_ledgers_education_unqualified`. A refused answer fails the call as `negative_ledgers_read_failed`, with the specific code below in `error.cause`; `negative_ledgers_before_books`, `negative_ledgers_education_unqualified` and `negative_ledgers_period_not_honoured` are the error's own code. The answer is refused, never reinterpreted, when
 a listed ledger carries both columns, neither, a zero, or the other sign than the one

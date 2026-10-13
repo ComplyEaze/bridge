@@ -475,23 +475,10 @@ pub struct BeginBatchInput {
     pub started_at_unix_ms: i64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ObservationStatus {
-    Accepted,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObserveRecordOutcome {
     Inserted { observation_id: String },
     AlreadyPresentIdentical { observation_id: String },
-}
-
-impl ObservationStatus {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Accepted => "accepted",
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -502,16 +489,14 @@ pub struct ObservedRecordInput {
     pub identity: SourceIdentityInput,
     pub observed_at_unix_ms: i64,
     pub raw_source_sha256: String,
-    pub canonical_sha256: Option<String>,
-    pub canonical_payload: Option<Value>,
+    pub canonical_sha256: String,
+    pub canonical_payload: Value,
     pub exact_decimals: BTreeMap<String, String>,
     pub observed_alter_id: Option<String>,
-    pub status: ObservationStatus,
-    pub safe_rejection_code: Option<String>,
 }
 
 struct PreparedObservedRecord {
-    canonical_payload_json: Option<String>,
+    canonical_payload_json: String,
     exact_decimals_json: String,
 }
 
@@ -2133,23 +2118,21 @@ impl TallyMirrorRepository {
                         && stored
                             .try_get::<Option<String>, _>("canonical_sha256")?
                             .as_deref()
-                            == input.canonical_sha256.as_deref()
+                            == Some(input.canonical_sha256.as_str())
                         && stored
                             .try_get::<Option<String>, _>("canonical_payload_json")?
                             .as_deref()
-                            == prepared.canonical_payload_json.as_deref()
+                            == Some(prepared.canonical_payload_json.as_str())
                         && stored.try_get::<String, _>("exact_decimals_json")?.as_str()
                             == prepared.exact_decimals_json.as_str()
                         && stored
                             .try_get::<Option<String>, _>("observed_alter_id")?
                             .as_deref()
                             == input.observed_alter_id.as_deref()
-                        && stored.try_get::<String, _>("validation_status")?.as_str()
-                            == input.status.as_str()
+                        && stored.try_get::<String, _>("validation_status")?.as_str() == "accepted"
                         && stored
                             .try_get::<Option<String>, _>("safe_rejection_code")?
-                            .as_deref()
-                            == input.safe_rejection_code.as_deref();
+                            .is_none();
                     if !identical {
                         return Err(MirrorError::ObservationConflict);
                     }
@@ -2199,8 +2182,8 @@ impl TallyMirrorRepository {
             "INSERT INTO tally_record_observations(\
                id, batch_id, source_record_id, observed_at_unix_ms, raw_source_sha256, \
                canonical_sha256, canonical_payload_json, exact_decimals_json, observed_alter_id, \
-               validation_status, safe_rejection_code\
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+               validation_status\
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'accepted')",
         )
         .bind(&observation_id)
         .bind(&input.batch_id)
@@ -2211,8 +2194,6 @@ impl TallyMirrorRepository {
         .bind(&prepared.canonical_payload_json)
         .bind(&prepared.exact_decimals_json)
         .bind(&input.observed_alter_id)
-        .bind(input.status.as_str())
-        .bind(&input.safe_rejection_code)
         .execute(&mut **transaction)
         .await?;
         Ok(ObservedTransactionResult {
@@ -2488,12 +2469,8 @@ impl TallyMirrorRepository {
                     };
                     (
                         record_key,
-                        observation
-                            .canonical_sha256
-                            .expect("validated accepted observation"),
-                        prepared
-                            .canonical_payload_json
-                            .expect("validated accepted observation"),
+                        observation.canonical_sha256,
+                        prepared.canonical_payload_json,
                         prepared.exact_decimals_json,
                         "observed",
                         Some(observed.source_record_id),
@@ -2940,9 +2917,14 @@ impl TallyMirrorRepository {
         .fetch_one(&mut *transaction)
         .await?;
 
+        // No path in this build writes a rejected observation, but the schema
+        // still admits one; a batch that holds one is refused whatever its
+        // verification state, so the hashed count stays zero.
+        if rejected_records != 0 {
+            return Err(MirrorError::VerificationInvariant);
+        }
         if input.verification == VerificationState::Verified
             && (input.outcome != RunOutcome::Completed
-                || rejected_records != 0
                 || !input.gap_codes.is_empty()
                 || input.snapshot_sha256.is_none()
                 || input.checkpoint_after.is_none())
@@ -4315,19 +4297,6 @@ fn validate_identity(identity: &SourceIdentityInput) -> Result<(), MirrorError> 
     Ok(())
 }
 
-fn validate_observation_shape(input: &ObservedRecordInput) -> Result<(), MirrorError> {
-    match input.status {
-        ObservationStatus::Accepted
-            if input.canonical_sha256.is_some()
-                && input.canonical_payload.is_some()
-                && input.safe_rejection_code.is_none() =>
-        {
-            Ok(())
-        }
-        _ => Err(MirrorError::InvalidInput("observation_status_shape")),
-    }
-}
-
 async fn acquire_mirror_write_lock(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<(), MirrorError> {
@@ -4397,7 +4366,6 @@ fn validate_snapshot_window_membership_input(
             let (object_type, source_id) = validate_snapshot_window_record_key(record_key)?;
             if observation.batch_id != batch_id
                 || observation.object_type != object_type
-                || observation.status != ObservationStatus::Accepted
                 || ![
                     observation.identity.guid.as_deref(),
                     observation.identity.remote_id.as_deref(),
@@ -4435,17 +4403,11 @@ fn prepare_observed_record(
     validate_safe_code(&input.object_type)?;
     validate_identity(&input.identity)?;
     validate_sha256(&input.raw_source_sha256)?;
-    validate_optional_sha256(input.canonical_sha256.as_deref())?;
+    validate_sha256(&input.canonical_sha256)?;
     validate_optional_text(input.display_name.as_deref(), 512, "display_name")?;
     validate_optional_token(input.observed_alter_id.as_deref())?;
-    validate_optional_safe_code(input.safe_rejection_code.as_deref())?;
-    validate_observation_shape(input)?;
     Ok(PreparedObservedRecord {
-        canonical_payload_json: input
-            .canonical_payload
-            .as_ref()
-            .map(canonical_json)
-            .transpose()?,
+        canonical_payload_json: canonical_json(&input.canonical_payload)?,
         exact_decimals_json: validate_and_serialize_decimals(&input.exact_decimals)?,
     })
 }

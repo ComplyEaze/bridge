@@ -128,13 +128,17 @@ pending consented synthetic live qualification.
     deleted as well; see the ADR 0009 amendment.) Phase/reconciliation
     metrics, persistence, general support bundles, and measured platform
     budgets remain follow-on work.
-11. PR13B1 now has bounded deterministic voucher generators and a versioned
-    parser-only qualification receipt. Inputs are generated before measurement;
-    each sample uses a fresh worker and must match exact bytes, hashes, record
-    counts, entry counts, and derived output. The receipt structurally disclaims
-    live Tally, support, capability, accounting, runtime-cap, and performance
-    budget authority. Windowed 50k/500k, HTTP fault/cap cases, native DB/resume,
-    UI responsiveness, and reviewed baselines remain follow-on work.
+11. PR13B1 built bounded deterministic voucher generators and a versioned
+    parser-only qualification receipt. The receipt, its tool
+    (`tools/bridge-tally-qualification`) and its CI step were deleted on
+    2026-10-12 in [#1566](https://github.com/ComplyEaze/bridge/pull/1566): the
+    tool checked Bridge's parser against data the repository's own simulator
+    generated, so it proved nothing a live capture does not, and no shipped
+    build depended on it. The simulator's voucher-window generator, whose only
+    user was that tool, was deleted on 2026-10-13 in
+    [#1670](https://github.com/ComplyEaze/bridge/pull/1670) because nothing
+    called it. A new scale or performance claim needs a new design, with its
+    evidence observed live.
 12. PR13B2 binds the app to the portable bounded HTTP transport, preserves
     distinct loopback socket identities, rejects proxy/redirect/non-identity
     content encoding paths, and characterizes Content-Length, chunked,

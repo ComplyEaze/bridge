@@ -1,0 +1,496 @@
+{
+ "comment": "UPI handles the second layout prints cut short (no @ in the field). Payments of Wages from Bank A, and one of Office Expenses. Completed and joined: c02 (cut NEEMTRADER, name NEEMTRAD) by c01's NEEMTRADERS.5, whose name NEEM TRADERS starts with it once the space is removed; c04 (cut TEA, name TEAKWOOD) by c03's TEAK.9, the cut name starting with the full handle's name TEAK; c16 (cut ASHOKA, name ASENTER) by ASHOKA.3, printed under two names (c14, c15) of which the second agrees; c18, whose cut handle KADAM9 equals c17's full one; c20 (cut SHISHAM.) by the full handle c19 prints in the second layout with an @. Not completed, and counted in cut_handle_unjoined_count (7): c05 and c06 (SALCOMMON under two names; no full handle starts with it, and c25's full handle XSALCOMMON holds it without starting with it), listed together as a group; c07 and c08 (PEEPALSOLO under one name, so one payee and no group); c11 (BANYAN., which two full handles start with: a group of three payees with c09 and c10); c13 (DEODAR.7, which only c12's DEODAR.77 completes, under another name: a group of two); c24 (PALASH., which two full handles start with; it joins c22 by its name, so the group is c22's payee and c23's). c21 carries the cut handle SALCOMMON on Office Expenses: it has no row, is not counted and is in no group. Sixteen payees, four groups, the possible_same finding.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_cut-000"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_cut-001"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_cut-002"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-np_cut-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 61816,
+   "closing": -61816
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 57766,
+   "credit": 0,
+   "closing": 57766
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 4050,
+   "credit": 0,
+   "closing": 4050
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "c01",
+   "date": "2025-04-02",
+   "base_type": "Payment",
+   "narration": "UPI-NEEM TRADERS-NEEMTRADERS.5@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     101
+    ],
+    [
+     "Bank A",
+     -101
+    ]
+   ]
+  },
+  {
+   "guid": "c02",
+   "date": "2025-04-03",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/NEEMTRAD/ZZBK/NEEMTRADER/PAY",
+   "lines": [
+    [
+     "Wages",
+     299
+    ],
+    [
+     "Bank A",
+     -299
+    ]
+   ]
+  },
+  {
+   "guid": "c03",
+   "date": "2025-04-04",
+   "base_type": "Payment",
+   "narration": "UPI-TEAK-TEAK.9@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     499
+    ],
+    [
+     "Bank A",
+     -499
+    ]
+   ]
+  },
+  {
+   "guid": "c04",
+   "date": "2025-04-05",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/TEAK WOOD/ZZBK/TEA/PAY",
+   "lines": [
+    [
+     "Wages",
+     701
+    ],
+    [
+     "Bank A",
+     -701
+    ]
+   ]
+  },
+  {
+   "guid": "c05",
+   "date": "2025-04-06",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/SAL ONE/ZZBK/SALCOMMON/PAY",
+   "lines": [
+    [
+     "Wages",
+     905
+    ],
+    [
+     "Bank A",
+     -905
+    ]
+   ]
+  },
+  {
+   "guid": "c06",
+   "date": "2025-04-07",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/SAL TWO/ZZBK/SAL COMMON/PAY",
+   "lines": [
+    [
+     "Wages",
+     1094
+    ],
+    [
+     "Bank A",
+     -1094
+    ]
+   ]
+  },
+  {
+   "guid": "c07",
+   "date": "2025-04-08",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/PEEPAL/ZZBK/PEEPALSOLO/PAY",
+   "lines": [
+    [
+     "Wages",
+     1285
+    ],
+    [
+     "Bank A",
+     -1285
+    ]
+   ]
+  },
+  {
+   "guid": "c08",
+   "date": "2025-04-09",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 13/PEEPAL/ZZBK/PEEPALSOLO/PAY",
+   "lines": [
+    [
+     "Wages",
+     1495
+    ],
+    [
+     "Bank A",
+     -1495
+    ]
+   ]
+  },
+  {
+   "guid": "c09",
+   "date": "2025-04-10",
+   "base_type": "Payment",
+   "narration": "UPI-BANYAN A-BANYAN.A1@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1690
+    ],
+    [
+     "Bank A",
+     -1690
+    ]
+   ]
+  },
+  {
+   "guid": "c10",
+   "date": "2025-04-11",
+   "base_type": "Payment",
+   "narration": "UPI-BANYAN B-BANYAN.B2@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     1887
+    ],
+    [
+     "Bank A",
+     -1887
+    ]
+   ]
+  },
+  {
+   "guid": "c11",
+   "date": "2025-04-12",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/BANYAN/ZZBK/BANYAN./PAY",
+   "lines": [
+    [
+     "Wages",
+     2086
+    ],
+    [
+     "Bank A",
+     -2086
+    ]
+   ]
+  },
+  {
+   "guid": "c12",
+   "date": "2025-04-13",
+   "base_type": "Payment",
+   "narration": "UPI-DEODAR MILLS-DEODAR.77@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2270
+    ],
+    [
+     "Bank A",
+     -2270
+    ]
+   ]
+  },
+  {
+   "guid": "c13",
+   "date": "2025-04-14",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/CEDARCO/ZZBK/DEODAR.7/PAY",
+   "lines": [
+    [
+     "Wages",
+     2473
+    ],
+    [
+     "Bank A",
+     -2473
+    ]
+   ]
+  },
+  {
+   "guid": "c14",
+   "date": "2025-04-15",
+   "base_type": "Payment",
+   "narration": "UPI-ASHOKA STORES-ASHOKA.3@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     2678
+    ],
+    [
+     "Bank A",
+     -2678
+    ]
+   ]
+  },
+  {
+   "guid": "c15",
+   "date": "2025-04-16",
+   "base_type": "Payment",
+   "narration": "UPI-A S ENTERPRISE-ASHOKA.3@QQBK",
+   "lines": [
+    [
+     "Wages",
+     2868
+    ],
+    [
+     "Bank A",
+     -2868
+    ]
+   ]
+  },
+  {
+   "guid": "c16",
+   "date": "2025-04-17",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/ASENTER/ZZBK/ASHOKA/PAY",
+   "lines": [
+    [
+     "Wages",
+     3060
+    ],
+    [
+     "Bank A",
+     -3060
+    ]
+   ]
+  },
+  {
+   "guid": "c17",
+   "date": "2025-04-18",
+   "base_type": "Payment",
+   "narration": "UPI-KADAM NINE-KADAM9@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     3254
+    ],
+    [
+     "Bank A",
+     -3254
+    ]
+   ]
+  },
+  {
+   "guid": "c18",
+   "date": "2025-04-19",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/KADAMNIN/ZZBK/KADAM9/PAY",
+   "lines": [
+    [
+     "Wages",
+     3450
+    ],
+    [
+     "Bank A",
+     -3450
+    ]
+   ]
+  },
+  {
+   "guid": "c19",
+   "date": "2025-04-20",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/SHISHAMCO/ZZBK/SHISHAM.5@Z/PAY",
+   "lines": [
+    [
+     "Wages",
+     3648
+    ],
+    [
+     "Bank A",
+     -3648
+    ]
+   ]
+  },
+  {
+   "guid": "c20",
+   "date": "2025-04-21",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/SHISHAM/ZZBK/SHISHAM./PAY",
+   "lines": [
+    [
+     "Wages",
+     3848
+    ],
+    [
+     "Bank A",
+     -3848
+    ]
+   ]
+  },
+  {
+   "guid": "c21",
+   "date": "2025-04-22",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/SAL SIX/ZZBK/SALCOMMON/PAY",
+   "lines": [
+    [
+     "Office Expenses",
+     4050
+    ],
+    [
+     "Bank A",
+     -4050
+    ]
+   ]
+  },
+  {
+   "guid": "c22",
+   "date": "2025-04-23",
+   "base_type": "Payment",
+   "narration": "UPI-PALASH-PALASH.A@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     4254
+    ],
+    [
+     "Bank A",
+     -4254
+    ]
+   ]
+  },
+  {
+   "guid": "c23",
+   "date": "2025-04-24",
+   "base_type": "Payment",
+   "narration": "UPI-PALASH B-PALASH.B@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     4443
+    ],
+    [
+     "Bank A",
+     -4443
+    ]
+   ]
+  },
+  {
+   "guid": "c24",
+   "date": "2025-04-25",
+   "base_type": "Payment",
+   "narration": "TO TRANSFER-UPI/DR/5 12/PALASH/ZZBK/PALASH./PAY",
+   "lines": [
+    [
+     "Wages",
+     4634
+    ],
+    [
+     "Bank A",
+     -4634
+    ]
+   ]
+  },
+  {
+   "guid": "c25",
+   "date": "2025-04-26",
+   "base_type": "Payment",
+   "narration": "UPI-SAL NINE-XSALCOMMON@ZZBK",
+   "lines": [
+    [
+     "Wages",
+     4844
+    ],
+    [
+     "Bank A",
+     -4844
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "narration_payee_ledgers": [
+  "Wages"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

@@ -23,14 +23,6 @@ The simulators always bind an ephemeral `127.0.0.1` port. Production code does
 not depend on this crate. `Simulator` handles exactly one request;
 `SequenceSimulator` handles an explicit ordered plan of 1–64 requests.
 
-The versioned voucher generator is a separate scale-test input. It writes a
-bounded corpus one window at a time, rejects a window above the 32 MiB encoded
-body limit before touching the caller's writer, and returns only counts, byte
-length, and a domain-separated SHA-256 digest. It never turns simulator output
-into live-Tally evidence. The qualification controller pre-generates these
-windows before starting a fresh parser worker so generator memory and time are
-outside the measured process.
-
 The master generator produces up to 50,000 deterministic ledger masters with
 strict company/schema/count evidence. It preflights the selected UTF-8 or
 BOM-qualified UTF-16 wire representation against the same 32 MiB encoded-body
@@ -61,9 +53,6 @@ let simulator = Simulator::spawn(plan)?;
 - Keep transport failure separate from application failure. HTTP 200 plus
   `STATUS=0` is an application rejection, not a successful empty collection.
 - Add a deterministic assertion whenever a fixture is added.
-- Use `Fixture::InconsistentDateFilter` when a test needs a declared July
-  window whose synthetic response improperly contains a June voucher; accepting
-  that row as canonical state is always a defect.
 
 UTF-16 fixtures are derived byte-for-byte from their UTF-8 source by
 `ScenarioPlan::response_bytes`; binary duplicates are intentionally not checked

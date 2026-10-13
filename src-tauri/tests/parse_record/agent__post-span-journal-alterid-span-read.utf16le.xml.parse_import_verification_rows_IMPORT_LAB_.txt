@@ -1,0 +1,196 @@
+# fixture: agent/post-span-journal-alterid-span-read.utf16le.xml
+# parser: parse_import_verification_rows(IMPORT_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1806),
+        "amounts": Array [
+            Object {
+                "amount": String("-500.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Expense A"),
+            },
+            Object {
+                "amount": String("500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("500.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Test Party"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260711"),
+        "effective_date": String("20260711"),
+        "guid": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c6"),
+        "is_invoice": Bool(false),
+        "master_id": String("1734"),
+        "narration": String("Accrual for July electricity"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c6"),
+        "voucher_number": String("356"),
+        "voucher_type": String("Journal"),
+    },
+    Object {
+        "alter_id": Number(1807),
+        "amounts": Array [
+            Object {
+                "amount": String("-75.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Expense B"),
+            },
+            Object {
+                "amount": String("75.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("75.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Test Party"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260711"),
+        "effective_date": String("20260711"),
+        "guid": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c7"),
+        "is_invoice": Bool(false),
+        "master_id": String("1735"),
+        "narration": String("Reclass of bank charges"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c7"),
+        "voucher_number": String("357"),
+        "voucher_type": String("Journal"),
+    },
+    Object {
+        "alter_id": Number(1808),
+        "amounts": Array [
+            Object {
+                "amount": String("-75.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Expense B"),
+            },
+            Object {
+                "amount": String("75.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("75.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Test Party"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260711"),
+        "effective_date": String("20260711"),
+        "guid": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c8"),
+        "is_invoice": Bool(false),
+        "master_id": String("1736"),
+        "narration": String("Reclass of bank charges"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c8"),
+        "voucher_number": String("358"),
+        "voucher_type": String("Journal"),
+    },
+    Object {
+        "alter_id": Number(1809),
+        "amounts": Array [
+            Object {
+                "amount": String("-120.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-120.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Party"),
+            },
+            Object {
+                "amount": String("120.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Test Expense A"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260711"),
+        "effective_date": String("20260711"),
+        "guid": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c9"),
+        "is_invoice": Bool(false),
+        "master_id": String("1737"),
+        "narration": String("Reversal of excess accrual"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("17a10910-773c-42c6-bd66-7bba9a392536-000006c9"),
+        "voucher_number": String("359"),
+        "voucher_type": String("Journal"),
+    },
+    Object {
+        "alter_id": Number(1810),
+        "amounts": Array [
+            Object {
+                "amount": String("-300.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Expense A"),
+            },
+            Object {
+                "amount": String("-200.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Test Expense B"),
+            },
+            Object {
+                "amount": String("500.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("500.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Test Party"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260711"),
+        "effective_date": String("20260711"),
+        "guid": String("17a10910-773c-42c6-bd66-7bba9a392536-000006ca"),
+        "is_invoice": Bool(false),
+        "master_id": String("1738"),
+        "narration": String("Split of a shared cost"),
+        "optional": Bool(false),
+        "party": Null,
+        "remote_id": String("17a10910-773c-42c6-bd66-7bba9a392536-000006ca"),
+        "voucher_number": String("360"),
+        "voucher_type": String("Journal"),
+    },
+])

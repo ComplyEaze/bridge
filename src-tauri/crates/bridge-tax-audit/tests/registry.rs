@@ -7,7 +7,9 @@
 
 mod common;
 
+use bridge_tax_audit::books_examined::CallerNamedDocument;
 use bridge_tax_audit::compare::compare;
+use bridge_tax_audit::documents::BankStatementLoad;
 use bridge_tax_audit::registry::{self, CallerData, PORTED};
 use bridge_tax_audit::rules_for;
 
@@ -24,8 +26,18 @@ fn caller(id: &str) -> CallerData {
             );
         }
         "books_examined" => {
-            c.documents_read =
-                registry::documents_read_from_json(&json("synthetic-documents-read.json")).unwrap();
+            // The golden's "GSTR-2B, GSTR-1, Form 26AS, Bank statement": GSTR-2B named, the rest
+            // listed from the documents held.
+            c.named_documents = [CallerNamedDocument::Gstr2b].into();
+            c.turnover_inputs.gstr1 =
+                registry::turnover_inputs_from_json(&json("synthetic-turnover-inputs.json"))
+                    .unwrap()
+                    .gstr1;
+            c.traces.form26as = bridge_tax_audit::documents::traces_documents_from_json(&json(
+                "synthetic-traces-documents.json",
+            ))
+            .unwrap()
+            .form26as;
         }
         "applicability_44ab" => {
             c.turnover_inputs =
@@ -35,8 +47,12 @@ fn caller(id: &str) -> CallerData {
         _ => {}
     }
     // `high_value_register` takes both documents, optionally; its golden is made with both.
-    if matches!(id, "bank_reconciliation" | "high_value_register") {
-        c.bank_statement = Some(
+    // `books_examined` lists the statement.
+    if matches!(
+        id,
+        "bank_reconciliation" | "books_examined" | "high_value_register"
+    ) {
+        c.bank_statement = BankStatementLoad::Read(
             bridge_tax_audit::documents::bank_statement_from_json(&json(
                 "synthetic-bank-statement.json",
             ))
@@ -150,7 +166,7 @@ fn the_registry_passes_a_refused_statement_reason_to_the_coverage_figure() {
         coverage(&c),
         "no bank statement supplied for this engagement"
     );
-    c.bank_statement_refused = Some("has no rows".to_string());
+    c.bank_statement = BankStatementLoad::Refused("has no rows".to_string());
     assert_eq!(
         coverage(&c),
         "the bank statement supplied was refused (it has no rows)"
@@ -162,9 +178,9 @@ fn the_registry_passes_a_refused_statement_reason_to_the_coverage_figure() {
     );
 }
 
-/// `bank_reconciliation`, as the registry passes the caller's two statement inputs: a refused
-/// statement (no document) gives the module's refused result with the reader's reason, as the
-/// reference's pack gives it; neither, or both, is refused as a caller error.
+/// `bank_reconciliation`, as the registry passes the caller's statement: a refused one gives the
+/// module's refused result with the reader's reason, as the reference's pack gives it; none
+/// supplied is refused as a caller error; one that was read is reconciled.
 #[test]
 fn the_registry_passes_a_refused_statement_reason_to_bank_reconciliation() {
     let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
@@ -175,7 +191,7 @@ fn the_registry_passes_a_refused_statement_reason_to_bank_reconciliation() {
         run(&c),
         Err(bridge_tax_audit::error::AuditError::Config(_))
     ));
-    c.bank_statement_refused = Some("declares no opening balance".to_string());
+    c.bank_statement = BankStatementLoad::Refused("declares no opening balance".to_string());
     let dump = run(&c).unwrap();
     let figures: Vec<(&str, &str)> = dump["figures"]
         .as_array()
@@ -195,8 +211,15 @@ fn the_registry_passes_a_refused_statement_reason_to_bank_reconciliation() {
         "bank_reconciliation/statement_refused"
     );
     c.bank_statement = caller("bank_reconciliation").bank_statement;
-    assert!(matches!(
-        run(&c),
-        Err(bridge_tax_audit::error::AuditError::Config(_))
-    ));
+    let dump = run(&c).unwrap();
+    let ids: Vec<&str> = dump["figures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["id"].as_str().unwrap())
+        .collect();
+    assert!(
+        ids.len() > 1 && !ids.contains(&"bank_reconciliation.statement_refused_reason"),
+        "a statement that was read is reconciled, not refused"
+    );
 }

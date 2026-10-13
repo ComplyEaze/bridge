@@ -1,0 +1,341 @@
+# fixture: tests/fixtures/agent/native-outstandings-probe-b-bills-payable.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20260331)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "W1 Debtor 02",
+        reference: "W1-INV-00085",
+        bill_date: TallyDate(
+            "20250405",
+        ),
+        due_date: TallyDate(
+            "20250420",
+        ),
+        closing_balance: ExactDecimal(
+            "82.92",
+        ),
+        tally_overdue_days: Some(
+            345,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 03",
+        reference: "W1-INV-00170",
+        bill_date: TallyDate(
+            "20250409",
+        ),
+        due_date: TallyDate(
+            "20250509",
+        ),
+        closing_balance: ExactDecimal(
+            "145.81",
+        ),
+        tally_overdue_days: Some(
+            326,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 04",
+        reference: "W1-INV-00255",
+        bill_date: TallyDate(
+            "20250413",
+        ),
+        due_date: TallyDate(
+            "20250528",
+        ),
+        closing_balance: ExactDecimal(
+            "208.71",
+        ),
+        tally_overdue_days: Some(
+            307,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 05",
+        reference: "W1-INV-00340",
+        bill_date: TallyDate(
+            "20250417",
+        ),
+        due_date: TallyDate(
+            "20250417",
+        ),
+        closing_balance: ExactDecimal(
+            "271.61",
+        ),
+        tally_overdue_days: Some(
+            348,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 06",
+        reference: "W1-INV-00425",
+        bill_date: TallyDate(
+            "20250422",
+        ),
+        due_date: TallyDate(
+            "20250507",
+        ),
+        closing_balance: ExactDecimal(
+            "334.50",
+        ),
+        tally_overdue_days: Some(
+            328,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 07",
+        reference: "W1-INV-00510",
+        bill_date: TallyDate(
+            "20250426",
+        ),
+        due_date: TallyDate(
+            "20250526",
+        ),
+        closing_balance: ExactDecimal(
+            "397.40",
+        ),
+        tally_overdue_days: Some(
+            309,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 08",
+        reference: "W1-INV-00595",
+        bill_date: TallyDate(
+            "20250430",
+        ),
+        due_date: TallyDate(
+            "20250614",
+        ),
+        closing_balance: ExactDecimal(
+            "460.32",
+        ),
+        tally_overdue_days: Some(
+            290,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 09",
+        reference: "W1-INV-00680",
+        bill_date: TallyDate(
+            "20250504",
+        ),
+        due_date: TallyDate(
+            "20250504",
+        ),
+        closing_balance: ExactDecimal(
+            "523.22",
+        ),
+        tally_overdue_days: Some(
+            331,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 10",
+        reference: "W1-INV-00765",
+        bill_date: TallyDate(
+            "20250509",
+        ),
+        due_date: TallyDate(
+            "20250524",
+        ),
+        closing_balance: ExactDecimal(
+            "586.11",
+        ),
+        tally_overdue_days: Some(
+            311,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 11",
+        reference: "W1-INV-00850",
+        bill_date: TallyDate(
+            "20250513",
+        ),
+        due_date: TallyDate(
+            "20250612",
+        ),
+        closing_balance: ExactDecimal(
+            "649.01",
+        ),
+        tally_overdue_days: Some(
+            292,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 12",
+        reference: "W1-INV-00935",
+        bill_date: TallyDate(
+            "20250517",
+        ),
+        due_date: TallyDate(
+            "20250701",
+        ),
+        closing_balance: ExactDecimal(
+            "711.91",
+        ),
+        tally_overdue_days: Some(
+            273,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 01",
+        reference: "W1-INV-01020",
+        bill_date: TallyDate(
+            "20250521",
+        ),
+        due_date: TallyDate(
+            "20250521",
+        ),
+        closing_balance: ExactDecimal(
+            "774.80",
+        ),
+        tally_overdue_days: Some(
+            314,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 02",
+        reference: "W1-INV-01105",
+        bill_date: TallyDate(
+            "20250526",
+        ),
+        due_date: TallyDate(
+            "20250610",
+        ),
+        closing_balance: ExactDecimal(
+            "837.70",
+        ),
+        tally_overdue_days: Some(
+            294,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 03",
+        reference: "W1-INV-01190",
+        bill_date: TallyDate(
+            "20250530",
+        ),
+        due_date: TallyDate(
+            "20250629",
+        ),
+        closing_balance: ExactDecimal(
+            "900.62",
+        ),
+        tally_overdue_days: Some(
+            275,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 04",
+        reference: "W1-INV-01275",
+        bill_date: TallyDate(
+            "20250603",
+        ),
+        due_date: TallyDate(
+            "20250718",
+        ),
+        closing_balance: ExactDecimal(
+            "963.51",
+        ),
+        tally_overdue_days: Some(
+            256,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 05",
+        reference: "W1-INV-01360",
+        bill_date: TallyDate(
+            "20250607",
+        ),
+        due_date: TallyDate(
+            "20250607",
+        ),
+        closing_balance: ExactDecimal(
+            "1026.41",
+        ),
+        tally_overdue_days: Some(
+            297,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 06",
+        reference: "W1-INV-01445",
+        bill_date: TallyDate(
+            "20250612",
+        ),
+        due_date: TallyDate(
+            "20250627",
+        ),
+        closing_balance: ExactDecimal(
+            "1089.31",
+        ),
+        tally_overdue_days: Some(
+            277,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 07",
+        reference: "W1-INV-01530",
+        bill_date: TallyDate(
+            "20250616",
+        ),
+        due_date: TallyDate(
+            "20250716",
+        ),
+        closing_balance: ExactDecimal(
+            "1152.21",
+        ),
+        tally_overdue_days: Some(
+            258,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 08",
+        reference: "W1-INV-01615",
+        bill_date: TallyDate(
+            "20250620",
+        ),
+        due_date: TallyDate(
+            "20250804",
+        ),
+        closing_balance: ExactDecimal(
+            "1215.10",
+        ),
+        tally_overdue_days: Some(
+            239,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 09",
+        reference: "W1-INV-01700",
+        bill_date: TallyDate(
+            "20250624",
+        ),
+        due_date: TallyDate(
+            "20250624",
+        ),
+        closing_balance: ExactDecimal(
+            "1278.00",
+        ),
+        tally_overdue_days: Some(
+            280,
+        ),
+    },
+    NativeBillRow {
+        party: "W1 Debtor 10",
+        reference: "W1-INV-01785",
+        bill_date: TallyDate(
+            "20250629",
+        ),
+        due_date: TallyDate(
+            "20250714",
+        ),
+        closing_balance: ExactDecimal(
+            "1340.92",
+        ),
+        tally_overdue_days: Some(
+            260,
+        ),
+    },
+])

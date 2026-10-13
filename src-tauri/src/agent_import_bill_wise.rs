@@ -18,7 +18,7 @@ use super::{
     party_name, EntrySide, ImportCompanyTuple, ImportEntry, ImportPayload, ImportVoucher,
     VoucherType,
 };
-use bridge_tally_core::ExactDecimal;
+use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::{BillWiseFlag, StandardLedgerCatalogV2};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -109,7 +109,7 @@ pub(super) fn named_ledgers(payload: &ImportPayload) -> BTreeSet<&str> {
 pub(super) struct PartyRow {
     pub(super) bridge_txn_id: String,
     pub(super) voucher_type: VoucherType,
-    pub(super) date: String,
+    pub(super) date: TallyDate,
     pub(super) entries: Vec<(EntrySide, String)>,
 }
 
@@ -216,7 +216,7 @@ pub(super) fn batch_content_digest(vouchers: &[ImportVoucher]) -> [u8; 32] {
             entries,
         } = voucher;
         encoder.field(bridge_txn_id.as_bytes());
-        encoder.field(date.as_bytes());
+        encoder.field(date.as_str().as_bytes());
         encoder.field(voucher_type.as_str().as_bytes());
         encoder.optional(narration.as_deref());
         encoder.optional(reference.as_deref());
@@ -262,7 +262,12 @@ pub(super) fn party_digest(context: &DigestContext<'_>, party: &BillWiseParty) -
         company_number,
         books_from,
     } = context.company;
-    for field in [name, guid, company_number, books_from] {
+    for field in [
+        name.as_str(),
+        guid.as_str(),
+        company_number.as_str(),
+        books_from.as_str(),
+    ] {
         encoder.field(field.as_bytes());
     }
     encoder.field(context.endpoint_origin.as_bytes());
@@ -273,7 +278,7 @@ pub(super) fn party_digest(context: &DigestContext<'_>, party: &BillWiseParty) -
     for row in &party.rows {
         encoder.field(row.bridge_txn_id.as_bytes());
         encoder.field(row.voucher_type.as_str().as_bytes());
-        encoder.field(row.date.as_bytes());
+        encoder.field(row.date.as_str().as_bytes());
         encoder.count(row.entries.len());
         for (side, amount) in &row.entries {
             encoder.field(side_text(side));

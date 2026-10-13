@@ -1,0 +1,14 @@
+# fixture: tests/fixtures/note-days/shape_lab_currencies_1_response.utf16le.xml
+# parser: parse_company_currency
+# source: captured
+Ok(CompanyCurrency {
+    symbol: "USD",
+    mailing_name: "US Dollar",
+    currency_count: 2,
+    decimal_places: 2,
+    is_inr: false,
+    names: [
+        "USD",
+        "₹",
+    ],
+})

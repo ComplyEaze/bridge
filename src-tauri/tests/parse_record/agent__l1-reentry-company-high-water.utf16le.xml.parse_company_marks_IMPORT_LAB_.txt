@@ -1,0 +1,7 @@
+# fixture: agent/l1-reentry-company-high-water.utf16le.xml
+# parser: parse_company_marks(IMPORT_LAB)
+# source: captured
+Ok((
+    1790,
+    234,
+))

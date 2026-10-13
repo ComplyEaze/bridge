@@ -1,0 +1,22 @@
+# fixture: ../tally-protocol-simulator/fixtures/import_counters.xml
+# parser: parse_import_result
+# source: synthetic: not evidence of what Tally sends
+Ok(TallyImportResult {
+    created: 2,
+    altered: 3,
+    deleted: 1,
+    ignored: 0,
+    errors: 0,
+    cancelled: 0,
+    exceptions: 0,
+    line_error_count: 0,
+    counter_presence: TallyImportCounterPresence {
+        created: true,
+        altered: true,
+        deleted: true,
+        ignored: true,
+        errors: true,
+        cancelled: true,
+        exceptions: true,
+    },
+})

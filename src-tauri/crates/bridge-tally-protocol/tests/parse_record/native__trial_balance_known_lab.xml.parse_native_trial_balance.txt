@@ -1,0 +1,137 @@
+# fixture: tests/fixtures/native/trial_balance_known_lab.xml
+# parser: parse_native_trial_balance
+# source: captured
+Ok(NativeTrialBalance {
+    rows: [
+        NativeTrialBalanceRow {
+            name: "Ageing Bank",
+            guid: "eebb9a9f-1679-4468-9e8f-814c729674cb-000000d1",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "Ageing Customer A",
+            guid: "eebb9a9f-1679-4468-9e8f-814c729674cb-000000ce",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-7000.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-4777.00",
+                ),
+            ),
+            credit: Present(
+                ExactDecimal(
+                    "4500.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "-7277.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Ageing Customer B",
+            guid: "eebb9a9f-1679-4468-9e8f-814c729674cb-000000cf",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "2600.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "1200.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "3800.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Ageing Sales",
+            guid: "eebb9a9f-1679-4468-9e8f-814c729674cb-000000d2",
+            parent: Returned(
+                "Sales Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "4027.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "4027.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Cash",
+            guid: "eebb9a9f-1679-4468-9e8f-814c729674cb-0000001f",
+            parent: Returned(
+                "Cash-in-Hand",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-2600.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-4950.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-7550.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Profit & Loss A/c",
+            guid: "eebb9a9f-1679-4468-9e8f-814c729674cb-0000001e",
+            parent: Returned(
+                "�#4; Primary",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "7000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "7000.00",
+                ),
+            ),
+        },
+    ],
+})

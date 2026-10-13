@@ -1,0 +1,266 @@
+# fixture: tests/fixtures/native/ledger_snapshot_validation_lab.xml
+# parser: parse_native_ledger_snapshot
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "BVL Alpha Traders",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-33333.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL Beta Supplies",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-33333.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-33333.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-33333.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL Delta Mixed",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-55555.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL Delta Mixed Payable",
+        parent: Some(
+            "Sundry Creditors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "66666.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL Gamma Opening",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-44444.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-44444.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-44444.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL Purchase Expense",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-66666.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL Purchases",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "=BVL Zeta Formula",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-88888.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "BVL ???????? ????????",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-77777.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "188887.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Purchase",
+        parent: Some(
+            "Purchase Accounts",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+    LedgerSnapshotEntry {
+        name: "Sales",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "255553.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: None,
+    },
+])

@@ -1,0 +1,15 @@
+# fixture: ../tally-protocol-simulator/fixtures/normal_export.xml
+# parser: parse_ledgers
+# source: synthetic: not evidence of what Tally sends
+Ok([
+    TallyLedger {
+        name: "BRIDGE SYNTHETIC LEDGER",
+        parent: Returned(
+            "BRIDGE SYNTHETIC GROUP",
+        ),
+        party_gstin: NotObserved,
+        opening_balance: Some(
+            "-1180.00",
+        ),
+    },
+])

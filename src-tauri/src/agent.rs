@@ -43,6 +43,10 @@ use company::*;
 mod cash_flow;
 #[path = "agent_changes.rs"]
 mod changes;
+#[path = "agent_company_features.rs"]
+mod company_features;
+#[path = "agent_gst_status.rs"]
+mod gst_status;
 #[path = "agent_headline.rs"]
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
@@ -82,6 +86,8 @@ use voucher_summary::{SummaryGroup, SummaryRequest};
 mod movement;
 #[path = "agent_register.rs"]
 mod register;
+#[path = "agent_statement_tie_out.rs"]
+mod statement_tie_out;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -105,6 +111,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
+#[path = "agent_read_cost_preview.rs"]
+mod read_cost_preview;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -795,6 +803,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(check.code());
         }
+        if let Some(features) = cause
+            .downcast_ref::<bridge_tally_protocol::native_company_features::NativeCompanyFeaturesError>()
+        {
+            return Some(features.code());
+        }
         if let Some(outstandings) =
             cause.downcast_ref::<bridge_tally_protocol::native_outstandings::NativeOutstandingsError>()
         {
@@ -847,7 +860,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "terms_not_accepted" => Some(
             "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
              them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
-             extension settings and turn on \"I accept the ComplyEaze Bridge Terms of Use\" \
+             extension settings and tick \"I accept the ComplyEaze Bridge Terms of Use\" \
              there, then quit Claude completely and reopen it so ComplyEaze Bridge starts again. Nothing \
              was read from Tally.",
         ),
@@ -857,6 +870,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              can be written; if the file is damaged, move it aside and ComplyEaze Bridge will record your \
              acceptance again. Then quit Claude completely and reopen it. Nothing was read from \
              Tally.",
+        ),
+        "statement_password_file_permissions" => Some(
+            "The password file is not private to you: someone else may be able to read or change \
+             it, so ComplyEaze Bridge did not read the password and parsed nothing. On a Mac, \
+             turn off the file's group and other permissions (chmod 600). On Windows, make a new \
+             copy of it in a folder of your own on this computer, then delete the original: moving \
+             it keeps who can read it. Then run the parse again.",
         ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
@@ -926,6 +946,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "`as_of` selects the date `party_gstin` is read as of, which only \
              fields=compliance returns. Pass fields=compliance, or drop `as_of`: a basic \
              read's opening balance is dated by `opening_balance_as_of`, not by `as_of`.",
+        ),
+        "ledger_masters_gst_details_requires_compliance" => Some(
+            "`include_gst_details` adds each ledger's dated GST rate details, which only \
+             fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
         ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
@@ -1194,10 +1218,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              readers rewrite exactly that sequence before parsing, so a voucher number \
              carrying it could never be confirmed as posted, and a native post of a narration \
              carrying it could never be bound to the voucher it created, so never confirmed \
-             either. Remove that sequence from the voucher number or narration and build the \
-             batch again with build_import_xml: a saved batch cannot be changed, and \
-             post_import refuses one saved with such a narration. The reference may carry it \
-             freely.",
+             either. A narration is also refused when it holds a character that draws nothing \
+             (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the \
+             prepended concatenation marks). Remove that sequence or character from the \
+             voucher number or narration and build the batch again with build_import_xml (for \
+             proposals from an earlier parse_bank_statement, run parse_bank_statement again \
+             first): a saved batch cannot be changed, and post_import refuses one saved with \
+             such a narration. The reference may carry either freely.",
         ),
         // Same shared-code shape as voucher_text_invalid, for a ledger name
         // instead of the voucher number.
@@ -1375,6 +1402,23 @@ impl ArgumentRepair {
     }
 }
 
+/// The next step when no response answered a request (#1458): the two reasons a person meets
+/// first, Tally not running and the hold-back that follows repeated failures. It is consulted
+/// last, so a code's or a typed cause's own next step wins, and it is a function of its own,
+/// not arms of `refusal_remediation`, which is also asked with a code or a typed cause. The
+/// other unanswered reasons name no step yet.
+fn unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "endpoint_unreachable" => Some(
+            "Tell the user to confirm Tally is running with the XML server enabled on the port named in this error. Do not repeat the request until they have.",
+        ),
+        "endpoint_circuit_cooldown" => Some(
+            "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -1504,6 +1548,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -1767,6 +1815,9 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
+                    })
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
@@ -2099,7 +2150,9 @@ impl Server {
             }
             "cash_flow" => self.cash_flow(args).await,
             "changed_since" => self.changed_since(args).await,
+            "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
+            "gst_status" => self.gst_status(args).await,
             "ledger_masters" => self.ledger_masters(args).await,
             "ledger_movement" => self.ledger_movement(args).await,
             "list_companies" => {
@@ -2127,6 +2180,7 @@ impl Server {
             "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "sales_register" => self.register(register::RegisterKind::Sales, args).await,
+            "statement_tie_out" => self.statement_tie_out(args).await,
             "stock_summary" => self.stock_summary(args).await,
             "tally_status" => {
                 let (result, evidence) = self.status().await?;
@@ -2141,6 +2195,7 @@ impl Server {
             "validate_masters" => self.validate_masters(args).await,
             "verify_import" => self.verify_import(args).await,
             "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_read_cost" => self.voucher_read_cost(args).await,
             "voucher_schema" => self.voucher_schema().map_err(Into::into),
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
@@ -2581,8 +2636,10 @@ fn corroborate_empty_voucher_window(
     if !widened_rows.is_empty() {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
-        // response, so they cannot promote the original empty window.
-        return Ok((true, Some("nonempty_uncorroborated")));
+        // response, so they cannot promote the original empty window. The
+        // reason names the wider read as the nonempty one: the window's own
+        // read found nothing.
+        return Ok((true, Some("empty_window_wider_read_nonempty")));
     }
     match company_high_water {
         Some(0) => Ok((false, Some("company_has_no_vouchers"))),
@@ -2684,6 +2741,15 @@ fn optional_string(args: &Value, key: &str) -> Result<Option<String>, String> {
     match args.get(key) {
         None => Ok(None),
         Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("argument_invalid:{key}")),
+    }
+}
+/// An optional argument that must be a real JSON boolean: a string or a number
+/// is `argument_invalid:<key>`, never read as true or false.
+fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
+    match args.get(key) {
+        None => Ok(None),
+        Some(Value::Bool(value)) => Ok(Some(*value)),
         Some(_) => Err(format!("argument_invalid:{key}")),
     }
 }
@@ -2851,6 +2917,9 @@ fn attach_build_egress_failure(response: &mut Value) -> bool {
     true
 }
 
+#[cfg(test)]
+#[path = "agent_parse_record_tests.rs"]
+mod parse_record_tests;
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod tests;

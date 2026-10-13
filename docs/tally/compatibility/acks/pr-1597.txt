@@ -1,0 +1,4 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+reviewer: lamemustafa

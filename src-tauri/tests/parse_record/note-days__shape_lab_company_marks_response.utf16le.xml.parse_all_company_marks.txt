@@ -1,0 +1,11 @@
+# fixture: note-days/shape_lab_company_marks_response.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE SHAPE LAB",
+        guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+        vouchers: 111,
+        masters: 289,
+    },
+])

@@ -1,0 +1,155 @@
+# fixture: tests/fixtures/builtin_cash_flow_probe_b_fy_live.utf16le.xml
+# parser: parse_native_cash_flow(20250401..20260331)
+# source: captured
+Ok(NativeCashFlow {
+    rows: [
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 4,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-3864.02",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-3864.02",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 5,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-1786801.00",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-1786801.00",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 6,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-5472348.20",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-5472348.20",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 7,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-9299416.24",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-9299416.24",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 8,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-1413551.76",
+                ),
+            ),
+            credit: Empty,
+            closing: Present(
+                ExactDecimal(
+                    "-1413551.76",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 9,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 10,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 11,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2025,
+                month: 12,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 1,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 2,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 3,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+    ],
+})

@@ -1,0 +1,218 @@
+{
+ "comment": "Names that match nothing, or match only as written. narration_payee_ledgers lists Wages, Ghost Wages (no ledger master), loading charges (the master is Loading Charges), Wages with a trailing space, and No Such Ledger: configured_ledgers_count is 5. The bank ledgers given are Bank A, Ghost Bank (no master) and bank b od (the master is Bank B OD). m01 debits Ghost Wages: read by name, a payment to ALPHA TRADERS. m02 debits Ghost Advances, a ledger with no master: counted as ALPHA TRADERS' debit to another ledger and cited as a ledger, which the result check EVID-1 reports. m03 is paid from Ghost Bank: a bank payment, to BETA STORES. m04 pays Loading Charges: not read, since the listed name differs in case. m05 is paid from Bank B OD: not a bank payment (not_through_bank_total), since the name given differs in case. The book check MAP-0 reports the three ledgers with no master.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Bank OD A/c": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-np_names-000"
+  },
+  {
+   "name": "Bank B OD",
+   "chain": [
+    "Bank OD A/c",
+    "Loans (Liability)"
+   ],
+   "guid": "edge-np_names-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-np_names-002"
+  },
+  {
+   "name": "Wages",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_names-003"
+  },
+  {
+   "name": "Loading Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-np_names-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 16730,
+   "closing": -16730
+  },
+  {
+   "ledger": "Bank B OD",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2750,
+   "closing": -2750
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Wages",
+   "opening": 0,
+   "debit": 5920,
+   "credit": 0,
+   "closing": 5920
+  },
+  {
+   "ledger": "Loading Charges",
+   "opening": 0,
+   "debit": 4390,
+   "credit": 0,
+   "closing": 4390
+  },
+  {
+   "ledger": "Ghost Advances",
+   "opening": 0,
+   "debit": 7130,
+   "credit": 0,
+   "closing": 7130
+  },
+  {
+   "ledger": "Ghost Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 3170,
+   "closing": -3170
+  },
+  {
+   "ledger": "Ghost Wages",
+   "opening": 0,
+   "debit": 5210,
+   "credit": 0,
+   "closing": 5210
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "m01",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-WAGES",
+   "lines": [
+    [
+     "Ghost Wages",
+     5210
+    ],
+    [
+     "Bank A",
+     -5210
+    ]
+   ]
+  },
+  {
+   "guid": "m02",
+   "date": "2025-05-03",
+   "base_type": "Payment",
+   "narration": "UPI-ALPHA TRADERS-ADVANCE",
+   "lines": [
+    [
+     "Ghost Advances",
+     7130
+    ],
+    [
+     "Bank A",
+     -7130
+    ]
+   ]
+  },
+  {
+   "guid": "m03",
+   "date": "2025-05-04",
+   "base_type": "Payment",
+   "narration": "UPI-BETA STORES-WAGES",
+   "lines": [
+    [
+     "Wages",
+     3170
+    ],
+    [
+     "Ghost Bank",
+     -3170
+    ]
+   ]
+  },
+  {
+   "guid": "m04",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "narration": "UPI-GAMMA MILLS-LOADING",
+   "lines": [
+    [
+     "Loading Charges",
+     4390
+    ],
+    [
+     "Bank A",
+     -4390
+    ]
+   ]
+  },
+  {
+   "guid": "m05",
+   "date": "2025-05-06",
+   "base_type": "Payment",
+   "narration": "UPI-DELTA WORKS-WAGES",
+   "lines": [
+    [
+     "Wages",
+     2750
+    ],
+    [
+     "Bank B OD",
+     -2750
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank A",
+  "Ghost Bank",
+  "bank b od"
+ ],
+ "narration_payee_ledgers": [
+  "Wages",
+  "Ghost Wages",
+  "loading charges",
+  "Wages ",
+  "No Such Ledger"
+ ],
+ "tests": [
+  "tds_payees",
+  "narration_payees"
+ ]
+}

@@ -132,34 +132,6 @@ if (!bundleOs || seamControl.match(/^        os: .*$/m)?.[0] !== bundleOs) {
   failures.push("seam-control must cover every platform bundle-smoke builds");
 }
 
-// native-legacy runs the legacy-feature guard, tests and lint beside native (they were native's last
-// steps). Its whole text is pinned: a changed line is a changed test or lint. It also restores native's
-// Windows dependency cache without saving it. rust-cache keys on shared-key, the workspaces, the env vars
-// it hashes and the CARGO* environment, so a difference in one of them is not a failure but a cold build
-// on every run. The shared-key expression, the workspaces, the env-var list and the two CARGO_PROFILE
-// lines are therefore required to appear in both jobs. (Other rust-cache inputs and step order are not
-// compared here; native's own digest pins its side, so changing them needs both digests edited on purpose.)
-const nativeJob = jobBlock(workflow, "native");
-const legacyJob = jobBlock(workflow, "native-legacy");
-// The block runs to the next job key, so comment lines that introduce the next job are trimmed off.
-const legacyDigest = sha256(legacyJob.replace(/(?:\n(?: {0,2}#.*)?)+$/, ""));
-if (legacyDigest !== "32585bd0ee2c51fc34de2f736facf3c3866659695e0f529ecf989a99c73a020d") {
-  failures.push(`native-legacy changed; its digest is now ${legacyDigest}`);
-}
-const cacheKey = (job) => job.match(/^          shared-key: .*?(format\('native-deps-v1-\{0\}', hashFiles\('[^']+'\)\))/m)?.[1];
-if (!cacheKey(nativeJob) || cacheKey(legacyJob) !== cacheKey(nativeJob)) {
-  failures.push("native-legacy must restore native's Windows dependency cache: its shared-key must use native's key expression");
-}
-for (const input of [
-  "          workspaces: |\n            src-tauri -> target\n            tools -> target",
-  "ImageOS ImageVersion OPENSSL LIBCLANG",
-  "      CARGO_PROFILE_DEV_DEBUG: '0'\n      CARGO_PROFILE_TEST_DEBUG: '0'",
-]) {
-  if (!nativeJob.includes(input) || !legacyJob.includes(input)) {
-    failures.push(`native-legacy and native must share this cache input: ${input.trim().split("\n")[0].trim()}`);
-  }
-}
-
 // A step that must run is pinned whole: a pinned command line alone still passes with a step-level
 // `if`, a `continue-on-error`, an `|| true`, or the command kept only in a comment. Everything that
 // runs in its job before it can also change what it sees, so each job is pinned too, by SHA-256
@@ -235,7 +207,7 @@ if (localActionsDigest !== "64490129722cf1c153ab7e9643a9c69bbc16b22aeef165f17a85
 // The lookup that decides whether a master push may skip heavy jobs is pinned by its bytes: a change
 // to it is a change to what can be skipped, so it needs this file edited (and acknowledged) with it.
 const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/master-push-reuse.mjs"))).digest("hex");
-if (reuseScriptDigest !== "17b3627cbe5d369e2e53e8fff0fc09e4ccce2d471817ba96cfec40d19024b880") {
+if (reuseScriptDigest !== "1cf4382fc71ab7339022544962a5ce55fd8128269fe7bf9f269b022a430d8854") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
 if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if: needs.changes.outputs.native == 'true'") {
@@ -245,8 +217,8 @@ if (jobBlock(workflow, "native").match(/^    if: .*$/gm)?.join("\n") !== "    if
 // diagnostics-only artifact uploads. Each runs under `always()`, has no `id`, and nothing in this
 // repository downloads or reads its outcome; a GitHub service timeout in one of them (a merge-queue
 // entry was dropped on 3 Oct 2026 by `CreateArtifact ETIMEDOUT`) is not a failure of the code under
-// test. Left out on purpose: the qualification-smoke receipt, the failed-run executable evidence and
-// the unsigned bundle upload, whose absence or failure must stay visible. Each allowed step is pinned
+// test. Left out on purpose: the failed-run executable evidence and the unsigned bundle
+// upload, whose absence or failure must stay visible. Each allowed step is pinned
 // whole (its job, its text and the upload action's SHA), so the flag cannot move to another step or
 // take an expression, and the count and exact line are checked below.
 const diagnosticUploads = [
@@ -436,21 +408,21 @@ const expectedChanges = [
   "          # --no-renames lists a moved file under both paths, so a file moved out of a gated directory still selects it.",
   "          # -z: git would otherwise quote a path with non-ASCII bytes, and the quoted form matches no prefix below.",
   "          changed_files=\"$(git diff --name-only --no-renames -z \"$base\" \"$GITHUB_SHA\" | tr '\\0' '\\n')\"",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/|\\.github/actions/setup-windows-native/|rust-toolchain\\.toml|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))'; then",
+  "          if grep -Eq '^(\\.github/workflows/|\\.github/actions/|rust-toolchain\\.toml|glama/Dockerfile$|src-tauri/|tools/|scripts/package-mcpb\\.mjs|scripts/check-no-test-seam(\\.test)?\\.mjs|scripts/check-tally-egress-boundary(\\.test)?\\.mjs|scripts/tally-egress-census\\.json|scripts/testdata/egress-census-|\\.cargo/|\\.gitattributes$|package\\.json$|packaging/mcpb/manifest\\.json$|packaging/pdfium/|docs/adr/0016-master-binding-authority\\.md$|docs/agent/README\\.md$|docs/legal/terms\\.md$|docs/tally/compatibility/compatibility-surface\\.json$|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fixtures/|fetch-pdfium\\.py$|check-tally-request-builder-hazards\\.mjs$|collect-macos-test-crashes\\.py$|retain-macos-test-binaries\\.py$))' <<< \"$changed_files\"; then",
   "            echo 'native=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'native=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
   "          # The mutation records check runs when the crate it guards changes, or this workflow does.",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/ci\\.yml|src-tauri/crates/bridge-tax-audit/)'; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|src-tauri/crates/bridge-tax-audit/)' <<< \"$changed_files\"; then",
   "            echo 'tax_audit=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
   "          # tools/ is deliberately excluded: it is not shipped in the bundle, which validates the artifact and its resources.",
-  "          if printf '%s\\n' \"$changed_files\" | grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.py|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)'; then",
+  "          if grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.py|capture-package-log(\\.test)?\\.py|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",
@@ -465,12 +437,16 @@ if (jobBlock(workflow, "changes").trimEnd() !== expectedChanges) {
 // through include_str!/include_bytes!, and every file listed below that a test or a native-job step
 // reads at run time, must be matched by the native scope's own pattern. Tests in tools/ are not listed: `Tally
 // portable core` runs that workspace on every pull request, whatever the scope selects.
-const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))'; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
+const nativeScope = new RegExp(/grep -Eq '(\^\([^']+\))' <<< "\$changed_files"; then\n\s+echo 'native=true'/.exec(jobBlock(workflow, "changes"))?.[1] ?? "(unreadable)");
 const tracked = trackedFiles();
 const readAtRunTime = [
   [".cargo/config.toml", "src-tauri/tests/approval_seam_gate.rs (read if present; none is tracked today)", true],
   [".gitattributes", "byte-exact fixture checkout on Windows"],
   ["package.json", "src-tauri/tests/approval_seam_gate.rs"],
+  [".github/actions/", "src-tauri/tests/approval_seam_gate.rs (every composite action)"],
+  ["glama/Dockerfile", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
+  ["scripts/check-no-test-seam.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
+  ["scripts/package-mcpb.mjs", "src-tauri/tests/approval_seam_gate.rs (it starts cargo)"],
   ["packaging/pdfium/pdfium.lock.json", "the native job's PDFium step"],
   ["scripts/fetch-pdfium.py", "the native job's PDFium step"],
   ["scripts/collect-macos-test-crashes.py", "the native job's macOS crash steps"],

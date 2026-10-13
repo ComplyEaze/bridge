@@ -1,0 +1,6 @@
+# fixture: tests/fixtures/masters_units_reads_lab_live.utf16le.xml
+# parser: parse_native_masters(Units)
+# source: captured
+Ok(NativeMasters {
+    rows: [],
+})

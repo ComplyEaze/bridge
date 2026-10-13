@@ -89,7 +89,9 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "balance_sheet",
         "cash_flow",
         "changed_since",
+        "company_features",
         "egress_log",
+        "gst_status",
         "ledger_masters",
         "ledger_movement",
         "list_companies",
@@ -100,11 +102,13 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "purchase_register",
         "read_evidence",
         "sales_register",
+        "statement_tie_out",
         "stock_summary",
         "tally_status",
         "trial_balance",
         "validate_masters",
         "voucher_presence",
+        "voucher_read_cost",
         "voucher_schema",
         "vouchers",
     ];
@@ -130,10 +134,11 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
         // A new file each call: additive.
         ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
-        // A newer verification replaces the saved proof.
-        ("verify_import", true, "Reads the batch's date window from Tally, then creates or replaces the batch's saved proof files and saves a status record, and may also save a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer (paging an existing proof only reads it); writes nothing to Tally."),
-        // It verifies the batch twice, so it replaces the proof as well.
-        ("acknowledge_post_review", true, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also replaces the batch's saved proof and adds status records there; writes nothing to Tally."),
+        // Each verification adds its own proof files beside the earlier ones
+        // and replaces nothing (#911): additive.
+        ("verify_import", false, "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally."),
+        // Its two verifications add proofs as verify_import does: additive.
+        ("acknowledge_post_review", false, "Writes one acknowledgement record to ComplyEaze Bridge's local folder on this computer, and verifies the batch before and after the review, so it also adds proof files and status records there, replacing and deleting nothing; writes nothing to Tally."),
     ];
     let definitions = registered_tool_definitions(true, true);
     let published: Vec<&str> = definitions
@@ -1052,6 +1057,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "post_import",
+            "No review can be recorded for a batch whose post_span_binding is refused: acknowledge_post_review refuses it",
+            "a refused binding is checked in Tally, never sent to a review that refuses it",
+        ),
+        (
+            "local_data_report",
+            "not_settled_binding_refused",
+            "a refused binding is a class of its own, not read as a fault",
+        ),
+        (
+            "post_import",
             "never change a row to get it past the check",
             "a row edited past the duplicate check posts a duplicate",
         ),
@@ -1104,6 +1119,26 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "build_import_xml",
             "A batch you imported by hand blocks nothing until verify_import records the whole batch posted",
             "an unverified hand import does not stop a duplicate",
+        ),
+        (
+            "build_import_xml",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "build_import_xml",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
         ),
         (
             "tally_status",
@@ -1245,6 +1280,46 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "returns no partial list",
             "a read that breached its bound returns nothing partial",
         ),
+        (
+            "company_features",
+            "not_reported, never no",
+            "a setting Tally did not send is not a setting that is off",
+        ),
+        (
+            "gst_status",
+            "not a judgement of ComplyEaze Bridge",
+            "a status is Tally's own flag, not a finding about the voucher",
+        ),
+        (
+            "gst_status",
+            "never as included",
+            "a voucher whose flags were not read is not reported as in the return",
+        ),
+        (
+            "gst_status",
+            "The reason for a status is not available",
+            "the tool names no reason for a status",
+        ),
+        (
+            "voucher_read_cost",
+            "a narrower window does not lower it",
+            "the census follows the book's mark, so a shorter window is not a cheaper call",
+        ),
+        (
+            "voucher_read_cost",
+            "It is as of this call's own read of the mark",
+            "the figure is not a promise about the next call",
+        ),
+        (
+            "voucher_read_cost",
+            "No estimate is made",
+            "the measured runs are data, not a computed figure",
+        ),
+        (
+            "voucher_read_cost",
+            "`vouchers`, `ledger_movement` or `verify_import`",
+            "the tools the figure covers",
+        ),
     ];
     let definitions = registered_tool_definitions(true, true);
     let description_of = |tool: &str| -> String {
@@ -1298,5 +1373,30 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             extension.contains(phrase),
             "the extension description lost {phrase:?}"
         );
+    }
+}
+
+/// A paged tool's `limit` defaults to the configured row limit (`BRIDGE_AGENT_MAX_ROWS`), which an
+/// operator can change, so its schema names no default of its own: a fixed 500 there was false
+/// whenever the row limit was not 500 (#1148). The two evidence reads default to 20 and keep it.
+#[test]
+fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
+    for tool in registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+    {
+        let name = tool["name"].as_str().expect("tool name");
+        let limit = &tool["inputSchema"]["properties"]["limit"];
+        if limit.is_null() {
+            continue;
+        }
+        if matches!(name, "egress_log" | "read_evidence") {
+            assert_eq!(limit["default"], json!(20), "{name}");
+        } else {
+            assert!(
+                limit.get("default").is_none(),
+                "{name}: its limit defaults to the configured row limit, so the schema names no default"
+            );
+        }
     }
 }

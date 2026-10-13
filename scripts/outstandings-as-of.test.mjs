@@ -246,3 +246,22 @@ test("the ledger-master request carries the screen's date only when the operator
   assert.equal(partyLedgerMasterInvokeArgument(config, company, "", true), null);
   assert.equal(partyLedgerMasterInvokeArgument(config, company, "2027-3-31", true), null);
 });
+
+test("main.tsx tells the Outstandings screen whether the operator chose the As of date (bridge#903)", async () => {
+  const frontend = await readFile(new URL("../src/main.tsx", import.meta.url), "utf8");
+  const start = frontend.indexOf("<OutstandingsScreen");
+  assert.notEqual(start, -1);
+  assert.equal(frontend.indexOf("<OutstandingsScreen", start + 1), -1, "one Outstandings screen");
+  const element = frontend.slice(start, frontend.indexOf("/>", start));
+  assert.match(element, /asOf=\{outstandingsAsOfSelection\.value\}/);
+  assert.match(element, /asOfOperatorSelected=\{outstandingsAsOfSelection\.operatorSelected\}/);
+  // The screen reports the operator's date through the handler that marks it as chosen;
+  // a no-op handler would leave the automatic (host) date in force for the export.
+  assert.match(element, /onAsOfChange=\{changeOutstandingsAsOf\}/);
+  // An operator's date is the one that marks it as chosen; the automatic one never does.
+  assert.match(
+    frontend,
+    /const changeOutstandingsAsOf = React\.useCallback\(\(value: string\) => \{\s*setOutstandingsAsOfSelection\(operatorSelectedOutstandingsAsOf\(value\)\);/,
+  );
+  assert.match(frontend, /useState\(\s*\(\) => automaticOutstandingsAsOf\(\),\s*\)/);
+});

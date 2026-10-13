@@ -403,14 +403,6 @@ pub trait TallyConnector: Send + Sync {
         &self,
         context: &RequestContext,
     ) -> Result<CanonicalPackWindow, TallyError>;
-    async fn read_core_period_balance_report(
-        &self,
-        _context: &RequestContext,
-    ) -> Result<report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Err(TallyError::Unsupported {
-            code: "core_period_balance_report_not_supported".to_string(),
-        })
-    }
 }
 
 #[cfg(test)]

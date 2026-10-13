@@ -25,8 +25,9 @@
 //! writes), which leaves it a voucher without one; and into a type that reads
 //! Manual, where Tally keeps the number and the type's duplicate setting then
 //! decides. That a numbered voucher changes existing numbers on a type set to
-//! "Renumber Vouchers" is not measured: it is refused there because the
-//! number is discarded. Every other
+//! "Renumber Vouchers" is not measured: it is refused there because under
+//! Automatic numbering Tally was seen to discard a supplied number (measured
+//! with `Auto Retain`), which would leave it a voucher without one. Every other
 //! reading, and a type the read does not hold, refuses: a type that does not
 //! read Automatic as `import_voucher_numbering_not_automatic`, and an
 //! Automatic one whose sub-method reads `Auto Renumber`, is missing or is not
@@ -138,7 +139,8 @@ pub(in crate::agent) const GUIDANCE_MIN_RESPONSE_BUDGET: usize =
     2 * crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET;
 
 /// What one numbering read admitted: the voucher types every voucher of the
-/// batch goes into, each read Automatic with `Auto Retain`, for one company,
+/// batch goes into, each read as its vouchers may go into (Automatic with
+/// `Auto Retain`; Manual too, for a voucher that carries a number), for one company,
 /// under one master mark. Neither `Clone` nor serialisable, so it cannot
 /// outlive the pass whose read made it.
 #[derive(Debug)]
@@ -271,8 +273,8 @@ impl NumberingRefusal {
     }
 }
 
-/// One reading in the three forms a refusal needs, with whether it is the
-/// reading of a type set to "Renumber Vouchers".
+/// One reading in the three forms a refusal needs, with what a person is
+/// told about entering the voucher by hand.
 struct Reading {
     /// Why the reading refuses the voucher, or `None` where it admits it.
     reason: Option<RefusalReason>,

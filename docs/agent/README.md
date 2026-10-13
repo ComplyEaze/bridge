@@ -293,11 +293,10 @@ voucher-numbering refusals (`import_voucher_numbering_not_automatic` and
 `post_import`, for the message that names the refused voucher types: from 4,096 up to 8,192 a
 refused `build_import_xml` still returns `state`, `reason` and `refused_types`, and a refused
 `post_import` its `error.code` and `error.refused_types` with the general message; under about
-2,500 bytes even those do not fit, and the answer is cut down as any tool's is. Measured
-through the tools against a test double: a post refusing three voucher types answered in
-6,603 bytes with them and 2,467 without, a build refusing one in 4,908 and 1,658; an answer
-naming four voucher types, with its JSON-RPC frame, came to 7,394 bytes (post) and 5,864
-(build). Before a tool response is written, ComplyEaze Bridge appends a
+2,500 bytes even those do not fit, and the answer is cut down as any tool's is. The tests hold a
+refused post naming three voucher types and a refused build naming one within 8,192 bytes with
+the next step and within 4,096 without it, and an answer naming four voucher types within the
+server's caps at 8,192; the sizes themselves are not printed here, since the texts change. Before a tool response is written, ComplyEaze Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested

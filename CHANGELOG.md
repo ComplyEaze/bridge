@@ -148,9 +148,11 @@ These changes are in source and not yet in a published build.
   is checked by `build_import_xml` too: it is written into a voucher type that reads Manual, where Tally keeps the
   number and the type's duplicate setting decides, or Automatic with `Auto Retain`, where Tally discards the number
   and assigns the next, and it is refused otherwise under the same two codes. It is refused on a voucher type set
-  to "Renumber Vouchers" because the number is discarded there, which leaves it a voucher without one; a numbered
+  to "Renumber Vouchers" because under Automatic numbering Tally was seen to discard a supplied number (measured with Auto
+  Retain), which would leave it a voucher without one; a numbered
   voucher on such a type was not itself measured. So a build that holds only Journals carrying their own numbers,
-  which made no numbering read before, now makes that read: it can fail with that read's own codes, and it is
+  which made no numbering read before, now makes that read: it can fail with that read's own codes, or as `pre_import_mark_unobserved` when the
+  company's master mark cannot be read, and it is
   refused on a book in Education mode, as a build of vouchers without numbers is. On the desktop's Journal
   screen the refusal names the voucher type and what was read of it. The next step, and a post's message naming
   the voucher types, are sent only where `BRIDGE_AGENT_MAX_BYTES` is at least 8,192; from 4,096 up to that a refused build

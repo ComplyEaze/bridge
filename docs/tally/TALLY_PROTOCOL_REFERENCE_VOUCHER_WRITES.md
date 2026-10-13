@@ -37,11 +37,13 @@ Two consequences, both significant:
    column.** §9.8 sent a failed `Alter`; it did not test a `Create` retry, a restart, or another
    voucher type, and its own rule below forbids carrying the observation to a different request
    identity mechanism. Read "idempotency" here as "this failure mode, under this setting".
-   Voucher-number-based idempotency in that sense only works with Manual numbering. Under automatic
+   Voucher-number-based idempotency in that sense only works with Manual numbering (of the two
+   methods in the table; no other method was put through a failed Alter). Under automatic
    numbering the client-supplied number is thrown away, so any dedupe key built on it is
-   silently ineffective. (The method measured here is `Automatic`, with `Auto Retain`; on
-   2026-10-13 it was thrown away under `Auto Renumber` too, and kept under the separate method
-   `Automatic (Manual Override)`: the dated paragraphs below.)
+   silently ineffective. (The method measured here is `Automatic`, with `Auto Retain`. On
+   2026-10-13 one raw import of a Receipt had its number thrown away under `Auto Renumber` too,
+   and one raw import of a Journal kept its number under the separate method `Automatic (Manual
+   Override)`: the dated paragraphs below.)
    This was not obvious — the create returned `CREATED=1, ERRORS=0`
    and looked entirely successful.
 2. **Manual numbering converts a dangerous failure into a safe one.** The same failed Alter
@@ -299,8 +301,9 @@ against `CONTENT-LENGTH`).
 - **Not established:** Journal, Payment and Contra; a deletion; a type holding more than a handful
   of vouchers; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post. A file
   of two vouchers and a voucher that carries a number were measured later the same day (next
-  paragraph), and after them one numberless Journal with an earlier date under "Renumber
-  Vouchers" (the paragraph after that), which is all that is measured of a Journal here.
+  paragraph), and after them one numberless Journal dated 19 July, between the Journals of the
+  book, under "Renumber Vouchers" (the paragraph after that), which is all that is measured of a
+  Journal under that setting.
 
 **A file of two vouchers, and a voucher that carries a number, each changed numbers already in
 the book under "Renumber Vouchers", and neither supplied number was kept: verified 2026-10-13 on
@@ -463,8 +466,9 @@ numbers every voucher it creates.
   file imported through Tally's Import menu. Automatic (Manual Override) was measured on
   2026-10-13 by a raw import, not by a native post: a Journal without a number read back with
   none (above). Automatic set to renumber on
-  insertion was measured on 2026-10-13 for one voucher type, by hand entry and by raw imports (one
-  voucher, a file of two, and a voucher carrying a number), not by a native post (above).
+  insertion was measured on 2026-10-13 for two voucher types, not by a native post (above):
+  Receipt, by hand entry and by raw imports (one voucher, a file of two, and a voucher carrying a
+  number), and Journal, by one raw import of a voucher without a number.
 - Evidence: the never-merged branches `lab/724-m-manual-numbering-answers` (`2fd954f9`),
   `lab/724-m3-second-voucher-answers` (`6ab6a667`) and `lab/724-m4-m5-numbering-answers`
   (`3684c58c`, under `m5/`); bridge#724.
@@ -515,8 +519,9 @@ Four properties of it are not guessable, and each was measured:
 2. **`EFFECTIVEDATE` accompanied `DATE` on every voucher**, always equal to it. Whether these
    types import without it was not tested, so omitting it is outside this measurement.
 3. **No `<VOUCHERNUMBER>`.** These types numbered automatically in the observed book, and §9.8
-   established that the method `Automatic` discards a supplied number in silence (the method
-   `Automatic (Manual Override)` kept one, 2026-10-13). Tally assigned
+   established that the method `Automatic` discards a supplied number in silence (under the
+   method `Automatic (Manual Override)` one raw import of a Journal kept its number,
+   2026-10-13). Tally assigned
    its own. The bank's reference goes in the narration, which survives.
 4. **`REMOTEID` on every voucher.** Delete by the client-supplied `REMOTEID` is the correction
    path, and §9.12b confirms it on a live book — the value you sent stays addressable as a delete

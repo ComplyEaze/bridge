@@ -54,8 +54,8 @@ fn bill_direction_labels_make_mixed_party_amounts_unambiguous() {
     assert_eq!(bill_direction_label(ExposureDirection::Payable), "Payable");
 }
 use super::*;
-use crate::reports::party_statement::build_party_statement;
-use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedParty};
+use crate::reports::party_statement::build_party_statement_with_ageing_anchor;
+use crate::tally::{ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor, UnallocatedParty};
 use bridge_tally_core::ExactDecimal;
 
 fn bill(reference: &str, amount: &str, age_days: u32) -> OpenBillRow {
@@ -80,9 +80,15 @@ fn renders_a_non_empty_workbook_for_a_billed_and_unallocated_party() {
         opening_balance: None,
         composition: None,
     }];
-    let statement =
-        build_party_statement("Lab Co", "20260808", "Aarav Textiles", &bills, &unallocated)
-            .unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "Aarav Textiles",
+        &bills,
+        &unallocated,
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
     let bytes = render_party_statement_xlsx(&statement).unwrap();
     // A well-formed xlsx is a zip archive; the local-file-header
     // signature is the cheapest evidence this is real workbook bytes and
@@ -100,8 +106,15 @@ fn renders_a_workbook_for_a_party_with_no_bills() {
         opening_balance: None,
         composition: None,
     }];
-    let statement =
-        build_party_statement("Lab Co", "20260808", "On Account Only", &[], &unallocated).unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "On Account Only",
+        &[],
+        &unallocated,
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
     let bytes = render_party_statement_xlsx(&statement).unwrap();
     assert!(bytes.len() > 200);
 }
@@ -115,8 +128,15 @@ fn renders_unallocated_direction_in_the_workbook_text() {
         opening_balance: None,
         composition: None,
     }];
-    let statement =
-        build_party_statement("Lab Co", "20260808", "On Account Only", &[], &unallocated).unwrap();
+    let statement = build_party_statement_with_ageing_anchor(
+        "Lab Co",
+        "20260808",
+        "On Account Only",
+        &[],
+        &unallocated,
+        OutstandingsAgeingAnchor::DueDate,
+    )
+    .unwrap();
     let bytes = render_party_statement_xlsx(&statement).unwrap();
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
     let mut text = String::new();
@@ -129,12 +149,13 @@ fn renders_unallocated_direction_in_the_workbook_text() {
 
 #[test]
 fn an_invalid_date_is_rejected_rather_than_written_as_a_string() {
-    let statement = build_party_statement(
+    let statement = build_party_statement_with_ageing_anchor(
         "Lab Co",
         "not-a-date",
         "Aarav Textiles",
         &[bill("INV-1", "10.00", 5)],
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .unwrap();
     let error = render_party_statement_xlsx(&statement).unwrap_err();

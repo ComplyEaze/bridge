@@ -1309,7 +1309,12 @@ impl super::super::Server {
             .map_err(|_| failed("current_date_invalid"))?;
         let listing = self
             .runtime
-            .fetch_agent_party_ledger_masters_with_evidence(self.tally_config(), identity, today)
+            .fetch_agent_party_ledger_masters_with_evidence(
+                self.tally_config(),
+                identity,
+                today,
+                crate::tally::connection::ComplianceRead::Standard,
+            )
             .await
             .map_err(|error| {
                 super::super::ToolFailure::from_runtime("party_ledger_master_read_failed", error)

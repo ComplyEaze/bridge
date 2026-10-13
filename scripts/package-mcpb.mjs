@@ -4,6 +4,7 @@ import { assertNoTestSeam } from "./check-no-test-seam.mjs";
 import { arch, platform } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(import.meta.dirname, "..");
@@ -179,6 +180,6 @@ async function main() {
   console.log(`Prepared ${destination} from ${sourceBinary}, staged ${library} from ${pdfiumDirectory}, and verified the ${host.key} binary, PDFium library, launch manifest, and legal resources; do not commit host artifacts.`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   await main();
 }

@@ -11,11 +11,14 @@ import {
   asOfYyyymmdd,
   bulkPartyStatementsInvokeArgument,
   bulkPartyStatementsPreviewInvokeArgument,
+  partyLedgerMasterInvokeArgument,
   partyStatementInvokeArgument,
   settleAsOfBoundValue,
   singleCompanyOutstandingsInvokeArgument,
   workingPaperInvokeArgument,
   type AsOfBoundValue,
+  type PartyLedgerMasterExport,
+  type PartyLedgerMasterNote,
 } from "./outstandings-as-of";
 import { companyIdentityKey, type CompanyIdentityKey } from "./company-identity";
 import { reportEvidenceDrawerEntry, type EvidenceDrawerEntry } from "./evidence-drawer-entry";
@@ -26,6 +29,8 @@ export type OutstandingsExportNotice = {
   path?: string;
   location?: string;
   failures?: Array<{ party: string; code: string; reason: string }>;
+  /** What a ledger-master workbook says about its date, by kind (bridge#903). */
+  notes?: PartyLedgerMasterNote[];
 };
 
 type Props = {
@@ -46,6 +51,8 @@ type Props = {
   liveReadSuppressed: boolean;
   openBookCount?: number;
   asOf: string;
+  /** Whether the operator chose `asOf`; an automatic date is the host's own. */
+  asOfOperatorSelected: boolean;
   onAsOfChange: (value: string) => void;
   onTallyReadActivityChange: (delta: 1 | -1) => void;
   onExportNoticeChange: (notice: OutstandingsExportNotice | null) => void;
@@ -155,7 +162,7 @@ export type OutstandingsEvidence =
       sourceBytes: number;
       receivableTotal: string;
       payableTotal: string;
-      // The native read can establish this residual; voucher scans cannot.
+      // The native read can establish this residual.
       // Undefined is intentionally distinct from an exact zero amount.
       unallocatedTotal?: string;
     }
@@ -208,6 +215,13 @@ export function OutstandingsExportNotice({
         )}
         <button type="button" onClick={onDismiss} aria-label="Dismiss">Dismiss</button>
       </span>
+      {notice.notes && notice.notes.length > 0 && (
+        <ul className="outstandings-export-notes">
+          {notice.notes.map((note) => (
+            <li key={note.kind} data-note-kind={note.kind}>{note.text}</li>
+          ))}
+        </ul>
+      )}
       {notice.failures && notice.failures.length > 0 && (
         <ul className="outstandings-export-failures">
           {notice.failures.map((failure) => (
@@ -229,6 +243,7 @@ export function OutstandingsScreen({
   liveReadSuppressed,
   openBookCount = 1,
   asOf,
+  asOfOperatorSelected,
   onAsOfChange,
   onTallyReadActivityChange,
   onExportNoticeChange,
@@ -326,7 +341,6 @@ export function OutstandingsScreen({
           currencyAssertion: inrCompleteResult.currency_assertion,
           readProvenance: {
             read_strategy: inrCompleteResult.read_strategy,
-            source_voucher_count: inrCompleteResult.report.source_voucher_count,
             open_receivable_bill_count: inrCompleteResult.report.open_receivable_bill_count,
           },
           sourceBytes: inrCompleteResult.report.source_bytes,
@@ -610,7 +624,6 @@ export function OutstandingsScreen({
             {completeResult
               ? ` · ${readProvenance({
                   read_strategy: completeResult.read_strategy,
-                  source_voucher_count: completeResult.report.source_voucher_count,
                   open_receivable_bill_count: completeResult.report.open_receivable_bill_count,
                 })}`
               : ""}
@@ -678,11 +691,16 @@ export function OutstandingsScreen({
               type="button"
               disabled={exporting !== null || loading || liveReadNavigationLocked}
               onClick={async () => {
+                const argument = partyLedgerMasterInvokeArgument(config, company, asOf, asOfOperatorSelected);
+                if (!argument) {
+                  onExportNoticeChange({ message: "Choose a valid As of date before exporting the ledger master." });
+                  return;
+                }
                 if (!beginExport("ledger-master")) return;
                 onTallyReadActivityChange(1);
                 try {
-                  const path = await exportPartyLedgerMaster(config, company);
-                  onExportNoticeChange({ message: fileNameOf(path), path });
+                  const { path, notes } = await exportPartyLedgerMaster(argument);
+                  onExportNoticeChange({ message: fileNameOf(path), path, notes });
                 } catch (cause) {
                   onExportNoticeChange({ message: operatorMessage(cause) });
                 } finally {
@@ -1068,22 +1086,13 @@ async function exportWorkingPaper(result: InrCompleteResult) {
   return invoke<string>("export_outstandings_working_paper", argument);
 }
 
-/** Reads the qualified ledger/master source and writes its traceable workbook. */
+/** Reads the qualified ledger/master source and writes its traceable workbook.
+ * The argument is built by `partyLedgerMasterInvokeArgument`, which sends the
+ * screen's date only when the operator chose it. */
 async function exportPartyLedgerMaster(
-  config: Props["config"],
-  company: NonNullable<Props["company"]>,
+  argument: NonNullable<ReturnType<typeof partyLedgerMasterInvokeArgument>>,
 ) {
-  return invoke<string>("export_party_ledger_master", {
-    request: {
-      config,
-      selected_company: {
-        display_name: company.name,
-        company_guid: company.guid,
-        company_number: company.company_number,
-        books_from_yyyymmdd: company.books_from_yyyymmdd,
-      },
-    },
-  });
+  return invoke<PartyLedgerMasterExport>("export_party_ledger_master", argument);
 }
 
 /// Builds the report as CSV.

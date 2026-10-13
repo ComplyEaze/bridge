@@ -795,10 +795,11 @@ pub(crate) mod test_seam {
         );
     }
 
-    /// The dialog child's stand-in, `examples/approval_standin.rs` (#702),
-    /// built beside this test executable: `cargo test` and `cargo nextest
-    /// run` build examples, `cargo test --lib` does not. Missing, it fails the
-    /// test; it never skips it.
+    /// The dialog child's stand-in, `crates/bridge-approval-standin/examples/approval_standin.rs` (#702),
+    /// built beside this test executable: `cargo test --workspace` and `cargo
+    /// nextest run --workspace` build it; a run of `-p bridge` alone does not,
+    /// because the example belongs to the `bridge-approval-standin` package.
+    /// Missing, it fails the test; it never skips it.
     fn standin_example() -> std::path::PathBuf {
         let test = std::env::current_exe().unwrap();
         let profile = test.parent().and_then(std::path::Path::parent).unwrap();
@@ -807,7 +808,7 @@ pub(crate) mod test_seam {
             .join(format!("approval_standin{}", std::env::consts::EXE_SUFFIX));
         assert!(
             example.is_file(),
-            "{} is missing: build the approval_standin example (cargo test without --lib)",
+            "{} is missing: build it with cargo test or cargo nextest run --workspace, or cargo build -p bridge-approval-standin --example approval_standin",
             example.display()
         );
         example

@@ -21,6 +21,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use bridge_tally_primitives::TallyDate;
+use bridge_tally_protocol::audit_company_part::admit_audit_company_part;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
 use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
@@ -45,8 +46,8 @@ use bridge_tally_protocol::native_trial_balance::{
 };
 use bridge_tally_protocol::native_voucher_type_numbering::parse_voucher_type_numbering;
 use bridge_tally_protocol::outstandings_shared::{
-    parse_company_book_extent, parse_company_book_extent_v2, parse_company_ledger_count,
-    CompanyBookExtent, CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
+    parse_company_book_extent_v2, parse_company_ledger_count, CompanyBookExtent,
+    CompanyBookExtentExpectation, DateBoundaryProfile, OutstandingsError,
 };
 use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
@@ -60,7 +61,6 @@ use bridge_tally_protocol::{
     parse_native_voucher_type_source_records_with_evidence,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    parse_voucher_source_records_with_evidence, parse_vouchers_with_evidence,
     ExpectedTallyTextEncoding, TallyImportApplicationStatus, TallyImportResult,
 };
 use sha2::{Digest, Sha256};
@@ -276,9 +276,9 @@ const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
-const AARAV_NAME: &str = "Aarav Trading Company Demo";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
@@ -610,20 +610,8 @@ const ROWS: &[Row] = &[
         parser: "parse_company_gateway_capability_observation",
         parse: |_, text| gateway(text),
     },
-    // Company book extents: tests/outstandings_shared.rs (V1 and the split V2 tuple); the app's
+    // Company book extents: tests/outstandings_shared.rs (the split V2 tuple); the app's
     // replays for the rest, against the expectation built from the paired company list.
-    Row {
-        fixture: "tests/fixtures/unit_a_company_extent_live.xml",
-        source: Source::Captured,
-        parser: "parse_company_book_extent(Aarav)",
-        parse: |_, text| extent(parse_company_book_extent(text, AARAV_NAME, AARAV_GUID)),
-    },
-    Row {
-        fixture: "tests/fixtures/native/company_extent_9000.xml",
-        source: Source::Captured,
-        parser: "parse_company_book_extent(Aarav)",
-        parse: |_, text| extent(parse_company_book_extent(text, AARAV_NAME, AARAV_GUID)),
-    },
     Row {
         fixture: "tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml",
         source: Source::Captured,
@@ -1143,6 +1131,13 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_company_features(BRIDGE CORPUS FOREX)",
         parse: |_, text| company_features(text, FOREX_GUID, "BRIDGE CORPUS FOREX", "100011"),
+    },
+    // The audit read's company part: src/audit_company_part_tests.rs.
+    Row {
+        fixture: "tests/fixtures/company_audit_object_batch_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "admit_audit_company_part(BRIDGE BATCH LAB)",
+        parse: |_, text| typed(admit_audit_company_part(text, BATCH_LAB_GUID, "20260401")),
     },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
@@ -1730,7 +1725,7 @@ const ROWS: &[Row] = &[
         parse: |_, text| party_masters(text, "6b43e498-430c-4d5c-bfef-d32e2ab93c85"),
     },
     // Group snapshots: tests/native_outstandings_live_fixtures.rs, tests/native_core_regressions.rs,
-    // tests/decoder_convergence.rs, src/native_outstandings/wire_group_tests.rs; the app's replays
+    // src/native_outstandings/wire_group_tests.rs; the app's replays
     // (src/reports/statements_tests.rs, src/agent_register_tests.rs, src/agent_import_bank_tests.rs,
     // src/agent_voucher_groups_tests.rs, src/tally/runtime_*_tests.rs) for the rest.
     Row {
@@ -2106,8 +2101,7 @@ const ROWS: &[Row] = &[
         parse: |_, text| bills(text, "20250401", "20260923"),
     },
     // The simulator's authored corpus (../tally-protocol-simulator/fixtures/PROVENANCE.md):
-    // tests/simulator_corpus.rs. `inconsistent_date_filter.xml` has no parsing test; it is a
-    // Bridge-schema voucher export, read here as `voucher_export.xml` is.
+    // tests/simulator_corpus.rs.
     Row {
         fixture: "../tally-protocol-simulator/fixtures/export_status_1.xml",
         source: Source::Synthetic,
@@ -2191,24 +2185,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "parse_ledgers_with_evidence",
         parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_vouchers_with_evidence",
-        parse: |_, text| untyped(parse_vouchers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/voucher_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_voucher_source_records_with_evidence",
-        parse: |_, text| untyped(parse_voucher_source_records_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/inconsistent_date_filter.xml",
-        source: Source::Synthetic,
-        parser: "parse_vouchers_with_evidence",
-        parse: |_, text| untyped(parse_vouchers_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",
@@ -2298,7 +2274,7 @@ const PILOT_LAB_TAX_UNITS: &str = "an answer of the pilot lab (9 Oct 2026), the 
      reads: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs), and its \
      tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
      pin what the parse returns; pilot-lab/PROVENANCE.md says what it is";
-const GST_STATUS_READ: &str = "an answer of the GST status read (10 Oct 2026), which no parser of \
+const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
      this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
      tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
      agent/gst-status/PROVENANCE.md says what each file is";
@@ -2343,6 +2319,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_TAX_UNITS,
     ),
     // The GST status read answers.
+    (
+        "tests/fixtures/agent/gst-status/pilot-lab-gst-status-august.utf16le.xml",
+        GST_STATUS_READ,
+    ),
     (
         "tests/fixtures/agent/gst-status/pilot-lab-gst-status-sales-window.utf16le.xml",
         GST_STATUS_READ,

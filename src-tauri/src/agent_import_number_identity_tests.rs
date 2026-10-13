@@ -235,7 +235,9 @@ fn a_number_in_use_is_this_invoice_whatever_the_figures_and_however_it_is_spelt(
         assert!(!absent(&result), "{stored:?} {result}");
         assert_eq!(
             result["vouchers"][0]["diffs"],
-            json!(["voucher_number"]),
+            // The batch attributes by its tag, so it writes its narration with the tag (#1608):
+            // a keyed twin that holds none reads as a narration difference beside the number.
+            json!(["voucher_number", "narration"]),
             "{stored:?}"
         );
     }
@@ -334,7 +336,12 @@ fn a_journal_that_carries_a_number_is_still_matched_by_its_content() {
         )
         .unwrap();
         assert_eq!(result["counts"]["matching_content_observed"], 1, "{result}");
-        assert_eq!(result["vouchers"][0]["diffs"], json!(["voucher_number"]));
+        // The batch attributes by its tag, so it writes its narration with the tag (#1608): the
+        // row holds none, which reads as a narration difference beside the number.
+        assert_eq!(
+            result["vouchers"][0]["diffs"],
+            json!(["voucher_number", "narration"])
+        );
     }
 }
 

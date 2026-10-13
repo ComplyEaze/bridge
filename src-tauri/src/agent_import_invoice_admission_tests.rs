@@ -162,7 +162,7 @@ fn lab(mut plans: Vec<ScenarioPlan>) -> Lab {
         .clone();
     let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
         company.name.clone(),
-        LAB_GUID.into(),
+        crate::tally::test_company_guid(LAB_GUID),
         company.company_number.clone().unwrap(),
         company.books_from.clone().unwrap(),
         &companies,

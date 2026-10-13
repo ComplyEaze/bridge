@@ -40,7 +40,8 @@ use super::all_clients::migration::{
     ClientGroupLabelMigrationPreparationError,
 };
 use super::{
-    company_sweep_result, first_calendar_day_canary_window, party_ledger_master_balance_basis,
+    company_sweep_result, first_calendar_day_canary_window, mirror_unavailable_command_error,
+    mirror_unavailable_string_error, party_ledger_master_balance_basis,
     party_ledger_master_currency_admission_error, party_ledger_master_foreign_currency_error,
     party_ledger_master_mixed_currency_error, party_ledger_master_runtime_command_error,
     party_ledger_master_withheld, portable_export_file_name, reconcile_review_cleanup,
@@ -48,6 +49,7 @@ use super::{
     verify_observed_company_tuple_from_companies, write_unique_download, CompanySweepFailure,
     OutstandingsRequest, PartyLedgerMasterExport, PartyLedgerMasterRequest, PersistedTallyCompany,
     SavedTallySetup, SelectedCompanyIdentity, VerifiedCompanyIdentity, FOREIGN_LEDGERS_NAMED,
+    MIRROR_KEY_INVALID_MESSAGE, MIRROR_KEY_MISSING_MESSAGE,
 };
 use bridge_tally_core::TallyDate;
 // Used only by the `#[cfg(unix)]` non-UTF-8 destination test — an invalid-byte
@@ -589,6 +591,49 @@ fn the_export_request_reads_a_chosen_date_and_refuses_a_malformed_one_at_the_bou
     for malformed in ["2026-07-31", "20260230", "", "2026073"] {
         assert!(request(Some(malformed)).is_err(), "{malformed}");
     }
+}
+
+#[test]
+fn the_two_key_states_have_their_own_codes_and_a_credential_failure_does_not() {
+    use crate::db::MirrorKeyError;
+    let code = |error: MirrorKeyError| mirror_unavailable_command_error(anyhow::Error::new(error));
+    let missing = code(MirrorKeyError::MissingForExistingMirror);
+    assert_eq!(missing.code, "tally_mirror_key_missing");
+    assert_eq!(missing.retry, "not_recommended");
+    let invalid = code(MirrorKeyError::StoredKeyInvalid);
+    assert_eq!(invalid.code, "tally_mirror_key_invalid");
+    assert_eq!(invalid.retry, "not_recommended");
+    // Anything else keeps the old code, and a retry is safe: a denied prompt or a locked
+    // credential store must never read as a missing key.
+    for other in [
+        code(MirrorKeyError::Store(anyhow::anyhow!("denied"))),
+        code(MirrorKeyError::DatabaseStateUnreadable),
+        mirror_unavailable_command_error(anyhow::anyhow!("a disk error")),
+    ] {
+        assert_eq!(other.code, "tally_mirror_unavailable");
+        assert_eq!(other.retry, "safe");
+    }
+}
+
+#[test]
+fn a_string_error_tells_the_two_key_states_from_the_rest() {
+    use crate::db::MirrorKeyError;
+    let text = |error: anyhow::Error| mirror_unavailable_string_error(error);
+    let missing = text(anyhow::Error::new(MirrorKeyError::MissingForExistingMirror));
+    let invalid = text(anyhow::Error::new(MirrorKeyError::StoredKeyInvalid));
+    let other = text(anyhow::anyhow!("a disk error"));
+    assert!(missing.starts_with(MIRROR_KEY_MISSING_MESSAGE));
+    assert!(invalid.starts_with(MIRROR_KEY_INVALID_MESSAGE));
+    assert_ne!(missing, invalid);
+    assert_ne!(missing, other);
+    assert_ne!(invalid, other);
+    assert_eq!(
+        text(anyhow::Error::new(MirrorKeyError::Store(anyhow::anyhow!(
+            "denied"
+        )))),
+        other,
+        "a credential-store failure reads as the retryable one"
+    );
 }
 
 #[test]

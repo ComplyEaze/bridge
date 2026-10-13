@@ -456,25 +456,71 @@ fn party_ledger_master_local_export_error(
     )
 }
 
+/// The two key states a retry cannot fix: the mirror file is there and the credential store
+/// holds no key for it, or holds a key that is not the mirror's length. Read from the typed
+/// error the key resolution returns, never from its message.
+fn mirror_key_state(error: &anyhow::Error) -> Option<&crate::db::MirrorKeyError> {
+    error
+        .downcast_ref::<crate::db::MirrorKeyError>()
+        .filter(|state| {
+            matches!(
+                state,
+                crate::db::MirrorKeyError::MissingForExistingMirror
+                    | crate::db::MirrorKeyError::StoredKeyInvalid
+            )
+        })
+}
+
+const MIRROR_KEY_MISSING_MESSAGE: &str = "The encrypted Tally mirror exists, but the key that opens it is not in this computer's credential store.";
+const MIRROR_KEY_INVALID_MESSAGE: &str = "The key stored for the encrypted Tally mirror is not a valid key: it is not the length this version uses, and may be damaged or written by a different version of ComplyEaze Bridge.";
+
 /// Produces the typed command error for the encrypted Tally mirror failing to initialise on
-/// first use (denied keychain authorisation, or a local disk/storage failure). The mirror was
-/// never opened, so no local or Tally state changed; retrying after the operator resolves the
-/// underlying keychain/disk issue is safe.
-fn mirror_unavailable_command_error(_error: anyhow::Error) -> TallyCommandError {
-    tally_command_error(
-        "tally_mirror_unavailable",
-        "Operation",
-        "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.",
-        "safe",
-        false,
-        "Approve the operating-system credential prompt for ComplyEaze Bridge, or verify local disk access, then retry.",
-    )
+/// first use. The mirror was never opened, so no local or Tally state changed. A missing or
+/// invalid key is permanent until the credential or the data folder is put back: retrying does
+/// not help, and the app deletes nothing. Any other failure (a denied credential prompt, a
+/// local disk or storage failure) is safe to retry once the operator has resolved it.
+fn mirror_unavailable_command_error(error: anyhow::Error) -> TallyCommandError {
+    match mirror_key_state(&error) {
+        Some(crate::db::MirrorKeyError::MissingForExistingMirror) => tally_command_error(
+            "tally_mirror_key_missing",
+            "Operation",
+            MIRROR_KEY_MISSING_MESSAGE,
+            "not_recommended",
+            false,
+            "Open ComplyEaze Bridge as the same computer user, from the same data folder, and restore the operating-system credential if it was reset or restored (the macOS login keychain, or that user's Windows Credential Manager). Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
+        ),
+        Some(crate::db::MirrorKeyError::StoredKeyInvalid) => tally_command_error(
+            "tally_mirror_key_invalid",
+            "Operation",
+            MIRROR_KEY_INVALID_MESSAGE,
+            "not_recommended",
+            false,
+            "Restore the operating-system credential from a backup of the same user's credential store, or open the version of ComplyEaze Bridge that created it. Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
+        ),
+        _ => tally_command_error(
+            "tally_mirror_unavailable",
+            "Operation",
+            "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.",
+            "safe",
+            false,
+            "Approve the operating-system credential prompt for ComplyEaze Bridge, or verify local disk access, then retry.",
+        ),
+    }
 }
 
 /// Same failure as [`mirror_unavailable_command_error`], for the handful of mirror-backed
-/// commands that report errors as a plain `String` rather than a [`TallyCommandError`].
-fn mirror_unavailable_string_error(_error: anyhow::Error) -> String {
-    "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.".to_string()
+/// commands that report errors as a plain `String` rather than a [`TallyCommandError`]: the
+/// text tells the three cases apart, since a string carries no code.
+fn mirror_unavailable_string_error(error: anyhow::Error) -> String {
+    match mirror_key_state(&error) {
+        Some(crate::db::MirrorKeyError::MissingForExistingMirror) => format!(
+            "{MIRROR_KEY_MISSING_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
+        ),
+        Some(crate::db::MirrorKeyError::StoredKeyInvalid) => format!(
+            "{MIRROR_KEY_INVALID_MESSAGE} Retrying does not help until the credential is restored; the app does not delete the local mirror."
+        ),
+        _ => "The encrypted Tally mirror could not be opened. Its operating-system credential may have been denied, or local storage is unavailable.".to_string(),
+    }
 }
 
 #[tauri::command]

@@ -33,6 +33,26 @@ pub enum EncryptedOpenError {
     PoolTimedOut,
 }
 
+/// Why the mirror's key could not be resolved. The two key states are permanent
+/// until the credential or the data folder is put back, so a retry cannot fix
+/// them; every other failure is the credential store's or the file system's own.
+#[derive(Debug, thiserror::Error)]
+pub enum MirrorKeyError {
+    /// The database exists and the credential store holds no key for it.
+    #[error("The encrypted Tally mirror exists but its operating-system key is missing")]
+    MissingForExistingMirror,
+    /// The stored key is not a key of the length the mirror uses.
+    #[error("The stored Tally mirror key is invalid")]
+    StoredKeyInvalid,
+    /// Whether the database exists could not be read, so no key is generated:
+    /// a key made beside a database that does exist could never open it.
+    #[error("The Tally mirror files could not be checked, so no key was created")]
+    DatabaseStateUnreadable,
+    /// The credential store or the random generator failed.
+    #[error(transparent)]
+    Store(anyhow::Error),
+}
+
 pub trait MirrorKeyStore: Send + Sync {
     fn load(&self) -> anyhow::Result<Option<Zeroizing<Vec<u8>>>>;
     fn save(&self, key: &[u8]) -> anyhow::Result<()>;
@@ -109,31 +129,46 @@ pub struct ResolvedMirrorKey {
 pub fn resolve_mirror_key(
     database_path: &Path,
     key_store: &dyn MirrorKeyStore,
-) -> anyhow::Result<ResolvedMirrorKey> {
-    if let Some(key) = key_store.load()? {
+) -> Result<ResolvedMirrorKey, MirrorKeyError> {
+    if let Some(key) = key_store.load().map_err(MirrorKeyError::Store)? {
         validate_key(&key)?;
         return Ok(ResolvedMirrorKey { key });
     }
 
-    if database_path.exists() {
-        anyhow::bail!(
-            "The encrypted Tally mirror exists but its operating-system key is missing; an explicit local reset is required"
-        );
+    if mirror_files_exist(database_path)? {
+        return Err(MirrorKeyError::MissingForExistingMirror);
     }
 
     let mut key = Zeroizing::new(vec![0_u8; MIRROR_KEY_BYTES]);
     getrandom::fill(&mut key).map_err(|_| {
-        anyhow::anyhow!("The operating system could not generate a Tally mirror key")
+        MirrorKeyError::Store(anyhow::anyhow!(
+            "The operating system could not generate a Tally mirror key"
+        ))
     })?;
-    key_store.save(&key)?;
+    key_store.save(&key).map_err(MirrorKeyError::Store)?;
     Ok(ResolvedMirrorKey { key })
 }
 
-fn validate_key(key: &[u8]) -> anyhow::Result<()> {
+/// Whether the database, or the write-ahead files SQLite keeps beside it, is
+/// there. A path that cannot be checked is not "absent" (`Path::exists` says
+/// false on any error): it refuses, so a key is never made beside a database.
+fn mirror_files_exist(database_path: &Path) -> Result<bool, MirrorKeyError> {
+    for suffix in ["", "-wal", "-shm"] {
+        let mut path = database_path.as_os_str().to_os_string();
+        path.push(suffix);
+        if Path::new(&path)
+            .try_exists()
+            .map_err(|_| MirrorKeyError::DatabaseStateUnreadable)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn validate_key(key: &[u8]) -> Result<(), MirrorKeyError> {
     if key.len() != MIRROR_KEY_BYTES {
-        anyhow::bail!(
-            "The stored Tally mirror key is invalid; an explicit local reset is required"
-        );
+        return Err(MirrorKeyError::StoredKeyInvalid);
     }
     Ok(())
 }

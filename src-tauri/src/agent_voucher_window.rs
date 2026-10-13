@@ -52,8 +52,7 @@ const CENSUS_WIRE_BYTES_PER_VOUCHER: u64 = 4 * 1024;
 pub(super) const MAX_CENSUS_READS: usize = 256;
 
 /// The most planned data reads one window read may spend before it is refused
-/// as needing a narrower window. The same ceiling the outstandings scanner uses
-/// for its own segment pairs.
+/// as needing a narrower window.
 pub(super) const MAX_PLANNED_READS: usize = 128;
 
 /// The request shapes this bound plans for, each with the per-voucher cost to
@@ -2096,9 +2095,7 @@ async fn estimate_window_volume<R: WindowReader>(
     // read that reports completeness or absence counts any other mark however
     // small the book, so a small or new company can have a window checked
     // complete and a presence question answered absent (#1029).
-    let fits_one_request =
-        high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes;
-    if high_water == 0 || (fits_one_request && limits.small_books == SmallBooks::Skip) {
+    if skips_census(high_water, limits) {
         return Ok(Preflight::Whole {
             census: None,
             marks: None,
@@ -2119,6 +2116,30 @@ async fn estimate_window_volume<R: WindowReader>(
         });
     }
     Ok(whole_or_counted(census, Some(marks), limits))
+}
+
+/// Whether a window read of a book whose voucher mark is `high_water` sends no
+/// census: the mark bounds the book and it fits one request, or the book has never
+/// held a voucher. [`census_read_count`] states the same rule beforehand.
+fn skips_census(high_water: u64, limits: WindowReadLimits) -> bool {
+    let fits_one_request =
+        high_water.saturating_mul(limits.default_bytes_per_voucher) <= limits.budget_bytes;
+    high_water == 0 || (fits_one_request && limits.small_books == SmallBooks::Skip)
+}
+
+/// How many census requests a window read of a book whose voucher mark is
+/// `high_water` sends under `limits`, or [`BOOK_TOO_LARGE`] when it is refused
+/// before the first. The same two rules the read applies ([`skips_census`] and
+/// [`census_spans`]), so what is stated before a read cannot differ from what the
+/// read does. It depends on the mark and the limits, never on the window.
+pub(super) fn census_read_count(
+    high_water: u64,
+    limits: WindowReadLimits,
+) -> Result<u64, &'static str> {
+    if skips_census(high_water, limits) {
+        return Ok(0);
+    }
+    census_spans(high_water, limits.census_capacity()).map(|spans| spans.count() as u64)
 }
 
 /// Count the window's vouchers per day, every census request bounded

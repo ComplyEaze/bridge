@@ -345,8 +345,9 @@ read (parity/python_golden.py --emit-bank-statement)",
             bridge_tax_audit::documents::traces_documents_from_json(&parsed)
                 .map(|t| caller.traces = t)
         } else if test_id == "bank_reconciliation" || test_id == "high_value_register" {
-            bridge_tax_audit::documents::bank_statement_from_json(&parsed)
-                .map(|t| caller.bank_statement = Some(t))
+            bridge_tax_audit::documents::bank_statement_from_json(&parsed).map(|t| {
+                caller.bank_statement = bridge_tax_audit::documents::BankStatementLoad::Read(t)
+            })
         } else {
             registry::turnover_inputs_from_json(&parsed).map(|t| caller.turnover_inputs = t)
         };

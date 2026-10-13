@@ -3,9 +3,9 @@
 // [VERIFY ...] / [PUBLISH DATE] marker, or a broken template fails with the input line number and
 // writes nothing. Unlike the changelog renderer there is no fallback page: a legal page must not
 // silently degrade.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const ARTICLE_MARKER = "<!-- legal -->";
 export const TITLE_MARKER = "<!-- legal-title -->";
@@ -251,4 +251,4 @@ export function main(argv) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exitCode = main(process.argv.slice(2));

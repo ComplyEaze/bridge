@@ -105,15 +105,16 @@ fn outstanding_destination_approvals_remain_independent() {
 fn traversal_like_party_name_cannot_escape_the_selected_directory() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "xlsx",
-        &[bill("../../etc/passwd", "15.00")],
-        &[],
-        |_| Ok(b"synthetic workbook".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "xlsx",
+        open_bills: &[bill("../../etc/passwd", "15.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic workbook".to_vec()),
+    })
     .expect("statement batch succeeds");
 
     assert_eq!(result.written.len(), 1);
@@ -134,21 +135,22 @@ fn traversal_like_party_name_cannot_escape_the_selected_directory() {
 fn renderer_failure_is_recorded_in_result_and_manifest_while_other_parties_write() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf",
-        &[bill("Good Party", "10.00"), bill("Broken Party", "20.00")],
-        &[],
-        |statement| {
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf",
+        open_bills: &[bill("Good Party", "10.00"), bill("Broken Party", "20.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |statement: &PartyStatement| {
             if statement.party == "Broken Party" {
                 Err("synthetic renderer failure".to_string())
             } else {
                 Ok(b"synthetic PDF".to_vec())
             }
         },
-    )
+    })
     .expect("partial batch result is returned");
 
     assert_eq!(result.written.len(), 1);
@@ -184,15 +186,16 @@ fn manifest_totals_keep_receivable_and_payable_directions_separate() {
         composition: None,
     }];
 
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf",
-        &[bill("Mixed Party", "10.00"), payable_bill],
-        &unallocated,
-        |_| Ok(b"synthetic PDF".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf",
+        open_bills: &[bill("Mixed Party", "10.00"), payable_bill],
+        unallocated_by_party: &unallocated,
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic PDF".to_vec()),
+    })
     .expect("mixed statement writes");
 
     assert_eq!(result.written[0].receivable_amount, "10");
@@ -223,15 +226,16 @@ fn manifest_discloses_the_selected_ageing_anchor() {
 fn per_party_file_creation_failure_is_retained_in_the_manifest() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf/invalid",
-        &[bill("Write Failure", "10.00")],
-        &[],
-        |_| Ok(b"synthetic PDF".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf/invalid",
+        open_bills: &[bill("Write Failure", "10.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic PDF".to_vec()),
+    })
     .expect("a partial batch result is returned");
 
     assert!(result.written.is_empty());
@@ -264,15 +268,16 @@ fn write_failure_reason_never_carries_the_local_destination_path_into_the_manife
         .to_string();
     let approved = approved_destination(destination.path());
 
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "pdf/invalid",
-        &[bill("Write Failure", "10.00")],
-        &[],
-        |_| Ok(b"synthetic PDF".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "pdf/invalid",
+        open_bills: &[bill("Write Failure", "10.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic PDF".to_vec()),
+    })
     .expect("a partial batch result is returned");
 
     assert_eq!(result.failures.len(), 1);
@@ -295,15 +300,16 @@ fn write_failure_reason_never_carries_the_local_destination_path_into_the_manife
 fn colliding_safe_names_are_written_to_distinct_files() {
     let destination = tempfile::tempdir().expect("temporary destination");
     let approved = approved_destination(destination.path());
-    let result = write_bulk_party_statements(
-        &approved,
-        "Synthetic Books Pvt Ltd",
-        "20260808",
-        "xlsx",
-        &[bill("A/B", "10.00"), bill("A:B", "20.00")],
-        &[],
-        |_| Ok(b"synthetic workbook".to_vec()),
-    )
+    let result = write_bulk_party_statements_with_ageing_anchor(BulkPartyStatementRequest {
+        destination: &approved,
+        company: "Synthetic Books Pvt Ltd",
+        as_of_yyyymmdd: "20260808",
+        format: "xlsx",
+        open_bills: &[bill("A/B", "10.00"), bill("A:B", "20.00")],
+        unallocated_by_party: &[],
+        ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+        render: |_: &PartyStatement| Ok(b"synthetic workbook".to_vec()),
+    })
     .expect("statements write");
 
     assert_eq!(result.written.len(), 2);

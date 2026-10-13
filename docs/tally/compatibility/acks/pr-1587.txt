@@ -1,0 +1,12 @@
+docs/step-by-step-roadmap.md
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+src-tauri/src/lib.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/runtime.rs
+src-tauri/src/tally/runtime_company_features.rs
+src-tauri/src/tally/runtime_control.rs
+src-tauri/src/tally/runtime_masters.rs
+src-tauri/src/tally/runtime_stock_summary.rs
+src-tauri/src/tally/runtime_trial_balance.rs
+tools/bridge-tally-compatibility/src/lib.rs
+reviewer: lamemustafa

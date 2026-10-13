@@ -74,7 +74,7 @@ use verification::{
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    Attribution, DeltaBasis, VerificationStatus,
+    Attribution, DeltaBasis, VerificationStatus, WrittenNarration,
 };
 #[cfg(test)]
 use verification::{
@@ -1574,27 +1574,41 @@ impl Server {
                 // Tally created none of its vouchers and none is found (for a
                 // batch, with the voucher mark measured unmoved), say so
                 // (bridge#1108); otherwise an edit in Tally is as likely. Only
-                // the post's own readback reads that answer: by a later
-                // verification someone may have entered a voucher by hand and
-                // edited it.
-                let counters = current_dispatch
-                    .then(|| {
-                        dispatch_response
-                            .as_ref()
-                            .and_then(|response| response.outcome.as_ref())
-                            .map(|outcome| outcome.counters())
-                    })
-                    .flatten();
-                let voucher_step =
-                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
-                match verification::unmatched_cause(
-                    counters,
-                    line.vouchers.len(),
-                    verification::unmatched_count(&result),
-                    voucher_step,
-                ) {
+                // the post's own readback reads a voucher as not created: by
+                // a later verification someone may have entered it by hand
+                // and edited it, so a later one keeps `sent_not_attributed`
+                // and only says, in the voucher's next step, what that answer
+                // reported when the voucher was sent.
+                let answer = dispatch_response
+                    .as_ref()
+                    .and_then(|response| response.outcome.as_ref())
+                    .map(|outcome| outcome.counters());
+                let cause = if current_dispatch {
+                    verification::unmatched_cause(
+                        answer,
+                        line.vouchers.len(),
+                        verification::unmatched_count(&result),
+                        verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark),
+                    )
+                } else {
+                    // The post's own verdict on its voucher step, for a batch.
+                    // Read only where it decides, and never a way for this
+                    // check to fail: no record reads as not matched.
+                    let step_matched = answer.is_some()
+                        && line.vouchers.len() > 1
+                        && self
+                            .imports_dir()
+                            .ok()
+                            .and_then(|imports| read_masters_check(&imports, &line.batch_id))
+                            .is_some_and(|check| check["batch_step"]["state"] == "matched");
+                    verification::later_unmatched_cause(answer, line.vouchers.len(), step_matched)
+                };
+                match cause {
                     verification::UnmatchedCause::ReportedNotCreated => {
                         verification::mark_reported_not_created(&mut result)
+                    }
+                    verification::UnmatchedCause::ReportedNotCreatedWhenSent => {
+                        verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
                         verification::mark_sent_not_attributed(&mut result)
@@ -2392,6 +2406,36 @@ impl Server {
         }
     }
 
+    /// Whether the import journal already holds a batch of this company, sent
+    /// or found posted, with a row of `vouchers` (a statement file's vouchers,
+    /// in the shape a build takes). The same check a build makes before it
+    /// writes an import file.
+    pub(super) fn import_journal_holds_rows_of(
+        &self,
+        company_guid: &str,
+        vouchers: &Value,
+    ) -> Result<bool, String> {
+        // A statement file's vouchers carry the caller's date text, as a build
+        // receives them; each is parsed the way a build parses it.
+        let vouchers: Vec<ImportVoucher<String>> = serde_json::from_value(vouchers.clone())
+            .map_err(|_| "proposals_file_invalid".to_string())?;
+        let vouchers = vouchers
+            .into_iter()
+            .map(|voucher| {
+                let date = normalized_date(&voucher.date)
+                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                Ok(voucher.dated(date))
+            })
+            .collect::<Result<Vec<ImportVoucher>, String>>()?;
+        let _admission_lock = self.lock_import_admission_shared()?;
+        Ok(self
+            .import_vouchers_already_posted_while_admitted(
+                &canonical_batch_guid(company_guid),
+                &vouchers,
+            )?
+            .is_some())
+    }
+
     fn latest_import_snapshot(
         &self,
         batch_id: &str,
@@ -2488,37 +2532,76 @@ fn append_private_import_ledger(
     bytes: &[u8],
     prepare_permissions: impl FnOnce(&std::fs::File) -> Result<(), String>,
 ) -> Result<(), String> {
+    append_private_import_ledger_syncing(
+        path,
+        bytes,
+        prepare_permissions,
+        persistence::sync_directory,
+    )
+}
+
+/// [`append_private_import_ledger`] with the directory sync given, so a test can
+/// fail it.
+fn append_private_import_ledger_syncing(
+    path: &Path,
+    bytes: &[u8],
+    prepare_permissions: impl FnOnce(&std::fs::File) -> Result<(), String>,
+    sync_directory: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<(), String> {
     // Admission serializes writers; read/write access also permits Windows rollback.
     let mut file = super::local_file::open_local_file(path, true)
         .map_err(|_| "import_ledger_unavailable".to_string())?;
     prepare_permissions(&file)?;
     file.seek(SeekFrom::End(0))
         .map_err(|_| "import_ledger_unavailable".to_string())?;
-    append_import_ledger_bytes(&mut file, bytes)
+    let mut journal = JournalFile {
+        file,
+        directory: path.parent().unwrap_or(path).to_path_buf(),
+        sync_directory: Some(sync_directory),
+    };
+    append_import_ledger_bytes(&mut journal, bytes)
 }
 
 trait ImportLedgerWriter {
     fn length(&mut self) -> std::io::Result<u64>;
     fn append(&mut self, bytes: &[u8]) -> std::io::Result<()>;
     fn sync(&mut self) -> std::io::Result<()>;
+    /// Make the file's name in its directory durable. Called after an append to
+    /// a file that was empty or has just been created: a file a power failure
+    /// can take back is no record.
+    fn sync_entry(&mut self) -> std::io::Result<()>;
     fn truncate(&mut self, length: u64) -> std::io::Result<()>;
 }
 
-impl ImportLedgerWriter for std::fs::File {
+/// The journal file and the directory it is in.
+struct JournalFile<S> {
+    file: std::fs::File,
+    directory: PathBuf,
+    sync_directory: Option<S>,
+}
+
+impl<S: FnOnce(&Path) -> std::io::Result<()>> ImportLedgerWriter for JournalFile<S> {
     fn length(&mut self) -> std::io::Result<u64> {
-        self.metadata().map(|metadata| metadata.len())
+        self.file.metadata().map(|metadata| metadata.len())
     }
 
     fn append(&mut self, bytes: &[u8]) -> std::io::Result<()> {
-        self.write_all(bytes)
+        self.file.write_all(bytes)
     }
 
     fn sync(&mut self) -> std::io::Result<()> {
-        self.sync_data()
+        self.file.sync_data()
+    }
+
+    fn sync_entry(&mut self) -> std::io::Result<()> {
+        match self.sync_directory.take() {
+            Some(sync) => sync(&self.directory),
+            None => Err(std::io::Error::other("directory already synced")),
+        }
     }
 
     fn truncate(&mut self, length: u64) -> std::io::Result<()> {
-        self.set_len(length)
+        self.file.set_len(length)
     }
 }
 
@@ -2529,7 +2612,20 @@ fn append_import_ledger_bytes(
     let original_length = writer
         .length()
         .map_err(|_| "import_ledger_unavailable".to_string())?;
-    if writer.append(bytes).and_then(|_| writer.sync()).is_err() {
+    // The length is read afresh for every append: a journal that is empty here
+    // (just created, or left empty by an append that stopped) may lack a durable
+    // directory entry, so the write is not complete until that is synced.
+    let appended = writer
+        .append(bytes)
+        .and_then(|_| writer.sync())
+        .and_then(|_| {
+            if original_length == 0 {
+                writer.sync_entry()
+            } else {
+                Ok(())
+            }
+        });
+    if appended.is_err() {
         writer
             .truncate(original_length)
             .and_then(|_| writer.sync())
@@ -2627,7 +2723,7 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
             "a voucher carries its own number, and native posting lets Tally assign it".to_string()
         }
         "import_review_layout_text" | "import_review_format_text" => {
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully".to_string()
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)".to_string()
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()
@@ -2868,10 +2964,11 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
             }
         }
         if let Some(number) = voucher.voucher_number.as_deref() {
-            // Unlike narration/reference, `voucher_diffs` compares the
-            // voucher number verbatim, so a value that would read back
-            // rewritten must be refused here — verification could never
-            // confirm it as posted.
+            // Unlike the reference, `voucher_diffs` compares the voucher
+            // number verbatim (and the narration, which
+            // `refuse_rewritten_narration` guards), so a value that would
+            // read back rewritten must be refused here — verification could
+            // never confirm it as posted.
             if number.is_empty()
                 || number.chars().count() > MAX_TEXT_CHARS
                 || number.chars().any(char::is_control)
@@ -3241,9 +3338,9 @@ fn cash_bank_refusals(
 /// Call this only on a field something compares as text: a ledger name
 /// (checked in `validate_payload`'s entry loop) and the voucher number
 /// (checked above), which `voucher_diffs` (agent_import_verification.rs)
-/// compares, and the narration, which a native post's span binding compares
-/// byte for byte (`agent_import_span_identity.rs`) and the build and a native
-/// post refuse (`refuse_rewritten_narration`). The reference is never
+/// compares, and the narration, which a native post's span binding and the
+/// read-back compare byte for byte (`narration_differs`, #1608) and the build
+/// and a native post refuse (`refuse_rewritten_narration`). The reference is never
 /// compared, so refusing it would refuse a value nothing downstream would
 /// ever notice as changed, and `validate_payload` does not.
 ///

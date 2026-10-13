@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-import { pathToFileURL } from "node:url";
+import { existsSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const managedKey = /^bridge-package-sccache-v1-(macOS|Windows)-(ARM64|X64)-[a-f0-9]{64}-[a-f0-9]{40}-\d+$/;
 // Swatinem/rust-cache keys end in an environment hash and a lockfile hash, and it restores by the
@@ -96,7 +97,7 @@ export async function pruneCaches({ env = process.env, fetcher = fetch, apply = 
   return { applied: apply, obsoleteIds: obsolete.map((cache) => cache.id), retainedPerOS: 2, retainedPerRustFamily: 1 };
 }
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   if (process.argv.slice(2).some((arg) => arg !== "--apply")) throw new TypeError("Unexpected argument");
   console.log(JSON.stringify(await pruneCaches({ apply: process.argv.includes("--apply") })));
 }

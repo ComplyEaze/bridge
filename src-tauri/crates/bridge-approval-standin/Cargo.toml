@@ -1,0 +1,12 @@
+[package]
+name = "bridge-approval-standin"
+version = "0.1.0"
+description = "Home of the approval dialog's stand-in example, kept out of the bridge package so building it never compiles bridge"
+license = "Apache-2.0"
+repository = "https://github.com/ComplyEaze/bridge"
+publish = false
+edition = "2021"
+rust-version = "1.96"
+
+[lints]
+workspace = true

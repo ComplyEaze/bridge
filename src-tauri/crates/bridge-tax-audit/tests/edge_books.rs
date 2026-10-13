@@ -17,11 +17,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 use bridge_tax_audit::book::{
-    Book, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher, VoucherStatus,
+    Book, ClosingStock, InventoryLine, Ledger, LedgerLine, OpeningStock, TbRow, Voucher,
+    VoucherStatus,
 };
 use bridge_tax_audit::canonical::canonical_test_result;
 use bridge_tax_audit::compare::compare;
-use bridge_tax_audit::documents::{bank_statement_from_json, traces_documents_from_json};
+use bridge_tax_audit::documents::{
+    bank_statement_from_json, traces_documents_from_json, BankStatementLoad,
+};
 use bridge_tax_audit::error::{AuditError, Result};
 use bridge_tax_audit::findings::{EvidenceRef, TestResult};
 use bridge_tax_audit::read::Window;
@@ -30,11 +33,11 @@ use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, high_value_register,
-    knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees, partners_40b_194t,
-    party_identity, party_monthly, questionnaire_cl13, read_scope, related_parties_cl23,
-    specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock, stock_read,
-    tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements,
+    high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
+    partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
+    related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
+    stock_read, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts, PartnersConfig,
     RelatedPartiesConfig, Tds26asConfig, TdsConfig,
 };
 use serde_json::Value;
@@ -211,6 +214,32 @@ fn opening_stock(s: &Value) -> OpeningStock {
     .unwrap_or_default()
 }
 
+/// `closing_stock`: integer paise, or one of the reasons it is unknown; absent means none applies.
+fn closing_stock(s: &Value) -> ClosingStock {
+    use bridge_tax_audit::book::ClosingStockUnknown as U;
+    typed(
+        s,
+        "closing_stock",
+        false,
+        "integer paise or a reason",
+        |v| {
+            v.as_i64().map(ClosingStock::Valued).or_else(|| {
+                [
+                    U::NotRead,
+                    U::NoSummaryAtPeriodEnd,
+                    U::Unreadable,
+                    U::NoStockItems,
+                    U::SeveralSummariesAtPeriodEnd,
+                ]
+                .into_iter()
+                .find(|u| v.as_str() == Some(u.as_str()))
+                .map(ClosingStock::Unknown)
+            })
+        },
+    )
+    .unwrap_or_default()
+}
+
 fn build(s: &Value) -> Book {
     let groups = s["groups"]
         .as_object()
@@ -320,6 +349,7 @@ fn build(s: &Value) -> Book {
         currency_read: typed(s, "currency_read", false, "true or false", Value::as_bool)
             .unwrap_or(false),
         opening_stock: opening_stock(s),
+        closing_stock: closing_stock(s),
         ..Default::default()
     }
 }
@@ -839,6 +869,13 @@ fn check(name: &str) {
                 let c = cash_book_integrity::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
+            "financial_statements" => {
+                // As `parity/edge_golden.py` runs it: no partners' interest ledgers and no report
+                // totals.
+                let r = financial_statements::run(&book, &rules, &BTreeSet::new(), None).unwrap();
+                let c = financial_statements::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
             "cash_payments_40a3" => {
                 // As `parity/edge_golden.py` runs it: the configured loan ledgers and the
                 // round-off ledgers as given. The reference module has no `check_invariants`.
@@ -1128,23 +1165,27 @@ fn check(name: &str) {
                 // As `parity/edge_golden.py` runs it: the statement and the AIS rows optional, the
                 // counterparty types already merged, the recipient type from `entity_type` unless
                 // the spec names one ("unknown" meaning none). A statement the reader refuses is not
-                // supplied, and its reason is passed, as the pack passes it.
-                let (statement, refused) = match &s["bank_statement"] {
-                    Value::Null => (
-                        None,
-                        s["bank_statement_refused"].as_str().map(str::to_string),
-                    ),
+                // supplied, and its reason is passed, as the pack passes it. A statement read and also
+                // refused is not a state `BankStatementLoad` can hold, so a spec giving both panics.
+                let statement = match &s["bank_statement"] {
+                    Value::Null => match s["bank_statement_refused"].as_str() {
+                        Some(reason) => BankStatementLoad::Refused(reason.to_string()),
+                        None => BankStatementLoad::NotSupplied,
+                    },
                     v => match bank_statement_from_json(v) {
-                        Ok(statement) => (
-                            Some(statement),
-                            s["bank_statement_refused"].as_str().map(str::to_string),
-                        ),
+                        Ok(statement) => {
+                            assert!(
+                                s["bank_statement_refused"].is_null(),
+                                "{name}: bank_statement_refused is given and the statement is read"
+                            );
+                            BankStatementLoad::Read(statement)
+                        }
                         Err(AuditError::StatementRefused(refusal)) => {
                             assert!(
                                 s["bank_statement_refused"].is_null(),
                                 "{name}: bank_statement_refused is given and the reader refuses"
                             );
-                            (None, Some(refusal.reason()))
+                            BankStatementLoad::Refused(refusal.reason())
                         }
                         Err(e) => panic!("{name}: the statement is malformed: {e}"),
                     },
@@ -1177,13 +1218,12 @@ fn check(name: &str) {
                     cash: &cash,
                     bank: &bank,
                     threshold_paise: None,
-                    bank_statement: statement.as_ref(),
+                    bank_statement: &statement,
                     s194n_narration_terms: &terms,
                     ais_rows: docs.ais_rows(),
                     s194n_recipient_type: recipient,
                     round_off_ledgers: &round_off,
                     counterparty_type_by_ledger: &types,
-                    bank_statement_refused: refused.as_deref(),
                 };
                 let r = high_value_register::run(&book, &rules, &inputs).unwrap();
                 // The reference module has no check_invariants: an empty evaluated list.
@@ -1264,7 +1304,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 30] = [
+const EDGE_TESTS: [&str; 31] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1277,6 +1317,7 @@ const EDGE_TESTS: [&str; 30] = [
     "creditor_ageing_43bh",
     "depreciation",
     "entity_269st_gap",
+    "financial_statements",
     "high_value_register",
     "knock_off_candidates",
     "ledger_scrutiny",
@@ -1928,13 +1969,12 @@ fn two_party_ledgers_with_one_tag_are_refused_in_the_high_value_register() {
         cash: &cash,
         bank: &none,
         threshold_paise: None,
-        bank_statement: None,
+        bank_statement: &BankStatementLoad::NotSupplied,
         s194n_narration_terms: &none,
         ais_rows: &[],
         s194n_recipient_type: None,
         round_off_ledgers: &none,
         counterparty_type_by_ledger: &no_types,
-        bank_statement_refused: None,
     };
     let result = std::panic::catch_unwind(|| high_value_register::run(&book, &rules, &inputs))
         .expect("refused, not panicked");

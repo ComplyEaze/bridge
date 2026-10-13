@@ -499,6 +499,15 @@ synthetic read responses and the exact native master/balance/group responses are
 the repository's `master_fields_lab` fixtures; every request in the lab run was bracketed by a
 200 `/status` response and every write was explicitly scoped to the lab company.
 
+**A sent list is not merged (PARTIAL; 2026-10-08; one licensed TallyPrime 7.1 Gold book, one
+stock item, once).** An `Alter` that carried a stock item's GST details list holding one new
+dated entry left the item with only the entry sent: its older entry, which held the HSN, was
+gone. The preservation above is of an omitted scalar field; a list that is sent stands for the
+whole list. Not measured: a ledger's lists (GST rate and HSN details, the dated registration
+history, the mailing details), and other releases. Until they are, a writer treats every list it
+sends as replacing the stored one, and sends the whole list as read, with its addition. The run's
+request and responses are not in this repository.
+
 ### 9.4b Master-name matching: case- and separator-insensitive, otherwise exact
 
 **VERIFIED 2026-07-30** — recorded in `IMPLEMENTATION_GUIDE.md` §3.3a's sibling §3.3b since then,
@@ -666,8 +675,8 @@ none is `ledger_not_found`; and **more than one is `ledger_ambiguous` — an err
 comparison that returns the first match is the failure this rule exists to prevent.
 
 **Copy its discipline, not its fold.** That resolver's `ledger_lookup_key` keeps only alphanumerics,
-which is *looser* than anything §3.3b measured — it drops `&` outright, so `A & B` and `AB` share a
-key.
+which is *looser* than anything `IMPLEMENTATION_GUIDE.md` §3.3b measured — it drops `&` outright,
+so `A & B` and `AB` share a key.
 
 Be exact about what was and was not tested there, because I was not. §3.3b sent
 `ZZ Ram AND Sons Pvt Ltd` against `ZZ Ram & Sons Pvt Ltd` and it was **rejected** — that tested
@@ -888,7 +897,7 @@ habits, not against real operator input.
 - the CR LF name after plain;
 - a lowercase CR LF name after an uppercase plain one.
 
-A folded twin is therefore a second master, not a silent Alter of the first (contrast §9.4).
+A twin that differs by a trailing CR LF is therefore a second master, not a silent Alter of the first (contrast §9.4). A name that differed by case alone altered the existing ledger (2026-10-13, below).
 
 Every voucher below was imported as a file over the gateway, with no errors. The ledger it posted to was read back per ledger GUID.
 
@@ -901,12 +910,19 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 
 **When a ledger carries exactly the imported name, the import posts to it**, and creation order does not decide. In the first three rows the matched ledger was also the older twin. The last row names the newer one and still posts to the exact match. That voucher was a probe: a file built for the uppercase ledger, before the twin existed, with its one `LEDGERNAME` then changed to the lowercase CR LF name. `verify_import` against the built batch reported it `posted_divergent`, naming both ledgers.
 
-**Not measured:**
-- a name that matches **neither** twin exactly, only folding to both (e.g. mixed case without the CR LF): which twin Tally picks there is open;
-- twins made or edited in Tally's own screens;
+**Not measured in that run:**
+- a name that matches **neither** twin exactly, only folding to both (measured on 2026-10-13, below);
+- twins made or edited in Tally's own screens (two screen attempts on 2026-10-13, below);
 - the fold-twin behaviour on Gold and Education (the CR LF block below measures an encoding on Gold, not twins).
 
-Until the fold-only case is measured, bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`).
+**A name that only folds to both twins landed on one of them; a case-only Create altered; an alias reached its ledger. VERIFIED 2026-10-13, licensed TallyPrime 7.1 Silver on Windows, one synthetic company, one run of each step. Confidence: PARTIAL.** Branch `lab/626-twin-answers`, `a283cd3c`, bridge#626; every figure was read from the answers with an XML parser.
+- **The fold-only name.** The company held a ledger whose name ends in CR LF. A second ledger with the same name and no line break was created by request (`CREATED` 1; its own GUID; the first unchanged). A Payment was then imported whose debit named the ledger in capitals with no line break, which equals neither name and folds to both. It answered `CREATED` 1, and its debit entry read back with the name of the ledger **without** the line break, the one ledger row whose `NAME` attribute equals it. So a name equal to neither twin was accepted, and nothing in the import's answer named the ledger it landed on.
+- **Case alone.** With a ledger named in capitals in the book, a `Create` naming it in small letters under another group answered `ALTERED` 1, `CREATED` 0: the same GUID, its group changed, the row's `NAME` attribute still in capitals and its own name (the `NAME` under `LANGUAGENAME.LIST/NAME.LIST`) in small letters. §9.4g measured a `Create` on the same spelling altering the ledger. So a ledger's own name changed here, through a `Create` in another case; in the captured books of §9.4h, which describes rows whose attribute and own name differ, only the attribute was seen to change. The request carried a name and a group only. No pair differing by case alone was made.
+- **An alias.** After an alias was added (on the ledger alteration screen, by the branch's notes), the ledger read back with a second `NAME` element. A Payment imported with the alias as its ledger name answered `CREATED` 1 and read back under the ledger's own name.
+- **From that branch's notes, not from an answer:** the ledger creation screen refused a name differing by case alone from an existing ledger ("Name already exists."), and a name pasted into it with a trailing CR LF was stored without the line break.
+- **Not established:** both creation orders of each pair; an alias that only folds equal to another ledger's name; a balance read of either ledger (which ledger a voucher landed on is read from the voucher entry's name); Gold and Education; other releases.
+
+bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`). The 2026-10-13 run does not change that.
 
 **Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
 Gold, one client book, 2026-09-28).**
@@ -1080,7 +1096,7 @@ mark was not measured.
 - an `OPENINGBALANCE` of `0` or an empty element (only an omitted element was measured);
 - an opening-only change on a ledger under a nominal group;
 - an omitted opening in a `Create` that also changes the parent or the bill-wise flag;
-- a folded or differently cased spelling of the name (§9.4b, §9.4d, §9.4e);
+- a folded spelling of the name (§9.4b, §9.4d, §9.4e); a spelling in another case, with another group and nothing else, altered the existing ledger on 2026-10-13 (§9.4e);
 - a ledger that holds bill allocations or posted vouchers;
 - the cause of the date-less `0.00`;
 - the same behaviour on Gold or Education;
@@ -1096,14 +1112,20 @@ mark was not measured.
 
 **Measured on captured `List of Ledgers` collections, 4,017 distinct ledger GUIDs in 13 books (kept outside the repository, counted separately and not re-derived here); one row is committed.** **Confidence: PARTIAL.**
 
-A ledger row names its ledger twice: in the row's `NAME` attribute, and as the first `NAME` under `LANGUAGENAME.LIST/NAME.LIST` (its own name; any later `NAME` is an alias). The voucher rows' `LEDGERNAME` has so far carried the attribute spelling (measured on one book only, not the synthetic book read below, where the two spellings had converged).
+A ledger row names its ledger twice: in the row's `NAME` attribute, and as the first `NAME` under `LANGUAGENAME.LIST/NAME.LIST` (its own name; any later `NAME` is an alias). The voucher rows' `LEDGERNAME` has so far carried the attribute spelling (see the 12 Oct 2026 bullet below for a read where the two differed).
 
 - **26** of the 4,017 GUIDs ever had an attribute that differed from their own name, in 4 of the 13 books. Every such pair shares the same letters and digits and differs in case or symbols. The committed capture `native-shape-lab-ledger-catalogue.utf16le.xml` holds one: attribute `ROUND OFF`, own name `Round Off`.
 - For 21 GUIDs the attribute changed between captures (the `ALTERID` advanced) while the own name stayed the same. The own name never varied for a GUID.
 - ComplyEaze Bridge reads the own name (`standard_ledger_catalog.rs`), takes either spelling as an exact request for that one ledger in `vouchers` and the `outstandings` party detail (a spelling that is two ledgers' is `ledger_ambiguous`, and so is a case-and-spaces match over either spelling of two ledgers), and shows the own name. The voucher filter still compares the spelling the voucher rows carry. A party detail of the `outstandings` tool that finds no bill or no unallocated row for a ledger whose two spellings differ carries `report_spelling: not_established`, because the bills are matched on the voucher spelling: it may mean the report names the ledger differently, and is not a finding about the party.
-- **Read on that book again, 6 Oct 2026 (PARTIAL: one book, one ledger; three read-only `vouchers` calls in a maintainers' run on a build of the stored-name change, #1085 slice a; their captures were deleted when the cycle ended, so only the committed parts below can be re-checked).** Committed: the capture `native-shape-lab-ledger-catalogue-v2.utf16le.xml` of the same synthetic book `BRIDGE SHAPE LAB` (44 ledger rows) has the Round Off row's `NAME` attribute `Round Off`, equal to its own name, where the earlier capture above has `ROUND OFF`; `vouchers-shape-lab-fy.rows.json` holds the book's 67 vouchers for its financial year, two of which carry the Round Off entry, both spelled `Round Off`. From that run, not committed: a request for `Round Off` resolved as an exact spelling and one for `ROUND OFF` as a case-and-spaces match, and both returned the same voucher (a Purchase of 21 Apr 2025) for the window the call was given, complete, without a refusal. The window of those two calls was recorded only in a note that is not committed, so which other Round Off voucher (the book holds a second) the window excluded is not shown here. So that state (attribute different from own name) was not present on the book when it was read, and which spelling a voucher row carries when the two differ is still not measured. What moves the attribute is unknown.
+- **Read on that book again, 6 Oct 2026 (PARTIAL: one book, one ledger; three read-only `vouchers` calls in a maintainers' run on a build of the stored-name change, #1085 slice a; their captures were deleted when the cycle ended, so only the committed parts below can be re-checked).** Committed: the capture `native-shape-lab-ledger-catalogue-v2.utf16le.xml` of the same synthetic book `BRIDGE SHAPE LAB` (44 ledger rows) has the Round Off row's `NAME` attribute `Round Off`, equal to its own name, where the earlier capture above has `ROUND OFF`; `vouchers-shape-lab-fy.rows.json` holds the book's 67 vouchers for its financial year, two of which carry the Round Off entry, both spelled `Round Off`. From that run, not committed: a request for `Round Off` resolved as an exact spelling and one for `ROUND OFF` as a case-and-spaces match, and both returned the same voucher (a Purchase of 21 Apr 2025) for the window the call was given, complete, without a refusal. The window of those two calls was recorded only in a note that is not committed, so which other Round Off voucher (the book holds a second) the window excluded is not shown here. So that state (attribute different from own name) was not present on the book when it was read, and which spelling a voucher row carries when the two differ was not measured then (read since: see the 12 Oct 2026 bullet below). What moves the attribute is unknown.
+- **Read on a book where the two spellings differed, 12 Oct 2026 (VERIFIED on one Tally and one ledger pair; the cause is INFERRED).** Evidence: branch `lab/1262-capture-answers` at `7ce2ebf5` (not for merge): 20 answers (`K1` to `K5`, requests `q1` to `q4`), `SHA256.txt`, `log.txt` and `RESULTS.md`, from TallyPrime 7.1 Silver on port 9001, by `curl` only, one request at a time, every answer HTTP 200. Two synthetic companies: `BRIDGE SPELL LAB` holds the ledger `Bridge Spell Party` and one Receipt of 1 Apr 2026 (Cash 100.00, the party 100.00); `BRIDGE SPELL TWIN` holds a ledger keyed in capitals, `BRIDGE SPELL PARTY`, and no voucher. Only `BRIDGE SPELL LAB` was read. Read by structure (`LEDGER` row attribute, first `LANGUAGENAME.LIST/NAME.LIST/NAME`, and the voucher's `LEDGERNAME` and `PARTYLEDGERNAME`):
+  - **Within one load state, the voucher's ledger names equal the row's `NAME` attribute** at all five checkpoints, including the one where the attribute differed from the own name. In `K3` (restart; `TWIN` loaded first, then `LAB`) the attribute was `BRIDGE SPELL PARTY`, the own name `Bridge Spell Party`, and both voucher names `BRIDGE SPELL PARTY`. Read through `q1` and `q2`, and again through `q4` and `q3`, the two requests `ledger_movement` sends.
+  - **Load order moved the attribute and the voucher's ledger names together, and not the own name.** `K4` (restart; `LAB` first, then `TWIN`) read `Bridge Spell Party` everywhere. `K3` and `K4` differ only in those name strings.
+  - **Neither a second company created and loaded (`K1` against `K2`) nor a restart (`K5` against `K1`) changed any name.** `K1` and `K2` are byte-identical; `K5` is byte-identical to `K4` and differs from `K1` only in the `CMPINFO` counters, which reset after a restart.
+  - **INFERRED, from one pair of load orders:** when two loaded companies share a ledger name that differs only in case, the first-loaded company's spelling is the one both the attribute and the voucher's ledger names carry.
+  - So the state a stored-name filter would need (a voucher carrying the own name while the attribute differs) was not produced at any checkpoint.
 
-**Not measured:** that the first `LANGUAGENAME.LIST` is the primary language when a master has several; what the outstandings (bills) reports carry for such a ledger; which spelling a voucher row carries for a ledger whose two spellings differ at the time of the read (the one read through Bridge found them equal), on any book other than the one the attribute spelling was seen on; whether Tally accepts the attribute spelling in an import when it differs from the own name (imports are unchanged); whether an alias can equal another ledger's own name.
+**Not measured:** that the first `LANGUAGENAME.LIST` is the primary language when a master has several; what the outstandings (bills) reports carry for such a ledger; a voucher carrying the own name while the attribute differs (it was reported and is not reproduced by the 12 Oct 2026 capture); whether the first-loaded company's spelling wins for other load orders, for three companies, and for differences other than case; why the second company's own Chart of Accounts showed its capitals-keyed ledger in mixed case (it was never read through a request); whether Tally accepts the attribute spelling in an import when it differs from the own name (imports are unchanged); whether an alias can equal another ledger's own name.
 
 
 #

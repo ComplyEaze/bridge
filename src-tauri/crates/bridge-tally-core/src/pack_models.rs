@@ -669,45 +669,6 @@ pub struct BillsAndPaymentsBatch {
     pub parties: Vec<PartyOutstandingFacts>,
 }
 
-pub fn derive_bill_allocation_source_id(
-    company_fingerprint: &CanonicalText,
-    party_ledger_source_id: &SourceRecordId,
-    origin_parent_source_id: &SourceRecordId,
-    allocation_ordinal: u64,
-) -> Result<SourceRecordId, TallyError> {
-    if allocation_ordinal == 0 {
-        return Err(invalid_data("bill_allocation_ordinal_invalid"));
-    }
-    let mut digest = Sha256::new();
-    digest.update(b"bridge-tally-bill-allocation-id-v1\0");
-    digest.update(company_fingerprint.as_str().as_bytes());
-    digest.update(b"\0");
-    digest.update(party_ledger_source_id.as_str().as_bytes());
-    digest.update(b"\0");
-    digest.update(origin_parent_source_id.as_str().as_bytes());
-    digest.update(b"\0");
-    digest.update(allocation_ordinal.to_be_bytes());
-    SourceRecordId::parse(format!("bill-allocation:{}", hex_lower(&digest.finalize())))
-}
-
-pub fn derive_bill_outstanding_source_id(
-    exact_scope_fingerprint: &CanonicalText,
-    row_ordinal: u64,
-) -> Result<SourceRecordId, TallyError> {
-    if row_ordinal == 0 {
-        return Err(invalid_data("bill_outstanding_ordinal_invalid"));
-    }
-    let mut digest = Sha256::new();
-    digest.update(b"bridge-tally-outstanding-observation-id-v1\0");
-    digest.update(exact_scope_fingerprint.as_str().as_bytes());
-    digest.update(b"\0");
-    digest.update(row_ordinal.to_be_bytes());
-    SourceRecordId::parse(format!(
-        "bill-outstanding:{}",
-        hex_lower(&digest.finalize())
-    ))
-}
-
 impl BillsAndPaymentsBatch {
     pub fn validate(&self) -> Result<(), TallyError> {
         ensure_unique_source_ids(

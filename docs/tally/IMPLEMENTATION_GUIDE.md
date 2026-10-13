@@ -113,7 +113,7 @@ company lookups to produce a value that is constant for the entire request.
 > **Rule: never use `<COMPUTE>` to carry a per-request constant.** Company name, company GUID,
 > schema identifiers and record counts are all obtainable from a separate, cheap request — or
 > from the client that built the request in the first place. Bridge's existing
-> `company_book_extent_v1` profile already returns the verified company GUID in milliseconds.
+> `company_book_extent_v2` profile already returns the verified company GUID in milliseconds.
 
 This is the same category of error as the self-referential `$$NumItems` in §5.3b: a TDL
 construct that looks like free metadata and is actually per-row work. Both were inherited from
@@ -284,6 +284,10 @@ requires a restart.
 
 **OWNER-RULED 2026-07-30.** The wildcard outstandings profile has one narrow response-bound
 exception because a live 1,632-voucher boundary produced approximately 33.6 MiB:
+
+(October 2026: the voucher-scan outstandings read, its `VoucherOutstandingsV1` request and its
+40 MiB cap were deleted from the code; every read now has the 32 MiB cap. This section stays as
+the rule a future scan must meet.)
 
 - the general XML response cap remains **32 MiB**;
 - only the closed `VoucherOutstandingsV1` request type may use a **40 MiB** response cap;

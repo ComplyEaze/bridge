@@ -399,6 +399,10 @@ fn import_ledger_append_rolls_back_a_partial_failing_write() {
             Ok(())
         }
 
+        fn sync_entry(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+
         fn truncate(&mut self, length: u64) -> std::io::Result<()> {
             self.bytes.truncate(length as usize);
             Ok(())
@@ -863,7 +867,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
         alter_id: Some(11),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".into()),
-        narration: Some("[BRIDGE:txn-001]".into()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".into()),
         voucher_number: None,
         cancelled: Some(false),
         optional: Some(false),
@@ -1164,7 +1168,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
         alter_id: Some(11),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
-        narration: Some("[BRIDGE:txn-001]".to_string()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".to_string()),
         voucher_number: None,
         master_id: None,
         cancelled: Some(false),
@@ -1386,7 +1390,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         alter_id: Some(11),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
-        narration: Some("[BRIDGE:txn-001]".to_string()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".to_string()),
         voucher_number: None,
         master_id: None,
         cancelled: Some(false),
@@ -1414,7 +1418,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
         entries: Vec::new(),
         ..posted.clone()
     };
-    let copy = cancel("copy-guid", 5, Some("[BRIDGE:txn-001]"));
+    let copy = cancel("copy-guid", 5, Some("Paid & settled [BRIDGE:txn-001]"));
     let unrelated = cancel("unrelated-guid", 3, None);
     for observed in [
         vec![posted.clone(), copy.clone(), unrelated.clone()],
@@ -1616,7 +1620,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
         alter_id: Some(11),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
-        narration: Some("[BRIDGE:txn-001]".to_string()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".to_string()),
         voucher_number: None,
         master_id: None,
         cancelled: Some(false),
@@ -1688,7 +1692,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
         alter_id: Some(alter_id),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
-        narration: Some("[BRIDGE:txn-001]".to_string()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".to_string()),
         voucher_number: None,
         master_id: None,
         cancelled: Some(false),
@@ -1756,7 +1760,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
         alter_id: Some(alter_id),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
-        narration: Some("[BRIDGE:txn-001]".to_string()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".to_string()),
         voucher_number: None,
         master_id: None,
         cancelled: Some(false),
@@ -1818,7 +1822,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
         alter_id: Some(11),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".to_string()),
-        narration: Some("[BRIDGE:txn-001]".to_string()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".to_string()),
         voucher_number: None,
         master_id: None,
         cancelled: Some(false),
@@ -3177,9 +3181,11 @@ fn refusal_reason_states_the_current_voucher_limit() {
     let numbered = native_post_refusal_reason("import_post_numbered_journal_unsupported", 1);
     assert!(numbered.contains("carries its own number"), "{numbered}");
     for code in ["import_review_layout_text", "import_review_format_text"] {
-        let text = native_post_refusal_reason(code, 1);
-        assert!(text.contains("company name, a ledger name"), "{text}");
-        assert!(text.contains("cannot show faithfully"), "{text}");
+        assert_eq!(
+            native_post_refusal_reason(code, 1),
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)",
+            "{code}"
+        );
     }
     let dialog = native_post_refusal_reason("import_review_too_large", 1);
     assert!(
@@ -4623,7 +4629,7 @@ fn divergent_verification() -> Value {
         alter_id: Some(11),
         date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
         voucher_type: Some("Payment".into()),
-        narration: Some("[BRIDGE:txn-001]".into()),
+        narration: Some("Paid & settled [BRIDGE:txn-001]".into()),
         voucher_number: None,
         cancelled: Some(false),
         optional: Some(false),

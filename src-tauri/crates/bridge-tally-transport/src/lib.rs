@@ -6,8 +6,6 @@
 
 use std::{net::IpAddr, sync::Arc, time::Duration};
 
-#[cfg(feature = "voucher-scan")]
-use bridge_tally_protocol::outstandings::VoucherOutstandingsRequestXml;
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, encode_tally_xml_request_utf16le,
     validate_tally_xml_response_content_type, ExpectedTallyTextEncoding, TallyTextDecodeError,
@@ -92,13 +90,6 @@ pub const STATUS_RESPONSE_MAX_BYTES: usize = 1024 * 1024;
 /// HTTP entity is mathematically bounded to at most twice this size plus its BOM.
 pub const XML_REQUEST_MAX_BYTES: usize = 32 * 1024 * 1024;
 pub const XML_RESPONSE_MAX_BYTES: usize = 32 * 1024 * 1024;
-/// Sealed exception for the voucher-scan wildcard outstandings request only
-/// -- see `post_outstandings_xml_decoded`. Gated with the request type that
-/// is the only thing admitted through it: with `voucher-scan` off, nothing
-/// can construct that request, so a raised cap nothing can reach would be a
-/// widened attack surface for no reason.
-#[cfg(feature = "voucher-scan")]
-pub const OUTSTANDINGS_XML_RESPONSE_MAX_BYTES: usize = 40 * 1024 * 1024;
 pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 // `/status` is a bodyless ASCII-only liveness probe. Keep its pre-U1 UTF-8
@@ -625,43 +616,6 @@ impl TallyHttpTransport {
             .map_err(|refusal| TallyTransportError::WireRefused { refusal })
     }
 
-    pub fn canonical_origin(&self) -> Result<String, TallyTransportError> {
-        canonical_loopback_origin(&self.config)
-    }
-
-    pub async fn get_status(&self) -> Result<TallyHttpResponse, TallyTransportError> {
-        let url = endpoint_url(&self.config, "/status")?;
-        // Held until this function returns: the response read to its end, or
-        // the send failed.
-        let _wire = self.wire_lock_observed(SendKind::Status, None).await?;
-        let started = std::time::Instant::now();
-        let flight = InFlight::begin(self, SendKind::Status, None, started);
-        let result = self.get_status_locked(url).await;
-        flight.finish();
-        self.observe_result(SendKind::Status, None, started, &result, answered_raw);
-        result
-    }
-
-    async fn get_status_locked(&self, url: Url) -> Result<TallyHttpResponse, TallyTransportError> {
-        #[expect(
-            clippy::disallowed_methods,
-            reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
-        )]
-        let response = self
-            .client
-            .get(url)
-            .header(CONTENT_TYPE, TALLY_STATUS_CONTENT_TYPE)
-            .send()
-            .await
-            .map_err(classify_request_error)?;
-        read_response(
-            response,
-            self.policy.status_response_max_bytes,
-            TALLY_STATUS_RESPONSE_ENCODING,
-        )
-        .await
-    }
-
     pub async fn get_status_decoded(
         &self,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
@@ -746,37 +700,13 @@ impl TallyHttpTransport {
         &self,
         xml: String,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-        self.post_xml_decoded_with_response_limit(xml, self.policy.xml_response_max_bytes)
-            .await
-    }
-
-    /// Closed exception for the live-verified wildcard outstandings profile.
-    /// The general policy remains capped at 32 MiB and the same client keeps
-    /// the immutable 20-second request deadline.
-    #[cfg(feature = "voucher-scan")]
-    pub async fn post_outstandings_xml_decoded(
-        &self,
-        request: VoucherOutstandingsRequestXml,
-    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-        self.post_xml_decoded_with_response_limit(
-            request.into_xml(),
-            OUTSTANDINGS_XML_RESPONSE_MAX_BYTES,
-        )
-        .await
-    }
-
-    async fn post_xml_decoded_with_response_limit(
-        &self,
-        xml: String,
-        response_max_bytes: usize,
-    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         // The request is prepared before the lock is taken, so a request that
         // cannot be sent never holds it.
         let prepared = prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let url = endpoint_url(&self.config, "/")?;
         let request = Some(prepared.body.len());
         let _wire = self.wire_lock_observed(SendKind::Post, request).await?;
-        self.send_prepared_decoded(prepared, url, response_max_bytes)
+        self.send_prepared_decoded(prepared, url, self.policy.xml_response_max_bytes)
             .await
     }
 

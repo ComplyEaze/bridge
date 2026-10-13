@@ -10,9 +10,9 @@
 //
 // Exit 0: none. Exit 1: names each file and line. Exit 2: could not read the repository (never "none").
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 export const MARKER = /^(?:<<<<<<<|\|\|\|\|\|\|\||>>>>>>>)(?: .*)?$|^=======$/;
 
@@ -40,7 +40,7 @@ export function findMarkers(root) {
   return [...found];
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   const rootIndex = process.argv.indexOf("--root");
   const root = rootIndex === -1 ? process.cwd() : resolve(process.argv[rootIndex + 1] ?? "");
   try {

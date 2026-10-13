@@ -4,7 +4,8 @@
 )]
 use super::*;
 use crate::commands::VerifiedCompanyIdentity;
-use crate::tally::TallyProduct;
+use crate::tally::connection::TallyProduct;
+use crate::tally::ConnectionStatus;
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
@@ -35,7 +36,7 @@ fn captured_aarav_company_list_and_identity() -> (String, VerifiedCompanyIdentit
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        row.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&row.guid.clone().unwrap()),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &rows,
@@ -69,6 +70,9 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").expect("source from"),
         to: TallyDate::parse("20260731").expect("source to"),
+        balance_date_basis: BalanceDateBasis::HostToday(
+            TallyDate::parse("20260731").expect("source to"),
+        ),
         last_voucher_date: TallyDate::parse("20260731").expect("source to"),
         rows: Vec::new(),
         request_sha256: "0".repeat(64),
@@ -217,10 +221,6 @@ fn outstandings_read_strategy_serializes_as_an_explicit_wire_contract() {
     assert_eq!(
         serde_json::to_value(OutstandingsReadStrategy::NativeBills).unwrap(),
         serde_json::json!("native_bills")
-    );
-    assert_eq!(
-        serde_json::to_value(OutstandingsReadStrategy::VoucherScan).unwrap(),
-        serde_json::json!("voucher_scan")
     );
 }
 
@@ -675,27 +675,34 @@ fn raw_empty_bill_references_preserve_each_amount_and_get_explicit_label() {
 #[test]
 fn party_master_currency_assertion_rejects_a_changed_company_extent() {
     const EXTENT: &str = include_str!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/unit_a_company_extent_live.xml"
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
     );
-    let read_extent_xml = EXTENT.replacen(
-        r#"<GUID TYPE=\"String\">bb8ad19e-6aef-4239-a917-87fec0c6215e</GUID>"#,
-        r#"<GUID TYPE=\"String\">bb8ad19e-6aef-4239-a917-87fec0c6215e</GUID><ALTMSTID TYPE=\"Number\">1</ALTMSTID>"#,
-        1,
-    );
-    let changed_extent_xml = read_extent_xml.replace(
+    let read_extent_xml = EXTENT;
+    let changed_extent_xml = read_extent_xml.replacen(
         "<LASTVOUCHERDATE TYPE=\"Date\">20260401</LASTVOUCHERDATE>",
         "<LASTVOUCHERDATE TYPE=\"Date\">20260402</LASTVOUCHERDATE>",
+        1,
     );
-    let read_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent(
-        &read_extent_xml,
-        "Aarav Trading Company Demo",
-        "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+    assert_ne!(
+        changed_extent_xml, read_extent_xml,
+        "the mutation must apply"
+    );
+    let expectation =
+        bridge_tally_protocol::outstandings_shared::CompanyBookExtentExpectation::new(
+            "Aarav Trading Company Demo".to_string(),
+            "bb8ad19e-6aef-4239-a917-87fec0c6215e".to_string(),
+            "100000".to_string(),
+            "20240401".to_string(),
+        )
+        .expect("captured full tuple is a valid expectation");
+    let read_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
+        read_extent_xml,
+        &expectation,
     )
     .expect("captured extent parses");
-    let changed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent(
+    let changed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
         &changed_extent_xml,
-        "Aarav Trading Company Demo",
-        "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+        &expectation,
     )
     .expect("changed synthetic extent parses");
     let assertion = CompanyCurrencyRead {
@@ -708,7 +715,6 @@ fn party_master_currency_assertion_rejects_a_changed_company_extent() {
             names: Vec::new(),
         },
         extent: read_extent.clone(),
-        evidence: RuntimeReadEvidence::empty(),
     }
     .bind_party_ledger_master_assertion(OutstandingsCurrencyAssertion::Inr);
 
@@ -899,12 +905,13 @@ fn future_due_bill_from_raw_native_bytes_reaches_the_statement_source() {
     );
     assert_eq!(statement_rows[0].amount.as_str(), "100.00");
     assert_eq!(statement_rows[0].age_days, None);
-    let statement = crate::reports::party_statement::build_party_statement(
+    let statement = crate::reports::party_statement::build_party_statement_with_ageing_anchor(
         "Synthetic Company",
         as_of.as_str(),
         "Synthetic Party",
         &statement_rows,
         &[],
+        OutstandingsAgeingAnchor::DueDate,
     )
     .expect("the future-due bill must build a party statement");
     assert_eq!(statement.bills.len(), 1);
@@ -922,19 +929,25 @@ fn future_due_bill_from_raw_native_bytes_reaches_the_statement_source() {
     let approved_destination = approvals
         .consume(&approval_id, destination.path())
         .expect("consume synthetic approval");
-    let bulk = crate::reports::bulk_party_statement::write_bulk_party_statements(
-        &approved_destination,
-        "Synthetic Company",
-        as_of.as_str(),
-        "xlsx",
-        &statement_rows,
-        &[],
-        |party_statement| {
-            crate::reports::party_statement_xlsx::render_party_statement_xlsx(party_statement)
-                .map_err(|error| error.to_string())
-        },
-    )
-    .expect("a bulk run must write the future-due party statement");
+    let bulk =
+        crate::reports::bulk_party_statement::write_bulk_party_statements_with_ageing_anchor(
+            crate::reports::bulk_party_statement::BulkPartyStatementRequest {
+                destination: &approved_destination,
+                company: "Synthetic Company",
+                as_of_yyyymmdd: as_of.as_str(),
+                format: "xlsx",
+                open_bills: &statement_rows,
+                unallocated_by_party: &[],
+                ageing_anchor: OutstandingsAgeingAnchor::DueDate,
+                render: |party_statement: &crate::reports::party_statement::PartyStatement| {
+                    crate::reports::party_statement_xlsx::render_party_statement_xlsx(
+                        party_statement,
+                    )
+                    .map_err(|error| error.to_string())
+                },
+            },
+        )
+        .expect("a bulk run must write the future-due party statement");
     assert_eq!(bulk.written.len(), 1);
     let workbook = std::fs::File::open(destination.path().join(&bulk.written[0].file_name))
         .expect("the bulk statement file exists");
@@ -971,178 +984,6 @@ fn education_snapshot_period_refusal_is_an_in_band_partial() {
     ));
 }
 
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn outstandings_read_failures_are_partial_and_deadlines_recommend_restart() {
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::Error::new(TallyTransportError::RequestTimedOut)),
-        "tally_segment_deadline_restart_recommended"
-    );
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::Error::new(TallyTransportError::RequestFailed)),
-        "segment_request_failed"
-    );
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::Error::new(TallyTransportError::HttpStatus {
-            status: 500
-        })),
-        "segment_http_status_failure"
-    );
-    assert_eq!(
-        outstandings_read_failure_reason(&anyhow::anyhow!("connection refused")),
-        "segment_read_failed"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn outstandings_read_transport_failure_feeds_breaker_and_preserves_typed_partial() {
-    let runtime = TallyRuntime::default();
-    let config = TallyConfig {
-        host: "localhost".to_string(),
-        port: 9120,
-    };
-    let result = runtime
-        .execute(
-            config,
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            |_client| async {
-                Err::<OutstandingsLoadResult, _>(anyhow::Error::new(
-                    OutstandingsReadTransportFailure {
-                        reason_code: "tally_segment_deadline_restart_recommended",
-                        source: anyhow::Error::new(TallyTransportError::RequestTimedOut),
-                    },
-                ))
-            },
-        )
-        .await;
-    let caller_value = partial_after_outstandings_read_transport_failure(result)
-        .expect("outstandings read transport failures stay in-band for the caller");
-    assert!(matches!(
-        caller_value,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "tally_segment_deadline_restart_recommended"
-    ));
-    assert_eq!(
-        runtime.snapshots().expect("runtime snapshot")[0].consecutive_failures,
-        1,
-        "the breaker must observe the transport failure before UI mapping"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn verification_partial_stays_partial_without_feeding_breaker() {
-    let runtime = TallyRuntime::default();
-    let result = runtime
-        .execute(
-            TallyConfig {
-                host: "localhost".to_string(),
-                port: 9121,
-            },
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            |_client| async { Ok::<_, anyhow::Error>(partial_result("paired_segment_mismatch")) },
-        )
-        .await;
-    let caller_value = partial_after_outstandings_read_transport_failure(result)
-        .expect("verification partial remains an in-band result");
-    assert!(matches!(
-        caller_value,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "paired_segment_mismatch"
-    ));
-    assert_eq!(
-        runtime.snapshots().expect("runtime snapshot")[0].consecutive_failures,
-        0,
-        "a verification failure reached a responder and must not poison endpoint health"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn closing_coverage_drift_is_not_reported_as_uncovered_opening_bills() {
-    assert_eq!(
-        closing_coverage_partial_reason(false, true),
-        Some("ledger_master_identity_changed_during_scan")
-    );
-    assert_eq!(
-        closing_coverage_partial_reason(true, false),
-        Some("ledger_opening_bills_not_covered")
-    );
-    assert_eq!(closing_coverage_partial_reason(true, true), None);
-}
-
-#[cfg(feature = "voucher-scan")]
-#[test]
-fn intra_pair_ledger_coverage_drift_is_an_in_band_partial() {
-    assert_eq!(
-        paired_coverage_partial_reason(&LedgerOpeningCoverageRead::Drifted),
-        Some("ledger_master_identity_changed_during_scan")
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn witness_transport_failure_feeds_breaker_and_preserves_typed_partial() {
-    let error = fetch_empty_partition_witness(
-        VoucherAlterIdHighWater::parse("1").expect("positive high-water"),
-        || async { Err(anyhow::Error::new(TallyTransportError::RequestTimedOut)) },
-    )
-    .await
-    .expect_err("a witness transport failure must cross the runtime health boundary");
-    assert!(error.downcast_ref::<TallyTransportError>().is_some());
-
-    let runtime = TallyRuntime::default();
-    let result = runtime
-        .execute(
-            TallyConfig {
-                host: "localhost".to_string(),
-                port: 9122,
-            },
-            ReadOperation::VoucherExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            |_client| async {
-                Err::<OutstandingsLoadResult, _>(outstandings_read_transport_failure(
-                    anyhow::Error::new(TallyTransportError::RequestTimedOut),
-                ))
-            },
-        )
-        .await;
-    let caller_value = partial_after_outstandings_read_transport_failure(result)
-        .expect("witness transport failure stays in-band only after health accounting");
-
-    assert!(matches!(
-        caller_value,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "tally_segment_deadline_restart_recommended"
-    ));
-    assert_eq!(
-        runtime.snapshots().expect("runtime snapshot")[0].consecutive_failures,
-        1,
-        "the breaker must observe the witness transport failure"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
-#[tokio::test]
-async fn witness_non_transport_failure_remains_an_in_band_partial() {
-    let partial = fetch_empty_partition_witness(
-        VoucherAlterIdHighWater::parse("1").expect("positive high-water"),
-        || async { Err(anyhow::anyhow!("witness response was malformed")) },
-    )
-    .await
-    .expect("non-transport witness failure stays in-band")
-    .expect_err("a malformed witness cannot complete a non-empty book");
-
-    assert_eq!(
-        partial.reason_code,
-        "empty_date_witness_profile_unavailable"
-    );
-}
-
-#[cfg(feature = "voucher-scan")]
 #[test]
 fn outstandings_date_boundaries_follow_detected_mode_and_fallback_to_i12() {
     let mut profile = synthetic_probe_result().profile;
@@ -1172,50 +1013,19 @@ fn outstandings_date_boundaries_follow_detected_mode_and_fallback_to_i12() {
     );
 }
 
-/// An uncalibrated segment width no longer refuses the read -- it selects
-/// the native bills path, which needs no width. What must NOT change is
-/// that a non-loopback endpoint is still refused.
-///
-/// This test previously asserted `outstandings_segment_sizing_uncalibrated`
-/// and, by using a non-loopback host, proved the refusal happened BEFORE
-/// endpoint admission. That refusal was the defect: production has no
-/// calibrated width by construction, so every shipped build returned it for
-/// every company on every book and the screen could only ever say "No Tally
-/// data was read". The reason code is gone with it.
-///
-/// The loopback guard is unchanged and still fails closed; it is simply now
-/// the first guard the read reaches, before its currency read (the desktop
-/// read, which the uncalibrated voucher-scan build falls back to). That is the
-/// property worth pinning, so this asserts it directly rather than inferring
-/// it from an ordering that no longer exists.
+/// A non-loopback endpoint is refused by the outstandings read before any
+/// Tally request. The loopback guard is the first guard the read reaches,
+/// before its currency read, and this asserts it directly.
 #[tokio::test]
-async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non_loopback_endpoint()
-{
+async fn the_outstandings_read_refuses_a_non_loopback_endpoint() {
     let runtime = TallyRuntime::default();
-    #[cfg(feature = "voucher-scan")]
-    assert!(
-        runtime.outstandings_segment_policy.is_none(),
-        "a default runtime must have no calibrated width -- that is what routes to the native path"
-    );
 
     let config = TallyConfig {
         host: "not-a-loopback-endpoint".to_string(),
         port: 9000,
     };
-    let identity = verified_identity("Synthetic Company", "synthetic-guid");
+    let identity = verified_identity("Synthetic Company", "9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27");
     let as_of = TallyDate::parse("20260731").unwrap();
-    #[cfg(feature = "voucher-scan")]
-    let error = runtime
-        .fetch_outstandings(
-            config,
-            &identity,
-            as_of,
-            OutstandingsCurrencyAssertion::Inr,
-            OutstandingsAgeingAnchor::DueDate,
-        )
-        .await
-        .expect_err("a non-loopback endpoint must never be contacted");
-    #[cfg(not(feature = "voucher-scan"))]
     let error = runtime
         .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)
         .await
@@ -1224,72 +1034,6 @@ async fn uncalibrated_outstandings_takes_the_native_path_and_still_refuses_a_non
         error.to_string().contains("non_loopback_forbidden"),
         "loopback-only admission must fail closed before any Tally read, got: {error}"
     );
-}
-
-#[cfg(feature = "live-calibration-harness")]
-#[tokio::test]
-async fn calibrated_voucher_scan_withholds_totals_before_endpoint_admission_without_residual_coverage(
-) {
-    let result = TallyRuntime::for_billwise_lab_reconciliation_exit_check()
-        .fetch_outstandings(
-            TallyConfig {
-                host: "not-a-loopback-endpoint".to_string(),
-                port: 9000,
-            },
-            &verified_identity("Synthetic Company", "synthetic-guid"),
-            TallyDate::parse("20260731").unwrap(),
-            OutstandingsCurrencyAssertion::Inr,
-            OutstandingsAgeingAnchor::DueDate,
-        )
-        .await
-        .expect("missing coverage is an in-band partial result");
-    assert!(matches!(
-        result,
-        OutstandingsLoadResult::Partial { reason, .. }
-            if reason.reason_code == "unallocated_direct_postings_not_covered"
-    ));
-}
-
-#[cfg(all(feature = "voucher-scan", not(feature = "live-calibration-harness")))]
-#[test]
-fn default_build_has_no_outstandings_width_admission() {
-    let runtime = TallyRuntime::default();
-    assert!(runtime.outstandings_segment_policy.is_none());
-    assert!(runtime.outstandings_boundary_profile_override.is_none());
-}
-
-#[cfg(feature = "live-calibration-harness")]
-#[test]
-fn billwise_lab_exit_harness_uses_only_education_valid_boundaries() {
-    let runtime = TallyRuntime::for_billwise_lab_reconciliation_exit_check();
-    assert_eq!(
-        runtime.outstandings_boundary_profile_override,
-        Some(DateBoundaryProfile::EducationRestricted)
-    );
-    let reporting_window = DateWindow::parse(
-        runtime
-            .outstandings_boundary_profile_override
-            .expect("exit profile is fixed"),
-        "20240401",
-        "20260702",
-    )
-    .expect("accepted corpus extent uses Education-valid boundaries");
-    let partitions = reporting_window
-        .narrow_partitions()
-        .expect("Education-valid corpus partitions without day-3 synthesis");
-    assert!(partitions.iter().all(|partition| {
-        matches!(&partition.from().as_str()[6..8], "01" | "02" | "31")
-            && matches!(&partition.to().as_str()[6..8], "01" | "02" | "31")
-    }));
-
-    let unprofiled = DateWindow::parse(DateBoundaryProfile::ModeAgnostic, "20240401", "20260702")
-        .unwrap()
-        .narrow_partitions()
-        .unwrap();
-    assert!(unprofiled.iter().any(|partition| {
-        !matches!(&partition.from().as_str()[6..8], "01" | "02" | "31")
-            || !matches!(&partition.to().as_str()[6..8], "01" | "02" | "31")
-    }));
 }
 
 #[test]
@@ -1320,6 +1064,69 @@ fn local_rejections_and_client_http_statuses_do_not_poison_endpoint_health() {
         assert_eq!(
             classify_error(&anyhow::Error::new(error)),
             HealthOutcome::TransportFailure
+        );
+    }
+}
+
+#[test]
+fn a_failed_response_body_is_its_own_unretried_class_but_counts_as_a_transport_failure() {
+    for error in [
+        TallyTransportError::ResponseTruncated,
+        TallyTransportError::ResponseReadFailed,
+    ] {
+        let error = anyhow::Error::new(error);
+        let class = classify_failure(&error);
+        assert_eq!(class, ReadFailureClass::ResponseBodyFailed);
+        assert!(!class.retryable());
+        assert_eq!(classify_error(&error), HealthOutcome::TransportFailure);
+    }
+    // A request that failed before any response is still the retryable class.
+    let class = classify_failure(&anyhow::Error::new(TallyTransportError::RequestFailed));
+    assert_eq!(class, ReadFailureClass::RequestFailed);
+    assert!(class.retryable());
+}
+
+// The response head had already arrived, so Tally had begun answering; a client cannot cancel
+// that work and the gateway serialises, so a resend makes Tally produce the answer again
+// (IMPLEMENTATION_GUIDE rule I7, section 5.2).
+#[tokio::test]
+async fn a_read_whose_response_body_fails_is_sent_once() {
+    for (port, failure) in [
+        (9130, TallyTransportError::ResponseTruncated),
+        (9131, TallyTransportError::ResponseReadFailed),
+    ] {
+        let runtime = TallyRuntime::default();
+        let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = Arc::clone(&attempts);
+        let sent_failure = failure.clone();
+        let error = runtime
+            .execute(
+                TallyConfig {
+                    host: "localhost".to_string(),
+                    port,
+                },
+                ReadRetryPolicy::new(3, std::time::Duration::ZERO, std::time::Duration::ZERO, 0)
+                    .unwrap(),
+                move |_client| {
+                    let observed = Arc::clone(&observed);
+                    let sent_failure = sent_failure.clone();
+                    async move {
+                        observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        Err::<(), _>(anyhow::Error::new(sent_failure))
+                    }
+                },
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            attempts.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "{failure:?}"
+        );
+        assert_eq!(
+            error.downcast_ref::<TallyTransportError>(),
+            Some(&failure),
+            "the typed transport error is returned"
         );
     }
 }
@@ -1669,15 +1476,10 @@ async fn cancellation_registry_cancels_and_releases_requests() {
     let runtime_task = Arc::clone(&runtime);
     let task = tokio::spawn(async move {
         runtime_task
-            .execute(
-                config,
-                ReadOperation::OtherRead,
-                ReadRetryPolicy::SINGLE_ATTEMPT,
-                |_client| async {
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    Ok::<_, anyhow::Error>(())
-                },
-            )
+            .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, |_client| async {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                Ok::<_, anyhow::Error>(())
+            })
             .await
     });
     tokio::task::yield_now().await;
@@ -1715,22 +1517,6 @@ async fn cancellation_registry_cancels_and_releases_requests() {
         0,
         "operator cancellation must not degrade endpoint health"
     );
-}
-
-#[test]
-fn telemetry_preview_is_privacy_reduced_and_checksummed() {
-    let preview = TallyRuntime::default()
-        .telemetry_preview()
-        .expect("telemetry preview");
-    assert_eq!(preview.schema, "bridge.tally.telemetry-preview/2");
-    assert_eq!(preview.payload_sha256.len(), 64);
-    let preview_value: serde_json::Value =
-        serde_json::from_str(&preview.preview_json).expect("valid preview JSON");
-    assert_eq!(
-        preview_value["privacy_profile"],
-        "fixed_dimensions_bucketed_values_v1"
-    );
-    assert_eq!(preview_value["authenticity_claim"], "none");
 }
 
 /// What each unallocated row says about its own composition, on captures of a
@@ -1858,4 +1644,72 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
     let text = without_names.to_string().to_ascii_lowercase();
     assert!(!text.contains("on_account"));
     assert!(!text.contains("on account"));
+}
+
+/// Pins Bridge's handling of a read whose connection closes after the whole
+/// request was received and before any response: the transport calls it
+/// `RequestFailed`, and the read retry policy sends it again, three sends in
+/// all. The read retry policy also serves the connector's reads; see #1658.
+/// The double is local; this measures Bridge's mapping and retry count, not
+/// what a real Tally does when it closes.
+#[tokio::test]
+async fn a_read_is_sent_three_times_when_its_connection_closes_after_the_request_was_received() {
+    const MAX_HOST_ABORT_ATTEMPTS: usize = 3;
+    for attempt in 1..=MAX_HOST_ABORT_ATTEMPTS {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the local double");
+        let address = listener.local_addr().expect("double address");
+        let received = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = std::sync::Arc::clone(&received);
+        let double = tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.expect("accept a send");
+                let request =
+                    crate::tally::connection::tests::read_complete_http_request(&mut socket).await;
+                assert!(request.starts_with(b"POST "), "a Tally read is a POST");
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                // Close with the request fully read and nothing answered.
+                drop(socket);
+            }
+        });
+        let runtime = TallyRuntime::default();
+        let config = TallyConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        };
+
+        let (result, trail) =
+            crate::request_trail::with_request_trail(Box::pin(runtime.fetch_companies(config)))
+                .await;
+        double.abort();
+        let received = received.load(std::sync::atomic::Ordering::SeqCst);
+        let trail = trail.expect("the sends are on the call's trail");
+        // Windows endpoint-security software can abort a new loopback flow
+        // before the request reaches the double, as in the transport tests.
+        // Only that case, a send the double never received, reruns the whole
+        // call on a fresh double; the production retry policy is unchanged.
+        if attempt < MAX_HOST_ABORT_ATTEMPTS && trail["sent"].as_u64() != Some(received as u64) {
+            continue;
+        }
+
+        let error = result.expect_err("a read that is never answered must fail");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<TallyTransportError>()),
+            Some(TallyTransportError::RequestFailed)
+        ));
+        assert_eq!(classify_failure(&error), ReadFailureClass::RequestFailed);
+        assert_eq!(received, 3);
+        assert_eq!(trail["sent"], 3);
+        assert_eq!(trail["failed"], 3);
+        let sends = trail["last"].as_array().expect("trail sends");
+        assert_eq!(sends.len(), 3);
+        for send in sends {
+            assert_eq!(send["outcome"], "request_failed");
+        }
+        return;
+    }
+    unreachable!("bounded attempts always return")
 }

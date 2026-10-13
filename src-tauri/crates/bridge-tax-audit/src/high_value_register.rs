@@ -33,8 +33,8 @@
 //! carry them and its own defaults otherwise. The vendored rules excerpt carries neither table, so
 //! this port reads the defaults, whose numbers equal the reference's tables (a test pins them).
 //!
-//! The row walk generalises `cash_payments_40a3`'s s.269ST walk over a money set, a direction and
-//! a grain. Each voucher is its own [`VoucherKey`] (#1243): the voucher grain, a row's per-voucher
+//! The row walk generalises the s.269ST walk over a money set, a direction and a grain;
+//! `cash_269st_rows` is its cash entry for `cash_payments_40a3` and `entity_269st_gap`. Each voucher is its own [`VoucherKey`] (#1243): the voucher grain, a row's per-voucher
 //! shares and lines and the count of vouchers with no reference are by that key, so two vouchers
 //! sharing a GUID (blank, or repeated) are two vouchers; a citation still names the GUID. A
 //! journal-transfer row id that would repeat takes its place among those sharing it as a suffix.
@@ -46,7 +46,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use bridge_tally_primitives::TallyDate;
 
 use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
-use crate::documents::{AisRow, BankStatementDoc};
+use crate::documents::{AisRow, BankStatementLoad};
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::ledger_ids::stable_ledger_tag;
@@ -181,7 +181,7 @@ pub struct Row<'a> {
     pub lines: BTreeMap<VoucherKey, (i64, i64)>,
     /// The unidentified-party row only: the names its vouchers print, shown with it and never used
     /// to key or attribute.
-    names: PrintedNames,
+    pub(crate) names: PrintedNames,
 }
 
 impl<'a> Row<'a> {
@@ -220,7 +220,7 @@ enum Over {
     Yes,
 }
 
-type Rows<'a, K> = BTreeMap<(K, String), Row<'a>>;
+pub(crate) type Rows<'a, K> = BTreeMap<(K, String), Row<'a>>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -353,6 +353,33 @@ pub fn mode_rows<'a, K: Ord>(
     Ok(rows)
 }
 
+/// The s.269ST walk of `cash_payments_40a3` and `entity_269st_gap`: `(day, party ledger) -> row` for
+/// cash against `bank`, the cash-mode walk `mode_rows` generalises. Sales Accounts (receipt) or
+/// Purchase Accounts (payment) is never itself a party but stays in the voucher's total. Unlike this
+/// module's own cash rows it leaves out no counterparty type and no Loans (Liability) ledger: the
+/// s.269ST rows of those two modules never did.
+pub(crate) fn cash_269st_rows<'a>(
+    pop: &[&'a Voucher],
+    book: &Book,
+    cash: &BTreeSet<String>,
+    bank: &BTreeSet<String>,
+    direction: Direction,
+    round_off_ledgers: &BTreeSet<String>,
+) -> Result<Rows<'a, TallyDate>> {
+    let from_party = match direction {
+        Direction::Receipt => [SALES_ACCOUNTS_GROUP],
+        Direction::Payment => [PURCHASE_ACCOUNTS_GROUP],
+    };
+    let no_types = BTreeMap::new();
+    let x = Exclusions {
+        from_party_groups: &from_party,
+        entirely_groups: &[],
+        round_off_ledgers,
+        counterparty_types: &no_types,
+    };
+    mode_rows(pop, book, cash, bank, direction, |_, v| v.date.clone(), &x)
+}
+
 /// Limb (b): `(reference, party) -> row` for vouchers with a non-empty reference, and the count of
 /// qualifying vouchers whose reference is blank, counted as vouchers by their own keys (#1243: as
 /// distinct GUIDs, a voucher with no reference was hidden by one sharing its GUID that has one).
@@ -464,15 +491,28 @@ pub struct Inputs<'c> {
     pub bank: &'c BTreeSet<String>,
     /// `None`: `DEFAULT_CA_THRESHOLD_PAISE`, equal to the reference rules table's number.
     pub threshold_paise: Option<i64>,
-    pub bank_statement: Option<&'c BankStatementDoc>,
+    /// The caller's bank statement: none supplied, read, or refused with the reader's plain-words
+    /// reason (then s.194N's coverage says so, never "not supplied").
+    pub bank_statement: &'c BankStatementLoad,
     pub s194n_narration_terms: &'c BTreeSet<String>,
     pub ais_rows: &'c [AisRow],
     pub s194n_recipient_type: Option<Recipient>,
     pub round_off_ledgers: &'c BTreeSet<String>,
     pub counterparty_type_by_ledger: &'c BTreeMap<String, String>,
-    /// The reader's plain-words reason when the engagement's statement was supplied but refused;
-    /// then `bank_statement` is `None` and s.194N's coverage says so, never "not supplied".
-    pub bank_statement_refused: Option<&'c str>,
+}
+
+/// s.194N's coverage figure when no statement is available, whether none was supplied or the reader
+/// refused it.
+fn s194n_coverage_unavailable(r: &mut TestResult, coverage: String) -> Result<()> {
+    r.fig(
+        "s194n_coverage",
+        Value::Text(coverage),
+        Unit::Text,
+        "s.194N reads bank-statement narration only; no statement is available for this \
+                     client.",
+        vec![],
+    )?;
+    Ok(())
 }
 
 #[allow(clippy::too_many_lines)] // one section per limb, as the reference lays them out
@@ -1058,23 +1098,15 @@ pub fn run(book: &Book, rules: &Rules, i: &Inputs<'_>) -> Result<TestResult> {
     });
 
     match i.bank_statement {
-        None => {
-            let coverage = match i.bank_statement_refused {
-                Some(reason) => {
-                    format!("the bank statement supplied was refused (it {reason})")
-                }
-                None => "no bank statement supplied for this engagement".to_string(),
-            };
-            r.fig(
-                "s194n_coverage",
-                Value::Text(coverage),
-                Unit::Text,
-                "s.194N reads bank-statement narration only; no statement is available for this \
-                             client.",
-                vec![],
-            )?;
-        }
-        Some(statement) => {
+        BankStatementLoad::NotSupplied => s194n_coverage_unavailable(
+            &mut r,
+            "no bank statement supplied for this engagement".to_string(),
+        )?,
+        BankStatementLoad::Refused(reason) => s194n_coverage_unavailable(
+            &mut r,
+            format!("the bank statement supplied was refused (it {reason})"),
+        )?,
+        BankStatementLoad::Read(statement) => {
             let terms: BTreeSet<String> = i
                 .s194n_narration_terms
                 .iter()
@@ -1301,6 +1333,7 @@ mod tests {
             stock: None,
             currency_read: false,
             opening_stock: crate::book::OpeningStock::NotApplicable,
+            closing_stock: crate::book::ClosingStock::NotApplicable,
             vouchers: Vec::new(),
             tb: BTreeMap::new(),
         };
@@ -1362,6 +1395,7 @@ mod tests {
             stock: None,
             currency_read: false,
             opening_stock: crate::book::OpeningStock::NotApplicable,
+            closing_stock: crate::book::ClosingStock::NotApplicable,
             vouchers: vec![
                 voucher(
                     "g1",
@@ -1448,13 +1482,12 @@ mod tests {
             cash: &cash,
             bank: &bank,
             threshold_paise: None,
-            bank_statement: None,
+            bank_statement: &BankStatementLoad::NotSupplied,
             s194n_narration_terms: &none,
             ais_rows: &[],
             s194n_recipient_type: None,
             round_off_ledgers: &round_off,
             counterparty_type_by_ledger: &no_types,
-            bank_statement_refused: None,
         };
         let r = run(&book, &Rules::vendored().unwrap(), &inputs).unwrap();
         let figure = |prefix: &str| {

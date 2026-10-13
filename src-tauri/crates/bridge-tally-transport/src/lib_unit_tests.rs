@@ -51,8 +51,6 @@ fn policy_cannot_expand_production_caps_or_deadline() {
         TransportPolicy::default().xml_response_max_bytes,
         32 * 1024 * 1024
     );
-    #[cfg(feature = "voucher-scan")]
-    assert_eq!(OUTSTANDINGS_XML_RESPONSE_MAX_BYTES, 40 * 1024 * 1024);
     let expanded = TransportPolicy {
         request_timeout: MAX_REQUEST_TIMEOUT + Duration::from_millis(1),
         ..TransportPolicy::default()

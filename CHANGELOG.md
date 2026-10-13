@@ -219,8 +219,8 @@ These changes are in source and not yet in a published build.
   `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
   credential prompt and retry. Restoring the credential (the macOS login keychain, or that user's Windows
   Credential Manager) or opening the app from the same user and data folder is what recovers the mirror. The
-  app deletes nothing, and no reset exists yet (#1563). A key is also no longer created beside mirror files
-  whose existence cannot be checked, or beside a leftover write-ahead file. Not measured on a real
+  app deletes nothing, and no reset exists yet (#1563). A key is also no longer created when the mirror file's
+  existence cannot be checked. Not measured on a real
   credential store: what the macOS keychain or the Windows Credential Manager returns after a keychain reset
   or a profile move.
 - A later check (`verify_import`, a repeated `post_import`, or the check

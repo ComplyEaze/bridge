@@ -16,6 +16,12 @@ export function classifyTallyError({ code, message }: TallyErrorDetails) {
   if (code === "persisted_tally_company_profiles_unavailable") {
     return localProfileStoreUnavailable();
   }
+  if (code === "tally_mirror_key_missing" || code === "tally_mirror_key_invalid") {
+    return {
+      category: "The local Tally mirror cannot be opened",
+      action: "Retrying does not help. Restore this computer user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
+    };
+  }
   if (code === "tally_request_deadline_exceeded") {
     return {
       category: "Tally is taking longer than expected",

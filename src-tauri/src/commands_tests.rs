@@ -616,6 +616,19 @@ fn the_two_key_states_have_their_own_codes_and_a_credential_failure_does_not() {
 }
 
 #[test]
+fn a_key_state_still_reads_as_its_own_after_context_is_added() {
+    use crate::db::MirrorKeyError;
+    // The caller may add context on the way up; the typed state must survive it.
+    let wrapped = anyhow::Error::new(MirrorKeyError::StoredKeyInvalid)
+        .context("opening the mirror")
+        .context("starting the sync");
+    assert_eq!(
+        mirror_unavailable_command_error(wrapped).code,
+        "tally_mirror_key_invalid"
+    );
+}
+
+#[test]
 fn a_string_error_tells_the_two_key_states_from_the_rest() {
     use crate::db::MirrorKeyError;
     let text = |error: anyhow::Error| mirror_unavailable_string_error(error);

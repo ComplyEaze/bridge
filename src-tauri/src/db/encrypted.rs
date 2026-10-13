@@ -135,7 +135,7 @@ pub fn resolve_mirror_key(
         return Ok(ResolvedMirrorKey { key });
     }
 
-    if mirror_files_exist(database_path)? {
+    if mirror_file_exists(database_path)? {
         return Err(MirrorKeyError::MissingForExistingMirror);
     }
 
@@ -149,21 +149,14 @@ pub fn resolve_mirror_key(
     Ok(ResolvedMirrorKey { key })
 }
 
-/// Whether the database, or the write-ahead files SQLite keeps beside it, is
-/// there. A path that cannot be checked is not "absent" (`Path::exists` says
-/// false on any error): it refuses, so a key is never made beside a database.
-fn mirror_files_exist(database_path: &Path) -> Result<bool, MirrorKeyError> {
-    for suffix in ["", "-wal", "-shm"] {
-        let mut path = database_path.as_os_str().to_os_string();
-        path.push(suffix);
-        if Path::new(&path)
-            .try_exists()
-            .map_err(|_| MirrorKeyError::DatabaseStateUnreadable)?
-        {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+/// Whether the database file is there. A path that cannot be checked is not "absent"
+/// (`Path::exists` says false on any error): it refuses, so a key is never made beside a
+/// database. A leftover write-ahead file alone does not count: with no database file and no
+/// key there is nothing to recover, and refusing would lock out a first-run user.
+fn mirror_file_exists(database_path: &Path) -> Result<bool, MirrorKeyError> {
+    database_path
+        .try_exists()
+        .map_err(|_| MirrorKeyError::DatabaseStateUnreadable)
 }
 
 fn validate_key(key: &[u8]) -> Result<(), MirrorKeyError> {

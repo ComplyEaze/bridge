@@ -18,6 +18,21 @@ test("a deadline explains the safe next step without exposing protocol jargon", 
   );
 });
 
+test("a missing or invalid mirror key says a retry does not help and points at the credential store, not at Tally", () => {
+  const expected = {
+    category: "The local Tally mirror cannot be opened",
+    action: "Retrying does not help. Restore this computer user's credential store (see the technical details), then open ComplyEaze Bridge again. Nothing was deleted and nothing changed in Tally.",
+  };
+  for (const code of ["tally_mirror_key_missing", "tally_mirror_key_invalid"]) {
+    assert.deepEqual(classifyTallyError({ code, message: "The encrypted Tally mirror cannot be opened." }), expected, code);
+  }
+  assert.notDeepEqual(
+    classifyTallyError({ code: "tally_mirror_unavailable", message: "The encrypted Tally mirror could not be opened." }),
+    expected,
+    "a credential-store failure keeps its own, retryable guidance",
+  );
+});
+
 test("an unstructured request failure remains fail-closed without internal navigation jargon", () => {
   assert.deepEqual(
     classifyUnstructuredTallyError("Cannot read properties of undefined (reading 'invoke')"),

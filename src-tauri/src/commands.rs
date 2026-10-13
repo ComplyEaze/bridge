@@ -460,19 +460,11 @@ fn party_ledger_master_local_export_error(
 /// holds no key for it, or holds a key that is not the mirror's length. Read from the typed
 /// error the key resolution returns, never from its message.
 fn mirror_key_state(error: &anyhow::Error) -> Option<&crate::db::MirrorKeyError> {
-    error
-        .downcast_ref::<crate::db::MirrorKeyError>()
-        .filter(|state| {
-            matches!(
-                state,
-                crate::db::MirrorKeyError::MissingForExistingMirror
-                    | crate::db::MirrorKeyError::StoredKeyInvalid
-            )
-        })
+    error.downcast_ref::<crate::db::MirrorKeyError>()
 }
 
 const MIRROR_KEY_MISSING_MESSAGE: &str = "The encrypted Tally mirror exists, but the key that opens it is not in this computer's credential store.";
-const MIRROR_KEY_INVALID_MESSAGE: &str = "The key stored for the encrypted Tally mirror is not a valid key: it is not the length this version uses, and may be damaged or written by a different version of ComplyEaze Bridge.";
+const MIRROR_KEY_INVALID_MESSAGE: &str = "The key stored for the encrypted Tally mirror is not a valid key: it is not the length the mirror uses, and may be damaged.";
 
 /// Produces the typed command error for the encrypted Tally mirror failing to initialise on
 /// first use. The mirror was never opened, so no local or Tally state changed. A missing or
@@ -487,7 +479,7 @@ fn mirror_unavailable_command_error(error: anyhow::Error) -> TallyCommandError {
             MIRROR_KEY_MISSING_MESSAGE,
             "not_recommended",
             false,
-            "Open ComplyEaze Bridge as the same computer user, from the same data folder, and restore the operating-system credential if it was reset or restored (the macOS login keychain, or that user's Windows Credential Manager). Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
+            "Open ComplyEaze Bridge as the same computer user, and restore the operating-system credential if it was reset or restored (the macOS login keychain, or that user's Windows Credential Manager). Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
         ),
         Some(crate::db::MirrorKeyError::StoredKeyInvalid) => tally_command_error(
             "tally_mirror_key_invalid",
@@ -495,7 +487,7 @@ fn mirror_unavailable_command_error(error: anyhow::Error) -> TallyCommandError {
             MIRROR_KEY_INVALID_MESSAGE,
             "not_recommended",
             false,
-            "Restore the operating-system credential from a backup of the same user's credential store, or open the version of ComplyEaze Bridge that created it. Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
+            "Restore the operating-system credential from a backup of the same user's credential store. Retrying does not help until then. The app does not delete the local mirror, and no reset is offered yet.",
         ),
         _ => tally_command_error(
             "tally_mirror_unavailable",

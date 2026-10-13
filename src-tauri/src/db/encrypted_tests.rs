@@ -160,29 +160,6 @@ fn a_credential_store_that_cannot_be_read_is_not_a_missing_key() {
     ));
 }
 
-#[test]
-fn a_leftover_write_ahead_file_counts_as_an_existing_mirror() {
-    for suffix in ["-wal", "-shm"] {
-        let directory = tempfile::tempdir().expect("temporary directory");
-        let database = directory.path().join("mirror.db");
-        let mut leftover = database.as_os_str().to_os_string();
-        leftover.push(suffix);
-        fs::write(&leftover, b"leftover").expect("create leftover file");
-        let store = FakeKeyStore::default();
-        assert!(
-            matches!(
-                resolve_mirror_key(&database, &store),
-                Err(MirrorKeyError::MissingForExistingMirror)
-            ),
-            "{suffix}"
-        );
-        assert!(
-            store.load().expect("reload").is_none(),
-            "{suffix}: no key is made"
-        );
-    }
-}
-
 /// A path whose existence cannot be read is not "no database": no key is made
 /// beside a database that may be there.
 #[cfg(unix)]

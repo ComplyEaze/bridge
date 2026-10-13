@@ -555,12 +555,12 @@ several currencies, and a large book with cash activity.
 ### Negative Ledgers (`negative_ledgers`)
 
 Use `negative_ledgers` with `company_guid`, `from` and `to` for Tally's own Negative
-Ledgers list: the ledgers Tally lists with a closing balance on the side it does not
-expect, each as `ledger`, `side` (`debit` or `credit`) and `amount` (an exact decimal
-with no sign). The list is Tally's own and is returned as it is, in Tally's order. Why
-Tally lists a ledger is not derived here: on the one book measured a creditor with a
-debit balance and a debtor with a credit balance were listed and a ledger under
-Suspense A/c with a credit balance was not.
+Ledgers list: the ledgers on that list, each as `ledger`, `side` (`debit` or `credit`) and `amount` (an exact decimal
+with no sign). The list is Tally's own and is returned as it is, in Tally's order. The
+rule by which Tally lists a ledger is not established and is not derived here: on three
+books each listed ledger's balance sat on the side opposite its group, and on the first
+book measured a creditor with a debit balance and a debtor with a credit balance were
+listed and a ledger under Suspense A/c with a credit balance was not.
 
 It is **not compared with any other report**: `checks` says `list_complete` and
 `amounts_against_trial_balance` are `not_checked`, so a ledger Tally did not list is not

@@ -1,8 +1,8 @@
 //! One native Negative Ledgers read, inside the identity and book-extent bracket
 //! the other built-in report reads use (#1358).
 //!
-//! The report is Tally's own list of ledgers whose closing balance is on the side
-//! opposite to the one it expects (the rule is Tally's and is not derived here), so
+//! The report is Tally's own Negative Ledgers list (the rule by which Tally lists a
+//! ledger is Tally's, is not established and is not derived here), so
 //! this read compares it with no other source: it is the report as returned, bound
 //! only by the company, mode and extent checks around it. The bracket is the
 //! trial balance read's (the period before the identity bracket, the books-from

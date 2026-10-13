@@ -15,6 +15,9 @@ use bridge_tally_core::book_presence::{
 };
 use bridge_tally_core::book_presence::{ColumnEvidence, ObservedMarker};
 use bridge_tally_core::master_binding::{MasterCatalog, MasterClass, SourceEntity};
+use bridge_tally_protocol::native_voucher_type_numbering::{
+    NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
+};
 
 /// Most vouchers one presence request may propose. The window read is
 /// unaffected by this: it always reads its whole range.
@@ -111,6 +114,14 @@ impl Server {
             accumulate(&mut accumulated, catalogue_evidence);
             let catalog = MasterCatalog::new(MasterClass::Ledger, &catalogue)
                 .map_err(|error| error.safe_reason_code().to_string())?;
+
+            // A number is an identity only where the book's own series for
+            // the type says Manual. The caller's declaration is a belief, so a
+            // type declared Manual is checked against the book before the
+            // window is read (bridge#1691).
+            let numbering_read = self
+                .read_presence_numbering(&company, &identity, &numbering, &mut accumulated)
+                .await?;
 
             let read = self
                 .read_entry_wildcard_window(
@@ -215,7 +226,7 @@ impl Server {
             let request = PresenceRequest::new(&window, &catalog, &numbering, &proposals)
                 .map_err(presence_code)?;
             let report = book_presence::assess(&request);
-            let (result, truncated) = presence_result(
+            let (mut result, truncated) = presence_result(
                 &report,
                 &catalogue,
                 read,
@@ -224,6 +235,7 @@ impl Server {
                 limit,
                 self.settings.max_bytes,
             );
+            result["numbering_read"] = numbering_read;
 
             Ok(ToolOutcome {
                 payload: json!({
@@ -242,6 +254,128 @@ impl Server {
             Some(evidence) => failure.with_prior_evidence(evidence),
             None => failure,
         })
+    }
+}
+
+impl Server {
+    /// Reads the book's own numbering for the declared voucher types, before
+    /// the window, when at least one type is declared Manual; a call that
+    /// declares none Manual reads nothing and says so. A type declared Manual
+    /// that the book does not hold as Manual with exactly one series refuses
+    /// the whole call, with the types named; so does a book whose numbering
+    /// cannot be read (Education mode included), because a Manual declaration
+    /// that cannot be checked is the unsafe direction. Names match exactly,
+    /// as the declaration does.
+    async fn read_presence_numbering(
+        &self,
+        company: &bridge_tally_protocol::TallyCompany,
+        identity: &VerifiedCompanyIdentity,
+        numbering: &NumberingDeclaration,
+        accumulated: &mut Option<Evidence>,
+    ) -> Result<Value, ToolFailure> {
+        let declared: Vec<(&str, NumberingMethod)> = numbering.declarations().collect();
+        if !declared
+            .iter()
+            .any(|(_, method)| *method == NumberingMethod::Manual)
+        {
+            return Ok(json!({"state": "not_read", "reason": "no_type_declared_manual"}));
+        }
+        let (master_mark, mark_evidence) = self.master_mark(company, identity).await?;
+        accumulate(accumulated, mark_evidence);
+        let read = self
+            .runtime
+            .fetch_voucher_type_numbering(self.tally_config(), identity, master_mark)
+            .await
+            .map_err(|error| ToolFailure::from_runtime("presence_numbering_unreadable", error))?;
+        accumulate(
+            accumulated,
+            evidence_from_runtime_read(read.evidence().clone()),
+        );
+        let mut rows = Vec::with_capacity(declared.len());
+        let mut refused = Vec::new();
+        for (voucher_type, method) in declared {
+            let found = read
+                .types()
+                .iter()
+                .find(|(name, _)| name == voucher_type)
+                .map(|(_, numbering)| numbering);
+            let (book, is_manual) = book_numbering_json(found);
+            let declared_label = match method {
+                NumberingMethod::Manual => "manual",
+                NumberingMethod::Automatic => "automatic",
+                NumberingMethod::Unknown => "unknown",
+            };
+            let row = json!({
+                "voucher_type": voucher_type,
+                "declared": declared_label,
+                "book": book,
+                "agrees": match method {
+                    NumberingMethod::Manual => json!(is_manual),
+                    _ => Value::Null,
+                },
+            });
+            if method == NumberingMethod::Manual && !is_manual {
+                refused.push(row.clone());
+            }
+            rows.push(row);
+        }
+        if !refused.is_empty() {
+            let mut failure =
+                ToolFailure::from("presence_numbering_method_differs_from_book".to_string());
+            failure.candidates = Some(Box::new(Candidates {
+                requested: None,
+                items: refused,
+                miss: None,
+            }));
+            return Err(failure);
+        }
+        Ok(json!({
+            "state": "read",
+            "read_before_window": true,
+            "master_mark": read.master_mark(),
+            "types": rows,
+        }))
+    }
+}
+
+/// What the book's series says about one voucher type, as data, and whether
+/// it is Manual with exactly one series: the only reading under which a
+/// voucher number is an identity. A sub-method printed on a Manual series is
+/// not read (every captured Manual series prints one).
+fn book_numbering_json(found: Option<&VoucherTypeNumbering>) -> (Value, bool) {
+    match found {
+        None => (json!({"state": "not_in_book"}), false),
+        Some(VoucherTypeNumbering::SeriesCount(count)) => {
+            (json!({"state": "series_count", "series": count}), false)
+        }
+        Some(VoucherTypeNumbering::FieldInvalid(code)) => {
+            (json!({"state": "field_invalid", "code": code}), false)
+        }
+        Some(VoucherTypeNumbering::Observed { method, .. }) => match method {
+            SeriesNumberingMethod::Manual => {
+                (json!({"state": "observed", "method": "manual"}), true)
+            }
+            SeriesNumberingMethod::Automatic(sub) => {
+                let sub = match sub {
+                    NumberingSubMethod::AutoRetain => "auto_retain",
+                    NumberingSubMethod::AutoRenumber => "auto_renumber",
+                    NumberingSubMethod::Absent => "absent",
+                    NumberingSubMethod::Unrecognised(_) => "unrecognised",
+                };
+                (
+                    json!({"state": "observed", "method": "automatic", "sub_method": sub}),
+                    false,
+                )
+            }
+            SeriesNumberingMethod::AutomaticManualOverride => (
+                json!({"state": "observed", "method": "automatic_manual_override"}),
+                false,
+            ),
+            SeriesNumberingMethod::Unrecognised(_) => (
+                json!({"state": "observed", "method": "unrecognised"}),
+                false,
+            ),
+        },
     }
 }
 

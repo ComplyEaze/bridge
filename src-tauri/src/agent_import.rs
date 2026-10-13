@@ -2231,6 +2231,21 @@ impl Server {
         Ok((mark, evidence))
     }
 
+    /// The company's `ALTMSTID`, read once, for a read that is bounded by a
+    /// master mark (the voucher-type numbering read of `voucher_presence`).
+    pub(in crate::agent) async fn master_mark(
+        &self,
+        company: &bridge_tally_protocol::TallyCompany,
+        identity: &super::VerifiedCompanyIdentity,
+    ) -> Result<(u64, Evidence), ToolFailure> {
+        let (mark, evidence) = self.pre_import_mark(company, identity).await?;
+        let master_mark = mark.master_value.ok_or_else(|| {
+            ToolFailure::from("pre_import_mark_unobserved".to_string())
+                .with_prior_evidence(evidence.clone())
+        })?;
+        Ok((master_mark, evidence))
+    }
+
     async fn pre_import_mark(
         &self,
         company: &bridge_tally_protocol::TallyCompany,

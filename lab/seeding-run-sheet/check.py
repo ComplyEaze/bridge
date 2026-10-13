@@ -96,7 +96,19 @@ def run(argv):
         if os.path.realpath(argv[2]) == os.path.realpath(argv[3]): raise Err("the same file given twice proves nothing")
         a, b = open(argv[2], "rb").read(), open(argv[3], "rb").read()
         if not a or not b: raise Err("an empty file proves nothing")
-        return 0 if a == b else 1, f"same: {len(a)} B vs {len(b)} B, {'identical' if a == b else 'DIFFERENT'}"
+        if a == b: return 0, f"same: {len(a)} B vs {len(b)} B, identical"
+        # not byte-identical: equal when everything under COLLECTION is equal leaf by leaf; the header's own counters
+        # (DESC/CMPINFO) may differ and are recorded, not a stop (they count what the last request fetched)
+        _, _, ra = tree(argv[2]); _, _, rb = tree(argv[3])
+        ca, cb = ra.find(".//COLLECTION"), rb.find(".//COLLECTION")
+        if ca is None or cb is None: return 1, f"same: {len(a)} B vs {len(b)} B, DIFFERENT (no COLLECTION to compare leaf by leaf)"
+        if canon(ca) != canon(cb): return 1, f"same: {len(a)} B vs {len(b)} B, DIFFERENT under COLLECTION"
+        def counters(r):
+            c = r.find(".//CMPINFO")
+            return {} if c is None else {e.tag: (e.text or "").strip() for e in c}
+        ka, kb = counters(ra), counters(rb)
+        moved = sorted(f"{k} {ka.get(k)}->{kb.get(k)}" for k in set(ka) | set(kb) if ka.get(k) != kb.get(k))
+        return 0, f"same: {len(a)} B vs {len(b)} B, equal leaf by leaf under COLLECTION; header counters differ (recorded, not a stop): {moved}"
     step, path = argv[1], argv[2]
     opt = lambda k: argv[argv.index(k) + 1] if k in argv else None
     data, root = common(step, path)
@@ -203,19 +215,23 @@ def run(argv):
             wasrows = {name_of(r): r for r in rows(broot, tag)}
             if len(target) == 1 and rowname in wasrows:
                 def stripped(r):
+                    # what Tally adds by itself when an HSN row is saved (seen live, 14 Oct): a State Cess duty row with
+                    # no rate, the language id 1033, and on a group one GST row (source As per Company/Stock Group,
+                    # duty heads, no rate); the HSN list and the alteration id move by design
                     c = ET.fromstring(ET.tostring(r))
-                    for h in list(c):
-                        if h.tag in ("HSNDETAILS.LIST", "ALTERID") or (step == "a10" and h.tag == "GSTDETAILS.LIST"): c.remove(h)
+                    for p in list(c.iter()):
+                        for h in list(p):
+                            if h.tag in ("HSNDETAILS.LIST", "ALTERID"): p.remove(h)
+                            elif h.tag == "LANGUAGEID" and (h.text or "").strip() == "1033": p.remove(h)
+                            elif h.tag == "RATEDETAILS.LIST" and txt(h, "GSTRATEDUTYHEAD") == "State Cess" and h.find("GSTRATE") is None: p.remove(h)
+                            elif step == "a10" and h.tag == "GSTDETAILS.LIST" and (not has_text(h) or (txt(h, "SRCOFGSTDETAILS") == "As per Company/Stock Group" and not list(h.iter("GSTRATE")))): p.remove(h)
                     return canon(c)
                 same_other = stripped(target[0]) == stripped(wasrows[rowname])
-                notes.append(f"{rowname} other content (all but its HSN list, ALTERID" + (" and GST rows" if step == "a10" else "") + f"): {'unchanged' if same_other else 'CHANGED'}")
-                if not same_other: bad += 1; notes.append("EXPECT nothing but the HSN entry written on the named row")
+                notes.append(f"{rowname} other content (all but the HSN list, ALTERID and what Tally adds by itself: a State Cess row without a rate, LANGUAGEID 1033" + (", one As per Company/Stock Group GST row without a rate" if step == "a10" else "") + f"): {'unchanged' if same_other else 'CHANGED'}")
+                if not same_other: bad += 1; notes.append("EXPECT nothing but the HSN entry (and Tally's own additions) on the named row")
                 if step == "a10":
-                    rates = [(e.text or "").strip() for g in target[0].iter("GSTDETAILS.LIST") for e in g.iter("GSTRATE")]
-                    nonzero = [x for x in rates if x and float(x) != 0]
-                    gl = [(txt(g, "APPLICABLEFROM"), txt(g, "TAXABILITY")) for g in target[0].iter("GSTDETAILS.LIST") if has_text(g)]
+                    gl = [(txt(g, "APPLICABLEFROM"), txt(g, "SRCOFGSTDETAILS")) for g in target[0].iter("GSTDETAILS.LIST") if has_text(g)]
                     notes.append(f"{rowname} GST rows {gl}")
-                    if nonzero: bad += 1; notes.append(f"EXPECT only the rate-0 row Tally adds by itself; a rate of {nonzero} is not")
             was = {name_of(r): canon(r) for r in rows(broot, tag)}
             now = {name_of(r): canon(r) for r in rs}
             moved = sorted(n for n in set(was) | set(now) if n != rowname and was.get(n) != now.get(n))

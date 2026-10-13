@@ -17,6 +17,12 @@ and `PROMPT_PLAYBOOK.md` Phase 4 step 4. Their prescriptions are separate from t
 
 ### 9.8 Voucher numbering method changes everything — **use Manual**
 
+**Scope: "use Manual" applies when ComplyEaze Bridge supplies the voucher number.** A numberless
+native post is the opposite case: under Manual numbering its second voucher was given a repeated
+number or refused, and under Automatic with "Retain Original Voucher No." it was numbered in
+sequence; see "A numberless native post under Manual and Automatic numbering" at the end of this
+section.
+
 **VERIFIED.** The voucher type's numbering method silently determines both whether your
 voucher number survives and how a failed Alter behaves.
 
@@ -156,14 +162,50 @@ without), and one export of all 24 voucher types fetched `NUMBERINGMETHOD`, `PRE
 - **VERIFIED:** the type-level `NUMBERINGMETHOD` reads `None` for the three types set by hand and
   `Default` for the rest, and the type-level `PREVENTDUPLICATES` reads `No` on all 24, including
   Payment, whose screen says Yes. The type level is not the method and is never read for it.
-- **Observed, meaning not established:** `NUMBERINGSUBMETHOD` reads `Auto Retain` on all 24 series,
-  Manual ones included; `DUPLICATECONTROL` is present and empty on all 24 series.
-- **Not established:** more than one series on a type; a single series not named `Default`; `Automatic (Manual Override)` on a captured
-  response (seen on a real book on 2026-09-28, not committed); Multi-user Auto; a type created new
-  rather than altered; other releases; macOS. A type with no series or several is a typed
-  observation, not a method, and a method outside `Automatic`, `Manual` and
+- **Observed, meaning not established:** `DUPLICATECONTROL` is present and empty on all 24 series.
+  `NUMBERINGSUBMETHOD` read `Auto Retain` on all 24 series, Manual ones included; what it carries
+  was measured on 2026-10-13 (next paragraph), as were the texts of `Automatic (Manual Override)`
+  (until then seen only on a real book on 2026-09-28, not committed) and Multi-user Auto.
+- **Not established:** more than one series on a type; a single series not named `Default`; a type
+  created new rather than altered; other releases; macOS. A type with no series or several is a
+  typed observation, not a method, and a method outside `Automatic`, `Manual` and
   `Automatic (Manual Override)` is kept raw and never read as `Manual`
   (`native_voucher_type_numbering.rs`).
+
+**A save of a voucher-type screen moved the master mark, and three more settings as exported:
+verified 2026-10-13 on one book and one voucher type (PARTIAL).** On a synthetic book on Silver 7.1
+on Windows, one voucher type that held no vouchers (Contra) was saved on Tally's own screen nine
+times: first with no field changed, then with one field changed per save and each change then
+undone. The company's marks (`ALTVCHID`, `ALTMSTID`) were read after every save, and the series
+request above (1,106 bytes; 1,116 as sent, with only the company name changed) once before the
+saves and after six of the nine (branch `lab/724-m6-master-mark-answers`, `b7761256`, bridge#724;
+every marks and series answer was read with an XML parser, with its size checked against
+`CONTENT-LENGTH`). The screen labels, the licence and release, which field each save changed or
+left at its offered default, and that the type held no vouchers are from that branch's notes; no
+screenshot is on the branch.
+
+- **VERIFIED:** each of the nine saves moved `ALTMSTID` by 2 (213 to 231) and left `ALTVCHID`
+  unchanged, including the save with no field changed. In every series answer read after a save,
+  the type's own `ALTERID` equals the `ALTMSTID` read with it, and no other type's `ALTERID` moved.
+  So on this book every save of that type's screen moved `ALTMSTID`; a save of another type was not
+  measured. A moved `ALTMSTID` does not show that a setting changed.
+- **VERIFIED:** the series `NUMBERINGMETHOD` prints `Automatic (Manual Override)` and
+  `Multi-user Auto` exactly as the screen names them, in plain ASCII; Multi-user Auto was offered
+  on this Silver licence. A type switched to `Manual` with the screen's default left reads
+  `PREVENTDUPLICATES` `No`.
+- **VERIFIED:** on this type, with the method Automatic, the series `NUMBERINGSUBMETHOD` followed
+  the screen's "Numbering behaviour on insertion/deletion": `Auto Retain` for "Retain Original
+  Voucher No." and `Auto Renumber` for "Renumber Vouchers". It was the only child of the series
+  list that differed, and `NUMBERINGMETHOD` stayed `Automatic`.
+- **VERIFIED:** the type-level `NUMBERINGMETHOD` of the saved type read `Default` before the saves
+  and `None` in every series answer after them, also with the method back at Automatic. Of the
+  other 23 types, 22 read `Default` throughout and Payment, whose series already read `Manual` at
+  the first read, reads `None` throughout. This agrees with the 9 October reading above. Not
+  established: whether the save that changed nothing flips it on its own (no series answer was
+  read between it and the next save).
+- **Not established:** the same on a type that holds vouchers; what `Auto Renumber` does to numbers
+  already in the book; Gold; other releases; macOS; the same answers through ComplyEaze Bridge's
+  own read.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**
@@ -200,6 +242,33 @@ observation.**
     post follows from it.
 - Evidence: the never-merged branch `lab/1c-numbering-evidence` (`s1c-RESULT.md`,
   `s1c-pre-payment-numbers.txt`, `s1c-after-manual-payment-numbers.txt`).
+
+**A numberless native post under Manual and Automatic numbering: verified 2026-10-12, one post per
+setting (PARTIAL; VERIFIED applies to each bullet as marked).** The rule above is about a flow that supplies the voucher number. A native post
+supplies none: it refuses a supplied `VOUCHERNUMBER` (see "Native mutation selector" above), so Tally
+numbers every voucher it creates.
+- Setup: licensed TallyPrime 7.1 Silver on Windows, new synthetic companies, each loaded alone; one
+  ComplyEaze Bridge build, `bridge_mcp` SHA-256 `411f7cca…`; single native posts with no voucher
+  number. Each type's setting was set or read on Tally's own screen.
+- **VERIFIED:** the first numberless voucher of a type is created and numbered `1`, with Manual
+  numbering and duplicates prevented (a Payment and a Journal) or allowed (a Payment).
+- **VERIFIED, Manual with duplicates allowed (Payment):** the second numberless voucher was created
+  and numbered `1` again. Both read `posted_verified`, because a post's readback compares the number
+  only when the batch supplied one.
+- **VERIFIED, Manual with duplicates prevented (Journal):** the second numberless voucher was refused
+  whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`. Tally's 538-byte answer
+  has the same SHA-256 (`09a713e2…`) as earlier whole refusals of zero-value vouchers
+  (`lab/1342-capture-answers`), so it names no cause; that the cause is the repeated number is
+  inferred.
+- **VERIFIED, Automatic with "Retain Original Voucher No." on insertion and deletion (Journal):** a
+  second numberless voucher was numbered `2`, and a third dated before both was numbered `3`. The
+  first two kept their numbers and AlterIDs, and a later read-back still read them `posted_verified`.
+- Not established: Receipt and Contra under Manual numbering; a batch; Automatic (Manual Override);
+  Multi-user Auto; Automatic set to renumber on insertion; Gold; a file imported through Tally's
+  Import menu.
+- Evidence: the never-merged branches `lab/724-m-manual-numbering-answers` (`2fd954f9`),
+  `lab/724-m3-second-voucher-answers` (`6ab6a667`) and `lab/724-m4-m5-numbering-answers`
+  (`3684c58c`, under `m5/`); bridge#724.
 
 ### 9.13 Payment, Receipt and Contra — the bank-statement voucher shapes
 
@@ -848,14 +917,32 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
 - **VERIFIED: the flags were read as No, Yes, No on an uncertain voucher (the tax figure of §9.17 that differed),
   and an Accept As Is voucher read included with `ISGSTOVERRIDDEN` Yes.** The uncertain voucher is dated 1-Aug-2026,
   outside the narrow two-day window, so it was shown by the wider voucher read-back (the `three-vouchers` fixture),
-  not by the narrow request; the narrow request has **not** been seen to answer an uncertain voucher. The Accept As Is
-  voucher was read by both.
+  not by the narrow request. The Accept As Is voucher was read by both.
+- **VERIFIED: the narrow request answers uncertain vouchers, and shows an accept between two reads** (lab set W13,
+  12 Oct 2026, the same company, evidence on `lab/1342-w13-answers`, answers `aw13-status-window-0` and `-1`, the
+  request for 1 to 31 August 2026 and type `BRIDGE Sales`, byte for byte what the code renders). Of the 28 vouchers
+  each read returned, six read No, Yes, No in the first. `BP/26-27/0005` was then accepted as it stands on Tally's
+  screen, alone, and in the second read it was the only voucher that differed: included, not uncertain,
+  `ISGSTOVERRIDDEN` Yes, with a higher `ALTERID`.
+- **VERIFIED: a cancelled voucher reads the included flag Yes and an optional one reads all three No, and the
+  request answers whether a voucher is either once `ISCANCELLED` and `ISOPTIONAL` are added** (lab sets W19 and
+  W20, 12 Oct 2026, the same company; evidence on `lab/1342-w19-answers`, answer `aw19-c`, and on
+  `lab/1342-w20-answers`, answer `aw20-b`). `BP/26-27/0041`, saved and then
+  cancelled, reads `ISCANCELLED` Yes and the three flags Yes, No, No. `BP/26-27/0042`, saved as optional, reads
+  `ISOPTIONAL` Yes and No, No, No. With `,ISCANCELLED,ISOPTIONAL` appended to the field list of the request the
+  code renders for 1 to 31 August 2026 and `BRIDGE Sales`, each of the 32 vouchers carried both exactly once, and
+  every other voucher read No and No. Every voucher's three flags, `ISGSTOVERRIDDEN` and `ALTERID` equalled those
+  of the same read without the two names, and the company marks were byte-identical before and after. So a reader
+  that takes the three flags alone reports a cancelled voucher as included and an optional one as not listed:
+  decide the two fields first. One voucher each.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;
   - the reason for a status: no field in the two lists tried carries it, which is a negative measured on those
     lists only;
-  - cancelled, optional and post-dated vouchers (the request does not fetch them);
+  - post-dated vouchers (the request does not fetch `ISPOSTDATED`), and deleted vouchers kept by the edit log;
+  - a voucher both cancelled and optional, and whether Tally lists a cancelled voucher anywhere in the return,
+    such as among the documents issued;
   - the cost of the selection on a large book: it was timed on about thirty vouchers, so any size bound a
     program applies is its own provisional choice and not a Tally limit;
   - another release or licence tier.

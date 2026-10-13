@@ -108,13 +108,14 @@ The ordinary default tools, in name order:
 - `validate_masters`
 - `verify_import`
 - `voucher_presence`
+- `voucher_read_cost`
 - `voucher_schema`
 - `vouchers`
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features` and `gst_status` are in the source
-after release 0.5.0 and are not in a published build yet. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
+source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -628,19 +629,25 @@ type in the window, and returns for each voucher its `voucher_number`, `date`, `
 same class under another name is not read, and a name that holds a double quote, a backslash, `&`, `<`, `>`, `'` or a control
 character, or a space at either end, is refused before any read (`gst_status_type_name_invalid`).
 
-`gst_status` is `included`, `uncertain`, `excluded` or `not_in_return`. `not_in_return` means Tally's three flags
-all read No. On the lab's Receipts that means Tally does not list the voucher in the return; it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
+`gst_status` is `included`, `uncertain`, `excluded`, `not_in_return`, `cancelled` or `optional`. `cancelled` and
+`optional` are Tally's own `ISCANCELLED` and `ISOPTIONAL` flags read Yes, decided before the three status flags and
+never counted as `included` or `not_in_return`: on the lab's book a cancelled Sales voucher read the included flag Yes
+and an optional one read all three No (one voucher each); whether Tally lists a cancelled voucher anywhere in the
+return is not measured, and a voucher that reads both Yes is unread. `not_in_return` means Tally's three flags
+all read No. On the lab's Receipts that means Tally does not list the voucher in the return (read with the request before it
+fetched the cancelled and optional flags; the request as it is now is measured on Sales vouchers only); it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
 accepted the voucher as it stands (Accept As Is) and `false` otherwise; `included` counts such a voucher too, so it is not
 'clean', and it is included by a person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
 voucher is right or wrong, or that a return is ready. The reason for a status (the one measured is a tax figure that did not match Tally's own)
 is on Tally's screen only; no field carries it, so none is returned. Tally keeps the
-status a voucher was given when it was saved (one voucher, cause unverified). Cancelled, optional and post-dated
-vouchers are not marked, and a total of 0 may mean that the type name matched nothing. Each page is a new read,
+status a voucher was given when it was saved (one voucher, cause unverified). Post-dated vouchers are not marked,
+and a total of 0 may mean that the type name matched nothing. Each page is a new read,
 so a voucher saved between two pages can shift the offsets. The result holds `counts` (`included`, `uncertain`,
-`excluded`, `not_in_return`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
+`excluded`, `not_in_return`, `cancelled`, `optional`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
 `items`; page with `limit` and `offset` (`next_offset` when more remain).
 
-A voucher whose flags are absent, repeated, nested in another element or spelled another way keeps its row with
+A voucher whose flags, or whose cancelled or optional flag, are absent, repeated, nested in another element or
+spelled another way keeps its row with
 `{"unread": code}` (`gst_status_not_reported` or `gst_status_unreadable`) in place of the value and is never read as
 `included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). An answer in which a voucher
 cannot be told apart from another (a missing or repeated `MASTERID`, or a missing number, date, type or
@@ -1345,6 +1352,45 @@ census when the book is large; the verdict is then `not_established`). A
 `ledger_movement` refusal states no block yet. The result of a quick call is
 unchanged.
 
+### What one windowed call will cost, before it runs (`voucher_read_cost`, #1465)
+
+`voucher_read_cost` takes `company_guid` and nothing else: no window, because the figure has none.
+The census a window read pays follows the book's voucher mark, not the window, so a narrower window
+does not lower it and N one-day calls pay it N times. The tool reads the company's marks once (the
+paired, identity-bracketed read every windowed call opens with: the identity read, then one marks read;
+no census and no voucher request) and says, for `vouchers`, `ledger_movement` and `verify_import`
+each, the most census reads one call of it will send on this book (a read can be refused before its census
+ends).
+
+- `voucher_mark` is the mark that read saw. `per_call` has one entry per tool: `state: counted` with
+  `census_reads` and `floor_seconds`, or `state: refused_by_allowance` with `code:
+  voucher_window_book_too_large` and `limit_census_reads` (a mark above 2,097,152, the refusal the read
+  itself makes, from the same function; no floor is given for a read that sends no census).
+- `census_reads` is **derived** from the mark and the read's own rules (`census_read_count`, which the
+  read also calls), never a second copy of them. `vouchers` counts a small book (#1314), so it sends at
+  least one census read on any book that has held a voucher; `ledger_movement` and `verify_import` send
+  none while the mark times their default voucher size fits one request (a mark of 170 or less). A
+  book that has never held a voucher (no mark) sends none, and only then is the count 0.
+- `floor_seconds` is **derived from the gate's rule**, as `read_cost.floor_seconds` is, and from the
+  same function: (N - 1) x 0.5 s, rounded down. It is the least time spent on the gaps between census
+  reads of a call that is not refused earlier. It leaves out every data part, and the recorded runs took
+  more than twice their floor. There is no estimate and no field for one: a computed figure was cut from
+  #1289, and a floor is never presented as one.
+- `measured` is **constant text**: whole calls the protocol reference records (§11c.5), each with its
+  census reads, data parts, seconds (the whole call, not the census alone), book, host, date, confidence and
+  `not_a_bound: true`. Bridge computes nothing from them. The book's
+  mark is rounded (it is not a lab company).
+- `host_limits` is the block `read_cost` states, unchanged.
+- If the marks cannot be read, the call fails with the code that read gives (for example
+  `master_checkpoint_not_observed`) and states no figure; a missing figure is never 0.
+- It is as of its own read of the mark. The call that follows reads the mark again. It refuses
+  nothing; `vouchers` and the other two read as before.
+
+Not covered: the data parts (they need the census), the wider read an empty window gets in `vouchers` and in
+`ledger_movement` (it pays its own census on a large book), the second window read of `ledger_movement`
+(it sends no census),
+`outstandings` and `voucher_presence`. Windows hosts are not measured.
+
 ### Search and summaries in `vouchers` (#1230)
 
 Search, and the `ledger`, `month` and `voucher_type` summaries, work on the rows `vouchers`
@@ -1792,24 +1838,43 @@ import-admission lock for a moment, so a build or post at the same time can be
 refused as lock-busy, and it can be refused by theirs; nothing waits, so nothing
 deadlocks.
 
-- **Whole statements only.** The parse records the statement's own first and
-  last row dates in an optional `window` of the proposals file (`first_row_date`,
-  `last_row_date`, `whole_statement`); the schema string is unchanged, and an
-  older build still reads such a file. A file with no `window`, or a
-  `whole_statement` of `false`, is `not_established` (`window_not_recorded`,
-  `window_narrower_than_statement`), answered from the file once the company is
-  verified. A narrowed window would need the running balance at its edges, which
-  the parse result deliberately never returns.
+- **A whole statement, or whole calendar months of it.** The parse records the
+  statement's own first and last row dates in an optional `window` of the
+  proposals file (`first_row_date`, `last_row_date`, `whole_statement`), and in
+  `window.tie_out` where the file can be compared with the book: either
+  `established`, with the dates and the statement's balance at the start of the
+  first and the end of the last (`first_date`, `last_date`, `opening_balance`,
+  `closing_balance`, basis `statement_rows_by_transaction_date`), or
+  `not_established` with a reason. The schema string is unchanged, and an older
+  build still reads such a file. For the whole statement the dates are its first
+  and last row dates and the balances are the ones the caller supplied. For a
+  `from`/`to` window that leaves rows out they are the window's own dates, which
+  must be whole calendar months (from the 1st to a month's last day,
+  `window_not_whole_calendar_months`) within the statement's rows
+  (`window_beyond_statement_rows`); the opening is the supplied opening plus the
+  net of the rows dated before the window, and the closing the supplied closing
+  less the net of the rows dated after it. These are sums by transaction date,
+  so the order the bank printed the rows in cannot move them, and every row's
+  amount is proved by the running-balance check before they are taken. The
+  tie-out checks the month rule again when it reads the file. For a file that
+  carries `tie_out`, when every row in the window has a voucher in the file, the
+  vouchers must move the bank ledger by exactly the closing less the opening, or
+  the file is refused (`proposals_file_invalid`); an older whole-statement file
+  is not checked this way. A file with no `window` is `not_established`
+  (`window_not_recorded`), and so is a narrowed file written before the parse
+  recorded `tie_out` (`window_narrower_than_statement`), answered from the file
+  once the company is verified.
 - **The file is not bound to a company.** It names a bank ledger, not the
   company it was parsed for; pass the company the statement belongs to.
-- **Three reads of the ledger list**, none of vouchers: the position at the first
-  row's date, at the day after the last row's date, and at the first date again.
-  A change dated before the statement, or an edit to the ledger itself (its
+- **Three reads of the ledger list**, none of vouchers: the position at the
+  window's first date, at the day after its last date, and at the first date
+  again. A change dated before the window, or an edit to the ledger itself (its
   opening balance, name or removal), made between the first and third read, is
-  `book_changed_during_read`; a voucher dated inside the statement and posted
+  `book_changed_during_read`; a voucher dated inside the window and posted
   during the read moves only the end figure and is not caught. No ledger is read
   when the file alone answers (`window_not_recorded`,
-  `window_narrower_than_statement`) or the statement starts before the company's
+  `window_narrower_than_statement`, `window_not_whole_calendar_months`,
+  `window_beyond_statement_rows`) or the window starts before the company's
   books begin (`window_precedes_books_from`).
 - **Three figures**, all in the statement's sign (book less statement: positive
   means the book shows more money in the bank), with the two dates:
@@ -1822,8 +1887,20 @@ deadlocks.
   check a build makes before it writes a file); `after_post` is unaffected.
 - **What the result reveals.** The book's own balances are not returned, but a
   gap plus the statement balance the caller supplied gives the book's balance,
-  so they are derivable. The result also carries the company block, the stage
-  and the reading.
+  so they are derivable. For a window of whole calendar months the reverse also
+  holds: the book's figure (which `ledger_movement` reads) less a gap gives the
+  statement's balance at a month edge, and `change_in_window` with the book's
+  movement gives the statement's net over those months. That is why a narrowed
+  window must be whole calendar months within the statement's rows: what can be
+  learnt this way is the statement's balance at month ends and its net per
+  month, never a part of a month except the part-months at the statement's own
+  start and end, whose net a month edge's balance gives together with the
+  opening and closing supplied to the parse. A month in which every other row's amount is
+  already known still gives that row's amount: a month of one row, or one row
+  beside open cash lines, whose amounts `cash_questions` returns. The parse
+  result already ties such a row to its party and direction through
+  `rows_in_window` and `counterparties`. The result also carries the company block, the
+  stage, the window's two dates (`first_date`, `last_date`) and the reading.
 - **The sign is a type** (`BankSide`): Tally holds a debit balance as a negative
   number, a statement prints money in the account as positive, and
   `BankSide::from_book` is the only conversion.
@@ -1838,7 +1915,10 @@ deadlocks.
   synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
   recorded, in the pull request: the import summary was not captured and no raw
   answers are kept. A statement whose last day is the end of a financial year is
-  still to be run.
+  still to be run, and so is a window of whole calendar months: the book's
+  position read at a month's first day and the day after its last has been
+  measured on some ledgers and dates (protocol reference section 5.5), not on a
+  bank ledger in the middle of its year or after its last voucher.
 
 ## Approved voucher posting
 
@@ -2139,9 +2219,16 @@ counted, and none of them is found, they are `tally_reported_not_created`
 instead (bridge#1108). For a batch this also needs the company's voucher mark
 read on both sides of the post and unmoved. The person is told to check that
 each is not in Tally and enter it there by hand, not through Tally's Import
-menu. A later `verify_import` never reads the post's answer, since someone may
-have entered a voucher by hand and edited it since: it reads
-`sent_not_attributed`. A partly created batch is never read as not created: a
+menu. A later check (`verify_import`, a repeated `post_import`, or the check
+before a review is recorded) never reads a voucher as not created, since
+someone may have entered it by hand and edited it since: it reads
+`sent_not_attributed`. When the post's saved answer had that shape (every
+counter reported, none created, one exception for each voucher sent, nothing
+else counted), and for a batch the post itself recorded its voucher step as
+matching, the `next_step` of each voucher the check cannot find says that
+Tally reported the voucher as not created when it was sent, and to look for it
+in Tally before entering it by hand; the status and the batch's state are the
+same. A partly created batch is never read as not created: a
 count does not say which voucher Tally rejected, and two vouchers of one batch
 with the same content defeat matching by content. A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made
@@ -2414,13 +2501,13 @@ Per tool:
     the commitment. None of the individual master, balance or group requests
     is reported on its own.
 - `statement_tie_out` (`src-tauri/src/agent_statement_tie_out.rs`): the company
-  read, and then, when the file records no window or a narrower one, nothing
-  more (evidence `partial`, with that reason). Otherwise:
+  read, and then, when the file records no window or one it cannot compare,
+  nothing more (evidence `partial`, with that reason). Otherwise:
   1. the company read;
-  2. a runtime ledger read (currency masters, ledger export) at the first row's
-     date;
-  3. the same at the day after the last row's date;
-  4. the same again at the first row's date.
+  2. a runtime ledger read (currency masters, ledger export) at the window's
+     first date;
+  3. the same at the day after its last date;
+  4. the same again at its first date.
 
   Each ledger read carries its own deadline and size limits, as for
   `ledger_movement`; none reads vouchers. The result is `partial` when any

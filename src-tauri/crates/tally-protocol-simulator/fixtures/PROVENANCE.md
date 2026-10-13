@@ -6,8 +6,8 @@ release emits. They were added together in `0100e6b2` (2026-07-16) under the
 fixture rules in `../README.md`: `BRIDGE SYNTHETIC` names, GUIDs in the
 reserved `00000000-0000-4000-8000-…` range, `BRIDGE_SYNTHETIC_*` line errors,
 and no output copied from a real company or Tally installation. The
-`COMPANYCONTEXT` schema strings (`bridge.tally.ledgers/1`,
-`bridge.tally.vouchers/2`, `/3`) are Bridge's own, not native Tally.
+`COMPANYCONTEXT` schema string (`bridge.tally.ledgers/1`) is Bridge's own, not
+native Tally.
 
 `../src/fixtures.rs` loads each file with `include_str!` into a `Fixture`
 variant. The only transformation is `ScenarioPlan::response_bytes`, which

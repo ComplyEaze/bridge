@@ -1,15 +1,18 @@
 //! The GST status tool (R7) against Tally's own bytes.
 //!
-//! The answers are the lab's, read on 10 Oct 2026 from the synthetic company
+//! The answers are the lab's, read on 10 and 12 Oct 2026 from the synthetic company
 //! `BRIDGE PILOT LAB` (TallyPrime 7.1 Silver) and committed byte for byte under
-//! `agent/gst-status/` (see its PROVENANCE.md). Nothing here is evidence about a real book. The
+//! `agent/gst-status/` (see its PROVENANCE.md). The 12 Oct answer is to the request the tool
+//! sends; two of the 10 Oct answers are to the earlier request, which did not fetch whether a
+//! voucher is cancelled or optional, and read every voucher unread. Nothing here is evidence about a real book. The
 //! expected rows below were taken from those bytes with a separate script, not from the code
 //! under test; the mutations are string replacements on the decoded text of the committed
 //! answer, each asserted to match exactly once, so none can pass by changing nothing.
 //!
 //! What each part proves:
-//! - the status and acceptance flags read exactly as measured, and every other spelling is
-//!   refused with a code rather than read as a status;
+//! - the cancelled and optional flags are decided first, then the status and acceptance flags
+//!   read exactly as measured, and every other spelling is refused with a code rather than read
+//!   as a status;
 //! - the request is the lab's request, character for character, and a type name that could break
 //!   its string literal is refused before it is rendered;
 //! - the parse of each answer, and the way a voucher or an answer that cannot be read fails closed;
@@ -31,8 +34,14 @@ const FULL_WINDOW: &[u8] = include_bytes!(
 const THREE_VOUCHERS: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-three-vouchers.utf16le.xml"
 );
-const SALES_WINDOW_REQUEST: &[u8] = include_bytes!(
+const EARLIER_REQUEST: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-sales-window.request.utf16le.xml"
+);
+const AUGUST: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-august.utf16le.xml"
+);
+const AUGUST_REQUEST: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-august.request.utf16le.xml"
 );
 
 const SALES_WINDOW_SHA256: &str =
@@ -40,7 +49,11 @@ const SALES_WINDOW_SHA256: &str =
 const FULL_WINDOW_SHA256: &str = "bdde73bd794236fd76b4b3975f34366b6080322ec4a113cbffb871e016dcde57";
 const THREE_VOUCHERS_SHA256: &str =
     "ebc84c460da6123c329ff36ce2b74e13f55f8024efa33d7b2ddec7c318996cb8";
-const REQUEST_SHA256: &str = "6c94de0ce12aec70c33fda1a59b759bd16bb5e44179756411fa254136c56cd65";
+const EARLIER_REQUEST_SHA256: &str =
+    "6c94de0ce12aec70c33fda1a59b759bd16bb5e44179756411fa254136c56cd65";
+const AUGUST_SHA256: &str = "5b536b15bf0cc57188c6c711e9071e995389295deaa4150c9c5c3a4299f4ae48";
+/// The request the tool sends, as the lab sent it on 12 Oct 2026.
+const REQUEST_SHA256: &str = "b58442823c22314087eb6941781ca92fe8627497817fbd7b25bff71cc751936c";
 
 const LAB_COMPANY: &str = "BRIDGE PILOT LAB";
 const LAB_TYPE: &str = "BRIDGE Sales";
@@ -73,16 +86,20 @@ fn the_committed_files_are_the_lab_bytes() {
         (SALES_WINDOW, 21_030, SALES_WINDOW_SHA256),
         (FULL_WINDOW, 35_928, FULL_WINDOW_SHA256),
         (THREE_VOUCHERS, 234_936, THREE_VOUCHERS_SHA256),
-        (SALES_WINDOW_REQUEST, 1_776, REQUEST_SHA256),
+        (EARLIER_REQUEST, 1_776, EARLIER_REQUEST_SHA256),
+        (AUGUST, 105_178, AUGUST_SHA256),
+        (AUGUST_REQUEST, 1_822, REQUEST_SHA256),
     ] {
         assert_eq!(bytes.len(), length);
         assert_eq!(sha256_hex(bytes), sha256);
     }
     // Tally's answers carry no byte order mark; the request the lab sent begins with one.
-    for answer in [SALES_WINDOW, FULL_WINDOW, THREE_VOUCHERS] {
+    for answer in [SALES_WINDOW, FULL_WINDOW, THREE_VOUCHERS, AUGUST] {
         assert_eq!(&answer[..2], b"<\0");
     }
-    assert_eq!(&SALES_WINDOW_REQUEST[..2], &[0xFF, 0xFE]);
+    for request in [EARLIER_REQUEST, AUGUST_REQUEST] {
+        assert_eq!(&request[..2], &[0xFF, 0xFE]);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -190,18 +207,162 @@ fn the_acceptance_flag_is_yes_or_no_and_nothing_else() {
     }
 }
 
+#[test]
+fn cancelled_and_optional_are_decided_before_the_three_flags_and_only_from_yes_and_no() {
+    let (mut cancelled, mut optional, mut by_flags, mut not_reported, mut unreadable) =
+        (0, 0, 0, 0, 0);
+    let mut outcomes = std::collections::BTreeMap::<String, usize>::new();
+    for is_cancelled in FLAG_VALUES {
+        for is_optional in FLAG_VALUES {
+            for included in FLAG_VALUES {
+                for uncertain in FLAG_VALUES {
+                    for excluded in FLAG_VALUES {
+                        // A cancelled or optional voucher whose three flags state no measured
+                        // state is unread, with the flags' own code.
+                        let flags = status_of_flags(included, uncertain, excluded);
+                        let expected = match (is_cancelled, is_optional) {
+                            (Some("Yes"), Some("No")) => {
+                                cancelled += 1;
+                                flags.map(|_| GstStatus::Cancelled)
+                            }
+                            (Some("No"), Some("Yes")) => {
+                                optional += 1;
+                                flags.map(|_| GstStatus::Optional)
+                            }
+                            (Some("No"), Some("No")) => {
+                                by_flags += 1;
+                                status_of_flags(included, uncertain, excluded)
+                            }
+                            (None, None) => {
+                                not_reported += 1;
+                                Err(NOT_REPORTED)
+                            }
+                            _ => {
+                                unreadable += 1;
+                                Err(UNREADABLE)
+                            }
+                        };
+                        *outcomes.entry(format!("{expected:?}")).or_default() += 1;
+                        let flags = (is_cancelled, is_optional, included, uncertain, excluded);
+                        assert_eq!(
+                            status_of_voucher(
+                                is_cancelled,
+                                is_optional,
+                                included,
+                                uncertain,
+                                excluded
+                            ),
+                            expected,
+                            "{flags:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    // 216 combinations of the three status flags for each of the 36 pairs: one pair each is
+    // cancelled, optional, read by its status flags and not reported; the 32 others are unread.
+    assert_eq!(
+        (cancelled, optional, by_flags, not_reported, unreadable),
+        (216, 216, 216, 216, 32 * 216)
+    );
+    // Of the 7,776, a state is read only where the pair is one of three and the flags are one of
+    // the four measured combinations: four cancelled, four optional, four by the flags.
+    let count = |key: &str| outcomes.get(key).copied().unwrap_or(0);
+    assert_eq!(count("Ok(Cancelled)"), 4);
+    assert_eq!(count("Ok(Optional)"), 4);
+    assert_eq!(
+        count("Ok(Included)")
+            + count("Ok(Uncertain)")
+            + count("Ok(Excluded)")
+            + count("Ok(NotInReturn)"),
+        4
+    );
+    // Not reported: the 216 with both absent, and the one all-absent triple of each of the three.
+    assert_eq!(count(&format!("Err({NOT_REPORTED:?})")), 219);
+    assert_eq!(count(&format!("Err({UNREADABLE:?})")), 7_776 - 12 - 219);
+}
+
+#[test]
+fn the_measured_cancelled_and_optional_vouchers_are_neither_included_nor_not_in_the_return() {
+    // `BP/26-27/0041`, cancelled, reads the included flag Yes; `BP/26-27/0042`, optional, reads
+    // all three No.
+    let yes_no_no = (Some("Yes"), Some("No"), Some("No"));
+    let no_no_no = (Some("No"), Some("No"), Some("No"));
+    assert_eq!(
+        status_of_voucher(
+            Some("Yes"),
+            Some("No"),
+            yes_no_no.0,
+            yes_no_no.1,
+            yes_no_no.2
+        ),
+        Ok(GstStatus::Cancelled)
+    );
+    assert_eq!(
+        status_of_voucher(Some("No"), Some("Yes"), no_no_no.0, no_no_no.1, no_no_no.2),
+        Ok(GstStatus::Optional)
+    );
+    // The same flags on a voucher that is neither read as the flags say.
+    assert_eq!(
+        status_of_voucher(
+            Some("No"),
+            Some("No"),
+            yes_no_no.0,
+            yes_no_no.1,
+            yes_no_no.2
+        ),
+        Ok(GstStatus::Included)
+    );
+    assert_eq!(
+        status_of_voucher(Some("No"), Some("No"), no_no_no.0, no_no_no.1, no_no_no.2),
+        Ok(GstStatus::NotInReturn)
+    );
+    // A cancelled voucher whose flags state no measured state (two Yes) is unread.
+    assert_eq!(
+        status_of_voucher(
+            Some("Yes"),
+            Some("No"),
+            Some("Yes"),
+            Some("Yes"),
+            Some("No")
+        ),
+        Err(UNREADABLE)
+    );
+    // Both Yes was never seen, and one of the two absent is never No.
+    for (is_cancelled, is_optional) in [
+        (Some("Yes"), Some("Yes")),
+        (None, Some("No")),
+        (Some("No"), None),
+        (None, Some("Yes")),
+        (Some("Yes"), None),
+    ] {
+        assert_eq!(
+            status_of_voucher(
+                is_cancelled,
+                is_optional,
+                yes_no_no.0,
+                yes_no_no.1,
+                yes_no_no.2
+            ),
+            Err(UNREADABLE),
+            "{is_cancelled:?} {is_optional:?}"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // The request.
 // ---------------------------------------------------------------------------------------------
 
 #[test]
 fn the_renderer_reproduces_the_request_the_lab_sent_character_for_character() {
-    let sent = decode_utf16(SALES_WINDOW_REQUEST);
+    let sent = decode_utf16(AUGUST_REQUEST);
     let sent = sent.strip_prefix('\u{feff}').expect("a byte order mark");
     let rendered = read_profiles::render_gst_status_window(
         LAB_COMPANY,
-        &tally_date("20260802"),
-        &tally_date("20260803"),
+        &tally_date("20260801"),
+        &tally_date("20260831"),
         LAB_TYPE,
     )
     .unwrap();
@@ -209,12 +370,34 @@ fn the_renderer_reproduces_the_request_the_lab_sent_character_for_character() {
     // The read built for the tool is the same text.
     let request = read_profiles::gst_status_read(
         LAB_COMPANY,
+        &tally_date("20260801"),
+        &tally_date("20260831"),
+        LAB_TYPE,
+    )
+    .unwrap();
+    assert_eq!(request.into_xml(), sent);
+}
+
+#[test]
+fn the_earlier_request_differs_only_by_the_cancelled_and_optional_field_names() {
+    let earlier = decode_utf16(EARLIER_REQUEST);
+    let earlier = earlier.strip_prefix('\u{feff}').expect("a byte order mark");
+    let rendered = read_profiles::render_gst_status_window(
+        LAB_COMPANY,
         &tally_date("20260802"),
         &tally_date("20260803"),
         LAB_TYPE,
     )
     .unwrap();
-    assert_eq!(request.into_xml(), sent);
+    assert_ne!(rendered, earlier);
+    assert_eq!(
+        rendered,
+        once(
+            earlier,
+            "ISGSTOVERRIDDEN</FETCH>",
+            "ISGSTOVERRIDDEN,ISCANCELLED,ISOPTIONAL</FETCH>"
+        )
+    );
 }
 
 #[test]
@@ -303,6 +486,18 @@ type Expected = (
     bool,
 );
 
+/// The rows of an answer to the earlier request: each voucher identified and its acceptance read,
+/// and no state, since whether it is cancelled or optional was not fetched.
+fn earlier_rows(expected: &[Expected]) -> Vec<StatusRow> {
+    expected_rows(expected)
+        .into_iter()
+        .map(|row| StatusRow {
+            status: Err(NOT_REPORTED),
+            ..row
+        })
+        .collect()
+}
+
 fn expected_rows(expected: &[Expected]) -> Vec<StatusRow> {
     expected
         .iter()
@@ -319,6 +514,45 @@ fn expected_rows(expected: &[Expected]) -> Vec<StatusRow> {
         )
         .collect()
 }
+
+/// The vouchers of the 12 Oct answer, in the answer's order (taken from its bytes by a separate
+/// script): 25 included (five of them accepted as they stand), five uncertain, `BP/26-27/0041`
+/// cancelled and `BP/26-27/0042` optional.
+#[rustfmt::skip]
+const AUGUST_ROWS: [Expected; 32] = [
+    ("BP/26-27/0001", "20260801", "BRIDGE Sales", "1", "2", GstStatus::Included, false),
+    ("BP/26-27/0002", "20260801", "BRIDGE Sales", "2", "11", GstStatus::Uncertain, false),
+    ("BP/26-27/0003", "20260801", "BRIDGE Sales", "3", "50", GstStatus::Uncertain, false),
+    ("BP/26-27/0004", "20260801", "BRIDGE Sales", "4", "13", GstStatus::Included, false),
+    ("BP/26-27/0005", "20260801", "BRIDGE Sales", "5", "54", GstStatus::Included, true),
+    ("BP/26-27/0006", "20260801", "BRIDGE Sales", "6", "48", GstStatus::Included, true),
+    ("BP/26-27/0007", "20260801", "BRIDGE Sales", "7", "8", GstStatus::Included, false),
+    ("BP/26-27/0008", "20260801", "BRIDGE Sales", "8", "9", GstStatus::Uncertain, false),
+    ("BP/26-27/0009", "20260801", "BRIDGE Sales", "9", "10", GstStatus::Included, false),
+    ("BP/26-27/0011", "20260801", "BRIDGE Sales", "10", "16", GstStatus::Included, false),
+    ("BP/26-27/0010", "20260801", "BRIDGE Sales", "11", "17", GstStatus::Included, false),
+    ("BP/26-27/0012", "20260802", "BRIDGE Sales", "16", "23", GstStatus::Included, false),
+    ("BP/26-27/0013", "20260802", "BRIDGE Sales", "17", "24", GstStatus::Included, false),
+    ("BP/26-27/0014", "20260802", "BRIDGE Sales", "18", "25", GstStatus::Included, false),
+    ("BP/26-27/0015", "20260802", "BRIDGE Sales", "19", "26", GstStatus::Included, false),
+    ("BP/26-27/0016", "20260802", "BRIDGE Sales", "20", "28", GstStatus::Included, true),
+    ("BP/26-27/0019", "20260802", "BRIDGE Sales", "22", "30", GstStatus::Included, false),
+    ("BP/26-27/0021", "20260805", "BRIDGE Sales", "26", "35", GstStatus::Included, false),
+    ("5", "20260807", "BRIDGE Sales", "27", "36", GstStatus::Uncertain, false),
+    ("6", "20260807", "BRIDGE Sales", "28", "37", GstStatus::Uncertain, false),
+    ("7", "20260807", "BRIDGE Sales", "29", "38", GstStatus::Included, false),
+    ("8", "20260807", "BRIDGE Sales", "30", "39", GstStatus::Included, false),
+    ("9", "20260807", "BRIDGE Sales", "31", "40", GstStatus::Included, false),
+    ("10", "20260807", "BRIDGE Sales", "32", "41", GstStatus::Included, false),
+    ("11", "20260807", "BRIDGE Sales", "33", "42", GstStatus::Included, false),
+    ("12", "20260807", "BRIDGE Sales", "34", "43", GstStatus::Included, false),
+    ("13", "20260807", "BRIDGE Sales", "35", "44", GstStatus::Included, false),
+    ("14", "20260807", "BRIDGE Sales", "36", "45", GstStatus::Included, false),
+    ("BP/26-27/0041", "20260820", "BRIDGE Sales", "40", "63", GstStatus::Cancelled, false),
+    ("BP/26-27/0042", "20260820", "BRIDGE Sales", "41", "62", GstStatus::Optional, false),
+    ("BP/26-27/0043", "20260822", "BRIDGE Sales", "43", "67", GstStatus::Included, true),
+    ("BP/26-27/0044", "20260822", "BRIDGE Sales", "44", "68", GstStatus::Included, true),
+];
 
 #[rustfmt::skip]
 const SALES_WINDOW_ROWS: [Expected; 6] = [
@@ -353,31 +587,61 @@ const THREE_VOUCHER_ROWS: [Expected; 3] = [
 ];
 
 #[test]
-fn the_sales_window_answer_reads_six_included_vouchers_one_of_them_accepted_as_it_stands() {
-    let rows = parse_status_rows(&decode_utf16(SALES_WINDOW)).unwrap();
-    assert_eq!(rows, expected_rows(&SALES_WINDOW_ROWS));
+fn the_august_answer_reads_the_cancelled_and_the_optional_voucher_apart_from_the_others() {
+    let rows = parse_status_rows(&august()).unwrap();
+    assert_eq!(rows, expected_rows(&AUGUST_ROWS));
+    let state = |number: &str| {
+        let row = rows
+            .iter()
+            .find(|row| row.voucher_number == number)
+            .unwrap();
+        (row.status, row.overridden)
+    };
+    // The cancelled voucher's included flag is Yes and the optional one's three flags are No.
+    assert_eq!(
+        state("BP/26-27/0041"),
+        (Ok(GstStatus::Cancelled), Ok(false))
+    );
+    assert_eq!(state("BP/26-27/0042"), (Ok(GstStatus::Optional), Ok(false)));
+    let count = |status: GstStatus| rows.iter().filter(|row| row.status == Ok(status)).count();
+    assert_eq!(
+        [
+            count(GstStatus::Included),
+            count(GstStatus::Uncertain),
+            count(GstStatus::Excluded),
+            count(GstStatus::NotInReturn),
+            count(GstStatus::Cancelled),
+            count(GstStatus::Optional),
+        ],
+        [25, 5, 0, 0, 1, 1]
+    );
 }
 
 #[test]
-fn the_unfiltered_window_answer_reads_the_other_sales_class_type_and_four_receipts_not_in_the_return(
-) {
+fn an_answer_to_the_earlier_request_reads_every_voucher_unread_never_included() {
+    // The six vouchers' status flags are all there, but not whether each is cancelled or
+    // optional: none has a state, and each keeps its identity and its acceptance flag.
+    let rows = parse_status_rows(&decode_utf16(SALES_WINDOW)).unwrap();
+    assert_eq!(rows, earlier_rows(&SALES_WINDOW_ROWS));
+}
+
+#[test]
+fn the_unfiltered_answer_to_the_earlier_request_reads_every_voucher_unread_with_its_type() {
     let rows = parse_status_rows(&decode_utf16(FULL_WINDOW)).unwrap();
-    assert_eq!(rows, expected_rows(&FULL_WINDOW_ROWS));
-    // The Receipts' three flags all read No: not a document of the return, not an unread voucher.
-    let receipts: Vec<&StatusRow> = rows
-        .iter()
-        .filter(|row| row.voucher_type == "Receipt")
-        .collect();
-    assert_eq!(receipts.len(), 4);
-    assert!(receipts
-        .iter()
-        .all(|row| row.status == Ok(GstStatus::NotInReturn) && row.overridden == Ok(false)));
+    assert_eq!(rows, earlier_rows(&FULL_WINDOW_ROWS));
+    // The four Receipts read all three flags No, which is no longer read as not in the return.
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.voucher_type == "Receipt" && row.status == Err(NOT_REPORTED))
+            .count(),
+        4
+    );
 }
 
 #[test]
 fn the_wider_field_list_answer_reads_uncertain_included_and_included_accepted() {
     // It carries `&#4;` references, which the parse marks and cleans, and some forty fields a
-    // voucher beyond the four it reads.
+    // voucher beyond the six it reads, the cancelled and optional flags (No) among them.
     let text = decode_utf16(THREE_VOUCHERS);
     assert!(text.contains("&#4;"));
     let rows = parse_status_rows(&text).unwrap();
@@ -386,7 +650,7 @@ fn the_wider_field_list_answer_reads_uncertain_included_and_included_accepted() 
 
 #[test]
 fn an_answer_with_a_collection_and_no_voucher_is_an_empty_list() {
-    let text = decode_utf16(SALES_WINDOW);
+    let text = august();
     let open = text.find("<COLLECTION").unwrap();
     let close = text.find("</COLLECTION>").unwrap() + "</COLLECTION>".len();
     let empty = format!(
@@ -398,19 +662,23 @@ fn an_answer_with_a_collection_and_no_voucher_is_an_empty_list() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Mutations of the sales-window answer. Each is an exact replacement, asserted to match once.
+// Mutations of the August answer. Each is an exact replacement, asserted to match once.
 // ---------------------------------------------------------------------------------------------
 
-/// The voucher every mutation below is made on (master id 17), and its four status elements as
-/// Tally wrote them.
+/// The voucher every mutation below is made on (master id 17, the thirteenth row), and its six
+/// status elements as Tally wrote them.
 const TARGET: &str = "BP/26-27/0013";
 const INCLUDED: &str = r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">Yes</VCHGSTSTATUSISINCLUDED>"#;
 const UNCERTAIN: &str = r#"<VCHGSTSTATUSISUNCERTAIN TYPE="Logical">No</VCHGSTSTATUSISUNCERTAIN>"#;
 const EXCLUDED: &str = r#"<VCHGSTSTATUSISEXCLUDED TYPE="Logical">No</VCHGSTSTATUSISEXCLUDED>"#;
 const OVERRIDDEN: &str = r#"<ISGSTOVERRIDDEN TYPE="Logical">No</ISGSTOVERRIDDEN>"#;
+const CANCELLED: &str = r#"<ISCANCELLED TYPE="Logical">No</ISCANCELLED>"#;
+const OPTIONAL: &str = r#"<ISOPTIONAL TYPE="Logical">No</ISOPTIONAL>"#;
+/// The target's position in the answer, and in the tool's items (by date, then number).
+const TARGET_AT: usize = 12;
 
-fn sales_window() -> String {
-    decode_utf16(SALES_WINDOW)
+fn august() -> String {
+    decode_utf16(AUGUST)
 }
 
 /// `haystack` with the one occurrence of `from` replaced; any other count fails the test.
@@ -430,18 +698,19 @@ fn edit(xml: &str, number: &str, change: impl FnOnce(String) -> String) -> Strin
     format!("{}{}{}", &xml[..start], changed, &xml[end..])
 }
 
-/// The target voucher's row after `change`, with the other five rows asserted to read exactly as
+/// The target voucher's row after `change`, with the other 31 rows asserted to read exactly as
 /// in the committed answer.
 fn target_after(change: impl FnOnce(String) -> String) -> StatusRow {
-    let rows = parse_status_rows(&edit(&sales_window(), TARGET, change)).unwrap();
-    assert_eq!(rows.len(), 6);
+    let rows = parse_status_rows(&edit(&august(), TARGET, change)).unwrap();
+    assert_eq!(rows.len(), 32);
+    assert_eq!(rows[TARGET_AT].voucher_number, TARGET);
     let mut target = None;
     for row in rows {
         if row.voucher_number == TARGET {
             assert_eq!(row.master_id, "17");
             target = Some(row);
         } else {
-            let expected = SALES_WINDOW_ROWS
+            let expected = AUGUST_ROWS
                 .iter()
                 .find(|expected| expected.0 == row.voucher_number)
                 .unwrap();
@@ -456,6 +725,103 @@ fn the_unmutated_target_reads_included_so_each_mutation_below_is_the_cause() {
     let target = target_after(|block| block);
     assert_eq!(target.status, Ok(GstStatus::Included));
     assert_eq!(target.overridden, Ok(false));
+}
+
+#[test]
+fn a_cancelled_or_optional_flag_decides_the_state_and_an_unreadable_one_leaves_none() {
+    let yes = |element: &str| element.replace(">No<", ">Yes<");
+    // Yes on either flag decides the state over the measured flags beside it; the acceptance is
+    // still read.
+    let target = target_after(|block| once(&block, CANCELLED, &yes(CANCELLED)));
+    assert_eq!(
+        (target.status, target.overridden),
+        (Ok(GstStatus::Cancelled), Ok(false))
+    );
+    let target = target_after(|block| once(&block, OPTIONAL, &yes(OPTIONAL)));
+    assert_eq!(
+        (target.status, target.overridden),
+        (Ok(GstStatus::Optional), Ok(false))
+    );
+    // A cancelled voucher whose three status flags are absent is not reported, and one spelt
+    // another way or repeated leaves it unread: the answer around the cancelled flag is not read.
+    let target = target_after(|block| {
+        [INCLUDED, UNCERTAIN, EXCLUDED].iter().fold(
+            once(&block, CANCELLED, &yes(CANCELLED)),
+            |block, element| once(&block, element, ""),
+        )
+    });
+    assert_eq!(
+        (target.status, target.overridden),
+        (Err(NOT_REPORTED), Ok(false))
+    );
+    let target = target_after(|block| {
+        once(
+            &once(&block, CANCELLED, &yes(CANCELLED)),
+            INCLUDED,
+            &INCLUDED.replace(">Yes<", ">yes<"),
+        )
+    });
+    assert_eq!(
+        (target.status, target.overridden),
+        (Err(UNREADABLE), Ok(false))
+    );
+    let target = target_after(|block| {
+        once(
+            &once(&block, CANCELLED, &yes(CANCELLED)),
+            INCLUDED,
+            &format!("{INCLUDED}{INCLUDED}"),
+        )
+    });
+    assert_eq!(
+        (target.status, target.overridden),
+        (Err(UNREADABLE), Err(UNREADABLE))
+    );
+    // Both Yes; one removed; both removed; spelt another way, empty or closed empty: no state,
+    // and the acceptance is still read.
+    let both = target_after(|block| {
+        once(
+            &once(&block, CANCELLED, &yes(CANCELLED)),
+            OPTIONAL,
+            &yes(OPTIONAL),
+        )
+    });
+    assert_eq!((both.status, both.overridden), (Err(UNREADABLE), Ok(false)));
+    for element in [CANCELLED, OPTIONAL] {
+        let name = element[1..element.find(' ').unwrap()].to_string();
+        for changed in [
+            String::new(),
+            element.replace(">No<", ">no<"),
+            element.replace(">No<", "><"),
+            format!(r#"<{name} TYPE="Logical"/>"#),
+        ] {
+            let target = target_after(|block| once(&block, element, &changed));
+            assert_eq!(
+                (target.status, target.overridden),
+                (Err(UNREADABLE), Ok(false)),
+                "{changed:?}"
+            );
+        }
+    }
+    let neither = target_after(|block| once(&once(&block, CANCELLED, ""), OPTIONAL, ""));
+    assert_eq!(
+        (neither.status, neither.overridden),
+        (Err(NOT_REPORTED), Ok(false))
+    );
+    // Repeated, or inside another element: neither the state nor the acceptance is read.
+    for element in [CANCELLED, OPTIONAL] {
+        for changed in [
+            format!("{element}{element}"),
+            format!("<WRAPPER>{element}</WRAPPER>"),
+            format!("{element}<WRAPPER>{}</WRAPPER>", yes(element)),
+        ] {
+            let target = target_after(|block| once(&block, element, &changed));
+            assert_eq!(
+                (target.status, target.overridden),
+                (Err(UNREADABLE), Err(UNREADABLE)),
+                "{changed}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -577,13 +943,13 @@ fn a_flag_spelt_in_lower_case_left_empty_or_closed_empty_is_unreadable() {
 
 #[test]
 fn a_voucher_row_repeated_with_the_same_master_id_refuses_the_whole_answer() {
-    let repeated = edit(&sales_window(), TARGET, |block| format!("{block}{block}"));
+    let repeated = edit(&august(), TARGET, |block| format!("{block}{block}"));
     assert_eq!(
         parse_status_rows(&repeated).unwrap_err(),
         "gst_status_read_voucher_repeated"
     );
     // The same master id under another voucher number is the same voucher row.
-    let renumbered = edit(&sales_window(), TARGET, |block| {
+    let renumbered = edit(&august(), TARGET, |block| {
         let second = once(&block, "BP/26-27/0013", "BP/26-27/9999");
         format!("{block}{second}")
     });
@@ -600,7 +966,7 @@ fn a_voucher_that_cannot_be_told_apart_refuses_the_whole_answer() {
     let day = r#"<DATE TYPE="Date">20260802</DATE>"#;
     let kind = "<VOUCHERTYPENAME>BRIDGE Sales</VOUCHERTYPENAME>";
     let number = "<VOUCHERNUMBER>BP/26-27/0013</VOUCHERNUMBER>";
-    let window = sales_window();
+    let window = august();
     let cases = [
         (
             "no master id",
@@ -675,7 +1041,7 @@ fn an_answer_whose_status_is_not_one_is_refused_before_any_row_is_read() {
     // `gst_status_read_status_not_success` is not the code a STATUS of 0 reaches.
     for status in ["0", "2", ""] {
         let mutated = once(
-            &sales_window(),
+            &august(),
             "<STATUS>1</STATUS>",
             &format!("<STATUS>{status}</STATUS>"),
         );
@@ -685,7 +1051,7 @@ fn an_answer_whose_status_is_not_one_is_refused_before_any_row_is_read() {
             "{status:?}"
         );
     }
-    let without = once(&sales_window(), "<STATUS>1</STATUS>", "");
+    let without = once(&august(), "<STATUS>1</STATUS>", "");
     assert_eq!(
         parse_status_rows(&without).unwrap_err(),
         "gst_status_read_protocol_invalid"
@@ -694,7 +1060,7 @@ fn an_answer_whose_status_is_not_one_is_refused_before_any_row_is_read() {
 
 #[test]
 fn a_truncated_answer_is_a_protocol_error_and_yields_no_row() {
-    let text = sales_window();
+    let text = august();
     assert!(text.is_ascii(), "byte offsets are character offsets");
     let before_close = text.rfind("</ENVELOPE>").unwrap();
     for end in [
@@ -718,7 +1084,7 @@ fn a_truncated_answer_is_a_protocol_error_and_yields_no_row() {
 
 #[test]
 fn an_answer_with_no_collection_or_no_data_names_the_missing_collection() {
-    let text = sales_window();
+    let text = august();
     let open = r#"<COLLECTION ISCMPDEPTYPE="Yes" CMPLOCUS="4" CMPDEPTYPE="64">"#;
     let renamed = once(&text, open, &open.replace("<COLLECTION", "<COLLECTIONS"));
     let no_collection = once(&renamed, "</COLLECTION>", "</COLLECTIONS>");
@@ -736,7 +1102,7 @@ fn an_answer_with_no_collection_or_no_data_names_the_missing_collection() {
 
 #[test]
 fn a_second_collection_or_a_voucher_outside_the_collection_refuses_the_answer() {
-    let text = sales_window();
+    let text = august();
     let close = "</COLLECTION>";
     let second = once(
         &text,
@@ -763,7 +1129,7 @@ fn a_second_collection_or_a_voucher_outside_the_collection_refuses_the_answer() 
 
 #[test]
 fn a_line_error_or_an_error_element_anywhere_in_the_answer_refuses_it() {
-    let text = sales_window();
+    let text = august();
     let in_collection = once(
         &text,
         "</COLLECTION>",
@@ -795,7 +1161,7 @@ fn a_value_written_with_a_character_reference_or_a_cdata_section_reads_as_its_te
     let kind = "<VOUCHERTYPENAME>BRIDGE Sales</VOUCHERTYPENAME>";
     // `&#83;` is an ordinary character reference (an `S`): only references to control characters
     // are marked.
-    let referenced = edit(&sales_window(), TARGET, |block| {
+    let referenced = edit(&august(), TARGET, |block| {
         once(
             &block,
             kind,
@@ -803,10 +1169,10 @@ fn a_value_written_with_a_character_reference_or_a_cdata_section_reads_as_its_te
         )
     });
     assert_eq!(
-        parse_status_rows(&referenced).unwrap()[1].voucher_type,
+        parse_status_rows(&referenced).unwrap()[TARGET_AT].voucher_type,
         "BRIDGE Sales"
     );
-    let cdata = edit(&sales_window(), TARGET, |block| {
+    let cdata = edit(&august(), TARGET, |block| {
         once(
             &block,
             kind,
@@ -814,7 +1180,7 @@ fn a_value_written_with_a_character_reference_or_a_cdata_section_reads_as_its_te
         )
     });
     assert_eq!(
-        parse_status_rows(&cdata).unwrap()[1].voucher_type,
+        parse_status_rows(&cdata).unwrap()[TARGET_AT].voucher_type,
         "BRIDGE Sales"
     );
 }
@@ -915,7 +1281,7 @@ fn arguments(from: &str, to: &str, type_name: &str) -> Value {
 
 /// The window and type of the lab's request.
 fn lab_arguments() -> Value {
-    arguments("20260802", "20260803", LAB_TYPE)
+    arguments("20260801", "20260831", LAB_TYPE)
 }
 
 struct Call {
@@ -978,7 +1344,17 @@ fn status_name(status: GstStatus) -> &'static str {
         GstStatus::Uncertain => "uncertain",
         GstStatus::Excluded => "excluded",
         GstStatus::NotInReturn => "not_in_return",
+        GstStatus::Cancelled => "cancelled",
+        GstStatus::Optional => "optional",
     }
+}
+
+/// The August rows as the tool orders its items: by date, then voucher number (as text), then
+/// master id.
+fn august_items() -> Vec<Value> {
+    let mut rows = AUGUST_ROWS.to_vec();
+    rows.sort_by(|a, b| (a.1, a.0, a.3).cmp(&(b.1, b.0, b.3)));
+    rows.iter().map(item).collect()
 }
 
 fn item(expected: &Expected) -> Value {
@@ -995,7 +1371,7 @@ fn item(expected: &Expected) -> Value {
 
 #[tokio::test]
 async fn a_read_returns_each_vouchers_status_and_sends_the_request_the_lab_sent() {
-    let call = run(plans_with(marks(), sales_window()), lab_arguments()).await;
+    let call = run(plans_with(marks(), august()), lab_arguments()).await;
     assert_eq!(
         call.observed.len(),
         call.expected,
@@ -1010,25 +1386,46 @@ async fn a_read_returns_each_vouchers_status_and_sends_the_request_the_lab_sent(
     );
     assert_eq!(
         result["window"],
-        json!({"from": "20260802", "to": "20260803"})
+        json!({"from": "20260801", "to": "20260831"})
     );
     assert_eq!(result["voucher_type_name"], LAB_TYPE);
-    assert_eq!(result["total"], 6);
+    assert_eq!(result["total"], 32);
     assert_eq!(result["offset"], 0);
+    // The cancelled and the optional voucher are counted under their own keys only.
     assert_eq!(
         result["counts"],
         json!({
-            "included": 6,
-            "uncertain": 0,
+            "included": 25,
+            "uncertain": 5,
             "excluded": 0,
             "not_in_return": 0,
+            "cancelled": 1,
+            "optional": 1,
             "unread": 0,
-            "accepted_as_it_stands": 1,
+            "accepted_as_it_stands": 5,
         })
     );
+    assert_eq!(result["items"], Value::Array(august_items()));
+    // Ordered by date, then voucher number as text: `10` sorts before `5`.
+    let numbers: Vec<&str> = result["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["voucher_number"].as_str().unwrap())
+        .collect();
     assert_eq!(
-        result["items"],
-        Value::Array(SALES_WINDOW_ROWS.iter().map(item).collect())
+        &numbers[9..12],
+        ["BP/26-27/0010", "BP/26-27/0011", "BP/26-27/0012"]
+    );
+    assert_eq!(&numbers[18..21], ["10", "11", "12"]);
+    assert_eq!(
+        &numbers[28..],
+        [
+            "BP/26-27/0041",
+            "BP/26-27/0042",
+            "BP/26-27/0043",
+            "BP/26-27/0044"
+        ]
     );
     assert!(result.get("next_offset").is_none(), "{result}");
     let limitations = result["limitations"]
@@ -1041,7 +1438,8 @@ async fn a_read_returns_each_vouchers_status_and_sends_the_request_the_lab_sent(
     for stated in [
         "included is not 'clean'",
         "Receipts only",
-        "Cancelled, optional and post-dated vouchers are not marked",
+        "never counted as included or not_in_return",
+        "Post-dated vouchers are not marked",
         "A total of 0 may mean",
         "a voucher saved between two pages",
         "excluded has not been observed",
@@ -1079,10 +1477,10 @@ async fn a_read_returns_each_vouchers_status_and_sends_the_request_the_lab_sent(
     let answers = [
         plan(companies()).response_bytes(),
         plan(marks()).response_bytes(),
-        plan(sales_window()).response_bytes(),
+        plan(august()).response_bytes(),
     ];
     assert_eq!(
-        answers[2], SALES_WINDOW,
+        answers[2], AUGUST,
         "the replayed answer is the committed bytes"
     );
     assert_eq!(
@@ -1097,39 +1495,41 @@ async fn a_read_returns_each_vouchers_status_and_sends_the_request_the_lab_sent(
 #[tokio::test]
 async fn dates_written_with_hyphens_send_the_same_request() {
     let call = run(
-        plans_with(marks(), sales_window()),
-        arguments("2026-08-02", "2026-08-03", LAB_TYPE),
+        plans_with(marks(), august()),
+        arguments("2026-08-01", "2026-08-31", LAB_TYPE),
     )
     .await;
     assert_eq!(call.observed.len(), call.expected);
     assert_eq!(
         payload(&call.response)["window"],
-        json!({"from": "20260802", "to": "20260803"})
+        json!({"from": "20260801", "to": "20260831"})
     );
     assert_eq!(call.observed[11].request_body_sha256, REQUEST_SHA256);
 }
 
 #[tokio::test]
-async fn a_page_of_two_names_the_next_offset_and_the_counts_cover_the_whole_window() {
+async fn a_page_of_ten_names_the_next_offset_and_the_counts_cover_the_whole_window() {
     for (offset, rows, next) in [
-        (0_usize, 0..2, Some(2)),
-        (2, 2..4, Some(4)),
-        (4, 4..6, None),
+        (0_usize, 0..10, Some(10)),
+        (10, 10..20, Some(20)),
+        (20, 20..30, Some(30)),
+        (30, 30..32, None),
     ] {
         let mut args = lab_arguments();
-        args["limit"] = json!(2);
+        args["limit"] = json!(10);
         args["offset"] = json!(offset);
-        let call = run(plans_with(marks(), sales_window()), args).await;
+        let call = run(plans_with(marks(), august()), args).await;
         assert_eq!(call.observed.len(), call.expected);
         let result = payload(&call.response);
         assert_eq!(result["state"], "complete");
-        assert_eq!(result["total"], 6, "offset {offset}");
+        assert_eq!(result["total"], 32, "offset {offset}");
         assert_eq!(result["offset"], offset);
-        assert_eq!(result["counts"]["included"], 6);
-        assert_eq!(result["counts"]["accepted_as_it_stands"], 1);
+        assert_eq!(result["counts"]["included"], 25);
+        assert_eq!(result["counts"]["cancelled"], 1);
+        assert_eq!(result["counts"]["accepted_as_it_stands"], 5);
         assert_eq!(
             result["items"],
-            Value::Array(SALES_WINDOW_ROWS[rows].iter().map(item).collect()),
+            Value::Array(august_items()[rows].to_vec()),
             "offset {offset}"
         );
         match next {
@@ -1157,6 +1557,8 @@ async fn the_wider_answer_through_the_tool_counts_one_uncertain_and_two_included
             "uncertain": 1,
             "excluded": 0,
             "not_in_return": 0,
+            "cancelled": 0,
+            "optional": 0,
             "unread": 0,
             "accepted_as_it_stands": 1,
         })
@@ -1166,6 +1568,43 @@ async fn the_wider_answer_through_the_tool_counts_one_uncertain_and_two_included
         result["items"],
         Value::Array(THREE_VOUCHER_ROWS.iter().map(item).collect())
     );
+}
+
+#[tokio::test]
+async fn an_answer_to_the_earlier_request_through_the_tool_is_partial_and_counts_nothing_included()
+{
+    let call = run(
+        plans_with(marks(), decode_utf16(SALES_WINDOW)),
+        arguments("20260802", "20260803", LAB_TYPE),
+    )
+    .await;
+    assert_eq!(call.observed.len(), call.expected);
+    let result = payload(&call.response);
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["total"], 6);
+    assert_eq!(
+        result["counts"],
+        json!({
+            "included": 0,
+            "uncertain": 0,
+            "excluded": 0,
+            "not_in_return": 0,
+            "cancelled": 0,
+            "optional": 0,
+            "unread": 6,
+            "accepted_as_it_stands": 1,
+        })
+    );
+    for item in result["items"].as_array().unwrap() {
+        assert_eq!(
+            item["gst_status"],
+            json!({"unread": NOT_REPORTED}),
+            "{item}"
+        );
+    }
+    let receipt = receipt(&call.response);
+    assert_eq!(receipt["state"], "partial");
+    assert_eq!(receipt["reason_code"], "gst_status_voucher_unread");
 }
 
 #[tokio::test]
@@ -1231,7 +1670,7 @@ async fn a_window_of_ninety_three_days_is_read_and_the_vouchers_outside_it_are_r
     // April 1 to July 2 is 93 days: admitted, so every read is made; the answer holds vouchers
     // dated 2 August, which the window does not cover.
     let call = run(
-        plans_with(marks(), sales_window()),
+        plans_with(marks(), august()),
         arguments("20260401", "20260702", LAB_TYPE),
     )
     .await;
@@ -1246,7 +1685,7 @@ async fn a_window_of_ninety_three_days_is_read_and_the_vouchers_outside_it_are_r
 #[tokio::test]
 async fn a_voucher_dated_after_the_window_is_refused_not_reported() {
     let call = run(
-        plans_with(marks(), sales_window()),
+        plans_with(marks(), august()),
         arguments("20260801", "20260801", LAB_TYPE),
     )
     .await;
@@ -1296,7 +1735,7 @@ async fn a_book_with_a_voucher_mark_above_the_limit_is_refused_before_the_status
 #[tokio::test]
 async fn a_book_at_the_limit_is_read() {
     let call = run(
-        plans_with(marks_with_voucher_mark(25_000), sales_window()),
+        plans_with(marks_with_voucher_mark(25_000), august()),
         lab_arguments(),
     )
     .await;
@@ -1306,7 +1745,7 @@ async fn a_book_at_the_limit_is_read() {
 
 #[tokio::test]
 async fn an_answer_that_repeats_a_voucher_is_refused_whole() {
-    let repeated = edit(&sales_window(), TARGET, |block| format!("{block}{block}"));
+    let repeated = edit(&august(), TARGET, |block| format!("{block}{block}"));
     let call = run(plans_with(marks(), repeated), lab_arguments()).await;
     assert_eq!(call.observed.len(), call.expected);
     assert_eq!(
@@ -1320,7 +1759,7 @@ async fn an_answer_that_repeats_a_voucher_is_refused_whole() {
 
 #[tokio::test]
 async fn a_voucher_with_a_date_that_is_not_a_date_is_refused_as_unidentified() {
-    let mutated = edit(&sales_window(), TARGET, |block| {
+    let mutated = edit(&august(), TARGET, |block| {
         once(
             &block,
             r#"<DATE TYPE="Date">20260802</DATE>"#,
@@ -1337,7 +1776,7 @@ async fn a_voucher_with_a_date_that_is_not_a_date_is_refused_as_unidentified() {
 
 #[tokio::test]
 async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_never_included() {
-    let window = sales_window();
+    let window = august();
     let cases = [
         // One of the three status flags removed.
         (
@@ -1381,32 +1820,34 @@ async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_ne
         let result = payload(&call.response);
         // The voucher is returned, with the code that says why it has no status.
         assert_eq!(result["state"], "partial", "{unread}");
-        assert_eq!(result["total"], 6);
+        assert_eq!(result["total"], 32);
         assert_eq!(
             result["counts"],
             json!({
-                "included": 5,
-                "uncertain": 0,
+                "included": 24,
+                "uncertain": 5,
                 "excluded": 0,
                 "not_in_return": 0,
+                "cancelled": 1,
+                "optional": 1,
                 "unread": 1,
-                "accepted_as_it_stands": 1,
+                "accepted_as_it_stands": 5,
             }),
             "{unread}"
         );
         let items = result["items"].as_array().unwrap();
-        assert_eq!(items.len(), 6);
-        assert_eq!(items[1]["voucher_number"], TARGET);
-        assert_eq!(items[1]["master_id"], "17");
+        assert_eq!(items.len(), 32);
+        assert_eq!(items[TARGET_AT]["voucher_number"], TARGET);
+        assert_eq!(items[TARGET_AT]["master_id"], "17");
         assert_eq!(
-            items[1]["gst_status"],
+            items[TARGET_AT]["gst_status"],
             json!({"unread": unread}),
             "{unread}"
         );
-        // The five others are read as in the committed answer.
-        for (position, expected) in SALES_WINDOW_ROWS.iter().enumerate() {
-            if position != 1 {
-                assert_eq!(items[position], item(expected), "{position}");
+        // The 31 others are read as in the committed answer.
+        for (position, expected) in august_items().iter().enumerate() {
+            if position != TARGET_AT {
+                assert_eq!(&items[position], expected, "{position}");
             }
         }
         let receipt = receipt(&call.response);
@@ -1422,7 +1863,7 @@ async fn a_voucher_whose_flags_cannot_be_read_makes_the_result_partial_and_is_ne
 /// only the excluded flag Yes and one with all three No.
 #[tokio::test]
 async fn excluded_and_not_in_return_vouchers_are_counted_under_their_own_keys() {
-    let mutated = edit(&sales_window(), TARGET, |block| {
+    let mutated = edit(&august(), TARGET, |block| {
         let block = once(&block, INCLUDED, &INCLUDED.replace(">Yes<", ">No<"));
         once(&block, EXCLUDED, &EXCLUDED.replace(">No<", ">Yes<"))
     });
@@ -1433,10 +1874,12 @@ async fn excluded_and_not_in_return_vouchers_are_counted_under_their_own_keys() 
     assert_eq!(call.observed.len(), call.expected);
     let result = payload(&call.response);
     assert_eq!(result["state"], "complete");
-    assert_eq!(result["counts"]["included"], 4);
+    assert_eq!(result["counts"]["included"], 23);
     assert_eq!(result["counts"]["excluded"], 1);
     assert_eq!(result["counts"]["not_in_return"], 1);
-    assert_eq!(result["counts"]["uncertain"], 0);
+    assert_eq!(result["counts"]["uncertain"], 5);
+    assert_eq!(result["counts"]["cancelled"], 1);
+    assert_eq!(result["counts"]["optional"], 1);
 }
 
 /// A voucher whose status reads but whose acceptance flag does not is not a clean read: its
@@ -1444,14 +1887,12 @@ async fn excluded_and_not_in_return_vouchers_are_counted_under_their_own_keys() 
 #[tokio::test]
 async fn a_voucher_whose_acceptance_flag_is_missing_keeps_its_status_and_makes_the_result_partial()
 {
-    let mutated = edit(&sales_window(), TARGET, |block| {
-        once(&block, OVERRIDDEN, "")
-    });
+    let mutated = edit(&august(), TARGET, |block| once(&block, OVERRIDDEN, ""));
     let call = run(plans_with(marks(), mutated), lab_arguments()).await;
     assert_eq!(call.observed.len(), call.expected);
     let result = payload(&call.response);
     assert_eq!(result["state"], "partial");
-    assert_eq!(result["counts"]["included"], 6, "the status was read");
+    assert_eq!(result["counts"]["included"], 25, "the status was read");
     assert_eq!(result["counts"]["unread"], 1);
     assert_eq!(receipt(&call.response)["state"], "partial");
     assert_eq!(

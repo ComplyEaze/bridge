@@ -1,0 +1,20 @@
+# DIFF of two reads of the COMPANY row = the paths whose text differs or that exist in one read only.
+# A path is every attribute and every leaf element of the row, by position (TAG[i] among its siblings).
+
+read 1: 414 paths; flat file sha256 031f8ba16842972e12a74c726d2bb76490effa8c6ae806951e7a22011097cdb0; answer 32986 bytes, sha256 0ea14d78cc5fc84cc14c656775064903274d3efca4e9cecd392b60f86af74f51
+read 2: 414 paths; flat file sha256 031f8ba16842972e12a74c726d2bb76490effa8c6ae806951e7a22011097cdb0; answer 32986 bytes, sha256 0ea14d78cc5fc84cc14c656775064903274d3efca4e9cecd392b60f86af74f51
+read 3: 414 paths; flat file sha256 031f8ba16842972e12a74c726d2bb76490effa8c6ae806951e7a22011097cdb0; answer 32986 bytes, sha256 0ea14d78cc5fc84cc14c656775064903274d3efca4e9cecd392b60f86af74f51
+read 4: 414 paths; flat file sha256 031f8ba16842972e12a74c726d2bb76490effa8c6ae806951e7a22011097cdb0; answer 32986 bytes, sha256 0ea14d78cc5fc84cc14c656775064903274d3efca4e9cecd392b60f86af74f51
+read 5: 414 paths; flat file sha256 031f8ba16842972e12a74c726d2bb76490effa8c6ae806951e7a22011097cdb0; answer 32986 bytes, sha256 0ea14d78cc5fc84cc14c656775064903274d3efca4e9cecd392b60f86af74f51
+read 6: 414 paths; flat file sha256 a6134e4966da401778f3b86361c55136203af620729ed053b3b6cd0fe1b99f83; answer 32986 bytes, sha256 665a303004e6ca0ae11970e97ed67e447cf4676cf6d115441ef22aa97e3c727e
+read 7: 414 paths; flat file sha256 031f8ba16842972e12a74c726d2bb76490effa8c6ae806951e7a22011097cdb0; answer 32986 bytes, sha256 0ea14d78cc5fc84cc14c656775064903274d3efca4e9cecd392b60f86af74f51
+
+DIFF 1-2 (5 minutes untouched): 0 paths
+DIFF 2-3 (shut and reload): 0 paths
+DIFF 3-4 (a backup): 0 paths
+DIFF 4-5 (a restore of that same backup): 0 paths
+DIFF 5-6 (a restore of an older backup): 1 paths
+   COMPANY/AUDITEDUPTO[0] : read 5 '20260710' ; read 6 '20260701'
+DIFF 5-7 (the same backup restored twice, two loads apart): 0 paths
+DIFF 6-7 (the older backup against the first one restored again): 1 paths
+   COMPANY/AUDITEDUPTO[0] : read 6 '20260701' ; read 7 '20260710'

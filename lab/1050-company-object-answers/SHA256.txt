@@ -1,0 +1,6 @@
+# sha256  bytes  file (every file of this folder except this one)
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+1f6f75e97cf5ee07d55a0b5e53a1065c39e43746e4e7d4391356765bd212ac5e  3794  NOTES.md
+294df22d0beb19d3328eb910c64f634cb5de4120a798cb18e5d9dc952d959e57  9707  SHA256-kept-on-lab-pc.txt
+b7968aa176ce3e58ec0aa3ff7939191b2fc00c5fe74d94dbdbc3d8eebfc80655  2044  derived/flat-diff.txt
+8c2dff4662f56180e9d12ab9b5589344192ade55fbe11f28cbac6abf6515ddbb  1488  derived/result-table.md

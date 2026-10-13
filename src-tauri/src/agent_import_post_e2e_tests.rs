@@ -5332,6 +5332,9 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         assert_eq!(landed["alter_id"], alter_id, "{id}: {landed}");
         assert_eq!(landed["master_id"], master_id, "{id}: {landed}");
         assert_eq!(landed["diffs"], json!([]), "{id}: {landed}");
+        // A row matched by content has no next step, and the lead does not
+        // promise one for it.
+        assert!(landed.get("next_step").is_none(), "{id}: {landed}");
     }
     assert_eq!(
         voucher("partial-2")["status"],
@@ -5348,7 +5351,7 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     );
     assert_eq!(
         batch_headline(&posted)["lead"],
-        "0 of 3 vouchers of this batch are confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; its next step says how. ComplyEaze Bridge will not send them again.",
+        "0 of 3 vouchers of this batch are confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; each row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
         "{posted}"
     );
     let verdicts = String::from_utf8(journal(directory.path()))

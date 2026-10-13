@@ -54,6 +54,12 @@ These changes are in source and not yet in a published build.
   opens without a password needs `password_file` to be an empty file (on a Mac it must be owned by you with no group or other permission bits; on Windows it must be owned by you or Administrators, and no one but you, SYSTEM and Administrators may read or change it). Not measured: other
   account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
 
+- `post_import` (after a send was read back) and `verify_import` now begin with a `headline` for a batch
+  ComplyEaze Bridge sent: how many of its vouchers are confirmed in Tally and how many are not, with a count
+  for each other status, counted from the result's own rows. A batch whose vouchers all read back but whose
+  readback as a whole is not confirmed is not called confirmed. A batch not yet posted, a file imported by
+  hand and a refusal before anything was sent have none. The result is unchanged (part of #1090).
+
 **Changed**
 
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor

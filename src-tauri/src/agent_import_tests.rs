@@ -3797,6 +3797,74 @@ async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
     assert_eq!(later["structuredContent"]["headline"], *headline, "{later}");
 }
 
+/// The lead promises a next step only where a row has one: of the ten statuses
+/// a voucher can be left in, four carry a next step and six do not, and the
+/// lead is the same for both. Each status is counted in its own field, a
+/// result that sent nothing has no headline, and a result with no row has none.
+#[test]
+fn the_batch_lead_claims_a_next_step_only_where_a_row_has_one() {
+    let result = |state: Value, statuses: &[&str]| {
+        json!({
+            "dispatch": {"state": state},
+            "verification_status": "verification_incomplete",
+            "vouchers": statuses
+                .iter()
+                .map(|status| json!({"status": status}))
+                .collect::<Vec<_>>(),
+        })
+    };
+    let with_next_step = [
+        "bound_not_in_window",
+        "book_rolled_back",
+        "sent_not_attributed",
+        "tally_reported_not_created",
+    ];
+    let without_next_step = [
+        "matching_content_observed",
+        "posted_divergent",
+        "posted_not_effective",
+        "not_found",
+        "not_attributable",
+        "duplicate_fingerprint",
+    ];
+    for status in with_next_step {
+        assert!(verification::plain_next_step(status).is_some(), "{status}");
+    }
+    for status in without_next_step {
+        assert_eq!(verification::plain_next_step(status), None, "{status}");
+    }
+    for status in with_next_step.into_iter().chain(without_next_step) {
+        let headline =
+            verification::batch_headline(&result(json!("reconciliation_required"), &[status]))
+                .map(|headline| serde_json::to_value(headline).unwrap())
+                .expect("a dispatched batch states how it ended");
+        assert_eq!(
+            headline["lead"],
+            "0 of 1 vouchers of this batch are confirmed in Tally. 1 is not: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
+            "{status}"
+        );
+        // Only the status's own count is one: no other field takes it.
+        assert_eq!(headline["batch"]["not_confirmed"][status], 1, "{status}");
+        let others = headline["batch"]["not_confirmed"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(name, _)| name.as_str() != status)
+            .map(|(_, count)| count.as_u64().unwrap())
+            .sum::<u64>();
+        assert_eq!(others, 0, "{status}");
+    }
+    // A result that sent nothing, or lists no voucher, states no outcome.
+    assert!(
+        verification::batch_headline(&result(json!("not_dispatched"), &["not_found"])).is_none()
+    );
+    assert!(verification::batch_headline(&json!({
+        "vouchers": [{"status": "not_found"}],
+    }))
+    .is_none());
+    assert!(verification::batch_headline(&result(json!("posted_verified"), &[])).is_none());
+}
+
 async fn verify_saved_batch_after_dispatch(
     dispatched: bool,
     dispatch_response: Option<ledger::DispatchResponse>,

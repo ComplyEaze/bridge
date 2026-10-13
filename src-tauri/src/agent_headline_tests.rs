@@ -700,7 +700,7 @@ fn a_batch_with_vouchers_left_says_how_many_and_counts_each_status() {
     );
     assert_eq!(
         partly.headline().lead,
-        "1 of 4 vouchers of this batch is confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; its next step says how. ComplyEaze Bridge will not send them again."
+        "1 of 4 vouchers of this batch is confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; each row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
     );
     assert_eq!(
         serde_json::to_value(&partly).unwrap(),
@@ -721,7 +721,7 @@ fn a_batch_with_vouchers_left_says_how_many_and_counts_each_status() {
     );
     assert_eq!(
         one.headline().lead,
-        "2 of 3 vouchers of this batch are confirmed in Tally. 1 is not: check it in Tally before doing anything else with it; its next step says how. ComplyEaze Bridge will not send it again."
+        "2 of 3 vouchers of this batch are confirmed in Tally. 1 is not: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
     );
 }
 
@@ -738,9 +738,54 @@ fn all_vouchers_read_back_beside_an_unconfirmed_batch_is_not_called_confirmed() 
     .lead;
     assert_eq!(
         lead,
-        "All 2 vouchers of this batch read back in Tally, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send it again."
+        "All 2 vouchers of this batch read back in Tally, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again."
     );
     assert!(!lead.contains("are confirmed"), "{lead}");
+}
+
+/// One voucher that reads back, in a batch that is not confirmed as a whole,
+/// has its own sentence.
+#[test]
+fn one_voucher_that_reads_back_beside_an_unconfirmed_batch_is_not_called_confirmed() {
+    let lead = outcome(&["posted_verified"], BatchVerdict::VerificationIncomplete)
+        .headline()
+        .lead;
+    assert_eq!(
+        lead,
+        "The voucher of this batch reads back in Tally, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again."
+    );
+}
+
+/// Each status other than `posted_verified` is counted in its own field, and
+/// no field takes another's voucher.
+#[test]
+fn every_status_is_counted_in_its_own_field() {
+    let statuses = [
+        "matching_content_observed",
+        "sent_not_attributed",
+        "tally_reported_not_created",
+        "posted_divergent",
+        "posted_not_effective",
+        "not_found",
+        "not_attributable",
+        "duplicate_fingerprint",
+        "bound_not_in_window",
+        "book_rolled_back",
+        "unrecognised",
+    ];
+    for (index, status) in statuses.into_iter().enumerate() {
+        // Each status is counted a different number of times, so two fields
+        // swapped by mistake cannot read the same.
+        let times = index + 1;
+        let batch = outcome(&vec![status; times], BatchVerdict::PostedVerified);
+        let value = serde_json::to_value(&batch).unwrap();
+        for other in statuses {
+            let wanted = if other == status { times } else { 0 };
+            assert_eq!(value["not_confirmed"][other], wanted, "{status} / {other}");
+        }
+        assert_eq!(value["vouchers"], times, "{status}");
+        assert_eq!(value["confirmed"], 0, "{status}");
+    }
 }
 
 /// A voucher that is not confirmed cannot sit in a batch whose verdict is
@@ -759,10 +804,11 @@ fn the_verdict_cannot_be_confirmed_beside_a_voucher_that_is_not() {
     );
 }
 
-/// A byte cap that trims the rows restates the headline from its page and
-/// must keep the batch's counts.
+/// A headline with no page (a batch's) comes through `restate_rows` as it
+/// went in, counts included. It does not show that a trim keeps the counts of
+/// a headline that has a page: a batch headline has none.
 #[test]
-fn restating_the_rows_of_a_response_keeps_the_batch_counts() {
+fn restating_the_rows_of_a_response_leaves_a_batch_headline_as_it_was() {
     let headline = outcome(
         &["posted_verified", "not_found"],
         BatchVerdict::PostedVerified,

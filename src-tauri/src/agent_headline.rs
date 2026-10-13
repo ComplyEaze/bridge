@@ -797,25 +797,25 @@ impl BatchOutcome {
                 format!("All {vouchers} vouchers of this batch are confirmed in Tally.")
             }
             // Every voucher reads back, but something else about the batch
-            // (a duplicate, a doubt about the ledgers or the voucher mark)
-            // keeps it from being confirmed: the result names it.
+            // (a duplicate, a doubt about the ledgers or the voucher mark, or
+            // an answer from Tally that was not clean or is missing) keeps it
+            // from being confirmed: the result names it.
             (0, BatchVerdict::VerificationIncomplete) => {
                 let subject = if vouchers == 1 {
                     "The voucher of this batch reads back in Tally".to_string()
                 } else {
                     format!("All {vouchers} vouchers of this batch read back in Tally")
                 };
-                format!("{subject}, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send it again.")
+                format!("{subject}, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again.")
             }
             _ => {
-                let (are, them) = if rest == 1 {
-                    ("is", "it")
+                let (are, each, row) = if rest == 1 {
+                    ("is", "it", "its row")
                 } else {
-                    ("are", "them")
+                    ("are", "each", "each row")
                 };
-                let each = if rest == 1 { "it" } else { "each" };
                 let confirmed_are = if confirmed == 1 { "is" } else { "are" };
-                format!("{confirmed} of {vouchers} vouchers of this batch {confirmed_are} confirmed in Tally. {rest} {are} not: check {each} in Tally before doing anything else with it; its next step says how. ComplyEaze Bridge will not send {them} again.")
+                format!("{confirmed} of {vouchers} vouchers of this batch {confirmed_are} confirmed in Tally. {rest} {are} not: check {each} in Tally before doing anything else with it; {row} says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.")
             }
         };
         Headline {

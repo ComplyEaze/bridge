@@ -1,6 +1,7 @@
 src-tauri/crates/bridge-tally-protocol/src/lib.rs
 src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_responses.rs
 src-tauri/src/agent_tests.rs
 src-tauri/src/tally/connection.rs
 src-tauri/src/tally/runtime.rs

@@ -1,4 +1,4 @@
-//! The uncertain vouchers of one Sales voucher type in a date window, with the vouchers a
+//! The uncertain vouchers of one voucher type (a Sales type is what was measured) in a date window, with the vouchers a
 //! person accepted as they stand (Accept As Is), and the line a CA reads before filing.
 //!
 //! It is the status read of `gst_status` (its request, its parse and its refusals) with two
@@ -285,7 +285,7 @@ const LIMITATIONS: [&str; 14] = [
     "Measured on one synthetic book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, which changed that voucher alone. Not measured: item invoices, a registered buyer, credit notes or other Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once, Gold and other releases",
     "excluded has not been observed on the lab's book. included counts a voucher a person accepted as it stands as well, so included is not 'clean'. A status is Tally's own flag and not a judgement of ComplyEaze Bridge",
     "A voucher whose ISDELETED or ISDELETEDVCHRETAINED flag reads Yes is unread (gst_status_voucher_deleted); a Yes was never measured",
-    "At most 93 days a window and one voucher type named by its exact name (a type of the same class under another name is not read and not in the line, which says Sales because this tool is for a Sales type and ends by naming the type it covers). The name is not checked against the book's voucher types, so take it from masters. A total of 0 may mean the type name matched nothing: the line is withheld, with the counts kept, when no voucher was read and when none is uncertain, because a line of 0 would read as clearance. A book whose voucher mark is above 25,000 is refused (gst_status_book_too_large), because the selection is evaluated on every voucher of the book",
+    "At most 93 days a window and one voucher type named by its exact name (a type of the same class under another name is not read and not in the line, which names the type it covers and does not say it is a Sales type, because the type's class is not read). The name is not checked against the book's voucher types, so take it from masters. A total of 0 may mean the type name matched nothing: the line is withheld, with the counts kept, when no voucher was read and when none is uncertain, because a line of 0 would read as clearance. A book whose voucher mark is above 25,000 is refused (gst_status_book_too_large), because the selection is evaluated on every voucher of the book",
 ];
 
 #[cfg(test)]

@@ -72,7 +72,7 @@ These changes are in source and not yet in a published build.
   buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
   voucher has not been observed.
 
-- `gst_uncertain_vouchers` lists the vouchers of one Sales voucher type in a window that Tally marks Uncertain in its
+- `gst_uncertain_vouchers` lists the vouchers of one voucher type (a Sales type is what was measured) in a window that Tally marks Uncertain in its
   GSTR-1, and the vouchers a person accepted as they stand (Accept As Is), each with its party ledger, its invoice total
   (without its sign, with its side) and Tally's identifiers, and the line a CA reads before filing. It counts the window's
   vouchers with the status read first and refuses a window above 1,000 vouchers (provisional) before it reads amounts; the

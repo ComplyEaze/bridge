@@ -639,7 +639,7 @@ bound is provisional: the read has been timed only on a book of about thirty vou
 synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices (protocol reference
 §9.17 holds the Sales flags and Accept As Is; the by-name selection and the narrow field list are in the fixtures' PROVENANCE.md); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
 
-### Uncertain vouchers of one Sales voucher type (`gst_uncertain_vouchers`)
+### Uncertain vouchers of one voucher type (`gst_uncertain_vouchers`)
 
 `gst_uncertain_vouchers` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, with
 the same checks and refusals as `gst_status` (an exact type name, at most 93 days, a book whose voucher mark is at most

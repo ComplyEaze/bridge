@@ -261,5 +261,11 @@ Contra vouchers, and 5 Journals).
   are identical in content and their own order cannot be observed (the request
   order of vouchers that can be told apart was measured in two raw runs);
   the local journal is the trust root; writes from another Gold process are
-  unmeasured; whether a restore or rewrite reuses AlterIDs or MasterIDs is
-  unmeasured.
+  unmeasured; whether a data rewrite reuses AlterIDs or MasterIDs is
+  unmeasured. **Amended 2026-10-13:** a restore does. After a backup was
+  restored on one synthetic book, the next voucher, keyed by hand in one run
+  and sent by import in another, read the number, MasterID, AlterID and GUID
+  of the voucher the restore had removed (protocol reference §9.15, PARTIAL).
+  So a bound GUID can name another voucher once a restored book is keyed
+  past the post's mark; the rolled-back check sees a restore only while the
+  mark reads below that floor.

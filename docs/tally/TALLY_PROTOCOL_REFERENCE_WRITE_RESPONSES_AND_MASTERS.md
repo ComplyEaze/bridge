@@ -897,7 +897,7 @@ habits, not against real operator input.
 - the CR LF name after plain;
 - a lowercase CR LF name after an uppercase plain one.
 
-A folded twin is therefore a second master, not a silent Alter of the first (contrast §9.4).
+A twin that differs by a trailing CR LF is therefore a second master, not a silent Alter of the first (contrast §9.4). A name that differed by case alone altered the existing ledger (2026-10-13, below).
 
 Every voucher below was imported as a file over the gateway, with no errors. The ledger it posted to was read back per ledger GUID.
 
@@ -910,12 +910,19 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 
 **When a ledger carries exactly the imported name, the import posts to it**, and creation order does not decide. In the first three rows the matched ledger was also the older twin. The last row names the newer one and still posts to the exact match. That voucher was a probe: a file built for the uppercase ledger, before the twin existed, with its one `LEDGERNAME` then changed to the lowercase CR LF name. `verify_import` against the built batch reported it `posted_divergent`, naming both ledgers.
 
-**Not measured:**
-- a name that matches **neither** twin exactly, only folding to both (e.g. mixed case without the CR LF): which twin Tally picks there is open;
-- twins made or edited in Tally's own screens;
+**Not measured in that run:**
+- a name that matches **neither** twin exactly, only folding to both (measured on 2026-10-13, below);
+- twins made or edited in Tally's own screens (two screen attempts on 2026-10-13, below);
 - the fold-twin behaviour on Gold and Education (the CR LF block below measures an encoding on Gold, not twins).
 
-Until the fold-only case is measured, bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`).
+**A name that only folds to both twins landed on one of them; a case-only Create altered; an alias reached its ledger. VERIFIED 2026-10-13, licensed TallyPrime 7.1 Silver on Windows, one synthetic company, one run of each step. Confidence: PARTIAL.** Branch `lab/626-twin-answers`, `a283cd3c`, bridge#626; every figure was read from the answers with an XML parser.
+- **The fold-only name.** The company held a ledger whose name ends in CR LF. A second ledger with the same name and no line break was created by request (`CREATED` 1; its own GUID; the first unchanged). A Payment was then imported whose debit named the ledger in capitals with no line break, which equals neither name and folds to both. It answered `CREATED` 1, and its debit entry read back with the name of the ledger **without** the line break, the one ledger row whose `NAME` attribute equals it. So a name equal to neither twin was accepted, and nothing in the import's answer named the ledger it landed on.
+- **Case alone.** With a ledger named in capitals in the book, a `Create` naming it in small letters under another group answered `ALTERED` 1, `CREATED` 0: the same GUID, its group changed, the row's `NAME` attribute still in capitals and its own name (the `NAME` under `LANGUAGENAME.LIST/NAME.LIST`) in small letters. §9.4g measured a `Create` on the same spelling altering the ledger. So a ledger's own name changed here, through a `Create` in another case; in the captured books of §9.4h, which describes rows whose attribute and own name differ, only the attribute was seen to change. The request carried a name and a group only. No pair differing by case alone was made.
+- **An alias.** After an alias was added (on the ledger alteration screen, by the branch's notes), the ledger read back with a second `NAME` element. A Payment imported with the alias as its ledger name answered `CREATED` 1 and read back under the ledger's own name.
+- **From that branch's notes, not from an answer:** the ledger creation screen refused a name differing by case alone from an existing ledger ("Name already exists."), and a name pasted into it with a trailing CR LF was stored without the line break.
+- **Not established:** both creation orders of each pair; an alias that only folds equal to another ledger's name; a balance read of either ledger (which ledger a voucher landed on is read from the voucher entry's name); Gold and Education; other releases.
+
+bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`). The 2026-10-13 run does not change that.
 
 **Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
 Gold, one client book, 2026-09-28).**
@@ -1089,7 +1096,7 @@ mark was not measured.
 - an `OPENINGBALANCE` of `0` or an empty element (only an omitted element was measured);
 - an opening-only change on a ledger under a nominal group;
 - an omitted opening in a `Create` that also changes the parent or the bill-wise flag;
-- a folded or differently cased spelling of the name (§9.4b, §9.4d, §9.4e);
+- a folded spelling of the name (§9.4b, §9.4d, §9.4e); a spelling in another case, with another group and nothing else, altered the existing ledger on 2026-10-13 (§9.4e);
 - a ledger that holds bill allocations or posted vouchers;
 - the cause of the date-less `0.00`;
 - the same behaviour on Gold or Education;

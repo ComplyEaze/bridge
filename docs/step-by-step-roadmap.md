@@ -144,8 +144,12 @@ pending consented synthetic live qualification.
     content encoding paths, and characterizes Content-Length, chunked,
     close-delimited, truncation, cap, timeout, and UTF-16 behavior against the
     loopback simulator. Export/import envelope ambiguity, cancellation pacing,
-    and half-open probe stampedes are rectified. A bounded 50,000-ledger master
-    generator and 10,000-ledger cross-encoding parser test exist. This is
+    and half-open probe stampedes are rectified. The simulator's bounded
+    50,000-ledger master generator was deleted on 2026-10-13 in
+    [#1690](https://github.com/ComplyEaze/bridge/pull/1690) because nothing
+    called it: the 10,000-ledger cross-encoding parser test builds its rows
+    itself, and it remains
+    (`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`). This is
     synthetic evidence only; process-isolated runtime, native database/UI, and
     live Education qualification remain pending.
 13. PR14 now has a closed-schema compatibility receipt and executable release

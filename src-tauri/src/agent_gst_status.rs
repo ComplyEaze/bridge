@@ -266,16 +266,10 @@ pub(super) struct StatusRow {
 /// one voucher) refuses the whole answer: nothing attributes a status to it. A
 /// voucher whose status fields are absent, repeated, nested in another element
 /// or spelled another way keeps its row with the code that says so; it is
-/// never read as included.
-#[cfg(test)]
-pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static str> {
-    parse_rows_with(xml, |_| ()).map(|rows| rows.into_iter().map(|(row, ())| row).collect())
-}
-
-/// [`parse_status_rows`], with `extra` read from each voucher's node beside its
-/// status. `extra` sees the voucher's direct children and whatever lies below
-/// them; it is not part of the nesting check, which covers only the fields the
-/// status is read from.
+/// never read as included. `extra` is read from each voucher's node beside its
+/// status: it sees the voucher's direct children and whatever lies below
+/// them, and is not part of the nesting check, which covers only the fields
+/// the status is read from.
 pub(super) fn parse_rows_with<T>(
     xml: &str,
     extra: impl Fn(&Node) -> T,

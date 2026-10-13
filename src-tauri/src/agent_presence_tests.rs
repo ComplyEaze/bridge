@@ -742,14 +742,24 @@ fn with_book_numbering(base: Vec<ScenarioPlan>, manual: &[&str]) -> Vec<Scenario
 /// `with_book_numbering` with the masters and numbering answers given.
 fn with_book_numbering_answers(
     base: Vec<ScenarioPlan>,
+    answers: (String, String),
+) -> Vec<ScenarioPlan> {
+    splice_numbering(base, answers, licensed_companies_xml(), high_water_xml())
+}
+
+/// The numbering check spliced in, with the licence answer of its mode probe
+/// and the answer of the master-mark read given.
+fn splice_numbering(
+    base: Vec<ScenarioPlan>,
     (masters, numbering): (String, String),
+    licensed: String,
+    mark: String,
 ) -> Vec<ScenarioPlan> {
     // The master mark (a read of its own), then the numbering read: its mode
     // probe (the status, then the company list with its licence fields), the
     // identity check, the masters pair, the numbering pair, the identity check
     // and the mode probe again.
-    let licensed = licensed_companies_xml();
-    let mut steps = paired_read(&high_water_xml());
+    let mut steps = paired_read(&mark);
     steps.extend([Step::Status, Step::Payload(licensed.clone()), Step::Company]);
     steps.extend([
         Step::Payload(masters.clone()),
@@ -1114,7 +1124,7 @@ fn every_admission_leaf_is_pinned_by_this_digest() {
     // and the schema change was deliberate, update the constant *and* add the
     // acknowledgement (docs/release-process.md) — that pairing is the point, not
     // an inconvenience.
-    const PINNED: &str = "afb11e7f6ed878c12915e72045adfb45a96f68f6da49a074a5f7d75f1fd5eb16";
+    const PINNED: &str = "20826af47c7fc1f1e6d20d19d342b7fbf0ab0dc9c1f85fc1670244d15d98e74e";
     let definitions = tool_definitions(true, false);
     let schema = definitions
         .as_array()
@@ -2301,9 +2311,12 @@ async fn a_numbering_read_that_fails_refuses_a_manual_declaration_before_the_win
         response["structuredContent"]["result"]["error"]["code"], "presence_numbering_unreadable",
         "{response}"
     );
-    assert!(
-        sent <= BEFORE_SERIES_READ + SERIES_READ_REQUESTS,
-        "the window was read after an unreadable numbering: {sent} requests"
+    // It stopped inside the numbering read, where the masters answer is read:
+    // the mark read (6), the mode probe and identity (3), the masters pair (4).
+    assert_eq!(
+        sent,
+        BEFORE_SERIES_READ + 6 + 3 + 4,
+        "stopped at another step"
     );
 }
 
@@ -2359,4 +2372,149 @@ async fn a_type_with_several_series_is_not_read_as_manual() {
     );
     let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
     assert_eq!(row["book"]["series"], 2, "{response}");
+}
+
+#[tokio::test]
+async fn a_proposed_type_the_book_numbers_automatic_is_refused_before_the_window() {
+    // The book numbers Journal Automatic (Tally assigns its own numbers), so a
+    // Manual declaration for the type the proposals name is refused.
+    let simulator =
+        SequenceSimulator::spawn(with_book_numbering(presence_plans(), &[])).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Journal", "observed")],
+        sent,
+    );
+    assert_eq!(sent, BEFORE_SERIES_READ + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_company_that_never_held_a_voucher_still_has_its_numbering_checked() {
+    // No ALTVCHID: the book has never held a voucher. The numbering check needs
+    // only the master axis, so it runs and refuses on the book's own reading,
+    // not on the empty book (the build path refuses that book on purpose).
+    let no_voucher_axis = high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "");
+    let plans = splice_numbering(
+        presence_plans(),
+        agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, &[]),
+        licensed_companies_xml(),
+        no_voucher_axis,
+    );
+    let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Journal", "observed")],
+        sent,
+    );
+}
+
+#[tokio::test]
+async fn education_mode_refuses_a_manual_declaration_with_the_reads_own_code() {
+    let education = licensed_companies_xml().replace(
+        "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+        "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+    );
+    assert_ne!(
+        education,
+        licensed_companies_xml(),
+        "the capture names the mode"
+    );
+    let plans = splice_numbering(
+        presence_plans(),
+        agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, &["Journal"]),
+        education,
+        high_water_xml(),
+    );
+    let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "masters_education_unqualified",
+        "{response}"
+    );
+    assert!(
+        sent <= BEFORE_SERIES_READ + 6 + 3,
+        "the read went past its mode probe: {sent} requests"
+    );
+}
+
+#[tokio::test]
+async fn a_manual_override_series_and_an_unrecognised_method_are_not_read_as_manual() {
+    for (printed, method) in [
+        ("Automatic (Manual Override)", "automatic_manual_override"),
+        ("Something Else", "unrecognised"),
+    ] {
+        let plans = agent_import::numbering_fixtures::with_series_text(
+            with_book_numbering(presence_plans(), &["Journal"]),
+            "Journal",
+            "<NUMBERINGMETHOD>Manual</NUMBERINGMETHOD>",
+            &format!("<NUMBERINGMETHOD>{printed}</NUMBERINGMETHOD>"),
+        );
+        let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+        let directory = tempfile::tempdir().expect("directory");
+        let server = presence_server(&simulator, directory.path());
+        let response = presence_under(
+            &server,
+            json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+        )
+        .await;
+        simulator.cancel();
+        let sent = answered(&simulator.finish().expect("requests"));
+        assert_numbering_refusal(
+            &response,
+            "presence_numbering_method_differs_from_book",
+            &[("Journal", "observed")],
+            sent,
+        );
+        let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+        assert_eq!(row["book"]["method"], method, "{printed}: {response}");
+    }
+}
+
+#[test]
+fn the_numbering_rows_are_bounded_by_their_own_budget() {
+    let row = |name: &str, agrees: bool| json!({"voucher_type": name, "declared": "manual", "book": {"state": "observed", "method": "manual"}, "agrees": agrees});
+    // Fifty declared types with the longest names the schema admits: a sibling of
+    // `items` that `fit_response` cannot trim, so it must bound itself.
+    let long = "T".repeat(1024);
+    let rows = (0..50)
+        .map(|n| row(&format!("{long}{n}"), n % 2 == 0))
+        .collect::<Vec<_>>();
+    let bounded = bounded_numbering_rows(rows.clone(), 200_000 / 8);
+    assert_eq!(bounded["types_omitted"], true);
+    assert_eq!(bounded["declared"], 50);
+    assert_eq!(bounded["agreeing"], 25);
+    assert!(bounded.get("types").is_none());
+    assert!(bounded.to_string().len() < 200, "{bounded}");
+    // A few ordinary rows are returned whole.
+    let few = vec![row("Journal", true), row("Payment", true)];
+    let kept = bounded_numbering_rows(few.clone(), 200_000 / 8);
+    assert_eq!(kept["types"], json!(few));
 }

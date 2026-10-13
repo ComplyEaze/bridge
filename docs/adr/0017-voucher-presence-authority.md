@@ -249,8 +249,9 @@ what `Default` means for numbering is still unmeasured, so the rule above
 stands: the method is still declared by the caller.
 
 **Note (14 October 2026, bridge#1691).** The premise above, that Bridge has no
-qualified voucher-type read, no longer holds: the voucher-type numbering read
-exists (`masters`, bridge#1542, and the numbering check of a build, bridge#724).
+qualified voucher-type read, no longer holds once the voucher-type numbering read
+(`masters`, bridge#1542, and the numbering check of a build, bridge#724) is in the
+tree; this change is stacked on those two and merges after them.
 The declaration is still the caller's, but a type declared Manual is now checked
 against the book's own series before the window is read, and the call is refused
 when the book does not number that type Manual with exactly one series, does not

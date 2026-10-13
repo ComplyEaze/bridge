@@ -2592,11 +2592,14 @@ Per tool:
 - `voucher_presence` (`src-tauri/src/agent_presence.rs`):
   1. the company read;
   2. the ledger catalogue;
-  3. only when a voucher type is declared `manual`: the company's master mark, then the
-     voucher-type numbering (20 requests: the mode probe and identity, the masters pair, the
-     numbering pair, identity and mode again), and the call is refused here, before any window
-     request, when a declared-manual type is not Manual with exactly one series in the book,
-     is not in the book, or its numbering cannot be read;
+  3. only when a voucher type is declared `manual` (20 requests): the company's master mark (6),
+     then the voucher-type numbering (14: the mode probe and identity, the masters pair, the
+     numbering pair, identity and mode again); the call is refused here, before any window
+     request, when a declared-manual type is not Manual with exactly one series in the book, the
+     book holds no type of that exact name, or its numbering cannot be read (Education mode keeps
+     the read's own code, `masters_education_unqualified`). The check reads the numbering as it
+     is now, holds for the moment of the read, and does not know how existing vouchers were
+     numbered when they were entered;
   4. the window read;
   5. the corroboration (if empty);
   6. the ledger catalogue again.

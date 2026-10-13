@@ -215,6 +215,15 @@ These changes are in source and not yet in a published build.
 
 **Safer or fixed**
 
+- When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
+  not a valid key, the app now says so with its own codes (`tally_mirror_key_missing`,
+  `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
+  credential prompt and retry. Restoring the credential (the macOS login keychain, or that user's Windows
+  Credential Manager) or opening the app as the same computer user is what recovers the mirror. The
+  app deletes nothing, and no reset exists yet (#1563). A key is also no longer created when the mirror file's
+  existence cannot be checked. Not measured on a real
+  credential store: what the macOS keychain or the Windows Credential Manager returns after a keychain reset
+  or a profile move.
 - A later check (`verify_import`, a repeated `post_import`, or the check
   before a review is recorded) of a post that Tally answered as creating none
   of its vouchers no longer suggests the voucher was edited in Tally. Its

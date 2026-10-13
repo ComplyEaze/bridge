@@ -1,0 +1,5 @@
+scripts/tally-error-copy.test.mjs
+src-tauri/src/commands.rs
+src-tauri/src/db/encrypted.rs
+src/tally-error-copy.ts
+reviewer: lamemustafa

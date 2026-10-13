@@ -18,6 +18,15 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `voucher_presence` now checks a voucher type declared `manual` against the book's own numbering before it
+  reads the window, because a voucher number is an identity only where the book's series for the type says
+  Manual. The call reads the company's master mark and the voucher-type numbering (20 more requests, so 34
+  become 54 on a small book) and refuses the whole call, with `presence_numbering_method_differs_from_book` and
+  the types in `candidates`, when the book does not number a declared-manual type Manual with exactly one series
+  or does not hold the type; a numbering that cannot be read (Education mode included) refuses with
+  `presence_numbering_unreadable`. A sub-method printed on a Manual series is not read. Names match exactly. A
+  call that declares no type manual reads no numbering and its result says `numbering_read` `not_read`; a call
+  that does read it returns what the book said for each declared type.
 - `masters` with `kind` `voucher_types` now returns, on each row, `series_numbering`: the numbering method
   (`automatic`, `manual`, `automatic_manual_override`, or the raw text under `unrecognised`, never read as
   `manual`) and whether duplicate numbers are prevented, read at the number-series level from a second paired

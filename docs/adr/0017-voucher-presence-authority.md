@@ -248,6 +248,16 @@ It is measured on one synthetic book (`Default`, `Automatic` and `Manual`), and
 what `Default` means for numbering is still unmeasured, so the rule above
 stands: the method is still declared by the caller.
 
+**Note (14 October 2026, bridge#1691).** The premise above, that Bridge has no
+qualified voucher-type read, no longer holds: the voucher-type numbering read
+exists (`masters`, bridge#1542, and the numbering check of a build, bridge#724).
+The declaration is still the caller's, but a type declared Manual is now checked
+against the book's own series before the window is read, and the call is refused
+when the book does not number that type Manual with exactly one series, does not
+hold the type, or cannot be read. Declarations and the book's type names still
+match exactly. A declaration of automatic or unknown is not checked, because it
+only demotes the number to a resemblance.
+
 ### 4. Three statuses. The middle one is never resolved
 
 Per proposed voucher, exactly one of:

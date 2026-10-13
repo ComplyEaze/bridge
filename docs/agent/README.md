@@ -2592,9 +2592,14 @@ Per tool:
 - `voucher_presence` (`src-tauri/src/agent_presence.rs`):
   1. the company read;
   2. the ledger catalogue;
-  3. the window read;
-  4. the corroboration (if empty);
-  5. the ledger catalogue again.
+  3. only when a voucher type is declared `manual`: the company's master mark, then the
+     voucher-type numbering (20 requests: the mode probe and identity, the masters pair, the
+     numbering pair, identity and mode again), and the call is refused here, before any window
+     request, when a declared-manual type is not Manual with exactly one series in the book,
+     is not in the book, or its numbering cannot be read;
+  4. the window read;
+  5. the corroboration (if empty);
+  6. the ledger catalogue again.
 
   Its `catalogue_evidence_sha256` hashes parsed names, not a request.
 - `ledger_movement` (`src-tauri/src/agent_movement.rs`):

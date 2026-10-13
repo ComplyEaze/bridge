@@ -3,7 +3,7 @@
 //! person" in a day, and `cash_payments_40a3` keys that population by party LEDGER, so one person
 //! holding two ledgers who pays 1.5 lakh into each on one day shows two under-limit rows and no
 //! finding. This test does not re-key the population. It takes the same one
-//! (`cash_payments_40a3::compute_269st_rows`), re-aggregates it by the PAN each ledger carries and
+//! (`high_value_register::cash_269st_rows`), re-aggregates it by the PAN each ledger carries and
 //! reports only the residue: an entity whose same-day total reaches the limit while no single
 //! constituent ledger did. Every finding is judgement-required: the books show that ledgers share
 //! one PAN, only the CA can confirm they are one person.
@@ -18,9 +18,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use bridge_tally_primitives::TallyDate;
 
 use crate::book::{Book, Voucher};
-use crate::cash_payments_40a3::compute_269st_rows;
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
+use crate::high_value_register::{cash_269st_rows, Direction};
 use crate::party_identity::{EntityBinding, PanSource, PartyIndex};
 use crate::read::iso;
 use crate::rules::Rules;
@@ -62,7 +62,14 @@ pub fn run(
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     let limit = rules.s269st_limit_per_person_per_day_paise;
     let pop = book.population()?;
-    let rows = compute_269st_rows(&pop, book, cash, bank, round_off_ledgers)?;
+    let rows = cash_269st_rows(
+        &pop,
+        book,
+        cash,
+        bank,
+        Direction::Receipt,
+        round_off_ledgers,
+    )?;
 
     // (day, entity PAN) -> constituent ledger rows, for ledgers that bind to an entity at all.
     let mut by_entity: BTreeMap<(TallyDate, &str), Slot> = BTreeMap::new();
@@ -206,6 +213,8 @@ arose, NOT that per-ledger keying is safe.",
 aggregated with any other ledger here at all.",
         Vec::new(),
     )?;
+    // The reference's own text, compared byte for byte by the goldens: it still names the function the
+    // walk had there.
     r.population_note =
         "Population is cash_payments_40a3.compute_269st_rows, unchanged; this test \
 only re-aggregates it by PAN and reports the residue no single ledger already triggers."
@@ -259,5 +268,135 @@ mod tests {
         ]));
         assert_eq!(fired.len(), 1);
         assert!(fired[0].starts_with("GAP-1 entity_269st_gap.entity_largest_single_ledger_"));
+    }
+
+    /// Characterises the population this test re-aggregates, the receipt leg of the s.269ST walk
+    /// (`high_value_register::cash_269st_rows`), through the production entry: a Sales line stays
+    /// in a lone party's total, a round-off line (as bound) does too and is never a party, and a
+    /// Contra is no row. Two ledgers of one PAN, Rs 1.5 lakh each, are a gap.
+    #[test]
+    fn the_entity_total_is_the_walks_rows_summed_by_pan() {
+        use crate::book::{Ledger, LedgerLine, VoucherStatus};
+        use crate::party_identity::{build_party_index, PartyConfig};
+        let ledger = |name: &str, group: &str, pan: &str| Ledger {
+            name: name.to_string(),
+            parent: group.to_string(),
+            chain: vec![group.to_string()],
+            chain_complete: true,
+            master_opening_paise: 0,
+            guid: format!("invented-{name}"),
+            masterid: None,
+            pan: pan.to_string(),
+            gstin: String::new(),
+        };
+        let voucher = |guid: &str, base_type: &str, lines: &[(&str, i64)]| Voucher {
+            guid: guid.to_string(),
+            date: TallyDate::parse("20250601").unwrap(),
+            base_type: base_type.to_string(),
+            status: VoucherStatus::Regular,
+            lines: lines
+                .iter()
+                .map(|(ledger, amount_paise)| LedgerLine {
+                    ledger: (*ledger).to_string(),
+                    amount_paise: *amount_paise,
+                })
+                .collect(),
+            ..Default::default()
+        };
+        let book = Book {
+            ledgers: [
+                ledger("Alpha A", "Sundry Debtors", "PAN-ONE"),
+                ledger("Alpha B", "Sundry Debtors", "PAN-ONE"),
+                ledger("Sales", "Sales Accounts", ""),
+                ledger("Round Off", "Indirect Expenses", ""),
+                ledger("Loan Y", "Loans (Liability)", ""),
+            ]
+            .into_iter()
+            .map(|l| (l.name.clone(), l))
+            .collect(),
+            vouchers: vec![
+                voucher(
+                    "e1",
+                    "Receipt",
+                    &[
+                        ("Cash", 15_000_000),
+                        ("Alpha A", -10_000_000),
+                        ("Sales", -5_000_000),
+                    ],
+                ),
+                voucher(
+                    "e2",
+                    "Receipt",
+                    &[
+                        ("Cash", 15_000_100),
+                        ("Alpha B", -15_000_000),
+                        ("Round Off", -100),
+                    ],
+                ),
+                // A loan line is a ledger with no PAN, and a voucher naming no party is the
+                // unidentified bucket: both are unbound, neither is left out.
+                voucher(
+                    "e4",
+                    "Receipt",
+                    &[("Cash", 1_000_000), ("Loan Y", -1_000_000)],
+                ),
+                voucher(
+                    "e5",
+                    "Receipt",
+                    &[("Cash", 2_000_000), ("Sales", -2_000_000)],
+                ),
+                voucher(
+                    "e3",
+                    "Contra",
+                    &[("Cash", 30_000_000), ("Alpha A", -30_000_000)],
+                ),
+            ],
+            ..Default::default()
+        };
+        let set = |names: &[&str]| -> BTreeSet<String> {
+            names.iter().map(|n| (*n).to_string()).collect()
+        };
+        let index = build_party_index(&book, &PartyConfig::default()).unwrap();
+        let r = run(
+            &book,
+            &Rules::vendored().unwrap(),
+            &set(&["Cash"]),
+            &set(&["Bank"]),
+            &index,
+            &set(&["Round Off"]),
+        )
+        .unwrap();
+        let rid = format!("2025-06-01_{}", hash8("PAN-ONE"));
+        let value = |name: &str| {
+            let id = format!("{TEST_ID}.{name}");
+            match r.figures.iter().find(|f| f.id == id).unwrap().value {
+                Value::Int(v) => v,
+                _ => panic!("not an integer"),
+            }
+        };
+        assert_eq!(value(&format!("entity_day_total_{rid}")), 30_000_100);
+        assert_eq!(value(&format!("entity_ledger_count_{rid}")), 2);
+        assert_eq!(
+            value(&format!("entity_largest_single_ledger_{rid}")),
+            15_000_100
+        );
+        assert_eq!(value("gap_rows_count"), 1);
+        assert_eq!(value("unbound_ledger_count"), 2);
+        assert_eq!(r.findings.len(), 1);
+        let cited: Vec<(&str, &str)> = r.findings[0]
+            .evidence
+            .iter()
+            .map(|e| (e.kind.as_str(), e.id.as_str()))
+            .collect();
+        assert_eq!(
+            cited,
+            [
+                ("voucher", "e1"),
+                ("voucher", "e2"),
+                ("ledger", "Alpha A"),
+                ("ledger", "Alpha B"),
+                ("pan", "PAN-ONE"),
+            ]
+        );
     }
 }

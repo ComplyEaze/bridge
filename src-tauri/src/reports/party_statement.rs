@@ -81,24 +81,12 @@ impl DirectionalAgeingSubtotals {
             days_90_plus: ExactDecimal::zero(),
         }
     }
-
-    /// Sums every rendered ageing category through checked exact-decimal
-    /// addition so a statement cannot appear reconciled through a lossy
-    /// display-only conversion.
-    pub fn total(&self) -> Result<ExactDecimal, PartyStatementError> {
-        self.not_yet_due
-            .checked_add(&self.days_0_30)
-            .and_then(|value| value.checked_add(&self.days_31_60))
-            .and_then(|value| value.checked_add(&self.days_61_90))
-            .and_then(|value| value.checked_add(&self.days_90_plus))
-            .map_err(|_| PartyStatementError::ArithmeticOverflow)
-    }
 }
 
 /// Exact ageing subtotals split by the direction shown on each bill row.
-/// Positive Tally magnitudes are not netted: [`AgeingSubtotals::total`]
-/// remains exactly equal to [`PartyStatement::bill_total`], while every
-/// rendered bucket makes its receivable/payable direction explicit.
+/// Positive Tally magnitudes are not netted: the buckets of both directions
+/// add up exactly to [`PartyStatement::bill_total`], while every rendered
+/// bucket makes its receivable/payable direction explicit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgeingSubtotals {
     pub receivable: DirectionalAgeingSubtotals,
@@ -106,17 +94,6 @@ pub struct AgeingSubtotals {
 }
 
 impl AgeingSubtotals {
-    /// Sums every rendered directional ageing category through checked exact-
-    /// decimal addition so a statement cannot appear reconciled through a
-    /// lossy display-only conversion.
-    pub fn total(&self) -> Result<ExactDecimal, PartyStatementError> {
-        let receivable = self.receivable.total()?;
-        let payable = self.payable.total()?;
-        receivable
-            .checked_add(&payable)
-            .map_err(|_| PartyStatementError::ArithmeticOverflow)
-    }
-
     pub fn by_direction(&self) -> [(&'static str, &DirectionalAgeingSubtotals); 2] {
         [("Receivable", &self.receivable), ("Payable", &self.payable)]
     }
@@ -167,28 +144,9 @@ pub enum PartyStatementError {
 
 /// Builds one party's statement from the `open_bills` and
 /// `unallocated_by_party` slices `OutstandingsLoadResult::Complete` already
-/// carries. Pure: no I/O, no Tally request, and no reliance on anything
+/// carries, with the selected report basis retained for every client-facing
+/// renderer. Pure: no I/O, no Tally request, and no reliance on anything
 /// beyond its arguments.
-pub fn build_party_statement(
-    company: &str,
-    as_of_yyyymmdd: &str,
-    party: &str,
-    open_bills: &[OpenBillRow],
-    unallocated_by_party: &[UnallocatedParty],
-) -> Result<PartyStatement, PartyStatementError> {
-    build_party_statement_with_ageing_anchor(
-        company,
-        as_of_yyyymmdd,
-        party,
-        open_bills,
-        unallocated_by_party,
-        OutstandingsAgeingAnchor::DueDate,
-    )
-}
-
-/// Builds a statement with the selected report basis retained for every
-/// client-facing renderer. The compatibility wrapper above is due-date only
-/// for existing internal callers that predate the selector.
 pub fn build_party_statement_with_ageing_anchor(
     company: &str,
     as_of_yyyymmdd: &str,
@@ -272,6 +230,28 @@ pub fn build_party_statement_with_ageing_anchor(
         unallocated_direction,
         grand_total,
     })
+}
+
+/// The sum of every ageing bucket of both directions, by checked exact-decimal addition, for
+/// the tests that hold a statement's subtotals to its `bill_total`.
+#[cfg(test)]
+pub(crate) fn subtotals_sum(subtotals: &AgeingSubtotals) -> ExactDecimal {
+    subtotals
+        .by_direction()
+        .into_iter()
+        .flat_map(|(_, bucket)| {
+            [
+                &bucket.not_yet_due,
+                &bucket.days_0_30,
+                &bucket.days_31_60,
+                &bucket.days_61_90,
+                &bucket.days_90_plus,
+            ]
+        })
+        .fold(ExactDecimal::zero(), |sum, amount| {
+            sum.checked_add(amount)
+                .expect("synthetic subtotals add exactly")
+        })
 }
 
 #[cfg(test)]

@@ -33,7 +33,7 @@ use serde_json::{json, Value};
 
 /// The wait between two census reads, in ms (`SHIPPED_REQUEST_SPACING`, pinned
 /// to the runtime's constant by a test that reads its source).
-const SPACING_MS: u64 = 500;
+pub(super) const SPACING_MS: u64 = 500;
 
 /// The one call limit that has been measured: Claude Desktop's chat app on
 /// macOS, bundle 2.19675.0, cancelled a silent 250 s call at 240 s in two runs
@@ -120,7 +120,7 @@ impl Cost {
             marks_ms,
             census_ms,
             parts_ms,
-            floor_ms: census_reads.saturating_sub(1).saturating_mul(SPACING_MS),
+            floor_ms: census_floor_ms(census_reads),
             fit,
         }
     }
@@ -167,6 +167,13 @@ impl Cost {
     fn notable(&self) -> bool {
         self.total_ms() >= NOTABLE_ELAPSED_MS || self.floor_ms >= NOTABLE_FLOOR_MS
     }
+}
+
+/// The least time `census_reads` census reads took in gaps: (N - 1) x the
+/// spacing. One rule for what a call showed and for what the preview states
+/// before it (`voucher_read_cost`).
+pub(super) fn census_floor_ms(census_reads: u64) -> u64 {
+    census_reads.saturating_sub(1).saturating_mul(SPACING_MS)
 }
 
 fn ms(value: u128) -> u64 {
@@ -247,11 +254,7 @@ fn block(cost: Cost, ended: Ended, window_reads: u64) -> Option<Value> {
         // Derived from the gate's rule (the gaps between reads), rounded down.
         "floor_seconds": cost.floor_ms / 1000,
         "host_240": host_240,
-        "host_limits": [
-            {"host": "claude_desktop_chat_macos", "seconds": 240, "basis": "measured_twice_one_build_silent_calls"},
-            {"host": "claude_desktop_chat_windows", "seconds": null, "basis": "unmeasured"},
-            {"host": "claude_code", "seconds": null, "basis": "default_completed_150s_two_builds_configured_60s_cut_at_60s_earlier_60s_unexplained"},
-        ],
+        "host_limits": host_limits(),
         "say": say(&cost, ended, window_reads),
     });
     // Said only when it is not the usual one read, so the `vouchers` block keeps its shape.
@@ -259,6 +262,16 @@ fn block(cost: Cost, ended: Ended, window_reads: u64) -> Option<Value> {
         block["window_reads"] = json!(window_reads);
     }
     Some(block)
+}
+
+/// The host limits as facts, each with its basis. Bridge is never told which
+/// applies.
+pub(super) fn host_limits() -> Value {
+    json!([
+        {"host": "claude_desktop_chat_macos", "seconds": 240, "basis": "measured_twice_one_build_silent_calls"},
+        {"host": "claude_desktop_chat_windows", "seconds": null, "basis": "unmeasured"},
+        {"host": "claude_code", "seconds": null, "basis": "default_completed_150s_two_builds_configured_60s_cut_at_60s_earlier_60s_unexplained"},
+    ])
 }
 
 /// Adds the block to a `window` value as its `read_cost` when there is one and

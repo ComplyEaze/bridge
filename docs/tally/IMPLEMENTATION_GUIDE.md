@@ -113,7 +113,7 @@ company lookups to produce a value that is constant for the entire request.
 > **Rule: never use `<COMPUTE>` to carry a per-request constant.** Company name, company GUID,
 > schema identifiers and record counts are all obtainable from a separate, cheap request — or
 > from the client that built the request in the first place. Bridge's existing
-> `company_book_extent_v1` profile already returns the verified company GUID in milliseconds.
+> `company_book_extent_v2` profile already returns the verified company GUID in milliseconds.
 
 This is the same category of error as the self-referential `$$NumItems` in §5.3b: a TDL
 construct that looks like free metadata and is actually per-row work. Both were inherited from

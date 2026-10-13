@@ -122,3 +122,16 @@ test("a pull request or merge group is scoped by its diff, as before, whatever t
       { native: "true", bundle: "true", tax_audit: "false" }, `${event} native code`);
   }
 });
+
+test("a change list larger than a pipe buffer is still scoped by its first heavy path", () => {
+  // `printf | grep -q` under pipefail failed when grep stopped at the first match while printf still had more to write
+  // (SIGPIPE, status 141), and the step then wrote native=false. The paths sort with the workflow file first, so the heavy
+  // match is the first line and the list that follows is well over 64 KiB.
+  const docs = Array.from({ length: 1700 }, (_, index) => `docs/tally/scope-fixture/a-long-directory-name/${String(index).padStart(5, "0")}-reference-file-name.md`);
+  const changed = [".github/workflows/a.yml", ...docs];
+  assert.ok(changed.join("\n").length > 100_000, "the list is over a pipe buffer");
+  for (const event of ["pull_request", "merge_group"]) {
+    assert.deepEqual(heavy(runScope(event, { script: "both", changed }).outputs),
+      { native: "true", bundle: "false", tax_audit: "false" }, `${event} with a heavy path first in a long list`);
+  }
+});

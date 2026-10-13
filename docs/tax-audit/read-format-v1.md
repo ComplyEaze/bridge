@@ -170,8 +170,11 @@ Any kind a reader does not know is ignored. This is how v1.x can add kinds.
 
 ## 7. Consumer rules
 
-`bridge-tax-audit`'s `read` module enforces C1–C7 and C10; see its source for the exact code
-path.
+`bridge-tax-audit` enforces every rule below. Its `read` module applies C1–C7 and C10; the
+rules that need parsed parts are applied by `load_book` in its `book` module. It takes the vouchers
+parts one at a time, each passing the voucher-type resolution of C4, then C8, C9 and the stored file
+name of C2 before the next is read; then C11 over all of them together; then the company part's C5
+identity. `CFG` is applied when the client config is read. See the source for the exact code path.
 
 | Code | Rule |
 |---|---|
@@ -185,6 +188,7 @@ path.
 | C8 | Every voucher's DATE lies inside its own part's window. This catches Education-mode widening and a wrongly declared window |
 | C9 | Each vouchers part's declared `rows` and `alter_id_max` equal what the consumer's own parser found. No ALTERID exceeds the closing high-water |
 | C10 | If `education_mode` is true, every window end and `as_of` falls on day 1, 2 or 31 |
+| C11 | Every voucher of the read has a GUID, and no two vouchers share one. A VOUCHER element with neither a GUID element nor a REMOTEID attribute is a template row in both engines and is not a voucher. A voucher's GUID is its GUID element, else its REMOTEID attribute; one that is empty after trimming is none (`C11-blank-guid`, which counts them and names the first one's date and part). Two vouchers share a GUID when their trimmed values are equal without regard to case (`C11-repeated-guid`, which names the GUID and both parts). Every voucher counts whatever its status (a cancelled, optional or postdated voucher is still a voucher, since Tally cancels in place under the GUID), and the comparison spans every vouchers part together, so a voucher read twice is refused. A consumer's Book built some other way is not refused here; its book invariant POP-5 reports a blank or shared GUID among the vouchers in the books |
 | CFG | A client config that names a read must not also name raw, unwrapped files (`CFG-mixed`) |
 
 **Configuration.** A client config selects a read like this (paths and names below are

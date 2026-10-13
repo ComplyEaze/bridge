@@ -639,6 +639,24 @@ fn c11_a_cancelled_copy_is_refused_too() {
 }
 
 #[test]
+fn c11_a_cancelled_voucher_with_no_guid_is_refused_too() {
+    let scratch = common::ScratchRead::new("c11-cancelled-blank");
+    rewrite_voucher(&scratch, "00000002", |b| {
+        b.replace(
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+            "<ISCANCELLED TYPE=\"Logical\">Yes</ISCANCELLED>",
+        )
+    });
+    drop_guid(&scratch, "00000002");
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-blank-guid");
+    assert_eq!(
+        detail,
+        "1 voucher(s) have no GUID, first dated 2025-04-18 in vouchers_h1.xml"
+    );
+}
+
+#[test]
 fn c11_an_optional_or_postdated_copy_is_refused_too() {
     // The side list marks the second-half vouchers 0x10 optional and 0x11 postdated.
     for (tag, n) in [("optional", "00000010"), ("postdated", "00000011")] {

@@ -761,7 +761,12 @@ impl Server {
             .map_err(|_| ToolFailure::from("current_date_invalid".to_string()))?;
         let listing = self
             .runtime
-            .fetch_agent_party_ledger_masters_with_evidence(self.tally_config(), identity, today)
+            .fetch_agent_party_ledger_masters_with_evidence(
+                self.tally_config(),
+                identity,
+                today,
+                crate::tally::connection::ComplianceRead::Standard,
+            )
             .await
             .map_err(|error| ToolFailure::from_runtime("party_ledger_master_read_failed", error))?;
         let marks = CompanyMarks {

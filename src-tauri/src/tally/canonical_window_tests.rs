@@ -5,15 +5,13 @@ use bridge_tally_core::{
     SourceIdentity, SourceIdentityKind, TallyError,
 };
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, parse_group_source_records_with_evidence,
-    parse_ledger_source_records_with_evidence, parse_native_group_source_records_with_evidence,
+    decode_tally_xml_response_bytes_limited, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
-    parse_native_voucher_type_source_records_with_evidence,
-    parse_voucher_source_records_with_evidence, parse_voucher_type_source_records_with_evidence,
-    ExpectedTallyTextEncoding, ParsedExport, ParsedSourceRecord, TallyLedger, TallyNamedMaster,
-    TallyVoucher, BRIDGE_GROUP_EXPORT_SCHEMA, BRIDGE_LEDGER_EXPORT_SCHEMA,
-    BRIDGE_VOUCHER_EXPORT_SCHEMA, BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA, TALLY_SANITIZED_ROOT_MARKER,
+    parse_native_voucher_type_source_records_with_evidence, CompanyContextEvidence,
+    ExpectedTallyTextEncoding, ExportEvidence, ParsedExport, ParsedSourceIdentities,
+    ParsedSourceIdentityKind, ParsedSourceRecord, PartyLedgerMasterFieldObservation, TallyLedger,
+    TallyLedgerEntry, TallyNamedMaster, TallyVoucher, TALLY_SANITIZED_ROOT_MARKER,
 };
 
 fn context() -> RequestContext {
@@ -38,12 +36,106 @@ fn context() -> RequestContext {
     }
 }
 
+/// Opaque stand-in for the digest of the exact source fragment a row was read
+/// from. `build_core_window` only requires it to be a well-formed SHA-256 and
+/// keeps it as provenance; deriving it from a label keeps two different rows
+/// from sharing one.
+fn fixture_digest(label: &str) -> String {
+    Sha256::digest(label.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// A parsed export with the count evidence the shipped native parsers give:
+/// the count of rows read (`observed_record_count`), and no count Tally
+/// reported (`source_record_count`). `build_core_window` takes the observed
+/// count first (and the source count only when none was observed), and builds
+/// `source_counts` from the source-reported counts alone.
+fn export_of<T>(records: Vec<ParsedSourceRecord<T>>) -> ParsedExport<ParsedSourceRecord<T>> {
+    let count = records.len() as u64;
+    ParsedExport {
+        records,
+        evidence: ExportEvidence {
+            company_context: Some(CompanyContextEvidence {
+                name: Some("BRIDGE SYNTHETIC BOOK".to_string()),
+                guid: Some("synthetic-company-guid".to_string()),
+                ..CompanyContextEvidence::default()
+            }),
+            observed_record_count: Some(count),
+            identified_record_count: count,
+            ..ExportEvidence::default()
+        },
+    }
+}
+
+fn source_record<T: std::fmt::Debug>(
+    record: T,
+    guid: &str,
+    remote_id: Option<&str>,
+    master_id: &str,
+    alter_id: &str,
+) -> ParsedSourceRecord<T> {
+    let raw_source_sha256 = fixture_digest(&format!("{guid}|{master_id}|{alter_id}|{record:?}"));
+    ParsedSourceRecord {
+        record,
+        source_id: Some(guid.to_string()),
+        identity_kind: Some(ParsedSourceIdentityKind::Guid),
+        identities: ParsedSourceIdentities {
+            guid: Some(guid.to_string()),
+            remote_id: remote_id.map(str::to_string),
+            master_id: Some(master_id.to_string()),
+        },
+        alter_id: Some(alter_id.to_string()),
+        raw_source_sha256,
+    }
+}
+
+/// The same export as the Bridge-defined export shapes carried it: the row
+/// count also set as a count the source reported. Only these shapes reach the
+/// `source_counts` branch of `build_core_window`; issue #1570 deletes them.
+fn reported_by_the_source<T>(
+    mut export: ParsedExport<ParsedSourceRecord<T>>,
+) -> ParsedExport<ParsedSourceRecord<T>> {
+    export.evidence.source_record_count = export.evidence.observed_record_count;
+    export
+}
+
 fn groups() -> ParsedExport<ParsedSourceRecord<TallyNamedMaster>> {
-    parse_group_source_records_with_evidence(&format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="GROUP" NAME="BRIDGE SYNTHETIC BOOK" GUID="synthetic-company-guid" RECORDCOUNT="1"/><GROUP NAME="Assets" GUID="group-guid" MASTERID="1" ALTERID="5"><PARENT>&#4; Primary</PARENT></GROUP></BODY></ENVELOPE>"#,
-        BRIDGE_GROUP_EXPORT_SCHEMA
-    ))
-    .unwrap()
+    export_of(vec![source_record(
+        TallyNamedMaster {
+            name: "Assets".to_string(),
+            parent: PartyLedgerMasterFieldObservation::Returned(format!(
+                "{TALLY_SANITIZED_ROOT_MARKER} Primary"
+            )),
+            reserved_name: None,
+        },
+        "group-guid",
+        None,
+        "1",
+        "5",
+    )])
+}
+
+fn ledger(
+    name: &str,
+    guid: &str,
+    remote_id: Option<&str>,
+    master_id: &str,
+    alter_id: &str,
+) -> ParsedSourceRecord<TallyLedger> {
+    source_record(
+        TallyLedger {
+            name: name.to_string(),
+            parent: PartyLedgerMasterFieldObservation::Returned("Assets".to_string()),
+            party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
+            opening_balance: Some("0".to_string()),
+        },
+        guid,
+        remote_id,
+        master_id,
+        alter_id,
+    )
 }
 
 fn ledgers_and_vouchers(
@@ -53,30 +145,46 @@ fn ledgers_and_vouchers(
     ParsedExport<ParsedSourceRecord<TallyLedger>>,
     ParsedExport<ParsedSourceRecord<TallyVoucher>>,
 ) {
-    let ledgers = parse_ledger_source_records_with_evidence(&format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="synthetic-company-guid" RECORDCOUNT="2"/><LEDGER NAME="{}" GUID="ledger-cash" REMOTEID="cash-remote" MASTERID="2" ALTERID="6"><PARENT>Assets</PARENT><OPENINGBALANCE>0</OPENINGBALANCE></LEDGER><LEDGER NAME="Sales" GUID="ledger-sales" MASTERID="3" ALTERID="7"><PARENT>Assets</PARENT><OPENINGBALANCE>0</OPENINGBALANCE></LEDGER></BODY></ENVELOPE>"#,
-        BRIDGE_LEDGER_EXPORT_SCHEMA, cash_name
-    ))
-    .unwrap();
-    let vouchers = parse_voucher_source_records_with_evidence(&format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="synthetic-company-guid" RECORDCOUNT="1"/><VOUCHER GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="9" ALTERID="10"><DATE>20260714</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>SYN-1</VOUCHERNUMBER><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>2</LEDGERENTRYCOUNT><LEDGERENTRIES><LEDGERENTRY><ENTRYINDEX>1</ENTRYINDEX><LEDGERNAME>{}</LEDGERNAME><AMOUNT>-100.00</AMOUNT><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE></LEDGERENTRY><LEDGERENTRY><ENTRYINDEX>2</ENTRYINDEX><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>100.00</AMOUNT><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE></LEDGERENTRY></LEDGERENTRIES></VOUCHER></BODY></ENVELOPE>"#,
-        BRIDGE_VOUCHER_EXPORT_SCHEMA, entry_ledger_name
-    ))
-    .unwrap();
-    (ledgers, vouchers)
+    let ledgers = export_of(vec![
+        ledger(cash_name, "ledger-cash", Some("cash-remote"), "2", "6"),
+        ledger("Sales", "ledger-sales", None, "3", "7"),
+    ]);
+    (
+        ledgers,
+        voucher_with_entries(entry_ledger_name, "Sales", true, false),
+    )
 }
 
 fn voucher_types() -> ParsedExport<ParsedSourceRecord<TallyNamedMaster>> {
-    parse_voucher_type_source_records_with_evidence(&format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHERTYPE" NAME="BRIDGE SYNTHETIC BOOK" GUID="synthetic-company-guid" RECORDCOUNT="1"/><VOUCHERTYPE NAME="Receipt" GUID="voucher-type-guid" MASTERID="8" ALTERID="9"><PARENT>Receipt</PARENT></VOUCHERTYPE></BODY></ENVELOPE>"#,
-        BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA
-    ))
-    .unwrap()
+    export_of(vec![source_record(
+        TallyNamedMaster {
+            name: "Receipt".to_string(),
+            parent: PartyLedgerMasterFieldObservation::Returned("Receipt".to_string()),
+            reserved_name: None,
+        },
+        "voucher-type-guid",
+        None,
+        "8",
+        "9",
+    )])
 }
 
 fn valid_window() -> CanonicalPackWindow {
     let (ledgers, vouchers) = ledgers_and_vouchers("Cash", "Cash");
     build_core_window(&context(), groups(), ledgers, voucher_types(), vouchers).unwrap()
+}
+
+/// [`valid_window`] from exports that also carry source-reported counts.
+fn valid_window_with_source_reported_counts() -> CanonicalPackWindow {
+    let (ledgers, vouchers) = ledgers_and_vouchers("Cash", "Cash");
+    build_core_window(
+        &context(),
+        reported_by_the_source(groups()),
+        reported_by_the_source(ledgers),
+        reported_by_the_source(voucher_types()),
+        reported_by_the_source(vouchers),
+    )
+    .unwrap()
 }
 
 /// A balanced two-entry Receipt whose entry flags are given by the caller,
@@ -89,11 +197,58 @@ fn voucher_with_entry_flags(
     cash_flag: &str,
     sales_flag: &str,
 ) -> ParsedExport<ParsedSourceRecord<TallyVoucher>> {
-    parse_voucher_source_records_with_evidence(&format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="synthetic-company-guid" RECORDCOUNT="1"/><VOUCHER GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="9" ALTERID="10"><DATE>20260714</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>SYN-1</VOUCHERNUMBER><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>2</LEDGERENTRYCOUNT><LEDGERENTRIES><LEDGERENTRY><ENTRYINDEX>1</ENTRYINDEX><LEDGERNAME>Cash</LEDGERNAME><AMOUNT>-100.00</AMOUNT><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE></LEDGERENTRY><LEDGERENTRY><ENTRYINDEX>2</ENTRYINDEX><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>100.00</AMOUNT><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE></LEDGERENTRY></LEDGERENTRIES></VOUCHER></BODY></ENVELOPE>"#,
-        BRIDGE_VOUCHER_EXPORT_SCHEMA, cash_flag, sales_flag
-    ))
-    .unwrap()
+    let deemed_positive = |flag: &str| match flag {
+        "Yes" => true,
+        "No" => false,
+        other => panic!("not a Tally logical: {other}"),
+    };
+    voucher_with_entries(
+        "Cash",
+        "Sales",
+        deemed_positive(cash_flag),
+        deemed_positive(sales_flag),
+    )
+}
+
+/// The balanced two-entry Receipt `SYN-1`: the first entry debits
+/// `first_ledger` for 100.00, the second credits `second_ledger`.
+fn voucher_with_entries(
+    first_ledger: &str,
+    second_ledger: &str,
+    first_deemed_positive: bool,
+    second_deemed_positive: bool,
+) -> ParsedExport<ParsedSourceRecord<TallyVoucher>> {
+    let entry = |entry_index: u64, ledger_name: &str, amount: &str, is_deemed_positive: bool| {
+        TallyLedgerEntry {
+            entry_index,
+            ledger_name: ledger_name.to_string(),
+            amount: amount.to_string(),
+            is_deemed_positive,
+            raw_source_sha256: fixture_digest(&format!(
+                "voucher-guid|{entry_index}|{ledger_name}|{amount}|{is_deemed_positive}"
+            )),
+        }
+    };
+    export_of(vec![source_record(
+        TallyVoucher {
+            id: Some("voucher-guid".to_string()),
+            date: Some("20260714".to_string()),
+            voucher_type: Some("Receipt".to_string()),
+            voucher_number: Some("SYN-1".to_string()),
+            party_ledger_name: None,
+            cancelled: Some(false),
+            optional: Some(false),
+            ledger_entry_count: Some(2),
+            ledger_entries: vec![
+                entry(1, first_ledger, "-100.00", first_deemed_positive),
+                entry(2, second_ledger, "100.00", second_deemed_positive),
+            ],
+        },
+        "voucher-guid",
+        Some("voucher-remote"),
+        "9",
+        "10",
+    )])
 }
 
 fn assess_flags(
@@ -108,7 +263,7 @@ fn assess_flags(
         voucher_types(),
         voucher_with_entry_flags(cash_flag, sales_flag),
     )
-    .expect("a disagreeing flag is observed data, not a parse failure");
+    .expect("a disagreeing flag is observed data, not a build failure");
     let PackBatch::CoreAccounting(batch) = &window.batch else {
         panic!("expected a core accounting pack")
     };
@@ -120,7 +275,7 @@ fn assess_flags(
 
 #[test]
 fn a_lone_disagreeing_leg_reaches_reconciliation_and_is_not_a_mismatch() {
-    // The rounding shape, driven the whole way: parse -> canonical window ->
+    // The rounding shape, driven the whole way: parsed records -> canonical window ->
     // reconciliation. `Sales 100.00` carries `Yes`, so its flag disagrees
     // with its sign while `Cash` agrees. One leg of two.
     let assessment = assess_flags("Yes", "Yes");
@@ -263,7 +418,9 @@ fn marker_prefixed_real_master_name_resolves_by_its_raw_name() {
 
 #[test]
 fn canonicalizes_all_core_records_with_exact_reference_and_provenance_binding() {
-    let window = valid_window();
+    // Source-reported counts are set explicitly: that branch is reached only by the
+    // Bridge-defined export shapes, which issue #1570 deletes.
+    let window = valid_window_with_source_reported_counts();
     window.validate_record_evidence_binding().unwrap();
     let PackBatch::CoreAccounting(batch) = &window.batch else {
         panic!("wrong pack")
@@ -335,7 +492,9 @@ fn canonicalizes_all_core_records_with_exact_reference_and_provenance_binding() 
 
 #[test]
 fn nested_entry_totals_remain_local_and_are_never_claimed_as_source_reported() {
-    let window = valid_window();
+    // Source-reported counts are set explicitly: that branch is reached only by the
+    // Bridge-defined export shapes, which issue #1570 deletes.
+    let window = valid_window_with_source_reported_counts();
     let PackBatch::CoreAccounting(batch) = &window.batch else {
         panic!("wrong pack")
     };
@@ -357,6 +516,17 @@ fn nested_entry_totals_remain_local_and_are_never_claimed_as_source_reported() {
         .unwrap()
         .iter()
         .all(|evidence| evidence.object_type.as_str() != "ledger_entry"));
+}
+
+#[test]
+fn native_shaped_exports_give_a_window_with_no_source_reported_counts() {
+    // The shipped native parsers observe their row counts and never see a count
+    // Tally reported, so the window carries per-record evidence and no
+    // `source_counts`.
+    let window = valid_window();
+    assert!(window.source_counts.is_none());
+    assert_eq!(window.record_evidence.as_ref().unwrap().len(), 7);
+    window.validate_record_evidence_binding().unwrap();
 }
 
 #[test]
@@ -488,8 +658,8 @@ fn foreign_master_name_with_c1_control_is_retained_and_diagnosed_verbatim() {
 // synthetic XML shaped exactly like the real native captures in
 // `bridge-tally-protocol/tests/fixtures/native/*` (ENVELOPE/HEADER/STATUS,
 // BODY/DATA/COLLECTION, GUID/MASTERID/ALTERID identity, company-guid-prefixed
-// GUIDs) rather than the ad hoc `LEDGERENTRIES`/`LEDGERENTRY` shape the other
-// helpers in this module use for the pre-native legacy parsers.
+// GUIDs) and are read by the native parsers, whereas the helpers at the top of
+// this module build the parsed records directly, with no XML involved.
 const PADDED_COMPANY_GUID: &str = "synthetic-company-guid";
 
 fn padded_native_group_export(

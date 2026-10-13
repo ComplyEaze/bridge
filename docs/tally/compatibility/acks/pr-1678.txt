@@ -1,0 +1,3 @@
+docs/step-by-step-roadmap.md
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+reviewer: lamemustafa

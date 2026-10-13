@@ -11,8 +11,8 @@
 // This repo already has the fix pattern in wide use — `reader.take(N +
 // 1).read_to_end(&mut buf)`, reading one byte past a declared limit so an
 // over-limit input is detectable rather than silently truncated (see
-// src-tauri/src/agent_bank_statement.rs, agent_desktop_journal.rs, source_draft/files.rs,
-// tools/bridge-tally-qualification). This gate checks that every such call
+// src-tauri/src/agent_bank_statement.rs, agent_desktop_journal.rs, source_draft/files.rs).
+// This gate checks that every such call
 // site actually uses it, so a new call site that forgets the `.take(...)` is
 // caught mechanically instead of depending on a reviewer noticing.
 //
@@ -51,19 +51,22 @@
 // statement and bound to a variable is reported; the allow-list below is the
 // reviewed escape hatch for that.
 
-import { existsSync, readFileSync } from "node:fs";
+// Which files the scan reads is itself checked (#1148 item 12). Every tracked `.rs` file
+// (`git ls-files -z -- '*.rs'`) must be under a scanned root, excluded by the path rule below
+// (tests, by rule), or named in UNSCANNED_RS_FILES with its reason; any other file fails with an
+// UnscannedSourceFileError that names it, so a file outside the roots is never silently unread. A
+// name in the table that git no longer tracks fails too: the table cannot outlive the file it
+// excuses. The script exports its checks and runs the scan only when run directly, the shape of
+// check-surface-ack.mjs, so the tests can call them.
+
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { relative, resolve } from "node:path";
 
 const scriptRoot = fileURLToPath(new URL("../", import.meta.url));
-const rootArgument = process.argv.indexOf("--root");
-if (rootArgument !== -1 && !process.argv[rootArgument + 1]) {
-  throw new Error("--root requires a repository path");
-}
-const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[rootArgument + 1]);
 
-const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates", "tools"];
+export const SOURCE_ROOTS = ["src-tauri/src", "src-tauri/crates", "tools"];
 // The method form; its argument must start `&mut` (see 1. above).
 const METHOD_READ = /\.\s*read_to_(?:end|string)\s*\(/g;
 // The qualified form; quick_xml's `Reader::read_to_end` is not `Read::`.
@@ -83,7 +86,7 @@ const MOD_LINE = /^(\s*)(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{?\s*$/;
 // exception can never quietly cover a read added after its reason went away.
 const ALLOWED_FILE = "scripts/unbounded-reads-allowed.json";
 
-function loadAllowed() {
+function loadAllowed(repositoryRoot) {
   const path = resolve(repositoryRoot, ALLOWED_FILE);
   if (!existsSync(path)) return new Map();
   const entries = JSON.parse(readFileSync(path, "utf8"));
@@ -98,28 +101,67 @@ function loadAllowed() {
   return new Map(Object.entries(entries));
 }
 
-const ALLOWED_UNBOUNDED = loadAllowed();
-// How many unbounded reads each allowed file's entry excused in this scan.
-const excused = new Map([...ALLOWED_UNBOUNDED.keys()].map((file) => [file, 0]));
+// Tracked `.rs` files the scan does not read, each with why. Tests are not listed here: the path
+// rule below excludes them wherever they are.
+export const UNSCANNED_RS_FILES = new Map([["src-tauri/build.rs", "build script, no external input"]]);
+export const TESTS_EXCLUDED_REASON = "tests are excluded by rule";
 
-function listSourceFiles() {
-  const files = [];
-  for (const sourceRoot of SOURCE_ROOTS) {
-    const result = execFileSync(
-      "git",
-      ["ls-files", "-z", "--", sourceRoot],
-      { cwd: repositoryRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+export class UnscannedSourceFileError extends Error {
+  constructor(files) {
+    super(
+      `${files.length} tracked .rs file(s) are neither under a scanned root (${SOURCE_ROOTS.join(", ")}), ` +
+        `excluded by rule (${TESTS_EXCLUDED_REASON}), nor named with a reason in UNSCANNED_RS_FILES, ` +
+        "so the read-bound scan never reads them. Move the file under a scanned root, or name it with " +
+        "its reason:\n" +
+        files.map((file) => `  - ${file}`).join("\n"),
     );
-    for (const path of result.split("\0")) {
-      if (path && path.endsWith(".rs")) files.push(path);
-    }
+    this.files = files;
   }
-  return files;
 }
+// Set on the prototype so the uncaught error's first line already names the type.
+UnscannedSourceFileError.prototype.name = "UnscannedSourceFileError";
 
-function isExcludedByPath(path) {
+export function isExcludedByPath(path) {
   return path.includes("/tests/") || /_tests?\.rs$/.test(path);
 }
+
+export function validateExclusions(exclusions) {
+  for (const [file, reason] of exclusions) {
+    if (typeof reason !== "string" || reason.trim() === "") {
+      throw new Error(`UNSCANNED_RS_FILES: ${file} has no reason; every exclusion says why`);
+    }
+  }
+}
+
+// The files to scan, in root order, from every tracked `.rs` file; throws if one is unaccounted for.
+export function checkSourceCoverage(tracked, { roots = SOURCE_ROOTS, exclusions = UNSCANNED_RS_FILES } = {}) {
+  validateExclusions(exclusions);
+  const under = (root) => (path) => path.startsWith(`${root}/`);
+  const unaccounted = tracked.filter(
+    (path) => !roots.some((root) => under(root)(path)) && !isExcludedByPath(path) && !exclusions.has(path),
+  );
+  if (unaccounted.length) throw new UnscannedSourceFileError(unaccounted);
+  const trackedSet = new Set(tracked);
+  const stale = [...exclusions.keys()].filter((file) => !trackedSet.has(file));
+  if (stale.length) {
+    throw new Error(
+      `${stale.length} stale exclusion(s) in UNSCANNED_RS_FILES: each names a file git does not ` +
+        "track, so the table would excuse a file added there later unreported. Remove the entry:\n" +
+        stale.map((file) => `  - ${file}`).join("\n"),
+    );
+  }
+  return roots.flatMap((root) => tracked.filter((path) => under(root)(path) && !isExcludedByPath(path)));
+}
+
+function trackedRustFiles(repositoryRoot) {
+  const result = execFileSync("git", ["ls-files", "-z", "--", "*.rs"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return result.split("\0").filter(Boolean);
+}
+
 
 // Returns, for each line index, whether that line is inside a `#[cfg(test)]`
 // module or a `#[test]`-family-attributed function — tracked by indentation,
@@ -285,58 +327,72 @@ function readCalls(masked) {
   return calls.sort((left, right) => left.offset - right.offset);
 }
 
-const failures = [];
-let scanned = 0;
-let boundedCount = 0;
-
-for (const path of listSourceFiles()) {
-  if (isExcludedByPath(path)) continue;
-  const absolute = resolve(repositoryRoot, path);
-  const text = readFileSync(absolute, "utf8");
-  const lines = text.split("\n");
-  const inTestScope = testScopeMask(lines);
-
-  for (const call of readCalls(maskRust(text))) {
-    const index = text.slice(0, call.offset).split("\n").length - 1;
-    scanned += 1;
-    if (inTestScope[index]) continue;
-    if (call.bounded) {
-      boundedCount += 1;
-      continue;
-    }
-    if (ALLOWED_UNBOUNDED.has(path)) {
-      excused.set(path, excused.get(path) + 1);
-      continue;
-    }
-    failures.push(`${path}:${index + 1}: ${lines[index].trim()}`);
+function main(argv) {
+  const rootArgument = argv.indexOf("--root");
+  if (rootArgument !== -1 && !argv[rootArgument + 1]) {
+    throw new Error("--root requires a repository path");
   }
-}
+  const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(argv[rootArgument + 1]);
 
-const stale = [...excused].filter(([, count]) => count === 0).map(([file]) => file);
+  const allowedUnbounded = loadAllowed(repositoryRoot);
+  // How many unbounded reads each allowed file's entry excused in this scan.
+  const excused = new Map([...allowedUnbounded.keys()].map((file) => [file, 0]));
+  const failures = [];
+  let scanned = 0;
+  let boundedCount = 0;
 
-if (failures.length) {
-  throw new Error(
-    `${failures.length} unbounded Read::read_to_end/read_to_string call(s) found ` +
-      `(${scanned} scanned, ${boundedCount} bounded) — each reads an unbounded amount of ` +
-      "external data into memory through a reader that is not a `take(N)`. Wrap the " +
-      "reader itself in `.take(limit + 1)` (see " +
-      "src-tauri/src/agent_bank_statement.rs for the pattern — the `+ 1` lets an " +
-      "over-limit input be detected rather than silently truncated), or add a " +
-      `reviewed entry to ${ALLOWED_FILE} with the reason:\n` +
-      failures.map((line) => `  - ${line}`).join("\n"),
+  for (const path of checkSourceCoverage(trackedRustFiles(repositoryRoot))) {
+    const absolute = resolve(repositoryRoot, path);
+    const text = readFileSync(absolute, "utf8");
+    const lines = text.split("\n");
+    const inTestScope = testScopeMask(lines);
+
+    for (const call of readCalls(maskRust(text))) {
+      const index = text.slice(0, call.offset).split("\n").length - 1;
+      scanned += 1;
+      if (inTestScope[index]) continue;
+      if (call.bounded) {
+        boundedCount += 1;
+        continue;
+      }
+      if (allowedUnbounded.has(path)) {
+        excused.set(path, excused.get(path) + 1);
+        continue;
+      }
+      failures.push(`${path}:${index + 1}: ${lines[index].trim()}`);
+    }
+  }
+
+  const stale = [...excused].filter(([, count]) => count === 0).map(([file]) => file);
+
+  if (failures.length) {
+    throw new Error(
+      `${failures.length} unbounded Read::read_to_end/read_to_string call(s) found ` +
+        `(${scanned} scanned, ${boundedCount} bounded) — each reads an unbounded amount of ` +
+        "external data into memory through a reader that is not a `take(N)`. Wrap the " +
+        "reader itself in `.take(limit + 1)` (see " +
+        "src-tauri/src/agent_bank_statement.rs for the pattern — the `+ 1` lets an " +
+        "over-limit input be detected rather than silently truncated), or add a " +
+        `reviewed entry to ${ALLOWED_FILE} with the reason:\n` +
+        failures.map((line) => `  - ${line}`).join("\n"),
+    );
+  }
+
+  if (stale.length) {
+    throw new Error(
+      `${stale.length} stale exception(s) in ${ALLOWED_FILE}: each names a file with no ` +
+        "unbounded read left to excuse, so a new one there would pass unreported. Remove " +
+        "the entry:\n" +
+        stale.map((file) => `  - ${file}`).join("\n"),
+    );
+  }
+
+  console.log(
+    `Read bound coverage holds: ${scanned} read_to_end/read_to_string call site(s) scanned, ` +
+      `${boundedCount} bounded, 0 unbounded (${allowedUnbounded.size} reviewed exception(s)).`,
   );
 }
 
-if (stale.length) {
-  throw new Error(
-    `${stale.length} stale exception(s) in ${ALLOWED_FILE}: each names a file with no ` +
-      "unbounded read left to excuse, so a new one there would pass unreported. Remove " +
-      "the entry:\n" +
-      stale.map((file) => `  - ${file}`).join("\n"),
-  );
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  main(process.argv.slice(2));
 }
-
-console.log(
-  `Read bound coverage holds: ${scanned} read_to_end/read_to_string call site(s) scanned, ` +
-    `${boundedCount} bounded, 0 unbounded (${ALLOWED_UNBOUNDED.size} reviewed exception(s)).`,
-);

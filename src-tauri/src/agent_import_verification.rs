@@ -825,8 +825,8 @@ pub(super) fn verification_response_page(
 pub(super) fn batch_headline(result: &Value) -> Option<super::super::headline::Headline> {
     // Only a batch that was dispatched natively has an outcome to state. A
     // built batch not yet posted, or a file not yet imported by hand, reads
-    // every row as not found, and "will not send it again" would be false: it
-    // can still be posted. Every dispatch state counts (`posted_verified`,
+    // every row as not found, and "will not send this saved batch again" would
+    // be false: it can still be posted. Every dispatch state counts (`posted_verified`,
     // `reconciliation_required`, `previous_attempt_reconciled`); a refusal
     // that sent nothing says `not_dispatched`.
     match result["dispatch"]["state"].as_str() {

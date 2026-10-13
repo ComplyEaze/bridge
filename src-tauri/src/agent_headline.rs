@@ -808,6 +808,10 @@ impl BatchOutcome {
                 };
                 format!("{subject}, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again.")
             }
+            // Nothing is confirmed and the batch has one voucher.
+            _ if vouchers == 1 => {
+                "The voucher of this batch is not confirmed in Tally: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.".to_string()
+            }
             _ => {
                 let (are, each, row) = if rest == 1 {
                     ("is", "it", "its row")

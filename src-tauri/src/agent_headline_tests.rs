@@ -760,26 +760,24 @@ fn one_voucher_that_reads_back_beside_an_unconfirmed_batch_is_not_called_confirm
 /// no field takes another's voucher.
 #[test]
 fn every_status_is_counted_in_its_own_field() {
-    let statuses = [
-        "matching_content_observed",
-        "sent_not_attributed",
-        "tally_reported_not_created",
-        "posted_divergent",
-        "posted_not_effective",
-        "not_found",
-        "not_attributable",
-        "duplicate_fingerprint",
-        "bound_not_in_window",
-        "book_rolled_back",
-        "unrecognised",
-    ];
-    for (index, status) in statuses.into_iter().enumerate() {
+    // The fields of the counter itself, so a status added to it is walked
+    // here; one with no arm in `count` lands in `unrecognised` and fails.
+    let fields = serde_json::to_value(NotConfirmed::default()).unwrap();
+    let statuses = fields
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert!(statuses.contains(&"unrecognised"));
+    assert!(statuses.len() > 1);
+    for (index, &status) in statuses.iter().enumerate() {
         // Each status is counted a different number of times, so two fields
         // swapped by mistake cannot read the same.
         let times = index + 1;
         let batch = outcome(&vec![status; times], BatchVerdict::PostedVerified);
         let value = serde_json::to_value(&batch).unwrap();
-        for other in statuses {
+        for &other in &statuses {
             let wanted = if other == status { times } else { 0 };
             assert_eq!(value["not_confirmed"][other], wanted, "{status} / {other}");
         }

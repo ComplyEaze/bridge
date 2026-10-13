@@ -3833,6 +3833,23 @@ fn the_batch_lead_claims_a_next_step_only_where_a_row_has_one() {
         "not_attributable",
         "duplicate_fingerprint",
     ];
+    // Every status the headline counts is in one of the two lists: a status
+    // added to the counter must be sorted here before this test passes.
+    let counted = serde_json::to_value(super::super::headline::NotConfirmed::default()).unwrap();
+    let mut counted = counted
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .filter(|status| *status != "unrecognised")
+        .collect::<Vec<_>>();
+    let mut listed = with_next_step
+        .into_iter()
+        .chain(without_next_step)
+        .collect::<Vec<_>>();
+    counted.sort_unstable();
+    listed.sort_unstable();
+    assert_eq!(counted, listed);
     for status in with_next_step {
         assert!(verification::plain_next_step(status).is_some(), "{status}");
     }
@@ -3846,7 +3863,7 @@ fn the_batch_lead_claims_a_next_step_only_where_a_row_has_one() {
                 .expect("a dispatched batch states how it ended");
         assert_eq!(
             headline["lead"],
-            "0 of 1 vouchers of this batch are confirmed in Tally. 1 is not: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
+            "The voucher of this batch is not confirmed in Tally: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
             "{status}"
         );
         // Only the status's own count is one: no other field takes it.

@@ -196,10 +196,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       accepted as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
     - The negative ledgers read (`negative_ledgers`) sends the company name and
-      its identifier and the dates, and for each ledger Tally lists with a closing
-      balance on the side it does not expect, the ledger's name (shortened under
-      `mask_parties`), the side and the closing amount. The side and the amount are
-      not masked under any setting. It holds no narrations.
+      its identifier and the dates, and for each ledger on Tally's Negative
+      Ledgers list, the ledger's name (shortened under `mask_parties`), the side
+      and the closing amount. The side and the amount are not masked under any
+      setting. It holds no narrations.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

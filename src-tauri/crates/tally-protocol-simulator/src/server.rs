@@ -123,11 +123,10 @@ pub struct ObservedRequest {
     pub bytes_received: usize,
     pub request_body_bytes: usize,
     pub request_body_sha256: String,
-    /// The same fingerprint of the body with the field-list words added since the recordings removed: the
-    /// first `,REFERENCEDATE` (the voucher read, #1257) and the first `, LEDMAILINGDETAILS.LIST` (the
-    /// party-master read, #1490), each in UTF-8 or UTF-16LE. For tests that pin a request recorded before
-    /// those reads named those fields: equal to `request_body_sha256` for every request that carries neither.
-    pub request_body_sha256_as_recorded: String,
+    /// The same fingerprint of the body with the field-list word `,REFERENCEDATE` removed (UTF-8 or UTF-16LE),
+    /// for tests that pin a request recorded before the voucher read named that field (#1257): equal to
+    /// `request_body_sha256` for every request that does not carry the word.
+    pub request_body_sha256_without_reference_date: String,
     pub request_processed: bool,
     pub cancelled: bool,
     /// The client stopped consuming a response after the request was processed.
@@ -522,9 +521,9 @@ fn observe(request: &[u8], cancelled: bool) -> ObservedRequest {
         request_body: request_body.to_vec(),
         request_body_bytes: request_body.len(),
         request_body_sha256: hex::encode(Sha256::digest(request_body)),
-        request_body_sha256_as_recorded: hex::encode(Sha256::digest(without_added_fetch_words(
-            request_body,
-        ))),
+        request_body_sha256_without_reference_date: hex::encode(Sha256::digest(
+            without_reference_date_word(request_body),
+        )),
         request_processed: false,
         cancelled,
         client_stopped_reading_response: false,
@@ -918,42 +917,38 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[path = "server_tests.rs"]
 mod tests;
 
-/// Test-only and temporary: it exists because recorded request fingerprints predate the voucher read's
-/// REFERENCEDATE (#1257) and the party-master read's LEDMAILINGDETAILS.LIST (#1490); remove it when those
-/// recordings are next captured.
+/// Test-only and temporary: it exists because ten recorded request fingerprints predate the voucher read's
+/// REFERENCEDATE (#1257); remove it when those recordings are next captured.
 ///
-/// The body with the FIRST `,REFERENCEDATE` and the FIRST `, LEDMAILINGDETAILS.LIST` (each UTF-8 or UTF-16LE)
-/// removed: a request that carries a word twice, or elsewhere than the field list of its one read, does not
-/// equal the recorded one.
-fn without_added_fetch_words(body: &[u8]) -> Vec<u8> {
-    let mut out = body.to_vec();
-    for text in [",REFERENCEDATE", ", LEDMAILINGDETAILS.LIST"] {
-        let utf16: Vec<u8> = text
-            .encode_utf16()
-            .flat_map(|unit| unit.to_le_bytes())
-            .collect();
-        for word in [utf16.as_slice(), text.as_bytes()] {
-            if let Some(at) = out.windows(word.len()).position(|window| window == word) {
-                out.drain(at..at + word.len());
-                break;
-            }
+/// The body with the FIRST `,REFERENCEDATE` (UTF-8 or UTF-16LE) removed: a request that carries the word twice,
+/// or that carries it elsewhere than the field list of the one voucher read, does not equal the recorded one.
+fn without_reference_date_word(body: &[u8]) -> Vec<u8> {
+    let utf16: Vec<u8> = ",REFERENCEDATE"
+        .encode_utf16()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect();
+    for word in [utf16.as_slice(), b",REFERENCEDATE".as_slice()] {
+        if let Some(at) = body.windows(word.len()).position(|window| window == word) {
+            let mut out = body[..at].to_vec();
+            out.extend_from_slice(&body[at + word.len()..]);
+            return out;
         }
     }
-    out
+    body.to_vec()
 }
 
 #[cfg(test)]
-mod added_fetch_word_tests {
-    use super::without_added_fetch_words;
+mod reference_date_word_tests {
+    use super::without_reference_date_word;
 
     #[test]
     fn only_the_first_word_is_removed_in_either_encoding() {
         assert_eq!(
-            without_added_fetch_words(b"A,REFERENCEDATE</FETCH>"),
+            without_reference_date_word(b"A,REFERENCEDATE</FETCH>"),
             b"A</FETCH>"
         );
         assert_eq!(
-            without_added_fetch_words(b"A,REFERENCEDATE,REFERENCEDATE"),
+            without_reference_date_word(b"A,REFERENCEDATE,REFERENCEDATE"),
             b"A,REFERENCEDATE"
         );
         let wide = |text: &str| -> Vec<u8> {
@@ -962,38 +957,9 @@ mod added_fetch_word_tests {
                 .collect()
         };
         assert_eq!(
-            without_added_fetch_words(&wide("A,REFERENCEDATE</FETCH>")),
+            without_reference_date_word(&wide("A,REFERENCEDATE</FETCH>")),
             wide("A</FETCH>")
         );
-        assert_eq!(without_added_fetch_words(b"no word"), b"no word");
-    }
-
-    #[test]
-    fn the_mailing_details_element_is_removed_once_in_either_encoding_beside_the_other_word() {
-        assert_eq!(
-            without_added_fetch_words(b"A, LEDMAILINGDETAILS.LIST</FETCH>"),
-            b"A</FETCH>"
-        );
-        assert_eq!(
-            without_added_fetch_words(b"A, LEDMAILINGDETAILS.LIST, LEDMAILINGDETAILS.LIST"),
-            b"A, LEDMAILINGDETAILS.LIST"
-        );
-        let wide = |text: &str| -> Vec<u8> {
-            text.encode_utf16()
-                .flat_map(|unit| unit.to_le_bytes())
-                .collect()
-        };
-        assert_eq!(
-            without_added_fetch_words(&wide("A, LEDMAILINGDETAILS.LIST</FETCH>")),
-            wide("A</FETCH>")
-        );
-        assert_eq!(
-            without_added_fetch_words(b"A, LEDMAILINGDETAILS.LIST,REFERENCEDATE</FETCH>"),
-            b"A</FETCH>"
-        );
-        assert_eq!(
-            without_added_fetch_words(b"LEDMAILINGDETAILS.LIST without its comma"),
-            b"LEDMAILINGDETAILS.LIST without its comma"
-        );
+        assert_eq!(without_reference_date_word(b"no word"), b"no word");
     }
 }

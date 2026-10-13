@@ -1314,7 +1314,7 @@ fn the_compliance_read_admits_by_mark_counts_by_catalogue_or_census_then_refuses
     let census_limit = super::ledger_census_mark_limit();
     assert_eq!(
         (master_limit, count_limit, census_limit),
-        (3_404, 22_857, 400_000)
+        (4_266, 22_857, 400_000)
     );
     assert_eq!(
         super::admit_compliance_master_read(master_limit, None, super::ComplianceRead::Standard)
@@ -1488,7 +1488,7 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
 /// is planned into eight parts by ledger count, not refused for its
 /// parent count (#679): the shape of a real book of about 9,500 ledgers.
 /// More parts than Bridge will send is refused at the real limits: thirteen
-/// groups of 1,703 ledgers cannot share a part (two are 3,406, over 3,404), so
+/// groups of 2,134 ledgers cannot share a part (two are 4,268, over 4,266), so
 /// they need thirteen against a ceiling of twelve.
 #[test]
 fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
@@ -1497,7 +1497,7 @@ fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
     };
     let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
     for parent in 0..13 {
-        for _ in 0..1_703 {
+        for _ in 0..2_134 {
             let index = rows.len();
             rows.push((
                 format!("Ledger {index}"),
@@ -1808,6 +1808,43 @@ fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     );
     assert!(super::compliance_estimate_unverified(with, WithGstDetails).fits);
     assert!(!super::compliance_estimate_unverified(with + 1, WithGstDetails).fits);
+}
+
+/// The read that names the mailing details (`ledger_masters`, the workbook) is
+/// sized by its own estimate, above the shared one the registers keep and below
+/// the GST details read's; the limits are the constants' own quotients (#1490).
+#[test]
+fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
+    use super::ComplianceRead::{Standard, WithGstDetails, WithMailingDetails};
+    assert_eq!(
+        super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED,
+        4_700
+    );
+    let standard = super::compliance_master_ledgers_per_read(Standard);
+    let mailing = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    let details = super::compliance_master_ledgers_per_read(WithGstDetails);
+    assert_eq!(
+        (standard, mailing, details),
+        (4_266, 3_404, 1_787),
+        "the registers keep their limit; the others are the budget over their own estimates"
+    );
+    // A mark the registers admit is counted first when the mailing details are named.
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(mailing, None, WithMailingDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(mailing + 1, None, WithMailingDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::parent_partition_limits(WithMailingDetails).max_ledgers_per_part,
+        mailing
+    );
 }
 
 /// A book read in parts is split by the read's own ledger bound; every other

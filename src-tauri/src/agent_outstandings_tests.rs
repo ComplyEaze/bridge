@@ -1044,10 +1044,9 @@ fn assert_replay_matches_the_live_call(
     for (sent, recorded) in observed.iter().zip(requests) {
         assert_eq!(sent.method, recorded["method"], "seq {}", recorded["seq"]);
         if let Some(sha) = recorded["request_sha256"].as_str() {
-            // Recorded before the voucher read named REFERENCEDATE and the party-master read named
-            // LEDMAILINGDETAILS.LIST: equal once those words are removed.
+            // Recorded before the voucher read named REFERENCEDATE: equal once that word is removed.
             assert_eq!(
-                sent.request_body_sha256_as_recorded, sha,
+                sent.request_body_sha256_without_reference_date, sha,
                 "seq {}",
                 recorded["seq"]
             );

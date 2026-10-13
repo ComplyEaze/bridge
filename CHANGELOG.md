@@ -30,9 +30,10 @@ These changes are in source and not yet in a published build.
   Balances-as-of date shows the first date in its status, and an entry that held content the reader does not take
   is flagged (`other_content_skipped`). The address, PIN code and state are returned under every redaction mode:
   `mask_parties` masks only the mailing name. The request is longer by one element, so the per-ledger size estimate
-  of the compliance master read rose from 3,750 to 4,700 bytes (8,000 to 8,950 with the GST details) by the one
-  growth measured (948 bytes for one populated party row); it was not measured on a book of many populated
-  parties, so a large book may be read in more parts, or refused, sooner than before.
+  of the reads that name it (`ledger_masters` and the workbook) is 4,700 bytes instead of 3,750 (8,950 instead of
+  8,000 with the GST details), from the one growth measured (948 bytes for one populated party row); it was not
+  measured on a book of many populated parties, so a large book may be read in more parts, or refused, sooner than
+  before. The registers do not read the mailing details and keep their request and their estimate.
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then

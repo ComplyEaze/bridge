@@ -813,7 +813,7 @@ impl Server {
                         if gst_details {
                             ComplianceRead::WithGstDetails
                         } else {
-                            ComplianceRead::Standard
+                            ComplianceRead::WithMailingDetails
                         },
                     )
                     .await

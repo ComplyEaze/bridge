@@ -587,6 +587,19 @@ fn mailing_content_the_reader_does_not_take_is_flagged() {
     assert_eq!(skipped_of("<NEWFIELD/>"), (vec![], false));
 }
 
+/// Markup nested inside one address line is not text: the read fails as a whole, as
+/// it does for every sibling scalar field, rather than keep a line with tags in it.
+#[test]
+fn markup_inside_an_address_line_fails_the_read_rather_than_becoming_text() {
+    let element = "<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20260401</APPLICABLEFROM>\
+        <ADDRESS.LIST><ADDRESS>12<B/>Rd</ADDRESS></ADDRESS.LIST></LEDMAILINGDETAILS.LIST>";
+    let xml = master_response_with_extra(Some(EXPECTED_COMPANY_GUID), element);
+    assert!(
+        parse_native_party_ledger_master_records_with_evidence(&xml, EXPECTED_COMPANY_GUID)
+            .is_err()
+    );
+}
+
 #[test]
 fn the_mailing_element_is_ignored_by_a_read_that_retains_no_master_fields() {
     let xml = master_response_with_extra(

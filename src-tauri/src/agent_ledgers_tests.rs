@@ -1,6 +1,9 @@
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::{
-    native_outstandings::{render_party_ledger_master_request, NativeLedgerExportPeriod},
+    native_outstandings::{
+        render_party_ledger_master_request,
+        render_party_ledger_master_request_with_mailing_details, NativeLedgerExportPeriod,
+    },
     outstandings_shared::DateBoundaryProfile,
     parse_native_party_ledger_master_records_with_evidence, GstDutyHead, GstDutyHeadObservation,
     PartyLedgerMasterFieldObservation,
@@ -65,7 +68,11 @@ fn party_ledger_master_request_fetches_tax_type_and_gst_duty_head() {
 
     let request = render_party_ledger_master_request("BRIDGE GST RECON LAB", &period);
     assert!(request.contains("TAXTYPE, GSTDUTYHEAD"));
-    assert!(request.contains(", LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>"));
+    assert!(request.contains(", LEDGSTREGDETAILS.LIST</FETCH>"));
+    // `ledger_masters` and the workbook send the one that also names the dated mailing details.
+    let with_mailing =
+        render_party_ledger_master_request_with_mailing_details("BRIDGE GST RECON LAB", &period);
+    assert!(with_mailing.contains(", LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>"));
 }
 
 #[test]
@@ -312,9 +319,9 @@ fn a_live_capture_backs_sgst_utgst_as_a_recognised_head() {
     )
     .unwrap();
     assert_eq!(
-        sha256_hex(without_mailing_details_word(&render_party_ledger_master_request("BRIDGE GST RECON LAB", &period)).as_bytes()),
+        sha256_hex(render_party_ledger_master_request("BRIDGE GST RECON LAB", &period).as_bytes()),
         "f700339d10d4bdc845f7ab4af482e407fc03d9901a7eaebdf34feb86f8d7ea68",
-        "the fixture answers the request ledger_masters sends, less the mailing details element added since"
+        "the fixture answers the party-master request that does not name the mailing details"
     );
     let parsed = parse_native_party_ledger_master_records_with_evidence(
         &captured_live_ledger_masters_with_sgst_utgst(),
@@ -411,9 +418,9 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
     )
     .unwrap();
     assert_eq!(
-        sha256_hex(without_mailing_details_word(&render_party_ledger_master_request("BRIDGE READS LAB", &period)).as_bytes()),
+        sha256_hex(render_party_ledger_master_request("BRIDGE READS LAB", &period).as_bytes()),
         "c2f9f8e9fefab44077b222402254a2be3dfd9a9690d4e577efbae99d531c819c",
-        "the fixture answers the request ledger_masters sends, less the mailing details element added since"
+        "the fixture answers the party-master request that does not name the mailing details"
     );
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-gst-registrations.utf16le.xml"
@@ -490,15 +497,6 @@ fn a_gstin_held_only_in_the_dated_registration_history_is_reported_in_force() {
         (text("29ZZZZZ0000Z1Z5"), "in_force", text("Regular"), None),
         "the later registration applies from its own date"
     );
-}
-
-/// A party-master request as it was before it named the dated mailing details:
-/// the captures these tests pin were answered to that request, and the request
-/// sent now differs from it by that one `FETCH` element (bridge#1490).
-fn without_mailing_details_word(request: &str) -> String {
-    let word = ", LEDMAILINGDETAILS.LIST";
-    assert_eq!(request.matches(word).count(), 1);
-    request.replacen(word, "", 1)
 }
 
 /// A `compliance` object without its `mailing_details` key. The goldens below were
@@ -4808,8 +4806,8 @@ mod through_the_tool {
             compliance_master_ledgers_per_read, parent_partition_limits, ComplianceRead,
         };
         use bridge_tally_protocol::native_outstandings::{
-            render_party_ledger_master_request_for_parents,
             render_party_ledger_master_request_for_parents_with_gst_details,
+            render_party_ledger_master_request_for_parents_with_mailing_details,
             render_party_ledger_master_request_with_gst_details,
         };
         use bridge_tally_protocol::parent_partition::{
@@ -4933,15 +4931,17 @@ mod through_the_tool {
         fn master_reads_sent(observed: &[ObservedRequest], parts: &[ParentPart]) -> usize {
             let period = harness_period();
             let mut requests = vec![
-                render_party_ledger_master_request(HARNESS_COMPANY, &period),
+                render_party_ledger_master_request_with_mailing_details(HARNESS_COMPANY, &period),
                 render_party_ledger_master_request_with_gst_details(HARNESS_COMPANY, &period),
             ];
             for part in parts {
-                requests.push(render_party_ledger_master_request_for_parents(
-                    HARNESS_COMPANY,
-                    &period,
-                    part,
-                ));
+                requests.push(
+                    render_party_ledger_master_request_for_parents_with_mailing_details(
+                        HARNESS_COMPANY,
+                        &period,
+                        part,
+                    ),
+                );
                 requests.push(
                     render_party_ledger_master_request_for_parents_with_gst_details(
                         HARNESS_COMPANY,
@@ -5013,7 +5013,10 @@ mod through_the_tool {
                 assert_eq!(
                     sent(
                         &observed,
-                        &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                        &render_party_ledger_master_request_with_mailing_details(
+                            HARNESS_COMPANY,
+                            &period
+                        )
                     ),
                     2,
                     "the production compliance request, read as a pair: {flag:?}"
@@ -5074,7 +5077,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request_with_mailing_details(
+                        HARNESS_COMPANY,
+                        &period
+                    )
                 ),
                 0,
                 "the production request is not also sent"
@@ -5490,7 +5496,7 @@ mod through_the_tool {
         /// either read counts the book first.
         #[test]
         fn the_books_chosen_for_the_boundary_tests_sit_between_the_two_limits() {
-            let standard = compliance_master_ledgers_per_read(ComplianceRead::Standard);
+            let standard = compliance_master_ledgers_per_read(ComplianceRead::WithMailingDetails);
             let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
             assert!(with < standard);
             assert!(std::hint::black_box(MARK) > standard);
@@ -5518,7 +5524,10 @@ mod through_the_tool {
             assert_eq!(
                 sent(
                     &observed,
-                    &render_party_ledger_master_request(HARNESS_COMPANY, &period)
+                    &render_party_ledger_master_request_with_mailing_details(
+                        HARNESS_COMPANY,
+                        &period
+                    )
                 ),
                 2
             );
@@ -5554,7 +5563,7 @@ mod through_the_tool {
                 assert_eq!(
                     sent(
                         &observed,
-                        &render_party_ledger_master_request_for_parents(
+                        &render_party_ledger_master_request_for_parents_with_mailing_details(
                             HARNESS_COMPANY,
                             &period,
                             part

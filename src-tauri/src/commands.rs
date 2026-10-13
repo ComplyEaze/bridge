@@ -1919,7 +1919,7 @@ async fn export_party_ledger_master_once(
             &identity,
             currency_assertion,
             basis,
-            crate::tally::connection::ComplianceRead::Standard,
+            crate::tally::connection::ComplianceRead::WithMailingDetails,
         )
         .await
         .map_err(party_ledger_master_runtime_command_error)?;

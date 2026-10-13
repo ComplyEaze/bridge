@@ -1314,7 +1314,7 @@ fn the_compliance_read_admits_by_mark_counts_by_catalogue_or_census_then_refuses
     let census_limit = super::ledger_census_mark_limit();
     assert_eq!(
         (master_limit, count_limit, census_limit),
-        (4_266, 22_857, 400_000)
+        (3_404, 22_857, 400_000)
     );
     assert_eq!(
         super::admit_compliance_master_read(master_limit, None, super::ComplianceRead::Standard)
@@ -1488,7 +1488,7 @@ fn the_catalogue_limit_sits_under_the_transport_cap_and_admits_a_real_books_mark
 /// is planned into eight parts by ledger count, not refused for its
 /// parent count (#679): the shape of a real book of about 9,500 ledgers.
 /// More parts than Bridge will send is refused at the real limits: thirteen
-/// groups of 2,134 ledgers cannot share a part (two are 4,268, over 4,266), so
+/// groups of 1,703 ledgers cannot share a part (two are 3,406, over 3,404), so
 /// they need thirteen against a ceiling of twelve.
 #[test]
 fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
@@ -1497,7 +1497,7 @@ fn a_book_needing_more_parts_than_the_ceiling_is_refused_at_the_real_limits() {
     };
     let mut rows: Vec<(String, String, Option<String>)> = Vec::new();
     for parent in 0..13 {
-        for _ in 0..2_134 {
+        for _ in 0..1_703 {
             let index = rows.len();
             rows.push((
                 format!("Ledger {index}"),
@@ -1742,7 +1742,7 @@ fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     // UNVERIFIED: decided against one capture (a margin above 5,394).
     assert_eq!(
         super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
-        8_000
+        8_950
     );
     assert!(
         std::hint::black_box(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED)

@@ -1088,7 +1088,8 @@ fn read_gst_registration_entry(
 /// One `LEDMAILINGDETAILS.LIST` element: its date, name, address lines, state,
 /// country and PIN code. Text is read as every sibling master field is (trimmed;
 /// empty is absent). `ADDRESS` lines are kept in document order and a blank one
-/// is dropped. Other children are consumed and not kept, but count as content.
+/// is dropped. Other children, and text, are consumed and not kept: they count as
+/// content and set `other_content_skipped`.
 fn read_mailing_details_entry(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
@@ -1115,7 +1116,8 @@ fn read_mailing_details_entry(
                     Some(index) => {
                         let repeated = std::mem::replace(&mut seen[index], true);
                         if index == 5 {
-                            let lines = read_mailing_address_lines(reader, &child)?;
+                            let (lines, skipped) = read_mailing_address_lines(reader, &child)?;
+                            entry.other_content_skipped |= skipped;
                             if repeated {
                                 entry.repeated_field = true;
                             } else {
@@ -1138,6 +1140,7 @@ fn read_mailing_details_entry(
                         }
                     }
                     None => {
+                        entry.other_content_skipped = true;
                         let child_name = child.name().as_ref().to_owned();
                         reader.read_to_end(QName(&child_name).to_owned())?;
                     }
@@ -1155,22 +1158,30 @@ fn read_mailing_details_entry(
             Event::Eof => return Err(crate::RowCutOff.into()),
             // Text, a reference or CDATA directly in the list is content the parser does not
             // read: it is flagged, so a list holding only that is not taken for a placeholder.
-            Event::Text(text) if !text.trim().is_empty() => entry.has_content = true,
-            Event::GeneralRef(_) | Event::CData(_) => entry.has_content = true,
+            Event::Text(text) if !text.trim().is_empty() => {
+                entry.has_content = true;
+                entry.other_content_skipped = true;
+            }
+            Event::GeneralRef(_) | Event::CData(_) => {
+                entry.has_content = true;
+                entry.other_content_skipped = true;
+            }
             _ => {}
         }
     }
     Ok(entry)
 }
 
-/// The `ADDRESS` lines of one `ADDRESS.LIST`, in document order. A blank line
-/// is dropped; any other child is consumed and not kept.
+/// The `ADDRESS` lines of one `ADDRESS.LIST`, in document order, and whether
+/// anything else was in it. A blank line is dropped; any other child, and any
+/// text directly in the list, is consumed and not kept (the flag is true).
 fn read_mailing_address_lines(
     reader: &mut Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<(Vec<String>, bool)> {
     let list_name = element.name().as_ref().as_bytes().to_vec();
     let mut lines = Vec::new();
+    let mut skipped = false;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
@@ -1182,16 +1193,19 @@ fn read_mailing_address_lines(
                 {
                     lines.extend(read_optional_text(reader, child.name())?);
                 } else {
+                    skipped = true;
                     let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             }
             Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
             Event::Eof => return Err(crate::RowCutOff.into()),
+            Event::Text(text) if !text.trim().is_empty() => skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => skipped = true,
             _ => {}
         }
     }
-    Ok(lines)
+    Ok((lines, skipped))
 }
 
 /// One element's text exactly as sent: not trimmed, entity and numeric

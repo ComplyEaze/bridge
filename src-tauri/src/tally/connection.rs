@@ -346,8 +346,15 @@ fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -
 /// about twofold. PARTIAL: a synthetic book of 1,989 ledgers, the parties
 /// carrying every compliance field, read 2,875 bytes per ledger (5.7 MB,
 /// 0.9 s; 2026-09-29), so 3,750 is a budget above that book's mean, not a bound
-/// on a row: party rows cost 3.2 to 3.3 KB there.
-const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
+/// on a row: party rows cost 3.2 to 3.3 KB there. That book's request did not
+/// name `LEDMAILINGDETAILS.LIST` (#1490). Naming it grew the one populated party
+/// row of the captured eight-ledger book by 948 bytes (3,010 to 3,958 UTF-16
+/// bytes; one dated entry of two address lines) and every other row by 122.
+/// The budget is the earlier 3,750 plus 950 and an UNVERIFIED margin like it:
+/// no book of many populated parties, or of parties with two entries, has been
+/// read since, and the 20 s request deadline leaves no slack over the 16 MB
+/// budget, so an under-estimate can be an abandoned read, not only a refusal.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 4_700;
 
 /// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
@@ -364,8 +371,10 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// which most ledgers hold two or more entries could exceed the 16 MB response
 /// budget while still admitted. UNVERIFIED until measured on more books; it is
 /// not a bound. The shared [`COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED`] is
-/// for reads without the details.
-const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
+/// for reads without the details. That capture's request did not name
+/// `LEDMAILINGDETAILS.LIST` either (#1490), so this figure carries the same 950
+/// bytes added to the shared one: 8,000 plus 950.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_950;
 
 /// What a compliance master read asks Tally for. [`Self::Standard`] is the
 /// production request, and every caller other than a `ledger_masters` call
@@ -491,8 +500,8 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// The ceiling on one parent group is the whole-read bound: a group with more
 /// ledgers than one part may carry is refused as `parent_over_budget`, never
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
-/// the budget over the read's per-ledger constant, not a measurement: 4,266
-/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// the budget over the read's per-ledger constant, not a measurement: 3,404
+/// ledgers for a [`ComplianceRead::Standard`] read and 1,787 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on

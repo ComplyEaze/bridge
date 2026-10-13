@@ -1870,9 +1870,9 @@ mod through_the_tool {
         )
         .await;
         let admitted_plans = marked_compliance_plans(
-            4_266,
+            3_404,
             vec![masters(), balances(), groups()],
-            Some(extent_with_master_mark(4_266)),
+            Some(extent_with_master_mark(3_404)),
         );
         let (admitted, _) = call(
             admitted_plans,
@@ -2731,7 +2731,7 @@ mod through_the_tool {
     /// the same three reads in the same order, and the same rows.
     #[tokio::test]
     async fn a_book_whose_master_mark_is_at_the_bound_reads_as_before() {
-        let mark = 16_000_000 / 3_750;
+        let mark = 16_000_000 / 4_700;
         let plans = marked_compliance_plans(
             mark,
             vec![masters(), balances(), groups()],
@@ -3204,7 +3204,8 @@ mod through_the_tool {
                     "address_lines": ["1 Test Street", "Test Area"],
                     "state": "Karnataka",
                     "country": "India",
-                    "pin_code": "560001"
+                    "pin_code": "560001",
+                    "other_content_skipped": false
                 }]
             })
         );
@@ -3231,12 +3232,14 @@ mod through_the_tool {
                 bridge_tally_protocol::mailing_details::MailingDetailsHistory::Entries {
                     entries: vec![
                         bridge_tally_protocol::mailing_details::MailingDetailsEntry {
-                            applicable_from: "20260401".to_string(),
+                            applicable_from: bridge_tally_core::TallyDate::parse("20260401")
+                                .unwrap(),
                             mailing_name: Some(name.to_string()),
                             address_lines: vec!["1 Test Street".to_string()],
                             state: Some("Karnataka".to_string()),
                             country: Some("India".to_string()),
                             pin_code: Some("560001".to_string()),
+                            other_content_skipped: false,
                         },
                     ],
                 },
@@ -5152,7 +5155,7 @@ mod through_the_tool {
                 "slab rates are only flagged",
                 "14-ledger lab book of TallyPrime 7.1 Silver",
                 "not yet run through this tool on a live Tally",
-                "admitted at 8,000 bytes a ledger instead of 3,750",
+                "admitted at 8,950 bytes a ledger instead of 4,700",
                 "not a measured ratio",
             ] {
                 assert!(limitations.contains(words), "{words}: {limitations}");

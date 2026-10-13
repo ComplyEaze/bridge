@@ -367,7 +367,7 @@ const GST_DETAILS_LIMITATIONS: [&str; 5] = [
     "HSN/SAC and type of supply are not returned because no capture shows them; the place of supply is in the registration history (compliance.gst_registrations), not here; slab rates are only flagged (slab_rates_present), not read; other_content_skipped says an entry held content that was not read.",
     "A state_name or valuation_type that starts with U+FFFD and #4; is a Tally reserved value (written &#4; on the wire), kept as the parser returned it.",
     "Measured on one 14-ledger lab book of TallyPrime 7.1 Silver; this was not yet run through this tool on a live Tally.",
-    "The read is admitted at 8,000 bytes a ledger instead of 3,750, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio; a large book may be read in more parts or refused as too large.",
+    "The read is admitted at 8,950 bytes a ledger instead of 4,700, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element; that request did not name the mailing details, so 950 bytes were added to each figure), not a measured ratio; a large book may be read in more parts or refused as too large.",
 ];
 
 /// The frame with the GST details' limitations added when the rows hold them,

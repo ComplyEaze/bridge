@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 /// One dated mailing entry, as Tally returned it.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct MailingDetailsEntry {
-    /// `YYYYMMDD`, as Tally writes `APPLICABLEFROM`.
-    pub applicable_from: String,
+    /// `APPLICABLEFROM`, a real `YYYYMMDD` calendar date.
+    pub applicable_from: TallyDate,
     /// `MAILINGNAME`, when returned and not empty.
     pub mailing_name: Option<String>,
     /// The `ADDRESS` lines of `ADDRESS.LIST`, in the order Tally sent them.
@@ -30,6 +30,11 @@ pub struct MailingDetailsEntry {
     pub country: Option<String>,
     /// `PINCODE`, when returned and not empty.
     pub pin_code: Option<String>,
+    /// The entry held a child, or text inside `ADDRESS.LIST`, that this reader
+    /// does not take: the address lines shown may be missing some of what Tally
+    /// holds. Set, never inferred away (the precedent is `gst_details`).
+    #[serde(default)]
+    pub other_content_skipped: bool,
 }
 
 /// Why a returned mailing history cannot be read as one.
@@ -86,6 +91,8 @@ pub struct RawMailingDetailsEntry {
     /// The element carried one of these single fields (or `ADDRESS.LIST`) more
     /// than once.
     pub repeated_field: bool,
+    /// A child, or text inside `ADDRESS.LIST`, that is not one of the fields above.
+    pub other_content_skipped: bool,
     /// The element held any child or any text, whether or not it was read or
     /// empty. Only an element that held nothing is a placeholder.
     pub has_content: bool,
@@ -117,9 +124,9 @@ impl MailingDetailsHistory {
             let Some(applicable_from) = entry.applicable_from else {
                 return Self::unreadable(MailingDetailsDefect::EntryWithoutDate);
             };
-            if TallyDate::parse(applicable_from.as_str()).is_err() {
+            let Ok(applicable_from) = TallyDate::parse(applicable_from) else {
                 return Self::unreadable(MailingDetailsDefect::DateInvalid);
-            }
+            };
             entries.push(MailingDetailsEntry {
                 applicable_from,
                 mailing_name: entry.mailing_name,
@@ -127,6 +134,7 @@ impl MailingDetailsHistory {
                 state: entry.state,
                 country: entry.country,
                 pin_code: entry.pin_code,
+                other_content_skipped: entry.other_content_skipped,
             });
         }
         // Document order is not assumed to be date order.
@@ -151,15 +159,15 @@ impl MailingDetailsHistory {
         Self::Unreadable { defect }
     }
 
-    /// The entry in force on `as_of` (`YYYYMMDD`): the one with the latest
+    /// The entry in force on `as_of`: the one with the latest
     /// `applicable_from` on or before it. `None` when no entry applies yet, or
     /// when the history was not observed or is unreadable.
-    pub fn in_force(&self, as_of: &str) -> Option<&MailingDetailsEntry> {
+    pub fn in_force(&self, as_of: &TallyDate) -> Option<&MailingDetailsEntry> {
         match self {
             Self::Entries { entries } => entries
                 .iter()
                 .rev()
-                .find(|entry| entry.applicable_from.as_str() <= as_of),
+                .find(|entry| entry.applicable_from <= *as_of),
             Self::NotObserved | Self::Unreadable { .. } => None,
         }
     }

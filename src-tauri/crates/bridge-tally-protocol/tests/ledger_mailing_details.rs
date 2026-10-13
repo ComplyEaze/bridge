@@ -57,12 +57,13 @@ fn fields_of<'a>(
 
 fn probe_entry() -> MailingDetailsEntry {
     MailingDetailsEntry {
-        applicable_from: "20260401".to_string(),
+        applicable_from: bridge_tally_primitives::TallyDate::parse("20260401").unwrap(),
         mailing_name: Some(PROBE.to_string()),
         address_lines: vec!["1 Test Street".to_string(), "Test Area".to_string()],
         state: Some("Karnataka".to_string()),
         country: Some("India".to_string()),
         pin_code: Some("560001".to_string()),
+        other_content_skipped: false,
     }
 }
 

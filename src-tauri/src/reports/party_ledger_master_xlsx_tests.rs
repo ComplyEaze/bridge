@@ -523,12 +523,13 @@ fn mailing_row(name: &str, id: &str, history: MailingDetailsHistory) -> PartyLed
 
 fn mailing_entry(from: &str, pin: &str) -> MailingDetailsEntry {
     MailingDetailsEntry {
-        applicable_from: from.to_string(),
+        applicable_from: TallyDate::parse(from).unwrap(),
         mailing_name: Some("Lab Party".to_string()),
         address_lines: vec!["1 Test Street".to_string(), "Test Area".to_string()],
         state: Some("Karnataka".to_string()),
         country: Some("India".to_string()),
         pin_code: Some(pin.to_string()),
+        other_content_skipped: false,
     }
 }
 
@@ -618,13 +619,29 @@ fn a_partys_mailing_entry_in_force_on_the_balances_date_fills_the_five_cells() {
 
 #[test]
 fn each_mailing_status_says_why_the_values_are_blank() {
-    let status =
-        |history: MailingDetailsHistory, as_of: &str| mailing_cells(&history, as_of)[4].clone();
+    let status = |history: MailingDetailsHistory, as_of: &str| {
+        mailing_cells(&history, &TallyDate::parse(as_of).unwrap())[4].clone()
+    };
     let one = MailingDetailsHistory::Entries {
         entries: vec![mailing_entry("20260401", "560001")],
     };
     assert_eq!(status(one.clone(), "20260401"), "in force");
-    assert_eq!(status(one, "20260331"), "none in force on that date");
+    // Not "no address": the first entry starts later, and the status says when.
+    assert_eq!(
+        status(one.clone(), "20260331"),
+        "none in force on that date; first entry from 20260401"
+    );
+    let mut skipped = mailing_entry("20260401", "560001");
+    skipped.other_content_skipped = true;
+    assert_eq!(
+        status(
+            MailingDetailsHistory::Entries {
+                entries: vec![skipped]
+            },
+            "20260401"
+        ),
+        "in force; some content of the entry was not read"
+    );
     assert_eq!(
         status(
             MailingDetailsHistory::Entries { entries: vec![] },
@@ -665,7 +682,7 @@ fn an_entry_missing_its_pin_or_state_leaves_those_cells_blank_and_the_rest_fille
         &MailingDetailsHistory::Entries {
             entries: vec![entry],
         },
-        "20260731",
+        &TallyDate::parse("20260731").unwrap(),
     );
     assert_eq!(cells, ["Only line", "", "", "20260401", "in force"]);
 }

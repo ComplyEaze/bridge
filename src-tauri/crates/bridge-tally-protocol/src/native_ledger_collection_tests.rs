@@ -529,15 +529,62 @@ fn mailing_fields_are_read_as_siblings_are_and_address_lines_keep_their_order() 
         mailing_history_of(element),
         MailingDetailsHistory::Entries {
             entries: vec![MailingDetailsEntry {
-                applicable_from: "20260401".to_string(),
+                applicable_from: bridge_tally_primitives::TallyDate::parse("20260401").unwrap(),
                 mailing_name: Some("Name & Co".to_string()),
                 address_lines: vec!["Line B".to_string(), "Line A".to_string()],
                 state: Some("Karnataka".to_string()),
                 country: None,
                 pin_code: None,
+                other_content_skipped: true,
             }]
         }
     );
+}
+
+/// Content the reader does not take is flagged on the entry, wherever it sits, so a
+/// blank address line is never taken for a party that has none.
+#[test]
+fn mailing_content_the_reader_does_not_take_is_flagged() {
+    use crate::mailing_details::MailingDetailsHistory;
+    let skipped_of = |content: &str| {
+        let element = format!(
+            "<LEDMAILINGDETAILS.LIST><APPLICABLEFROM>20260401</APPLICABLEFROM>{content}</LEDMAILINGDETAILS.LIST>"
+        );
+        match mailing_history_of(&element) {
+            MailingDetailsHistory::Entries { entries } => (
+                entries[0].address_lines.clone(),
+                entries[0].other_content_skipped,
+            ),
+            other => panic!("{content}: {other:?}"),
+        }
+    };
+    // The address held as text directly in the list, not as ADDRESS children.
+    assert_eq!(
+        skipped_of("<ADDRESS.LIST>1 Test St</ADDRESS.LIST>"),
+        (vec![], true)
+    );
+    assert_eq!(
+        skipped_of("<ADDRESS.LIST><LINE>1 Test St</LINE></ADDRESS.LIST>"),
+        (vec![], true)
+    );
+    assert_eq!(skipped_of("<NEWFIELD>x</NEWFIELD>"), (vec![], true));
+    // Text, or a reference, directly in the entry (not in any child) is not read either.
+    assert_eq!(skipped_of("stray text"), (vec![], true));
+    assert_eq!(skipped_of("&amp;"), (vec![], true));
+    assert_eq!(
+        skipped_of("<ADDRESS.LIST>&amp;</ADDRESS.LIST>"),
+        (vec![], true)
+    );
+    assert_eq!(
+        skipped_of("<ADDRESS.LIST><![CDATA[1 Test St]]></ADDRESS.LIST>"),
+        (vec![], true)
+    );
+    // What the reader takes, and an empty unknown tag, are not content skipped.
+    assert_eq!(
+        skipped_of("<ADDRESS.LIST>\n  <ADDRESS>1 Test St</ADDRESS>\n</ADDRESS.LIST>"),
+        (vec!["1 Test St".to_string()], false)
+    );
+    assert_eq!(skipped_of("<NEWFIELD/>"), (vec![], false));
 }
 
 #[test]

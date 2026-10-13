@@ -1,5 +1,6 @@
 //! Renders the exact party and ledger master source as one `.xlsx` workbook.
 
+use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::mailing_details::MailingDetailsHistory;
 use bridge_tally_protocol::PartyLedgerMasterFieldObservation;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
@@ -202,7 +203,7 @@ pub(crate) fn render_party_ledger_master_xlsx(
             worksheet.write_string(sheet_row, 22, "Not established")?;
         }
         worksheet.write_string(sheet_row, 21, row.opening_balance.as_str())?;
-        let mailing = mailing_cells(&row.fields.mailing_details, source.to.as_str());
+        let mailing = mailing_cells(&row.fields.mailing_details, &source.to);
         for (column, value) in mailing.into_iter().enumerate() {
             // An empty value (nothing in force) leaves its cell blank.
             if !value.is_empty() {
@@ -238,15 +239,23 @@ pub(crate) fn render_party_ledger_master_xlsx(
 
 /// The five mailing-details cells of one ledger as of `as_of` (`YYYYMMDD`):
 /// address lines joined by ", ", PIN code, state, the date the entry in force
-/// applies from, and a status that says why the cells are empty when they are.
-fn mailing_cells(history: &MailingDetailsHistory, as_of: &str) -> [String; 5] {
+/// applies from, and a status that says why the cells are empty when they are
+/// (a first entry that starts after `as_of` is named in the status, not shown).
+fn mailing_cells(history: &MailingDetailsHistory, as_of: &TallyDate) -> [String; 5] {
     let in_force = history.in_force(as_of);
     let status = match (history, in_force) {
+        (_, Some(entry)) if entry.other_content_skipped => {
+            "in force; some content of the entry was not read".to_string()
+        }
         (_, Some(_)) => "in force".to_string(),
         (MailingDetailsHistory::Entries { entries }, None) if entries.is_empty() => {
             "no mailing details".to_string()
         }
-        (MailingDetailsHistory::Entries { .. }, None) => "none in force on that date".to_string(),
+        // Not in force on the date, but not "no address": the first entry starts later.
+        (MailingDetailsHistory::Entries { entries }, None) => format!(
+            "none in force on that date; first entry from {}",
+            entries[0].applicable_from.as_str()
+        ),
         (MailingDetailsHistory::NotObserved, None) => "not observed".to_string(),
         (MailingDetailsHistory::Unreadable { defect }, None) => {
             format!("unreadable: {}", defect.as_str())
@@ -265,7 +274,7 @@ fn mailing_cells(history: &MailingDetailsHistory, as_of: &str) -> [String; 5] {
         entry.address_lines.join(", "),
         entry.pin_code.clone().unwrap_or_default(),
         entry.state.clone().unwrap_or_default(),
-        entry.applicable_from.clone(),
+        entry.applicable_from.as_str().to_string(),
         status,
     ]
 }

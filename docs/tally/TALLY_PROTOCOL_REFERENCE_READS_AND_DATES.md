@@ -777,6 +777,11 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   `tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml`; its request is not retained (it is the
   request above without `, LEDMAILINGDETAILS.LIST`), and its size and hash are recorded in the provenance note, not
   shown by a file.
+- **The element makes every row longer. VERIFIED on this book.** The answer is 20,896 bytes against 19,094 for the read
+  that did not name it. By ledger row (UTF-16 bytes, counted by structure): the one party that holds an address grew
+  from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
+  108 bytes). A second entry per party is not measured. Bridge's per-ledger budget for this read rose from 3,750 to
+  4,700 bytes (UNVERIFIED: no populated book has been read).
 - **Not shown.** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, is not measured: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), a party with two
   mailing rows, an entry with no `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers.

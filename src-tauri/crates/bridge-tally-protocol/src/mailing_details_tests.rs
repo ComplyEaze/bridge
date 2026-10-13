@@ -9,18 +9,24 @@ fn raw(date: Option<&str>, pin: Option<&str>) -> RawMailingDetailsEntry {
         country: Some("India".to_string()),
         pin_code: pin.map(str::to_string),
         repeated_field: false,
+        other_content_skipped: false,
         has_content: true,
     }
 }
 
+fn day(text: &str) -> TallyDate {
+    TallyDate::parse(text).unwrap()
+}
+
 fn entry(date: &str, pin: Option<&str>) -> MailingDetailsEntry {
     MailingDetailsEntry {
-        applicable_from: date.to_string(),
+        applicable_from: day(date),
         mailing_name: Some("Party".to_string()),
         address_lines: vec!["1 Test Street".to_string(), "Test Area".to_string()],
         state: Some("Karnataka".to_string()),
         country: Some("India".to_string()),
         pin_code: pin.map(str::to_string),
+        other_content_skipped: false,
     }
 }
 
@@ -177,7 +183,11 @@ fn the_entry_in_force_is_the_latest_on_or_before_the_date_and_none_before_the_fi
         raw(Some("20260401"), Some("560001")),
         raw(Some("20261001"), Some("560003")),
     ]);
-    let pin = |as_of| history.in_force(as_of).and_then(|e| e.pin_code.as_deref());
+    let pin = |as_of| {
+        history
+            .in_force(&day(as_of))
+            .and_then(|e| e.pin_code.as_deref())
+    };
     assert_eq!(pin("20260331"), None, "before the first date");
     assert_eq!(pin("20260401"), Some("560001"), "on the first date");
     assert_eq!(pin("20260630"), Some("560001"));
@@ -193,18 +203,18 @@ fn the_entry_in_force_is_the_latest_on_or_before_the_date_and_none_before_the_fi
 #[test]
 fn nothing_is_in_force_from_an_empty_unobserved_or_unreadable_history() {
     assert_eq!(
-        MailingDetailsHistory::Entries { entries: vec![] }.in_force("20260831"),
+        MailingDetailsHistory::Entries { entries: vec![] }.in_force(&day("20260831")),
         None
     );
     assert_eq!(
-        MailingDetailsHistory::NotObserved.in_force("20260831"),
+        MailingDetailsHistory::NotObserved.in_force(&day("20260831")),
         None
     );
     assert_eq!(
         MailingDetailsHistory::Unreadable {
             defect: MailingDetailsDefect::DateInvalid
         }
-        .in_force("20260831"),
+        .in_force(&day("20260831")),
         None
     );
 }
@@ -254,4 +264,22 @@ fn a_defect_names_itself_as_it_serialises() {
             defect.as_str()
         );
     }
+}
+
+#[test]
+fn skipped_content_is_carried_to_the_entry_and_is_part_of_what_two_entries_must_agree_on() {
+    let mut skipping = raw(Some("20260401"), Some("560001"));
+    skipping.other_content_skipped = true;
+    let MailingDetailsHistory::Entries { entries } =
+        MailingDetailsHistory::from_raw(vec![skipping.clone()])
+    else {
+        panic!("one entry reads");
+    };
+    assert!(entries[0].other_content_skipped);
+    // The same date said once with content unread and once without is a conflict,
+    // not a duplicate: the two readings do not agree on what Tally holds.
+    assert_eq!(
+        unreadable(vec![skipping, raw(Some("20260401"), Some("560001"))]),
+        Some(MailingDetailsDefect::ConflictingEntriesOnOneDate)
+    );
 }

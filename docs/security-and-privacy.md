@@ -107,8 +107,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     named in a build warning and the ledger in a refused cash-or-bank row), stock
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
-    and three fields of a ledger's details: the name on the PAN, the bank account
-    holder's name and the bank details. A name of four characters or fewer is
+    and four fields of a ledger's details: the name on the PAN, the bank account
+    holder's name, the bank details and the name a mailing address is printed under.
+    A party's mailing address, PIN code and state, which `ledger_masters` returns with
+    `fields=compliance`, are not masked under any mode. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
     beside its name when the two differ, is left out. It does not mask amounts, company names, the names of
     groups in a group total (shown as the book has them), a ledger's parent

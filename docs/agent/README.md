@@ -173,7 +173,7 @@ A compliance ledger read (`ledger_masters fields=compliance`) whose company's ma
 mark puts the estimated response over Bridge's budget has its ledgers counted first with a
 balance-free catalogue read (a stable pair, bound to the company by name and GUID) (#637, #668,
 #679). A count that fits is read whole. A count that does not is read in parts: the catalogue's
-parent groups are packed by ledger count into parts of at most 4,266 ledgers (2,000 with `include_gst_details`) and 200 parents, and
+parent groups are packed by ledger count into parts of at most 3,404 ledgers (1,787 with `include_gst_details`) and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
@@ -188,7 +188,7 @@ whose name cannot sit in a filter, such as one with a control character, are rea
 last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
 parents per formula, all applied together), and the same coverage proof applies to it. A book
 that cannot be split is refused before any master request: one parent group, or the ledgers
-under unnameable parents, over 4,266 ledgers (2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
+under unnameable parents, over 3,404 ledgers (1,787 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
 (`parent_partition_too_many_parts`), a complement filter over 256 KiB
 (`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
@@ -225,11 +225,14 @@ two-parent filter and the census slices measured on three books; `fields=basic` 
 these books.
 Each `fields=compliance` row's `compliance` object also carries the dated mailing details
 (`compliance.mailing_details`, #1490): `observation` is `not_observed` (the response held no such list),
-`entries` (each dated entry with `applicable_from`, `address_lines`, `pin_code`, `state`, `country` and
-`mailing_name`; an empty list is a ledger with no mailing details) or `unreadable` (a `defect`, for that
-ledger only). The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state` fields are the legacy
-elements: TallyPrime 7.1 returned them empty or absent for a party that held an address in the measured
-book. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
+`entries` (each dated entry with `applicable_from`, `address_lines`, `pin_code`, `state`, `country`,
+`mailing_name` and `other_content_skipped`, true when the entry held content that was not read, so its
+address lines may be incomplete; an empty list is a ledger with no mailing details) or `unreadable` (a
+`defect`, for that ledger only). The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state`
+fields are Tally's older elements: TallyPrime 7.1 returned them empty or absent for a party that held an
+address in the one synthetic book measured, so read the address from `mailing_details`; other books may
+fill the flat fields. `mask_parties` masks the entry's `mailing_name` only: the address lines, PIN code and
+state reach the assistant's provider under every redaction mode. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
 releases are not measured.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
@@ -243,9 +246,7 @@ flag and state rows, whose rate rows carry a `rate` that is `absent`, `empty`, `
 not returned because no capture shows them, the place of supply is in the registration history
 (`compliance.gst_registrations`), and slab rates are flagged, not read. The result's `limitations` say this
 and that the shape was measured on one 14-ledger lab book of TallyPrime 7.1 Silver and has not yet been run
-through this tool on a live Tally. The read is admitted at 8,000 bytes a ledger instead of 3,750, an
-UNVERIFIED margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry
-5,248 to 5,394; UTF-16 bytes of the ledger's own element), not a measured ratio: a read, whole or one part, holds at most 2,000 ledgers (4,266 without
+through this tool on a live Tally. The read is admitted at 8,950 bytes a ledger instead of 4,700, an UNVERIFIED margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element; that request did not name the mailing details, so 950 bytes were added to each figure), not a measured ratio: a read, whole or one part, holds at most 1,787 ledgers (3,404 without
 the flag; both figures are the 16 MB budget over the per-ledger constant, not measured), so a book that fits one
 read today may come back in more parts, or be refused as the existing `parent_over_budget`, never truncated.
 A held listing is served only to a page that asks for the same mode, so repeat `include_gst_details` on later

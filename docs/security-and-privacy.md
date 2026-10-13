@@ -109,7 +109,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     names and their parents, the category a cost centre belongs to,
     and four fields of a ledger's details: the name on the PAN, the bank account
     holder's name, the bank details and the name a mailing address is printed under.
-    A party's mailing address, PIN code and state, which `ledger_masters` returns with
+    A party's mailing address, PIN code, state and country, which `ledger_masters` returns with
     `fields=compliance`, are not masked under any mode. A name of four characters or fewer is
     replaced by “…”. The spelling a ledger's vouchers carry, which is returned
     beside its name when the two differ, is left out. It does not mask amounts, company names, the names of

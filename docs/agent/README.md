@@ -226,19 +226,19 @@ these books.
 Each `fields=compliance` row's `compliance` object also carries the dated mailing details
 (`compliance.mailing_details`, #1490): `observation` is `not_observed` (the response held no such list),
 `entries` (each dated entry with `applicable_from`, `address_lines`, `pin_code`, `state`, `country`,
-`mailing_name` and `other_content_skipped`, true when the entry held content that was not read, so its
+`mailing_name` (present only when Tally sent one) and `other_content_skipped`, true when the entry held content that was not read, so its
 address lines may be incomplete; an empty list is a ledger with no mailing details) or `unreadable` (a
 `defect`, for that ledger only). The flat `compliance.address`, `pin_code`, `gst_pin_code` and `state`
 fields are Tally's older elements: TallyPrime 7.1 returned them empty or absent for a party that held an
 address in the one synthetic book measured, so read the address from `mailing_details`; other books may
-fill the flat fields. `mask_parties` masks the entry's `mailing_name` only: the address lines, PIN code and
-state reach the assistant's provider under every redaction mode. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
+fill the flat fields. `mask_parties` masks the entry's `mailing_name` only: the address lines, PIN code,
+state and country reach the assistant's provider under every redaction mode. Measured on one synthetic book; a second dated entry, a party with two mailing rows and other
 releases are not measured.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields` it is refused before any read as `ledger_masters_gst_details_requires_compliance`,
-and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) every
-request, the request commitment, the sizing and the result are what they were, and no row has a `gst_details`
-key. With it, the master read of each request (the whole book or each part by parent group) also names every
+and a value that is not a boolean is `argument_invalid:include_gst_details`. Without it (absent or false) no
+request names the GST details, the read is sized without them (4,700 bytes a ledger) and no row has a
+`gst_details` key. With it, the master read of each request (the whole book or each part by parent group) also names every
 ledger's `GSTDETAILS.LIST`, and each row's `compliance.gst_details` holds Tally's ledger-level GST details as
 sent: `observation` is `not_observed`, `entries` (each dated entry with its taxability, source, input-credit
 flag and state rows, whose rate rows carry a `rate` that is `absent`, `empty`, `zero` or `value` with `raw` and

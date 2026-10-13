@@ -516,15 +516,16 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// The ceiling on one parent group is the whole-read bound: a group with more
 /// ledgers than one part may carry is refused as `parent_over_budget`, never
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
-/// the budget over the read's per-ledger constant, not a measurement: 3,404
+/// the budget over the read's per-ledger constant, not a measurement: 4,266
 /// ledgers for a [`ComplianceRead::Standard`] read, 3,404 for a
 /// [`ComplianceRead::WithMailingDetails`] one and 1,787 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
-/// far past what the mark bound admits.
+/// limit. It admits about 51,000 ledgers (about 40,800 with the mailing
+/// details, about 21,400 with the GST details), far past what the mark bound
+/// admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
 /// Most bytes of `NOT` formula text the complement part's request may carry

@@ -768,7 +768,7 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   placeholder) and `STATENAME` is absent, although the request names all four. The address is in that row's
   `LEDMAILINGDETAILS.LIST`: an `ADDRESS.LIST` of two `ADDRESS` lines, then `APPLICABLEFROM` (`YYYYMMDD`), `PINCODE`,
   `MAILINGNAME`, `STATE` and `COUNTRY`. An address line repeats inside `ADDRESS.LIST`; no other child repeated.
-- **Absence is a whitespace-only placeholder, in every row. VERIFIED.** The other seven ledgers (one more party and six
+- **Absence is a whitespace-only placeholder, in every row. VERIFIED.** The other seven ledgers (two more parties and five
   that are not parties) carry `<LEDMAILINGDETAILS.LIST>` holding only whitespace, so a ledger with no address is an
   element with no children, not a missing element.
 - **A `FETCH` that does not name the list does not get it. VERIFIED on this book.** The earlier read of the same book, whose

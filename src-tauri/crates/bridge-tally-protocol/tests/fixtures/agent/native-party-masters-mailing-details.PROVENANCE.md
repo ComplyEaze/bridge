@@ -12,7 +12,7 @@ Covers `native-party-masters-mailing-details.request.utf16le.xml`,
 
 Captured from a synthetic company on TallyPrime 7.1 licensed Silver on 12 October 2026,
 one request each, HTTP 200, raw bytes unchanged. The request is the `List of Ledgers`
-collection that `render_party_ledger_master_request` renders (company `Bridge Lab Win 0.5.1`,
+collection that `render_party_ledger_master_request_with_mailing_details` renders (company `Bridge Lab Win 0.5.1`,
 `SVFROMDATE` 20260401, `SVTODATE` 20260831), UTF-16LE with a byte-order mark; its `FETCH`
 ends `LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST`. The answer is UTF-16LE with no
 byte-order mark and holds eight ledgers.
@@ -22,7 +22,8 @@ byte-order mark and holds eight ledgers.
 On this one book and release: every ledger row carries exactly one `LEDMAILINGDETAILS.LIST`.
 For the party `Lab Party Duplicate Probe` it holds an `ADDRESS.LIST` of two `ADDRESS` lines,
 `APPLICABLEFROM` 20260401, `PINCODE` 560001, `MAILINGNAME`, `STATE` Karnataka and `COUNTRY`
-India. For the other seven ledgers (one more party and six that are not parties) it is a
+India. For the other seven ledgers (two more parties, `Synthetic Debtor` and `Synthetic Creditor`, and
+five that are not parties) it is a
 placeholder holding only whitespace. In the same answer, for the same party, the flat
 `LEDADDRESS.LIST`, `LEDPINCODE` and `LEDGSTPINCODE` come back empty and `STATENAME` is absent.
 The third file is the answer, from the same company, to the request sent 22 minutes earlier

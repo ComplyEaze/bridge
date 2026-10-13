@@ -1216,6 +1216,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "the journal and imports folder are what was already sent to Tally",
         ),
         (
+            "local_data_report",
+            "the skipped-rows file agent-import-statement-skips.jsonl",
+            "the record of skipped statement rows is not offered for deletion",
+        ),
+        (
             "verify_import",
             "This never dispatches import XML to Tally.",
             "the recovery read writes nothing to Tally",

@@ -9,7 +9,7 @@
 //! duplicate setting the capture printed. Every series keeps the sub-method the
 //! capture printed, `Auto Retain`, unless a test sets one with
 //! [`with_sub_method`].
-use super::post::numbering::admit_numbering;
+use super::post::numbering::{admit_numbering, OwnNumber};
 use crate::agent::responses::{
     enforce_jsonrpc_response_byte_cap, enforce_mcp_result_byte_cap, enforce_response_byte_cap,
 };
@@ -76,9 +76,21 @@ const CAPTURED_SUB_METHOD: &str = "<NUMBERINGSUBMETHOD>Auto Retain</NUMBERINGSUB
 /// `element` in place of its captured sub-method element, in both answers of
 /// the numbering pair. One edit of the captured answer; nothing else changes.
 pub(in crate::agent) fn with_sub_method(
-    mut plans: Vec<ScenarioPlan>,
+    plans: Vec<ScenarioPlan>,
     voucher_type: &str,
     element: &str,
+) -> Vec<ScenarioPlan> {
+    with_series_text(plans, voucher_type, CAPTURED_SUB_METHOD, element)
+}
+
+/// `plans` with `from`, which the row of the voucher type named
+/// `voucher_type` holds once, replaced by `to`, in both answers of the
+/// numbering pair.
+pub(in crate::agent) fn with_series_text(
+    mut plans: Vec<ScenarioPlan>,
+    voucher_type: &str,
+    from: &str,
+    to: &str,
 ) -> Vec<ScenarioPlan> {
     let mut changed = 0;
     for plan in &mut plans {
@@ -89,12 +101,8 @@ pub(in crate::agent) fn with_sub_method(
             continue;
         }
         let row = block(body, voucher_type);
-        assert_eq!(
-            row.matches(CAPTURED_SUB_METHOD).count(),
-            1,
-            "{voucher_type}"
-        );
-        let edited = row.replacen(CAPTURED_SUB_METHOD, element, 1);
+        assert_eq!(row.matches(from).count(), 1, "{voucher_type}: {from}");
+        let edited = row.replacen(from, to, 1);
         assert_eq!(body.matches(row).count(), 1, "{voucher_type}");
         let body = body.replacen(row, &edited, 1);
         plan.fixture = Fixture::SyntheticXml(body);
@@ -135,7 +143,8 @@ pub(in crate::agent) fn four_types_through_the_caps(
             })
             .collect(),
     );
-    let refusal = admit_numbering(read, NUMBERED_TYPES).expect_err("every type is refused");
+    let refusal = admit_numbering(read, NUMBERED_TYPES.map(|name| (name, OwnNumber::Absent)))
+        .expect_err("every type is refused");
     let named = structured.pointer_mut(at).expect(at);
     named["refused_types"] = refusal.refused_types();
     if named.get("message").is_some() {
@@ -156,27 +165,12 @@ pub(in crate::agent) fn four_types_through_the_caps(
 /// The masters answer and the numbering answer of `company_guid`'s four voucher
 /// types, the types in `manual` numbered Manual and the rest Automatic.
 pub(in crate::agent) fn numbering_answers(company_guid: &str, manual: &[&str]) -> (String, String) {
-    let masters = decode(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_live.utf16le.xml"
-    ))
-    .replace(MASTERS_CAPTURE_GUID, company_guid);
-    let numbering = decode(include_bytes!(
+    let series = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
     ))
     .replace(NUMBERING_CAPTURE_GUID, company_guid);
-    let mut master_rows = String::new();
-    let mut numbering_rows = String::new();
-    for (at, name) in NUMBERED_TYPES.iter().enumerate() {
-        let alter_id = format!(" {}", at + 1);
-        let master = set(block(&masters, name), "ALTERID", &alter_id);
-        let guid = text_of(&master, "GUID").to_string();
-        master_rows.push_str(&master);
-        let series = set(
-            &set(block(&numbering, name), "GUID", &guid),
-            "ALTERID",
-            &alter_id,
-        );
-        let (from, to) = if manual.contains(name) {
+    joined_answers(company_guid, &series, |name, row| {
+        let (from, to) = if manual.contains(&name) {
             (
                 "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
                 "<NUMBERINGMETHOD>Manual</NUMBERINGMETHOD>",
@@ -187,10 +181,50 @@ pub(in crate::agent) fn numbering_answers(company_guid: &str, manual: &[&str]) -
                 "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
             )
         };
-        numbering_rows.push_str(&series.replace(from, to));
+        row.replace(from, to)
+    })
+}
+
+/// The masters answer and `series`, a committed series capture of another
+/// book, as its numbering answer. The JOIN IS EDITED, as in
+/// [`numbering_answers`]: only the four voucher types are kept, and each row's
+/// GUID and AlterID are set to those of the masters row. Every numbering field
+/// of those four rows (method, sub-method, duplicate setting) is as captured.
+pub(in crate::agent) fn captured_numbering_answers(
+    company_guid: &str,
+    series: &[u8],
+) -> (String, String) {
+    joined_answers(company_guid, &decode(series), |_, row| row)
+}
+
+/// The masters capture and `series` cut to the four voucher types and joined:
+/// each numbering row takes its masters row's GUID and an AlterID of 1 to 4,
+/// then `numbering_of` its name.
+fn joined_answers(
+    company_guid: &str,
+    series: &str,
+    numbering_of: impl Fn(&str, String) -> String,
+) -> (String, String) {
+    let masters = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_live.utf16le.xml"
+    ))
+    .replace(MASTERS_CAPTURE_GUID, company_guid);
+    let mut master_rows = String::new();
+    let mut numbering_rows = String::new();
+    for (at, name) in NUMBERED_TYPES.iter().enumerate() {
+        let alter_id = format!(" {}", at + 1);
+        let master = set(block(&masters, name), "ALTERID", &alter_id);
+        let guid = text_of(&master, "GUID").to_string();
+        master_rows.push_str(&master);
+        let row = set(
+            &set(block(series, name), "GUID", &guid),
+            "ALTERID",
+            &alter_id,
+        );
+        numbering_rows.push_str(&numbering_of(name, row));
     }
     (
         with_rows(&masters, &master_rows),
-        with_rows(&numbering, &numbering_rows),
+        with_rows(series, &numbering_rows),
     )
 }

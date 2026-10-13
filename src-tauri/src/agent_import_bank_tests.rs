@@ -510,6 +510,15 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
 /// The build request sequence for a payload that carries a cash/bank voucher:
 /// the Journal cycle plus a paired group read after each catalogue read.
 pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
+    bank_build_plans_numbering(build_numbering_plans(&[]))
+}
+
+/// How many requests a bank build sends up to and including its numbering
+/// read.
+const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
+
+/// [`bank_build_plans`], its numbering read answered by `numbering`.
+fn bank_build_plans_numbering(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
     let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
@@ -517,7 +526,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
         cycle[..10].to_vec(),
         group_read_plans(),
         cycle[10..16].to_vec(),
-        build_numbering_plans(&[]),
+        numbering,
         cycle[4..10].to_vec(),
         group_read_plans(),
         build_preflight_plans(),
@@ -553,6 +562,65 @@ pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
         writes_enabled: false,
         batch_post_enabled: false,
     })
+}
+
+/// The committed series answers of 13 October 2026 through the build tool: a
+/// Receipt without a number, built against the answer taken with the Receipt
+/// type set to "Renumber Vouchers", is refused under the sub-method's code and
+/// names Receipt; against the answer taken before the change it is built.
+/// The join is edited (see `captured_numbering_answers`): the four rows carry
+/// the masters capture's GUIDs and AlterIDs of 1 to 4. Their method,
+/// sub-method and duplicate setting are as captured.
+#[tokio::test]
+async fn the_captured_series_answers_decide_a_numberless_receipt_through_the_build() {
+    use super::super::numbering_fixtures::captured_numbering_answers;
+    let numbering = |series: &[u8]| {
+        build_numbering_plans_answering(
+            captured_numbering_answers(CAPTURED_GUID, series),
+            &mode_tests::licensed_import_probe(),
+        )
+    };
+    let receipt = || {
+        let mut payload = captured_bank_payload();
+        payload.vouchers.remove(0);
+        assert_eq!(payload.vouchers[0].voucher_type.as_str(), "Receipt");
+        assert_eq!(payload.vouchers[0].voucher_number, None);
+        serde_json::to_value(payload).unwrap()
+    };
+
+    let mut plans = bank_build_plans_numbering(numbering(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml"
+    )));
+    plans.truncate(THROUGH_BANK_NUMBERING);
+    let simulator = SequenceSimulator::spawn(plans).expect("bank build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let refused = server.build_import_xml(&receipt()).await.unwrap();
+    let result = &refused.payload["result"];
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(result["reason"], "import_voucher_numbering_not_retain");
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Receipt","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}])
+    );
+    assert_eq!(simulator.finish().unwrap().len(), THROUGH_BANK_NUMBERING);
+    assert_eq!(written_files(directory.path()), 0);
+
+    let plans = bank_build_plans_numbering(numbering(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml"
+    )));
+    let whole = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).expect("bank build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let built = server.build_import_xml(&receipt()).await.unwrap();
+    assert_eq!(
+        built.payload["result"]["voucher_count"], 1,
+        "{}",
+        built.payload
+    );
+    assert_eq!(simulator.finish().unwrap().len(), whole);
+    assert_eq!(written_files(directory.path()), 1);
 }
 
 #[tokio::test]

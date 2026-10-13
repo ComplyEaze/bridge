@@ -140,13 +140,16 @@ These changes are in source and not yet in a published build.
   hand, and when a voucher with an earlier date was sent by import without a number, without moving any voucher's
   AlterID and with the import's answer reading CREATED 1, ALTERED 0; a voucher dated after every other changed
   nothing (one synthetic book, one voucher type, TallyPrime 7.1 Silver). A series that prints no sub-method, or one
-  ComplyEaze Bridge does not recognise, is refused the same way. An amendment is checked the same way for its
-  vouchers that carry no number. It is refused before its own check of the book, so its next step says that
+  ComplyEaze Bridge does not recognise, is refused the same way. An amendment's vouchers are checked the same
+  way. It is refused before its own check of the book, so its next step says that
   whether the earlier batch's vouchers are in the book was not checked, and has the assistant call `verify_import`
-  for that batch first: a voucher found in the book is corrected in Tally and never entered again, and entering one
-  that is not found is the user's decision. A Journal that carries its own voucher number (one built for Tally's Import menu)
-  is not checked by this rule: under Automatic numbering Tally discards a supplied number and assigns its own, and
-  what such a voucher does on a voucher type set to "Renumber Vouchers" is not measured. On the desktop's Journal
+  for that batch first: a voucher found in the book is corrected in Tally and never entered again, and for one
+  that is not found the user looks in Tally before deciding to enter it. A Journal that carries its own voucher number (one built for Tally's Import menu)
+  is checked by `build_import_xml` too: it is written into a voucher type that reads Manual, where Tally keeps the
+  number and the type's duplicate setting decides, or Automatic with `Auto Retain`, where Tally discards the number
+  and assigns the next, and it is refused otherwise under the same two codes. It is refused on a voucher type set
+  to "Renumber Vouchers" because the number is discarded there, which leaves it a voucher without one; a numbered
+  voucher on such a type was not itself measured. So every build now sends the numbering read. On the desktop's Journal
   screen the refusal names the voucher type and what was read of it. The next step, and a post's message naming
   the voucher types, are sent only where `BRIDGE_AGENT_MAX_BYTES` is at least 8,192; from 4,096 up to that a refused build
   still returns its `reason` and `refused_types`, and a refused post its code and `refused_types`. A batch, other voucher types, Gold, other
@@ -160,9 +163,9 @@ These changes are in source and not yet in a published build.
   and two in each of two runs on a type holding vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A voucher type
   saved during the read itself refuses as `masters_bound_premise_violated` (cause
   `masters_alter_id_above_master_mark`). A book in Education mode is now refused, as
-  `masters_education_unqualified`, for a post and for a build of any voucher without a number. Each pass of a post
+  `masters_education_unqualified`, for a post and for a build. Each pass of a post
   sends 20 more requests to Tally before the approval (12 of them POSTs), so a held approval redeemed in a later call
-  sends them again; a build of vouchers without numbers sends 14 more (8 POSTs), under its admission lock.
+  sends them again; a build sends 14 more (8 POSTs), under its admission lock.
 
 - **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,

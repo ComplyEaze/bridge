@@ -2980,8 +2980,8 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         (true, 1, true, false),
         (false, 1, false, false),
     ] {
-        let simulator =
-            SequenceSimulator::spawn(build_plans_numbered(numbered)).expect("captured build plan");
+        let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
+            .expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(crate::agent::Settings {
             endpoint: TallyEndpointConfig {
@@ -3071,7 +3071,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
         );
         assert_eq!(
             simulator.finish().unwrap().len(),
-            build_plans_numbered(numbered).len()
+            whole_build(build_numbering_plans(&[])).len()
         );
     }
 }
@@ -3103,12 +3103,8 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         let mut input = captured_catalogue_payload();
         input.vouchers.truncate(voucher_count);
         edit(&mut input);
-        let numbered = input
-            .vouchers
-            .iter()
-            .all(|voucher| voucher.voucher_number.is_some());
-        let simulator =
-            SequenceSimulator::spawn(build_plans_numbered(numbered)).expect("captured build plan");
+        let simulator = SequenceSimulator::spawn(whole_build(build_numbering_plans(&[])))
+            .expect("captured build plan");
         let directory = tempfile::tempdir().unwrap();
         let server = Server::new(crate::agent::Settings {
             endpoint: TallyEndpointConfig {
@@ -3175,7 +3171,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
         }
         assert_eq!(
             simulator.finish().unwrap().len(),
-            build_plans_numbered(numbered).len()
+            whole_build(build_numbering_plans(&[])).len()
         );
     }
 }
@@ -3299,9 +3295,19 @@ pub(super) fn build_numbering_plans_probed(
     manual: &[&str],
     probe: &[ScenarioPlan],
 ) -> Vec<ScenarioPlan> {
+    build_numbering_plans_answering(
+        super::numbering_fixtures::numbering_answers(CAPTURED_GUID, manual),
+        probe,
+    )
+}
+
+/// The numbering read of a build, answered by `(masters, numbering)`.
+pub(super) fn build_numbering_plans_answering(
+    (masters, numbering): (String, String),
+    probe: &[ScenarioPlan],
+) -> Vec<ScenarioPlan> {
     let cycle = import_cycle_plans();
     let (company, status) = (cycle[0].clone(), cycle[1].clone());
-    let (masters, numbering) = super::numbering_fixtures::numbering_answers(CAPTURED_GUID, manual);
     let answer = |body: String| {
         ScenarioPlan::new(Fixture::SyntheticXml(body))
             .with_encoding(WireEncoding::Utf16Le)
@@ -4943,29 +4949,22 @@ fn through_build_numbering(manual: &[&str]) -> Vec<ScenarioPlan> {
     .concat()
 }
 
-/// A whole build's requests: with no numbering read when every voucher carries
-/// its own number.
-fn build_plans_numbered(numbered: bool) -> Vec<ScenarioPlan> {
-    if numbered {
-        build_without_numbering()
-    } else {
-        qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec()
-    }
-}
-
-/// A whole build with no numbering read: the requests of a batch whose every
-/// voucher carries its own number.
-fn build_without_numbering() -> Vec<ScenarioPlan> {
+/// A whole build's requests, its numbering read answered by `numbering`. A
+/// voucher that carries its own number is read for like any other.
+fn whole_build(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
     let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
-    [
+    let plans = [
         probe.clone(),
         cycle[..16].to_vec(),
+        numbering,
         cycle[4..10].to_vec(),
         build_preflight_plans(),
         probe,
     ]
-    .concat()
+    .concat();
+    assert_eq!(plans.len(), QUALIFIED_BUILD_REQUESTS);
+    plans
 }
 
 fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
@@ -5158,9 +5157,10 @@ async fn a_refused_build_keeps_its_reason_and_types_at_the_general_floor() {
     assert!(response.to_string().len() <= FLOOR, "{response}");
 }
 
-#[tokio::test]
-async fn a_journal_carrying_its_own_number_is_built_without_the_numbering_read() {
-    let simulator = SequenceSimulator::spawn(build_without_numbering()).expect("build plan");
+/// One numbered Journal built against `numbering`: the build's result, how
+/// many requests it sent and how many files it wrote.
+async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usize, usize) {
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
     let directory = tempfile::tempdir().unwrap();
     let server = numbering_server(directory.path(), simulator.address().port());
     let mut input = captured_catalogue_payload();
@@ -5170,16 +5170,85 @@ async fn a_journal_carrying_its_own_number_is_built_without_the_numbering_read()
         .build_import_xml(&serde_json::to_value(input).unwrap())
         .await
         .unwrap();
-    assert_eq!(
-        built.payload["result"]["voucher_count"], 1,
-        "{}",
-        built.payload
-    );
-    simulator.finish().unwrap();
+    (
+        built.payload["result"].clone(),
+        simulator.finish().unwrap().len(),
+        written_files(directory.path()),
+    )
 }
 
+/// A Journal that carries its own number, into a Journal type numbered
+/// Manual: Tally keeps the number there, so it is built, after the numbering
+/// read like every other voucher.
 #[tokio::test]
-async fn a_numbered_journal_beside_a_numberless_one_still_reads_the_numbering() {
+async fn a_journal_carrying_its_own_number_is_built_into_a_manual_type_after_the_numbering_read() {
+    let (result, requests, files) =
+        numbered_journal_built_against(whole_build(build_numbering_plans(&["Journal"]))).await;
+    assert_eq!(result["voucher_count"], 1, "{result}");
+    assert_eq!(requests, QUALIFIED_BUILD_REQUESTS);
+    assert_eq!(files, 1);
+}
+
+/// The same numbered Journal into an Automatic type. Under Automatic
+/// numbering Tally discards the number, so the type must retain existing
+/// numbers, as for a voucher without one: `Auto Retain` builds, and a type set
+/// to renumber, one that prints no sub-method and Automatic (Manual Override)
+/// refuse under the same two codes, with nothing written.
+#[tokio::test]
+async fn a_numbered_journal_into_an_automatic_type_is_held_to_auto_retain() {
+    use super::numbering_fixtures::{with_series_text, with_sub_method};
+    let (result, requests, files) =
+        numbered_journal_built_against(whole_build(build_numbering_plans(&[]))).await;
+    assert_eq!(result["voucher_count"], 1, "{result}");
+    assert_eq!((requests, files), (QUALIFIED_BUILD_REQUESTS, 1));
+
+    let journal = |observed: Value| json!([{"voucher_type":"Journal","observed":observed}]);
+    for (plans, reason, refused) in [
+        (
+            with_sub_method(
+                through_build_numbering(&[]),
+                "Journal",
+                "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>",
+            ),
+            "import_voucher_numbering_not_retain",
+            journal(
+                json!({"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}),
+            ),
+        ),
+        (
+            with_sub_method(through_build_numbering(&[]), "Journal", ""),
+            "import_voucher_numbering_not_retain",
+            journal(
+                json!({"observation":"observed","method":"automatic","sub_method":"absent","duplicates":"not_prevented"}),
+            ),
+        ),
+        (
+            with_series_text(
+                through_build_numbering(&[]),
+                "Journal",
+                "<NUMBERINGMETHOD>Automatic</NUMBERINGMETHOD>",
+                "<NUMBERINGMETHOD>Automatic (Manual Override)</NUMBERINGMETHOD>",
+            ),
+            "import_voucher_numbering_not_automatic",
+            journal(
+                json!({"observation":"observed","method":"automatic_manual_override","duplicates":"not_prevented"}),
+            ),
+        ),
+    ] {
+        let expected = plans.len();
+        let (result, requests, files) = numbered_journal_built_against(plans).await;
+        assert_eq!(result["state"], "refused", "{reason}: {result}");
+        assert_eq!(result["reason"], reason, "{result}");
+        assert_eq!(result["refused_types"], refused, "{reason}");
+        assert_eq!((requests, files), (expected, 0), "{reason}");
+    }
+}
+
+/// A numbered and a numberless Journal into a Journal type numbered Manual:
+/// the batch is refused for the numberless one only (the numbered one alone
+/// is built, above), so the type is named once and the code is not-Automatic.
+#[tokio::test]
+async fn a_numbered_journal_beside_a_numberless_one_into_a_manual_type_is_refused_for_the_latter() {
     let plans = through_build_numbering(&["Journal"]);
     let simulator = SequenceSimulator::spawn(plans).expect("build plan");
     let directory = tempfile::tempdir().unwrap();
@@ -5195,6 +5264,10 @@ async fn a_numbered_journal_beside_a_numberless_one_still_reads_the_numbering() 
         built.payload["result"]["reason"], "import_voucher_numbering_not_automatic",
         "{}",
         built.payload
+    );
+    assert_eq!(
+        built.payload["result"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"not_prevented"}}])
     );
     assert_eq!(written_files(directory.path()), 0);
 }

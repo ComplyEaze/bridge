@@ -2033,11 +2033,14 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    sub-method, or prints one ComplyEaze Bridge does not recognise) refuses with
    `import_voucher_numbering_not_retain`. Either names each such voucher type
    and what was read in `refused_types`; a batch that holds both is refused
-   as `import_voucher_numbering_not_automatic`. `build_import_xml` refuses the
-   same for a voucher without a number; a Journal that carries its own voucher
-   number is not checked by this rule (under Automatic numbering Tally
-   discards a supplied number and assigns its own, and what such a voucher
-   does on a voucher type set to "Renumber Vouchers" is not measured). With a
+   as `import_voucher_numbering_not_automatic`. `build_import_xml` checks every
+   voucher the same way, and writes a Journal that carries its own voucher
+   number into a voucher type that reads Manual as well: Tally keeps the
+   number there, and the type's duplicate setting decides. Under Automatic
+   numbering Tally discards a supplied number and assigns its own, so such a
+   Journal is held to `Auto Retain` like a voucher without a number; it is
+   refused on a voucher type set to "Renumber Vouchers" for that reason, and
+   a numbered voucher on such a type was not itself measured. With a
    type set to "Renumber Vouchers", numbers already in the book were seen to
    change when a voucher with an earlier date was entered by hand, and again
    when a voucher with an earlier date was sent by import without a number:

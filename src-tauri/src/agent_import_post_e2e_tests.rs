@@ -5902,6 +5902,42 @@ async fn the_desktop_journal_is_told_which_voucher_type_was_refused_and_what_was
     }
 }
 
+/// The Journal type reads Automatic and its series prints no sub-method: a
+/// post is refused before the approval under the sub-method's code, says the
+/// sub-method was absent, and nothing is asked or sent.
+#[tokio::test]
+async fn a_journal_into_a_journal_type_that_prints_no_sub_method_is_refused_before_the_approval() {
+    let numbering = crate::agent::agent_import::numbering_fixtures::with_sub_method(
+        numbering_read(&[]),
+        "Journal",
+        "",
+    );
+    let plans = before_approval_numbering(numbering);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_retain",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"automatic","sub_method":"absent","duplicates":"not_prevented"}}]),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
 /// A batch of two voucher types whose SECOND type is set to renumber: the
 /// rule reads every voucher's type, so the whole batch is refused before the
 /// approval and that type is the one named.

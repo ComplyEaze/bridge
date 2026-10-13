@@ -1038,63 +1038,56 @@ impl Server {
             let on_account_approved = verdict.approved;
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
-            // A voucher written without a number is numbered by its voucher
-            // type, so that type must be numbered Automatic with existing
-            // numbers retained (bridge#724). Read after the mark above. A
-            // Journal that carries its own number is not checked by this
-            // rule: under Automatic numbering Tally discards a supplied
-            // number and assigns its own (protocol reference, voucher
-            // writes), and what such a voucher does on a type set to
-            // "Renumber Vouchers" is not measured. A blank number counts as
-            // none, and an amendment's vouchers that carry no number are
-            // checked like any other.
-            let numberless = payload
-                .vouchers
-                .iter()
-                .filter(|voucher| {
-                    voucher
-                        .voucher_number
-                        .as_deref()
-                        .is_none_or(|number| number.trim().is_empty())
-                })
-                .map(|voucher| voucher.voucher_type.as_str())
-                .collect::<Vec<_>>();
-            if !numberless.is_empty() {
-                let master_mark = mark
-                    .master_value
-                    .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
-                match self
-                    .admit_voucher_numbering(&identity, master_mark, numberless, &mut accumulated)
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(post::numbering::NumberingFailure::Read(failure)) => return Err(failure),
-                    Err(post::numbering::NumberingFailure::Refused(refusal)) => {
-                        let mut result = json!({
-                            "state":"refused", "reason":refusal.code(),
-                            "refused_types":refusal.refused_types(),
-                        });
-                        // The next step goes out only under a budget that
-                        // holds it: an answer over its budget is replaced
-                        // whole, and the reason and the refused types are
-                        // what the caller needs most. An amendment has its
-                        // own: its book check has not run yet.
-                        if self.settings.max_bytes
-                            >= post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET
-                        {
-                            result["next_step"] = json!(if payload.amends_batch_id.is_some() {
-                                post::numbering::BUILD_AMENDMENT_NEXT_STEP
-                            } else {
-                                post::numbering::BUILD_NEXT_STEP
-                            });
-                        }
-                        return Ok(ToolOutcome {
-                            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
-                            evidence: accumulated.clone(),
-                            company_guid: Some(payload.company_guid),
-                            truncated: false,
+            // Every voucher is admitted against its voucher type's voucher
+            // numbering, read after the mark above (bridge#724). One written
+            // without a number is numbered by its type, so that type must be
+            // numbered Automatic with existing numbers retained. A Journal
+            // that carries its own number is also written into a type
+            // numbered Manual, where Tally keeps the number; under Automatic
+            // numbering Tally discards it and assigns its own (protocol
+            // reference, voucher writes), so there it is held to the same
+            // reading as a voucher without one. A blank number counts as
+            // none, and an amendment's vouchers are checked like any other.
+            let vouchers = payload.vouchers.iter().map(|voucher| {
+                (
+                    voucher.voucher_type.as_str(),
+                    post::numbering::OwnNumber::of(voucher.voucher_number.as_deref()),
+                )
+            });
+            let master_mark = mark
+                .master_value
+                .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+            match self
+                .admit_voucher_numbering(&identity, master_mark, vouchers, &mut accumulated)
+                .await
+            {
+                Ok(_) => {}
+                Err(post::numbering::NumberingFailure::Read(failure)) => return Err(failure),
+                Err(post::numbering::NumberingFailure::Refused(refusal)) => {
+                    let mut result = json!({
+                        "state":"refused", "reason":refusal.code(),
+                        "refused_types":refusal.refused_types(),
+                    });
+                    // The next step goes out only under a budget that
+                    // holds it: an answer over its budget is replaced
+                    // whole, and the reason and the refused types are
+                    // what the caller needs most. An amendment has its
+                    // own: its book check has not run yet.
+                    if self.settings.max_bytes
+                        >= post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET
+                    {
+                        result["next_step"] = json!(if payload.amends_batch_id.is_some() {
+                            post::numbering::BUILD_AMENDMENT_NEXT_STEP
+                        } else {
+                            post::numbering::BUILD_NEXT_STEP
                         });
                     }
+                    return Ok(ToolOutcome {
+                        payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
+                        evidence: accumulated.clone(),
+                        company_guid: Some(payload.company_guid),
+                        truncated: false,
+                    });
                 }
             }
             let (_, _, _, repeated_catalogue_evidence) = self

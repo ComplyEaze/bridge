@@ -3,8 +3,9 @@
 //! queue makes before the POST.
 use super::location::LoadedCompanyMarks;
 use super::numbering::{
-    admit_numbering, NumberingRefusal, RefusalReason, BUILD_AMENDMENT_NEXT_STEP, BUILD_NEXT_STEP,
-    NUMBERING_NOT_AUTOMATIC, NUMBERING_NOT_RETAIN, POST_NEXT_STEP,
+    admit_numbering as admit_vouchers, NumberingAdmission, NumberingRefusal, OwnNumber,
+    RefusalReason, BUILD_AMENDMENT_NEXT_STEP, BUILD_NEXT_STEP, NUMBERING_NOT_AUTOMATIC,
+    NUMBERING_NOT_RETAIN, POST_NEXT_STEP,
 };
 use crate::tally::approved_import::ApprovedImportAdmissionError;
 use crate::tally::runtime::VoucherNumberingRead;
@@ -16,6 +17,20 @@ use serde_json::json;
 
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const NAME: &str = "WR2 Unicode Lab";
+
+/// The admission of vouchers that carry no number, as a post's are and as
+/// every test below that does not say otherwise means.
+fn admit_numbering<'a>(
+    read: VoucherNumberingRead,
+    voucher_types: impl IntoIterator<Item = &'a str>,
+) -> Result<NumberingAdmission, NumberingRefusal> {
+    admit_vouchers(
+        read,
+        voucher_types
+            .into_iter()
+            .map(|voucher_type| (voucher_type, OwnNumber::Absent)),
+    )
+}
 
 fn observed(method: SeriesNumberingMethod, duplicates: DuplicateSetting) -> VoucherTypeNumbering {
     VoucherTypeNumbering::Observed { method, duplicates }
@@ -437,6 +452,157 @@ fn the_captured_book_refuses_payment_and_receipt_and_admits_journal_and_contra()
     );
 }
 
+/// A voucher that carries its own number: admitted into a type read as Manual
+/// (Tally keeps the number) or as Automatic with `Auto Retain` (Tally discards
+/// it and assigns the next), under either duplicate setting, and refused for
+/// every other reading exactly as a voucher without one is, row for row.
+#[test]
+fn a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only() {
+    let automatic = |sub_method| SeriesNumberingMethod::Automatic(sub_method);
+    for duplicates in [DuplicateSetting::Prevented, DuplicateSetting::NotPrevented] {
+        for method in [
+            SeriesNumberingMethod::Manual,
+            automatic(NumberingSubMethod::AutoRetain),
+        ] {
+            let read = read_with_journal(observed(method.clone(), duplicates));
+            assert!(
+                admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok(),
+                "{method:?} {duplicates:?}"
+            );
+        }
+    }
+    let refusing = [
+        (
+            Some(observed(
+                automatic(NumberingSubMethod::AutoRenumber),
+                DuplicateSetting::NotPrevented,
+            )),
+            RefusalReason::NotRetain,
+        ),
+        (
+            Some(observed(
+                automatic(NumberingSubMethod::Absent),
+                DuplicateSetting::Prevented,
+            )),
+            RefusalReason::NotRetain,
+        ),
+        (
+            Some(observed(
+                automatic(NumberingSubMethod::Unrecognised("x".to_string())),
+                DuplicateSetting::NotPrevented,
+            )),
+            RefusalReason::NotRetain,
+        ),
+        (
+            Some(observed(
+                SeriesNumberingMethod::AutomaticManualOverride,
+                DuplicateSetting::NotPrevented,
+            )),
+            RefusalReason::NotAutomatic,
+        ),
+        (
+            Some(observed(
+                SeriesNumberingMethod::Unrecognised("Serial".to_string()),
+                DuplicateSetting::NotPrevented,
+            )),
+            RefusalReason::NotAutomatic,
+        ),
+        (
+            Some(VoucherTypeNumbering::SeriesCount(0)),
+            RefusalReason::NotAutomatic,
+        ),
+        (
+            Some(VoucherTypeNumbering::SeriesCount(2)),
+            RefusalReason::NotAutomatic,
+        ),
+        (
+            Some(VoucherTypeNumbering::FieldInvalid("series_method")),
+            RefusalReason::NotAutomatic,
+        ),
+        (None, RefusalReason::NotAutomatic),
+    ];
+    for (numbering, reason) in refusing {
+        let read = || {
+            VoucherNumberingRead::for_test(
+                GUID,
+                7,
+                numbering
+                    .clone()
+                    .map(|numbering| ("Journal".to_string(), numbering))
+                    .into_iter()
+                    .collect(),
+            )
+        };
+        let numbered = admit_vouchers(read(), [("Journal", OwnNumber::Carried)]).unwrap_err();
+        assert_eq!(numbered.0.len(), 1, "{numbering:?}");
+        assert_eq!(numbered.0[0].reason, reason, "{numbering:?}");
+        // The row is the one a voucher without a number gets: the same
+        // reading, said the same way.
+        let numberless = admit_numbering(read(), ["Journal"]).unwrap_err();
+        assert_eq!(numbered, numberless, "{numbering:?}");
+    }
+}
+
+/// The number is read from the voucher: a blank one is none.
+#[test]
+fn a_blank_voucher_number_is_no_number() {
+    for (given, own) in [
+        (None, OwnNumber::Absent),
+        (Some(""), OwnNumber::Absent),
+        (Some("  "), OwnNumber::Absent),
+        (Some("7"), OwnNumber::Carried),
+        (Some(" JV/1 "), OwnNumber::Carried),
+    ] {
+        assert_eq!(OwnNumber::of(given), own, "{given:?}");
+    }
+}
+
+/// One voucher type that a numbered and a numberless voucher both go into.
+/// Under Manual only the numberless one refuses, in either order, and the
+/// type is named once; where both refuse, it is still named once.
+#[test]
+fn a_type_holding_numbered_and_numberless_vouchers_is_named_once() {
+    let manual = || {
+        read_with_journal(observed(
+            SeriesNumberingMethod::Manual,
+            DuplicateSetting::Prevented,
+        ))
+    };
+    let expected = json!({"observation":"observed","method":"manual","duplicates":"prevented"});
+    for vouchers in [
+        [
+            ("Journal", OwnNumber::Carried),
+            ("Journal", OwnNumber::Absent),
+        ],
+        [
+            ("Journal", OwnNumber::Absent),
+            ("Journal", OwnNumber::Carried),
+        ],
+    ] {
+        let refusal = admit_vouchers(manual(), vouchers).unwrap_err();
+        assert_eq!(
+            rows(&refusal),
+            [("Journal", RefusalReason::NotAutomatic, &expected)]
+        );
+        assert_eq!(refusal.code(), NUMBERING_NOT_AUTOMATIC);
+    }
+    let renumber = read_with_journal(observed(
+        SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRenumber),
+        DuplicateSetting::NotPrevented,
+    ));
+    let refusal = admit_vouchers(
+        renumber,
+        [
+            ("Journal", OwnNumber::Carried),
+            ("Journal", OwnNumber::Absent),
+            ("JOURNAL", OwnNumber::Carried),
+        ],
+    )
+    .unwrap_err();
+    assert_eq!(refusal.0.len(), 1);
+    assert_eq!(refusal.code(), NUMBERING_NOT_RETAIN);
+}
+
 /// What a person is shown where only the message is shown: each refused
 /// voucher type by name with what was read of it, every reading in its own
 /// words, and never Tally's own text for a reading that was not recognised;
@@ -569,12 +735,18 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
     }
     // An amendment is refused before its book check: its step claims nothing
     // of the book and sends the caller to verify_import.
+    // A build's vouchers may carry a number: neither build step says they
+    // have none, and both say where one that does is written.
+    for build in [BUILD_NEXT_STEP, BUILD_AMENDMENT_NEXT_STEP] {
+        assert!(!build.contains("without a voucher number"), "{build}");
+        assert!(build.contains("is also written into one read as Manual"));
+    }
     assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Ask the user to enter"));
     for stated in [
         "was not checked before this refusal",
         "Call verify_import",
         "is never entered again",
-        "that carry no number",
+        "carries no number",
     ] {
         assert!(BUILD_AMENDMENT_NEXT_STEP.contains(stated), "{stated}");
     }

@@ -107,7 +107,9 @@ capability from assumption, and a completed request from a verified snapshot.
   the masked number as printed, so the same statement gives the same ids whatever label digits
   were typed. IMPS, `MBK`,
   `EBANK`, interest, disbursement, `BY <name>`, cheque-clearing rows and every other wording
-  go to suspense. Not measured: other account types and branches, a statement printed
+  go to suspense. Such a row names no party, so no mapping row can match it and the mapping can neither book it
+  as a Contra nor skip it: its proposal is a Payment or Receipt on the suspense ledger, also when it
+  is a transfer between the firm's own accounts. Not measured: other account types and branches, a statement printed
   oldest first (refused as `rows_not_newest_first` when the dates show it; a statement whose
   rows all share one date is caught by the balance replay instead), other wordings, and statements fetched another
   way.

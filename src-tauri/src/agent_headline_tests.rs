@@ -756,6 +756,33 @@ fn one_voucher_that_reads_back_beside_an_unconfirmed_batch_is_not_called_confirm
     );
 }
 
+/// A batch of one voucher that is not confirmed has its own sentence, whether
+/// or not its row carries a next step, and its typed counts say the same.
+#[test]
+fn one_voucher_that_is_not_confirmed_has_its_own_sentence_and_counts() {
+    // One status that carries a next step and one that does not.
+    for status in ["sent_not_attributed", "posted_divergent"] {
+        let batch = outcome(&[status], BatchVerdict::PostedVerified);
+        assert_eq!(
+            batch.headline().lead,
+            "The voucher of this batch is not confirmed in Tally: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
+            "{status}"
+        );
+        let value = serde_json::to_value(&batch).unwrap();
+        assert_eq!(value["vouchers"], 1, "{status}");
+        assert_eq!(value["confirmed"], 0, "{status}");
+        assert_eq!(value["verdict"], "verification_incomplete", "{status}");
+        assert_eq!(value["not_confirmed"][status], 1, "{status}");
+        let total = value["not_confirmed"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|count| count.as_u64().unwrap())
+            .sum::<u64>();
+        assert_eq!(total, 1, "{status}");
+    }
+}
+
 /// Each status other than `posted_verified` is counted in its own field, and
 /// no field takes another's voucher.
 #[test]

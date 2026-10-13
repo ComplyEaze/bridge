@@ -2619,8 +2619,9 @@ another shape (below); the other read tools and the refusals follow.
 `post_import` (after a send was read back) and every page of `verify_import` carry a headline that
 says how the batch ended, counted voucher by voucher from the verification's own rows, never from
 tool arguments and never stored in the proof (a later page recomputes the same one from the saved
-proof). The lead says how many of the batch's vouchers are confirmed (`posted_verified`) and how many
-are not; `batch` holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
+proof). The lead says whether the batch is confirmed: for a batch of one voucher it is a sentence about
+that voucher, and for a batch of several vouchers it gives their number and, when some are not
+confirmed, how many are confirmed (`posted_verified`) and how many are not. The counts are always in `batch`, which holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
 and `unrecognised` for any status this build does not know) and `verdict` (`posted_verified` only when
 every voucher is confirmed and the readback as a whole is). When every voucher reads back but the
 batch as a whole is not confirmed (a duplicate, a doubt about the ledgers or the voucher mark, or an

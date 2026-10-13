@@ -292,16 +292,10 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
 #[test]
 fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
     const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
-    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
-    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
     let requests: Vec<(&str, String)> = vec![
         (
             "tally::tdl_engine::ledgers_request",
             crate::tally::tdl_engine::ledgers_request(NAME),
-        ),
-        (
-            "tally::tdl_engine::ledger_period_balances_request",
-            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
         ),
         (
             "agent_read_profiles::render_agent_vouchers",
@@ -770,7 +764,9 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // returns only three settings, a currency symbol and the company's own name;
     // `gst_status` returns only voucher numbers, dates, the voucher type's name
     // and ids, and no party or ledger name; `statement_tie_out` returns two
-    // dates, three signed gaps and fixed sentences, and never a ledger name.
+    // dates, three signed gaps and fixed sentences, and never a ledger name;
+    // `voucher_read_cost` returns only a voucher mark, counts, seconds and
+    // constant text, and the company's own name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
@@ -779,6 +775,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "gst_status",
         "local_data_report",
         "statement_tie_out",
+        "voucher_read_cost",
     ];
     // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
     // is set as it is built, and another test changes that variable, so the

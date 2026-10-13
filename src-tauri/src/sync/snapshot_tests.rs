@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+use crate::sync::reconciliation::ReconciliationMismatch;
+use bridge_tally_core::report_tie_out::scoped_mismatch_record_alias;
 use bridge_tally_core::{
     CanonicalPackWindow, CapabilityEvidence, CapabilityProfile, CoreAccountingBatch,
     EvidenceConfidence, GroupRecord, ObservedSourceIdentities, PackBatch, ProbeResult,
@@ -15,8 +17,8 @@ use tally_protocol_simulator::{
 };
 
 use crate::db::tally_mirror::{
-    CapabilityItemInput, CapabilityKind, CapabilitySnapshotInput, CompanyInput, Confidence,
-    RunOutcome, SourceIdentityInput, VerificationState,
+    CapabilityItemInput, CapabilityKind, CapabilitySnapshotInput, Confidence, ReviewedSetupInput,
+    ReviewedSetupRef, RunOutcome, SourceIdentityInput, VerificationState,
 };
 use crate::tally::{
     company_source_identity, connector::simulator_test_lock, RuntimeTallyConnector, TallyConfig,
@@ -61,10 +63,6 @@ struct FakeConnector {
 struct RuntimeCancelledStabilityConnector {
     inner: FakeConnector,
     request_count: Mutex<usize>,
-}
-
-struct RuntimeCancelledReportConnector {
-    inner: FakeConnector,
 }
 
 struct RuntimeCancelledEndProbeConnector {
@@ -423,110 +421,6 @@ impl TallyConnector for ReportConnector {
     ) -> Result<CanonicalPackWindow, TallyError> {
         self.inner.read_pack_window(context).await
     }
-
-    async fn read_core_period_balance_report(
-        &self,
-        context: &RequestContext,
-    ) -> Result<bridge_tally_core::report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Ok(
-            bridge_tally_core::report_tie_out::LedgerPeriodBalanceReport {
-                source_identity: context.company.identity.clone(),
-                window: context.window.clone(),
-                ordinary_books_scope_observed: true,
-                source_reported_count: 0,
-                balances: Vec::new(),
-            },
-        )
-    }
-}
-
-/// A connector whose period report is refused in Education before sending.
-struct EducationReportConnector {
-    inner: FakeConnector,
-}
-
-#[async_trait]
-impl TallyConnector for EducationReportConnector {
-    async fn probe(&self) -> Result<ProbeResult, TallyError> {
-        self.inner.probe().await
-    }
-
-    async fn probe_fresh(&self) -> Result<ProbeResult, TallyError> {
-        self.inner.probe_fresh().await
-    }
-
-    async fn discover_companies(&self) -> Result<Vec<CompanyRef>, TallyError> {
-        self.inner.discover_companies().await
-    }
-
-    async fn read_pack_window(
-        &self,
-        context: &RequestContext,
-    ) -> Result<CanonicalPackWindow, TallyError> {
-        self.inner.read_pack_window(context).await
-    }
-
-    async fn read_core_period_balance_report(
-        &self,
-        _context: &RequestContext,
-    ) -> Result<bridge_tally_core::report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Err(TallyError::Unsupported {
-            code: "education_report_family_unsupported".to_string(),
-        })
-    }
-}
-
-/// Refuses the first period report in Education, then returns one.
-struct EducationThenReportConnector {
-    inner: FakeConnector,
-    reports: Mutex<usize>,
-}
-
-#[async_trait]
-impl TallyConnector for EducationThenReportConnector {
-    async fn probe(&self) -> Result<ProbeResult, TallyError> {
-        self.inner.probe().await
-    }
-
-    async fn probe_fresh(&self) -> Result<ProbeResult, TallyError> {
-        self.inner.probe_fresh().await
-    }
-
-    async fn discover_companies(&self) -> Result<Vec<CompanyRef>, TallyError> {
-        self.inner.discover_companies().await
-    }
-
-    async fn read_pack_window(
-        &self,
-        context: &RequestContext,
-    ) -> Result<CanonicalPackWindow, TallyError> {
-        self.inner.read_pack_window(context).await
-    }
-
-    async fn read_core_period_balance_report(
-        &self,
-        context: &RequestContext,
-    ) -> Result<bridge_tally_core::report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        let first = {
-            let mut reports = self.reports.lock().unwrap();
-            *reports += 1;
-            *reports == 1
-        };
-        if first {
-            return Err(TallyError::Unsupported {
-                code: "education_report_family_unsupported".to_string(),
-            });
-        }
-        Ok(
-            bridge_tally_core::report_tie_out::LedgerPeriodBalanceReport {
-                source_identity: context.company.identity.clone(),
-                window: context.window.clone(),
-                ordinary_books_scope_observed: true,
-                source_reported_count: 0,
-                balances: Vec::new(),
-            },
-        )
-    }
 }
 
 fn core_groups(count: usize) -> CanonicalPackWindow {
@@ -615,35 +509,6 @@ impl TallyConnector for RuntimeCancelledStabilityConnector {
 }
 
 #[async_trait]
-impl TallyConnector for RuntimeCancelledReportConnector {
-    async fn probe(&self) -> Result<ProbeResult, TallyError> {
-        self.inner.probe().await
-    }
-
-    async fn probe_fresh(&self) -> Result<ProbeResult, TallyError> {
-        self.inner.probe_fresh().await
-    }
-
-    async fn discover_companies(&self) -> Result<Vec<CompanyRef>, TallyError> {
-        self.inner.discover_companies().await
-    }
-
-    async fn read_pack_window(
-        &self,
-        context: &RequestContext,
-    ) -> Result<CanonicalPackWindow, TallyError> {
-        self.inner.read_pack_window(context).await
-    }
-
-    async fn read_core_period_balance_report(
-        &self,
-        _context: &RequestContext,
-    ) -> Result<bridge_tally_core::report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Err(TallyError::Cancelled)
-    }
-}
-
-#[async_trait]
 impl TallyConnector for RuntimeCancelledEndProbeConnector {
     async fn probe(&self) -> Result<ProbeResult, TallyError> {
         self.inner.probe().await
@@ -717,40 +582,43 @@ pub(crate) async fn setup() -> (
         SqliteSnapshotStateStore::for_worker(pool.clone(), "synthetic-test-worker".to_string())
             .unwrap();
     store.migrate().await.unwrap();
-    let capability = mirror
-        .save_capability_snapshot(CapabilitySnapshotInput {
-            canonical_origin: "http://127.0.0.1:9000".to_string(),
-            observed_at_unix_ms: 1_000,
-            profile_version: 1,
-            product: "TallyPrime".to_string(),
-            release: None,
-            license_tier: None,
-            mode: Some("Education".to_string()),
-            mode_confidence: Confidence::Observed,
-            items: vec![CapabilityItemInput {
-                kind: CapabilityKind::Pack,
-                key: "core_accounting".to_string(),
-                state: crate::db::tally_mirror::CapabilityState::Supported,
-                confidence: Confidence::Observed,
-                safe_reason_code: None,
-            }],
-        })
-        .await
-        .unwrap();
     let company_identity = SourceIdentity {
         bridge_source_lineage: "lineage".to_string(),
         company_guid: "e2b8c4f6-17a3-4d90-85c1-a6f3d0b9724e".to_string(),
         observed_fingerprint: "fingerprint".to_string(),
     };
-    let company = mirror
-        .upsert_company(CompanyInput {
-            endpoint_id: capability.endpoint_id.clone(),
-            display_name: "Synthetic Company".to_string(),
-            identity: SourceIdentityInput {
+    let ReviewedSetupRef {
+        snapshot: capability,
+        company,
+    } = mirror
+        .save_reviewed_setup(ReviewedSetupInput {
+            review_commitment_sha256: "5eed".repeat(16),
+            capability: CapabilitySnapshotInput {
+                canonical_origin: "http://127.0.0.1:9000".to_string(),
+                observed_at_unix_ms: 1_000,
+                profile_version: 1,
+                product: "TallyPrime".to_string(),
+                release: None,
+                license_tier: None,
+                mode: Some("Education".to_string()),
+                mode_confidence: Confidence::Observed,
+                items: vec![CapabilityItemInput {
+                    kind: CapabilityKind::Pack,
+                    key: "core_accounting".to_string(),
+                    state: crate::db::tally_mirror::CapabilityState::Supported,
+                    confidence: Confidence::Observed,
+                    safe_reason_code: None,
+                }],
+            },
+            company_display_name: "Synthetic Company".to_string(),
+            company_identity: SourceIdentityInput {
                 guid: Some(company_identity.company_guid.clone()),
+                confidence: Some(Confidence::Observed),
                 ..SourceIdentityInput::default()
             },
-            observed_at_unix_ms: 1_000,
+            company_number: "100001".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+            selected_read_scope: None,
         })
         .await
         .unwrap();
@@ -3448,10 +3316,10 @@ async fn runtime_cancellation_during_source_stability_is_terminal() {
 }
 
 #[tokio::test]
-async fn runtime_cancellation_during_period_report_survives_commit_pending_resume() {
+async fn runtime_cancellation_survives_commit_pending_resume() {
     let (_, mirror, store, plan) = setup().await;
     let cancellation = AtomicCancellation::default();
-    let connector = RuntimeCancelledReportConnector {
+    let connector = RuntimeCancelledEndProbeConnector {
         inner: FakeConnector {
             batch: Mutex::new(VecDeque::new()),
             company: plan.company.clone(),
@@ -3486,10 +3354,6 @@ async fn runtime_cancellation_during_period_report_survives_commit_pending_resum
         .await
         .expect("cancelled proof resumes without another source request");
     assert_eq!(result.state.progress.phase, SnapshotPhase::Cancelled);
-    assert!(!result
-        .state
-        .gap_codes
-        .contains("report_tie_out_unavailable"));
     assert!(result.state.gap_codes.contains("run_cancelled"));
     assert!(!result.receipt.checkpoint_advanced);
     assert_eq!(
@@ -3504,7 +3368,10 @@ async fn runtime_cancellation_during_period_report_survives_commit_pending_resum
         .await
         .unwrap();
     assert_eq!(receipt.facts.outcome, RunOutcome::Cancelled);
-    assert_eq!(receipt.facts.gap_codes, vec!["run_cancelled"]);
+    assert_eq!(
+        receipt.facts.gap_codes,
+        vec!["report_tie_out_unavailable", "run_cancelled"]
+    );
 }
 
 #[tokio::test]
@@ -3982,83 +3849,4 @@ async fn durable_store_rejects_corruption_and_plan_drift() {
         store.load(&plan.resume_key).await,
         Err(SnapshotError::CorruptState)
     ));
-}
-
-/// A period report refused before sending in Education (bridge#45) leaves the
-/// tie-out unavailable and says why; any other unsupported report does not.
-#[tokio::test]
-async fn an_education_refused_period_report_is_named_in_the_gaps() {
-    for education in [true, false] {
-        let (_, mirror, store, plan) = setup().await;
-        let fake = FakeConnector {
-            batch: Mutex::new(VecDeque::new()),
-            company: plan.company.clone(),
-            requests: Mutex::new(Vec::new()),
-        };
-        let result = if education {
-            FullSnapshotEngine::new(&mirror, &store, &EducationReportConnector { inner: fake })
-                .run(&plan, &AtomicCancellation::default())
-                .await
-        } else {
-            FullSnapshotEngine::new(&mirror, &store, &fake)
-                .run(&plan, &AtomicCancellation::default())
-                .await
-        }
-        .expect("the run completes without the tie-out");
-        assert!(
-            result
-                .state
-                .gap_codes
-                .contains("report_tie_out_unavailable"),
-            "{education}"
-        );
-        assert_eq!(
-            result
-                .state
-                .gap_codes
-                .contains("education_report_family_unsupported"),
-            education
-        );
-        assert_eq!(
-            result
-                .proof
-                .gaps
-                .iter()
-                .any(|gap| gap.safe_reason_code == "education_report_family_unsupported"),
-            education
-        );
-    }
-}
-
-/// A later window's report that succeeds clears the Education refusal code, as
-/// it clears the other tie-out codes: the code would otherwise outlive the
-/// state it explained. The refused window's missing evidence is still reported
-/// as `report_tie_out_unavailable` by the reconciliation.
-#[tokio::test]
-async fn a_later_report_clears_the_education_refusal_code() {
-    let (_, mirror, store, plan) = setup().await;
-    let connector = EducationThenReportConnector {
-        inner: FakeConnector {
-            batch: Mutex::new(VecDeque::from([Err(TallyError::ReadResponseTooLarge {
-                scope: ReadResponseScope::VoucherWindow,
-            })])),
-            company: plan.company.clone(),
-            requests: Mutex::new(Vec::new()),
-        },
-        reports: Mutex::new(0),
-    };
-    let result = FullSnapshotEngine::new(&mirror, &store, &connector)
-        .run(&plan, &AtomicCancellation::default())
-        .await
-        .expect("the split run completes");
-    assert_eq!(*connector.reports.lock().unwrap(), 2, "one report per leaf");
-    assert!(!result
-        .state
-        .gap_codes
-        .contains("education_report_family_unsupported"));
-    assert!(result
-        .proof
-        .gaps
-        .iter()
-        .any(|gap| gap.safe_reason_code == "report_tie_out_unavailable"));
 }

@@ -46,11 +46,20 @@ These changes are in source and not yet in a published build.
 - `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says whether the bank ledger in
   Tally stands where the statement says it stood at the start and at the end of the statement's dates, as three
   gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
-  after one made by hand. It covers whole statements only, names no cause and writes nothing. It returns the two
-  dates and the gaps, not the balances, though a gap plus the statement balance you supplied gives the book's. The
-  parse's proposals file now also records the statement's first and last dates (part of #1211). It is not yet
-  proved against a live book: one run on two synthetic companies by an outside contributor is only partly recorded (see
-  the pull request).
+  after one made by hand. It covers a whole statement, or whole calendar months of it, names no cause and writes
+  nothing. It returns the two dates and the gaps, not the balances, though a gap plus the statement's balance at
+  that date (for a whole statement, the balance you supplied) gives the book's. The parse's proposals file now also
+  records the statement's first and last dates (part of #1211). It is not yet proved against a live book: one run
+  on two synthetic companies by an outside contributor is only partly recorded (see the pull request).
+- `statement_tie_out` can check whole calendar months of a longer statement: a file parsed with `from` and `to` (or
+  one of them) from the 1st of a month to the last day of a month, within the statement's rows, is compared with the
+  book at those dates, against the statement's balance there as worked out from its own rows. Any other narrowed
+  window is `not_established` (`window_not_whole_calendar_months`, `window_beyond_statement_rows`). With the book's
+  figures, the gaps then give the statement's balance at those month ends and its net over those months: never a
+  part of a month except the part-months at the statement's own start and end (whose net a month-end balance gives
+  together with the opening and closing supplied to the parse), though a month in which every other row's amount is already known (one row alone, or one row
+  beside open cash lines, whose amounts the parse returns) gives that row's amount (part of #1211). No month window
+  has been run against a live book.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
@@ -69,6 +78,16 @@ These changes are in source and not yet in a published build.
   settings are the ones Tally holds today, not what the books contain or what they were during a year. The
   currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
   a setting changed inside a sitting, Education mode and other releases are not measured.
+
+- `voucher_read_cost` says, before a call, the most census reads one call of `vouchers`, `ledger_movement` or
+  `verify_import` will send on a company (a read can be refused before its census ends), and the least time a call
+  that is not refused earlier spends on the gaps between them (part of #1465, after #1239). It reads the company's
+  identity and then its marks (the opening every windowed call makes) and sends no census and no voucher request. The census follows the book's voucher mark, not the window, so the figure is for
+  one call: a narrower window does not lower it, and N calls pay it N times. The count and the floor are derived
+  from the mark and the read's own rules, not measured on the book, and they leave out the data parts and the
+  wider re-read an empty window gets in `vouchers` and `ledger_movement`; no estimate is made. Beside them are the
+  whole calls the protocol reference records, with their census reads and data parts (one book, about 250,000
+  vouchers, 31 census reads), as data marked as not a bound. Nothing is refused on it. Not measured: Windows hosts, and any book other than that one.
 
 - `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
   two real statements, held privately, and the profile follows what was seen there:

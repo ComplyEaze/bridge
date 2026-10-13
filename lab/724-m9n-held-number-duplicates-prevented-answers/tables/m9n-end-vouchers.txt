@@ -1,0 +1,4 @@
+﻿# 3 VOUCHER rows; DATE, VOUCHERTYPENAME, VOUCHERNUMBER (text in quotes, BLANK, ABSENT or SPACES), MASTERID, ALTERID, GUID, NUMBERINGSTYLE, VOUCHERRETAINKEY, ISOPTIONAL, ISCANCELLED || LEDGERNAME, AMOUNT, ISDEEMEDPOSITIVE per entry (narration: not read)
+20260701, Receipt, "1", M1, A1, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000001, style Auto Retain, retainkey 1, optional No, cancelled No || Lab Seed Income, 1.00, No || Cash, -1.00, Yes
+20260715, Payment, "1", M2, A2, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000002, style Manual, retainkey 1, optional No, cancelled No || Lab Charges, -10.00, Yes || Lab Bank, 10.00, No
+20260715, Journal, "1", M3, A3, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000003, style Manual, retainkey 1, optional No, cancelled No || Lab Charges, -10.00, Yes || Suspense, 10.00, No

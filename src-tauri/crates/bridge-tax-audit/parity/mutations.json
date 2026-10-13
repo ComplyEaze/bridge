@@ -14102,5 +14102,37 @@
   "file": "src/high_value_register.rs",
   "from": "            row.names.note(v, [mode_set, other_money]);\n",
   "to": ""
+ },
+ {
+  "id": "H8-01",
+  "by": "author",
+  "what": "the shared tag is seven hex digits",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..7].to_string()\n"
+ },
+ {
+  "id": "H8-02",
+  "by": "author",
+  "what": "the shared tag is upper-case hex",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_uppercase()\n"
+ },
+ {
+  "id": "H8-03",
+  "by": "author",
+  "what": "the shared tag hashes the text lower-cased",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.to_lowercase().as_bytes()))[..8].to_string()\n"
+ },
+ {
+  "id": "H8-04",
+  "by": "author",
+  "what": "the shared tag hashes the text with a suffix",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest([text, \"x\"].concat().as_bytes()))[..8].to_string()\n"
  }
 ]

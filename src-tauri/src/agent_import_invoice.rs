@@ -33,8 +33,8 @@ pub(in crate::agent) use wire::{
 #[serde(deny_unknown_fields)]
 pub(super) struct InvoiceDetail {
     /// The voucher type the invoice is filed under, by its display name in
-    /// this book. A book can hold several types of one class (a client
-    /// sample book on the lab has Sales and Sales Acc), so Bridge never picks one: the
+    /// this book. A book can hold several types of one class (a Sales type
+    /// and another Sales-class type, for one), so Bridge never picks one: the
     /// caller names it and the build checks the name against Tally.
     pub(super) voucher_type_name: String,
     /// The state the supply is made in, as Tally names it.
@@ -328,7 +328,8 @@ fn paise(amount: &str) -> Option<i128> {
 /// The largest company master mark (an upper bound on its ledgers) a v0
 /// invoice is built or posted on. Each invoice reads the whole compliance
 /// listing three times; above this the read is refused rather than risk a
-/// large book's gateway. A small firm's sample book on the lab sits near 1,600.
+/// large book's gateway. The bound is provisional: no read of a book near it
+/// has been measured.
 const INVOICE_MAX_MASTER_MARK: u64 = 5_000;
 
 /// The largest voucher mark (an upper bound on the book's vouchers) a v0

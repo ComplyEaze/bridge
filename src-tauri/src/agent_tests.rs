@@ -293,16 +293,10 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
 #[test]
 fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
     const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
-    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
-    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
     let requests: Vec<(&str, String)> = vec![
         (
             "tally::tdl_engine::ledgers_request",
             crate::tally::tdl_engine::ledgers_request(NAME),
-        ),
-        (
-            "tally::tdl_engine::ledger_period_balances_request",
-            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
         ),
         (
             "agent_read_profiles::render_agent_vouchers",

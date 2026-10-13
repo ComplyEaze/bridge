@@ -199,7 +199,9 @@ def main(argv):
         code, msg = 3, f"{argv[1] if len(argv) > 1 else '?'}: {e}"
     except BaseException as e:                       # any other failure is "could not check", never a pass or a finding
         code, msg = 2, f"{argv[1] if len(argv) > 1 else '?'}: could not run the check ({type(e).__name__}: {e})"
-    print(f"{['PASS', 'FINDING', 'CHECK-ERROR', 'STOP'][code]} {msg}")
+    # ASCII only: the lab console is not UTF-8, and a name such as the rupee sign must not stop the check at its print
+    line = f"{['PASS', 'FINDING', 'CHECK-ERROR', 'STOP'][code]} {msg}".encode("ascii", "backslashreplace").decode("ascii")
+    print(line)
     return code
 
 if __name__ == "__main__":

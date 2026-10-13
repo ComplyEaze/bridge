@@ -23,6 +23,9 @@ shapes measured on two real statements (no value from either).
 | `print-to-pdf-vector-glyphs.pdf` | 21,643 | `08a3722a9e27975eb8547e0d11973f760fab7a2993554ccf8392923f7e54ade9` |
 | `scan-with-visible-stamp.pdf` | 1,256 | `ae4bc131732ad8808db287097ddaf363bbc1add12ba510e51f2413a66cbf5008` |
 | `hdfc-logo-and-watermark.pdf` | 3,260 | `d82ea459eb763263af46482c5adea1250e08866ba63778d08680e59f054332c3` |
+| `scan-with-ocr-layer.pdf` | 3,215 | `81b892826964fd74d870feea3985054907e6b576b27dd04252ee3bf9dc8f575d` |
+| `scan-ocr-with-stamp.pdf` | 3,287 | `6f9dffb1a90035686658e35dc4860d6331498302be73cbdbe2db3786b9f73465` |
+| `hdfc-hidden-cells.pdf` | 4,895 | `c75f7e2aafd3b9ad73a11b6e03e7948eb53a95a59d0fb6a6e8f5c0d36f8f711c` |
 
 - `hdfc-synthetic.pdf` — three pages, user password `synthetic-user-4321`. A
   12-digit UPI reference and an ACH reference broken mid-token at the 240pt
@@ -74,8 +77,23 @@ shapes measured on two real statements (no value from either).
   image as a logo and a light rotated rectangle as a watermark.
   `pdftotext -bbox` reports 72 words, as for page 1 of `hdfc-synthetic.pdf`
   (measured 2026-10-07).
+- `scan-with-ocr-layer.pdf` — the same image under the HDFC page 1 lines as
+  real text in render mode 3 (`3 Tr`), which draws nothing: the shape of the
+  OCR layer a scanner app lays under its page image.
+- `scan-ocr-with-stamp.pdf` — the same, with one line of drawn text over it,
+  "SCANNED 12/08/2026 PAGE 1 OF 1": a scanner app's stamp that prints a date
+  and a page number.
+- `hdfc-hidden-cells.pdf` — `hdfc-synthetic.pdf` with two cells in render mode 3
+  on the 02/08/26 row, one in the narration column and one in the empty deposit
+  column, written in the middle of page 1's text block, which then sets the mode
+  back to 0.
 
-**Limits.** None of these four was made by a scanner or a printer driver: they
+PDFium's render mode for every character of these three, read with the PDFium
+the tests bind (2026-10-12): the two scans carry 658 hidden characters each and
+the stamp's 30 drawn ones; `hdfc-hidden-cells.pdf` carries 17 hidden and the
+same 1,079 drawn characters as `hdfc-synthetic.pdf`.
+
+**Limits.** None of these seven was made by a scanner or a printer driver: they
 are shaped like what those tools write, not captured from them.
 
 Encryption is RC4 128-bit (standard security handler revision 3);

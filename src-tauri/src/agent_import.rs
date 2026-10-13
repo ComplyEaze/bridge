@@ -79,6 +79,7 @@ use verification::{
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch_as, voucher_diffs,
     voucher_is_accounting_effective, Attribution, DeltaBasis, InvoiceIdentity, VerificationStatus,
+    WrittenNarration,
 };
 #[cfg(test)]
 use verification::{
@@ -1737,27 +1738,41 @@ impl Server {
                 // Tally created none of its vouchers and none is found (for a
                 // batch, with the voucher mark measured unmoved), say so
                 // (bridge#1108); otherwise an edit in Tally is as likely. Only
-                // the post's own readback reads that answer: by a later
-                // verification someone may have entered a voucher by hand and
-                // edited it.
-                let counters = current_dispatch
-                    .then(|| {
-                        dispatch_response
-                            .as_ref()
-                            .and_then(|response| response.outcome.as_ref())
-                            .map(|outcome| outcome.counters())
-                    })
-                    .flatten();
-                let voucher_step =
-                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
-                match verification::unmatched_cause(
-                    counters,
-                    line.vouchers.len(),
-                    verification::unmatched_count(&result),
-                    voucher_step,
-                ) {
+                // the post's own readback reads a voucher as not created: by
+                // a later verification someone may have entered it by hand
+                // and edited it, so a later one keeps `sent_not_attributed`
+                // and only says, in the voucher's next step, what that answer
+                // reported when the voucher was sent.
+                let answer = dispatch_response
+                    .as_ref()
+                    .and_then(|response| response.outcome.as_ref())
+                    .map(|outcome| outcome.counters());
+                let cause = if current_dispatch {
+                    verification::unmatched_cause(
+                        answer,
+                        line.vouchers.len(),
+                        verification::unmatched_count(&result),
+                        verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark),
+                    )
+                } else {
+                    // The post's own verdict on its voucher step, for a batch.
+                    // Read only where it decides, and never a way for this
+                    // check to fail: no record reads as not matched.
+                    let step_matched = answer.is_some()
+                        && line.vouchers.len() > 1
+                        && self
+                            .imports_dir()
+                            .ok()
+                            .and_then(|imports| read_masters_check(&imports, &line.batch_id))
+                            .is_some_and(|check| check["batch_step"]["state"] == "matched");
+                    verification::later_unmatched_cause(answer, line.vouchers.len(), step_matched)
+                };
+                match cause {
                     verification::UnmatchedCause::ReportedNotCreated => {
                         verification::mark_reported_not_created(&mut result)
+                    }
+                    verification::UnmatchedCause::ReportedNotCreatedWhenSent => {
+                        verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
                         verification::mark_sent_not_attributed(&mut result)
@@ -2686,6 +2701,36 @@ impl Server {
         }
     }
 
+    /// Whether the import journal already holds a batch of this company, sent
+    /// or found posted, with a row of `vouchers` (a statement file's vouchers,
+    /// in the shape a build takes). The same check a build makes before it
+    /// writes an import file.
+    pub(super) fn import_journal_holds_rows_of(
+        &self,
+        company_guid: &str,
+        vouchers: &Value,
+    ) -> Result<bool, String> {
+        // A statement file's vouchers carry the caller's date text, as a build
+        // receives them; each is parsed the way a build parses it.
+        let vouchers: Vec<ImportVoucher<String>> = serde_json::from_value(vouchers.clone())
+            .map_err(|_| "proposals_file_invalid".to_string())?;
+        let vouchers = vouchers
+            .into_iter()
+            .map(|voucher| {
+                let date = normalized_date(&voucher.date)
+                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                Ok(voucher.dated(date))
+            })
+            .collect::<Result<Vec<ImportVoucher>, String>>()?;
+        let _admission_lock = self.lock_import_admission_shared()?;
+        Ok(self
+            .import_vouchers_already_posted_while_admitted(
+                &canonical_batch_guid(company_guid),
+                &vouchers,
+            )?
+            .is_some())
+    }
+
     fn latest_import_snapshot(
         &self,
         batch_id: &str,
@@ -3306,10 +3351,11 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
             }
         }
         if let Some(number) = voucher.voucher_number.as_deref() {
-            // Unlike narration/reference, `voucher_diffs` compares the
-            // voucher number verbatim, so a value that would read back
-            // rewritten must be refused here — verification could never
-            // confirm it as posted.
+            // Unlike the reference, `voucher_diffs` compares the voucher
+            // number verbatim (and the narration, which
+            // `refuse_rewritten_narration` guards), so a value that would
+            // read back rewritten must be refused here — verification could
+            // never confirm it as posted.
             if number.is_empty()
                 || number.chars().count() > MAX_TEXT_CHARS
                 || number.chars().any(char::is_control)
@@ -3680,9 +3726,9 @@ fn cash_bank_refusals(
 /// Call this only on a field something compares as text: a ledger name
 /// (checked in `validate_payload`'s entry loop) and the voucher number
 /// (checked above), which `voucher_diffs` (agent_import_verification.rs)
-/// compares, and the narration, which a native post's span binding compares
-/// byte for byte (`agent_import_span_identity.rs`) and the build and a native
-/// post refuse (`refuse_rewritten_narration`). The reference is never
+/// compares, and the narration, which a native post's span binding and the
+/// read-back compare byte for byte (`narration_differs`, #1608) and the build
+/// and a native post refuse (`refuse_rewritten_narration`). The reference is never
 /// compared, so refusing it would refuse a value nothing downstream would
 /// ever notice as changed, and `validate_payload` does not.
 ///

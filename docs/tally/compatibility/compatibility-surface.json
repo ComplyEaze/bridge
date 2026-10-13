@@ -203,9 +203,6 @@
       "path": "src-tauri/crates/bridge-tally-core/src/report_tie_out.rs"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-core/src/transport_qualification.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-primitives/Cargo.toml"
     },
     {
@@ -380,9 +377,6 @@
       "path": "src-tauri/crates/tally-protocol-simulator/README.md"
     },
     {
-      "path": "src-tauri/crates/tally-protocol-simulator/fixtures/inconsistent_date_filter.xml"
-    },
-    {
       "path": "src-tauri/crates/tally-protocol-simulator/src/fixtures.rs"
     },
     {
@@ -509,6 +503,10 @@
       "path": "src-tauri/src/agent_protocol.rs"
     },
     {
+      "path": "src-tauri/src/agent_read_cost_preview.rs",
+      "reason": "The voucher_read_cost tool: states before a call the most census reads it will send and the least time a call not refused earlier spends on the gaps between them, from the voucher mark. A defect states a floor as an estimate, a refused read as a cost, or an unreadable mark as zero."
+    },
+    {
       "path": "src-tauri/src/agent_read_profiles.rs"
     },
     {
@@ -527,6 +525,10 @@
     },
     {
       "path": "src-tauri/src/agent_responses.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_statement_tie_out.rs",
+      "reason": "decides what the statement tie-out reads from Tally and returns to the assistant: the three ledger reads, the gaps computed from a bank statement's own balances, and the not-established states that keep it from claiming a tie it did not observe"
     },
     {
       "path": "src-tauri/src/agent_statements.rs"
@@ -654,9 +656,6 @@
     },
     {
       "path": "src-tauri/src/db/tally_mirror.rs"
-    },
-    {
-      "path": "src-tauri/src/db/tally_write_store.rs"
     },
     {
       "path": "src-tauri/src/endpoint_coordination.rs"
@@ -809,9 +808,6 @@
     },
     {
       "path": "src-tauri/src/tally/canonical_window.rs"
-    },
-    {
-      "path": "src-tauri/src/tally/capability_packs.rs"
     },
     {
       "path": "src-tauri/src/tally/connection.rs"

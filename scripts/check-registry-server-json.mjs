@@ -12,6 +12,7 @@
 // Equality and the hashes are therefore checked when the publish workflow runs.
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export class RegistryFileError extends Error {
@@ -146,7 +147,7 @@ export async function run(args, { root = resolve(import.meta.dirname, ".."), fet
   return `registry/server.json ok (version ${checked.version}${published >= 0 ? `, hashes equal the ${tag} release` : ""})`;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   try {
     console.log(await run(process.argv.slice(2)));
   } catch (error) {

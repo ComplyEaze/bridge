@@ -12,6 +12,10 @@ use tauri::{AppHandle, Manager, State};
 /// A safe, typed failure returned by the read-only label-migration planner.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case", tag = "code")]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "the variant names, snake_cased, are the serialized `code` values of the error"
+)]
 pub enum ClientGroupLabelMigrationPreparationError {
     ConfigurationUnavailable,
     LabelsUnavailable,

@@ -1529,6 +1529,10 @@ impl Server {
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
+        // The build and the post refuse a type that is not qualified before any
+        // request; so does every verification, which this path serves, however
+        // the batch came to be saved.
+        refuse_unqualified_types(&line.vouchers, LIVE_QUALIFIED_VOUCHER_TYPES)?;
         validate_dispatched_import_endpoint(&line, dispatched, &self.settings.endpoint)?;
         let opening_mode = self.observe_import_profile().await?;
         let (company, identity, identity_evidence) = self

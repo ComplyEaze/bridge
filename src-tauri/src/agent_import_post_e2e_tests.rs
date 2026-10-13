@@ -320,6 +320,43 @@ fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedger
     (line, args)
 }
 
+/// A saved batch whose voucher type is declared and not qualified is refused by
+/// verification before any request, with the code the build and the post use.
+#[tokio::test]
+async fn verification_refuses_a_voucher_type_that_is_not_qualified_before_any_request() {
+    let directory = tempfile::tempdir().unwrap();
+    // Port 9 answers nothing: a verification that sent a request would fail on
+    // the connection instead of with this refusal.
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (journal_line, _) = saved_batch(&server);
+    let mut line = journal_line.clone();
+    line.batch_id = "bridge-00000000-0000-4000-8000-000000000584".into();
+    line.vouchers[0].voucher_type = VoucherType::Sales;
+    let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(rendered.as_bytes());
+    server.append_import_ledger(&line).unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        rendered,
+    )
+    .unwrap();
+    let before = journal(directory.path());
+    let response = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":GUID,"batch_id":line.batch_id}),
+        )
+        .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_voucher_type_unqualified",
+        "{response}"
+    );
+    assert_eq!(journal(directory.path()), before, "nothing was recorded");
+}
+
 fn journal(directory: &std::path::Path) -> Vec<u8> {
     fs::read(directory.join("agent-import-ledger.jsonl")).unwrap()
 }

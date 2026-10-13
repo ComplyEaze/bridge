@@ -28,6 +28,8 @@ const AMOUNT_UNREADABLE: &str = "gst_uncertain_amount_unreadable";
 const PARTY_NOT_REPORTED: &str = "gst_uncertain_party_not_reported";
 const PARTY_EMPTY: &str = "gst_uncertain_party_empty";
 const PARTY_UNREADABLE: &str = "gst_uncertain_party_unreadable";
+const NO_VOUCHERS_READ: &str = "gst_uncertain_no_vouchers_in_window";
+const NONE_UNCERTAIN: &str = "gst_uncertain_none_marked_uncertain";
 
 /// Which side of the party's entry an amount is on, from Tally's sign: a debit is written
 /// negative. Only negative amounts were measured, on Sales invoices.
@@ -41,8 +43,8 @@ pub(super) enum PartySide {
 /// A voucher's total as Tally wrote it, without its sign, and the side the sign said.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct InvoiceAmount {
-    pub(super) magnitude: ExactDecimal,
-    pub(super) side: PartySide,
+    magnitude: ExactDecimal,
+    side: PartySide,
 }
 
 /// The party and the amount of one voucher, each read or the code of why it was not.
@@ -129,12 +131,15 @@ fn dashed(date: &bridge_tally_core::TallyDate) -> String {
     format!("{}-{}-{}", &text[..4], &text[4..6], &text[6..])
 }
 
-fn pre_filing_line(uncertain: u64, from: &str, to: &str) -> String {
+/// The owner's line, then one sentence naming the voucher type it covers: another Sales type
+/// in the book is not counted in it.
+fn pre_filing_line(uncertain: u64, from: &str, to: &str, type_name: &str) -> String {
     format!(
         "Tally marks {uncertain} Sales vouchers dated {from} to {to} as Uncertain and leaves \
          them out of its GSTR-1 screen. Amounts are from ComplyEaze Bridge's voucher read; \
          Tally's JSON export and the portal are not checked. Resolve each in Tally before \
-         exporting; do not add them on the portal by hand."
+         exporting; do not add them on the portal by hand. This covers the voucher type \
+         {type_name} only."
     )
 }
 
@@ -209,17 +214,30 @@ impl Server {
             return Err(failure);
         }
 
-        let (state, line) = if unread == 0 {
-            (
-                "complete",
-                json!(pre_filing_line(uncertain, &dashed(from), &dashed(to))),
-            )
-        } else {
+        // A line stating "0 vouchers" reads as clearance, so it is stated only when at least one
+        // voucher is marked Uncertain. A mistyped type name, or a type with none, reads no
+        // voucher or none uncertain: the counts are complete and the line is withheld.
+        let total = rows.len() as u64;
+        let (state, line) = if unread > 0 {
             evidence.state = "partial";
             evidence.reason_code = Some("gst_uncertain_voucher_unread".to_string());
             (
                 "partial",
                 json!({"withheld": "gst_uncertain_voucher_unread"}),
+            )
+        } else if total == 0 {
+            ("complete", json!({"withheld": NO_VOUCHERS_READ}))
+        } else if uncertain == 0 {
+            ("complete", json!({"withheld": NONE_UNCERTAIN}))
+        } else {
+            (
+                "complete",
+                json!(pre_filing_line(
+                    uncertain,
+                    &dashed(from),
+                    &dashed(to),
+                    type_name
+                )),
             )
         };
         let mut result = json!({
@@ -227,7 +245,7 @@ impl Server {
             "basis": "tally_voucher_gst_status_party_amount_one_voucher_type_one_window",
             "window": {"from": from.as_str(), "to": to.as_str()},
             "voucher_type_name": type_name,
-            "total": rows.len(),
+            "total": total,
             "counts": counts_json(&counts, unread),
             "items": items,
             "pre_filing_line": line,
@@ -249,22 +267,21 @@ impl Server {
     }
 }
 
-const LIMITATIONS: [&str; 15] = [
+const LIMITATIONS: [&str; 14] = [
     "uncertain means Tally's uncertain flag reads Yes on the voucher once cancelled, optional and post-dated are decided first; those three are counted under their own keys and never as uncertain. The flags are the ones Tally holds when the vouchers are read: Tally keeps the status a voucher was given when it was saved",
     "The reason for uncertainty is not read: Tally shows it on its screen only. Bills missing an HSN/SAC are not split out from the others; they need re-saving with the code, not Accept As Is",
-    "list=overridden holds every voucher whose acceptance flag (ISGSTOVERRIDDEN) reads Yes, with its gst_status as Tally reads it now. One that reads uncertain or excluded now, after it was accepted, is the row to look at. A voucher can appear under both lists",
-    "A voucher counts as verified only if an earlier run listed it uncertain under the same master_id and this run lists it overridden, with gst_status included and the same amount. This tool keeps no state: compare the runs by master_id, alter_id and amount. A voucher that is no longer listed has not been shown to be verified",
+    "list=overridden holds every voucher whose acceptance flag (ISGSTOVERRIDDEN) reads Yes, with its gst_status as Tally reads it now. The flag is read as Accept As Is having been used; that nothing else sets it to Yes is not measured, and the before-capture already held five vouchers with the flag Yes whose origin is not recorded. One that reads uncertain or excluded now, after it was accepted, is the row to look at. A voucher can appear under both lists",
+    "The acceptance is confirmed only if an earlier run listed the voucher uncertain under the same master_id and this run lists it overridden, with gst_status included and the same amount. That shows only that the acceptance flag was set and the voucher reads included with the same amount, not that the voucher is correct or complete. This tool keeps no state: compare the runs by master_id, alter_id and amount. A voucher that is no longer listed has not had its acceptance confirmed",
     "party is the party ledger of the voucher: a cash sale shows the cash ledger, and no GSTIN is fetched. It was measured on an unregistered buyer only; a registered buyer is not measured",
     "amount is the invoice total on the party's entry, tax and round-off included, without its sign; party_side is the side Tally's sign gives it (a negative amount is a debit). It is not the taxable value of the GSTR-1 tables. Only negative amounts, on Sales invoices, were measured",
     "Amounts are not masked by the party masking setting: that setting masks party names only. This tool's answer carries both party names and amounts to the assistant; gst_status carries neither",
     "A voucher is unread when its flags, or its acceptance flag, were not read, or, if it is listed, when its party or its amount was not: absent, empty, repeated, zero, or not a plain decimal (a foreign-currency amount is not read). The state is then partial, the pre-filing line is withheld and the counts include the voucher under unread, so the number in the line is never short",
-    "A cancelled voucher reads an empty party and amount on the lab's book and is not listed; an optional voucher reads its party and amount and is not counted as uncertain. A post-dated voucher is not counted as uncertain either: the amount of a post-dated voucher was not measured",
+    "A cancelled voucher reads an empty party and amount on the lab's book and is not listed as uncertain; one whose acceptance flag reads Yes is listed under overridden, and its empty party and amount then make the result partial and withhold the line. An optional voucher reads its party and amount and is not counted as uncertain. A post-dated voucher is not counted as uncertain either: the amount of a post-dated voucher was not measured",
     "The window's vouchers are counted with the status read first and the amounts are read after it, so a voucher saved between the two reads can make the second larger than counted. A window the count finds above 1,000 vouchers is refused before the second read (gst_uncertain_window_too_large; provisional: sized on the lab's vouchers, and item invoices, which are larger, were not measured). Rows above this server's row limit are refused, with the counts (gst_uncertain_rows_over_limit)",
-    "The pre-filing line says Sales because this tool is for a Sales voucher type: the type name is not checked against the book's voucher types, so take it from masters. Its dates are the window",
     "Measured on one synthetic book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, which changed that voucher alone. Not measured: item invoices, a registered buyer, credit notes or other Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once, Gold and other releases",
     "excluded has not been observed on the lab's book. included counts a voucher a person accepted as it stands as well, so included is not 'clean'. A status is Tally's own flag and not a judgement of ComplyEaze Bridge",
     "A voucher whose ISDELETED or ISDELETEDVCHRETAINED flag reads Yes is unread (gst_status_voucher_deleted); a Yes was never measured",
-    "At most 93 days a window and a voucher type named by its exact name (a type of the same class under another name is not read). A book whose voucher mark is above 25,000 is refused (gst_status_book_too_large), because the selection is evaluated on every voucher of the book. A total of 0 may mean the type name matched nothing",
+    "At most 93 days a window and one voucher type named by its exact name (a type of the same class under another name is not read and not in the line, which says Sales because this tool is for a Sales type and ends by naming the type it covers). The name is not checked against the book's voucher types, so take it from masters. A total of 0 may mean the type name matched nothing: the line is withheld, with the counts kept, when no voucher was read and when none is uncertain, because a line of 0 would read as clearance. A book whose voucher mark is above 25,000 is refused (gst_status_book_too_large), because the selection is evaluated on every voucher of the book",
 ];
 
 #[cfg(test)]

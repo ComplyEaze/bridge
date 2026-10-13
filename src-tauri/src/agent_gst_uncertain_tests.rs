@@ -44,8 +44,12 @@ const LAB_TYPE: &str = "BRIDGE Sales";
 const LAB_PARTY: &str = "BRIDGE Walk-in";
 
 /// The line the owner approved for the pre-filing check, with the product's full name, for five
-/// vouchers dated the whole of August 2026.
-const LINE_FOR_FIVE: &str = "Tally marks 5 Sales vouchers dated 2026-08-01 to 2026-08-31 as Uncertain and leaves them out of its GSTR-1 screen. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.";
+/// vouchers dated the whole of August 2026, and the sentence that names the voucher type it
+/// covers.
+const LINE_FOR_FIVE: &str = concat!(
+    "Tally marks 5 Sales vouchers dated 2026-08-01 to 2026-08-31 as Uncertain and leaves them out of its GSTR-1 screen. Amounts are from ComplyEaze Bridge's voucher read; Tally's JSON export and the portal are not checked. Resolve each in Tally before exporting; do not add them on the portal by hand.",
+    " This covers the voucher type BRIDGE Sales only."
+);
 
 fn decode_utf16(bytes: &[u8]) -> String {
     assert_eq!(bytes.len() % 2, 0, "whole UTF-16 code units");
@@ -76,342 +80,68 @@ type Expected = (
     bool,
 );
 
-const BEFORE_ROWS: [Expected; 32] = [
-    (
-        "20260801",
-        "BP/26-27/0001",
-        "1",
-        "2",
-        "BRIDGE Walk-in",
-        "1050.00",
-        "included",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0002",
-        "2",
-        "11",
-        "BRIDGE Walk-in",
-        "1051.05",
-        "uncertain",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0003",
-        "3",
-        "50",
-        "BRIDGE Walk-in",
-        "1051.04",
-        "uncertain",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0004",
-        "4",
-        "13",
-        "BRIDGE Walk-in",
-        "1051.05",
-        "included",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0005",
-        "5",
-        "54",
-        "BRIDGE Walk-in",
-        "1051.05",
-        "included",
-        true,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0006",
-        "6",
-        "48",
-        "BRIDGE Walk-in",
-        "1050.02",
-        "included",
-        true,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0007",
-        "7",
-        "8",
-        "BRIDGE Walk-in",
-        "1050.00",
-        "included",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0008",
-        "8",
-        "9",
-        "BRIDGE Walk-in",
-        "1051.05",
-        "uncertain",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0009",
-        "9",
-        "10",
-        "BRIDGE Walk-in",
-        "1456.00",
-        "included",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0011",
-        "10",
-        "16",
-        "BRIDGE Walk-in",
-        "1051.06",
-        "included",
-        false,
-    ),
-    (
-        "20260801",
-        "BP/26-27/0010",
-        "11",
-        "17",
-        "BRIDGE Walk-in",
-        "1051.00",
-        "included",
-        false,
-    ),
-    (
-        "20260802",
-        "BP/26-27/0012",
-        "16",
-        "23",
-        "BRIDGE Walk-in",
-        "210.20",
-        "included",
-        false,
-    ),
-    (
-        "20260802",
-        "BP/26-27/0013",
-        "17",
-        "24",
-        "BRIDGE Walk-in",
-        "210.44",
-        "included",
-        false,
-    ),
-    (
-        "20260802",
-        "BP/26-27/0014",
-        "18",
-        "25",
-        "BRIDGE Walk-in",
-        "211.28",
-        "included",
-        false,
-    ),
-    (
-        "20260802",
-        "BP/26-27/0015",
-        "19",
-        "26",
-        "BRIDGE Walk-in",
-        "210.44",
-        "included",
-        false,
-    ),
-    (
-        "20260802",
-        "BP/26-27/0016",
-        "20",
-        "28",
-        "BRIDGE Walk-in",
-        "210.42",
-        "included",
-        true,
-    ),
-    (
-        "20260802",
-        "BP/26-27/0019",
-        "22",
-        "30",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260805",
-        "BP/26-27/0021",
-        "26",
-        "35",
-        "BRIDGE Walk-in",
-        "315.30",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "5",
-        "27",
-        "36",
-        "BRIDGE Walk-in",
-        "105.00",
-        "uncertain",
-        false,
-    ),
-    (
-        "20260807",
-        "6",
-        "28",
-        "37",
-        "BRIDGE Walk-in",
-        "105.00",
-        "uncertain",
-        false,
-    ),
-    (
-        "20260807",
-        "7",
-        "29",
-        "38",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "8",
-        "30",
-        "39",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "9",
-        "31",
-        "40",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "10",
-        "32",
-        "41",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "11",
-        "33",
-        "42",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "12",
-        "34",
-        "43",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "13",
-        "35",
-        "44",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260807",
-        "14",
-        "36",
-        "45",
-        "BRIDGE Walk-in",
-        "105.00",
-        "included",
-        false,
-    ),
-    (
-        "20260820",
-        "BP/26-27/0041",
-        "40",
-        "63",
-        "",
-        "",
-        "cancelled",
-        false,
-    ),
-    (
-        "20260820",
-        "BP/26-27/0042",
-        "41",
-        "62",
-        "BRIDGE Walk-in",
-        "1050.00",
-        "optional",
-        false,
-    ),
-    (
-        "20260822",
-        "BP/26-27/0043",
-        "43",
-        "67",
-        "BRIDGE Walk-in",
-        "1051.05",
-        "included",
-        true,
-    ),
-    (
-        "20260822",
-        "BP/26-27/0044",
-        "44",
-        "68",
-        "BRIDGE Walk-in",
-        "1051.05",
-        "included",
-        true,
-    ),
-];
+/// The lab script's rows, one voucher a line, the fields of `Expected` separated by `|`.
+const BEFORE_TABLE: &str = "\
+20260801|BP/26-27/0001|1|2|BRIDGE Walk-in|1050.00|included|false
+20260801|BP/26-27/0002|2|11|BRIDGE Walk-in|1051.05|uncertain|false
+20260801|BP/26-27/0003|3|50|BRIDGE Walk-in|1051.04|uncertain|false
+20260801|BP/26-27/0004|4|13|BRIDGE Walk-in|1051.05|included|false
+20260801|BP/26-27/0005|5|54|BRIDGE Walk-in|1051.05|included|true
+20260801|BP/26-27/0006|6|48|BRIDGE Walk-in|1050.02|included|true
+20260801|BP/26-27/0007|7|8|BRIDGE Walk-in|1050.00|included|false
+20260801|BP/26-27/0008|8|9|BRIDGE Walk-in|1051.05|uncertain|false
+20260801|BP/26-27/0009|9|10|BRIDGE Walk-in|1456.00|included|false
+20260801|BP/26-27/0011|10|16|BRIDGE Walk-in|1051.06|included|false
+20260801|BP/26-27/0010|11|17|BRIDGE Walk-in|1051.00|included|false
+20260802|BP/26-27/0012|16|23|BRIDGE Walk-in|210.20|included|false
+20260802|BP/26-27/0013|17|24|BRIDGE Walk-in|210.44|included|false
+20260802|BP/26-27/0014|18|25|BRIDGE Walk-in|211.28|included|false
+20260802|BP/26-27/0015|19|26|BRIDGE Walk-in|210.44|included|false
+20260802|BP/26-27/0016|20|28|BRIDGE Walk-in|210.42|included|true
+20260802|BP/26-27/0019|22|30|BRIDGE Walk-in|105.00|included|false
+20260805|BP/26-27/0021|26|35|BRIDGE Walk-in|315.30|included|false
+20260807|5|27|36|BRIDGE Walk-in|105.00|uncertain|false
+20260807|6|28|37|BRIDGE Walk-in|105.00|uncertain|false
+20260807|7|29|38|BRIDGE Walk-in|105.00|included|false
+20260807|8|30|39|BRIDGE Walk-in|105.00|included|false
+20260807|9|31|40|BRIDGE Walk-in|105.00|included|false
+20260807|10|32|41|BRIDGE Walk-in|105.00|included|false
+20260807|11|33|42|BRIDGE Walk-in|105.00|included|false
+20260807|12|34|43|BRIDGE Walk-in|105.00|included|false
+20260807|13|35|44|BRIDGE Walk-in|105.00|included|false
+20260807|14|36|45|BRIDGE Walk-in|105.00|included|false
+20260820|BP/26-27/0041|40|63|||cancelled|false
+20260820|BP/26-27/0042|41|62|BRIDGE Walk-in|1050.00|optional|false
+20260822|BP/26-27/0043|43|67|BRIDGE Walk-in|1051.05|included|true
+20260822|BP/26-27/0044|44|68|BRIDGE Walk-in|1051.05|included|true
+";
+
+fn before_rows() -> [Expected; 32] {
+    let rows: Vec<Expected> = BEFORE_TABLE
+        .lines()
+        .map(|line| {
+            let field: Vec<&'static str> = line.split('|').collect();
+            assert_eq!(field.len(), 8, "{line}");
+            let accepted = match field[7] {
+                "true" => true,
+                "false" => false,
+                other => panic!("{other}"),
+            };
+            (
+                field[0], field[1], field[2], field[3], field[4], field[5], field[6], accepted,
+            )
+        })
+        .collect();
+    rows.try_into().expect("32 rows")
+}
 
 /// The answer after one Accept As Is: the lab's script found one voucher different, the third.
 fn after_rows() -> [Expected; 32] {
-    let mut rows = BEFORE_ROWS;
-    rows[2] = (
-        "20260801",
-        "BP/26-27/0003",
-        "3",
-        "69",
-        "BRIDGE Walk-in",
-        "1051.04",
-        "included",
-        true,
-    );
+    let mut rows = before_rows();
+    // The accept gave the third voucher a new alter id, a state of included and the flag Yes.
+    rows[2].3 = "69";
+    rows[2].6 = "included";
+    rows[2].7 = true;
     rows
 }
 
@@ -560,7 +290,7 @@ fn check_rows(xml: &str, expected: &[Expected; 32]) {
 
 #[test]
 fn the_answer_before_the_accept_reads_every_voucher_with_its_party_and_amount() {
-    check_rows(&before(), &BEFORE_ROWS);
+    check_rows(&before(), &before_rows());
 }
 
 #[test]
@@ -1102,7 +832,7 @@ async fn the_tool_lists_the_five_uncertain_vouchers_and_the_five_accepted_ones_b
             ("overridden", "BP/26-27/0044"),
         ])
     );
-    assert_eq!(*items(&call.response), expected_items(&BEFORE_ROWS));
+    assert_eq!(*items(&call.response), expected_items(&before_rows()));
     // The first row, in full.
     assert_eq!(
         items(&call.response)[0],
@@ -1213,8 +943,8 @@ async fn after_the_accept_the_third_voucher_is_overridden_and_included_with_the_
         .as_str()
         .unwrap()
         .starts_with("Tally marks 4 Sales vouchers dated 2026-08-01 to 2026-08-31 as Uncertain"));
-    // Nothing but that voucher moved between the lists: the vouchers the earlier run listed,
-    // but the third, are listed as they were.
+    // Nothing but that voucher changed lists: the vouchers the earlier run listed, but the
+    // third, are listed as they were.
     let find = |response: &Value, list: &str, number: &str| {
         items(response)
             .iter()
@@ -1238,10 +968,10 @@ async fn after_the_accept_the_third_voucher_is_overridden_and_included_with_the_
     assert_eq!(items(&later.response).len(), items(&earlier.response).len());
 }
 
-/// What the assistant is told to do with two runs: a voucher is verified only if the earlier
-/// run listed it uncertain under a master id and this run lists it overridden and included
-/// under that master id with the same amount.
-fn verified(earlier: &Value, later: &Value) -> Vec<String> {
+/// What the assistant is told to do with two runs: the acceptance of a voucher is confirmed
+/// only if the earlier run listed it uncertain under a master id and this run lists it
+/// overridden and included under that master id with the same amount.
+fn confirmed(earlier: &Value, later: &Value) -> Vec<String> {
     let mut out = Vec::new();
     for before in items(earlier)
         .iter()
@@ -1261,21 +991,21 @@ fn verified(earlier: &Value, later: &Value) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn two_runs_hold_what_a_verification_compares_and_verify_only_the_accepted_voucher() {
+async fn two_runs_hold_what_a_confirmation_compares_and_confirm_only_the_accepted_voucher() {
     let earlier = call_on(before()).await;
     let later = call_on(after()).await;
-    assert_eq!(verified(&earlier.response, &later.response), [TARGET]);
-    // Run again with nothing accepted: nothing is verified.
+    assert_eq!(confirmed(&earlier.response, &later.response), [TARGET]);
+    // Run again with nothing accepted: nothing is confirmed.
     let same = call_on(before()).await;
-    assert!(verified(&earlier.response, &same.response).is_empty());
-    // An accepted voucher whose amount changed is not verified: edit the amount in both of the
+    assert!(confirmed(&earlier.response, &same.response).is_empty());
+    // An accepted voucher whose amount changed is not confirmed: edit the amount in both of the
     // wide reads' entries and in the voucher itself.
     let changed = edit(&after(), TARGET, |block| {
         block.replace("-1051.04", "-1051.03")
     });
     let edited = call_on(changed).await;
-    assert!(verified(&earlier.response, &edited.response).is_empty());
-    // A voucher accepted under another master id is not verified.
+    assert!(confirmed(&earlier.response, &edited.response).is_empty());
+    // A voucher accepted under another master id is not confirmed.
     let other = edit(&after(), TARGET, |block| {
         once(
             &block,
@@ -1283,8 +1013,8 @@ async fn two_runs_hold_what_a_verification_compares_and_verify_only_the_accepted
             r#"<MASTERID TYPE="Number"> 99</MASTERID>"#,
         )
     });
-    let moved = call_on(other).await;
-    assert!(verified(&earlier.response, &moved.response).is_empty());
+    let other_master = call_on(other).await;
+    assert!(confirmed(&earlier.response, &other_master.response).is_empty());
 }
 
 #[tokio::test]
@@ -1318,6 +1048,107 @@ async fn the_cancelled_and_the_optional_voucher_are_not_listed_and_the_line_does
     assert_eq!(result["counts"]["cancelled"], 1);
     assert_eq!(result["pre_filing_line"], LINE_FOR_FIVE);
     assert_eq!(listing(items(&call.response)).len(), 10);
+}
+
+#[tokio::test]
+async fn a_cancelled_voucher_whose_acceptance_flag_reads_yes_is_listed_and_makes_the_result_partial(
+) {
+    let call = call_on(edit(&before(), "BP/26-27/0041", |block| {
+        once(
+            &block,
+            r#"<ISGSTOVERRIDDEN TYPE="Logical">No</ISGSTOVERRIDDEN>"#,
+            r#"<ISGSTOVERRIDDEN TYPE="Logical">Yes</ISGSTOVERRIDDEN>"#,
+        )
+    }))
+    .await;
+    let result = payload(&call.response);
+    assert_eq!(result["state"], "partial");
+    assert_eq!(result["counts"]["cancelled"], 1);
+    assert_eq!(result["counts"]["unread"], 1);
+    assert_eq!(
+        result["pre_filing_line"],
+        json!({"withheld": "gst_uncertain_voucher_unread"})
+    );
+    let listed = items(&call.response)
+        .iter()
+        .find(|item| item["voucher_number"] == "BP/26-27/0041")
+        .expect("listed under overridden");
+    assert_eq!(listed["list"], "overridden");
+    assert_eq!(listed["party"], json!({"unread": PARTY_EMPTY}));
+}
+
+/// The lab's five uncertain vouchers, each given the flags of an included one.
+fn nothing_uncertain() -> String {
+    let mut xml = before();
+    for number in ["BP/26-27/0002", "BP/26-27/0003", "BP/26-27/0008", "5", "6"] {
+        xml = edit(&xml, number, |block| {
+            let block = once(
+                &block,
+                r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">No</VCHGSTSTATUSISINCLUDED>"#,
+                r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">Yes</VCHGSTSTATUSISINCLUDED>"#,
+            );
+            once(
+                &block,
+                r#"<VCHGSTSTATUSISUNCERTAIN TYPE="Logical">Yes</VCHGSTSTATUSISUNCERTAIN>"#,
+                r#"<VCHGSTSTATUSISUNCERTAIN TYPE="Logical">No</VCHGSTSTATUSISUNCERTAIN>"#,
+            )
+        });
+    }
+    xml
+}
+
+#[tokio::test]
+async fn a_window_with_vouchers_and_none_uncertain_withholds_the_line_and_keeps_the_counts() {
+    let call = call_on(nothing_uncertain()).await;
+    let result = payload(&call.response);
+    // Every voucher was read: the result is complete, with the counts and the five accepted
+    // vouchers. A line saying "0 vouchers" would read as clearance, so it is withheld with its
+    // own reason, not the unread one.
+    assert_eq!(result["state"], "complete");
+    assert_eq!(result["total"], 32);
+    assert_eq!(result["counts"]["uncertain"], 0);
+    assert_eq!(result["counts"]["included"], 30);
+    assert_eq!(result["counts"]["unread"], 0);
+    assert_eq!(result["counts"]["accepted_as_it_stands"], 5);
+    assert_eq!(
+        result["pre_filing_line"],
+        json!({"withheld": "gst_uncertain_none_marked_uncertain"})
+    );
+    assert_eq!(items(&call.response).len(), 5);
+    assert!(items(&call.response)
+        .iter()
+        .all(|item| item["list"] == "overridden"));
+    assert!(result["filed_period_note"].is_string());
+    assert_eq!(receipt(&call.response)["state"], "complete");
+}
+
+#[tokio::test]
+async fn the_line_names_the_voucher_type_and_one_uncertain_voucher_is_enough_to_state_it() {
+    // The five become one: the line is stated for N = 1 and ends with the type it covers.
+    let mut xml = nothing_uncertain();
+    xml = edit(&xml, "BP/26-27/0002", |block| {
+        let block = once(
+            &block,
+            r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">Yes</VCHGSTSTATUSISINCLUDED>"#,
+            r#"<VCHGSTSTATUSISINCLUDED TYPE="Logical">No</VCHGSTSTATUSISINCLUDED>"#,
+        );
+        once(
+            &block,
+            r#"<VCHGSTSTATUSISUNCERTAIN TYPE="Logical">No</VCHGSTSTATUSISUNCERTAIN>"#,
+            r#"<VCHGSTSTATUSISUNCERTAIN TYPE="Logical">Yes</VCHGSTSTATUSISUNCERTAIN>"#,
+        )
+    });
+    let call = call_on(xml).await;
+    let result = payload(&call.response);
+    assert_eq!(result["counts"]["uncertain"], 1);
+    assert_eq!(
+        result["pre_filing_line"],
+        LINE_FOR_FIVE.replace("marks 5 Sales", "marks 1 Sales")
+    );
+    assert!(result["pre_filing_line"]
+        .as_str()
+        .unwrap()
+        .ends_with(&format!(" This covers the voucher type {LAB_TYPE} only.")));
 }
 
 #[tokio::test]
@@ -1623,6 +1454,14 @@ async fn a_read_that_fails_is_a_refusal_and_never_a_window_with_no_vouchers() {
     assert_eq!(result["total"], 0);
     assert_eq!(result["state"], "complete");
     assert_eq!(items(&call.response).len(), 0);
+    // The counts are all read, and zero; a line saying "0 vouchers" would read as clearance
+    // (a mistyped type name reads no voucher), so the line is withheld with its own reason.
+    assert_eq!(result["counts"]["uncertain"], 0);
+    assert_eq!(result["counts"]["unread"], 0);
+    assert_eq!(
+        result["pre_filing_line"],
+        json!({"withheld": "gst_uncertain_no_vouchers_in_window"})
+    );
 }
 
 #[tokio::test]
@@ -1803,7 +1642,7 @@ async fn the_limitations_say_what_was_not_read_and_what_was_not_measured() {
         "they need re-saving with the code, not Accept As Is",
         "Amounts are not masked by the party masking setting",
         "gst_status carries neither",
-        "A voucher counts as verified only if an earlier run listed it uncertain under the same master_id",
+        "The acceptance is confirmed only if an earlier run listed the voucher uncertain under the same master_id",
         "keeps no state",
         "the invoice total on the party's entry, tax and round-off included",
         "not the taxable value of the GSTR-1 tables",
@@ -1812,6 +1651,9 @@ async fn the_limitations_say_what_was_not_read_and_what_was_not_measured() {
         "an unregistered buyer only",
         "item invoices, a registered buyer, credit notes or other Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once, Gold and other releases",
         "the pre-filing line is withheld",
+        "not that the voucher is correct or complete",
+        "whose origin is not recorded",
+        "listed under overridden",
         "above 1,000 vouchers",
         "provisional",
     ] {

@@ -1,0 +1,6 @@
+﻿== ans-s02.xml 3838 B sha256 7831dbc646712910cee59c30ad11ec1a45535091263566624b71e58189363c05
+== ans-s02r.xml 3838 B sha256 7831dbc646712910cee59c30ad11ec1a45535091263566624b71e58189363c05
+bytes: same length; differing bytes 0
+under COLLECTION: entries 16 / 16 (elements with their attributes, and leaf texts); differing or one-sided 0
+outside COLLECTION: entries 80 / 80; differing or one-sided 0
+RESULT: everything under COLLECTION is equal

@@ -1,0 +1,6 @@
+﻿== ans-s05.xml 21606 B sha256 69972ce1ca81998f4a985ceccdb7ff18cb417ab78f9777f268b6533a63865a20
+== ans-s05r.xml 21606 B sha256 69972ce1ca81998f4a985ceccdb7ff18cb417ab78f9777f268b6533a63865a20
+bytes: same length; differing bytes 0
+under COLLECTION: entries 290 / 290 (elements with their attributes, and leaf texts); differing or one-sided 0
+outside COLLECTION: entries 80 / 80; differing or one-sided 0
+RESULT: everything under COLLECTION is equal

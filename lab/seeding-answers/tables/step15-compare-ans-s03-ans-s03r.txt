@@ -1,0 +1,6 @@
+﻿== ans-s03.xml 5822 B sha256 5d954dbccc71ff68ff49884b3382cd96f88a251fd21089b60fc3ba038dabf2cb
+== ans-s03r.xml 5822 B sha256 5d954dbccc71ff68ff49884b3382cd96f88a251fd21089b60fc3ba038dabf2cb
+bytes: same length; differing bytes 0
+under COLLECTION: entries 52 / 52 (elements with their attributes, and leaf texts); differing or one-sided 0
+outside COLLECTION: entries 80 / 80; differing or one-sided 0
+RESULT: everything under COLLECTION is equal

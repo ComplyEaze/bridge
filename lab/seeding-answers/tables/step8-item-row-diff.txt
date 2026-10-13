@@ -1,0 +1,19 @@
+﻿row 1 [Carton Box Small] / [Carton Box Small]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 2 [Caustic Soda Flakes] / [Caustic Soda Flakes]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 3 [Cleaning Kit A] / [Cleaning Kit A]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 4 [Cleaning Kit B] / [Cleaning Kit B]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 5 [Descaler Concentrate] / [Descaler Concentrate]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 6 [HDPE Drum 50L] / [HDPE Drum 50L]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 7 [Hydrochloric Acid 33pc] / [Hydrochloric Acid 33pc]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 8 [Label Roll] / [Label Roll]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 9 [Soda Ash Light] / [Soda Ash Light]: leaves 25 -> 31; differing or new 8; attributes equal: True
+  only before: STOCKITEM/HSNDETAILS.LIST[1] = []
+  only after: STOCKITEM/GSTDETAILS.LIST[1]/STATEWISEDETAILS.LIST[1]/RATEDETAILS.LIST[5]/GSTRATEDUTYHEAD[1] = [State Cess]
+  only after: STOCKITEM/GSTDETAILS.LIST[1]/STATEWISEDETAILS.LIST[1]/RATEDETAILS.LIST[5]/GSTRATEVALUATIONTYPE[1] = [Based on Value]
+  only after: STOCKITEM/HSNDETAILS.LIST[1]/APPLICABLEFROM[1] = [20250401]
+  only after: STOCKITEM/HSNDETAILS.LIST[1]/HSNCODE[1] = [28362010]
+  only after: STOCKITEM/HSNDETAILS.LIST[1]/HSN[1] = [Disodium Carbonate, Dense]
+  only after: STOCKITEM/HSNDETAILS.LIST[1]/SRCOFHSNDETAILS[1] = [Specify Details Here]
+  only after: STOCKITEM/LANGUAGENAME.LIST[1]/LANGUAGEID[1] = [1033]
+row 10 [Sulphuric Acid 98pc] / [Sulphuric Acid 98pc]: leaves 10 -> 10; differing or new 0; attributes equal: True
+row 11 [Zero Stock Item] / [Zero Stock Item]: leaves 10 -> 10; differing or new 0; attributes equal: True

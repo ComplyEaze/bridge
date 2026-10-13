@@ -1,0 +1,6 @@
+﻿== ans-s06.xml 6730 B sha256 41634213d44e52c758cee5ed8d8af309c8dc96d7a993f42324f1ee879693694f
+== ans-s06r.xml 6730 B sha256 41634213d44e52c758cee5ed8d8af309c8dc96d7a993f42324f1ee879693694f
+bytes: same length; differing bytes 0
+under COLLECTION: entries 58 / 58 (elements with their attributes, and leaf texts); differing or one-sided 0
+outside COLLECTION: entries 80 / 80; differing or one-sided 0
+RESULT: everything under COLLECTION is equal

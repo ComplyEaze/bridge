@@ -30,7 +30,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use bridge_tally_primitives::TallyDate;
-use sha1::{Digest, Sha1};
 
 use crate::book::{Book, Voucher};
 use crate::cash_book_integrity::EXPENSE_GROUPS;
@@ -40,8 +39,8 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::rules::Rules;
 use crate::support::{
-    count, ledgers_by_tag, overflow, py_casefold, py_ci_eq, py_is_decimal, py_lower, py_repr_str,
-    py_split, py_strip, rupees, voucher_label,
+    count, hash8, ledgers_by_tag, overflow, py_casefold, py_ci_eq, py_is_decimal, py_lower,
+    py_repr_str, py_split, py_strip, rupees, voucher_label,
 };
 use crate::tds_payees::{deductor_question, deductor_status, DeductorActivity};
 
@@ -218,10 +217,6 @@ pub struct Inputs<'a> {
     pub turnover_is_placeholder: bool,
 }
 
-fn hash8(text: &str) -> String {
-    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()
-}
-
 /// Tally's Receipt base type, whatever its case or surrounding space.
 fn is_receipt(base_type: &str) -> bool {
     py_lower(py_strip(base_type)) == "receipt"
@@ -251,6 +246,16 @@ fn others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
     v.lines
         .iter()
         .filter(|l| l.ledger != ledger)
+        .map(|l| l.ledger.as_str())
+        .collect()
+}
+
+/// [`others_than`] without the ledgers on nil lines: a ledger on a nil line is no posting
+/// (bridge#1259 item 3, as `two_sided` and the loan listing read it).
+fn posted_others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
+    v.lines
+        .iter()
+        .filter(|l| l.ledger != ledger && l.amount_paise != 0)
         .map(|l| l.ledger.as_str())
         .collect()
 }
@@ -458,7 +463,10 @@ fn compute_loan_rows<'a>(
         if loan_amt == 0 {
             continue;
         }
-        let others = others_than(v, loan_ledger);
+        // A ledger on a nil line is no posting: a nil line beside an interest journal left it "not
+        // only the interest ledger and TDS", and a nil cash line made a bank loan a cash one
+        // (bridge#1259 item 3).
+        let others = posted_others_than(v, loan_ledger);
         // rest = others - (tds - ils): the other lines, besides TDS ledgers that are not also this
         // loan's interest ledgers.
         let rest: BTreeSet<&str> = others
@@ -1493,6 +1501,37 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
             ),
             ev_tds.clone(),
         )?;
+        // A voucher counted in taken or repaid already holds its TDS in its loan line (Loan Dr
+        // 10,000 / TDS Cr 1,000 / Bank Cr 9,000 is a repayment of 10,000): LOAN-1 adds
+        // tds_on_loan for the deductions outside those totals, so it is told what to leave out.
+        // Published where a taken or repaid voucher carries TDS lines that net to an amount on
+        // that voucher, at 0 when those vouchers' TDS offsets across them (bridge#1259 item 2). A
+        // voucher listed as both crediting and debiting the loan is not read this way: LOAN-1
+        // firing on one carrying TDS stays.
+        let in_principal: BTreeSet<usize> = rows
+            .taken
+            .iter()
+            .chain(&rows.repaid)
+            .map(|x| x.at)
+            .collect();
+        let principal_tds: Vec<(usize, i128)> = tds_by_voucher
+            .iter()
+            .copied()
+            .filter(|(at, _)| in_principal.contains(at))
+            .collect();
+        if !principal_tds.is_empty() {
+            r.fig(
+                &format!("tds_in_principal_{h}"),
+                paise(principal_tds.iter().map(|&(_, x)| x).sum())?,
+                Unit::Paise,
+                &format!(
+                    "Of the TDS deducted on loan ledger (tag {h}), the part on the vouchers counted \
+in its taken or repaid totals (a repayment booked net of TDS, say), summed. It is inside the TDS \
+figure beside it, and is shown so the loan's movement can be checked against the Trial Balance."
+                ),
+                voucher_refs(principal_tds.iter().map(|&(at, _)| pop[at])),
+            )?;
+        }
         // (c) of #779 Phase A: a listed voucher carrying the loan's interest ledger or a TDS ledger
         // leaves its interest out of interest_total and its TDS in tds_on_loan. The threshold is
         // open where the interest crosses it in some reading of those interest lines and not in
@@ -3480,7 +3519,15 @@ narrated with ACH, NACH, ECS or EMI (each has a notice)."
 /// because a voucher listed as both crediting and debiting a loan has its credit side in the
 /// loan's taken total and its debit side in its repaid total; LOAN-4 (#779 Phase A) holds that
 /// every such voucher is listed with its own two sides, or is an interest or TDS entry, or a
-/// balanced voucher on the loan alone.
+/// balanced voucher on the loan alone. The tie adds the TDS deducted on the loan, less what the
+/// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published where a taken
+/// or repaid voucher carries TDS lines that net to an amount on that voucher, at 0 when those
+/// vouchers' TDS offsets across them): a repayment booked net of TDS carries its deduction in its
+/// loan line (bridge#1259 item 2). Its re-derivation reads vouchers by GUID, as the reference does: on a GUID
+/// a voucher outside the taken and repaid rows shares, it reads that voucher too and the line can
+/// fire while the tie holds. It reads the published TDS ledger names as the figure holds them (an
+/// empty name among others too; an empty figure as none), where LOAN-4 leaves the empty name out.
+/// Refs go in (id, label) order; the reference's, per id, is not fixed.
 pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>> {
     check_invariants_with(book, result, NET_REVERSALS)
 }
@@ -3543,6 +3590,19 @@ pub fn check_invariants_with(
         }
     }
 
+    let pop = book.population()?;
+    // The TDS ledgers run() published (tds_payable_ledgers: the configuration, not a group), read
+    // back by LOAN-1 and LOAN-4. LOAN-1 reads the figure's lines as they are, an empty text being no
+    // ledger at all but an empty name beside another being a ledger; only LOAN-4 leaves the empty
+    // name out (`tds_read_loan4`).
+    let tds_read: BTreeSet<String> = figures
+        .get(format!("{prefix}tds_payable_ledgers").as_str())
+        .filter(|f| matches!(&f.value, Value::Text(t) if !t.is_empty()))
+        .map(|f| lines_of(f))
+        .unwrap_or_default();
+    let tds_read_loan4: BTreeSet<String> =
+        tds_read.iter().filter(|x| !x.is_empty()).cloned().collect();
+
     // LOAN-1
     let marker = format!("{prefix}interest_total_");
     for (fid, fig) in &figures {
@@ -3568,21 +3628,54 @@ pub fn check_invariants_with(
         // outside taken/repaid: the loan moved by the interest net of every TDS deduction on it.
         let tds_on_loan = value(format!("{prefix}tds_on_loan_{h}"));
         let interest = int_of(fig);
-        let expected_movement = -taken_total + repaid_total - interest + tds_on_loan;
+        // ... except the TDS on a voucher counted in taken or repaid, whose loan line holds it
+        // (bridge#1259 item 2). It is re-derived from the vouchers the figure cites, by GUID, on
+        // the TDS ledgers run() published, so a TDS line read wrongly on a taken or repaid voucher
+        // cannot cancel inside the tie.
+        let principal_id = format!("{prefix}tds_in_principal_{h}");
+        let tds_in_principal = value(principal_id.clone());
+        if let Some(principal) = figures.get(principal_id.as_str()) {
+            let cited: BTreeSet<&str> = principal
+                .evidence
+                .iter()
+                .filter(|e| e.kind == "voucher")
+                .map(|e| e.id.as_str())
+                .collect();
+            let derived: i128 = pop
+                .iter()
+                .filter(|v| {
+                    cited.contains(v.guid.as_str())
+                        && v.base_type != "Contra"
+                        && v.lines
+                            .iter()
+                            .any(|l| l.ledger == **name && l.amount_paise != 0)
+                })
+                .map(|v| -net_on(v, &tds_read))
+                .sum();
+            if derived != tds_in_principal {
+                out.push(format!(
+                    "LOAN-1: {name} (tag {h}) tds_in_principal_{h} says {tds_in_principal}p but \
+the lines on the TDS ledgers of the vouchers it cites on this loan are {derived}p"
+                ));
+            }
+        }
+        let expected_movement =
+            -taken_total + repaid_total - interest + tds_on_loan - tds_in_principal;
         let movement = i128::from(tb_row.closing_paise) - i128::from(tb_row.opening_paise);
         let diff = expected_movement - movement;
         if diff.abs() > tol {
             out.push(format!(
                 "LOAN-1: {name} (tag {h}) expected FY movement {expected_movement}p (= -taken \
-{taken_total}p + repaid {repaid_total}p - interest {interest}p + TDS {tds_on_loan}p) does not tie \
+{taken_total}p + repaid {repaid_total}p - interest {interest}p + TDS {}p) does not tie \
 the TB movement {movement}p (opening {}p, closing {}p); difference {diff}p -- a voucher on this \
 loan ledger was likely dropped from or wrongly added to the population.",
-                tb_row.opening_paise, tb_row.closing_paise
+                tds_on_loan - tds_in_principal,
+                tb_row.opening_paise,
+                tb_row.closing_paise
             ));
         }
     }
 
-    let pop = book.population()?;
     let mut pop_by_guid: HashMap<&str, Vec<&Voucher>> = HashMap::new();
     for v in &pop {
         pop_by_guid.entry(v.guid.as_str()).or_default().push(v);
@@ -3835,6 +3928,7 @@ possible_misposted_interest_{h} does not cite it: the entry is not asked about."
                 let stray: Vec<String> = v
                     .lines
                     .iter()
+                    .filter(|l| l.amount_paise != 0)
                     .map(|l| l.ledger.as_str())
                     .filter(|l| *l != loan.as_str() && !foreign.contains(l) && !under_duties(l))
                     .collect::<BTreeSet<_>>()
@@ -3871,16 +3965,9 @@ vouchers it cites net {on_loan}p.",
     // a credit and a debit line on it is either listed -- a two_sided_gross_credit/debit figure
     // pair citing it, equal to the voucher's own credit and debit lines on the loan -- or read as
     // interest: its every other non-zero line is one of the loan's interest ledgers or a TDS ledger
-    // run() published (tds_payable_ledgers: the configuration, not a group), with no other loan's
+    // run() published (tds_read_loan4, above), with no other loan's
     // line; a voucher on the loan alone is listed only if it does not balance. A listed voucher
     // that does not credit and debit the loan is named too.
-    let tds_read: BTreeSet<String> = figures
-        .get(format!("{prefix}tds_payable_ledgers").as_str())
-        .map(|f| lines_of(f))
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|x| !x.is_empty())
-        .collect();
     for fid in figures.keys() {
         let Some(h) = fid.strip_prefix(&format!("{prefix}interest_total_")) else {
             continue;
@@ -3940,7 +4027,7 @@ debits it {debit}p, but its listed record shows {shown_credit}p and {}p.",
                     .any(|o| *o != loan.as_str() && loan_names.contains(*o))
                 || !others
                     .iter()
-                    .all(|o| ils.contains(*o) || tds_read.contains(*o))
+                    .all(|o| ils.contains(*o) || tds_read_loan4.contains(*o))
             {
                 out.push(format!(
                     "LOAN-4: voucher {} (guid {}) both credits ({credit}p) and debits ({debit}p) loan \
@@ -4047,7 +4134,7 @@ are {debit_pop}p",
                 .filter(|(_, v)| v.base_type != "Contra")
                 .filter(|(_, v)| {
                     paired.iter().any(|loan| {
-                        let rest: Vec<&str> = others_than(v, loan)
+                        let rest: Vec<&str> = posted_others_than(v, loan)
                             .into_iter()
                             .filter(|o| !tds_of.get(loan).is_some_and(|t| t.contains(*o)))
                             .collect();
@@ -4332,6 +4419,23 @@ mod tests {
         // The control: distinct GUIDs give two rows.
         let two = book(vec![taken("g1", "20250601"), taken("g2", "20250602")]);
         assert_eq!(run_on(&two, &rules).unwrap().findings.len(), 2);
+    }
+
+    /// A row's figure id ends with the first eight hex digits of the sha1 of its voucher's GUID
+    /// (`hashlib.sha1(b"G1").hexdigest()[:8]`, measured in Python; upper-case on purpose, so a tag that
+    /// folds case is caught), so a change to the shared tag changes this module's ids.
+    #[test]
+    fn a_row_figure_id_ends_with_the_sha1_tag_of_its_voucher_guid() {
+        let rules = Rules::vendored().unwrap();
+        let r = run_on(&book(vec![taken("G1", "20250601")]), &rules).unwrap();
+        let ids: Vec<&str> = r
+            .figures
+            .iter()
+            .map(|f| f.id.as_str())
+            .filter(|id| id.contains(".clause31_row_amount_"))
+            .collect();
+        assert_eq!(ids.len(), 1);
+        assert!(ids[0].ends_with("_93191cee"), "{}", ids[0]);
     }
 
     /// Without `[tds_rates].s194a_bp` coverage is not judged: no expected or covering figure, the

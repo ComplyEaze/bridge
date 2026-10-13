@@ -22,7 +22,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
     assert!(parsed
         .rows
         .iter()
-        .all(|row| row.date.as_deref() == Some("20260801")));
+        .all(|row| row.date.as_str() == "20260801"));
     for fault in [
         "out_of_window",
         "invalid_amount",
@@ -56,10 +56,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
                 let rows = parse_import_vouchers(&body, CAPTURED_GUID).unwrap();
                 assert_eq!(rows.rows.len(), 3);
                 assert!(rows.rows.iter().all(|row| row.alter_id.is_none()));
-                assert!(rows
-                    .rows
-                    .iter()
-                    .all(|row| row.date.as_deref() == Some("20260801")));
+                assert!(rows.rows.iter().all(|row| row.date.as_str() == "20260801"));
                 body
             } else {
                 source.clone()

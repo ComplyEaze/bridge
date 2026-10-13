@@ -65,7 +65,7 @@ fn arguments() -> Result<Arguments, String> {
         pdfium: take("pdfium")?.into(),
         pdf: take("pdf")?.into(),
         password_file: take("password-file")?.into(),
-        bank: Bank::from_name(&take("bank")?).ok_or("--bank must be sbi, hdfc or ubi")?,
+        bank: Bank::from_name(&take("bank")?).ok_or("--bank must be sbi, hdfc, ubi or bob")?,
         poppler_xml: take("poppler-xml")?.into(),
     })
 }
@@ -152,8 +152,9 @@ fn run() -> Result<String, String> {
     let password = read_password(&arguments.password_file)?;
     let bytes = std::fs::read(&arguments.pdf).map_err(|_| "statement unreadable")?;
     let engine = engine(&arguments.pdfium).map_err(|refusal| refusal.category.to_string())?;
-    let pdfium_pages =
+    let pdfium_text =
         extract_pages(engine, &bytes, &password).map_err(|refusal| refusal.category.to_string())?;
+    let pdfium_pages = pdfium_text.pages();
     drop(password);
     let xml =
         std::fs::read_to_string(&arguments.poppler_xml).map_err(|_| "poppler XML unreadable")?;
@@ -165,7 +166,7 @@ fn run() -> Result<String, String> {
     }
 
     let outcome = |pages: &[Page]| parse_statement(pages, arguments.bank);
-    let (pdfium_rows, poppler_rows) = (outcome(&pdfium_pages), outcome(&poppler_pages));
+    let (pdfium_rows, poppler_rows) = (outcome(pdfium_pages), outcome(&poppler_pages));
     let rows_report = |rows: &Result<Vec<Row>, bridge_bank_statement::Refusal>| match rows {
         Ok(rows) => serde_json::json!({"rows": rows.len()}),
         Err(refusal) => serde_json::json!({"refused": refusal.category, "row": refusal.row}),
@@ -207,8 +208,8 @@ fn run() -> Result<String, String> {
         "bank": arguments.bank.name(),
         "pdfium": {
             "pages": pdfium_pages.len(),
-            "words": words(&pdfium_pages),
-            "lines": line_count(&pdfium_pages),
+            "words": words(pdfium_pages),
+            "lines": line_count(pdfium_pages),
             "parse": rows_report(&pdfium_rows),
         },
         "pdftotext": {
@@ -217,9 +218,9 @@ fn run() -> Result<String, String> {
             "lines": line_count(&poppler_pages),
             "parse": rows_report(&poppler_rows),
         },
-        "same_words_and_lines": horizontal_agreement(&pdfium_pages, &poppler_pages).is_some(),
+        "same_words_and_lines": horizontal_agreement(pdfium_pages, &poppler_pages).is_some(),
         "largest_horizontal_edge_difference_pt":
-            horizontal_agreement(&pdfium_pages, &poppler_pages).map(|value| (value * 1000.0).round() / 1000.0),
+            horizontal_agreement(pdfium_pages, &poppler_pages).map(|value| (value * 1000.0).round() / 1000.0),
         "rows": comparison,
     });
     serde_json::to_string_pretty(&report).map_err(|_| "report serialization failed".to_string())

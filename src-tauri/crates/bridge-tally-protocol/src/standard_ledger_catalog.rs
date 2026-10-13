@@ -148,13 +148,17 @@ pub fn parse_standard_ledger_identity_observation(
                 }
                 ledger_count += 1;
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
             Event::Empty(_element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
             {
                 anyhow::bail!("standard ledger identity collection contained an empty row");
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::End(element) => {
+                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -502,11 +506,13 @@ pub fn parse_ledger_census_slice(
                 }
                 guids.push(guid);
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
             Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
                 return Err(StandardLedgerCatalogError::MalformedResponse);
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
                 .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
@@ -529,13 +535,13 @@ fn parse_ledger_census_row(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<LedgerCensusRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let row_name = element.name().as_ref().to_ascii_uppercase();
+    let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
     let mut company_guid = None;
     let mut ledger_guid = None;
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 match child_name.as_slice() {
                     b"NAME" => {
                         validate_only_attributes(&child, &[b"TYPE"])?;
@@ -570,9 +576,17 @@ fn parse_ledger_census_row(
                     _ => anyhow::bail!("ledger census row contained an unexpected field"),
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(&row_name) => break,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&row_name) =>
+            {
+                break
+            }
             Event::Empty(_) => anyhow::bail!("ledger census row contained an empty field"),
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("ledger census row contained unexpected text")
             }
             Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
@@ -677,11 +691,13 @@ fn parse_standard_ledger_catalog_rows(
                     bill_wise: observed.bill_wise,
                 });
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
             Event::Empty(_) if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) => {
                 return Err(StandardLedgerCatalogError::MalformedResponse);
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
                 .map_err(|_| StandardLedgerCatalogError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
@@ -718,11 +734,11 @@ fn parse_standard_ledger_identity_row(
 ) -> anyhow::Result<StandardLedgerIdentityRow> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
     let mut ledger_name = include_ledger_name
-        .then(|| attr_value(reader, element, b"NAME"))
+        .then(|| attr_value(element, b"NAME"))
         .flatten()
         .map(|value| observed_standard_ledger_name(&value))
         .transpose()?;
-    let row_name = element.name().as_ref().to_ascii_uppercase();
+    let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
     let mut company_name = None;
     let mut company_guid = None;
     let mut ledger_guid = None;
@@ -735,13 +751,13 @@ fn parse_standard_ledger_identity_row(
     loop {
         match reader.read_event()? {
             Event::Start(child) => {
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 match child_name.as_slice() {
                     b"ISBILLWISEON" if read_bill_wise => {
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         // Every flag seen live is a Logical (§12a.15): a flag of
                         // another type, or with no type, is not read as one.
-                        if attr_value(reader, &child, b"TYPE").as_deref() != Some("Logical") {
+                        if attr_value(&child, b"TYPE").as_deref() != Some("Logical") {
                             return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
                         }
                         let text = read_optional_text(reader, child.name())?
@@ -766,7 +782,7 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         skip_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
                         )?;
                     }
                     b"BRIDGECOMPANYNAME" => {
@@ -807,7 +823,7 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         skip_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
                         )?;
                     }
                     b"PARENT" if include_ledger_name => {
@@ -835,7 +851,7 @@ fn parse_standard_ledger_identity_row(
                         validate_only_attributes(&child, &[b"TYPE"])?;
                         skip_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
                         )?;
                     }
                     // Only the first list can name the ledger: a later list, and
@@ -844,22 +860,30 @@ fn parse_standard_ledger_identity_row(
                         language_list_seen = true;
                         stored_name = walk_standard_ledger_identity_child(
                             reader,
-                            child.name().as_ref().to_ascii_uppercase(),
+                            child.name().as_ref().as_bytes().to_ascii_uppercase(),
                             true,
                         )?;
                     }
                     b"LANGUAGENAME.LIST" => skip_standard_ledger_identity_child(
                         reader,
-                        child.name().as_ref().to_ascii_uppercase(),
+                        child.name().as_ref().as_bytes().to_ascii_uppercase(),
                     )?,
                     _ => anyhow::bail!(
                         "standard ledger identity collection contained an unexpected row field"
                     ),
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(&row_name) => break,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&row_name) =>
+            {
+                break
+            }
             Event::Empty(child)
-                if include_ledger_name && child.name().as_ref().eq_ignore_ascii_case(b"PARENT") =>
+                if include_ledger_name && child.name().as_ref().eq_ignore_ascii_case("PARENT") =>
             {
                 validate_only_attributes(&child, &[b"TYPE"])?;
                 if parent_seen {
@@ -869,15 +893,14 @@ fn parse_standard_ledger_identity_row(
                 parent = PartyLedgerMasterFieldObservation::Returned(String::new());
             }
             Event::Empty(child)
-                if read_bill_wise
-                    && child.name().as_ref().eq_ignore_ascii_case(b"ISBILLWISEON") =>
+                if read_bill_wise && child.name().as_ref().eq_ignore_ascii_case("ISBILLWISEON") =>
             {
                 return Err(StandardLedgerCatalogError::BillWiseFlagInvalid.into());
             }
             Event::Empty(_) => {
                 anyhow::bail!("standard ledger identity collection contained an empty row field")
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("standard ledger identity collection contained unexpected row text")
             }
             Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
@@ -938,20 +961,15 @@ fn walk_standard_ledger_identity_child(
                     && depth == 2
                     && in_name_list
                     && !first_name_seen
-                    && child.name().as_ref().eq_ignore_ascii_case(b"NAME") =>
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME") =>
             {
                 first_name_seen = true;
                 // Not `read_identifier_text`: its `?` on a bad entity would refuse the
                 // whole catalogue for a name this walk can simply leave unread.
                 let raw = reader.read_text(child.name())?;
-                stored_name = raw
-                    .decode()
+                stored_name = quick_xml::escape::unescape(&raw)
                     .ok()
-                    .and_then(|text| {
-                        quick_xml::escape::unescape(&text)
-                            .ok()
-                            .map(|v| v.into_owned())
-                    })
+                    .map(|v| v.into_owned())
                     .filter(|value| !value.trim().is_empty())
                     .and_then(|value| observed_standard_ledger_name(&value).ok());
             }
@@ -959,7 +977,7 @@ fn walk_standard_ledger_identity_child(
                 if capture_stored_name
                     && depth == 2
                     && in_name_list
-                    && child.name().as_ref().eq_ignore_ascii_case(b"NAME") =>
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME") =>
             {
                 // An empty first name is still the first name: an alias after it is not.
                 first_name_seen = true;
@@ -967,7 +985,7 @@ fn walk_standard_ledger_identity_child(
             Event::Start(child)
                 if capture_stored_name
                     && depth == 1
-                    && child.name().as_ref().eq_ignore_ascii_case(b"NAME.LIST") =>
+                    && child.name().as_ref().eq_ignore_ascii_case("NAME.LIST") =>
             {
                 in_name_list = true;
                 depth = depth.checked_add(1).ok_or_else(|| {
@@ -989,7 +1007,12 @@ fn walk_standard_ledger_identity_child(
                     in_name_list = false;
                 }
                 if depth == 0 {
-                    if !end.name().as_ref().eq_ignore_ascii_case(&expected_name) {
+                    if !end
+                        .name()
+                        .as_ref()
+                        .as_bytes()
+                        .eq_ignore_ascii_case(&expected_name)
+                    {
                         anyhow::bail!(
                             "standard ledger identity collection closed an unexpected field"
                         );

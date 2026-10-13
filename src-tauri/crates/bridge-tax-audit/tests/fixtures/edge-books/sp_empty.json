@@ -1,0 +1,137 @@
+{
+ "comment": "Firm entity. The table holds one key, Partner Q, whose value is an empty object: the gate is \"yes\" and no finding is raised, although Partner Q Remuneration moves. Only the table names a person's natures.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_empty-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-sp_empty-001"
+  },
+  {
+   "name": "Partner Q Remuneration",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-sp_empty-002"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-sp_empty-003"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-sp_empty-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 9000000,
+   "credit": 1200000,
+   "closing": 57800000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50010000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50010000
+  },
+  {
+   "ledger": "Partner Q Remuneration",
+   "opening": 0,
+   "debit": 1200000,
+   "credit": 0,
+   "closing": 1200000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 10000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 10000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 9000000,
+   "closing": -9000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "r01",
+   "date": "2025-04-02",
+   "base_type": "Receipt",
+   "lines": [
+    [
+     "Sales",
+     -9000000
+    ],
+    [
+     "Bank A",
+     9000000
+    ]
+   ]
+  },
+  {
+   "guid": "p01",
+   "date": "2025-06-30",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Partner Q Remuneration",
+     1200000
+    ],
+    [
+     "Bank A",
+     -1200000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "related_parties_cl23",
+  "specified_persons_40a2b"
+ ],
+ "cash": [
+  "Petty Cash"
+ ],
+ "bank": [
+  "Bank A"
+ ],
+ "entity_type": "firm",
+ "related_parties": {
+  "Partner Q": {}
+ }
+}

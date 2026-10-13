@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(AMEND LAB)
+# source: captured
+Err(MalformedResponse)

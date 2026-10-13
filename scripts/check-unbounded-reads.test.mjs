@@ -3,7 +3,9 @@
 //
 // Each case is a synthetic --root tree with one real git repository (the
 // scanner shells out to `git ls-files`, so it needs one) holding a single
-// Rust file exercising one branch of the scanner's logic.
+// Rust file exercising one branch of the scanner's logic. Every tree also tracks
+// src-tauri/build.rs, the one file the gate's UNSCANNED_RS_FILES table names, since
+// a name in that table that git does not track is a stale exclusion (#1148 item 12).
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -11,9 +13,17 @@ import { join } from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import {
+  checkSourceCoverage,
+  SOURCE_ROOTS,
+  UNSCANNED_RS_FILES,
+  UnscannedSourceFileError,
+  validateExclusions,
+} from "./check-unbounded-reads.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const GATE = join(here, "check-unbounded-reads.mjs");
+const BUILD_RS = ["src-tauri/build.rs", "fn main() {}\n"];
 
 function git(cwd, ...args) {
   const out = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -26,6 +36,8 @@ async function makeRepo(rustFileRelativePath, rustSource) {
   const directory = rustFileRelativePath.split("/").slice(0, -1).join("/");
   await mkdir(join(root, directory), { recursive: true });
   await writeFile(join(root, rustFileRelativePath), rustSource);
+  await mkdir(join(root, "src-tauri"), { recursive: true });
+  await writeFile(join(root, BUILD_RS[0]), BUILD_RS[1]);
   git(root, "init", "-q", ".");
   git(root, "config", "user.email", "test@example.invalid");
   git(root, "config", "user.name", "test");
@@ -42,7 +54,8 @@ function runGateExpectingFailure(root) {
   try {
     runGate(root);
   } catch (error) {
-    return `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    // The gate fails by an uncaught throw; on Windows Node prints that with CRLF line ends (#1471).
+    return `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
   }
   throw new Error("expected the gate to fail, but it passed");
 }
@@ -178,6 +191,7 @@ test("a path under a tests/ directory is excluded regardless of content", async 
   const root = await mkdtemp(join(tmpdir(), ".unbounded-reads-"));
   try {
     await mkdir(join(root, "src-tauri/tests"), { recursive: true });
+    await writeFile(join(root, BUILD_RS[0]), BUILD_RS[1]);
     await writeFile(
       join(root, "src-tauri/tests/integration.rs"),
       `fn helper(mut reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
@@ -361,7 +375,9 @@ fn read(reader: impl std::io::Read) -> std::io::Result<Vec<u8>> {
 // longer excuses an unbounded read fails the gate.
 async function makeTree(files) {
   const root = await mkdtemp(join(tmpdir(), ".unbounded-reads-"));
-  for (const [path, text] of Object.entries(files)) {
+  // A null text leaves a path out, to build a tree without the tracked build script.
+  for (const [path, text] of Object.entries({ [BUILD_RS[0]]: BUILD_RS[1], ...files })) {
+    if (text === null) continue;
     await mkdir(join(root, path.split("/").slice(0, -1).join("/")), { recursive: true });
     await writeFile(join(root, path), text);
   }
@@ -449,6 +465,83 @@ test("an exception with no reason is refused", async () => {
     "Error: scripts/unbounded-reads-allowed.json: src-tauri/src/example.rs has no reason; " +
       "every exception says why",
   );
+});
+
+// #1148 item 12: which files the scan reads is itself checked.
+test("a tracked .rs file outside the roots, unlisted, fails by type and by name", () => {
+  assert.throws(
+    () => checkSourceCoverage(["src-tauri/build.rs", "src-tauri/src/a.rs", "src-tauri/examples/other.rs", "src-tauri/extra/b.rs"]),
+    (error) => {
+      assert.ok(error instanceof UnscannedSourceFileError);
+      assert.equal(error.name, "UnscannedSourceFileError");
+      assert.deepEqual(error.files, ["src-tauri/examples/other.rs", "src-tauri/extra/b.rs"]);
+      assert.match(error.message, /\n {2}- src-tauri\/examples\/other\.rs\n {2}- src-tauri\/extra\/b\.rs$/);
+      return true;
+    },
+  );
+});
+
+test("a listed file outside the roots passes and is not scanned", () => {
+  assert.deepEqual(checkSourceCoverage(["src-tauri/build.rs", "src-tauri/src/a.rs"]), ["src-tauri/src/a.rs"]);
+  const exclusions = new Map([["x/other.rs", "a generator, no external input"]]);
+  assert.deepEqual(checkSourceCoverage(["x/other.rs", "tools/b.rs"], { exclusions }), ["tools/b.rs"]);
+});
+
+test("a test file outside the roots is excluded by the path rule, not by a listed name", () => {
+  const tracked = ["src-tauri/tests/gate.rs", "src-tauri/examples/foo_tests.rs", "src-tauri/src/a.rs"];
+  assert.deepEqual(checkSourceCoverage(tracked, { exclusions: new Map() }), ["src-tauri/src/a.rs"]);
+});
+
+test("a test file under a root is excluded by the path rule from the files to scan", () => {
+  const tracked = ["src-tauri/src/a.rs", "src-tauri/src/a_tests.rs", "src-tauri/crates/x/tests/y.rs"];
+  assert.deepEqual(checkSourceCoverage(tracked, { exclusions: new Map() }), ["src-tauri/src/a.rs"]);
+});
+
+test("an exclusion with no reason is refused", () => {
+  for (const reason of ["", "  ", undefined]) {
+    assert.throws(
+      () => checkSourceCoverage(["x/other.rs", "src-tauri/src/a.rs"], { exclusions: new Map([["x/other.rs", reason]]) }),
+      { message: "UNSCANNED_RS_FILES: x/other.rs has no reason; every exclusion says why" },
+    );
+  }
+  assert.doesNotThrow(() => validateExclusions(UNSCANNED_RS_FILES));
+});
+
+test("an exclusion naming a file git does not track is a stale exclusion", () => {
+  assert.throws(() => checkSourceCoverage(["src-tauri/src/a.rs"]), {
+    message:
+      "1 stale exclusion(s) in UNSCANNED_RS_FILES: each names a file git does not track, so the " +
+      "table would excuse a file added there later unreported. Remove the entry:\n  - src-tauri/build.rs",
+  });
+});
+
+// The roots are spelled out here, not read from SOURCE_ROOTS, so dropping one drops its case's pass.
+for (const root of ["src-tauri/src", "src-tauri/crates", "tools"]) {
+  test(`an unguarded read under ${root} is scanned and reported`, async () => {
+    assert.ok(SOURCE_ROOTS.includes(root));
+    const output = await gateOnTree({ [`${root}/pkg/example.rs`]: UNCAPPED }, true);
+    assert.deepEqual(reported(output), [`${root}/pkg/example.rs:3: reader.read_to_end(&mut output)?;`]);
+  });
+}
+
+test("the gate names an unlisted file outside the roots, by type, and fails", async () => {
+  const output = await gateOnTree(
+    { "src-tauri/src/example.rs": "fn f() {}\n", "src-tauri/examples/other.rs": "fn main() {}\n" },
+    true,
+  );
+  assert.ok(output.split("\n").some((line) => line.startsWith("UnscannedSourceFileError: 1 tracked .rs file(s) are neither")));
+  assert.deepEqual(reported(output), ["src-tauri/examples/other.rs"]);
+});
+
+test("the gate does not read a listed file: its uncapped read is not reported", async () => {
+  const output = await gateOnTree({ "src-tauri/src/example.rs": "fn f() {}\n", "src-tauri/build.rs": UNCAPPED }, false);
+  assert.equal(output, summary(0));
+});
+
+test("the gate fails a listed file that git does not track", async () => {
+  const output = await gateOnTree({ "src-tauri/src/example.rs": "fn f() {}\n", "src-tauri/build.rs": null }, true);
+  assert.deepEqual(reported(output), ["src-tauri/build.rs"]);
+  assert.match(output, /1 stale exclusion\(s\) in UNSCANNED_RS_FILES/);
 });
 
 console.log("\nrunning check-unbounded-reads contract tests via node:test above");

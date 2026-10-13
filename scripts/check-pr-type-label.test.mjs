@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { parseDocument } from "yaml";
 
 import { TYPE_LABELS, typeLabelProblem } from "./check-pr-type-label.mjs";
 
-const script = new URL("./check-pr-type-label.mjs", import.meta.url).pathname;
+const script = fileURLToPath(new URL("./check-pr-type-label.mjs", import.meta.url));
 const run = (labels) => spawnSync(process.execPath, [script], { env: { ...process.env, PR_LABELS: labels }, encoding: "utf8" });
 
 test("exactly one known type label passes", () => {
@@ -34,7 +35,7 @@ test("the script exits 0 on a good set and 1 on a bad one, and fails closed on u
 test("the workflow runs on pull_request with the label names passed by environment, not spliced into the shell", () => {
   const flow = parseDocument(readFileSync(new URL("../.github/workflows/pr-labels.yml", import.meta.url), "utf8")).toJS();
   assert.deepEqual(Object.keys(flow.on), ["pull_request", "merge_group"], "not pull_request_target");
-  assert.deepEqual(flow.on.pull_request.types, ["opened", "reopened", "synchronize", "labeled", "unlabeled"]);
+  assert.deepEqual(flow.on.pull_request.types, ["opened", "reopened", "synchronize", "labeled", "unlabeled", "milestoned", "demilestoned"]);
   assert.deepEqual(flow.permissions, { contents: "read" });
   // No run may be cancelled: a cancelled "Type label" run stays beside the success and blocks the required check.
   assert.deepEqual(flow.concurrency, { group: "pr-labels-${{ github.event.pull_request.number || github.run_id }}", "cancel-in-progress": false, queue: "max" });

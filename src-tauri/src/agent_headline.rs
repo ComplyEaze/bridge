@@ -505,6 +505,152 @@ impl StatementBasis {
     }
 }
 
+/// What a cash flow read established, held for its headline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum CashFlowOutcome {
+    /// The net total equals the trial balance's cash and bank ledgers.
+    Tied,
+    /// The two differ.
+    Differs,
+    /// A Bank OD A/c or Bank OCC A/c ledger has movement in the period, and
+    /// Tally's Cash Flow was seen counting one such ledger, which the check does not count.
+    MoneyGroupUnmeasured,
+    /// No amount on either side (no cash or bank ledger with an amount, and an
+    /// empty Cash Flow): nothing was compared.
+    NothingToCompare,
+}
+
+/// What a cash flow read covered and found, held for its headline.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct CashFlowBasis {
+    from: bridge_tally_core::TallyDate,
+    to: bridge_tally_core::TallyDate,
+    outcome: CashFlowOutcome,
+    /// The answer holds something not yet compared with Tally's own Cash Flow
+    /// screen (a credit amount, a positive closing, a window across March into April).
+    unmeasured_shape: bool,
+}
+
+impl CashFlowBasis {
+    pub(super) fn new(
+        from: bridge_tally_core::TallyDate,
+        to: bridge_tally_core::TallyDate,
+        outcome: CashFlowOutcome,
+        unmeasured_shape: bool,
+    ) -> Self {
+        Self {
+            from,
+            to,
+            outcome,
+            unmeasured_shape,
+        }
+    }
+
+    /// Whether the months are withheld: they are shown only once the net total
+    /// is checked, so a month's figure is never shown beside a total Tally's own
+    /// ledgers contradict.
+    pub(super) fn months_withheld(&self) -> bool {
+        self.outcome != CashFlowOutcome::Tied
+    }
+
+    pub(super) fn headline(&self, company: &CompanyName) -> Headline {
+        let subject = format!(
+            "cash flow for {}, {} to {}",
+            company.quoted(),
+            plain_date(&self.from),
+            plain_date(&self.to)
+        );
+        let lead = match self.outcome {
+            CashFlowOutcome::Tied => format!(
+                "{}: Tally's net cash and bank movement for the whole period equals the cash and bank ledgers of its trial balance. The split into months is Tally's own and has not been checked. Tally's debit and credit columns are not shown, and a negative amount is a debit (cash and bank growing).{} This is Tally's month-wise cash and bank movement, not a cash flow statement under AS 3.",
+                capitalised(&subject),
+                if self.unmeasured_shape {
+                    " This answer holds a credit amount, a positive closing or a window from March into April, a shape of which a credit amount (two windows, one with a positive closing) tied to the trial balance in live runs on one synthetic book, a window from March into April was not run, and no month was compared with Tally's own Cash Flow screen: the net total agrees, but treat each month's figure as unverified and compare it with Tally's own Cash Flow."
+                } else {
+                    " No month's figure has been checked against Tally's own Cash Flow screen."
+                }
+            ),
+            CashFlowOutcome::Differs => format!(
+                "Not established: the {subject}. Tally's net cash and bank figure for the period differs from the cash and bank ledgers of its trial balance, so the months are withheld. Do not give either figure as the cash movement: ask the user to open Cash Flow in Tally for the same period."
+            ),
+            CashFlowOutcome::MoneyGroupUnmeasured => format!(
+                "Not established: the {subject}. A ledger under Bank OD A/c or Bank OCC A/c has movement in the period, and Tally's Cash Flow was seen counting such a ledger, which this check does not count, so the months are withheld. Tell the user that cash flow for this period has to be read in Tally."
+            ),
+            CashFlowOutcome::NothingToCompare => format!(
+                "Not established: the {subject}. Nothing could be tied: either neither the trial balance's cash and bank ledgers (Cash-in-Hand and Bank Accounts) nor Tally's Cash Flow carry any amount for the period (an empty month is not a zero), or both add up to zero, which would agree under any reading of the columns. The months are withheld. Tell the user that cash flow for this period has to be read in Tally."
+            ),
+        };
+        Headline {
+            lead,
+            rows: None,
+            page: None,
+        }
+    }
+}
+
+/// What a company features read found, held for its headline.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct CompanyFeaturesBasis {
+    cost_centres: bridge_tally_protocol::native_company_features::NativeSetting,
+    gst: bridge_tally_protocol::native_company_features::NativeSetting,
+    batch_wise: bridge_tally_protocol::native_company_features::NativeSetting,
+    currency: bridge_tally_protocol::native_company_features::NativeCurrencySymbol,
+}
+
+impl CompanyFeaturesBasis {
+    pub(super) fn new(
+        features: &bridge_tally_protocol::native_company_features::NativeCompanyFeatures,
+    ) -> Self {
+        Self {
+            cost_centres: features.cost_centres,
+            gst: features.gst,
+            batch_wise: features.batch_wise,
+            currency: features.base_currency.clone(),
+        }
+    }
+
+    /// Whether Tally sent every setting this read returns.
+    pub(super) fn all_reported(&self) -> bool {
+        use bridge_tally_protocol::native_company_features::NativeSetting::NotReported;
+        ![self.cost_centres, self.gst, self.batch_wise].contains(&NotReported)
+    }
+
+    pub(super) fn headline(&self, company: &CompanyName) -> Headline {
+        use bridge_tally_protocol::native_company_features::{NativeCurrencySymbol, NativeSetting};
+        let word = |setting: NativeSetting| match setting {
+            NativeSetting::Yes => "on",
+            NativeSetting::No => "off",
+            NativeSetting::NotReported => "not sent by Tally",
+        };
+        let mut lead = format!(
+            "The settings Tally's company record holds today for {}: cost centres {}, GST {}, batch-wise stock {}.",
+            company.quoted(),
+            word(self.cost_centres),
+            word(self.gst),
+            word(self.batch_wise)
+        );
+        if !self.all_reported() {
+            lead.push_str(
+                " A setting Tally did not send is not reported; that is not the same as off.",
+            );
+        }
+        lead.push_str(
+            " They are not what the books contain or what they were during a year, and each of the three has been compared with Tally's own screen, on synthetic books.",
+        );
+        match &self.currency {
+            NativeCurrencySymbol::Reported(symbol) => lead.push_str(&format!(
+                " The company's currency symbol is {symbol}: a symbol, not a currency code."
+            )),
+            NativeCurrencySymbol::NotReported => lead.push_str(" Tally sent no currency symbol."),
+        }
+        Headline {
+            lead,
+            rows: None,
+            page: None,
+        }
+    }
+}
+
 impl Headline {
     /// The same headline after a byte cap left `shown` rows of its page.
     fn restated(mut self, shown: usize) -> Self {

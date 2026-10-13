@@ -1,0 +1,138 @@
+{
+ "comment": "clause21a_candidates with no [ledger_scrutiny] table in the rules, so the large-entry threshold is the module's own default: a repairs entry one paisa over it is a capital candidate, a maintenance entry at it is not.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Admin Expenses": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_default_threshold-000"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c21a_default_threshold-001"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c21a_default_threshold-002"
+  },
+  {
+   "name": "Repairs",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_default_threshold-003"
+  },
+  {
+   "name": "Maintenance",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c21a_default_threshold-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000001,
+   "closing": -10000001
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Repairs",
+   "opening": 0,
+   "debit": 5000001,
+   "credit": 0,
+   "closing": 5000001
+  },
+  {
+   "ledger": "Maintenance",
+   "opening": 0,
+   "debit": 5000000,
+   "credit": 0,
+   "closing": 5000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "edge-c21a_default_threshold-v01",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Shop",
+   "lines": [
+    [
+     "Repairs",
+     5000001
+    ],
+    [
+     "Bank",
+     -5000001
+    ]
+   ]
+  },
+  {
+   "guid": "edge-c21a_default_threshold-v02",
+   "date": "2025-06-01",
+   "base_type": "Payment",
+   "narration": "Godown",
+   "lines": [
+    [
+     "Maintenance",
+     5000000
+    ],
+    [
+     "Bank",
+     -5000000
+    ]
+   ]
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "bank": [
+  "Bank"
+ ],
+ "rules_without": [
+  "ledger_scrutiny"
+ ],
+ "tests": [
+  "clause21a_candidates"
+ ]
+}

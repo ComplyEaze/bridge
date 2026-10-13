@@ -1,0 +1,145 @@
+{
+ "comment": "depreciation, two cash-paid lines of one voucher on one asset ledger, every GUID its own (#1243): a cash purchase with two lines on Machine A, the larger first (two rows, _1 and _2 in line order; the reference stopped here on a repeated figure id); a cash purchase of Machine A with a GUID of its own (its id as before); a cash purchase with one line on Machine A and one on Machine B (two ledgers: neither id repeats).",
+ "groups": {
+  "Fixed Assets": null,
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Indirect Expenses": null,
+  "Capital Account": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-dep_two_cash_lines-000"
+  },
+  {
+   "name": "Machine A",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_two_cash_lines-001"
+  },
+  {
+   "name": "Machine B",
+   "chain": [
+    "Fixed Assets"
+   ],
+   "guid": "edge-dep_two_cash_lines-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-dep_two_cash_lines-003"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 5023714,
+   "debit": 0,
+   "credit": 4816099,
+   "closing": 207615
+  },
+  {
+   "ledger": "Machine A",
+   "opening": 0,
+   "debit": 4085880,
+   "credit": 0,
+   "closing": 4085880
+  },
+  {
+   "ledger": "Machine B",
+   "opening": 61209,
+   "debit": 730219,
+   "credit": 0,
+   "closing": 791428
+  },
+  {
+   "ledger": "Capital",
+   "opening": -5084923,
+   "debit": 0,
+   "credit": 0,
+   "closing": -5084923
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "dep-t-1",
+   "date": "2025-06-11",
+   "base_type": "Payment",
+   "number": "Y1",
+   "lines": [
+    [
+     "Machine A",
+     1420119
+    ],
+    [
+     "Machine A",
+     610207
+    ],
+    [
+     "Cash",
+     -2030326
+    ]
+   ]
+  },
+  {
+   "guid": "dep-t-2",
+   "date": "2025-07-23",
+   "base_type": "Payment",
+   "number": "Y2",
+   "lines": [
+    [
+     "Machine A",
+     1150441
+    ],
+    [
+     "Cash",
+     -1150441
+    ]
+   ]
+  },
+  {
+   "guid": "dep-t-3",
+   "date": "2025-09-30",
+   "base_type": "Payment",
+   "number": "Y3",
+   "lines": [
+    [
+     "Machine A",
+     905113
+    ],
+    [
+     "Machine B",
+     730219
+    ],
+    [
+     "Cash",
+     -1635332
+    ]
+   ]
+  }
+ ],
+ "depreciation": {
+  "block_by_ledger": {
+   "Machine A": "plant_machinery_15",
+   "Machine B": "plant_machinery_15"
+  },
+  "opening_wdv_paise": {
+   "plant_machinery_15": 61209
+  },
+  "dep_expense_ledgers": []
+ },
+ "tests": [
+  "depreciation"
+ ]
+}

@@ -1,0 +1,88 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "clause21a_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "797c2b1bb11ca213",
+  "population_note_text": "Every debit line on a ledger under Purchase Accounts, Direct Expenses or Indirect Expenses, in the books population; credits on those ledgers that match are shown beside.",
+  "figures": [
+    {
+      "id": "clause21a_candidates.candidate_total_compounding",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "29e8e0db199a48a7",
+      "definition_text": "Clause 21(a) (vii) compounding an offence: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_skips-v09",
+          "label": "Payment edge-c21a_skips-v09 on 2025-06-01, Office Rent, ₹1,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.credits_total_compounding",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "7b9a591925e552f1",
+      "definition_text": "Credits on the same P&L ledgers matching the (vii) compounding an offence words: shown beside, never netted.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "clause21a_candidates/compounding",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_compounding"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_compounding"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_skips-v09",
+          "label": "Payment edge-c21a_skips-v09 on 2025-06-01, Office Rent, ₹1,000"
+        }
+      ],
+      "title_sha256_16": "f093400971fbbbad",
+      "title_text": "Clause 21(a) (vii) compounding an offence: candidates listed for the CA, not reported",
+      "limits_sha256_16": "dde934c670b86a90",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 para 33.22 (Explanation 3(iii) to s.37(1): compounding an offence); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "1d821fc51937ef20",
+      "ask_client_text": [
+        "Any compounding fee paid in the year? Enter it from the compounding application."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

@@ -1,0 +1,321 @@
+{
+ "comment": "clause44: what the module check catches. A voucher whose PARTYGSTIN is only spaces falls back to the party ledger's GSTIN in the walk and in the check alike; a regular voucher whose GUID a later cancelled voucher with an unregistered party repeats (the check reads the last voucher with a GUID); two regular vouchers sharing a GUID, one unregistered and one registered (each column cites the GUID once, labelled by its own first row); a line on a ledger with no master; a party that is a sales ledger. GSTINs invented (fourteenth character Y).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Fixed Assets": null,
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Provisions": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Purchase Accounts": null,
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Direct Incomes": null,
+  "Indirect Incomes": null,
+  "Carriage Inward": "Direct Expenses",
+  "Office Costs": "Indirect Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-c44_traps-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_traps-001"
+  },
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-c44_traps-002"
+  },
+  {
+   "name": "Input CGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_traps-003"
+  },
+  {
+   "name": "Input SGST",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_traps-004"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-c44_traps-005"
+  },
+  {
+   "name": "Office Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-c44_traps-006"
+  },
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_traps-007",
+   "gstin": "27ALPHA1111A1Y1"
+  },
+  {
+   "name": "Gamma Works",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-c44_traps-008",
+   "gstin": ""
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Capital",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 0,
+   "debit": 546515,
+   "credit": 0,
+   "closing": 546515
+  },
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  },
+  {
+   "ledger": "Input CGST",
+   "opening": 0,
+   "debit": 83377,
+   "credit": 0,
+   "closing": 83377
+  },
+  {
+   "ledger": "Input SGST",
+   "opening": 0,
+   "debit": 81291,
+   "credit": 0,
+   "closing": 81291
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 617945,
+   "closing": -617945
+  },
+  {
+   "ledger": "Office Expenses",
+   "opening": 0,
+   "debit": 431361,
+   "credit": 0,
+   "closing": 431361
+  },
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 0,
+   "credit": 427393,
+   "closing": -427393
+  },
+  {
+   "ledger": "Gamma Works",
+   "opening": 0,
+   "debit": 0,
+   "credit": 124627,
+   "closing": -124627
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "t01",
+   "date": "2025-04-10",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     64071
+    ],
+    [
+     "Alpha Traders",
+     -64071
+    ]
+   ],
+   "number": "P-1",
+   "party_gstin": "   "
+  },
+  {
+   "guid": "t02",
+   "date": "2025-04-11",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     86462
+    ],
+    [
+     "Input CGST",
+     57619
+    ],
+    [
+     "Input SGST",
+     74198
+    ],
+    [
+     "Alpha Traders",
+     -218279
+    ]
+   ],
+   "number": "P-2"
+  },
+  {
+   "guid": "t03",
+   "date": "2025-04-12",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     124627
+    ],
+    [
+     "Gamma Works",
+     -124627
+    ]
+   ],
+   "number": "P-3"
+  },
+  {
+   "guid": "t03",
+   "date": "2025-04-13",
+   "base_type": "Purchase",
+   "party": "Alpha Traders",
+   "lines": [
+    [
+     "Office Expenses",
+     112192
+    ],
+    [
+     "Input CGST",
+     25758
+    ],
+    [
+     "Input SGST",
+     7093
+    ],
+    [
+     "Alpha Traders",
+     -145043
+    ]
+   ],
+   "number": "P-4"
+  },
+  {
+   "guid": "t04",
+   "date": "2025-04-14",
+   "base_type": "Journal",
+   "party": "Sales",
+   "lines": [
+    [
+     "Office Expenses",
+     44009
+    ],
+    [
+     "Unmastered Expense",
+     27421
+    ],
+    [
+     "Sales",
+     -71430
+    ]
+   ],
+   "number": "J-1"
+  },
+  {
+   "guid": "t02",
+   "date": "2025-04-15",
+   "base_type": "Purchase",
+   "party": "Gamma Works",
+   "lines": [
+    [
+     "Office Expenses",
+     56409
+    ],
+    [
+     "Gamma Works",
+     -56409
+    ]
+   ],
+   "number": "P-5",
+   "status": "cancelled"
+  },
+  {
+   "guid": "t05",
+   "date": "2025-04-01",
+   "base_type": "Receipt",
+   "party": "Bank A",
+   "lines": [
+    [
+     "Bank A",
+     546515
+    ],
+    [
+     "Sales",
+     -546515
+    ]
+   ],
+   "number": "BR-1"
+  }
+ ],
+ "clause44": {
+  "tax_ledgers": {
+   "cgst": [
+    "Input CGST"
+   ],
+   "sgst": [
+    "Input SGST"
+   ]
+  },
+  "round_off_ledgers": []
+ },
+ "tests": [
+  "clause44"
+ ],
+ "cash": [],
+ "bank": []
+}

@@ -1,0 +1,723 @@
+{
+ "comment": "tds_payees, #1243: the client's list of reversals names a voucher by its GUID, so it reads on every voucher holding it. Builder N: two reversals sharing one GUID, classified as credit notes: both are named. Builder R: two blank-GUID reversals, the blank GUID classified as a credit note: both are named. Builder P: a bill-specific reversal names a GUID two of its bills share: classified, against either. Builder M: eleven bills share one GUID and a reversal names it as a duplicate or error: against each, in the books' order. Builders Q1 and Q2: one GUID on a bill to each; a bill-specific reversal on Q2 names it, against Q2's bill only. A listed reversal GUID no voucher holds is reported as matching nothing.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Secured Loans": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Labour Charges",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-000"
+  },
+  {
+   "name": "Builder N",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-001"
+  },
+  {
+   "name": "Builder P",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-002"
+  },
+  {
+   "name": "Builder M",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-003"
+  },
+  {
+   "name": "Builder Q1",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-004"
+  },
+  {
+   "name": "Builder Q2",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-005"
+  },
+  {
+   "name": "Builder R",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_reversals-006"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Builder M",
+   "opening": 0,
+   "debit": 500000,
+   "credit": 11000000,
+   "closing": -10500000
+  },
+  {
+   "ledger": "Builder N",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 12500000,
+   "closing": -12300000
+  },
+  {
+   "ledger": "Builder P",
+   "opening": 0,
+   "debit": 2500000,
+   "credit": 12500000,
+   "closing": -10000000
+  },
+  {
+   "ledger": "Builder Q1",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4000000,
+   "closing": -4000000
+  },
+  {
+   "ledger": "Builder Q2",
+   "opening": 0,
+   "debit": 1000000,
+   "credit": 4000000,
+   "closing": -3000000
+  },
+  {
+   "ledger": "Builder R",
+   "opening": 0,
+   "debit": 200000,
+   "credit": 12500000,
+   "closing": -12300000
+  },
+  {
+   "ledger": "Labour Charges",
+   "opening": 0,
+   "debit": 56500000,
+   "credit": 4400000,
+   "closing": 52100000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "n1",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "N1",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder N",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "n2",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "N2",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder N",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "n3",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "N3",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder N",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "n4",
+   "date": "2025-08-10",
+   "base_type": "Journal",
+   "number": "N4",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder N",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "n5",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "number": "N5",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder N",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "rv-n",
+   "date": "2025-11-05",
+   "base_type": "Journal",
+   "number": "N21",
+   "lines": [
+    [
+     "Builder N",
+     100000
+    ],
+    [
+     "Labour Charges",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "rv-n",
+   "date": "2025-12-05",
+   "base_type": "Journal",
+   "number": "N22",
+   "lines": [
+    [
+     "Builder N",
+     100000
+    ],
+    [
+     "Labour Charges",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-p",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "P1",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder P",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-p",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "P2",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder P",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "p3",
+   "date": "2025-07-10",
+   "base_type": "Journal",
+   "number": "P3",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder P",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "p4",
+   "date": "2025-08-10",
+   "base_type": "Journal",
+   "number": "P4",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder P",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "p5",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "number": "P5",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder P",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "rv-p",
+   "date": "2025-11-05",
+   "base_type": "Journal",
+   "number": "P9",
+   "lines": [
+    [
+     "Builder P",
+     2500000
+    ],
+    [
+     "Labour Charges",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-04-03",
+   "base_type": "Journal",
+   "number": "M1",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-04-12",
+   "base_type": "Journal",
+   "number": "M2",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-04-21",
+   "base_type": "Journal",
+   "number": "M3",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-05-03",
+   "base_type": "Journal",
+   "number": "M4",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "number": "M5",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-05-21",
+   "base_type": "Journal",
+   "number": "M6",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-06-03",
+   "base_type": "Journal",
+   "number": "M7",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-06-12",
+   "base_type": "Journal",
+   "number": "M8",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-06-21",
+   "base_type": "Journal",
+   "number": "M9",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-07-03",
+   "base_type": "Journal",
+   "number": "M10",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-m",
+   "date": "2025-07-12",
+   "base_type": "Journal",
+   "number": "M11",
+   "lines": [
+    [
+     "Labour Charges",
+     1000000
+    ],
+    [
+     "Builder M",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "rv-m",
+   "date": "2026-01-05",
+   "base_type": "Journal",
+   "number": "M20",
+   "lines": [
+    [
+     "Builder M",
+     500000
+    ],
+    [
+     "Labour Charges",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-q",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "Q1A",
+   "lines": [
+    [
+     "Labour Charges",
+     4000000
+    ],
+    [
+     "Builder Q1",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-q",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "Q2A",
+   "lines": [
+    [
+     "Labour Charges",
+     4000000
+    ],
+    [
+     "Builder Q2",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "rv-q",
+   "date": "2025-09-10",
+   "base_type": "Journal",
+   "number": "Q2R",
+   "lines": [
+    [
+     "Builder Q2",
+     1000000
+    ],
+    [
+     "Labour Charges",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "r1",
+   "date": "2025-05-20",
+   "base_type": "Journal",
+   "number": "R1",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder R",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "r2",
+   "date": "2025-06-20",
+   "base_type": "Journal",
+   "number": "R2",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder R",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "r3",
+   "date": "2025-07-20",
+   "base_type": "Journal",
+   "number": "R3",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder R",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "r4",
+   "date": "2025-08-20",
+   "base_type": "Journal",
+   "number": "R4",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder R",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "r5",
+   "date": "2025-09-20",
+   "base_type": "Journal",
+   "number": "R5",
+   "lines": [
+    [
+     "Labour Charges",
+     2500000
+    ],
+    [
+     "Builder R",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-11-20",
+   "base_type": "Journal",
+   "number": "R21",
+   "lines": [
+    [
+     "Builder R",
+     100000
+    ],
+    [
+     "Labour Charges",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-12-20",
+   "base_type": "Journal",
+   "number": "R22",
+   "lines": [
+    [
+     "Builder R",
+     100000
+    ],
+    [
+     "Labour Charges",
+     -100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Labour Charges": "194C"
+ },
+ "reversals": {
+  "rv-n": {
+   "kind": "credit_note"
+  },
+  "": {
+   "kind": "credit_note"
+  },
+  "rv-p": {
+   "kind": "bill_specific",
+   "bill": "dup-p"
+  },
+  "rv-m": {
+   "kind": "duplicate_or_error",
+   "bill": "dup-m"
+  },
+  "rv-q": {
+   "kind": "bill_specific",
+   "bill": "dup-q"
+  },
+  "rv-none": {
+   "kind": "credit_note"
+  }
+ }
+}

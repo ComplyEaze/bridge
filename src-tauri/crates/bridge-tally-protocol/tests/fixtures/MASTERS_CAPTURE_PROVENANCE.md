@@ -1,6 +1,6 @@
 # `masters_*` — provenance
 
-Voucher types, godowns, units and stock groups, each read as one native collection with the company GUID computed onto every row. These are the fixtures for the `masters` read (#724 step 1 for voucher types). Every file is a live capture, never hand-written.
+Voucher types, godowns, units, stock groups, cost centres and cost categories, each read as one native collection with the company GUID computed onto every row. These are the fixtures for the `masters` read (#724 step 1 for voucher types). Every file is a live capture, never hand-written.
 
 ## Provenance
 
@@ -37,3 +37,25 @@ Voucher types, godowns, units and stock groups, each read as one native collecti
 | `masters_units_reads_lab_live.utf16le.xml` | 3000 | `b5fbda77c4df9513a742a884734cbc565cbce1393b7785f4d9d4de597f1d3a15` | units | 0 |
 | `masters_stock_groups_reads_lab_live.utf16le.xml` | 2998 | `31f0974839de95aba8015df487b3e37e5ccb125deae1efe2999720024ff729ae` | stock groups | 0 |
 | `masters_godowns_reads_lab_live.utf16le.xml` | 4146 | `0d105ecc3a3ade0b2a83ce46f5e0bcdeb0b67c3882b081f3534e5ed15d2e951b` | godowns | 1 |
+
+**Cost centres and cost categories (2026-10-07, about 14:18 IST, licensed TallyPrime 7.1 Silver, `education_mode=false`, `http://127.0.0.1:9001`).** The owner read both books' Cost Centres setting on screen (F11): **No** on both. Five read-only requests, one at a time through a recording relay: on `BRIDGE SHAPE LAB` the Company flags, the cost centres and the cost categories, and on `BRIDGE CORPUS FOREX` the Company flags and the cost centres. Each answered HTTP 200 with an envelope and `STATUS` 1 (three of the five answers are stored here; the two Company-flag answers are not). The request files are the byte-exact request text the capture kit generated (the production renderer's own output, asserted equal by a test), UTF-16LE with a BOM; the responses are BOM-less UTF-16LE as received.
+- **Books:** `BRIDGE SHAPE LAB` (flag No, two cost centres and two cost categories) and `BRIDGE CORPUS FOREX` (flag No, no cost centre defined; its request differs from the SHAPE LAB one only by the company name and is not stored again).
+- **What the captures show:** a book whose setting reads No still returns its cost centres (`Assembly`, `Trading`: parent the reserved root, category `Business Line`) and its cost categories (`Business Line`: revenue Yes, non-revenue No, affects stock No; `Primary Cost Category`: Yes, Yes, No); a book with none defined answers one present, empty `COLLECTION` (`MSTDEPTYPE` 32). Every row carries `BRIDGECOMPANYGUID`.
+- **Not shown by these files:** a larger book, another release (a book whose setting reads Yes is in the next section).
+
+| file | bytes | sha256 | kind | rows |
+|---|---|---|---|---|
+| `masters_cost_centres_request.utf16le.xml` | 1150 | `7e4aec0f8f19f0dee68083422e5be5f029a58a77eb900e30452a39c5b4db749f` | request, cost centres | n/a |
+| `masters_cost_centres_shape_lab_flag_no_live.utf16le.xml` | 5296 | `f2966af3109cc74e60fdd13e3680d8ed6d75565d8a81d8c260478a8584fe12c9` | cost centres | 2 |
+| `masters_cost_categories_request.utf16le.xml` | 1232 | `c79688503edd6b897159774e16e0573c2fd869112dd6b702972d7859b6c4a582` | request, cost categories | n/a |
+| `masters_cost_categories_shape_lab_live.utf16le.xml` | 5782 | `e61714960d2c365c93805366c2021703eb885891be684b8c879d1721056c9b7b` | cost categories | 2 |
+| `masters_cost_centres_corpus_forex_empty_live.utf16le.xml` | 2996 | `9ec9b8fbbfc810101a9cfe8a4a8b1a82df383be0c678400cf3e5ab82d954909a` | cost centres | 0 |
+
+### Cost centres and categories on a book with the setting at Yes (captured 2026-10-07 in a separate sitting)
+
+A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the Company flag `ISCOSTCENTRESON`, equal to the owner's screen), captured through the same collection requests as the files above (these two answers carry no release or licence; the status read of that sitting, taken through the same relay just before them and not committed, recorded product TallyPrime, release 7.1, licence Silver, Education mode off). The fixtures are **scrubbed copies**: the company GUID prefix is replaced with a synthetic one and the three lab centre names with `Parity CC A`, `Parity CC A1` and `Parity CC B`; the structure and every other byte of the answers are as received (BOM-less UTF-16LE, `&#4;` kept in `PARENT`). The originals are 6,806 and 4,458 bytes.
+
+| file | bytes | sha256 | content |
+| --- | --- | --- | --- |
+| `masters_cost_centres_parity_flag_yes_live.utf16le.xml` | 6848 | `2a8fe692c63da913919ec5e8440a2da5571b2f7d5a371cb13d1288b6a0ca9186` | CostCentre, 3 rows: two at the top level, one under another centre, default category |
+| `masters_cost_categories_parity_flag_yes_live.utf16le.xml` | 4458 | `a07fd9d365134a5023e17b5aa5e7f3c762a27d9dd807ae12ff433edaf2863376` | CostCategory, 1 row, the predefined Primary Cost Category (Yes, Yes, No) |

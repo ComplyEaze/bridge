@@ -228,6 +228,160 @@ async fn movement_refuses_voucher_changes_even_when_period_openings_match() {
     }
 }
 
+/// An empty movement window whose widened read finds rows only on the
+/// neighbouring days is refused, and the refusal's code is the corroboration's
+/// own reason, `empty_window_wider_read_nonempty`: a public code, since the
+/// refusal is how `ledger_movement` reports a partial window. The window's
+/// answers are the captured empty collection; the widened answer is the
+/// captured three-voucher response unchanged (its vouchers are all dated
+/// 1 August 2026, outside the window of 2 August, inside the widened read of 1
+/// to 3 August).
+#[tokio::test]
+async fn an_empty_movement_window_beside_a_busy_day_is_refused_by_the_wider_reads_rows() {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let extent = captured_utf8(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    ));
+    let ledger = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
+    ));
+    let currency = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let busy_neighbour = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    ));
+    let empty = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
+    ));
+    let high_water = captured_utf8(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>61c6de69-1748-461c-ad3f-162cb949df9f</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>",
+    );
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let paired = |body: &ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body.clone(),
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let mut plans = vec![
+        company.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+    ];
+    // The movement's opening read: identity, extent, currency, ledger, extent
+    // and identity again, each paired (22 legs, as in the other movement tests).
+    plans.extend([
+        status.clone(),
+        company.clone(),
+        company.clone(),
+        extent.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        currency.clone(),
+        status.clone(),
+        currency.clone(),
+        status.clone(),
+        ledger.clone(),
+        status.clone(),
+        ledger.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        extent.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+        company.clone(),
+    ]);
+    // The window's pre-flight mark, the window (empty), and the corroboration's
+    // widened read (rows), which reuses that mark. The refusal ends the call: no
+    // closing read follows.
+    plans.extend(paired(&high_water));
+    plans.extend(paired(&empty));
+    plans.extend(paired(&busy_neighbour));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        writes_enabled: false,
+        batch_post_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260802", "to":"20260802", "ledger":"WR2 Sales"
+            }),
+        )
+        .await;
+    simulator.cancel();
+    let observed = simulator.finish().unwrap();
+    assert_eq!(response["isError"], true, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "empty_window_wider_read_nonempty",
+        "{response}"
+    );
+    // A refusal: no figure and no row of the window is returned.
+    assert_eq!(result["voucher_rows_observed"], Value::Null, "{response}");
+    assert_eq!(result["rows"], Value::Null, "{response}");
+    assert_eq!(
+        response["structuredContent"]["evidence"]["state"],
+        "partial"
+    );
+    // 4 prelude legs, the 22-leg opening read, then three paired reads of six
+    // legs: mark, window, widened window.
+    assert_eq!(observed.len(), 44);
+    let identity = {
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&company.fixture.body())
+                .unwrap();
+        let row = companies
+            .iter()
+            .find(|row| row.guid.as_deref() == Some("61c6de69-1748-461c-ad3f-162cb949df9f"))
+            .unwrap();
+        row.name.clone()
+    };
+    let day = |text: &str| bridge_tally_core::TallyDate::parse(text).unwrap();
+    let sha = |xml: &str| {
+        sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+            xml,
+        ))
+    };
+    let mark = render_agent_company_high_water(&identity);
+    let window =
+        render_agent_movement_vouchers(&identity, &day("20260802"), &day("20260802")).unwrap();
+    let wider = render_agent_vouchers(&identity, &day("20260801"), &day("20260803"), None).unwrap();
+    for (leg, request) in [
+        (27, &mark),
+        (29, &mark),
+        (33, &window),
+        (35, &window),
+        (39, &wider),
+        (41, &wider),
+    ] {
+        assert_eq!(observed[leg].request_body_sha256, sha(request), "leg {leg}");
+    }
+}
+
 /// `count` copies of the captured response's first voucher, AlterIDs `first..`,
 /// each with its own GUID, `REMOTEID`, AlterID and master ID, on `date`.
 fn many_vouchers(original: &str, ids: std::ops::RangeInclusive<u64>, date: &str) -> String {
@@ -383,6 +537,10 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
                 response["structuredContent"]["result"]["voucher_rows_observed"],
                 200
             );
+            // A quick call's result is unchanged: no block, nothing left out (#1239).
+            let result = &response["structuredContent"]["result"];
+            assert!(result.get("read_cost").is_none(), "{result}");
+            assert!(result.get("read_cost_left_out").is_none(), "{result}");
         } else {
             assert_eq!(response["isError"], true, "{response}");
             assert_eq!(

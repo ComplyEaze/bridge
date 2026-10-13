@@ -1,0 +1,2824 @@
+# fixture: tests/fixtures/statement_trial_balance_dense_month_live.utf16le.xml
+# parser: parse_native_trial_balance
+# source: captured
+Ok(NativeTrialBalance {
+    rows: [
+        NativeTrialBalanceRow {
+            name: "Cash",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000001f",
+            parent: Returned(
+                "Cash-in-Hand",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 001",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ce",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-864067.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-933428.20",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1797495.80",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 002",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000cf",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-865387.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-934289.41",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1799677.21",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 003",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d0",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-866208.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-935150.62",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1801358.62",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 004",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d1",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-867028.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-936011.83",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1803040.03",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 005",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d2",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-867848.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-936873.04",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1804721.44",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 006",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d3",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-868668.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-937734.25",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1806402.85",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 007",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d4",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-869488.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-938595.46",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1808084.26",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 008",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d5",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-870309.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-939456.67",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1809765.67",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 009",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d6",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-871129.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-940317.88",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1811447.08",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 010",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d7",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-871949.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-941179.09",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1813128.49",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 011",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d8",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-872769.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-942040.30",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1814809.90",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 012",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000d9",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-958181.31",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-942901.51",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1901082.82",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 013",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000da",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-959042.52",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-943762.72",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1902805.24",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 014",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000db",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-959903.73",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-944623.93",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1904527.66",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 015",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000dc",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-960764.94",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-945485.14",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1906250.08",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 016",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000dd",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-961626.15",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-946346.35",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1907972.50",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 017",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000de",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-962487.36",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-947207.56",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1909694.92",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 018",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000df",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-963348.57",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-948068.77",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1911417.34",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 019",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e0",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-964209.78",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-948929.98",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1913139.76",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 020",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e1",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-965070.99",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-949791.19",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1914862.18",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 021",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e2",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-965928.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-950648.40",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1916576.60",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 022",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e3",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-966789.41",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-951509.61",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1918299.02",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 023",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e4",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-967650.62",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-952370.82",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1920021.44",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 024",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e5",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-968511.83",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-953232.03",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1921743.86",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 025",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e6",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-969373.04",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-954093.24",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1923466.28",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 026",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e7",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-970234.25",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-954954.45",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1925188.70",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 027",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e8",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-971095.46",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-955815.66",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1926911.12",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 028",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000e9",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-971956.67",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-956676.87",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1928633.54",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 029",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ea",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-972817.88",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-957538.08",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1930355.96",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 030",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000eb",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-973679.09",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-958399.29",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1932078.38",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 031",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ec",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-974540.30",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-959260.50",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1933800.80",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 032",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ed",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-975401.51",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-960121.71",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1935523.22",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 033",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ee",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-976262.72",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-960982.92",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1937245.64",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 034",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ef",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-977123.93",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-961844.13",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1938968.06",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 035",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f0",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-977985.14",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-962705.34",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1940690.48",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 036",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f1",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-978846.35",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-963566.55",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1942412.90",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 037",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f2",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-979707.56",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-964427.76",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1944135.32",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 038",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f3",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-980568.77",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-965288.97",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1945857.74",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 039",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f4",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-886429.98",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-966150.18",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1852580.16",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 040",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f5",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-887291.19",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-967011.39",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1854302.58",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 041",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f6",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-888148.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-967868.60",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1856017.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 042",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f7",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-889009.61",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-968729.81",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1857739.42",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 043",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f8",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-889870.82",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-969591.02",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1859461.84",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 044",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000f9",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-890732.03",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-970452.23",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1861184.26",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 045",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000fa",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-891593.24",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-971313.44",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1862906.68",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 046",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000fb",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-892454.45",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-972174.65",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1864629.10",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 047",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000fc",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-893315.66",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-973035.86",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1866351.52",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 048",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000fd",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-894176.87",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-973897.07",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1868073.94",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 049",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000fe",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-895038.08",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-974758.28",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1869796.36",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 050",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-000000ff",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-895899.29",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-975619.49",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1871518.78",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 051",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000100",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-896760.50",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-976480.70",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1873241.20",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 052",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000101",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-897621.71",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-977341.91",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1874963.62",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 053",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000102",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-898482.92",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-978203.12",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1876686.04",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 054",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000103",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-899344.13",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-979064.33",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1878408.46",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 055",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000104",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-900205.34",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-979925.54",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1880130.88",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 056",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000105",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-901066.55",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-980786.75",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1881853.30",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 057",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000106",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-901927.76",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-981647.96",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1883575.72",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 058",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000107",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-902788.97",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-982509.17",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1885298.14",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 059",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000108",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-903650.18",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-983370.38",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1887020.56",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 060",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000109",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-904511.39",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-984231.59",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1888742.98",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 061",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000010a",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-905368.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-985088.80",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1890457.40",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 062",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000010b",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-899828.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-992351.62",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1892179.82",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 063",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000010c",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-900648.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-993253.84",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1893902.24",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 064",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000010d",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-901468.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-994156.06",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1895624.66",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 065",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000010e",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-902288.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-995058.28",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1897347.08",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 066",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000010f",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-903109.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-995960.50",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1899069.50",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 067",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000110",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-903929.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-996862.72",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1900791.92",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 068",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000111",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-904749.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-997764.94",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1902514.34",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 069",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000112",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-905569.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-998667.16",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1904236.76",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 070",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000113",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-906389.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-999569.38",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1905959.18",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 071",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000114",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-907210.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-1000471.60",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1907681.60",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 072",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000115",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-908030.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-1001373.82",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1909404.02",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 073",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000116",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-908850.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-1002276.04",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1911126.44",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 074",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000117",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-909670.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-1003178.26",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1912848.86",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 075",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000118",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-910490.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-1004080.48",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1914571.28",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 076",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000119",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-911311.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-909982.70",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1821293.70",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 077",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000011a",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-912131.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-910884.92",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1823016.12",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 078",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000011b",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-912951.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-911787.14",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1824738.54",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 079",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000011c",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-913771.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-912689.36",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1826460.96",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 080",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000011d",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-914591.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-913591.58",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1828183.38",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 081",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000011e",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-915408.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-914488.80",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1829896.80",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 082",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000011f",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-916228.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-915391.02",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1831619.22",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 083",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000120",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-917048.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-916293.24",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1833341.64",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 084",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000121",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-917868.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-901572.43",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1819441.03",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 085",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000122",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-918688.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-902433.64",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1821122.44",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 086",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000123",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-919509.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-903294.85",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1822803.85",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 087",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000124",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-920329.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-904156.06",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1824485.26",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 088",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000125",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-921149.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-905017.27",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1826166.67",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 089",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000126",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-921969.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-905878.48",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1827848.08",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 090",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000127",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-922789.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-906739.69",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1829529.49",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 091",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000128",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-923610.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-907600.90",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1831210.90",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 092",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000129",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-924430.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-908462.11",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1832892.31",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 093",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000012a",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-925250.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-909323.32",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1834573.72",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 094",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000012b",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-926070.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-910184.53",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1836255.13",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 095",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000012c",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-926890.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-911045.74",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1837936.54",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 096",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000012d",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-927711.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-911906.95",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1839617.95",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 097",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000012e",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-928531.20",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-912768.16",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1841299.36",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 098",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000012f",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-929351.40",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-913629.37",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1842980.77",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 099",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000130",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-930171.60",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-914490.58",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1844662.18",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 100",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000131",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-930991.80",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-915351.79",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1846343.59",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 101",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000132",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-931808.00",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-916208.00",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1848016.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 102",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000133",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-849266.99",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-917069.21",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1766336.20",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 103",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000134",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-850046.18",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-917930.42",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1767976.60",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 104",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000135",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-850825.37",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-918791.63",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1769617.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 105",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000136",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-851604.56",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-919652.84",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1771257.40",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 106",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000137",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-852383.75",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-920514.05",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1772897.80",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 107",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000138",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-853162.94",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-921375.26",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1774538.20",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 108",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000139",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-853942.13",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-922236.47",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1776178.60",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 109",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000013a",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-854721.32",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-923097.68",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1777819.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 110",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000013b",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-855500.51",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-923958.89",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1779459.40",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 111",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000013c",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-856279.70",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-924820.10",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1781099.80",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 112",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000013d",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-857058.89",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-925681.31",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1782740.20",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 113",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000013e",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-857838.08",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-926542.52",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1784380.60",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 114",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000013f",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-858617.27",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-927403.73",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1786021.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 115",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000140",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-859396.46",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-928264.94",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1787661.40",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 116",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000141",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-860175.65",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-929126.15",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1789301.80",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 117",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000142",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-860954.84",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-929987.36",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1790942.20",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 118",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000143",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-861734.03",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-930848.57",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1792582.60",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 119",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000144",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-862513.22",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-931709.78",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1794223.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Party 120",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000145",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-863292.41",
+                ),
+            ),
+            debit: Present(
+                ExactDecimal(
+                    "-932570.99",
+                ),
+            ),
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-1795863.40",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "DN Sales",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-00000146",
+            parent: Returned(
+                "Sales Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: Present(
+                ExactDecimal(
+                    "113726661.73",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "113726661.73",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Profit & Loss A/c",
+            guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-0000001e",
+            parent: Returned(
+                "�#4; Primary",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "109235760.65",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "109235760.65",
+                ),
+            ),
+        },
+    ],
+})

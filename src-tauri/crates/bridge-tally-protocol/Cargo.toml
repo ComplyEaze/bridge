@@ -1,7 +1,7 @@
 [package]
 name = "bridge-tally-protocol"
 version = "0.1.0"
-description = "Portable Tally wire decoding, XML protocol, and disabled JSONEX evidence tools for Bridge"
+description = "Portable Tally wire decoding and XML protocol for Bridge"
 license = "Apache-2.0"
 repository = "https://github.com/ComplyEaze/bridge"
 publish = false
@@ -10,17 +10,9 @@ rust-version = "1.96"
 
 [features]
 default = []
-jsonex-parser = ["dep:serde_json"]
-jsonex-request-builder = ["dep:serde_json"]
 india-tax-observation-parser = []
 bills-payments-observation-parser = []
 bills-native-outstandings-probe = []
-# Legacy voucher-scan outstandings path (`outstandings` module): reads every
-# voucher in a date/AlterID-partitioned wildcard scan and derives outstandings
-# from bill allocations. Superseded by the native Bills Receivable/Payable +
-# List of Ledgers path (`native_outstandings`, always compiled). Not a
-# default feature: no shipped build takes this path today.
-voucher-scan = []
 
 [lints]
 workspace = true
@@ -29,9 +21,8 @@ workspace = true
 anyhow = "1"
 bridge-tally-primitives = { path = "../bridge-tally-primitives" }
 icu_properties = "2.2"
-quick-xml = { version = "0.41", features = ["serialize"] }
+quick-xml = { version = "0.42", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["arbitrary_precision", "raw_value"], optional = true }
 sha2 = "0.11"
 
 [dev-dependencies]

@@ -198,10 +198,21 @@ fn service_recording(
     endpoint: TallyEndpointConfig,
     on_account: Value,
 ) -> (DesktopJournalService, ImportLedgerLine) {
+    service_debiting(root, voucher_number, endpoint, on_account, "Expense")
+}
+
+/// A service holding one saved Journal that debits `debit_ledger`.
+fn service_debiting(
+    root: PathBuf,
+    voucher_number: Option<&str>,
+    endpoint: TallyEndpointConfig,
+    on_account: Value,
+    debit_ledger: &str,
+) -> (DesktopJournalService, ImportLedgerLine) {
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000001", "identity_scheme":"batch_v1", "company_guid":"00000000-0000-4000-8000-000000000002", "endpoint_origin":super::super::canonical_loopback_origin(&endpoint).unwrap(),
         "company":{"name":"Synthetic Accounts","guid":"00000000-0000-4000-8000-000000000002","company_number":"100001","books_from":"20260401"}, "txn_ids":["journal-test"],"date_from":"20260901","date_to":"20260901","sha256":"","built_at":"2026-09-07T00:00:00Z","status":"built", "on_account_approved":on_account,"pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
-        "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal","voucher_number":voucher_number,"entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
+        "vouchers":[{"bridge_txn_id":"journal-test","date":"20260901","voucher_type":"Journal","voucher_number":voucher_number,"entries":[{"ledger":debit_ledger,"amount":"12.50","side":"Dr"},{"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
     })).unwrap();
     line.sha256 = sha256_hex(
         render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id).as_bytes(),
@@ -431,7 +442,10 @@ fn review_details_come_from_the_admitted_saved_journal() {
     .unwrap();
 
     let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+    // Both reach the approval window as the eight digits `displayJournalDate`
+    // reformats (#1307).
     assert_eq!(review.details.date, "20260901");
+    assert_eq!(review.company.books_from, "20260401");
     assert_eq!(review.details.total_debit, "12.5");
     assert_eq!(review.details.total_credit, "12.5");
     assert_eq!(
@@ -485,6 +499,66 @@ fn review_refuses_selected_xml_from_a_superseded_full_record() {
     let review = service.review_selected_xml(latest_xml.as_bytes()).unwrap();
     assert_eq!(review.sha256, line.sha256);
     assert_eq!(review.details.narration.as_deref(), Some("Updated Journal"));
+}
+
+/// The details of a review with one entry marked On Account, as they are
+/// serialised for the screen. The screen's own test
+/// (`scripts/journal-posting-screen.test.tsx`) reads this text from this file
+/// and renders it.
+const MARKED_REVIEW_DETAILS_SENT: &str = r#"{"date":"20260901","reference":null,"narration":null,"entries":[{"ledger":"Expense","side":"Dr","amount":"12.50","onAccount":true},{"ledger":"Cash","side":"Cr","amount":"12.50","onAccount":false}],"onAccountNote":"On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.","totalDebit":"12.5","totalCredit":"12.5"}"#;
+
+/// The review screen marks each entry on a ledger the batch records as
+/// approved to take entries On Account, and carries the native dialog's own
+/// sentence for the mark, as that dialog does next (#1234); a batch that
+/// records none carries neither.
+#[test]
+fn review_marks_each_entry_on_a_ledger_approved_on_account() {
+    for (approved, flags, note) in [
+        (json!([]), [false, false], None),
+        (
+            json!([{"ledger":"Expense","party_digest":"a".repeat(64)}]),
+            [true, false],
+            Some(super::post::ON_ACCOUNT_LEGEND),
+        ),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let (service, line) = service_recording(
+            directory.path().join("agent"),
+            None,
+            TallyEndpointConfig {
+                host: "127.0.0.1".into(),
+                port: 9001,
+            },
+            approved,
+        );
+        let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+        std::fs::write(
+            service
+                .server
+                .imports_dir()
+                .unwrap()
+                .join(format!("{}.xml", line.batch_id)),
+            &xml,
+        )
+        .unwrap();
+        let review = service.review_selected_xml(xml.as_bytes()).unwrap();
+        assert_eq!(
+            review
+                .details
+                .entries
+                .iter()
+                .map(|entry| entry.on_account)
+                .collect::<Vec<_>>(),
+            flags
+        );
+        assert_eq!(review.details.on_account_note.as_deref(), note);
+        if note.is_some() {
+            assert_eq!(
+                serde_json::to_string(&review.details).unwrap(),
+                MARKED_REVIEW_DETAILS_SENT
+            );
+        }
+    }
 }
 
 /// The desktop Journal review screen shows the narration the post sends
@@ -668,4 +742,164 @@ fn the_desktop_message_names_the_ledgers_the_result_lists() {
         "masters_after_post": {"ledgers": ["Cash"]},
     }));
     assert_eq!(other, "Reconcile.");
+}
+
+/// bridge#626: the desktop's review takes no saved Journal that names a
+/// ledger whose name ends in a line break, before or after it was posted:
+/// its screen shows a name as it is.
+#[test]
+fn a_journal_naming_a_ledger_that_ends_in_a_line_break_is_refused_on_the_desktop() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, line) = service_debiting(
+        directory.path().join("agent"),
+        None,
+        TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9001,
+        },
+        json!([]),
+        "Expense\r\n",
+    );
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_desktop_ledger_line_break"
+    );
+    service
+        .server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+            &line,
+            "a".repeat(64),
+            uuid::Uuid::new_v4(),
+        ))
+        .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_desktop_ledger_line_break"
+    );
+}
+
+/// bridge#626: once such a Journal was sent, the desktop's post and reconcile
+/// refuse it with the words of the review, where a sent Journal that names
+/// no such ledger goes on to read Tally. Before it was sent its reconcile
+/// finds no attempt, as for any Journal. The journal file is byte for byte
+/// what it was after the reconcile before it was sent, and after the post
+/// and reconcile once it was. An assistant's post of the same sent Journal
+/// is not answered so.
+#[tokio::test]
+async fn the_desktop_post_and_reconcile_refuse_a_ledger_name_ending_in_a_line_break() {
+    const WORDS: &str = "This saved Journal names a ledger whose name in Tally ends in a line break, and this screen cannot show such a name. Use the assistant for this Journal: its approval dialog shows such a name with the line break written out, and it can check a Journal that was already posted. If this one was already posted, do not post it again.";
+    // A port nothing listens on: an answer that reached for Tally would
+    // carry a read failure, never this refusal.
+    let unused_endpoint = || {
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let endpoint = TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: socket.local_addr().unwrap().port(),
+        };
+        (socket, endpoint)
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let (_socket, endpoint) = unused_endpoint();
+    let (service, line) = service_debiting(
+        directory.path().join("agent"),
+        None,
+        endpoint,
+        json!([]),
+        "Expense\r\n",
+    );
+    let journal = service
+        .server
+        .settings
+        .data_dir
+        .join("agent-import-ledger.jsonl");
+    let before = std::fs::read(&journal).unwrap();
+    let reconciled = service
+        .reconcile(&line.batch_id, &line.sha256, &line.company_guid)
+        .await
+        .result;
+    assert_eq!(
+        reconciled["result"]["error"]["code"],
+        "import_not_dispatched"
+    );
+    assert_eq!(reconciled["result"]["attempt_recorded"], false);
+    assert_eq!(std::fs::read(&journal).unwrap(), before);
+
+    let sent = |service: &DesktopJournalService, line: &ImportLedgerLine| {
+        service
+            .server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+                line,
+                "a".repeat(64),
+                uuid::Uuid::new_v4(),
+            ))
+            .unwrap();
+    };
+    sent(&service, &line);
+    let before = std::fs::read(&journal).unwrap();
+    let posted = service
+        .post(&line.batch_id, &line.sha256, &line.company_guid)
+        .await
+        .result;
+    assert_eq!(
+        posted["result"]["error"],
+        json!({"code": "import_desktop_ledger_line_break", "message": WORDS, "remediation": null})
+    );
+    assert_eq!(posted["result"]["attempt_recorded"], true);
+    assert!(posted["result"]["dispatch"]["state"].is_null());
+    let reconciled = service
+        .reconcile(&line.batch_id, &line.sha256, &line.company_guid)
+        .await
+        .result;
+    assert_eq!(
+        reconciled,
+        json!({"result":{"error":{"code": "import_desktop_ledger_line_break", "message": WORDS}}})
+    );
+    assert_eq!(std::fs::read(&journal).unwrap(), before);
+    // The refusal is the desktop's alone: an assistant's post of the same
+    // sent Journal goes on to read Tally.
+    let args = json!({"batch_id": line.batch_id, "company_guid": line.company_guid});
+    let assistant = service
+        .server
+        .post_import_checked(&args, Some(&line.sha256), super::post::PostScope::Vouchers)
+        .await;
+    let code = match assistant {
+        Ok(outcome) => outcome.payload["result"]["error"]["code"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        Err(failure) => failure.code,
+    };
+    assert_eq!(code, "import_mode_probe_failed");
+
+    // A sent Journal that names no such ledger goes on to read Tally.
+    let plain = tempfile::tempdir().unwrap();
+    let (_socket, endpoint) = unused_endpoint();
+    let (service, line) = service_at_endpoint(plain.path().join("agent"), None, endpoint);
+    sent(&service, &line);
+    for result in [
+        service
+            .post(&line.batch_id, &line.sha256, &line.company_guid)
+            .await
+            .result,
+        service
+            .reconcile(&line.batch_id, &line.sha256, &line.company_guid)
+            .await
+            .result,
+    ] {
+        assert_eq!(
+            result["result"]["error"]["code"],
+            "import_mode_probe_failed"
+        );
+    }
 }

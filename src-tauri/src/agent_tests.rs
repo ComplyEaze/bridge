@@ -77,8 +77,10 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
         let mut fields = Vec::new();
         loop {
             match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(event) if event.name().as_ref() == b"FETCH" => {
-                    fields = String::from_utf8_lossy(&reader.read_text(event.name()).unwrap())
+                quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
+                    fields = reader
+                        .read_text(event.name())
+                        .unwrap()
                         .split(',')
                         .map(str::to_string)
                         .collect();
@@ -108,6 +110,8 @@ fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
             "REFERENCE",
             "ISINVOICE",
             "PARTYGSTIN",
+            // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+            "REFERENCEDATE",
         ] {
             assert!(fields.iter().any(|value| value == field), "missing {field}");
         }
@@ -263,13 +267,12 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
             .expect("request must be well-formed XML")
         {
             quick_xml::events::Event::Start(event)
-                if event.name().as_ref() == b"SVCURRENTCOMPANY" =>
+                if event.name().as_ref() == "SVCURRENTCOMPANY" =>
             {
                 let raw = reader
                     .read_text(event.name())
                     .expect("SVCURRENTCOMPANY must have a matching close tag");
-                let decoded = raw.decode().expect("text must decode as UTF-8");
-                return quick_xml::escape::unescape(&decoded)
+                return quick_xml::escape::unescape(&raw)
                     .expect("text must unescape")
                     .into_owned();
             }
@@ -290,16 +293,10 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
 #[test]
 fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
     const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
-    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
-    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
     let requests: Vec<(&str, String)> = vec![
         (
             "tally::tdl_engine::ledgers_request",
             crate::tally::tdl_engine::ledgers_request(NAME),
-        ),
-        (
-            "tally::tdl_engine::ledger_period_balances_request",
-            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
         ),
         (
             "agent_read_profiles::render_agent_vouchers",
@@ -560,6 +557,21 @@ fn remediation_is_present_only_where_a_concrete_next_step_exists() {
     }
 }
 
+/// A password file someone else can read is refused with a step that fixes it
+/// on each platform: on Windows a new copy, because a move keeps who can read it.
+#[test]
+fn a_shared_password_file_says_how_to_make_it_private() {
+    let step = refusal_remediation("statement_password_file_permissions").expect("a next step");
+    for phrase in [
+        "did not read the password and parsed nothing",
+        "(chmod 600)",
+        "make a new copy of it in a folder of your own",
+        "moving it keeps who can read it",
+    ] {
+        assert!(step.contains(phrase), "{phrase}: {step}");
+    }
+}
+
 #[test]
 fn a_read_deadline_is_named_rather_than_collapsed_into_the_generic_failure() {
     use bridge_tally_transport::TallyTransportError;
@@ -748,18 +760,46 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // name, so a new tool must either be given a sample or be listed here
     // deliberately. `acknowledge_post_review` writes one local record and its
     // module marks no party name; `local_data_report` returns only static
-    // strings, counts, sizes and whole days.
+    // strings, counts, sizes and whole days; `cash_flow` returns only months,
+    // amounts and counts of ledgers, and no ledger name; `company_features`
+    // returns only three settings, a currency symbol and the company's own name;
+    // `gst_status` returns only voucher numbers, dates, the voucher type's name
+    // and ids, and no party or ledger name; `statement_tie_out` returns two
+    // dates, three signed gaps and fixed sentences, and never a ledger name;
+    // `voucher_read_cost` returns only a voucher mark, counts, seconds and
+    // constant text, and the company's own name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
-    let mut without_a_sample = vec!["acknowledge_post_review", "local_data_report"];
+    let mut without_a_sample = vec![
+        "acknowledge_post_review",
+        "cash_flow",
+        "company_features",
+        "gst_status",
+        "local_data_report",
+        "statement_tie_out",
+        "voucher_read_cost",
+    ];
+    // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
+    // is set as it is built, and another test changes that variable, so the
+    // exemptions below must come from this same read (#1435).
+    let registered = super::catalog::registered_tool_definitions(true, true)
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
+        .collect::<BTreeSet<_>>();
     // The lab-only tools, compiled in with the `lab-writes` feature, are not
     // sampled yet: `lab_read_inventory` returns party-bearing fields and the two
-    // import tools were not examined (#999).
+    // import tools were not examined (#999). Exempt those this read registered.
     #[cfg(feature = "lab-writes")]
-    without_a_sample.extend([
-        "lab_import_masters",
-        "lab_import_vouchers",
-        "lab_read_inventory",
-    ]);
+    without_a_sample.extend(
+        [
+            "lab_import_masters",
+            "lab_import_vouchers",
+            "lab_read_inventory",
+        ]
+        .into_iter()
+        .filter(|name| registered.contains(*name)),
+    );
     let sampled = samples.iter().map(|(tool, _)| *tool).collect::<Vec<_>>();
     assert_eq!(
         sampled.len(),
@@ -782,12 +822,6 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         covered.iter().collect::<BTreeSet<_>>().len(),
         "a tool is both sampled and listed without a sample: {covered:?}"
     );
-    let registered = super::catalog::registered_tool_definitions(true, true)
-        .as_array()
-        .expect("tools")
-        .iter()
-        .map(|tool| tool["name"].as_str().expect("tool name").to_string())
-        .collect::<BTreeSet<_>>();
     let covered = covered
         .iter()
         .map(|tool| tool.to_string())
@@ -2099,7 +2133,7 @@ fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
             "20260902",
             None,
         ),
-        Ok((true, Some("nonempty_uncorroborated")))
+        Ok((true, Some("empty_window_wider_read_nonempty")))
     );
     assert_eq!(
         corroborate_empty_voucher_window(
@@ -2220,6 +2254,14 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
         status_plan(),
         high_water_plan(),
         status_plan(),
+        // The census of the window (#1029), then the window, both of the
+        // captured vouchers.
+        company_plan(),
+        company_plan(),
+        voucher_plan(),
+        status_plan(),
+        voucher_plan(),
+        status_plan(),
         company_plan(),
         company_plan(),
         voucher_plan(),
@@ -2256,16 +2298,18 @@ async fn voucher_read_evidence_uses_utf16_transport_bytes() {
     let expected_bytes = bridge_tally_protocol::encode_tally_xml_request_utf16le(&company_xml)
         .len()
         + bridge_tally_protocol::encode_tally_xml_request_utf16le(high_water_xml).len()
-        + bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
+        // The census and the window both serve the captured vouchers.
+        + 2 * bridge_tally_protocol::encode_tally_xml_request_utf16le(captured_vouchers).len();
     assert_eq!(
         response["structuredContent"]["evidence"]["bytes"],
         expected_bytes * 2
     );
     assert_ne!(
         response["structuredContent"]["evidence"]["bytes"],
-        company_xml.len() + high_water_xml.len() + captured_vouchers.len()
+        company_xml.len() + high_water_xml.len() + 2 * captured_vouchers.len()
     );
-    assert_eq!(simulator.finish().expect("simulator result").len(), 16);
+    // 16 before the census (#1029) and its six legs.
+    assert_eq!(simulator.finish().expect("simulator result").len(), 22);
 }
 
 /// `vouchers` over an empty window on a company whose high-water row carries

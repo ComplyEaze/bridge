@@ -4,6 +4,8 @@
 until the owner resolves the empty-partition conflict below and rules on an initial `AlterID`
 width.**
 
+*October 2026: the voucher-scan outstandings read, its calibration harness and its 40 MiB response cap were deleted from the code (#1546). This document records that work; it does not describe current behaviour.*
+
 ## Company-selection correction
 
 The `Company` collection enumerates every loaded company; `SVCURRENTCOMPANY` does not filter

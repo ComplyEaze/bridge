@@ -89,7 +89,7 @@ Each run writes `OUTDIR/edge.<book>.questionnaire_cl13.json`, and `OUTDIR/edge.<
 for the two books naming `stock`. Running every book a second time, into a new directory,
 reproduced every golden byte for byte.
 
-The synthetic dump README section 14 describes (not part of this pack) was made with the crate's
+The synthetic dump README section 14 describes was made with the crate's
 `parity/python_golden.py` extended by the runner that section gives, with
 `ENGINE tests/fixtures/synthetic-engagement.toml OUT.json --test questionnaire_cl13`; made twice, it
 was byte-identical both times, and the same extended file reproduced the crate's committed

@@ -1,0 +1,297 @@
+{
+ "comment": "Seven matches on the period's last day, and one receipt that is not a match. h01 debits a ledger directly under Indirect Expenses; h02 a ledger under a sub-group of Direct Expenses; h03 is an Accrual Journal (base type Journal) and is labelled by its own type name; h04 touches an expense ledger only with a zero line; h05 credits an expense ledger; h06 and h07 have no number, so their labels show, in its place, the last 12 characters of a long GUID and the whole of a short one. The stock result is given: its Stock-in-Hand ledger has no voucher, so the stock count is 0 and the stock test raises its typed-in finding; this test only names the stock figure (REND-0 once).",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Provisions": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Manufacturing Expenses": "Direct Expenses"
+ },
+ "ledgers": [
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_core-b-000"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-qc_core-b-001"
+  },
+  {
+   "name": "Closing Stock",
+   "chain": [
+    "Stock-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-qc_core-b-002"
+  },
+  {
+   "name": "Expenses Payable",
+   "chain": [
+    "Provisions",
+    "Current Liabilities"
+   ],
+   "guid": "edge-qc_core-b-003"
+  },
+  {
+   "name": "Factory Wages",
+   "chain": [
+    "Manufacturing Expenses",
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_core-b-004"
+  },
+  {
+   "name": "Freight Inward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-qc_core-b-005"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-qc_core-b-006"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-qc_core-b-007"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-qc_core-b-008"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank A",
+   "opening": 19980000,
+   "debit": 200000,
+   "credit": 0,
+   "closing": 20180000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Closing Stock",
+   "opening": 30020000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 30020000
+  },
+  {
+   "ledger": "Expenses Payable",
+   "opening": 0,
+   "debit": 20000,
+   "credit": 210000,
+   "closing": -190000
+  },
+  {
+   "ledger": "Factory Wages",
+   "opening": 0,
+   "debit": 70000,
+   "credit": 0,
+   "closing": 70000
+  },
+  {
+   "ledger": "Freight Inward",
+   "opening": 0,
+   "debit": 40000,
+   "credit": 0,
+   "closing": 40000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 60000,
+   "credit": 20000,
+   "closing": 40000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 40000,
+   "credit": 0,
+   "closing": 40000
+  },
+  {
+   "ledger": "Sales",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "qc-core-b-h00",
+   "date": "2025-06-10",
+   "base_type": "Receipt",
+   "number": "RV-1",
+   "lines": [
+    [
+     "Bank A",
+     200000
+    ],
+    [
+     "Sales",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-core-b-h01",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-1",
+   "lines": [
+    [
+     "Office Rent",
+     50000
+    ],
+    [
+     "Expenses Payable",
+     -50000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-core-b-h02",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-2",
+   "lines": [
+    [
+     "Factory Wages",
+     70000
+    ],
+    [
+     "Expenses Payable",
+     -70000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-core-b-h03",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "vtype": "Accrual Journal",
+   "number": "AJ-1",
+   "lines": [
+    [
+     "Freight Inward",
+     30000
+    ],
+    [
+     "Expenses Payable",
+     -30000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-core-b-h04",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-3",
+   "lines": [
+    [
+     "Purchases",
+     40000
+    ],
+    [
+     "Office Rent",
+     0
+    ],
+    [
+     "Expenses Payable",
+     -40000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-core-b-h05",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "JV-4",
+   "lines": [
+    [
+     "Expenses Payable",
+     20000
+    ],
+    [
+     "Office Rent",
+     -20000
+    ]
+   ]
+  },
+  {
+   "guid": "qc-core-provision-entry-h06",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "",
+   "lines": [
+    [
+     "Office Rent",
+     10000
+    ],
+    [
+     "Expenses Payable",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "h07",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "number": "",
+   "lines": [
+    [
+     "Freight Inward",
+     10000
+    ],
+    [
+     "Expenses Payable",
+     -10000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "stock",
+  "questionnaire_cl13"
+ ],
+ "stock_opening": {
+  "as_of": "2025-03-31",
+  "rows": {}
+ },
+ "stock_closing": {
+  "as_of": "2026-03-31",
+  "rows": {}
+ }
+}

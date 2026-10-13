@@ -1,0 +1,53 @@
+# fixture: tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE AMEND LAB",
+        guid: Some(
+            "17a10910-773c-42c6-bd66-7bba9a392536",
+        ),
+        company_number: Some(
+            "100024",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS DENSE",
+        guid: Some(
+            "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        ),
+        company_number: Some(
+            "100012",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE CORPUS FOREX",
+        guid: Some(
+            "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        ),
+        company_number: Some(
+            "100011",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+    TallyCompany {
+        name: "BRIDGE READS LAB",
+        guid: Some(
+            "de2e15f2-6d42-4715-b6e7-b7a95a68abe8",
+        ),
+        company_number: Some(
+            "100023",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

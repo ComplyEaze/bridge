@@ -1,0 +1,151 @@
+# fixture: tests/fixtures/native/trial_balance_opening_year.xml
+# parser: parse_native_trial_balance
+# source: captured
+Ok(NativeTrialBalance {
+    rows: [
+        NativeTrialBalanceRow {
+            name: "Cash",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-0000001f",
+            parent: Returned(
+                "Cash-in-Hand",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+        NativeTrialBalanceRow {
+            name: "OPENING Bank",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-000000d1",
+            parent: Returned(
+                "Bank Accounts",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-40000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-40000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "OPENING Capital",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-000000d2",
+            parent: Returned(
+                "Capital Account",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "125000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "125000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "OPENING Creditor A",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-000000d0",
+            parent: Returned(
+                "Sundry Creditors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "88000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "88000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "OPENING Debtor A",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-000000ce",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-125000.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-125000.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "OPENING Debtor B",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-000000cf",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-64500.50",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-64500.50",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "OPENING Debtor C",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-000000d3",
+            parent: Returned(
+                "Sundry Debtors",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "-33333.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: Present(
+                ExactDecimal(
+                    "-33333.00",
+                ),
+            ),
+        },
+        NativeTrialBalanceRow {
+            name: "Profit & Loss A/c",
+            guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea-0000001e",
+            parent: Returned(
+                "�#4; Primary",
+            ),
+            opening: Present(
+                ExactDecimal(
+                    "0.00",
+                ),
+            ),
+            debit: PresentEmpty,
+            credit: PresentEmpty,
+            closing: PresentEmpty,
+        },
+    ],
+})

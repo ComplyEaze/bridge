@@ -72,8 +72,9 @@ fn build_treatments() {
         ("ALPHA", "Alpha Ledger", "contra"),
         ("OWN ACCT", "", "skip"),
     ]);
-    let Build { proposals, records } =
-        build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
+    let Build {
+        proposals, records, ..
+    } = build(&rows, Bank::Hdfc, &mapping, &options("SUSPENSE ACC")).unwrap();
     assert_eq!(proposals.len(), 2);
     assert_eq!(records.len(), 3);
     assert_eq!(proposals[0].voucher_type, VoucherType::Contra);
@@ -299,6 +300,83 @@ fn impossible_dates_are_typed() {
         "unparseable_date",
     );
     assert_eq!(refusal.row, Some(1));
+}
+
+/// Printed out of date order, so the earliest and latest dates are neither the
+/// first nor the last row printed: a span read off the ends would be wrong.
+fn out_of_order_rows() -> [Row; 4] {
+    [
+        upi("05/08/26", "A", "111111111111", "10.00", "", "990.00"),
+        upi("09/08/26", "B", "222222222222", "10.00", "", "980.00"),
+        upi("01/08/26", "C", "333333333333", "10.00", "", "970.00"),
+        upi("07/08/26", "D", "444444444444", "10.00", "", "960.00"),
+    ]
+}
+
+#[test]
+fn span_is_the_earliest_and_latest_row_date_whatever_the_print_order() {
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &options("SUSP"),
+    )
+    .unwrap();
+    assert_eq!(
+        built.span,
+        Some((
+            Date::new(2026, 8, 1).unwrap(),
+            Date::new(2026, 8, 9).unwrap()
+        ))
+    );
+    assert_eq!(built.rows_outside_window, 0);
+}
+
+#[test]
+fn a_window_that_drops_rows_counts_them_and_the_span_still_covers_every_row() {
+    let mut window = options("SUSP");
+    window.date_from = Date::new(2026, 8, 2);
+    window.date_to = Date::new(2026, 8, 8);
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &window,
+    )
+    .unwrap();
+    assert_eq!(built.records.len(), 2);
+    assert_eq!(built.rows_outside_window, 2);
+    assert_eq!(
+        built.span,
+        Some((
+            Date::new(2026, 8, 1).unwrap(),
+            Date::new(2026, 8, 9).unwrap()
+        ))
+    );
+}
+
+#[test]
+fn a_window_that_drops_only_one_side_is_still_not_the_whole_statement() {
+    let mut window = options("SUSP");
+    window.date_from = Date::new(2026, 8, 2);
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &window,
+    )
+    .unwrap();
+    assert_eq!(built.rows_outside_window, 1);
+    let mut window = options("SUSP");
+    window.date_to = Date::new(2026, 8, 8);
+    let built = build(
+        &out_of_order_rows(),
+        Bank::Hdfc,
+        &Mapping::default(),
+        &window,
+    )
+    .unwrap();
+    assert_eq!(built.rows_outside_window, 1);
 }
 
 #[test]

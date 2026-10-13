@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/note-days/shape_lab_base_currency_response.utf16le.xml
+# parser: parse_company_currency_name(SHAPE LAB)
+# source: captured
+Ok("₹")

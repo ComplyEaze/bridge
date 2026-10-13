@@ -2,6 +2,8 @@
 
 Status: **complete for Unit A scope, unmerged**
 
+*October 2026: the voucher-scan outstandings read, its calibration harness and its 40 MiB response cap were deleted from the code (#1546). This document records that work; it does not describe current behaviour.*
+
 Branch: `feat/tally-outstandings-slice`
 
 Base: `d9ee4aa` (`fix/tally-p0b-rectify-20260729`), which is not merged into `master`

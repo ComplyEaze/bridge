@@ -1,0 +1,189 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Generate `src/unicode_tables.rs` and `tests/fixtures/unicode-probes.json` from Python 3.13, the
+reference implementation's runtime, against the crate's own normalisation tables.
+
+    cargo run --locked --release -p bridge-tax-audit --example unicode_tables_dump > /tmp/nfd.tsv
+    uv run -q --python 3.13 python parity/unicode_tables.py /tmp/nfd.tsv
+
+`knock_off_candidates` reads names by Python's general categories and Python's NFD (its spec pack,
+README section 3.3). The crate's `unicode-normalization` carries newer Unicode tables than
+Python 3.13's 15.1, so this refuses unless the two agree on the combining class and the full
+canonical decomposition of every code point assigned at 15.1 (a code point the dump leaves out has
+class 0 and decomposes to itself). It writes:
+- `LETTER_OR_NUMBER`: the ranges whose category is `L*` or `N*`;
+- `MARK`: the ranges whose category is `M*`;
+- `LATE`: the code points unassigned at 15.1 that carry a combining class or a decomposition in the
+  crate's library; a reader cuts its text at each and normalises only the pieces between, so the
+  library cannot reorder marks around a character Python does not know;
+- the probe file: Python's category on both sides of every range, the late code points, and, for
+  each probe sequence, Python's NFD, its case-fold, and the tokens of `model_tokens` below.
+`model_tokens` is a model of README section 3.3 over Python's own categories, not the reference's
+code; the pack's goldens are what tie the model to the reference. Everything written is ASCII.
+After writing, run `cargo fmt -p bridge-tax-audit`.
+"""
+from __future__ import annotations
+
+import json
+import sys
+import unicodedata
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DROPPED = {0x200C, 0x200D, 0xAD}
+
+
+def ranges(cps):
+    out = []
+    for cp in cps:
+        if out and out[-1][1] == cp - 1:
+            out[-1][1] = cp
+        else:
+            out.append([cp, cp])
+    return out
+
+
+def rust_ranges(name, doc, rs):
+    body = "\n".join("    (0x{:04X}, 0x{:04X}),".format(a, b) for a, b in rs)
+    return f"{doc}pub(crate) const {name}: [(u32, u32); {len(rs)}] = [\n{body}\n];\n"
+
+
+def kind(cp):
+    cat = unicodedata.category(chr(cp))
+    return "letter_or_number" if cat[0] in "LN" else "mark" if cat[0] == "M" else "other"
+
+
+def read(text, late):
+    """README section 3.3's text before tokens: cut at each late code point, left as written; NFD
+    and case-fold each piece between."""
+    out, piece = [], []
+    for ch in text:
+        if ord(ch) in late:
+            out += [unicodedata.normalize("NFD", "".join(piece)).casefold(), ch]
+            piece = []
+        else:
+            piece.append(ch)
+    out.append(unicodedata.normalize("NFD", "".join(piece)).casefold())
+    return "".join(out)
+
+
+def model_tokens(text, late):
+    """README section 3.3's tokens, modelled: runs of letters, numbers and marks; a mark after
+    `a`-`z`, or one that would start a token, dropped; U+200C, U+200D and U+00AD dropped without
+    ending a token; anything else ends one."""
+    tokens, token = [], []
+    for ch in read(text, late):
+        cp = ord(ch)
+        if cp in DROPPED:
+            continue
+        k = "other" if cp in late else kind(cp)
+        if k == "letter_or_number":
+            token.append(ch)
+        elif k == "mark":
+            if token and not "a" <= token[-1] <= "z":
+                token.append(ch)
+        elif token:
+            tokens.append("".join(token))
+            token = []
+    if token:
+        tokens.append("".join(token))
+    return tokens
+
+
+def main() -> int:
+    lines = Path(sys.argv[1]).read_text(encoding="utf-8").splitlines()
+    library, rows = lines[0], [l.split("\t") for l in lines[1:]]
+    dumped = {int(cp, 16): (int(ccc), d) for cp, ccc, d in rows}
+    all_cps = [cp for cp in range(0x110000) if not 0xD800 <= cp <= 0xDFFF]
+    late = []
+    for cp in all_cps:
+        ccc, decomposition = dumped.get(cp, (0, ""))
+        c = chr(cp)
+        if unicodedata.category(c) == "Cn":
+            if ccc or decomposition:
+                late.append(cp)
+            continue
+        nfd = "".join(chr(int(x, 16)) for x in decomposition.split()) if decomposition else c
+        if unicodedata.combining(c) != ccc:
+            raise SystemExit(f"U+{cp:04X}: combining class {unicodedata.combining(c)} in Python, {ccc} in the library")
+        if unicodedata.normalize("NFD", c) != nfd:
+            raise SystemExit(f"U+{cp:04X}: NFD differs between Python and the library")
+    letters = ranges([cp for cp in all_cps if kind(cp) == "letter_or_number"])
+    marks = ranges([cp for cp in all_cps if kind(cp) == "mark"])
+    late_ranges = ranges(late)
+    py = f"Python {sys.version.split()[0]}, Unicode {unicodedata.unidata_version}"
+    out = (
+        "// SPDX-License-Identifier: Apache-2.0\n"
+        "// GENERATED by parity/unicode_tables.py -- do not edit.\n"
+        f"// {library}; {py}.\n\n"
+        "//! Python 3.13's general categories, and the code points its NFD does not know, against the\n"
+        "//! crate's `unicode-normalization` (`knock_off_candidates` reads names with them).\n\n"
+        + rust_ranges("LETTER_OR_NUMBER", "/// Code points whose Python category is `L*` or `N*`.\n", letters)
+        + "\n"
+        + rust_ranges("MARK", "/// Code points whose Python category is `M*`.\n", marks)
+        + "\n"
+        + rust_ranges(
+            "LATE",
+            "/// Code points unassigned in Python's tables that carry a combining class or a\n"
+            "/// decomposition in the crate's library: a reader cuts its text at each and leaves it as\n"
+            "/// written.\n",
+            late_ranges,
+        )
+    )
+    (ROOT / "src/unicode_tables.rs").write_text(out, encoding="ascii")
+
+    by_kind = {"letter_or_number": set(), "mark": set(), "other": set()}
+    for table in (letters, marks, late_ranges):
+        for a, b in table:
+            for cp in (a - 1, a, b, b + 1):
+                if 0 <= cp < 0x110000 and not 0xD800 <= cp <= 0xDFFF:
+                    by_kind[kind(cp)].add(cp)
+    late_set = set(late)
+    # A base: `a`, Greek alpha, Devanagari ka. Marks: two above, one below, the iota subscript, a
+    # Devanagari vowel sign and the virama.
+    bases = [0x61, 0x3B1, 0x915]
+    marks_used = [0x301, 0x308, 0x323, 0x345, 0x93E, 0x94D]
+    second = [0x301, 0x323, 0x94D]
+    late_used = sorted({late[0], late[-1], 0x113CE if 0x113CE in late_set else late[1]})
+    sequences = []
+    for base in bases:
+        sequences += [[m, base] for m in marks_used]
+        for m1 in marks_used:
+            for m2 in second:
+                sequences += [[base, m1, d, m2] for d in sorted(DROPPED)]
+        for lt in late_used:
+            for m1 in marks_used:
+                sequences += [[base, m1, lt], [base, lt, m1], [lt, base, m1]]
+                for m2 in second:
+                    sequences += [[base, m1, m2, lt], [base, m1, lt, m2], [base, lt, m1, m2]]
+    examples = [
+        [0x43, 0x61, 0x66, 0xE9], [0x43, 0x61, 0x66, 0x65, 0x301], [0x212A], [0x130, 0x4F, 0x54, 0x41],
+        [0xDF], [0xFB01], [0x926, 0x947, 0x935, 0x20, 0x91F, 0x94D, 0x930, 0x947, 0x921, 0x930, 0x94D, 0x938],
+        [0x5A, 0x6F, 0x65, 0x308], [0x3B1, 0x345, 0x301], [0x37E], [0x200C, 0x200D, 0xAD, 0x200B],
+        [0x41, 0x200B, 0x42], [0x41, 0x2122, 0x42], [0x37, 0x301],
+    ]
+    probes = {
+        "generator": "parity/unicode_tables.py",
+        "python": py,
+        "library": library,
+        "tokens": "model_tokens in the generator: a model of README section 3.3 over Python's own "
+                  "categories, not the reference's code; the pack's goldens tie it to the reference",
+        "categories": {k: sorted(v) for k, v in by_kind.items()},
+        "late": late,
+        "sequences": [
+            [seq,
+             [ord(x) for x in unicodedata.normalize("NFD", "".join(map(chr, seq)))],
+             [ord(x) for x in read("".join(map(chr, seq)), late_set)],
+             [[ord(x) for x in t] for t in model_tokens("".join(map(chr, seq)), late_set)]]
+            for seq in examples + sequences
+        ],
+    }
+    (ROOT / "tests/fixtures/unicode-probes.json").write_text(
+        json.dumps(probes, ensure_ascii=True, separators=(",", ":")) + "\n", encoding="ascii")
+    print(f"LETTER_OR_NUMBER {len(letters)}, MARK {len(marks)}, LATE {len(late)} code points in "
+          f"{len(late_ranges)} ranges; {sum(map(len, by_kind.values()))} category probes, "
+          f"{len(probes['sequences'])} sequences")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

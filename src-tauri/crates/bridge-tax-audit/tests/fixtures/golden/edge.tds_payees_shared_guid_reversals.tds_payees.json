@@ -1,0 +1,1487 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "tds_payees",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "99f767f57c072436",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded); Contra excluded throughout. A voucher whose mapped expense lines span more than one TDS nature (rare) attributes its full credit-line total to each nature present, not divided or netted.",
+  "figures": [
+    {
+      "id": "tds_payees.194C_credited_total",
+      "value": 56500000,
+      "unit": "paise",
+      "definition_sha256_16": "c6d791e6cb91b60a",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194C-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_over_limit_payee_count",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "018269baec844b51",
+      "definition_text": "Payee entities credited on a voucher with a 194C-mapped expense ledger line whose 194C test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_payee_entities_count",
+      "value": 6,
+      "unit": "count",
+      "definition_sha256_16": "1d35d018403be5a0",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194C-mapped expense ledger line.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_1ccab5be_001",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "38f23bcc32653d4c",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 1ccab5be) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Journal P1 on 2025-05-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_1ccab5be_002",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "38f23bcc32653d4c",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 1ccab5be) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Journal P2 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_1ccab5be_003",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "38f23bcc32653d4c",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 1ccab5be) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p3",
+          "label": "Journal P3 on 2025-07-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_1ccab5be_004",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "38f23bcc32653d4c",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 1ccab5be) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p4",
+          "label": "Journal P4 on 2025-08-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_1ccab5be_005",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "38f23bcc32653d4c",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 1ccab5be) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "p5",
+          "label": "Journal P5 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_3aca3de6_001",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "8a7fb28ab97e03f6",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 3aca3de6) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-q",
+          "label": "Journal Q2A on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_66e16086_001",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "ec8cef94846de141",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 66e16086) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n1",
+          "label": "Journal N1 on 2025-05-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_66e16086_002",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "ec8cef94846de141",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 66e16086) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n2",
+          "label": "Journal N2 on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_66e16086_003",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "ec8cef94846de141",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 66e16086) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n3",
+          "label": "Journal N3 on 2025-07-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_66e16086_004",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "ec8cef94846de141",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 66e16086) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n4",
+          "label": "Journal N4 on 2025-08-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_66e16086_005",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "ec8cef94846de141",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag 66e16086) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n5",
+          "label": "Journal N5 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_a368f32f_001",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "83d1fe10c88bc730",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag a368f32f) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-q",
+          "label": "Journal Q1A on 2025-05-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_001",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "db6a41b0edd7a83e",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag a8fe68fc) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r1",
+          "label": "Journal R1 on 2025-05-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_002",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "db6a41b0edd7a83e",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag a8fe68fc) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r2",
+          "label": "Journal R2 on 2025-06-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_003",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "db6a41b0edd7a83e",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag a8fe68fc) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r3",
+          "label": "Journal R3 on 2025-07-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_004",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "db6a41b0edd7a83e",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag a8fe68fc) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r4",
+          "label": "Journal R4 on 2025-08-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_005",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "db6a41b0edd7a83e",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag a8fe68fc) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r5",
+          "label": "Journal R5 on 2025-09-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_001",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M1 on 2025-04-03"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_002",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M2 on 2025-04-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_003",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M3 on 2025-04-21"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_004",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M4 on 2025-05-03"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_005",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M5 on 2025-05-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_006",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M6 on 2025-05-21"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_007",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M7 on 2025-06-03"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_008",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M8 on 2025-06-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_009",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M9 on 2025-06-21"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_010",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M10 on 2025-07-03"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_194C_abaf0642_011",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "916c392647477c4d",
+      "definition_text": "Clause 21(b)(ii)(A), s.40(a)(ia): one payment to this payee entity (tag abaf0642) under 194C, attracting TDS, as credited to the payee (the return applies the 30%). The voucher cited gives its date.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M11 on 2025-07-12"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_1ccab5be",
+      "value": 12500000,
+      "unit": "paise",
+      "definition_sha256_16": "5d3250cd76f0e58b",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 1ccab5be) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_3aca3de6",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "dc62b8574045065d",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 3aca3de6) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_66e16086",
+      "value": 12500000,
+      "unit": "paise",
+      "definition_sha256_16": "300e82a8ad29f790",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag 66e16086) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_a368f32f",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "6787bdfd808cd0e7",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag a368f32f) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_a8fe68fc",
+      "value": 12500000,
+      "unit": "paise",
+      "definition_sha256_16": "a85408f10258a1dd",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag a8fe68fc) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_21b_a_total_194C_abaf0642",
+      "value": 11000000,
+      "unit": "paise",
+      "definition_sha256_16": "74da582297e7579e",
+      "definition_text": "Clause 21(b)(ii)(A): the payments to this payee entity (tag abaf0642) listed there, summed. Each is its own item in clause 21(b); this total is not.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_1ccab5be",
+      "value": 12500000,
+      "unit": "paise",
+      "definition_sha256_16": "32dce3b3689e13b8",
+      "definition_text": "Total credited to one payee entity (tag 1ccab5be) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Journal P1 on 2025-05-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Journal P2 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "p3",
+          "label": "Journal P3 on 2025-07-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "p4",
+          "label": "Journal P4 on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "p5",
+          "label": "Journal P5 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_3aca3de6",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "8496e588d768b4eb",
+      "definition_text": "Total credited to one payee entity (tag 3aca3de6) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-q",
+          "label": "Journal Q2A on 2025-06-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_66e16086",
+      "value": 12500000,
+      "unit": "paise",
+      "definition_sha256_16": "8552b636509f6f94",
+      "definition_text": "Total credited to one payee entity (tag 66e16086) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n1",
+          "label": "Journal N1 on 2025-05-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n2",
+          "label": "Journal N2 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n3",
+          "label": "Journal N3 on 2025-07-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n4",
+          "label": "Journal N4 on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n5",
+          "label": "Journal N5 on 2025-09-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_a368f32f",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "3444784201d47732",
+      "definition_text": "Total credited to one payee entity (tag a368f32f) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-q",
+          "label": "Journal Q1A on 2025-05-10"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_a8fe68fc",
+      "value": 12500000,
+      "unit": "paise",
+      "definition_sha256_16": "76855197498f23c9",
+      "definition_text": "Total credited to one payee entity (tag a8fe68fc) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r1",
+          "label": "Journal R1 on 2025-05-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r2",
+          "label": "Journal R2 on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r3",
+          "label": "Journal R3 on 2025-07-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r4",
+          "label": "Journal R4 on 2025-08-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r5",
+          "label": "Journal R5 on 2025-09-20"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_credited_194C_abaf0642",
+      "value": 11000000,
+      "unit": "paise",
+      "definition_sha256_16": "c034e898ee72b599",
+      "definition_text": "Total credited to one payee entity (tag abaf0642) under 194C, summed across every population voucher touching a mapped expense ledger.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M1 on 2025-04-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M10 on 2025-07-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M11 on 2025-07-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M2 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M3 on 2025-04-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M4 on 2025-05-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M5 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M6 on 2025-05-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M7 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M8 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M9 on 2025-06-21"
+        }
+      ]
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_1ccab5be",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "63282b97f78645ca",
+      "definition_text": "Largest total credited to this payee entity (tag 1ccab5be) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_3aca3de6",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "9f54b9907e351880",
+      "definition_text": "Largest total credited to this payee entity (tag 3aca3de6) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_66e16086",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "0b48ebfe4505004a",
+      "definition_text": "Largest total credited to this payee entity (tag 66e16086) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_a368f32f",
+      "value": 4000000,
+      "unit": "paise",
+      "definition_sha256_16": "03323d187b712078",
+      "definition_text": "Largest total credited to this payee entity (tag a368f32f) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_a8fe68fc",
+      "value": 2500000,
+      "unit": "paise",
+      "definition_sha256_16": "4897ddd1c2871421",
+      "definition_text": "Largest total credited to this payee entity (tag a8fe68fc) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_row_max_single_194C_abaf0642",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "35ee415766d0a321",
+      "definition_text": "Largest total credited to this payee entity (tag abaf0642) within one voucher, under 194C.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194C_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "529536a7929105ee",
+      "definition_text": "Sum of the 194C-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line: inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1449014338a93dea",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194I-mapped expense ledger line (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "a0a0363fab5a0fc8",
+      "definition_text": "Payee entities credited on a voucher with a 194I-mapped expense ledger line whose 194I test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "d5a067612ec55500",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194I-mapped expense ledger line.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194I_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ef3b05505b746211",
+      "definition_text": "Sum of the 194I-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line: inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "fed1b85f21d59a4c",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category '28va' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "10bcd4c7824eda31",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category '28va' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "cf415d8a939d5bf1",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category '28va'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_28va_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "11231d6b39640206",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category '28va': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3fb472ec6edb6290",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'professional' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f621859ba5881f66",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'professional' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "9a7be0dcae8b0313",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'professional'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_professional_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "417e36d6d1a9608e",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'professional': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9ce366dcbb65d921",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'royalty' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "d588011f3d543cc9",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'royalty' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "bba06ca233dc2bd4",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'royalty'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_royalty_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "41af0047ed526f35",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'royalty': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3aee06fb97efcbf1",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'technical' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "0e964d495149d930",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'technical' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "c033ab36a29e99d5",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'technical'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_technical_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "440ac151fb3deb7a",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'technical': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_credited_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8d5e379ba7d60b0c",
+      "definition_text": "Sum credited to every payee entity credited on a voucher with a 194J-mapped expense ledger line, category 'unmapped' (excludes the goods-invoice bucket). Never summed with any other category's total before a threshold test.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_over_limit_payee_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "822394377ce7ff3a",
+      "definition_text": "Payee entities credited on a voucher with a 194J-mapped expense ledger line whose 194J, category 'unmapped' test trips (single sum/aggregate for 194C, any month for 194-I, per-category aggregate for 194J; every nonzero-credit payee for category 'unmapped', which is never threshold-tested).",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_payee_entities_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "ccaf861927fa70cb",
+      "definition_text": "Distinct payee entities (ledgers the client's setup names as one payee counted once; 'payee not named' counted as one entity, 'within supplier goods invoices' excluded) credited on a voucher with a 194J-mapped expense ledger line, category 'unmapped'.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.194J_unmapped_within_supplier_goods_invoices_total",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "361e189a0ba5f4e3",
+      "definition_text": "Sum of the 194J-mapped expense line(s) themselves (the charge -- e.g. freight -- not the supplier's full invoice credit) on vouchers that also carry a Purchase Accounts/Sales Accounts line, category 'unmapped': inside a goods invoice, not a separate contract with the payee; excluded from the per-payee tests.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.deductor_status",
+      "value": "deductor",
+      "unit": "text",
+      "definition_sha256_16": "f4ae0f27f28231f1",
+      "definition_text": "Whether the assessee must deduct TDS under s.194A/194C/194H/194-I/194J for the year: firm/LLP/company always; individual/HUF only if previous-year business turnover exceeded the rules' turnover limit for an individual or HUF -- never assumed from the current year's books alone.",
+      "evidence": []
+    },
+    {
+      "id": "tds_payees.tds_ledger_under_duties_taxes_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "642a041f3bc1b5f5",
+      "definition_text": "Ledgers under 'Duties & Taxes' whose name contains 'tds' (case-insensitive) -- a books figure only; existence or absence of such a ledger is not itself a conclusion about TDS compliance.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "tds_payees/194C_1ccab5be",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_1ccab5be"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_1ccab5be"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_1ccab5be"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_1ccab5be_001"
+        },
+        {
+          "name": "payment_a:002",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_1ccab5be_002"
+        },
+        {
+          "name": "payment_a:003",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_1ccab5be_003"
+        },
+        {
+          "name": "payment_a:004",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_1ccab5be_004"
+        },
+        {
+          "name": "payment_a:005",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_1ccab5be_005"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Journal P1 on 2025-05-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-p",
+          "label": "Journal P2 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "p3",
+          "label": "Journal P3 on 2025-07-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "p4",
+          "label": "Journal P4 on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "p5",
+          "label": "Journal P5 on 2025-09-10"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "abbb717db5dee548",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "5 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 reversal(s) the client's list of reversals classifies as reversing a particular bill, or as a duplicate or error, are NOT applied: the credits are counted gross, pending bill-wise detail from the books, because the part of each reversal that falls on the bill it names cannot yet be read. Adjust for them in judging this payee: Journal P9 on 2025-11-05 (bill-specific, against Journal P1 on 2025-05-10 or Journal P2 on 2025-06-10)."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_3aca3de6",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_3aca3de6"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_3aca3de6"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_3aca3de6"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_3aca3de6_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-q",
+          "label": "Journal Q2A on 2025-06-10"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "05bf3dc5da0b83f2",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 reversal(s) the client's list of reversals classifies as reversing a particular bill, or as a duplicate or error, are NOT applied: the credits are counted gross, pending bill-wise detail from the books, because the part of each reversal that falls on the bill it names cannot yet be read. Adjust for them in judging this payee: Journal Q2R on 2025-09-10 (bill-specific, against Journal Q2A on 2025-06-10)."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_66e16086",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_66e16086"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_66e16086"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_66e16086"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_66e16086_001"
+        },
+        {
+          "name": "payment_a:002",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_66e16086_002"
+        },
+        {
+          "name": "payment_a:003",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_66e16086_003"
+        },
+        {
+          "name": "payment_a:004",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_66e16086_004"
+        },
+        {
+          "name": "payment_a:005",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_66e16086_005"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "n1",
+          "label": "Journal N1 on 2025-05-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n2",
+          "label": "Journal N2 on 2025-06-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n3",
+          "label": "Journal N3 on 2025-07-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n4",
+          "label": "Journal N4 on 2025-08-10"
+        },
+        {
+          "kind": "voucher",
+          "id": "n5",
+          "label": "Journal N5 on 2025-09-10"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "85fdc613112b038c",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "5 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "Reversals the client's list of reversals classifies as credit notes, kept gross: Journal N21 on 2025-11-05, Journal N22 on 2025-12-05."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_a368f32f",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_a368f32f"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_a368f32f"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_a368f32f"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_a368f32f_001"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-q",
+          "label": "Journal Q1A on 2025-05-10"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "8a97d6d69e69a105",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_a8fe68fc",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_a8fe68fc"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_a8fe68fc"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_a8fe68fc"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_001"
+        },
+        {
+          "name": "payment_a:002",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_002"
+        },
+        {
+          "name": "payment_a:003",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_003"
+        },
+        {
+          "name": "payment_a:004",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_004"
+        },
+        {
+          "name": "payment_a:005",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_a8fe68fc_005"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "r1",
+          "label": "Journal R1 on 2025-05-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r2",
+          "label": "Journal R2 on 2025-06-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r3",
+          "label": "Journal R3 on 2025-07-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r4",
+          "label": "Journal R4 on 2025-08-20"
+        },
+        {
+          "kind": "voucher",
+          "id": "r5",
+          "label": "Journal R5 on 2025-09-20"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "02657a050d6e42f7",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "5 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "Reversals the client's list of reversals classifies as credit notes, kept gross: Journal R21 on 2025-11-20, Journal R22 on 2025-12-20."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/194C_abaf0642",
+      "clauses": [
+        "s.194C(5)",
+        "3CD-21(b)",
+        "3CD-34(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "credited",
+          "figure_id": "tds_payees.194C_row_credited_194C_abaf0642"
+        },
+        {
+          "name": "inadmissible_payments_total",
+          "figure_id": "tds_payees.194C_row_21b_a_total_194C_abaf0642"
+        },
+        {
+          "name": "max_single",
+          "figure_id": "tds_payees.194C_row_max_single_194C_abaf0642"
+        },
+        {
+          "name": "payment_a:001",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_001"
+        },
+        {
+          "name": "payment_a:002",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_002"
+        },
+        {
+          "name": "payment_a:003",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_003"
+        },
+        {
+          "name": "payment_a:004",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_004"
+        },
+        {
+          "name": "payment_a:005",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_005"
+        },
+        {
+          "name": "payment_a:006",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_006"
+        },
+        {
+          "name": "payment_a:007",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_007"
+        },
+        {
+          "name": "payment_a:008",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_008"
+        },
+        {
+          "name": "payment_a:009",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_009"
+        },
+        {
+          "name": "payment_a:010",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_010"
+        },
+        {
+          "name": "payment_a:011",
+          "figure_id": "tds_payees.194C_row_21b_a_194C_abaf0642_011"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M1 on 2025-04-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M10 on 2025-07-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M11 on 2025-07-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M2 on 2025-04-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M3 on 2025-04-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M4 on 2025-05-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M5 on 2025-05-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M6 on 2025-05-21"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M7 on 2025-06-03"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M8 on 2025-06-12"
+        },
+        {
+          "kind": "voucher",
+          "id": "dup-m",
+          "label": "Journal M9 on 2025-06-21"
+        }
+      ],
+      "title_sha256_16": "8eaee7b8a29c82d3",
+      "title_text": "Payee over the 194C limit",
+      "limits_sha256_16": "ef2801af0c177d5b",
+      "limits_text": [
+        "Books only: the contract's nature, any lower/nil-deduction certificate (s.197) and, for 194C, a s.194C(6) declaration (a contractor plying, hiring or leasing goods carriages that owned ten or fewer goods carriages at any time during the previous year, with its PAN) are not visible from vouchers -- contract nature and any certificate/declaration are a CA judgement call, not a books fact.",
+        "s.40(a)(ia) disallows 30% of the sum on TDS default; the second proviso removes this if the payee's Form 26A (Rule 31ACB) shows the income was returned -- s.201(1A) interest still runs either way.",
+        "Whether TDS on this payee covers the whole year's aggregate is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "11 payment(s) that attract TDS are listed in clause 21(b)(ii)(A) at their amounts as credited; whether TDS was deducted on them is not judged: the client's statutory dues classify no ledger as TDS payable.",
+        "1 reversal(s) the client's list of reversals classifies as reversing a particular bill, or as a duplicate or error, are NOT applied: the credits are counted gross, pending bill-wise detail from the books, because the part of each reversal that falls on the bill it names cannot yet be read. Adjust for them in judging this payee: Journal M20 on 2026-01-05 (duplicate or error, against Journal M1 on 2025-04-03 or Journal M2 on 2025-04-12 or Journal M3 on 2025-04-21 or Journal M4 on 2025-05-03 or Journal M5 on 2025-05-12 or Journal M6 on 2025-05-21 or Journal M7 on 2025-06-03 or Journal M8 on 2025-06-12 or Journal M9 on 2025-06-21 or Journal M10 on 2025-07-03 or Journal M11 on 2025-07-12)."
+      ],
+      "ask_client_sha256_16": "b53cfcd0738b684c",
+      "ask_client_text": [
+        "Confirm the nature of the contract/service and whether any lower/nil-deduction certificate or s.194C(6) declaration applies.",
+        "If no TDS was deducted, confirm whether Form 26A is available for this payee."
+      ]
+    },
+    {
+      "id": "tds_payees/config_unmatched",
+      "clauses": [],
+      "confidence": "judgement_required",
+      "facts": [],
+      "evidence": [],
+      "title_sha256_16": "c904c7ecc4fce2ca",
+      "title_text": "Entries in the client's TDS lists that match nothing in these books",
+      "limits_sha256_16": "fe3f0169a2e895ed",
+      "limits_text": [
+        "Each entry below names a payee or voucher these books do not hold, so it has no effect: reversal rv-none."
+      ],
+      "ask_client_sha256_16": "5a5412345ac84c3c",
+      "ask_client_text": [
+        "Check each entry's spelling against the ledger or voucher it is meant to name."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "POP-5",
+      "subject": "(blank)",
+      "detail": "2 in-books voucher(s) have no GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-m",
+      "detail": "11 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-p",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "dup-q",
+      "detail": "2 in-books vouchers share this GUID"
+    },
+    {
+      "invariant": "POP-5",
+      "subject": "rv-n",
+      "detail": "2 in-books vouchers share this GUID"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

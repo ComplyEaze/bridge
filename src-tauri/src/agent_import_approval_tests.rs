@@ -1796,8 +1796,8 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     for shown in [
-        "Journal 20260901  12.5  \"WR2 Sales\"  \"Synthetic test only\"",
-        "Journal 20260901  12.5  \"WR2 Sales\"  \"Second rent\"",
+        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"",
+        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Second rent\"",
     ] {
         assert!(batch.lines().any(|text| text == shown), "{shown}\n{batch}");
     }
@@ -1830,7 +1830,12 @@ fn the_agent_preview_says_when_the_post_happens() {
     // Exactly at the width cap, which refuses only past it: no margin.
     assert_eq!(now.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS, "{now}");
     let single = agent_review_preview(&one, &endpoint).unwrap();
-    assert!(single.ends_with(&format!("\n{now}")), "{single}");
+    // The last line ComplyEaze Bridge writes: only the voucher's own text,
+    // under its heading, follows it.
+    assert!(
+        single.contains(&format!("\n{now}\n{VOUCHER_TEXT_HEADING}\nReference: ")),
+        "{single}"
+    );
     assert!(!admit_fresh_saved_voucher(&one, &endpoint)
         .unwrap()
         .contains(&now));
@@ -1871,7 +1876,7 @@ fn the_agent_preview_says_when_the_post_happens() {
                     [
                         "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
                         "Each voucher: type, date, amount, ledger, narration (references not shown):",
-                        "Each line ends with its narration, quoted exactly as it will be posted.",
+                        "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
                     ]
                     .contains(&line),
                     "an unexpected line about narrations: {line:?}"

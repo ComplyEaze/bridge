@@ -1,0 +1,32 @@
+# fixture: agent/native-namespaced-journal.utf16le.xml
+# parser: parse_agent_rows(WR2_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(10),
+        "amounts": Array [
+            Object {
+                "amount": String("-12.61"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Bridge Nested Debtor WR4"),
+            },
+            Object {
+                "amount": String("12.61"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Cash"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260907"),
+        "guid": String("61c6de69-1748-461c-ad3f-162cb949df9f-00000005"),
+        "is_invoice": Bool(false),
+        "master_id": String("5"),
+        "narration": String("Bridge MCP batch namespace qualification [BRIDGE:9c8d8de4-c06c-847b-8309-60ba702bf663]"),
+        "optional": Bool(false),
+        "party": Null,
+        "voucher_number": String("2"),
+        "voucher_type": String("Journal"),
+    },
+])

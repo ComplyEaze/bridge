@@ -1,0 +1,120 @@
+# fixture: tests/fixtures/trial_balance_currency_forex_live.utf16le.xml
+# parser: parse_native_trial_balance_with_currency
+# source: captured
+Ok(CurrencyScopedTrialBalance {
+    report: NativeTrialBalance {
+        rows: [
+            NativeTrialBalanceRow {
+                name: "BRIDGE INR DEBTOR A",
+                guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb-000000d7",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                opening: Present(
+                    ExactDecimal(
+                        "-1000.00",
+                    ),
+                ),
+                debit: Present(
+                    ExactDecimal(
+                        "-2000.00",
+                    ),
+                ),
+                credit: PresentEmpty,
+                closing: Present(
+                    ExactDecimal(
+                        "-3000.00",
+                    ),
+                ),
+            },
+            NativeTrialBalanceRow {
+                name: "Cash",
+                guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb-0000001f",
+                parent: Returned(
+                    "Cash-in-Hand",
+                ),
+                opening: Present(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+                debit: Present(
+                    ExactDecimal(
+                        "-34400.00",
+                    ),
+                ),
+                credit: PresentEmpty,
+                closing: Present(
+                    ExactDecimal(
+                        "-34400.00",
+                    ),
+                ),
+            },
+            NativeTrialBalanceRow {
+                name: "FX Party 02",
+                guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb-000000d0",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                opening: Present(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+                debit: Present(
+                    ExactDecimal(
+                        "-9500.00",
+                    ),
+                ),
+                credit: PresentEmpty,
+                closing: Present(
+                    ExactDecimal(
+                        "-9500.00",
+                    ),
+                ),
+            },
+            NativeTrialBalanceRow {
+                name: "FX Party 03",
+                guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb-000000d1",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                opening: Present(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+                debit: Present(
+                    ExactDecimal(
+                        "-10500.00",
+                    ),
+                ),
+                credit: PresentEmpty,
+                closing: Present(
+                    ExactDecimal(
+                        "-10500.00",
+                    ),
+                ),
+            },
+        ],
+    },
+    foreign_currency_ledgers: [
+        ForeignCurrencyLedger {
+            ledger: "BRIDGE FX DEBTOR A",
+            currency: "$",
+        },
+        ForeignCurrencyLedger {
+            ledger: "FX USD Debtor 01",
+            currency: "$",
+        },
+        ForeignCurrencyLedger {
+            ledger: "FX USD Debtor 02",
+            currency: "$",
+        },
+    ],
+    mixed_currency_ledgers: [
+        "FX Party 01",
+        "FX Sales",
+        "Profit & Loss A/c",
+    ],
+})

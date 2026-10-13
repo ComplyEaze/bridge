@@ -11,6 +11,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -234,6 +235,12 @@ class Select(unittest.TestCase):
 
     def test_the_runner_and_its_results_are_inert(self):
         self.assertEqual(self.picked(list(mu.INERT)), set())
+
+    def test_the_local_parity_example_is_inert(self):
+        self.assertIn("examples/local_parity.rs", mu.INERT)
+        self.assertEqual(self.picked(["examples/local_parity.rs"]), set())
+        # Another example is not inert: it is not named, so its change selects everything.
+        self.assertNotEqual(self.picked(["examples/other.rs"]), set())
 
     def test_a_change_to_the_list_selects_only_the_entries_it_changes(self):
         changed = ["parity/mutations.json"]
@@ -759,6 +766,62 @@ class GitRepo(unittest.TestCase):
         rc, out = self.main("--verify", "--changed-since", "HEAD")
         self.assertEqual(rc, 1, out)
         self.assertIn("B1: accepted as a survivor but no longer in the list", out)
+
+    def anchors(self, ids: list[str], *argv: str) -> tuple[int, set[str]]:
+        """(exit, which of `ids` the output names) of `--check-anchors`: judged by id, never by message text."""
+        rc, out = self.main("--check-anchors", *argv)
+        return rc, {i for i in ids if re.search(rf"(?<![\w.-]){re.escape(i)}(?![\w.-])", out)}
+
+    def test_check_anchors_exits_2_on_an_anchor_not_exactly_once_in_heads_bytes(self):
+        work = self.root.parent / "mutants"
+        self.write("tests/deep.rs", "#[test] fn recurse() {}\n#[test] fn again() {}\n")
+        twice = dict(mutation("D2", "tests/deep.rs"), **{"from": "#[test] fn", "to": "#[ignore] fn"})
+        never = dict(mutation("Z0", "src/support.rs"), **{"from": "not in the file", "to": "x"})
+        ids = ["B1", "D2", "Z0"]  # B1 is the clean control
+        stale, clean = json.dumps([self.muts[0], twice, never]), json.dumps([self.muts[0]])
+        self.write("parity/mutations.json", stale)
+        self.commit("an anchor twice in a tests/ file, one nowhere in a src/ file")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (2, {"D2", "Z0"}))
+        # The working tree differs from HEAD in the list and in a file; HEAD's answer stands ...
+        self.write("parity/mutations.json", clean)
+        self.write("tests/deep.rs", "#[test] fn recurse() {}\n")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (2, {"D2", "Z0"}))
+        sh(self.repo, "checkout", "-q", "--", ".")
+        self.write("parity/mutations.json", clean)
+        self.commit("only the clean control")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (0, set()))
+        # ... both ways: a clean HEAD is not made stale by its working tree.
+        self.write("parity/mutations.json", stale)
+        self.write("src/book.rs", "// nothing to mutate\n")
+        self.assertEqual(self.anchors(ids, "--workdir", str(work)), (0, set()))
+        sh(self.repo, "checkout", "-q", "--", ".")
+        self.assertFalse(work.exists(), "no worker copy is made")
+        self.assertEqual(sh(self.repo, "status", "--porcelain"), "")
+
+    def test_check_anchors_names_at_most_report_rows_ids(self):
+        many = [dict(mutation(f"S{i}", "src/support.rs"), **{"from": f"absent {i};"})
+                for i in range(mu.REPORT_ROWS + 1)]
+        self.write("parity/mutations.json", json.dumps(many))
+        self.commit("more stale anchors than a report shows")
+        rc, named = self.anchors([m["id"] for m in many])
+        self.assertEqual((rc, len(named)), (2, mu.REPORT_ROWS))
+
+    def test_check_anchors_refuses_a_head_list_the_runner_cannot_judge(self):
+        for bad in ([self.muts[0], self.muts[0]], [dict(self.muts[0], id="B 1")]):  # every anchor is clean
+            self.write("parity/mutations.json", json.dumps(bad))
+            self.commit(f"a list the runner cannot judge: {bad}")
+            self.write("parity/mutations.json", json.dumps(self.muts))  # a good list, not committed
+            self.assertEqual(self.anchors(["B1"])[0], 2, bad)
+            sh(self.repo, "checkout", "-q", "--", ".")
+
+    def test_check_anchors_with_ids_or_another_mode_or_option_refuses(self):
+        out = self.root.parent / "out.json"
+        for extra in (["B1"], ["--verify"], ["--list"], ["--merge", str(out)], ["--changed-since", "HEAD"],
+                      ["--results", str(out)], ["--nightly-issues", str(out)], ["--report", str(out)],
+                      ["--full"], ["--shard", "1/2"]):
+            self.assertEqual(self.anchors([], *extra)[0], 2, extra)  # every anchor is clean: 2 is the refusal
+        self.assertFalse(out.exists(), "a refusal writes nothing")
+        self.assertEqual(self.anchors([])[0], 0, "the same list alone passes")
 
     def test_a_run_refuses_a_dirty_tree_and_a_held_workdir_before_any_build(self):
         work = self.root.parent / "mutants"

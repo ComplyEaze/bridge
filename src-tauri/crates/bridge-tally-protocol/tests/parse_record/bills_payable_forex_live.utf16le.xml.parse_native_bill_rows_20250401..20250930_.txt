@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/bills_payable_forex_live.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20250930)
+# source: captured
+Ok([])

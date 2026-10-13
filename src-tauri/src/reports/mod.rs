@@ -2,6 +2,7 @@
 //! `fetch_tally_outstandings` -- no module here issues a Tally request.
 
 pub mod bulk_party_statement;
+pub(crate) mod cash_flow;
 pub mod outstandings_working_paper;
 pub mod outstandings_working_paper_store;
 pub mod outstandings_working_paper_xlsx;

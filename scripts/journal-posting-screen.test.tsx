@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, test, vi } from "vitest";
@@ -374,4 +375,33 @@ test("does not admit Journal actions before native lifecycle protection is ready
   await act(async () => { button(host, "Choose Journal file").click(); });
   expect(mocks.invoke).not.toHaveBeenCalled();
   root.unmount();
+});
+
+test("marks an entry sent as On Account and shows its note only when sent (#1234)", async () => {
+  const note = "On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.";
+  const cells = async (details: typeof review.details & { onAccountNote?: string }) => {
+    mocks.invoke.mockResolvedValueOnce({ ...review, details });
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(<JournalPostingScreen config={config} />); });
+    await act(async () => { button(host, "Choose Journal file").click(); });
+    const shown = {
+      marks: [...host.querySelectorAll("tbody td:first-child")].map((cell) => cell.querySelector("strong")?.textContent ?? null),
+      note: host.textContent?.includes(note) ?? false,
+    };
+    root.unmount();
+    return shown;
+  };
+  expect(await cells(review.details)).toEqual({ marks: [null, null], note: false });
+  const [expense, cash] = review.details.entries;
+  expect(await cells({ ...review.details, entries: [{ ...expense, onAccount: true }, { ...cash, onAccount: false }], onAccountNote: note }))
+    .toEqual({ marks: ["On Account", null], note: true });
+  // The details of a marked review as the backend serialises them: the text its Rust test
+  // (review_marks_each_entry_on_a_ledger_approved_on_account) compares with its own output.
+  const rust = readFileSync("src-tauri/src/agent_desktop_journal_tests.rs", "utf8");
+  const pinned = /const MARKED_REVIEW_DETAILS_SENT: &str =\s*r#"(.+)"#;/.exec(rust);
+  expect(pinned, "MARKED_REVIEW_DETAILS_SENT was not found in the Rust test file").not.toBeNull();
+  const sent = JSON.parse(pinned![1]);
+  expect(await cells(sent)).toEqual({ marks: ["On Account", null], note: true });
 });

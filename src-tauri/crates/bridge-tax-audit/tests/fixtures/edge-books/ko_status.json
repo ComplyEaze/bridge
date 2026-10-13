@@ -1,0 +1,172 @@
+{
+ "comment": "Only the books population is read. s01 (optional), s02 (cancelled) and s03 (post-dated) would each be listed if they were regular: s01 and s02 are journals between two parties, s03 pays rent from Bank A with Alpha Traders in its narration. Only the regular journal s04 is listed.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Bank OD A/c": "Loans (Liability)",
+  "Indirect Expenses": null,
+  "Sales Accounts": null,
+  "Purchase Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Alpha Traders",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_status-000"
+  },
+  {
+   "name": "Bank A",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-ko_status-001"
+  },
+  {
+   "name": "Beta Stores",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-ko_status-002"
+  },
+  {
+   "name": "Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-ko_status-cap-1"
+  },
+  {
+   "name": "Office Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-ko_status-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Alpha Traders",
+   "opening": 0,
+   "debit": 400000,
+   "credit": 0,
+   "closing": 400000
+  },
+  {
+   "ledger": "Bank A",
+   "opening": 50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 50000000
+  },
+  {
+   "ledger": "Beta Stores",
+   "opening": 0,
+   "debit": 0,
+   "credit": 400000,
+   "closing": -400000
+  },
+  {
+   "ledger": "Capital",
+   "opening": -50000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -50000000
+  },
+  {
+   "ledger": "Office Rent",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "s01",
+   "date": "2025-04-08",
+   "base_type": "Journal",
+   "status": "optional",
+   "narration": "Set off",
+   "lines": [
+    [
+     "Alpha Traders",
+     100000
+    ],
+    [
+     "Beta Stores",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "s02",
+   "date": "2025-05-08",
+   "base_type": "Journal",
+   "status": "cancelled",
+   "narration": "Set off",
+   "lines": [
+    [
+     "Alpha Traders",
+     200000
+    ],
+    [
+     "Beta Stores",
+     -200000
+    ]
+   ]
+  },
+  {
+   "guid": "s03",
+   "date": "2025-06-08",
+   "base_type": "Payment",
+   "status": "postdated",
+   "narration": "Paid for Alpha Traders",
+   "lines": [
+    [
+     "Office Rent",
+     300000
+    ],
+    [
+     "Bank A",
+     -300000
+    ]
+   ]
+  },
+  {
+   "guid": "s04",
+   "date": "2025-07-08",
+   "base_type": "Journal",
+   "narration": "Set off",
+   "lines": [
+    [
+     "Alpha Traders",
+     400000
+    ],
+    [
+     "Beta Stores",
+     -400000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "knock_off_candidates"
+ ],
+ "cash": [],
+ "bank": [
+  "Bank A"
+ ]
+}

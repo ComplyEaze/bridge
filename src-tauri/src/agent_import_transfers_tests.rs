@@ -323,6 +323,52 @@ fn a_row_whose_amount_reverses_the_same_day_is_listed_once_for_each_batch_holdin
 }
 
 #[test]
+fn two_contras_of_one_batch_list_the_row_once_for_that_batch() {
+    let printing = |digits: &str| BankReference::from_recorded(digits);
+    let mut reversed = skip("st-reversed", "20260109", "555.55");
+    reversed.reversed_same_day = true;
+    let mut differs = skip("st-differs", "20260111", "999.99");
+    differs.reference = printing("600000000001");
+    assert!(differs.reference.is_some());
+    let of_another_reference = |txn: &str, digits: &str| {
+        let mut other = contra("batch-3", txn, "20260111", "999.99");
+        other.reference = printing(digits);
+        other
+    };
+    let facts = facts_of(
+        vec![skip("st-several", "20260108", "444.44"), reversed, differs],
+        vec![
+            contra("batch-1", "t1", "20260108", "444.44"),
+            contra("batch-1", "t2", "20260108", "444.44"),
+            contra("batch-2", "t3", "20260109", "555.55"),
+            contra("batch-2", "t4", "20260109", "555.55"),
+            of_another_reference("t5", "600000000002"),
+            of_another_reference("t6", "600000000003"),
+        ],
+    );
+    let summary = summary_of(&facts);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed("st-several", "20260108", "ambiguous", Some("batch-1")),
+            listed(
+                "st-reversed",
+                "20260109",
+                "reversed_same_day",
+                Some("batch-2")
+            ),
+            listed(
+                "st-differs",
+                "20260111",
+                "reference_differs",
+                Some("batch-3")
+            ),
+        ]
+    );
+    assert_eq!(open_count(&summary), 3);
+}
+
+#[test]
 fn a_row_of_such_a_state_with_no_candidate_keeps_one_row_without_a_batch() {
     let facts = facts_of(
         vec![
@@ -435,6 +481,32 @@ const EVERY_OPEN_STATE: [OpenState; 9] = [
     OpenState::HeldElsewhere,
     OpenState::DoubleBooked,
 ];
+
+/// Each state, read from its place in `EVERY_OPEN_STATE`. A state added to
+/// `OpenState` does not compile here until it has an arm, and its arm does not
+/// compile until the list is one longer: an index past the end is an error.
+fn from_the_list(state: OpenState) -> OpenState {
+    match state {
+        OpenState::NotFound => EVERY_OPEN_STATE[0],
+        OpenState::Ambiguous => EVERY_OPEN_STATE[1],
+        OpenState::OtherSideUnverified => EVERY_OPEN_STATE[2],
+        OpenState::NotEstablished => EVERY_OPEN_STATE[3],
+        OpenState::ReversedSameDay => EVERY_OPEN_STATE[4],
+        OpenState::MatchedUnconfirmed => EVERY_OPEN_STATE[5],
+        OpenState::ReferenceDiffers => EVERY_OPEN_STATE[6],
+        OpenState::HeldElsewhere => EVERY_OPEN_STATE[7],
+        OpenState::DoubleBooked => EVERY_OPEN_STATE[8],
+    }
+}
+
+/// With the labels being distinct (below), a list as long as the arms above
+/// holds every state.
+#[test]
+fn the_list_of_every_open_state_holds_each_state_at_its_own_place() {
+    for state in EVERY_OPEN_STATE {
+        assert_eq!(from_the_list(state), state);
+    }
+}
 
 #[test]
 fn every_open_state_has_its_own_label_and_its_own_step() {

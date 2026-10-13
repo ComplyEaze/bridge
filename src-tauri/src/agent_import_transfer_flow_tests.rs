@@ -1677,4 +1677,12 @@ async fn the_step_for_carried_rows_counts_the_rows_the_list_leaves_out() {
     let step = refused["next_step"].as_str().unwrap();
     assert!(step.contains("state other_side_unverified"), "{step}");
     assert!(step.contains("state paired"), "{step}");
+    // it is the step of both kinds among the refused rows, and of no other
+    assert_eq!(
+        step,
+        transfers::Carrier::refusal_step(&BTreeSet::from([
+            transfers::Carrier::Paired,
+            transfers::Carrier::OtherSideUnverified,
+        ]))
+    );
 }

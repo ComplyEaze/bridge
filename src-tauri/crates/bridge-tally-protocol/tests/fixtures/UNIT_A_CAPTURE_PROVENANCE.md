@@ -10,14 +10,10 @@ per file.
 
 | Fixture | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `unit_a_company_extent_live.xml` | 1731 | `ab580f9db97425ff328e30ebf0a81af000e21862180ef7093e553ccc8ed3d3e3` |
 | `unit_a_invalid_char_ref_live.xml` | 8616 | `c6484f004cdee7b1b1ef7065a4156243993956b54c4acf8776ab0c7b68fa5a8d` |
 | `unit_a_optional_voucher_live.xml` | 29994 | `0a692e6362101f9c176cddca1f8afb7d00da3ceb97f94ebd42ff682130b99e53` |
 | `unit_a_vouchers_wildcard_live.xml` | 1504566 | `6db364089068d13563047a58a491a518e90fd30099dc0723ab39da9ebaf58e99` |
 
-- `unit_a_company_extent_live.xml` — the company identity/extent read
-  (`BOOKSFROM` 20240401, `LASTVOUCHERDATE` 20260401). It carries no
-  `ALTMSTID`, unlike `native/company_extent_9000.xml`. Date not recorded.
 - `unit_a_invalid_char_ref_live.xml` — a Ledger collection containing Tally's
   invalid `&#4;` character reference; drives
   `real_invalid_character_reference_is_narrowly_repaired`. Date and company

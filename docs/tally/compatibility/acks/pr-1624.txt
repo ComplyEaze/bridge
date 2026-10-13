@@ -1,0 +1,4 @@
+docs/adr/0004-tally-write-safety.md
+docs/tally/compatibility/synthetic-write-canary-fixture.md
+src-tauri/src/db/tally_mirror.rs
+reviewer: lamemustafa

@@ -34,6 +34,8 @@ An empty window returns a clean, fast `STATUS=1`/0-row response, and a **strictl
 window** returns dated rows that positively bracket the empty span. Date filters are cheap
 (§2.3), so this corroboration is nearly free.
 
+> Note, 2026-10-12: the agent's `vouchers` read does not act on this as a promotion. A widened read with rows only outside an empty window leaves the window `partial` (`empty_window_wider_read_nonempty`); an empty window is `complete` only when the widened read is also empty and the company has no vouchers.
+
 ---
 
 ## Ruling

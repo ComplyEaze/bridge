@@ -78,7 +78,7 @@ use verification::{
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch, voucher_diffs, voucher_is_accounting_effective,
-    Attribution, DeltaBasis, VerificationStatus,
+    Attribution, DeltaBasis, VerificationStatus, WrittenNarration,
 };
 #[cfg(test)]
 use verification::{
@@ -2391,6 +2391,36 @@ impl Server {
         }
     }
 
+    /// Whether the import journal already holds a batch of this company, sent
+    /// or found posted, with a row of `vouchers` (a statement file's vouchers,
+    /// in the shape a build takes). The same check a build makes before it
+    /// writes an import file.
+    pub(super) fn import_journal_holds_rows_of(
+        &self,
+        company_guid: &str,
+        vouchers: &Value,
+    ) -> Result<bool, String> {
+        // A statement file's vouchers carry the caller's date text, as a build
+        // receives them; each is parsed the way a build parses it.
+        let vouchers: Vec<ImportVoucher<String>> = serde_json::from_value(vouchers.clone())
+            .map_err(|_| "proposals_file_invalid".to_string())?;
+        let vouchers = vouchers
+            .into_iter()
+            .map(|voucher| {
+                let date = normalized_date(&voucher.date)
+                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                Ok(voucher.dated(date))
+            })
+            .collect::<Result<Vec<ImportVoucher>, String>>()?;
+        let _admission_lock = self.lock_import_admission_shared()?;
+        Ok(self
+            .import_vouchers_already_posted_while_admitted(
+                &canonical_batch_guid(company_guid),
+                &vouchers,
+            )?
+            .is_some())
+    }
+
     fn latest_import_snapshot(
         &self,
         batch_id: &str,
@@ -2919,10 +2949,11 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
             }
         }
         if let Some(number) = voucher.voucher_number.as_deref() {
-            // Unlike narration/reference, `voucher_diffs` compares the
-            // voucher number verbatim, so a value that would read back
-            // rewritten must be refused here — verification could never
-            // confirm it as posted.
+            // Unlike the reference, `voucher_diffs` compares the voucher
+            // number verbatim (and the narration, which
+            // `refuse_rewritten_narration` guards), so a value that would
+            // read back rewritten must be refused here — verification could
+            // never confirm it as posted.
             if number.is_empty()
                 || number.chars().count() > MAX_TEXT_CHARS
                 || number.chars().any(char::is_control)
@@ -3292,9 +3323,9 @@ fn cash_bank_refusals(
 /// Call this only on a field something compares as text: a ledger name
 /// (checked in `validate_payload`'s entry loop) and the voucher number
 /// (checked above), which `voucher_diffs` (agent_import_verification.rs)
-/// compares, and the narration, which a native post's span binding compares
-/// byte for byte (`agent_import_span_identity.rs`) and the build and a native
-/// post refuse (`refuse_rewritten_narration`). The reference is never
+/// compares, and the narration, which a native post's span binding and the
+/// read-back compare byte for byte (`narration_differs`, #1608) and the build
+/// and a native post refuse (`refuse_rewritten_narration`). The reference is never
 /// compared, so refusing it would refuse a value nothing downstream would
 /// ever notice as changed, and `validate_payload` does not.
 ///

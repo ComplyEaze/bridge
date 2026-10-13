@@ -142,7 +142,9 @@ pub const PORTED: &[PortedTest] = &[
     },
     PortedTest {
         id: "financial_statements",
-        min_figures: 18,
+        // 10 on any book: the six group totals, the tie status and the three voucher counts,
+        // which is all a book shows when neither stock term is known.
+        min_figures: 10,
         run_on: |e, b, r, c| crate::financial_statements_on(e, b, r, c.report_totals.as_ref()),
     },
     PortedTest {

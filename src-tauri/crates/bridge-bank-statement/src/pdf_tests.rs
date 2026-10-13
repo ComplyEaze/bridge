@@ -88,3 +88,75 @@ fn one_figure_on_any_page_is_readable_text() {
         assert!(require_readable_text(&pages).is_ok(), "{figure}");
     }
 }
+
+fn mode(mode: PdfPageTextRenderMode) -> impl FnOnce() -> Result<PdfPageTextRenderMode, ()> {
+    move || Ok(mode)
+}
+
+#[test]
+fn only_render_mode_3_is_hidden_and_a_generated_character_is_never_asked_its_mode() {
+    let never =
+        || -> Result<PdfPageTextRenderMode, ()> { panic!("mode asked of a generated character") };
+    assert_eq!(classify(Ok(true), never), Ok(Origin::Generated));
+    assert_eq!(
+        classify(Ok(false), mode(PdfPageTextRenderMode::Invisible)),
+        Ok(Origin::Hidden)
+    );
+    // mode 7 only adds to the clip: what is painted after it can show through
+    for drawn in [
+        PdfPageTextRenderMode::FilledUnstroked,
+        PdfPageTextRenderMode::StrokedUnfilled,
+        PdfPageTextRenderMode::FilledThenStroked,
+        PdfPageTextRenderMode::FilledUnstrokedClipping,
+        PdfPageTextRenderMode::StrokedUnfilledClipping,
+        PdfPageTextRenderMode::FilledThenStrokedClipping,
+        PdfPageTextRenderMode::InvisibleClipping,
+    ] {
+        assert_eq!(
+            classify(Ok(false), mode(drawn)),
+            Ok(Origin::Drawn),
+            "{drawn:?}"
+        );
+    }
+}
+
+#[test]
+fn a_character_that_cannot_be_classified_refuses_the_pdf() {
+    let never =
+        || -> Result<PdfPageTextRenderMode, ()> { panic!("mode asked after a failed origin") };
+    for refused in [
+        classify(Err(()), never),
+        classify(Ok(false), || Err(())),
+        classify(Ok(false), mode(PdfPageTextRenderMode::Unknown)),
+    ] {
+        assert_eq!(refused.unwrap_err().category, "unreadable_pdf");
+    }
+}
+
+fn counts(origins: &[(Origin, usize)]) -> TextCounts {
+    let mut counts = TextCounts::default();
+    for &(origin, times) in origins {
+        (0..times).for_each(|_| counts.add(origin));
+    }
+    counts
+}
+
+#[test]
+fn hidden_text_must_outnumber_drawn_text_and_generated_characters_do_not_count() {
+    assert!(counts(&[(Origin::Hidden, 11), (Origin::Drawn, 10)]).mostly_hidden());
+    assert!(!counts(&[(Origin::Hidden, 10), (Origin::Drawn, 10)]).mostly_hidden());
+    assert!(!counts(&[]).mostly_hidden());
+    // PDFium's own spaces and line breaks are neither
+    assert!(counts(&[
+        (Origin::Hidden, 2),
+        (Origin::Drawn, 1),
+        (Origin::Generated, 5)
+    ])
+    .mostly_hidden());
+    assert!(!counts(&[
+        (Origin::Hidden, 1),
+        (Origin::Drawn, 1),
+        (Origin::Generated, 5)
+    ])
+    .mostly_hidden());
+}

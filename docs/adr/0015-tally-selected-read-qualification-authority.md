@@ -227,3 +227,15 @@ those shapes in a synthetic tree and requires each to be reported. Removing the 
   `cargo test -p bridge-tally-protocol` passes 348 of 348. `cargo test -p bridge --lib`: 1445
   passed, 0 failed, 6 ignored. The merged tree carries five fewer test attributes than that master
   (1596 to 1591), counted as above.
+
+## Note (October 2026)
+
+`tests/unit_a_live.rs`, cited above as a cross-crate use, was deleted with the voucher-scan path
+(#1546). The measurement above stands as a record of that date.
+
+## Note (2026-10-12, part of #1570)
+
+The `vouchers_v2` profile, the `bridge.tally.vouchers/2` parser that read it, and the two voucher
+steps of `tools/bridge-tally-live-read` that sent it were deleted. No shipped path sent that
+report; shipped voucher reads use native Tally shapes. The `ledgers_v1` profile stays until #609
+decides it. The decision text above is unchanged.

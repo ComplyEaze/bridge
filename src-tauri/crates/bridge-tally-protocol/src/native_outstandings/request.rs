@@ -271,9 +271,9 @@ const GST_DETAILS_FETCH_SUFFIX: &str =
 
 /// The compliance master read with each ledger's `GSTDETAILS.LIST` named in its
 /// `FETCH`: the request whose answer is the fixture
-/// `ledger_gst_details_live.utf16le.xml`. Nothing calls this renderer yet; the
-/// production compliance request ([`render_party_ledger_master_request`]) is
-/// unchanged.
+/// `ledger_gst_details_live.utf16le.xml`. Sent only when the caller asks for the
+/// details; the production compliance request
+/// ([`render_party_ledger_master_request`]) is unchanged.
 pub fn render_party_ledger_master_request_with_gst_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
@@ -289,6 +289,18 @@ pub fn render_party_ledger_master_request_for_parents(
     part: &ParentPart,
 ) -> String {
     render_party_ledger_master(company, period, Some(part), "")
+}
+
+/// [`render_party_ledger_master_request_for_parents`] with the same `FETCH`
+/// suffix as [`render_party_ledger_master_request_with_gst_details`]: a parent
+/// part of a book read with its GST details. The suffix is the only difference
+/// from the production parent-part request.
+pub fn render_party_ledger_master_request_for_parents_with_gst_details(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+    part: &ParentPart,
+) -> String {
+    render_party_ledger_master(company, period, Some(part), GST_DETAILS_FETCH_SUFFIX)
 }
 
 fn render_party_ledger_master(

@@ -1400,7 +1400,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
     row(
         "failure, journal unread",
         failure(None),
-        NEXT_UNCONFIRMED,
+        "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.",
         false,
         true,
     );
@@ -1583,6 +1583,150 @@ fn the_readme_and_the_tool_description_carry_the_corrected_sentences() {
         assert!(!readme.contains(replaced), "README: {replaced}");
         assert!(!description.contains(replaced), "description: {replaced}");
     }
+}
+
+/// The guide and the tool description say only what the read-back checks and
+/// where each answer comes from. Code names are compared with their backticks
+/// removed, since the guide marks them and the description does not.
+#[test]
+fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
+    let flat = |text: &str| {
+        text.replace('`', "")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let guide = flat(include_str!("../../docs/agent/README.md"));
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let description = definitions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "post_ledger_creates")
+        .and_then(|tool| tool["description"].as_str())
+        .map(flat)
+        .expect("the tool is listed");
+    for sentence in [
+        // A send recorded since the call began: where the hold field is given.
+        "When the check before the dialog finds a send of this batch recorded since the call began by another call, and when a held-name refusal finds it in the journal read that follows, the answer is import_already_attempted with error.hold send_of_this_batch_recorded_since",
+        "The check under the journal's lock answers the same code without the hold field, as an outcome that may have been sent",
+        // A company whose set of loaded companies changed is read and judged.
+        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that.",
+        // What posted_verified checks.
+        "bill-wise is not read back",
+        "no ledger or group that existed before changed",
+        // What confirmed_absent needs, and what it does not show.
+        "its read found the name absent and the company's master mark unmoved",
+        "a create that Tally rejected reaches it too, and it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for",
+        "make sure Tally is idle and answering",
+        // The failure answers.
+        "A failure answer that says the create may have been sent says the same.",
+        "When the journal could not be read for that answer, it says it is not known whether a send was recorded: call post_ledger_creates with the same batch_id again, which reads the book back and sends nothing if a send is on file, and otherwise asks for approval again before anything is sent",
+    ] {
+        assert!(guide.contains(sentence), "guide: {sentence}");
+        assert!(description.contains(sentence), "description: {sentence}");
+    }
+    assert!(guide.contains("no other loaded company's master mark moved"));
+    assert!(description.contains("no other loaded company's did"));
+    // A later call for a sent batch: what it does instead of the read-back.
+    assert!(guide.contains(
+        "A later call for a sent batch never sends. It repeats the read-back unless the batch already has a terminal verdict (it then answers from the journal alone), another dispatch is using the Tally endpoint"
+    ));
+    assert!(description.contains(
+        "calling again reads the book back, unless another dispatch is using the Tally endpoint or the batch's company cannot be matched"
+    ));
+    for replaced in [
+        "nothing else changed",
+        "no existing master changed",
+        "a later call found nothing created",
+        "only from a later call after an unknown outcome",
+        "or whose set of loaded companies changed is not read back",
+        "and the failure answer that says the create may have been sent each say",
+        "repeats the read-back and never sends",
+        "every loaded company's master mark",
+        "A send of this batch recorded since the call began by another call is answered as",
+    ] {
+        assert!(!guide.contains(replaced), "guide: {replaced}");
+        assert!(!description.contains(replaced), "description: {replaced}");
+    }
+}
+
+/// The refusal codes and answer fields the guide names for the ledger create
+/// exist in the code that makes them, and the guide names each one.
+#[test]
+fn the_codes_and_fields_the_guide_names_exist_in_the_code() {
+    let guide = include_str!("../../docs/agent/README.md").replace('`', "");
+    let sources = [
+        include_str!("agent_import_post.rs"),
+        include_str!("agent_master_tools.rs"),
+        include_str!("agent_master_verify.rs"),
+        include_str!("tally/approved_import.rs"),
+    ]
+    .join("\n");
+    for name in [
+        "master_writes_need_licensed_mode",
+        "group_export_invalid",
+        "post_catalogue_unreadable",
+        "master_approval_declined",
+        "master_approval_unavailable",
+        "master_approval_timed_out",
+        "verdict_written",
+        "verdict_record_error",
+        "answer_record_error",
+        "counters_note",
+        "not_read_back",
+        "endpoint_dispatch_busy",
+        "company_scope_changed",
+    ] {
+        assert!(sources.contains(&format!("\"{name}\"")), "code: {name}");
+        assert!(guide.contains(name), "guide: {name}");
+    }
+}
+
+/// What the verdict texts say they checked is what `judge` checks: one new
+/// ledger, the fields read back (not bill-wise), the ledgers and groups that
+/// existed before, and the other companies' marks. The absent verdict says what
+/// it needs and what it does not show.
+#[test]
+fn the_verified_and_absent_texts_say_what_is_checked_and_what_is_not() {
+    for text in [
+        settled_note(MasterVerdictState::PostedVerified),
+        settled_next_step(MasterVerdictState::PostedVerified),
+    ] {
+        for fragment in [
+            "exactly one ledger of this name, new",
+            "bill-wise is not read back",
+            "no ledger or group that existed before changed",
+            "no other loaded company's master mark moved",
+        ] {
+            assert!(text.contains(fragment), "{fragment}: {text}");
+        }
+        for replaced in ["nothing else changed", "no other master or company changed"] {
+            assert!(!text.contains(replaced), "{replaced}: {text}");
+        }
+    }
+    for text in [
+        settled_note(MasterVerdictState::ConfirmedAbsent),
+        settled_next_step(MasterVerdictState::ConfirmedAbsent),
+    ] {
+        for fragment in [
+            "no ledger of this name",
+            "Tally rejected",
+            "does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for",
+        ] {
+            assert!(text.contains(fragment), "{fragment}: {text}");
+        }
+        for replaced in ["Nothing was created in the book", "found nothing created"] {
+            assert!(!text.contains(replaced), "{replaced}: {text}");
+        }
+    }
+    let next = settled_next_step(MasterVerdictState::ConfirmedAbsent);
+    let idle = next.find("make sure Tally is idle and answering").unwrap();
+    let prepare = next
+        .find("call prepare_ledger_creates for a new batch")
+        .unwrap();
+    assert!(idle < prepare, "{next}");
+    assert!(next.contains("later read"), "{next}");
 }
 
 /// What a book that could not be read back is told to do, by what stopped it.
@@ -1924,6 +2068,16 @@ async fn an_intent_recorded_while_the_dialog_is_open_stops_the_post() {
         "import_already_attempted",
         "{response}"
     );
+    // The check under the lock answers the code without the hold field, as an
+    // outcome that may have been sent, with the step that reads it back.
+    let error = &result(&response)["error"];
+    assert!(error.get("hold").is_none(), "{response}");
+    assert_eq!(result(&response)["attempt_recorded"], true, "{response}");
+    assert!(error["message"]
+        .as_str()
+        .unwrap()
+        .contains("may have been sent"));
+    assert_eq!(error["next_step"], NEXT_UNCONFIRMED);
     assert_eq!(observed.len(), post_at, "every queue read, and no POST");
     // Only the other process's intent is in the journal.
     assert_eq!(
@@ -2724,6 +2878,11 @@ async fn a_journal_that_cannot_be_read_under_the_lock_stops_the_post() {
         "{response}"
     );
     assert_eq!(observed.len(), post_at, "every queue read, and no POST");
+    assert_eq!(
+        create_count(&observed),
+        0,
+        "no request carried the create's body"
+    );
     assert!(!String::from_utf8(journal_bytes(directory.path()))
         .unwrap()
         .contains("master_dispatch_intent"));
@@ -2813,6 +2972,114 @@ async fn a_dispatch_error_after_the_intent_is_an_unknown_outcome_never_resent() 
         "reconciliation_required",
         "{report}"
     );
+}
+
+/// A failed post whose own journal read also fails does not know whether a send
+/// was recorded. Its step is a later call for the same batch. Here a send was
+/// recorded (the POST was lost after its intent): that call reads the book back
+/// and sends nothing, and nobody is asked.
+#[tokio::test]
+async fn a_failure_answer_with_an_unread_journal_says_to_call_again_and_a_recorded_send_is_only_read(
+) {
+    let plans = through_post(xml(created_one()).with_delivery(
+        Delivery::ResetAfterRequestProcessed {
+            delay: Duration::from_millis(0),
+        },
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let (first, unused) = faulting(
+        vec!["failure_read_busy"],
+        posting(
+            &ScriptedApproval::approving(),
+            server.call_tool("post_ledger_creates", args.clone()),
+        ),
+    )
+    .await;
+    assert!(unused.is_empty(), "the journal read was not reached");
+    assert_eq!(create_count(&sent(simulator)), 1);
+    assert_eq!(
+        error_code(&first),
+        "import_dispatch_outcome_unknown",
+        "{first}"
+    );
+    let answered = result(&first);
+    assert!(answered["attempt_recorded"].is_null(), "{first}");
+    assert_eq!(answered["error"]["next_step"], NEXT_SEND_NOT_KNOWN);
+    assert_ne!(answered["error"]["next_step"], NEXT_UNCONFIRMED);
+    assert!(answered["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("not known"));
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_some());
+    // The call the step names: the send is on file, so it reads and sends nothing.
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(7, 3, None))).unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let scripted = ScriptedApproval::approving();
+    let second = posting_then(
+        &scripted,
+        book(),
+        later.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    let observed = sent(reads);
+    assert_eq!(create_count(&observed), 0, "the later call sends no create");
+    assert!(!observed.is_empty(), "the later call read the book back");
+    assert!(scripted.masters().is_empty(), "nobody was asked");
+    assert_eq!(result(&second)["verification"]["moment"], "reconcile");
+    assert_eq!(result(&second)["dispatch"]["resent"], false);
+}
+
+/// The same step when no send was recorded (the wire was busy before the
+/// intent): the later call asks for approval again, and nothing reaches the wire
+/// when it is declined.
+#[tokio::test]
+async fn a_failure_answer_with_an_unread_journal_says_to_call_again_and_no_send_asks_for_approval()
+{
+    let mut plans = before_approval();
+    let queue = after_approval(xml(created_one()));
+    let busy_send = plans.len() + queue.len() - 2;
+    plans.extend(queue);
+    plans.truncate(busy_send);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .busy_at_send(busy_send, Duration::from_millis(50)),
+    );
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let (first, unused) = faulting(
+        vec!["failure_read_busy"],
+        posting(
+            &ScriptedApproval::approving(),
+            server.call_tool("post_ledger_creates", args.clone()),
+        ),
+    )
+    .await;
+    assert!(unused.is_empty(), "the journal read was not reached");
+    assert_eq!(create_count(&sent(simulator)), 0, "no POST");
+    assert_eq!(error_code(&first), "tally_endpoint_busy", "{first}");
+    let answered = result(&first);
+    assert!(answered["attempt_recorded"].is_null(), "{first}");
+    assert_eq!(answered["error"]["next_step"], NEXT_SEND_NOT_KNOWN);
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_none());
+    // The call the step names: no send is on file, so it asks the person again
+    // before anything is sent.
+    let again = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let later = server_at(again.address(), directory.path());
+    let scripted = ScriptedApproval::declining();
+    let second = posting(&scripted, later.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(again);
+    assert_eq!(error_code(&second), "master_approval_declined", "{second}");
+    assert_eq!(scripted.masters().len(), 1, "the person was asked again");
+    assert_eq!(create_count(&observed), 0, "nothing was sent");
+    assert_eq!(observed.len(), before_approval().len());
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_none());
 }
 
 // --- post: the approval's own states, through the shared machinery ---------
@@ -3959,6 +4226,8 @@ struct Answered {
     unused: Vec<&'static str>,
     /// How many times the create's bytes reached the wire.
     posts: usize,
+    /// How many requests reached the wire after the POST: the read-back's.
+    reads_after_post: usize,
 }
 
 async fn answered_post(
@@ -3968,6 +4237,7 @@ async fn answered_post(
     after: Vec<IndexedMaster>,
 ) -> Answered {
     let mut plans = through_post(xml(answer));
+    let through_the_post = plans.len();
     plans.extend(read_back);
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -3982,7 +4252,8 @@ async fn answered_post(
         ),
     )
     .await;
-    let posts = create_count(&sent(simulator));
+    let observed = sent(simulator);
+    let posts = create_count(&observed);
     Answered {
         response,
         directory,
@@ -3990,6 +4261,7 @@ async fn answered_post(
         args,
         unused,
         posts,
+        reads_after_post: observed.len().saturating_sub(through_the_post),
     }
 }
 
@@ -4026,6 +4298,11 @@ async fn a_failed_first_append_of_the_answer_is_recorded_under_the_verdicts_lock
     let answered = result(&done.response);
     assert!(done.unused.is_empty(), "the fault was not reached");
     assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        done.reads_after_post,
+        clean_read_back().len(),
+        "the book was read back after the answer was lost"
+    );
     assert_eq!(answered["state"], "posted_verified", "{}", done.response);
     assert_eq!(answered["answer_recorded"], true);
     assert_eq!(answered["verification"]["verdict_recorded"], true);
@@ -4061,6 +4338,11 @@ async fn an_answer_that_cannot_be_recorded_twice_is_judged_and_a_second_call_has
     let answered = result(&done.response);
     assert!(done.unused.is_empty(), "both faults were reached");
     assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        done.reads_after_post,
+        clean_read_back().len(),
+        "the book was read back after the answer was lost twice"
+    );
     assert!(answered.get("error").is_none(), "{}", done.response);
     // Judged on the counters this call holds, and said not to be recorded.
     assert_eq!(answered["state"], "posted_verified", "{}", done.response);
@@ -4209,6 +4491,33 @@ async fn a_busy_shared_read_after_the_answer_is_recorded_still_gives_a_verdict()
             "master_verdict"
         ]
     );
+    assert!(state_of(done.directory.path(), &done.batch.batch_id).is_settled());
+}
+
+/// The shared read after the answer fails for a reason other than a busy lock
+/// (here the lock file cannot be opened): the journal is read without the lock
+/// all the same, so the book is still read back and judged.
+#[tokio::test]
+async fn a_shared_read_after_the_answer_that_fails_for_any_reason_is_retried_without_the_lock() {
+    let done = answered_post(
+        vec!["answer_read_lock_unavailable"],
+        created_one(),
+        clean_read_back(),
+        book_after(),
+    )
+    .await;
+    let answered = result(&done.response);
+    assert!(done.unused.is_empty(), "the failed read was not reached");
+    assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        done.reads_after_post,
+        clean_read_back().len(),
+        "the book was read back"
+    );
+    assert!(answered.get("error").is_none(), "{}", done.response);
+    assert_eq!(answered["state"], "posted_verified", "{}", done.response);
+    assert_eq!(answered["answer_recorded"], true);
+    assert_eq!(answered["verification"]["verdict_recorded"], true);
     assert!(state_of(done.directory.path(), &done.batch.batch_id).is_settled());
 }
 
@@ -4745,6 +5054,7 @@ fn the_fault_points_are_under_bare_cfg_test() {
     for needle in [
         "#[cfg(test)]\n        if super::master_ledger::test_fault_fires(\"answer_read_failed\") {",
         "#[cfg(test)]\n        let shared = if super::master_ledger::test_fault_fires(\"answer_read_busy\") {",
+        "} else if super::master_ledger::test_fault_fires(\"answer_read_lock_unavailable\") {",
         "#[cfg(test)]\n        if super::master_ledger::test_fault_fires(\"failure_read_busy\") {",
         "#[cfg(test)]\n        if super::master_ledger::test_fault_fires(\"hold_check_read_busy\") {",
         "#[cfg(test)]\n            let _ = super::master_ledger::BEFORE_HOLD_CHECK.try_with(|before| before());",

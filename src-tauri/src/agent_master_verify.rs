@@ -35,10 +35,15 @@ use std::collections::BTreeMap;
 
 /// The next step after each state. The two loud ones tell the person to check
 /// Tally and not to retry.
-pub(super) const NEXT_VERIFIED: &str = "The ledger exists as sent and nothing else changed. Nothing more is needed for this batch; never post it again.";
+pub(super) const NEXT_VERIFIED: &str = "The read-back found exactly one ledger of this name, new, with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back), no ledger or group that existed before changed, and no other loaded company's master mark moved. Nothing more is needed for this batch; do not post it again.";
 pub(super) const NEXT_INTO_EXISTING: &str = "Open the company in Tally now and check the ledger of this name, its group and the ledgers around it: a ledger that existed before may have been changed. Do not retry and do not post this batch again.";
 pub(super) const NEXT_ELSEWHERE: &str = "Open Tally now and check every loaded company: the change may have landed in a company other than the one approved. Do not retry and do not post this batch again.";
-pub(super) const NEXT_ABSENT: &str = "Nothing was created in the book and this batch is closed. Nothing is sent again automatically. To create the ledger, call prepare_ledger_creates for a new batch: it needs a new approval.";
+pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger of this name, and the company's master mark had not moved. This batch is closed, and nothing is sent again from it. That read also fits a create that Tally rejected, and it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for. To create the ledger, first make sure Tally is idle and answering, then call prepare_ledger_creates for a new batch: it needs a new approval.";
+/// The step for a failed post whose own journal read also failed, so that
+/// whether a send was recorded is not known. A later call is the right one
+/// either way: with a send on file it only reads the book back, and with none
+/// it asks for approval again before anything is sent.
+pub(super) const NEXT_SEND_NOT_KNOWN: &str = "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.";
 pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again later to read it back (it sends nothing), or look at the company's ledgers in Tally. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it. Never post this batch again.";
 /// The read-back found no ledger of this name, and the outcome is still open.
 /// The only step that tells the person to create the ledger by hand.
@@ -51,11 +56,11 @@ pub(super) const NEXT_LOAD_SAME_COMPANIES: &str = "The book could not be compare
 /// The batch's record is not one the read-back can describe.
 pub(super) const NEXT_RECORD_NOT_READABLE: &str = "ComplyEaze Bridge cannot read this batch back: its record is not one it can describe. Nothing was sent now. Compare the ledger in Tally with what was approved, by eye, and do not create it by hand from this batch. Never post this batch again.";
 pub(super) const NEXT_RECONCILE: &str = "The read-back did not settle the outcome. Check the ledger in Tally against the reasons given, then call post_ledger_creates with this batch_id again to read it back (it sends nothing). Do not create the ledger in Tally by hand meanwhile. Never post this batch again.";
-const NOTE_VERIFIED: &str = "ComplyEaze Bridge read the book back after the one create: exactly one ledger of this name, new, with the parent, tax fields and GSTIN as sent and no opening balance, and no other master or company changed.";
+const NOTE_VERIFIED: &str = "ComplyEaze Bridge read the book back after the one create: exactly one ledger of this name, new, with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back); no ledger or group that existed before changed; and no other loaded company's master mark moved.";
 const NOTE_ALERT_EXISTING: &str =
     "ATTENTION: the read-back shows an existing master may have been changed by this create.";
 const NOTE_ALERT_ELSEWHERE: &str = "ATTENTION: the read-back shows a master mark moved in a loaded company other than the one approved.";
-const NOTE_ABSENT: &str = "The read-back found no ledger of this name, no existing master changed and no loaded company's master mark moved since the create was recorded.";
+const NOTE_ABSENT: &str = "A later read of the book found no ledger of this name, no ledger or group that existed before changed and no loaded company's master mark moved since the create was recorded. A create that Tally rejected reaches this state too, and it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for.";
 const NOTE_UNCONFIRMED: &str = "The book could not be read back, so the create is NOT verified.";
 const NOTE_RECONCILE: &str =
     "The read-back did not settle the outcome: the create is NOT verified.";

@@ -1907,13 +1907,19 @@ only in case, spaces or symbols is refused too, because TallyPrime can take such
 a Create for the existing ledger and change it. If the ledger names TallyPrime
 returns cannot be read, `prepare_ledger_creates` refuses
 `master_ledger_index_unavailable` and nothing is created. After the one send
-ComplyEaze Bridge reads the book back (every loaded company's master mark, the
-paired ledger and group names, and the new ledger's parent, tax fields, GSTIN and
-opening balance) and answers with one state: `posted_verified` (exactly one new
-ledger as sent, nothing else changed), `posted_into_existing_master` or
-`master_write_located_elsewhere` (loud: check Tally, do not retry),
-`confirmed_absent` (a later call found nothing created and no mark moved; a new
-batch needs a new approval), `masters_after_post_unconfirmed` (the book could
+ComplyEaze Bridge reads the book back (the master marks of the loaded companies,
+the paired ledger and group names, and the new ledger's parent, tax fields, GSTIN
+and opening balance) and answers with one state: `posted_verified` (exactly one
+ledger of the name, new, with the parent, tax fields, GSTIN and opening balance
+as sent; bill-wise is not read back; no ledger or group that existed before
+changed; no other loaded company's master mark moved),
+`posted_into_existing_master` or `master_write_located_elsewhere` (loud: check
+Tally, do not retry), `confirmed_absent` (only from a later call: its read found
+the name absent and the company's master mark unmoved; a create that Tally
+rejected reaches it too, and it does not show that Tally will not still run a
+create that ComplyEaze Bridge stopped waiting for, so make sure Tally is idle and
+answering before a new batch is prepared, which needs a new approval),
+`masters_after_post_unconfirmed` (the book could
 not be read back; call again, which only reads), plain `posted_unverified`
 (Tally answered, with any counters it gave, but the read-back could not be
 attempted, so nothing was judged; see its `next_step`, never send again, check
@@ -1930,8 +1936,35 @@ that finds no answer on file shows no counters.
 `settled` is true only when the state is final and the verdict is recorded. With
 `verdict_recorded` false the state was judged but is not settled: call
 `post_ledger_creates` with the same `batch_id` again, which reads the book back and
-sends nothing. A later call for a sent batch repeats the read-back and never
-sends.
+sends nothing. A later call for a sent batch never sends. It repeats the
+read-back unless the batch already has a terminal verdict (it then answers from
+the journal alone), another dispatch is using the Tally endpoint (the book is
+then not read, and the answer is `masters_after_post_unconfirmed` with the reason
+`endpoint_dispatch_busy`), or the batch's company cannot be matched to a loaded
+company (it then answers from the journal and says what stopped the read-back).
+
+Refusals and answer fields not named above include these.
+`master_writes_need_licensed_mode` refuses a book in TallyPrime's Education mode,
+before the person is asked, because no master write has been measured there.
+`group_export_invalid` says the group names TallyPrime returned could not be read,
+with a `cause` when one is known. `post_catalogue_unreadable` says the ledger and
+group names read again after the approval differ between the two readings or
+cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
+`master_approval_timed_out` say the person declined the dialog, the dialog could
+not be shown, or the person did not answer in time. In an answer,
+`verification.verdict_written` is true when this call appended the verdict (an
+open verdict already on file in the same words is not appended again);
+`verification.verdict_record_error` is the code of why the verdict was not
+recorded; `verification.answer_record_error` is the code of why Tally's answer was
+not recorded, in the `posted_unverified` answer given when the book could not be
+read back; `verification.counters_note` says why no counters are shown; and
+`verification.not_read_back` lists `bill_wise` when the ledger asked for
+bill-wise, which the read-back does not fetch. An answer made from the journal
+alone (a batch with a terminal verdict, or a book that could not be read back) has
+a `journal` object with `response_recorded`, `counters` and `verdict`, takes its
+`state` from the verdict (or is `posted_unverified` when only Tally's answer is on
+file, and `reconciliation_required` when neither is), and, for a book that was not
+read back, has `verification.attempted` false with the code that stopped it.
 
 A create whose outcome is not settled holds its ledger name, and every name that
 may be the same ledger, against a new create in every company this data folder
@@ -1948,10 +1981,14 @@ name, and `blocking_batches_other_companies`, each with its `batch_id` and
 `company_guid`), `settled_meanwhile`, which only the check under the lock gives (the
 holder settled since the call began: post this batch again), or `journal_unread`,
 which either check can give (the journal could not be read just now, or did not
-show this batch: call again). A send of this batch recorded
-since the call began by another call is answered as `import_already_attempted`,
-with `error.hold` `send_of_this_batch_recorded_since`: call again later, which only
-reads, and create nothing by hand. For a held name, call `post_ledger_creates` with
+show this batch: call again). When the check before the dialog finds a send of this
+batch recorded since the call began by another call, and when a held-name refusal
+finds it in the journal read that follows, the answer is `import_already_attempted`
+with `error.hold` `send_of_this_batch_recorded_since`: call again later, which
+only reads, and create nothing by hand. The check under the journal's lock
+answers the same code without the `hold` field, as an outcome that may have been
+sent: call again, which reads the book back when the send is on file, and create
+nothing by hand meanwhile. For a held name, call `post_ledger_creates` with
 each blocking `batch_id`. For a batch of another company, `list_companies` shows
 only the companies loaded in Tally, so a `company_guid` not found there belongs to a
 company that is not loaded; the call reads that book back and sends nothing if the
@@ -1966,16 +2003,25 @@ present with no counters, or with a field that differs; a create Tally rejected,
 once the mark moves; and the reasons `pre_image_master_missing`,
 `pre_image_unreadable` and `master_index_not_usable`. A later call judges the book
 as it then is, so a state stays unsettled only while the book stays as it was read.
-A company that is not loaded, was renamed, or whose set of loaded companies changed
-is not read back until the same companies are loaded under the same names; the next
-call then reads the book back and judges it. Only a read-back that read the book,
+A company that is not loaded or was renamed is not read back until the same
+companies are loaded under the same names; the next call then reads the book back
+and judges it. A book whose set of loaded companies changed is read and judged:
+the answer is `reconciliation_required` with `company_scope_changed` among its
+reasons, and it says to load the same companies and call again; a read that shows
+a changed existing master or another company's mark moved keeps the state for
+that. Only a read-back that read the book,
 found the name absent and did not settle says to create the ledger in Tally by
 hand, and then it says to look at what else changed and to make sure Tally is idle
 and answering first, because a create still waiting in Tally would overwrite a
-ledger keyed by hand; keying it may not settle the batch. An unconfirmed answer,
-the answer given when the book could not be read back after Tally answered, and
-the failure answer that says the create may have been sent each say to call again
-later, which only reads, and to create nothing in Tally by hand meanwhile. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
+ledger keyed by hand; keying it may not settle the batch. An unconfirmed answer
+and the answer given when the book could not be read back after Tally answered
+say to call again later, which only reads, and to create nothing in Tally by hand
+meanwhile. A failure answer that says the create may have been sent says the same.
+When the journal could not be read for that answer, it says it is not known
+whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
+again, which reads the book back and sends nothing if a send is on file, and
+otherwise asks for approval again before anything is sent; create nothing in Tally by hand
+meanwhile. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
 address or phone number is put in an answer or a record; a GSTIN the caller
 supplied, which contains the party's PAN, is in the preview and in the batch's
 local record. The setting is a command-line setting only and is not in the MCPB

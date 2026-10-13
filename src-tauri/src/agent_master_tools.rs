@@ -65,7 +65,8 @@ mod verify;
 use verdict::Moment;
 use verify::{
     not_read_back_next_step, settled_alert, settled_next_step, settled_note, PostedAnswer,
-    NEXT_ANSWER_NOT_RECORDED, NEXT_NOT_READ_BACK_AFTER_ANSWER, NEXT_UNCONFIRMED,
+    NEXT_ANSWER_NOT_RECORDED, NEXT_NOT_READ_BACK_AFTER_ANSWER, NEXT_SEND_NOT_KNOWN,
+    NEXT_UNCONFIRMED,
 };
 
 /// What a caller is told after a ledger is prepared.
@@ -359,10 +360,12 @@ impl Server {
     }
 
     /// The masters journal after Tally answered the one create: the shared read
-    /// as [`Self::read_master_journal`], and, when another process holds the
-    /// admission lock, the read with no lock. A lockless read of an append in
-    /// progress fails closed on a torn last line. Nothing here may fail the
-    /// call: the caller answers from what it cannot read.
+    /// as [`Self::read_master_journal`], and, when that read fails for any
+    /// reason (the admission lock is held by another process or cannot be
+    /// opened, or the settled-state check of the imports folder refuses), the
+    /// read with no lock. A lockless read of an append in progress fails closed
+    /// on a torn last line. Nothing here may fail the call: the caller answers
+    /// from what it cannot read.
     fn read_master_journal_after_answer(&self) -> Result<MasterJournal, String> {
         #[cfg(test)]
         if super::master_ledger::test_fault_fires("answer_read_failed") {
@@ -372,11 +375,13 @@ impl Server {
         #[cfg(test)]
         let shared = if super::master_ledger::test_fault_fires("answer_read_busy") {
             Err("import_admission_busy".to_string())
+        } else if super::master_ledger::test_fault_fires("answer_read_lock_unavailable") {
+            Err("import_admission_lock_unavailable".to_string())
         } else {
             shared
         };
         match shared {
-            Err(code) if code == "import_admission_busy" => {
+            Err(_) => {
                 read_journal(&self.settings.data_dir).map_err(|error| error.code().to_string())
             }
             other => other,
@@ -1394,7 +1399,8 @@ fn require_licensed_mode(profile: DateBoundaryProfile) -> Result<(), ToolFailure
 
 /// What a failed post is answered with. `attempted` is what the journal showed:
 /// a recorded intent means the create may have been sent and must be
-/// reconciled, never repeated.
+/// reconciled, never repeated; `None` is a journal that could not be read, so
+/// whether a send was recorded is not known.
 fn master_failure_outcome(
     batch_id: &str,
     company_guid: &str,
@@ -1408,10 +1414,10 @@ fn master_failure_outcome(
         .unwrap_or(accumulated);
     evidence.state = "partial";
     evidence.reason_code = Some(failure.code.clone());
-    let mut error = json!({"code": failure.code, "message": if attempted == Some(false) {
-        "Nothing was sent. Review the error before requesting approval again."
-    } else {
-        "The create may have been sent to Tally. Do not send this batch again: check the company's ledgers in Tally."
+    let mut error = json!({"code": failure.code, "message": match attempted {
+        Some(false) => "Nothing was sent. Review the error before requesting approval again.",
+        Some(true) => "The create may have been sent to Tally. Do not send this batch again: check the company's ledgers in Tally.",
+        None => "Whether the create was sent to Tally is not known: the journal could not be read just now. Check the company's ledgers in Tally.",
     }});
     if let Some(cause) = failure.cause {
         error["cause"] = json!(cause);
@@ -1419,14 +1425,17 @@ fn master_failure_outcome(
     if failure.code == "tally_endpoint_busy" {
         error["retry_after_s"] = json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
     }
-    if attempted == Some(false) {
-        if let Some(next_step) = master_next_step(&failure.code) {
-            error["next_step"] = json!(next_step);
+    match attempted {
+        Some(false) => {
+            if let Some(next_step) = master_next_step(&failure.code) {
+                error["next_step"] = json!(next_step);
+            }
         }
-    } else {
-        // The create may have been sent: a later call reads the book back and
-        // sends nothing, and nothing is keyed by hand meanwhile.
-        error["next_step"] = json!(NEXT_UNCONFIRMED);
+        // A send is recorded: a later call reads the book back and sends
+        // nothing, and nothing is keyed by hand meanwhile.
+        Some(true) => error["next_step"] = json!(NEXT_UNCONFIRMED),
+        // Not known: a later call is true either way, and says which.
+        None => error["next_step"] = json!(NEXT_SEND_NOT_KNOWN),
     }
     ToolOutcome {
         payload: json!({"result":{

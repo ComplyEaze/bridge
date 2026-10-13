@@ -812,7 +812,9 @@ consumption authority is immutable.
 - JSONEX valid arrays.
 - Canonical semantic-projection fixtures that explicitly exclude transport
   provenance; the existing synthetic JSON reference is not an official Tally
-  JSONEX envelope and does not prove XML/JSONEX parity.
+  JSONEX envelope and does not prove XML/JSONEX parity. (2026-10-13 note: that
+  fixture was deleted in #1701; the only thing that read it was a test of its
+  own contents.)
 - unsupported capability.
 
 #### Acceptance
@@ -1279,7 +1281,9 @@ mirror/checkpoint/proof state, or supports writes. `Matched` remains
   is enabled by the production application.
 - The old Bridge-shaped JSON simulator fixture is explicitly labelled a
   synthetic semantic reference. It is not an official Tally JSONEX envelope
-  and supplies no capability or parity evidence.
+  and supplies no capability or parity evidence. (2026-10-13 note: that fixture
+  was deleted in #1701; the only thing that read it was a test of its own
+  contents.)
 
 #### Acceptance
 

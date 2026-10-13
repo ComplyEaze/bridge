@@ -1,0 +1,17 @@
+== aw26-b-whole.xml | 52082 bytes | sha256 cf434a02787239519c3f5091ac030d93ab582a711642edfc9beb80c7e5ad5229 | VOUCHER rows 1 | LINEERROR elements 0 | leaves 722
+== aw26-b-whole.xml | 52082 bytes | sha256 cf434a02787239519c3f5091ac030d93ab582a711642edfc9beb80c7e5ad5229 | VOUCHER rows 1 | LINEERROR elements 0 | leaves 722
+compare: leaves in A only 0, in B only 0, in both with a different value 0, in both and equal 722
+text "BP/26-27/0001" (13) in aw26-b-whole.xml: 1 leaf(s)
+  VOUCHER[1]/REFERENCE[1] = "BP/26-27/0001" (13)
+text "BP/26-27/0001" (13) in aw26-b-whole.xml: 1 leaf(s)
+  VOUCHER[1]/REFERENCE[1] = "BP/26-27/0001" (13)
+text "20260801" (8) in aw26-b-whole.xml: 1 leaf(s)
+  VOUCHER[1]/REFERENCEDATE[1] = "20260801" (8)
+text "20260801" (8) in aw26-b-whole.xml: 1 leaf(s)
+  VOUCHER[1]/REFERENCEDATE[1] = "20260801" (8)
+text "1-Aug" (5) in aw26-b-whole.xml: 0 leaf(s)
+text "1-Aug" (5) in aw26-b-whole.xml: 0 leaf(s)
+text "01-Sales Return" (15) in aw26-b-whole.xml: 1 leaf(s)
+  VOUCHER[1]/GSTNATUREOFRETURN[1] = "01-Sales Return" (15)
+text "01-Sales Return" (15) in aw26-b-whole.xml: 1 leaf(s)
+  VOUCHER[1]/GSTNATUREOFRETURN[1] = "01-Sales Return" (15)

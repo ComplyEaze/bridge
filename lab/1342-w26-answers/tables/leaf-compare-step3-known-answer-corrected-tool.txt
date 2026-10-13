@@ -1,0 +1,20 @@
+== aw24-b.xml | 10186 bytes | sha256 6a678e083bd440adf2e17c0693926c936e34b44335416e6cbac112cb183f5717 | VOUCHER rows 1 | LINEERROR elements 0 | leaves 56
+== aw25-b.xml | 10174 bytes | sha256 965d1a0be34ea0a83462c852971f0e9bcb4d520af9fc544ba919054455924aaf | VOUCHER rows 1 | LINEERROR elements 0 | leaves 56
+compare: leaves in A only 0, in B only 0, in both with a different value 17, in both and equal 39
+  differs: VOUCHER[1]/DATE[1] | A "20260921" (8) | B "20260922" (8)
+  differs: VOUCHER[1]/VOUCHERTYPENAME[1] | A "Credit Note" (11) | B "Debit Note" (10)
+  differs: VOUCHER[1]/ISDEEMEDPOSITIVE[1] | A "No" (2) | B "Yes" (3)
+  differs: VOUCHER[1]/VOUCHERKEY[1] | A "198792561295368" (15) | B "198796856262664" (15)
+  differs: VOUCHER[1]/AMOUNT[1] | A "210.00" (6) | B "-210.00" (7)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[1]/ISDEEMEDPOSITIVE[1] | A "No" (2) | B "Yes" (3)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[1]/ISLASTDEEMEDPOSITIVE[1] | A "No" (2) | B "Yes" (3)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[1]/AMOUNT[1] | A "210.00" (6) | B "-210.00" (7)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[2]/ISDEEMEDPOSITIVE[1] | A "Yes" (3) | B "No" (2)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[2]/ISLASTDEEMEDPOSITIVE[1] | A "Yes" (3) | B "No" (2)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[2]/AMOUNT[1] | A "-200.00" (7) | B "200.00" (6)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[3]/ISDEEMEDPOSITIVE[1] | A "Yes" (3) | B "No" (2)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[3]/ISLASTDEEMEDPOSITIVE[1] | A "Yes" (3) | B "No" (2)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[3]/AMOUNT[1] | A "-5.00" (5) | B "5.00" (4)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[4]/ISDEEMEDPOSITIVE[1] | A "Yes" (3) | B "No" (2)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[4]/ISLASTDEEMEDPOSITIVE[1] | A "Yes" (3) | B "No" (2)
+  differs: VOUCHER[1]/LEDGERENTRIES.LIST[4]/AMOUNT[1] | A "-5.00" (5) | B "5.00" (4)

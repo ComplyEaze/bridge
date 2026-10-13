@@ -559,14 +559,13 @@ proved. With it off, a batch of more than one voucher refuses exactly as before
   cash/bank ledgers;
 - the standing cautions.
 
-Order, changed on 13 October 2026 (#746; the lines and their wording are unchanged): the count
-and company, the company number, the count by type, the date range, the grand totals and the
-money lines come first; then the company GUID and the Tally origin, the voucher lines or the
-sentence in their place, the per-ledger lines, the batch id, and the cautions. Before that
-date the grand totals and the money lines followed the per-ledger lines. The new order has
-not yet been shown in a running dialog on Windows or macOS (UNVERIFIED).
+Order, as amended on 13 October 2026 (#746): the count and company, the company number, the
+count by type, the date range, the grand totals and the money lines lead; then the company
+GUID and the Tally origin, the voucher lines or the sentence in their place, the per-ledger
+lines, the batch id, and the cautions. This order has not yet been shown in a running dialog
+on Windows or macOS (UNVERIFIED).
 
-It said, in a line of its own, that each voucher's date, narration and reference are not shown. Since #1278 a batch of at most ten vouchers lists one line for each voucher instead, and when those lines cannot be shown one sentence says why. Its budget is its own: 40 lines, 3,200 characters, 100
+A batch of at most ten vouchers lists one line for each voucher (#1278), and when those lines cannot be shown one sentence says why. Its budget is its own: 40 lines, 3,200 characters, 100
 a line, and 7,000 UTF-8 bytes (under the dialog's 8,000). A summary over it is refused
 (`import_review_too_large`), never cut, and the caller posts the batch in parts. A 40-line native
 dialog has not yet been shown on Windows or macOS (UNVERIFIED).

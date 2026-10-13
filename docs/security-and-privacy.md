@@ -278,12 +278,16 @@ and a given file can be in either place (seen on one computer, #1459;
 that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
 Windows reports for that file, with a `path_state` beside it that says whether
 Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
-still prints the folder as the Windows location in the table above, whichever
-place the files are in. Microsoft's documentation says that uninstalling or
-resetting a Store app (here Claude Desktop itself, not the extension of
-section 8) removes that second folder and everything in it. **Not measured:**
-what that removes on a real Store install, and which of the files below are in
-that folder.
+still prints the folder as built (the Windows location in the table above,
+unless you set another data folder), whichever place the files are in. On that
+one computer (#1459) the second folder held a receipt log, the terms record,
+the import journal, the saved batch files (`imports/`), the bank-statement
+proposals, a lock file and the lock folder (`native-dispatch-leases/`).
+Microsoft's documentation says that uninstalling or resetting a Store app
+(here Claude Desktop itself; this is not the removal of the extension that
+section 8 describes) removes that second folder and everything in it.
+**Not measured:** any other computer, where the proof files of a verification
+go, and what an uninstall or reset really removes.
 
 - **A receipt log** (`agent-egress.jsonl`): two lines for each tool call. The
   first has the tool name, the time, the company's Tally GUID, fingerprints of

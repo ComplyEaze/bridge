@@ -39,9 +39,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha1::{Digest, Sha1};
-
-use crate::book::{Book, Voucher, VoucherStatus};
+use crate::book::{
+    Book, ClosingStock, ClosingStockUnknown, OpeningStock, OpeningStockUnknown, Voucher,
+    VoucherStatus,
+};
 use crate::error::{AuditError, Result};
 use crate::findings::{pct_bp, Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
 use crate::read::iso;
@@ -95,19 +96,117 @@ pub struct StockRow {
     pub stale: bool,
 }
 
+/// Why a stock term of the gross profit is not known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StockUnknown {
+    Opening(OpeningStockUnknown),
+    Closing(ClosingStockUnknown),
+    /// A Stock-in-Hand ledger carries a value on a book that keeps its stock on the stock items.
+    LedgerAlso,
+}
+
+impl StockUnknown {
+    fn limit(self) -> String {
+        let why = match self {
+            Self::Opening(r) => format!(
+                "Opening stock is held on the stock items, not on a ledger, and was {}",
+                r.as_str()
+            ),
+            Self::Closing(r) => format!(
+                "Closing stock is held on the stock items, not on a ledger, and was {}",
+                r.as_str()
+            ),
+            Self::LedgerAlso => {
+                "A ledger under Stock-in-Hand carries a value on a book that keeps \
+its stock on the stock items, and the two were not added, in case the stock is counted twice"
+                    .to_string()
+            }
+        };
+        format!("{why}; no gross profit or net profit is shown.")
+    }
+
+    fn ask(self) -> &'static str {
+        match self {
+            Self::Opening(_) => {
+                "Tally's Stock Summary as at the first day of the books, for the opening stock."
+            }
+            Self::Closing(_) => {
+                "Tally's Stock Summary as at the last day of the period, for the closing stock."
+            }
+            Self::LedgerAlso => {
+                "Whether the Stock-in-Hand ledger carries stock that the stock items also hold."
+            }
+        }
+    }
+}
+
+/// Where the stock terms of the gross profit come from, decided once from the book's typed terms.
+/// Only `Ledgers` and `Items` carry both terms, so a book whose stock is unknown cannot reach the
+/// gross profit sum.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StockBasis {
+    /// The company does not keep inventory integrated with its accounts: Stock-in-Hand ledgers.
+    Ledgers,
+    /// Integrated inventory, both terms known: the stock items' opening values and the Stock
+    /// Summary dated the trial balance's last day.
+    Items { opening: i64, closing: i64 },
+    /// Integrated inventory with a term unknown, or ledger stock beside it: each known term is
+    /// shown, no profit is.
+    Unknown {
+        opening: Option<i64>,
+        closing: Option<i64>,
+        why: Vec<StockUnknown>,
+    },
+}
+
+/// `ledger_has_value`: a Stock-in-Hand ledger carries a nonzero opening or closing.
+fn stock_basis(book: &Book, ledger_has_value: bool) -> StockBasis {
+    let opening = match book.opening_stock {
+        OpeningStock::NotApplicable => return StockBasis::Ledgers,
+        OpeningStock::Valued(v) => Ok(v),
+        OpeningStock::Unknown(r) => Err(StockUnknown::Opening(r)),
+    };
+    let closing = match book.closing_stock {
+        ClosingStock::Valued(v) => Ok(v),
+        ClosingStock::Unknown(r) => Err(StockUnknown::Closing(r)),
+        // `load_book` sets both terms from one flag; a book built by hand with only one is not read.
+        ClosingStock::NotApplicable => Err(StockUnknown::Closing(ClosingStockUnknown::NotRead)),
+    };
+    match (opening, closing) {
+        (Ok(opening), Ok(closing)) if !ledger_has_value => StockBasis::Items { opening, closing },
+        (opening, closing) => {
+            let mut why: Vec<StockUnknown> = [opening.err(), closing.err()]
+                .into_iter()
+                .flatten()
+                .collect();
+            if why.is_empty() {
+                why.push(StockUnknown::LedgerAlso);
+            }
+            StockBasis::Unknown {
+                opening: opening.ok(),
+                closing: closing.ok(),
+                why,
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Statements {
     pub sales: i64,
     pub purchases: i64,
     pub direct_expenses: i64,
     pub direct_incomes: i64,
-    pub opening_stock: i64,
-    pub closing_stock: i64,
+    pub stock_basis: StockBasis,
+    /// `None` when the term is not known.
+    pub opening_stock: Option<i64>,
+    pub closing_stock: Option<i64>,
     pub closing_stock_tb_field: i64,
-    pub gross_profit: i64,
+    /// `None` when a stock term is not known: never computed as if stock were zero.
+    pub gross_profit: Option<i64>,
     pub indirect_expenses: i64,
     pub other_income: i64,
-    pub net_profit: i64,
+    pub net_profit: Option<i64>,
     pub partner_interest_paise: Option<i64>,
     pub profit_before_partner_interest: Option<i64>,
     /// Per P&L group, the ledgers with a non-zero TB closing (for evidence).
@@ -143,12 +242,7 @@ fn status_value(s: VoucherStatus) -> &'static str {
     }
 }
 
-/// The reference's `_hash`: sha1 of the text, first 8 hex digits.
-fn hash8(text: &str) -> String {
-    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()
-}
-
-use crate::support::voucher_label;
+use crate::support::{hash8, voucher_label};
 
 /// The excluded vouchers' refs carry the "excluded_voucher" kind: listing them is this figure's
 /// purpose, and POP-4 checks that each really is outside the books population.
@@ -224,12 +318,30 @@ pub fn compute<'b>(
         });
     }
 
-    let cost = sub(
-        add(add(opening_stock, purchases)?, direct_expenses)?,
-        closing_stock,
-    )?;
-    let gross_profit = sub(add(sales, direct_incomes)?, cost)?;
-    let net_profit = add(sub(gross_profit, indirect_expenses)?, other_income)?;
+    let ledger_has_value = stock_rows.iter().any(|r| {
+        r.opening_paise != 0 || r.recomputed_closing_paise != 0 || r.tb_closing_field_paise != 0
+    });
+    let stock_basis = stock_basis(book, ledger_has_value);
+    let stock_terms = match &stock_basis {
+        StockBasis::Ledgers => Some((opening_stock, closing_stock)),
+        StockBasis::Items { opening, closing } => Some((*opening, *closing)),
+        StockBasis::Unknown { .. } => None,
+    };
+    let (opening_stock, closing_stock) = match &stock_basis {
+        StockBasis::Unknown {
+            opening, closing, ..
+        } => (*opening, *closing),
+        _ => (stock_terms.map(|t| t.0), stock_terms.map(|t| t.1)),
+    };
+    let (gross_profit, net_profit) = match stock_terms {
+        Some((opening, closing)) => {
+            let cost = sub(add(add(opening, purchases)?, direct_expenses)?, closing)?;
+            let gross_profit = sub(add(sales, direct_incomes)?, cost)?;
+            let net_profit = add(sub(gross_profit, indirect_expenses)?, other_income)?;
+            (Some(gross_profit), Some(net_profit))
+        }
+        None => (None, None),
+    };
 
     let (partner_interest_paise, profit_before_partner_interest) =
         if partner_interest_ledgers.is_empty() {
@@ -241,7 +353,7 @@ pub fn compute<'b>(
                     pi = add(pi, row.closing_paise)?;
                 }
             }
-            (Some(pi), Some(add(net_profit, pi)?))
+            (Some(pi), net_profit.map(|np| add(np, pi)).transpose()?)
         };
 
     let in_books = book.population()?.len();
@@ -261,6 +373,7 @@ pub fn compute<'b>(
             purchases,
             direct_expenses,
             direct_incomes,
+            stock_basis,
             opening_stock,
             closing_stock,
             closing_stock_tb_field,
@@ -335,78 +448,135 @@ no sign flip.",
         group_ev(DIRECT_EXPENSES_GROUP),
     )?;
 
+    let on_items = !matches!(d.stock_basis, StockBasis::Ledgers);
     let stock_ev: Vec<EvidenceRef> = d
         .stock_rows
         .iter()
         .map(|row| EvidenceRef::new("ledger", &row.ledger))
         .collect();
-    let f_open_stock = r.fig(
-        "opening_stock",
-        Value::Int(d.opening_stock),
-        Unit::Paise,
-        "Opening stock: sum of TB opening balances of every ledger under 'Stock-in-Hand' (a \
+    let f_open_stock = d
+        .opening_stock
+        .map(|v| {
+            if on_items {
+                r.fig(
+                    "opening_stock",
+                    Value::Int(v),
+                    Unit::Paise,
+                    "Opening stock: the stock items' opening values (Dr positive), as at the books' \
+first day. Tally holds it on the stock items, not on a ledger.",
+                    Vec::new(),
+                )
+            } else {
+                r.fig(
+                    "opening_stock",
+                    Value::Int(v),
+                    Unit::Paise,
+                    "Opening stock: sum of TB opening balances of every ledger under 'Stock-in-Hand' (a \
 masters value, read directly; not subject to the quirk in the Trial Balance's own closing field \
 for Stock-in-Hand ledgers).",
-        stock_ev.clone(),
-    )?;
-    let f_close_stock = r.fig(
-        "closing_stock",
-        Value::Int(d.closing_stock),
-        Unit::Paise,
-        "Closing stock: sum, per Stock-in-Hand ledger, of TB opening + the year's TB debit \
+                    stock_ev.clone(),
+                )
+            }
+        })
+        .transpose()?;
+    let f_close_stock = d
+        .closing_stock
+        .map(|v| {
+            if on_items {
+                r.fig(
+                    "closing_stock",
+                    Value::Int(v),
+                    Unit::Paise,
+                    "Closing stock: the closing values (Dr positive) of Tally's Stock Summary dated \
+the last day of the period. Tally holds it on the stock items, not on a ledger.",
+                    Vec::new(),
+                )
+            } else {
+                r.fig(
+                    "closing_stock",
+                    Value::Int(v),
+                    Unit::Paise,
+                    "Closing stock: sum, per Stock-in-Hand ledger, of TB opening + the year's TB debit \
 movement - the year's TB credit movement (recomputed; the ledger's own TB closing field is NOT \
 used -- it is shown separately, for comparison, with a count of the ledgers where it is stale).",
-        stock_ev.clone(),
-    )?;
-    r.fig(
-        "closing_stock_tb_field",
-        Value::Int(d.closing_stock_tb_field),
-        Unit::Paise,
-        "Sum, per Stock-in-Hand ledger, of the TB's OWN closing field -- shown only for comparison; \
+                    stock_ev.clone(),
+                )
+            }
+        })
+        .transpose()?;
+    if !on_items {
+        r.fig(
+            "closing_stock_tb_field",
+            Value::Int(d.closing_stock_tb_field),
+            Unit::Paise,
+            "Sum, per Stock-in-Hand ledger, of the TB's OWN closing field -- shown only for comparison; \
 the recomputed closing stock (opening plus net debit movement) is the figure used everywhere else in \
 this test.",
-        stock_ev,
-    )?;
-    let stale: Vec<&StockRow> = d.stock_rows.iter().filter(|row| row.stale).collect();
-    r.fig(
-        "stock_in_hand_ledgers_with_stale_tb_closing_field_count",
-        Value::Int(i64::try_from(stale.len()).map_err(|_| overflow())?),
-        Unit::Count,
-        "Stock-in-Hand ledgers where the TB's own closing field does not equal opening + net \
+            stock_ev,
+        )?;
+        let stale: Vec<&StockRow> = d.stock_rows.iter().filter(|row| row.stale).collect();
+        r.fig(
+            "stock_in_hand_ledgers_with_stale_tb_closing_field_count",
+            Value::Int(i64::try_from(stale.len()).map_err(|_| overflow())?),
+            Unit::Count,
+            "Stock-in-Hand ledgers where the TB's own closing field does not equal opening + net \
 debit movement -- Tally leaves the closing field as a static copy of the opening on such a ledger \
 when \
 the company does not integrate accounts with inventory; verified nonzero on data (not merely \
 asserted) wherever this quirk is present.",
-        stale
-            .iter()
-            .map(|row| EvidenceRef::new("ledger", &row.ledger))
-            .collect(),
-    )?;
+            stale
+                .iter()
+                .map(|row| EvidenceRef::new("ledger", &row.ledger))
+                .collect(),
+        )?;
+    }
 
-    let f_gp = r.fig(
-        "gross_profit",
-        Value::Int(d.gross_profit),
-        Unit::Paise,
-        "Sales plus direct incomes, less (opening stock plus purchases plus direct expenses less \
+    let f_gp = d
+        .gross_profit
+        .map(|gp| {
+            r.fig(
+                "gross_profit",
+                Value::Int(gp),
+                Unit::Paise,
+                if on_items {
+                    "Sales plus direct incomes, less (opening stock plus purchases plus direct expenses \
+less closing stock); the stock taken from the stock items at both ends, direct expenses included, so \
+this ties to Form 3CD Clause 40."
+                } else {
+                    "Sales plus direct incomes, less (opening stock plus purchases plus direct expenses less \
 closing stock); one stock basis (Trial Balance / balance sheet, with the recomputed closing stock) \
-used at BOTH ends, direct expenses included, so this ties to Form 3CD Clause 40.",
-        Vec::new(),
-    )?;
-    let f_gp_pct = r.fig(
-        "gross_profit_pct_bp",
-        pct_bp(d.gross_profit, d.sales).ok_or_else(overflow)?,
-        Unit::BasisPoints,
-        "Gross profit as a share of sales, on the Trial Balance stock basis (recomputed closing \
-stock).",
-        Vec::new(),
-    )?;
-    r.fig(
-        "stock_to_turnover_pct_bp",
-        pct_bp(d.closing_stock, d.sales).ok_or_else(overflow)?,
-        Unit::BasisPoints,
-        "Closing stock as a share of sales.",
-        Vec::new(),
-    )?;
+used at BOTH ends, direct expenses included, so this ties to Form 3CD Clause 40."
+                },
+                Vec::new(),
+            )
+        })
+        .transpose()?;
+    let f_gp_pct = d
+        .gross_profit
+        .map(|gp| {
+            r.fig(
+                "gross_profit_pct_bp",
+                pct_bp(gp, d.sales).ok_or_else(overflow)?,
+                Unit::BasisPoints,
+                if on_items {
+                    "Gross profit as a share of sales, on the stock items' values."
+                } else {
+                    "Gross profit as a share of sales, on the Trial Balance stock basis (recomputed \
+closing stock)."
+                },
+                Vec::new(),
+            )
+        })
+        .transpose()?;
+    if let Some(cs) = d.closing_stock {
+        r.fig(
+            "stock_to_turnover_pct_bp",
+            pct_bp(cs, d.sales).ok_or_else(overflow)?,
+            Unit::BasisPoints,
+            "Closing stock as a share of sales.",
+            Vec::new(),
+        )?;
+    }
     let f_indirect_exp = r.fig(
         "indirect_expenses",
         Value::Int(d.indirect_expenses),
@@ -423,36 +593,48 @@ Expenses', no sign flip.",
 sign-flipped to a positive figure.",
         group_ev(INDIRECT_INCOMES_GROUP),
     )?;
-    let f_np = r.fig(
-        "net_profit",
-        Value::Int(d.net_profit),
-        Unit::Paise,
-        "Gross profit less indirect expenses plus indirect incomes.",
-        Vec::new(),
-    )?;
-    r.fig(
-        "net_profit_pct_bp",
-        pct_bp(d.net_profit, d.sales).ok_or_else(overflow)?,
-        Unit::BasisPoints,
-        "Net profit as a share of sales.",
-        Vec::new(),
-    )?;
+    let f_np = d
+        .net_profit
+        .map(|np| {
+            r.fig(
+                "net_profit",
+                Value::Int(np),
+                Unit::Paise,
+                "Gross profit less indirect expenses plus indirect incomes.",
+                Vec::new(),
+            )
+        })
+        .transpose()?;
+    if let Some(np) = d.net_profit {
+        r.fig(
+            "net_profit_pct_bp",
+            pct_bp(np, d.sales).ok_or_else(overflow)?,
+            Unit::BasisPoints,
+            "Net profit as a share of sales.",
+            Vec::new(),
+        )?;
+    }
 
     let mut facts = vec![
         ("sales".to_string(), f_sales),
         ("purchases".to_string(), f_purchases),
         ("direct_expenses".to_string(), f_direct_exp),
         ("direct_incomes".to_string(), f_direct_inc),
-        ("opening_stock".to_string(), f_open_stock),
-        ("closing_stock".to_string(), f_close_stock),
-        ("gross_profit".to_string(), f_gp),
-        ("gross_profit_pct_bp".to_string(), f_gp_pct),
-        ("indirect_expenses".to_string(), f_indirect_exp),
-        ("other_income".to_string(), f_other_inc),
-        ("net_profit".to_string(), f_np),
     ];
+    // A term that is not known has no figure, so it has no fact either.
+    for (name, fact) in [
+        ("opening_stock", f_open_stock),
+        ("closing_stock", f_close_stock),
+        ("gross_profit", f_gp),
+        ("gross_profit_pct_bp", f_gp_pct),
+    ] {
+        facts.extend(fact.map(|f| (name.to_string(), f)));
+    }
+    facts.push(("indirect_expenses".to_string(), f_indirect_exp));
+    facts.push(("other_income".to_string(), f_other_inc));
+    facts.extend(f_np.map(|f| ("net_profit".to_string(), f)));
 
-    if let (Some(pi), Some(pbi)) = (d.partner_interest_paise, d.profit_before_partner_interest) {
+    if let Some(pi) = d.partner_interest_paise {
         let ev: Vec<EvidenceRef> = partner_interest_ledgers
             .iter()
             .map(|n| EvidenceRef::new("ledger", n))
@@ -465,19 +647,35 @@ sign-flipped to a positive figure.",
 setup; already included inside indirect expenses).",
             ev.clone(),
         )?;
-        let f_pbi = r.fig(
-            "profit_before_partner_interest",
-            Value::Int(pbi),
-            Unit::Paise,
-            "Net profit plus the partners' interest (net profit is AFTER partners' interest, since it \
-is charged as an indirect expense).",
-            ev,
-        )?;
         facts.push(("partner_interest".to_string(), f_pi));
-        facts.push(("profit_before_partner_interest".to_string(), f_pbi));
+        if let Some(pbi) = d.profit_before_partner_interest {
+            let f_pbi = r.fig(
+                "profit_before_partner_interest",
+                Value::Int(pbi),
+                Unit::Paise,
+                "Net profit plus the partners' interest (net profit is AFTER partners' interest, since it \
+is charged as an indirect expense).",
+                ev,
+            )?;
+            facts.push(("profit_before_partner_interest".to_string(), f_pbi));
+        }
     }
 
-    let limits = vec![
+    let limits = if on_items {
+        vec![
+            "The gross profit ratio uses the stock items' values: opening stock as at the books' first \
+day and closing stock from the Stock Summary dated the last day of the period, at the costing method \
+Tally applies, which was not read."
+                .to_string(),
+            "Stock is Tally's own valuation of the stock items, not an independently counted or valued \
+physical stock figure; the books cannot show whether it was actually verified."
+                .to_string(),
+            "A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \
+closing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero."
+                .to_string(),
+        ]
+    } else {
+        vec![
         "The gross profit ratio uses the stock values in the books (balance-sheet basis) at both \
 ends. A ratio on Tally's item-level Stock Summary values is not shown here; if one is wanted, both \
 opening and closing stock must be taken on that same basis."
@@ -486,15 +684,22 @@ opening and closing stock must be taken on that same basis."
 not integrated with inventory), not an independently counted or valued physical stock figure; the \
 books cannot show whether it was actually verified."
             .to_string(),
-    ];
+        ]
+    };
     let clauses = vec!["3CD-40".to_string(), "3CD-14".to_string()];
     // Whether the tie to Tally's own report was performed, as a figure: the finding below is about
     // the tie, and a reader takes its confidence as the tie's status, so "not performed" must be
     // said, not implied. The report's closing stock is optional, so "performed" names what was tied.
-    let tie_status = match report_totals {
-        None => "not performed: no report part in this read",
-        Some(rep) if rep.closing_stock_paise.is_some() => "performed: net profit and closing stock",
-        Some(_) => "performed: net profit only",
+    let tie_status = match (report_totals, d.net_profit) {
+        (None, _) => "not performed: no report part in this read",
+        (Some(rep), Some(_)) if rep.closing_stock_paise.is_some() => {
+            "performed: net profit and closing stock"
+        }
+        (Some(_), Some(_)) => "performed: net profit only",
+        (Some(rep), None) if rep.closing_stock_paise.is_some() && d.closing_stock.is_some() => {
+            "performed: closing stock only"
+        }
+        (Some(_), None) => "not performed: the stock is not known, so no net profit was derived",
     };
     let f_tie_status = r.fig(
         "report_tie_status",
@@ -506,6 +711,7 @@ part), else 'not performed' and why.",
         Vec::new(),
     )?;
     facts.push(("report_tie_status".to_string(), f_tie_status));
+    let mut diff_np = None;
     if let Some(rep) = report_totals {
         let source = rep
             .source
@@ -520,14 +726,17 @@ part), else 'not performed' and why.",
             ),
             Vec::new(),
         )?;
-        let diff_np = sub(d.net_profit, rep.net_profit_paise)?;
-        r.fig(
-            "report_net_profit_diff",
-            Value::Int(diff_np),
-            Unit::Paise,
-            "Net profit less the net profit in Tally's own report.",
-            Vec::new(),
-        )?;
+        if let Some(np) = d.net_profit {
+            let diff = sub(np, rep.net_profit_paise)?;
+            r.fig(
+                "report_net_profit_diff",
+                Value::Int(diff),
+                Unit::Paise,
+                "Net profit less the net profit in Tally's own report.",
+                Vec::new(),
+            )?;
+            diff_np = Some(diff);
+        }
         facts.push(("report_net_profit".to_string(), f_rep_np));
         if let Some(cs) = rep.closing_stock_paise {
             let f_rep_cs = r.fig(
@@ -540,15 +749,34 @@ test)."
                 ),
                 Vec::new(),
             )?;
-            r.fig(
-                "report_closing_stock_diff",
-                Value::Int(sub(d.closing_stock, cs)?),
-                Unit::Paise,
-                "Closing stock less the closing stock in Tally's own report.",
-                Vec::new(),
-            )?;
+            if let Some(derived) = d.closing_stock {
+                r.fig(
+                    "report_closing_stock_diff",
+                    Value::Int(sub(derived, cs)?),
+                    Unit::Paise,
+                    "Closing stock less the closing stock in Tally's own report.",
+                    Vec::new(),
+                )?;
+            }
             facts.push(("report_closing_stock".to_string(), f_rep_cs));
         }
+    }
+    if let StockBasis::Unknown { why, .. } = &d.stock_basis {
+        let mut limits = limits;
+        limits.extend(why.iter().map(|u| u.limit()));
+        r.findings.push(Finding {
+            id: format!("{TEST_ID}/report_tie"),
+            clauses,
+            title: "Report tie not performed on net profit: the stock is not known, so no gross \
+profit or net profit was derived"
+                .to_string(),
+            facts,
+            evidence: Vec::new(),
+            confidence: Confidence::NeedsDocument,
+            limits,
+            ask_client: why.iter().map(|u| u.ask().to_string()).collect(),
+        });
+    } else if let Some(diff_np) = diff_np {
         let tie_ok = diff_np.checked_abs().ok_or_else(overflow)? <= TIE_TOLERANCE_PAISE;
         r.findings.push(Finding {
             id: format!("{TEST_ID}/report_tie"),
@@ -577,10 +805,15 @@ this pack."
         r.findings.push(Finding {
             id: format!("{TEST_ID}/report_tie"),
             clauses,
-            title:
+            title: format!(
                 "Report tie not performed: no Tally Profit & Loss report part in this read; net \
-profit and closing stock are from the Trial Balance only"
-                    .to_string(),
+profit and closing stock are from {} only",
+                if on_items {
+                    "the Trial Balance and the stock items"
+                } else {
+                    "the Trial Balance"
+                }
+            ),
             facts,
             evidence: Vec::new(),
             confidence: Confidence::NeedsDocument,
@@ -694,46 +927,59 @@ closing stock ({rep}p) within {TIE_TOLERANCE_PAISE}p; difference {diff}p"
     let fresh_direct_inc = neg(g(DIRECT_INCOMES_GROUP))?;
     let fresh_other_inc = neg(g(INDIRECT_INCOMES_GROUP))?;
     let (mut open_stock, mut close_stock) = (0i64, 0i64);
+    let mut ledger_has_value = false;
     for (name, ledger) in &book.ledgers {
         if !ledger.under(STOCK_IN_HAND_GROUP) {
             continue;
         }
         if let Some(row) = book.tb.get(name) {
+            let closing = sub(add(row.opening_paise, row.debit_paise)?, row.credit_paise)?;
+            ledger_has_value |= row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;
             open_stock = add(open_stock, row.opening_paise)?;
-            close_stock = add(
-                close_stock,
-                sub(add(row.opening_paise, row.debit_paise)?, row.credit_paise)?,
-            )?;
+            close_stock = add(close_stock, closing)?;
         }
     }
-    let fresh_gp = sub(
-        add(fresh_sales, fresh_direct_inc)?,
-        sub(
-            add(
-                add(open_stock, g(PURCHASE_GROUP))?,
-                g(DIRECT_EXPENSES_GROUP),
+    // The stock terms as the book's typed terms give them, then the same sum written out again.
+    let profit = |open: i64, close: i64| -> Result<i64> {
+        let gp = sub(
+            add(fresh_sales, fresh_direct_inc)?,
+            sub(
+                add(add(open, g(PURCHASE_GROUP))?, g(DIRECT_EXPENSES_GROUP))?,
+                close,
             )?,
-            close_stock,
-        )?,
-    )?;
-    let fresh_np = add(sub(fresh_gp, g(INDIRECT_EXPENSES_GROUP))?, fresh_other_inc)?;
-    if let Some(derived) = np {
-        if fresh_np != derived {
-            out.push(format!(
-                "FS-2: fresh recompute of net_profit ({fresh_np}p) does not equal the published \
+        )?;
+        add(sub(gp, g(INDIRECT_EXPENSES_GROUP))?, fresh_other_inc)
+    };
+    let (fresh_close, fresh_np) = match stock_basis(book, ledger_has_value) {
+        StockBasis::Ledgers => (Some(close_stock), Some(profit(open_stock, close_stock)?)),
+        StockBasis::Items { opening, closing } => (Some(closing), Some(profit(opening, closing)?)),
+        StockBasis::Unknown { closing, .. } => (closing, None),
+    };
+    match (np, fresh_np) {
+        (Some(derived), Some(fresh_np)) if fresh_np != derived => out.push(format!(
+            "FS-2: fresh recompute of net_profit ({fresh_np}p) does not equal the published \
 figure ({derived}p); difference {}p",
-                sub(fresh_np, derived)?
-            ));
-        }
+            sub(fresh_np, derived)?
+        )),
+        (Some(derived), None) => out.push(format!(
+            "FS-2: net_profit ({derived}p) is published although a stock term is not known"
+        )),
+        (None, Some(fresh_np)) => out.push(format!(
+            "FS-2: net_profit is not published although the stock terms are known (fresh \
+recompute {fresh_np}p)"
+        )),
+        _ => {}
     }
-    if let Some(derived) = cs {
-        if close_stock != derived {
-            out.push(format!(
-                "FS-2: fresh recompute of closing_stock ({close_stock}p) does not equal the \
-published figure ({derived}p); difference {}p",
-                sub(close_stock, derived)?
-            ));
-        }
+    match (cs, fresh_close) {
+        (Some(derived), Some(close)) if close != derived => out.push(format!(
+            "FS-2: fresh recompute of closing_stock ({close}p) does not equal the published \
+figure ({derived}p); difference {}p",
+            sub(close, derived)?
+        )),
+        (Some(derived), None) => out.push(format!(
+            "FS-2: closing_stock ({derived}p) is published although it is not known"
+        )),
+        _ => {}
     }
     Ok(out)
 }
@@ -1098,5 +1344,468 @@ P&L/Balance Sheet report"
         assert_eq!(v.len(), 2, "{v:?}");
         assert!(v[0].contains("FS-2: fresh recompute of net_profit (480000p)"));
         assert!(v[1].contains("FS-2: fresh recompute of closing_stock (550000p)"));
+    }
+
+    // --- #1505: stock from the stock items on a book that keeps inventory integrated ---
+
+    use crate::book::{ClosingStock, ClosingStockUnknown, OpeningStock, OpeningStockUnknown};
+
+    /// `book()` without its Stock-in-Hand ledgers, as Tally holds a book with integrated
+    /// inventory: stock only on the stock items. Sales 10,000, purchases 6,000, freight 500, job
+    /// work 300, rent 1,200, partners' interest 400, interest received 100 (rupees).
+    fn item_book(opening: OpeningStock, closing: ClosingStock) -> Book {
+        let mut b = book();
+        for name in ["Stale Stock", "Still Stock"] {
+            b.ledgers.remove(name);
+            b.tb.remove(name);
+        }
+        b.opening_stock = opening;
+        b.closing_stock = closing;
+        b
+    }
+
+    fn has_figure(r: &TestResult, name: &str) -> bool {
+        r.figures
+            .iter()
+            .any(|f| f.id == format!("{TEST_ID}.{name}"))
+    }
+
+    const NO_PROFIT: [&str; 5] = [
+        "gross_profit",
+        "gross_profit_pct_bp",
+        "net_profit",
+        "net_profit_pct_bp",
+        "profit_before_partner_interest",
+    ];
+
+    /// The issue's example in rupees: opening stock 2,000 and closing stock 3,000 on the items.
+    /// GP = 10,000 + 300 - (2,000 + 6,000 + 500 - 3,000) = 4,800; NP = 4,800 - 1,600 + 100 = 3,300.
+    /// With both stock terms read as zero, as before, GP would be 3,800.
+    #[test]
+    fn an_integrated_book_takes_both_stock_terms_from_the_stock_items() {
+        let b = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+        let r = run(&b, &rules(), &interest(), None).unwrap();
+        assert_eq!(fig(&r, "opening_stock"), Value::Int(200_000));
+        assert_eq!(fig(&r, "closing_stock"), Value::Int(300_000));
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(480_000));
+        assert_eq!(fig(&r, "gross_profit_pct_bp"), Value::Int(4800));
+        assert_eq!(fig(&r, "net_profit"), Value::Int(330_000));
+        assert_eq!(fig(&r, "net_profit_pct_bp"), Value::Int(3300));
+        assert_eq!(fig(&r, "stock_to_turnover_pct_bp"), Value::Int(3000));
+        assert_eq!(
+            fig(&r, "profit_before_partner_interest"),
+            Value::Int(370_000)
+        );
+        // The ledger-only figures are not shown for stock that sits on no ledger.
+        assert!(!has_figure(&r, "closing_stock_tb_field"));
+        assert!(!has_figure(
+            &r,
+            "stock_in_hand_ledgers_with_stale_tb_closing_field_count"
+        ));
+        assert!(r.figures.iter().all(|f| {
+            !["opening_stock", "closing_stock"]
+                .iter()
+                .any(|n| f.id == format!("{TEST_ID}.{n}"))
+                || f.evidence.is_empty()
+        }));
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+    }
+
+    /// The lab's inventory book (#692, Book B) in paise: sales 1,400, purchase 3,000, freight 500,
+    /// no opening stock, closing stock 2,100. Tally's own P&L showed gross profit 500 and nett
+    /// profit 0; with no stock term the crate gave -1,600 and -2,100.
+    #[test]
+    fn the_lab_book_b_shape_ties_the_gross_and_net_profit_tally_showed() {
+        let mut b = item_book(OpeningStock::Valued(0), ClosingStock::Valued(210_000));
+        for name in [
+            "Freight",
+            "Job Work",
+            "Rent",
+            "Interest to Partners",
+            "Interest Received",
+        ] {
+            b.ledgers.remove(name);
+            b.tb.remove(name);
+        }
+        b.tb.get_mut("Sales").unwrap().closing_paise = -140_000;
+        b.tb.get_mut("Purchases").unwrap().closing_paise = 300_000;
+        b.ledgers.insert(
+            "Freight".to_string(),
+            ledger("Freight", &["Indirect Expenses"]),
+        );
+        b.tb.insert(
+            "Freight".to_string(),
+            TbRow {
+                opening_paise: 0,
+                debit_paise: 50_000,
+                credit_paise: 0,
+                closing_paise: 50_000,
+            },
+        );
+        let r = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(0, Some(210_000))),
+        )
+        .unwrap();
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(50_000));
+        assert_eq!(fig(&r, "net_profit"), Value::Int(0));
+        assert_eq!(r.findings[0].confidence, Confidence::Computed);
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+    }
+
+    /// A book that does not keep inventory integrated is read exactly as before, whatever the
+    /// closing term says: the whole result equals the one the ledgers alone give.
+    #[test]
+    fn a_book_that_is_not_integrated_keeps_the_ledger_path() {
+        let mut b = book();
+        b.closing_stock = ClosingStock::Valued(999_999);
+        let r = run(&b, &rules(), &interest(), None).unwrap();
+        assert_eq!(
+            format!("{r:?}"),
+            format!("{:?}", run(&book(), &rules(), &interest(), None).unwrap())
+        );
+        assert_eq!(fig(&r, "closing_stock"), Value::Int(550_000));
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(630_000));
+    }
+
+    /// A term that is not known is reported and never read as zero: no gross or net profit, no
+    /// ratio on them, and a limit that names the term and why. The known term and the rest stay.
+    #[test]
+    fn an_unknown_stock_term_shows_no_profit_and_says_which() {
+        let report_less = |opening, closing| {
+            let b = item_book(opening, closing);
+            let r = run(&b, &rules(), &interest(), None).unwrap();
+            for name in NO_PROFIT {
+                assert!(!has_figure(&r, name), "{name} must not be shown");
+            }
+            assert_eq!(fig(&r, "sales"), Value::Int(1_000_000));
+            assert_eq!(fig(&r, "partner_interest"), Value::Int(40_000));
+            assert!(check_invariants(&b, &r).unwrap().is_empty());
+            r
+        };
+        let opening_unknown = report_less(
+            OpeningStock::Unknown(OpeningStockUnknown::NotAtBooksStart),
+            ClosingStock::Valued(300_000),
+        );
+        assert!(!has_figure(&opening_unknown, "opening_stock"));
+        assert_eq!(fig(&opening_unknown, "closing_stock"), Value::Int(300_000));
+        assert_eq!(
+            fig(&opening_unknown, "stock_to_turnover_pct_bp"),
+            Value::Int(3000)
+        );
+        let f = &opening_unknown.findings[0];
+        assert_eq!(
+            f.title,
+            "Report tie not performed on net profit: the stock is not known, so no gross profit or \
+net profit was derived"
+        );
+        assert_eq!(f.confidence, Confidence::NeedsDocument);
+        assert_eq!(f.limits.len(), 4);
+        assert_eq!(
+            f.limits[3],
+            "Opening stock is held on the stock items, not on a ledger, and was not taken: the read \
+does not show the trial balance starting on the books' first day; no gross profit or net profit is \
+shown."
+        );
+        assert_eq!(
+            f.ask_client,
+            ["Tally's Stock Summary as at the first day of the books, for the opening stock."]
+        );
+        assert!(!f
+            .facts
+            .iter()
+            .any(|(k, _)| k == "opening_stock" || k == "gross_profit" || k == "net_profit"));
+
+        let closing_unknown = report_less(
+            OpeningStock::Valued(200_000),
+            ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd),
+        );
+        assert_eq!(fig(&closing_unknown, "opening_stock"), Value::Int(200_000));
+        assert!(!has_figure(&closing_unknown, "closing_stock"));
+        assert!(!has_figure(&closing_unknown, "stock_to_turnover_pct_bp"));
+        let f = &closing_unknown.findings[0];
+        assert_eq!(
+            f.limits[3],
+            "Closing stock is held on the stock items, not on a ledger, and was not taken: the read \
+has no Stock Summary dated the trial balance's last day; no gross profit or net profit is shown."
+        );
+        assert_eq!(
+            f.ask_client,
+            ["Tally's Stock Summary as at the last day of the period, for the closing stock."]
+        );
+
+        let both = report_less(
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead),
+            ClosingStock::Unknown(ClosingStockUnknown::Unreadable),
+        );
+        assert!(!has_figure(&both, "opening_stock"));
+        assert!(!has_figure(&both, "closing_stock"));
+        let f = &both.findings[0];
+        assert_eq!(f.limits.len(), 5);
+        assert!(f.limits[3].starts_with(
+            "Opening stock is held on the stock items, not on a ledger, and was not read;"
+        ));
+        assert!(f.limits[4].starts_with(
+            "Closing stock is held on the stock items, not on a ledger, and was unreadable;"
+        ));
+        assert_eq!(f.ask_client.len(), 2);
+
+        // A hand-built book with only an opening term is not read as having a closing one.
+        let half = item_book(OpeningStock::Valued(200_000), ClosingStock::NotApplicable);
+        let r = run(&half, &rules(), &BTreeSet::new(), None).unwrap();
+        assert!(!has_figure(&r, "gross_profit"));
+        assert!(r.findings[0].limits[3].starts_with(
+            "Closing stock is held on the stock items, not on a ledger, and was not read;"
+        ));
+    }
+
+    /// Stock on a Stock-in-Hand ledger beside stock on the items is never added to it: the profit
+    /// is not shown and the limit says why. The known terms still show.
+    #[test]
+    fn a_stock_in_hand_ledger_beside_the_items_is_not_added() {
+        let mut b = book();
+        b.opening_stock = OpeningStock::Valued(200_000);
+        b.closing_stock = ClosingStock::Valued(300_000);
+        let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        for name in NO_PROFIT {
+            assert!(!has_figure(&r, name), "{name} must not be shown");
+        }
+        assert_eq!(fig(&r, "opening_stock"), Value::Int(200_000));
+        assert_eq!(fig(&r, "closing_stock"), Value::Int(300_000));
+        assert_eq!(
+            r.findings[0].limits[3],
+            "A ledger under Stock-in-Hand carries a value on a book that keeps its stock on the \
+stock items, and the two were not added, in case the stock is counted twice; no gross profit or net \
+profit is shown."
+        );
+        assert_eq!(
+            r.findings[0].ask_client,
+            ["Whether the Stock-in-Hand ledger carries stock that the stock items also hold."]
+        );
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+        // A Stock-in-Hand ledger that carries nothing does not stop the items being used.
+        for name in ["Stale Stock", "Still Stock"] {
+            *b.tb.get_mut(name).unwrap() = TbRow {
+                opening_paise: 0,
+                debit_paise: 0,
+                credit_paise: 0,
+                closing_paise: 0,
+            };
+        }
+        let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        assert_eq!(fig(&r, "gross_profit"), Value::Int(480_000));
+    }
+
+    /// FS-1 ties the item-based figures to Tally's report as it tied the ledger-based ones.
+    #[test]
+    fn the_report_tie_works_on_the_item_basis() {
+        let b = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+        let r = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(330_000, Some(300_000))),
+        )
+        .unwrap();
+        assert_eq!(
+            fig(&r, "report_tie_status"),
+            Value::Text("performed: net profit and closing stock".to_string())
+        );
+        assert_eq!(fig(&r, "report_net_profit_diff"), Value::Int(0));
+        assert_eq!(fig(&r, "report_closing_stock_diff"), Value::Int(0));
+        assert_eq!(r.findings[0].confidence, Confidence::Computed);
+        assert!(r.findings[0].limits[0]
+            .starts_with("The gross profit ratio uses the stock items' values"));
+        // How a Summary row with no value, and a Summary with no row, read: said beside the rule.
+        assert_eq!(r.findings[0].limits.len(), 3);
+        assert_eq!(
+            r.findings[0].limits[2],
+            "A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \
+closing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero."
+        );
+        assert!(check_invariants(&b, &r).unwrap().is_empty());
+
+        let off = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(430_000, Some(250_000))),
+        )
+        .unwrap();
+        assert_eq!(off.findings[0].confidence, Confidence::JudgementRequired);
+        let v = check_invariants(&b, &off).unwrap();
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v[0].starts_with("FS-1: derived net_profit (330000p)"));
+        assert!(v[1].starts_with("FS-1: derived closing_stock (300000p)"));
+
+        // Without a report, the tie is not performed and the title does not say the stock is a
+        // ledger's.
+        let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        assert!(r.findings[0]
+            .title
+            .ends_with("from the Trial Balance and the stock items only"));
+    }
+
+    /// With the net profit unknown, only a closing stock tie can be performed, and the status
+    /// says exactly that.
+    #[test]
+    fn a_report_beside_an_unknown_term_ties_only_what_is_known() {
+        let opening_unknown = item_book(
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead),
+            ClosingStock::Valued(300_000),
+        );
+        let r = run(
+            &opening_unknown,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(330_000, Some(300_000))),
+        )
+        .unwrap();
+        assert_eq!(
+            fig(&r, "report_tie_status"),
+            Value::Text("performed: closing stock only".to_string())
+        );
+        assert_eq!(fig(&r, "report_net_profit"), Value::Int(330_000));
+        assert!(!has_figure(&r, "report_net_profit_diff"));
+        assert_eq!(fig(&r, "report_closing_stock_diff"), Value::Int(0));
+        assert!(check_invariants(&opening_unknown, &r).unwrap().is_empty());
+
+        for (b, rep) in [
+            (&opening_unknown, report(330_000, None)),
+            (
+                &item_book(
+                    OpeningStock::Valued(200_000),
+                    ClosingStock::Unknown(ClosingStockUnknown::NotRead),
+                ),
+                report(330_000, Some(300_000)),
+            ),
+        ] {
+            let r = run(b, &rules(), &BTreeSet::new(), Some(&rep)).unwrap();
+            assert_eq!(
+                fig(&r, "report_tie_status"),
+                Value::Text(
+                    "not performed: the stock is not known, so no net profit was derived"
+                        .to_string()
+                )
+            );
+            assert!(!has_figure(&r, "report_closing_stock_diff"));
+            assert_eq!(r.findings[0].confidence, Confidence::NeedsDocument);
+        }
+    }
+
+    /// FS-2 follows the book's own terms: a profit published for a book whose stock is unknown,
+    /// or one the item terms do not support, is caught.
+    #[test]
+    fn fs2_follows_the_stock_basis() {
+        let items = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+        let mut r = run(&items, &rules(), &BTreeSet::new(), None).unwrap();
+        for f in &mut r.figures {
+            if f.id.ends_with(".net_profit") {
+                f.value = Value::Int(380_000); // the figure with both stock terms read as zero
+            }
+            if f.id.ends_with(".closing_stock") {
+                f.value = Value::Int(0);
+            }
+        }
+        let v = check_invariants(&items, &r).unwrap();
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v[0].contains("FS-2: fresh recompute of net_profit (330000p)"));
+        assert!(v[1].contains("FS-2: fresh recompute of closing_stock (300000p)"));
+
+        let unknown = item_book(
+            OpeningStock::Valued(200_000),
+            ClosingStock::Unknown(ClosingStockUnknown::NotRead),
+        );
+        let honest = run(&unknown, &rules(), &BTreeSet::new(), None).unwrap();
+        let mut forged = honest.clone();
+        forged.figures.extend(
+            run(&items, &rules(), &BTreeSet::new(), None)
+                .unwrap()
+                .figures
+                .into_iter()
+                .filter(|f| f.id.ends_with(".net_profit") || f.id.ends_with(".closing_stock")),
+        );
+        let v = check_invariants(&unknown, &forged).unwrap();
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v[0].contains(
+            "FS-2: net_profit (330000p) is published although a stock term is not known"
+        ));
+        assert!(
+            v[1].contains("FS-2: closing_stock (300000p) is published although it is not known")
+        );
+
+        // And a profit left out of a book whose terms are all known.
+        let mut dropped = run(&items, &rules(), &BTreeSet::new(), None).unwrap();
+        dropped.figures.retain(|f| !f.id.ends_with(".net_profit"));
+        let v = check_invariants(&items, &dropped).unwrap();
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("FS-2: net_profit is not published although the stock terms are known (fresh recompute 330000p)"));
+    }
+
+    /// A Stock-in-Hand ledger counts as carrying a value by any one of its opening, its
+    /// recomputed closing (opening plus debit less credit) or the Trial Balance's own closing
+    /// field. Each alone keeps the stock items from being used beside it, and FS-2 agrees.
+    #[test]
+    fn each_value_a_stock_in_hand_ledger_can_carry_keeps_the_items_from_being_used() {
+        let cases = [
+            ("only the opening", 5_000, 0, 0, 0),
+            ("an opening wholly drawn down", 5_000, 0, 5_000, 0),
+            ("only a debit movement", 0, 5_000, 0, 0),
+            ("only a credit movement", 0, 0, 5_000, 0),
+            ("only the TB's own closing field", 0, 0, 0, 5_000),
+        ];
+        for (what, opening_paise, debit_paise, credit_paise, closing_paise) in cases {
+            let mut b = item_book(OpeningStock::Valued(200_000), ClosingStock::Valued(300_000));
+            b.ledgers.insert(
+                "Stock Ledger".to_string(),
+                ledger("Stock Ledger", &["Stock-in-Hand", "Current Assets"]),
+            );
+            b.tb.insert(
+                "Stock Ledger".to_string(),
+                TbRow {
+                    opening_paise,
+                    debit_paise,
+                    credit_paise,
+                    closing_paise,
+                },
+            );
+            let r = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+            for name in NO_PROFIT {
+                assert!(!has_figure(&r, name), "{what}: {name} must not be shown");
+            }
+            assert!(
+                r.findings[0].limits[3].starts_with("A ledger under Stock-in-Hand carries a value"),
+                "{what}: {:?}",
+                r.findings[0].limits
+            );
+            assert!(check_invariants(&b, &r).unwrap().is_empty(), "{what}");
+        }
+    }
+
+    /// The registry's figure floor is exactly what a book shows when neither stock term is known,
+    /// and a book on the ledger basis shows at least the 18 the floor used to be, so a ledger
+    /// book that loses figures does not hide behind the lower floor.
+    #[test]
+    fn the_figure_floor_is_what_a_book_with_no_stock_term_shows() {
+        let floor = crate::registry::find(TEST_ID).unwrap().min_figures;
+        let mut none = item_book(
+            OpeningStock::Unknown(OpeningStockUnknown::NotRead),
+            ClosingStock::Unknown(ClosingStockUnknown::NotRead),
+        );
+        none.vouchers.clear(); // no excluded-voucher figures on top
+        let r = run(&none, &rules(), &BTreeSet::new(), None).unwrap();
+        assert_eq!(
+            r.figures.len(),
+            floor,
+            "{:?}",
+            r.figures.iter().map(|f| &f.id).collect::<Vec<_>>()
+        );
+
+        let mut ledgers = book();
+        ledgers.vouchers.clear();
+        let r = run(&ledgers, &rules(), &BTreeSet::new(), None).unwrap();
+        assert!(r.figures.len() >= 18, "{}", r.figures.len());
     }
 }

@@ -1190,6 +1190,13 @@ that evidence.
 evidence needed to qualify an exact scope against XML. No comparator result
 enables JSONEX by itself.
 
+**Amended 2026-10-12:** the parser, the request builder and the comparator
+described under "Current implementation boundary", "Implemented qualification
+boundary" and "Acceptance" below were deleted in
+[#1574](https://github.com/ComplyEaze/bridge/pull/1574), because they were
+exercised only against synthetic fixtures and no shipped build used them. The
+text below is kept as the design record and no longer describes the repository.
+
 #### Current implementation boundary
 
 The repository contains the v1 qualification comparator plus an optional,
@@ -1510,6 +1517,11 @@ Track:
 
 #### Implemented PR13A boundary
 
+(2026-10-12 note: the collector and its observation types described here were
+deleted because nothing read the counts; see the ADR 0009 amendment. The text
+below records the contract as it was designed. A support bundle is designed
+from the request trail, not from this collector.)
+
 The first observability slice is a portable, local-only aggregation contract.
 It accepts only closed request/queue/response enums, monotonic durations, and
 response-byte counts. There are no strings, arbitrary attributes, IDs,
@@ -1536,6 +1548,12 @@ first read-runtime caller, but phase, reconciliation, checkpoint-age, memory,
 database, resume, UI, benchmark, and budget evidence remain unavailable.
 
 #### Implemented PR13B1 boundary
+
+(2026-10-13 note: the receipt described here, its tool
+`tools/bridge-tally-qualification` and its CI step were deleted on 2026-10-12
+in #1566, and the simulator's voucher-window generator on 2026-10-13 in #1670;
+see item 11 of `docs/step-by-step-roadmap.md`. The text below records the
+contract as it was designed.)
 
 The first performance-evidence slice is a portable repository-synthetic parser
 qualification harness. A bounded generator streams deterministic UTF-8 voucher
@@ -1603,6 +1621,13 @@ BOM-qualified UTF-16LE/BE. A deterministic master generator preflights up to
 10,000-ledger corpus traverses the production decoder and strict ledger parser;
 an independently derived digest proves every parsed identity and accounting
 field matches the generator expectation and remains identical across encodings.
+(2026-10-13 note: the master generator described here was deleted in #1690, and
+with it the digest and the "generator expectation" in the last sentence. The
+10,000-ledger test remains in
+`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`: it builds
+its rows itself, decodes them in UTF-8, UTF-16LE and UTF-16BE, and compares each
+parsed field with the row it built, with no digest. See item 12 of
+`docs/step-by-step-roadmap.md`.)
 
 Protocol hardening rejects duplicate/misplaced export header status fields and
 DTD/processing constructs. Import result parsing accepts Tally's documented
@@ -1620,6 +1645,8 @@ Tauri/runtime path, and native runtime tests cannot execute locally because
 database/reconcile/resume/UI cost, comparable performance baselines, and a
 read-only live Education compatibility receipt remain follow-on work. The
 existing PR13B1 receipt is not retroactively granted runtime-cap authority.
+(2026-10-12 note: that receipt was deleted; see the note under "Implemented
+PR13B1 boundary".)
 
 ---
 
@@ -1671,7 +1698,8 @@ A release may not broaden its support claim unless the matrix has current eviden
 
 - `bridge-tally-compatibility` now owns a separate, closed, privacy-reduced
   live-read receipt schema. It does not broaden the parser-only qualification
-  receipt and cannot itself emit a support claim.
+  receipt and cannot itself emit a support claim. (2026-10-12 note: that
+  receipt was deleted; see the note under "Implemented PR13B1 boundary".)
 - Eleven exact machine-readable Windows/Tally cells cover the initial release, mode,
   transport, ODBC, company-state, locale/encoding, data-tier, and platform
   dimensions. Every cell remains `unknown`; no live support evidence has been
@@ -1721,6 +1749,10 @@ A release may not broaden its support claim unless the matrix has current eviden
 another product pack.
 
 #### Implemented PR15 boundary (2026-07-15)
+
+(2026-10-12 note: the schema-v2 observations and the body-byte measurement
+described below were deleted because nothing read them; the circuit, queue,
+retry and cancellation behaviour is unchanged. See the ADR 0009 amendment.)
 
 - `bridge-tally-runtime` is a Tauri/SQLCipher-independent read control plane.
   It owns normalized per-endpoint serialization, bounded queue deadlines,

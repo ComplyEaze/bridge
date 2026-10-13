@@ -249,11 +249,23 @@ Contra vouchers, and 5 Journals).
   needs the voucher mark measured unmoved across the post. It reads
   Tally's answer together with that absence and, like
   `sent_not_attributed`, sits outside the absence qualification gate. A
+  later verification never gives that status: a voucher it cannot find
+  stays `sent_not_attributed`, and when the post's saved answer had that
+  counter shape its next step says what Tally reported when the voucher
+  was sent. For a batch it also needs the post's own recorded verdict
+  that its voucher step matched what Tally reported creating; the mark is
+  not read again for this, since it may have moved for other reasons. A
   refusal is final, so an edit made in Tally to one voucher
   before a deferred bind refuses the binding of the whole batch.
 - **Known limits:** identical twins are bound by position alone, since they
   are identical in content and their own order cannot be observed (the request
   order of vouchers that can be told apart was measured in two raw runs);
   the local journal is the trust root; writes from another Gold process are
-  unmeasured; whether a restore or rewrite reuses AlterIDs or MasterIDs is
-  unmeasured.
+  unmeasured; whether a data rewrite reuses AlterIDs or MasterIDs is
+  unmeasured. **Amended 2026-10-13:** a restore does. After a backup was
+  restored on one synthetic book, the next voucher, keyed by hand in one run
+  and sent by import in another, read the number, MasterID, AlterID and GUID
+  of the voucher the restore had removed (protocol reference §9.15, PARTIAL).
+  So a bound GUID can name another voucher once a restored book is keyed
+  past the post's mark; the rolled-back check sees a restore only while the
+  mark reads below that floor.

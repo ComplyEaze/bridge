@@ -173,113 +173,108 @@ impl TallyRuntime {
     ) -> anyhow::Result<(StockSummaryRead, CompanyBookExtent)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
-        self.execute(
-            config,
-            ReadOperation::MasterExport,
-            ReadRetryPolicy::SINGLE_ATTEMPT,
-            move |client| {
-                let identity = identity.clone();
-                let as_of = as_of.clone();
-                let today = today.clone();
-                async move {
-                    let mut evidence = RuntimeReadEvidence::empty();
-                    let result = async {
-                        let (profile, mode_evidence) = observe_read_boundary(&client).await?;
-                        evidence = mode_evidence;
-                        if profile == DateBoundaryProfile::EducationRestricted {
-                            return Err(StockSummaryReadError::EducationUnqualified.into());
-                        }
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        let extent = client.fetch_company_book_extent(&identity).await?;
-                        let period =
-                            stock_summary_period(profile, &as_of, extent.books_from(), &today)?;
-
-                        let request = render_company_inventory_flags_request(
-                            identity.display_name(),
-                            identity.company_guid(),
-                        )?;
-                        let (xml, bytes, hash) = client
-                            .fetch_native_report_paired(request.clone())
-                            .await?
-                            .require_stable(PairedReadValidationError::StockSummaryCollection)?;
-                        evidence = evidence
-                            .clone()
-                            .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                        let company_inventory =
-                            parse_company_inventory_flags(&xml, identity.company_guid())?;
-                        let inventory = company_inventory.flags;
-                        if inventory.inventory_on == NativeFlag::No {
-                            return Err(StockSummaryReadError::NotEnabled.into());
-                        }
-
-                        let mark = extent
-                            .master_alter_id_high_water()
-                            .ok_or(OutstandingsError::MasterWitnessAbsent)?
-                            .get();
-                        let estimate = admit_stock_summary_size(mark)?;
-                        let company = ValidatedCompanyName::new(identity.display_name())?;
-                        let range =
-                            ValidatedDateRange::new(period.from().as_str(), period.to().as_str())?;
-                        let request = ReadOnlyProfile::AuditStockItemsV1 {
-                            company: &company,
-                            period: &range,
-                        }
-                        .render();
-                        let (xml, bytes, hash) = client
-                            .fetch_native_report_paired(request.clone())
-                            .await?
-                            .require_stable(PairedReadValidationError::StockSummaryCollection)?;
-                        evidence = evidence
-                            .clone()
-                            .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                        let items = parse_native_stock_items(&xml, identity.company_guid())?;
-                        // Held until the closing extent is read: a book that
-                        // moved mid-read is reported as moved, not as whatever
-                        // its new rows broke.
-                        let premise = check_stock_premise(items.rows.len(), mark, bytes, estimate);
-
-                        let request =
-                            render_native_stock_summary_request(identity.display_name(), &period);
-                        let (xml, bytes, hash) = client
-                            .fetch_native_report_paired(request.clone())
-                            .await?
-                            .require_stable(PairedReadValidationError::NativeStatement)?;
-                        evidence = evidence
-                            .clone()
-                            .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                        // Held, like the premise, until the closing extent is
-                        // read: a book that moved says so before what its rows,
-                        // its item count or its report would have refused.
-                        let gate = parse_native_stock_summary_report(&xml).and_then(|report| {
-                            gate_stock_summary(items.rows, company_inventory.item_count, &report)
-                        });
-
-                        let closing_extent = client.fetch_company_book_extent(&identity).await?;
-                        if closing_extent != extent {
-                            return Err(PairedReadValidationError::StockSummaryExtent.into());
-                        }
-                        premise?;
-                        let gate = gate?;
-                        bracket_verified_company_identity(&client, &identity).await?;
-                        evidence = evidence
-                            .clone()
-                            .combine(confirm_read_boundary(&client, profile).await?);
-                        Ok((
-                            StockSummaryRead {
-                                from: period.from().clone(),
-                                to: period.to().clone(),
-                                inventory,
-                                gate,
-                                evidence: evidence.clone(),
-                            },
-                            extent,
-                        ))
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            let as_of = as_of.clone();
+            let today = today.clone();
+            async move {
+                let mut evidence = RuntimeReadEvidence::empty();
+                let result = async {
+                    let (profile, mode_evidence) = observe_read_boundary(&client).await?;
+                    evidence = mode_evidence;
+                    if profile == DateBoundaryProfile::EducationRestricted {
+                        return Err(StockSummaryReadError::EducationUnqualified.into());
                     }
-                    .await;
-                    result.map_err(|error| with_read_evidence(error, evidence))
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    let extent = client.fetch_company_book_extent(&identity).await?;
+                    let period =
+                        stock_summary_period(profile, &as_of, extent.books_from(), &today)?;
+
+                    let request = render_company_inventory_flags_request(
+                        identity.display_name(),
+                        identity.company_guid(),
+                    )?;
+                    let (xml, bytes, hash) = client
+                        .fetch_native_report_paired(request.clone())
+                        .await?
+                        .require_stable(PairedReadValidationError::StockSummaryCollection)?;
+                    evidence = evidence
+                        .clone()
+                        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                    let company_inventory =
+                        parse_company_inventory_flags(&xml, identity.company_guid())?;
+                    let inventory = company_inventory.flags;
+                    if inventory.inventory_on == NativeFlag::No {
+                        return Err(StockSummaryReadError::NotEnabled.into());
+                    }
+
+                    let mark = extent
+                        .master_alter_id_high_water()
+                        .ok_or(OutstandingsError::MasterWitnessAbsent)?
+                        .get();
+                    let estimate = admit_stock_summary_size(mark)?;
+                    let company = ValidatedCompanyName::new(identity.display_name())?;
+                    let range =
+                        ValidatedDateRange::new(period.from().as_str(), period.to().as_str())?;
+                    let request = ReadOnlyProfile::AuditStockItemsV1 {
+                        company: &company,
+                        period: &range,
+                    }
+                    .render();
+                    let (xml, bytes, hash) = client
+                        .fetch_native_report_paired(request.clone())
+                        .await?
+                        .require_stable(PairedReadValidationError::StockSummaryCollection)?;
+                    evidence = evidence
+                        .clone()
+                        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                    let items = parse_native_stock_items(&xml, identity.company_guid())?;
+                    // Held until the closing extent is read: a book that
+                    // moved mid-read is reported as moved, not as whatever
+                    // its new rows broke.
+                    let premise = check_stock_premise(items.rows.len(), mark, bytes, estimate);
+
+                    let request =
+                        render_native_stock_summary_request(identity.display_name(), &period);
+                    let (xml, bytes, hash) = client
+                        .fetch_native_report_paired(request.clone())
+                        .await?
+                        .require_stable(PairedReadValidationError::NativeStatement)?;
+                    evidence = evidence
+                        .clone()
+                        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+                    // Held, like the premise, until the closing extent is
+                    // read: a book that moved says so before what its rows,
+                    // its item count or its report would have refused.
+                    let gate = parse_native_stock_summary_report(&xml).and_then(|report| {
+                        gate_stock_summary(items.rows, company_inventory.item_count, &report)
+                    });
+
+                    let closing_extent = client.fetch_company_book_extent(&identity).await?;
+                    if closing_extent != extent {
+                        return Err(PairedReadValidationError::StockSummaryExtent.into());
+                    }
+                    premise?;
+                    let gate = gate?;
+                    bracket_verified_company_identity(&client, &identity).await?;
+                    evidence = evidence
+                        .clone()
+                        .combine(confirm_read_boundary(&client, profile).await?);
+                    Ok((
+                        StockSummaryRead {
+                            from: period.from().clone(),
+                            to: period.to().clone(),
+                            inventory,
+                            gate,
+                            evidence: evidence.clone(),
+                        },
+                        extent,
+                    ))
                 }
-            },
-        )
+                .await;
+                result.map_err(|error| with_read_evidence(error, evidence))
+            }
+        })
         .await
     }
 }

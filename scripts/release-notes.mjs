@@ -1,8 +1,8 @@
 // One source for what changed: CHANGELOG.md. `notes` composes a GitHub release body from it and
 // `page` renders the same file for the install site, so the two cannot drift. Neither may block a
 // release or a deploy: every fallback prints a warning and still writes a usable file.
-import { readFileSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const REPOSITORY_URL = "https://github.com/ComplyEaze/bridge";
 // The current `mcp-vX.Y.Z` form and the older `mcp-preview-X.Y.Z` (see scripts/release-tag-forms.test.mjs).
@@ -298,4 +298,4 @@ export function main(argv) {
   return 2;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) process.exitCode = main(process.argv.slice(2));

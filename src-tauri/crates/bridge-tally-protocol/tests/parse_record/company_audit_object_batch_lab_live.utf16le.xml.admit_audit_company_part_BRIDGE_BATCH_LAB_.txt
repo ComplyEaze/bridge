@@ -1,0 +1,11 @@
+# fixture: tests/fixtures/company_audit_object_batch_lab_live.utf16le.xml
+# parser: admit_audit_company_part(BRIDGE BATCH LAB)
+# source: captured
+Ok(AuditCompanyPart {
+    name: "BRIDGE BATCH LAB",
+    guid: "a30f23c3-4819-4334-96ab-ffa6fba70976",
+    books_from_yyyymmdd: "20260401",
+    is_integrated: Some(
+        "No",
+    ),
+})

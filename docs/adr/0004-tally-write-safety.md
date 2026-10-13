@@ -660,7 +660,7 @@ is accepted, and loud.
 
 **What it cannot send:** IGST, cess, items, credit and debit notes, a reference of the caller's own (the reference written is the invoice number), new ledgers, batches of invoices, amendments, and anything a book's types, ledgers and company state do not establish.
 
-**Qualification.** Sales is not in the qualified list. Its shape rests on section 9.16 (reads of 39 hand-keyed invoices and 38 hand imports on client books); on one rehearsal on a synthetic company two invoices built by ComplyEaze Bridge were posted and read back as built. Sales is qualified when what that rehearsal left owed is done, and the pull request records what is not measured.
+**Qualification.** Sales is not in the qualified list. Its shape rests on section 9.16 (reads of hand-keyed invoices and hand imports on lab books); on one rehearsal on a synthetic company two invoices built by ComplyEaze Bridge were posted and read back as built. Sales is qualified when what that rehearsal left owed is done, and the pull request records what is not measured.
 
 ## Amendment — owner decision, 2026-10-08: the order of the GST Sales slices after the invoice core
 

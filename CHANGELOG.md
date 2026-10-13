@@ -63,7 +63,8 @@ These changes are in source and not yet in a published build.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
-  return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  return (measured for Receipts only), or is cancelled or optional (decided first from Tally's own flags, never
+  counted as included; #1655), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
   judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
   whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
   type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher
@@ -211,6 +212,23 @@ These changes are in source and not yet in a published build.
   and an empty window next to a busy day still cannot reach `complete`. The other reasons
   (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
   `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
+
+**Safer or fixed**
+
+- A later check (`verify_import`, a repeated `post_import`, or the check
+  before a review is recorded) of a post that Tally answered as creating none
+  of its vouchers no longer suggests the voucher was edited in Tally. Its
+  status is unchanged (`sent_not_attributed`, the batch still
+  `reconciliation_required`), but the voucher's next step now says that Tally
+  reported it as not created when it was sent, that it is not found for these
+  dates now, and to look for it in Tally before entering it by hand, since it
+  may have been entered in another form meanwhile. This reads what the post
+  left on record: its saved answer (every counter reported, none created, one
+  exception for each voucher sent, nothing else counted) and, for a batch,
+  its own verdict that the voucher step matched. A partly created batch, and
+  a batch whose voucher mark moved across the post, keep the earlier line.
+  Measured live once, on a single voucher refused whole; a batch is not
+  measured live (#1108).
 
 ## [0.5.1] - 2026-10-09
 

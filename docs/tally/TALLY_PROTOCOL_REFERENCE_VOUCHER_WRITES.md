@@ -967,12 +967,25 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
   each read returned, six read No, Yes, No in the first. `BP/26-27/0005` was then accepted as it stands on Tally's
   screen, alone, and in the second read it was the only voucher that differed: included, not uncertain,
   `ISGSTOVERRIDDEN` Yes, with a higher `ALTERID`.
+- **VERIFIED: a cancelled voucher reads the included flag Yes and an optional one reads all three No, and the
+  request answers whether a voucher is either once `ISCANCELLED` and `ISOPTIONAL` are added** (lab sets W19 and
+  W20, 12 Oct 2026, the same company; evidence on `lab/1342-w19-answers`, answer `aw19-c`, and on
+  `lab/1342-w20-answers`, answer `aw20-b`). `BP/26-27/0041`, saved and then
+  cancelled, reads `ISCANCELLED` Yes and the three flags Yes, No, No. `BP/26-27/0042`, saved as optional, reads
+  `ISOPTIONAL` Yes and No, No, No. With `,ISCANCELLED,ISOPTIONAL` appended to the field list of the request the
+  code renders for 1 to 31 August 2026 and `BRIDGE Sales`, each of the 32 vouchers carried both exactly once, and
+  every other voucher read No and No. Every voucher's three flags, `ISGSTOVERRIDDEN` and `ALTERID` equalled those
+  of the same read without the two names, and the company marks were byte-identical before and after. So a reader
+  that takes the three flags alone reports a cancelled voucher as included and an optional one as not listed:
+  decide the two fields first. One voucher each.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;
   - the reason for a status: no field in the two lists tried carries it, which is a negative measured on those
     lists only;
-  - cancelled, optional and post-dated vouchers (the request does not fetch them);
+  - post-dated vouchers (the request does not fetch `ISPOSTDATED`), and deleted vouchers kept by the edit log;
+  - a voucher both cancelled and optional, and whether Tally lists a cancelled voucher anywhere in the return,
+    such as among the documents issued;
   - the cost of the selection on a large book: it was timed on about thirty vouchers, so any size bound a
     program applies is its own provisional choice and not a Tally limit;
   - another release or licence tier.

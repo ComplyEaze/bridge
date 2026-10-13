@@ -1,0 +1,5 @@
+# W24 run sheet: the wide GSTR-1 status read of one keyed Sales credit note WITH original invoice details, with the voucher types' series read before, after and after the restore; steps in W24-README.md. The three request files are W23's, byte for byte (lab/1342-w23-run-sheet dd821ff9; the same bytes answered in lab/1342-w23-answers): r02-marks.xml (976 bytes), w23-wide-credit-note-0921.xml (cb037151... with its window changed to 20260921 and its type name to Credit Note only), w23-series.xml (caf423642547... with its company name changed to BRIDGE PILOT LAB only).
+81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c  r02-marks.xml
+7a939dfed5530418e53ecbb053532679c3817817db6a54d6308c0090f1f8a0ec  w23-wide-credit-note-0921.xml
+e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276  w23-series.xml
+ea8b5e154dfb5691d942be83601208cb0db39517750cd06290a027ea0761e9af  W24-README.md

@@ -963,7 +963,7 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
   not by the narrow request. The Accept As Is voucher was read by both.
 - **VERIFIED: the narrow request answers uncertain vouchers, and shows an accept between two reads** (lab set W13,
   12 Oct 2026, the same company, evidence on `lab/1342-w13-answers`, answers `aw13-status-window-0` and `-1`, the
-  request for 1 to 31 August 2026 and type `BRIDGE Sales`, byte for byte what the code renders). Of the 28 vouchers
+  request for 1 to 31 August 2026 and type `BRIDGE Sales`, byte for byte what the code rendered that day). Of the 28 vouchers
   each read returned, six read No, Yes, No in the first. `BP/26-27/0005` was then accepted as it stands on Tally's
   screen, alone, and in the second read it was the only voucher that differed: included, not uncertain,
   `ISGSTOVERRIDDEN` Yes, with a higher `ALTERID`.
@@ -973,17 +973,47 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
   `lab/1342-w20-answers`, answer `aw20-b`). `BP/26-27/0041`, saved and then
   cancelled, reads `ISCANCELLED` Yes and the three flags Yes, No, No. `BP/26-27/0042`, saved as optional, reads
   `ISOPTIONAL` Yes and No, No, No. With `,ISCANCELLED,ISOPTIONAL` appended to the field list of the request the
-  code renders for 1 to 31 August 2026 and `BRIDGE Sales`, each of the 32 vouchers carried both exactly once, and
+  code rendered on 12 Oct 2026 for 1 to 31 August 2026 and `BRIDGE Sales`, each of the 32 vouchers carried both exactly once, and
   every other voucher read No and No. Every voucher's three flags, `ISGSTOVERRIDDEN` and `ALTERID` equalled those
   of the same read without the two names, and the company marks were byte-identical before and after. So a reader
   that takes the three flags alone reports a cancelled voucher as included and an optional one as not listed:
   decide the two fields first. One voucher each.
+- **VERIFIED: the request carries `ISPOSTDATED` once per voucher once the name is added, and Tally returns
+  `ISDELETED` and `ISDELETEDVCHRETAINED` once per voucher without being asked** (lab sets W21 and W21b, 12 Oct
+  2026, the same company; evidence on `lab/1342-w21-answers`, answer `aw21-b`, and on
+  `lab/1342-w21b-answers`, answer `aw21b-b`). The request is the one above with `,ISPOSTDATED` appended (request
+  file SHA-256 `68aaa000`). Read by structure and by a second independent parse, each of the 33 vouchers of
+  `aw21b-b` carried each of `ISCANCELLED`, `ISOPTIONAL`, `ISPOSTDATED`, `ISDELETED` and `ISDELETEDVCHRETAINED`
+  exactly once, as a direct child, none nested, and the two deleted flags have no `TYPE` attribute. The deleted
+  flags read No on all 33. The 32 vouchers of the earlier read (`aw21-b`) came back unchanged beside the new one.
+- **VERIFIED, one voucher: a voucher marked post-dated by hand reads `ISPOSTDATED` Yes and the included flag Yes
+  when Tally's current date is the voucher's date** (W21b; `lab/1342-w21b-answers`, answer `aw21b-b`). `BP/26-27/0045` was keyed as a `BRIDGE Sales` invoice
+  dated 25-Aug-2026 and marked post-dated on the voucher screen (Ctrl+T). The read was made with Tally's current
+  date (the date set with F2 at the Gateway, which is not the calendar's; the calendar date was 12 Oct 2026) set
+  to 25-Aug-2026, from the lab's send log. So a reader that takes the three flags alone reports it as included:
+  decide `ISPOSTDATED` first, as for the two fields above.
+- **VERIFIED, one voucher: the same read, made with Tally's current date before the voucher's date and again
+  after it, returned the same bytes, and the GSTR-1 screen counted the voucher at both dates** (W21c, 13 Oct
+  2026, the same company; evidence on `lab/1342-w21c-answers`, answers `aw21c-b` and `aw21c-c`, SHA-256
+  `5cc5d249…` for both). `BP/26-27/0045` was keyed as a `BRIDGE Sales` invoice dated 25-Aug-2026 and marked
+  post-dated. With the current date set at the Gateway to 10-Aug-2026 and then to 26-Aug-2026 the two answers
+  (111,748 bytes) are byte-identical: `ISPOSTDATED` Yes once, the included flag Yes, uncertain No, excluded No,
+  `ISGSTOVERRIDDEN` No. The read before the voucher was keyed (current date 10-Aug-2026) is byte-identical to
+  the earlier capture `aw21-b`, so the current date alone did not change the read. The GSTR-1 screen for August
+  showed 39 vouchers, 27 included, 7 not relevant and 5 uncertain before the voucher and 40, 28, 7 and 5 at both
+  dates after it (1,000.00 more taxable value), as the lab read them off the screen (the screenshots stay on the
+  lab PC); the Day Book of 25-Aug-2026 listed the voucher at both dates.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;
   - the reason for a status: no field in the two lists tried carries it, which is a negative measured on those
     lists only;
-  - post-dated vouchers (the request does not fetch `ISPOSTDATED`), and deleted vouchers kept by the edit log;
+  - a post-dated voucher whose date lies in a later return period, one that is also uncertain, another voucher
+    type, and Tally started afresh between two current dates: the one measured voucher is one Sales invoice, and
+    the finding rests on it;
+  - a Yes on either deleted flag: on this book the Edit Log was not seen to be on, and the one voucher deleted
+    left the answer altogether, so a deleted voucher kept by an Edit Log is unmeasured;
+  - more than one of `ISCANCELLED`, `ISOPTIONAL` and `ISPOSTDATED` Yes on one voucher;
   - a voucher both cancelled and optional, and whether Tally lists a cancelled voucher anywhere in the return,
     such as among the documents issued;
   - the cost of the selection on a large book: it was timed on about thirty vouchers, so any size bound a

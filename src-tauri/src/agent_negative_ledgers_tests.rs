@@ -384,6 +384,9 @@ async fn under_mask_parties_each_ledger_name_is_masked_and_nothing_else_changes(
     .await;
     let plain_ledgers = &result(&plain)["ledgers"];
     let masked_ledgers = &result(&masked)["ledgers"];
+    // The capture lists two ledgers: with none, the loop below would run zero times.
+    assert_eq!(plain_ledgers.as_array().unwrap().len(), 2);
+    assert_eq!(masked_ledgers.as_array().unwrap().len(), 2);
     for (plain, masked) in plain_ledgers
         .as_array()
         .unwrap()

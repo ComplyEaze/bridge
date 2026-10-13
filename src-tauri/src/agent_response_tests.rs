@@ -37,6 +37,21 @@ fn a_paged_masters_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
 }
 
 #[test]
+fn a_paged_ledgers_result_is_trimmed_with_a_cursor_and_an_unpaged_one_is_not() {
+    let mut paged = json!({"result":{"offset":0,"next_offset":null,
+        "ledgers":[{"ledger":"A"},{"ledger":"B"},{"ledger":"C"}]}});
+    assert!(truncate_response_items(&mut paged).expect("trims a ledgers page"));
+    assert_eq!(paged["result"]["ledgers"].as_array().unwrap().len(), 2);
+    assert_eq!(paged["result"]["next_offset"], 2);
+    // negative_ledgers keys `ledgers` with no `offset`: a cursor into it would
+    // resume nothing, so it is not trimmed.
+    let mut unpaged = json!({"result":{"ledgers":[{"ledger":"A"},{"ledger":"B"}]}});
+    assert!(!truncate_response_items(&mut unpaged).expect("no page shape"));
+    assert_eq!(unpaged["result"]["ledgers"].as_array().unwrap().len(), 2);
+    assert!(unpaged["result"].get("next_offset").is_none());
+}
+
+#[test]
 fn standalone_master_and_status_rows_are_counted_in_final_receipts() {
     for (tool, axis) in [
         ("validate_masters", "masters"),

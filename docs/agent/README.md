@@ -576,7 +576,7 @@ synthetic company: any other window is named in `unmeasured_in_this_answer` as
 `window_other_than_a_whole_financial_year`, and a book with GST, stock, several currencies
 or optional or post-dated vouchers was not measured. A window starting before the book is
 `negative_ledgers_before_books`, a reversed window `invalid_date_range`, and Education mode
-`negative_ledgers_education_unqualified`. The answer is refused, never reinterpreted, when
+`negative_ledgers_education_unqualified`. A refused read's code is `negative_ledgers_read_failed`, with the specific code below in `error.cause`. The answer is refused, never reinterpreted, when
 a listed ledger carries both columns, neither, a zero, or the other sign than the one
 measured (a debit as a negative debit amount, a credit as a positive credit amount:
 `negative_ledgers_balance_unexpected`), when a ledger is named twice
@@ -585,7 +585,7 @@ measured (a debit as a negative debit amount, a credit as a positive credit amou
 (`negative_ledgers_report_unknown`), when an amount is not a plain decimal
 (`negative_ledgers_amount_invalid`), or when the report or the book changed between the paired
 reads (`native_negative_ledgers_changed`), or the book's extent differed before and after the read (`native_ledger_extent_changed`). A window the read could not build a period for is `negative_ledgers_period_not_honoured`. The report has no
-size check and its cost on a large book is not known; the read is sent once. Measured on one
+size check and its cost on a large book is not known; one call is one paired read (two requests), never retried. Measured on one
 synthetic TallyPrime 7.1 Silver book (the captures are in the protocol crate's fixtures);
 this tool has not yet been run against Tally.
 

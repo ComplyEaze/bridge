@@ -69,9 +69,10 @@ fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
     }
     ["items", "ledgers", "masters"].into_iter().find_map(|key| {
         // `masters` also keys the unpaged results of validate_masters and
-        // build_import_xml, which carry no `offset`: only a paged result can be
-        // trimmed with a resumable cursor.
-        if key == "masters" && !result["offset"].is_u64() {
+        // build_import_xml, and `ledgers` the unpaged negative_ledgers answer;
+        // none carries an `offset`: only a paged result can be trimmed with a
+        // resumable cursor.
+        if key != "items" && !result["offset"].is_u64() {
             return None;
         }
         result[key]

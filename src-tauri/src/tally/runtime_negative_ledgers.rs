@@ -47,7 +47,7 @@ impl TallyRuntime {
     /// identity brackets as the other report reads: the book extent before and
     /// after must be equal and the report's two paired reads identical, or the
     /// read refuses. The report has no size check: its cost on a large book is
-    /// not known, and the read is sent once, never retried.
+    /// not known, and the read is one paired read (two requests), never retried.
     pub(crate) async fn fetch_negative_ledgers(
         &self,
         config: TallyConfig,

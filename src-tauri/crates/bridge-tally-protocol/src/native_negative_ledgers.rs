@@ -17,9 +17,10 @@
 //! not rendered, so it is returned as empty, never as "no negative ledger".
 //!
 //! The parser is closed: anything other than well-formed entries of the expected
-//! shape is refused, and a failure, an unknown report, a name repeated, an entry
-//! with no amount or with both columns, and a sign that is not the one measured
-//! each have their own error.
+//! shape is refused, and a failure, an unknown report, a name repeated and an
+//! amount that is not a plain decimal each have their own error; an entry with no
+//! amount, with both columns, with a zero or with a sign that is not the one
+//! measured is the one `BalanceUnexpected`.
 use bridge_tally_primitives::ExactDecimal;
 use quick_xml::{
     events::{BytesStart, Event},

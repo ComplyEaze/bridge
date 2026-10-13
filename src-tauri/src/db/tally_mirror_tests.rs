@@ -7,6 +7,10 @@ use crate::sync::reconciliation::{proof_record_counts_sha256, CommitBatchParts};
 
 const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const HASH_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const SEED_REVIEW_COMMITMENT: &str =
+    "5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed";
+const SEED_COMPANY_DISPLAY_NAME: &str = "Synthetic Bridge Test";
+const SEED_COMPANY_GUID: &str = "company-guid-1";
 
 pub(super) async fn repository() -> TallyMirrorRepository {
     let pool = SqlitePoolOptions::new()
@@ -226,48 +230,32 @@ async fn seed_repository_with_core_evidence(
     core_confidence: Confidence,
     core_reason: Option<&str>,
 ) -> (TallyMirrorRepository, CapabilitySnapshotRef, CompanyRef) {
-    let snapshot = repository
-        .save_capability_snapshot(CapabilitySnapshotInput {
-            canonical_origin: "http://127.0.0.1:9000".to_string(),
-            observed_at_unix_ms: 1_000,
-            profile_version: 1,
-            product: "TallyPrime".to_string(),
-            release: None,
-            license_tier: None,
-            mode: Some("Education".to_string()),
-            mode_confidence: Confidence::Observed,
-            items: vec![
-                CapabilityItemInput {
-                    kind: CapabilityKind::Transport,
-                    key: "xml_http".to_string(),
-                    state: CapabilityState::Supported,
-                    confidence: Confidence::Observed,
-                    safe_reason_code: None,
-                },
-                CapabilityItemInput {
-                    kind: CapabilityKind::Pack,
-                    key: "core_accounting".to_string(),
-                    state: core_state,
-                    confidence: core_confidence,
-                    safe_reason_code: core_reason.map(str::to_string),
-                },
-            ],
-        })
-        .await
-        .expect("save capability snapshot");
-    let company = repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id.clone(),
-            display_name: "Synthetic Bridge Test".to_string(),
-            identity: SourceIdentityInput {
-                guid: Some("company-guid-1".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
+    let capability = CapabilitySnapshotInput {
+        canonical_origin: "http://127.0.0.1:9000".to_string(),
+        observed_at_unix_ms: 1_000,
+        profile_version: 1,
+        product: "TallyPrime".to_string(),
+        release: None,
+        license_tier: None,
+        mode: Some("Education".to_string()),
+        mode_confidence: Confidence::Observed,
+        items: vec![
+            CapabilityItemInput {
+                kind: CapabilityKind::Transport,
+                key: "xml_http".to_string(),
+                state: CapabilityState::Supported,
+                confidence: Confidence::Observed,
+                safe_reason_code: None,
             },
-            observed_at_unix_ms: 1_000,
-        })
-        .await
-        .expect("save company");
+            CapabilityItemInput {
+                kind: CapabilityKind::Pack,
+                key: "core_accounting".to_string(),
+                state: core_state,
+                confidence: core_confidence,
+                safe_reason_code: core_reason.map(str::to_string),
+            },
+        ],
+    };
     let composite_tuple_columns = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM pragma_table_info('tally_companies') \
          WHERE name IN ('company_number', 'books_from_yyyymmdd')",
@@ -276,13 +264,48 @@ async fn seed_repository_with_core_evidence(
     .await
     .expect("inspect legacy company schema");
     if composite_tuple_columns == 0 {
-        sqlx::query("UPDATE tally_companies SET identity_confidence = 'observed' WHERE id = ?1")
-            .bind(&company.id)
-            .execute(&repository.pool)
+        // A schema from before the composite company tuple has no reviewed
+        // setup path, so the legacy GUID-only observed row is written as such.
+        let snapshot = repository
+            .save_capability_snapshot(capability)
             .await
-            .expect("seed legacy GUID-only observed company identity");
+            .expect("save capability snapshot");
+        let company = CompanyRef {
+            id: Uuid::new_v4().to_string(),
+            display_name: SEED_COMPANY_DISPLAY_NAME.to_string(),
+        };
+        sqlx::query(
+            "INSERT INTO tally_companies(\
+               id, endpoint_id, display_name, company_guid, identity_confidence, \
+               first_observed_at_unix_ms, last_observed_at_unix_ms\
+             ) VALUES (?1, ?2, ?3, ?4, 'observed', 1000, 1000)",
+        )
+        .bind(&company.id)
+        .bind(&snapshot.endpoint_id)
+        .bind(&company.display_name)
+        .bind(SEED_COMPANY_GUID)
+        .execute(&repository.pool)
+        .await
+        .expect("seed legacy GUID-only observed company identity");
+        return (repository, snapshot, company);
     }
-    (repository, snapshot, company)
+    let seeded = repository
+        .save_reviewed_setup(ReviewedSetupInput {
+            review_commitment_sha256: SEED_REVIEW_COMMITMENT.to_string(),
+            capability,
+            company_display_name: SEED_COMPANY_DISPLAY_NAME.to_string(),
+            company_identity: SourceIdentityInput {
+                guid: Some(SEED_COMPANY_GUID.to_string()),
+                confidence: Some(Confidence::Observed),
+                ..Default::default()
+            },
+            company_number: "100000".to_string(),
+            books_from_yyyymmdd: "20260401".to_string(),
+            selected_read_scope: None,
+        })
+        .await
+        .expect("save seeded company through the reviewed setup");
+    (repository, seeded.snapshot, seeded.company)
 }
 
 async fn seeded_repository() -> (TallyMirrorRepository, CapabilitySnapshotRef, CompanyRef) {
@@ -332,19 +355,19 @@ pub(super) fn reviewed_setup_input(review_commitment_sha256: &str) -> ReviewedSe
 #[tokio::test]
 async fn reviewed_setup_keeps_guid_collision_as_separate_observed_company() {
     let (repository, snapshot, _) = seeded_repository().await;
-    repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Synthetic Collision Peer".to_string(),
-            identity: SourceIdentityInput {
-                remote_id: Some("remote-peer-2".to_string()),
-                confidence: Some(Confidence::Observed),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 1_000,
-        })
-        .await
-        .expect("seed second identity");
+    // A legacy row identified only by a remote id: no production path creates
+    // one now, but a mirror written by an older build can hold it.
+    sqlx::query(
+        "INSERT INTO tally_companies(\
+           id, endpoint_id, display_name, remote_id, identity_confidence, \
+           first_observed_at_unix_ms, last_observed_at_unix_ms\
+         ) VALUES (?1, ?2, 'Synthetic Collision Peer', 'remote-peer-2', 'documented', 1000, 1000)",
+    )
+    .bind(Uuid::new_v4().to_string())
+    .bind(&snapshot.endpoint_id)
+    .execute(&repository.pool)
+    .await
+    .expect("seed second identity");
     let company_count_before = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_companies")
         .fetch_one(&repository.pool)
         .await
@@ -3145,38 +3168,49 @@ fn company_profile_correlation_is_casefolded_scoped_and_opaque() {
 
 #[tokio::test]
 async fn persisted_profiles_only_return_observed_stable_company_pins() {
-    let (repository, snapshot, _) = seeded_repository().await;
+    let (repository, snapshot, seeded) = seeded_repository().await;
     let observed = repository
         .save_reviewed_setup(reviewed_setup_input(HASH_A))
         .await
         .expect("save complete observed company tuple")
         .company;
-    repository
-        .upsert_company(CompanyInput {
-            endpoint_id: snapshot.endpoint_id,
-            display_name: "Synthetic Inferred Company".to_string(),
-            identity: SourceIdentityInput {
-                fallback_fingerprint: Some("inferred-company-fingerprint".to_string()),
-                confidence: Some(Confidence::Inferred),
-                ..Default::default()
-            },
-            observed_at_unix_ms: 2_000,
-        })
-        .await
-        .expect("save inferred company");
+    // A legacy row with only an inferred identity: no production path creates
+    // one now, but a mirror written by an older build can hold it.
+    sqlx::query(
+        "INSERT INTO tally_companies(\
+           id, endpoint_id, display_name, fallback_fingerprint, identity_confidence, \
+           first_observed_at_unix_ms, last_observed_at_unix_ms\
+         ) VALUES (?1, ?2, 'Synthetic Inferred Company', 'inferred-company-fingerprint', \
+           'inferred', 2000, 2000)",
+    )
+    .bind(Uuid::new_v4().to_string())
+    .bind(&snapshot.endpoint_id)
+    .execute(&repository.pool)
+    .await
+    .expect("save inferred company");
 
     let page = repository
         .persisted_company_profiles()
         .await
         .expect("load persisted profiles");
     let profiles = page.profiles;
-    assert_eq!(page.total_profiles, 1);
+    assert_eq!(page.total_profiles, 2);
     assert!(!page.truncated);
-    assert_eq!(profiles.len(), 1);
-    assert_eq!(profiles[0].mirror_company_id, observed.id);
-    assert!(profiles[0].guid_observed);
+    let mut profile_ids = profiles
+        .iter()
+        .map(|profile| profile.mirror_company_id.as_str())
+        .collect::<Vec<_>>();
+    profile_ids.sort_unstable();
+    let mut observed_ids = vec![seeded.id.as_str(), observed.id.as_str()];
+    observed_ids.sort_unstable();
+    assert_eq!(profile_ids, observed_ids);
+    let profile = profiles
+        .iter()
+        .find(|profile| profile.mirror_company_id == observed.id)
+        .expect("reviewed company profile");
+    assert!(profile.guid_observed);
     assert_eq!(
-        profiles[0].correlation_key,
+        profile.correlation_key,
         company_profile_correlation_key(
             "http://127.0.0.1:9000",
             "reviewed-company-guid",
@@ -3185,8 +3219,8 @@ async fn persisted_profiles_only_return_observed_stable_company_pins() {
             "20260401"
         )
     );
-    assert_eq!(profiles[0].identity_confidence, "observed");
-    assert_eq!(profiles[0].canonical_endpoint, "http://127.0.0.1:9000");
+    assert_eq!(profile.identity_confidence, "observed");
+    assert_eq!(profile.canonical_endpoint, "http://127.0.0.1:9000");
 }
 
 #[tokio::test]
@@ -3322,6 +3356,19 @@ async fn guid_only_company_pin_requires_reverification() {
         .execute(&repository.pool)
         .await
         .expect("weaken synthetic confidence");
+    assert!(matches!(
+        repository.snapshot_source_pin(&company.id).await,
+        Err(MirrorError::InvalidInput("company_identity_not_observed"))
+    ));
+    // A pin written before the composite company tuple holds the GUID alone.
+    sqlx::query(
+        "UPDATE tally_companies SET company_number = NULL, books_from_yyyymmdd = NULL \
+         WHERE id = ?1",
+    )
+    .bind(&company.id)
+    .execute(&repository.pool)
+    .await
+    .expect("make the pin GUID-only");
     assert!(matches!(
         repository.snapshot_source_pin(&company.id).await,
         Err(MirrorError::InvalidInput(

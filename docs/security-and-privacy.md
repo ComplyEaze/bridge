@@ -3,13 +3,14 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Four
+page was not read again at it, except as said below). Five
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
 `ledger_movement` read took, in section 2 (#1366), where a program built
-from this repository loads the PDF library from, in section 5 (#1422), and the
-statement party written into a bank voucher's narration, in section 2 (#1430). It was written from a reading
+from this repository loads the PDF library from, in section 5 (#1422), the
+statement party written into a bank voucher's narration, in section 2 (#1430), and the
+location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -272,9 +273,17 @@ or `1` is not asked.
 
 On a Microsoft Store install of Claude Desktop, Windows may keep some of these
 files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
-and a given file can be in either place. Bridge prints the location Windows
-reports for an existing file. Uninstalling or resetting the Store app removes
-that folder, including the import journal.
+and a given file can be in either place (seen on one computer, #1459;
+**Not measured:** when Windows puts a file in which place). For the import file
+that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
+Windows reports for that file, with a `path_state` beside it that says whether
+Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
+still prints the folder as the Windows location in the table above, whichever
+place the files are in. Microsoft's documentation says that uninstalling or
+resetting a Store app (here Claude Desktop itself, not the extension of
+section 8) removes that second folder and everything in it. **Not measured:**
+what that removes on a real Store install, and which of the files below are in
+that folder.
 
 - **A receipt log** (`agent-egress.jsonl`): two lines for each tool call. The
   first has the tool name, the time, the company's Tally GUID, fingerprints of

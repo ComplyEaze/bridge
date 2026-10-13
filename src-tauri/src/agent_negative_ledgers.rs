@@ -74,7 +74,7 @@ impl Server {
                 "An empty list is returned as empty and does not say that no ledger is negative: Tally's empty answer cannot be told from a report that was not rendered",
                 "The report was captured for one whole financial year (1 April to 31 March) on one synthetic company; any other window is named in unmeasured_in_this_answer, and no book with GST, stock, several currencies or optional or post-dated vouchers was measured",
                 "The window must not start before the book, and Education mode is refused",
-                "The report has no size check, and its cost on a large book is not known: one call is one paired read (two requests), never retried; ask for one financial year first, and if a call times out do not repeat it",
+                "The report has no size check, and its cost on a large book is not known: the report is one paired read (two requests), never retried; ask for one financial year first, and if a call times out do not repeat it",
                 "Tally's own report carries no company identity; it is bound only by the company, mode and book-extent checks around the read",
                 "Not voucher-level reconciliation or an atomic snapshot",
             ],

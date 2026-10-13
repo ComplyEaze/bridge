@@ -1135,7 +1135,8 @@ pub(super) fn append(
 #[cfg(test)]
 tokio::task_local! {
     /// The faults a test arms around the call under test: each entry names one
-    /// point, a `record_type` whose next [`append`] fails (or, with
+    /// point, a `record_type` whose next [`append`] (for an intent,
+    /// [`append_intent`]) fails (or, with
     /// `_lost_after_write`, is written and then reported as failed) or a read
     /// the answered call makes, and is used up by the first time that point is
     /// reached.
@@ -1176,7 +1177,21 @@ pub(super) fn append_intent(
     lock: &ExclusiveAdmission,
     intent: MasterDispatchIntent,
 ) -> Result<RecordedIntent, MasterLedgerError> {
-    append_intent_syncing(data_dir, lock, intent, sync_directory)
+    // The faults a test arms for [`append`] reach the intent the same way: one
+    // refused before any byte is written, and one written and then reported as
+    // a failed directory sync, which leaves the intent in the file.
+    #[cfg(test)]
+    if test_fault_fires("master_dispatch_intent") {
+        return Err(MasterLedgerError::Invalid(Invalid::BadDigest));
+    }
+    #[cfg(test)]
+    let intent_lost_after_write = test_fault_fires("master_dispatch_intent_lost_after_write");
+    let recorded = append_intent_syncing(data_dir, lock, intent, sync_directory);
+    #[cfg(test)]
+    if intent_lost_after_write && recorded.is_ok() {
+        return Err(MasterLedgerError::DirectorySyncFailed);
+    }
+    recorded
 }
 
 fn append_intent_syncing(

@@ -1407,7 +1407,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
     row(
         "failure, nothing sent",
         failure(Some(false)),
-        master_next_step("master_pre_image_write_failed").unwrap(),
+        NOTHING_RECORDED_STEP,
         false,
         false,
     );
@@ -2888,6 +2888,413 @@ async fn a_journal_that_cannot_be_read_under_the_lock_stops_the_post() {
         .contains("master_dispatch_intent"));
 }
 
+// --- post: the dispatch intent's own append, and a journal that is corrupt ---
+
+/// What a refusal of the journal that recorded nothing tells the caller to do.
+const NOTHING_RECORDED_STEP: &str = "Nothing was sent and nothing was recorded for this batch. Call prepare_ledger_creates for a new batch and ask for approval again.";
+
+/// The journal refuses the dispatch intent before a byte of it is written (the
+/// pre-checks make this unreachable without a fault, so it is armed): nothing is
+/// recorded, the sidecar this call wrote is removed, the create is not sent, the
+/// answer says nothing was sent, and the approval is spent, so a later call asks
+/// the person again.
+#[tokio::test]
+async fn an_intent_the_journal_refuses_before_writing_records_nothing_and_sends_nothing() {
+    // The first call's reads up to the POST, which it never makes, then the
+    // reads a second call makes before its dialog.
+    let mut plans = through_post(xml(created_one()));
+    let post_at = plans.len() - 1;
+    plans.pop();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let before = journal_bytes(directory.path());
+    let scripted = ScriptedApproval::approving();
+    let (response, unused) = faulting(
+        vec!["master_dispatch_intent"],
+        posting(
+            &scripted,
+            server.call_tool("post_ledger_creates", args.clone()),
+        ),
+    )
+    .await;
+    assert!(unused.is_empty(), "the fault was not reached");
+    assert_eq!(simulator.received(), post_at, "every queue read, no POST");
+    assert_eq!(error_code(&response), "master_ledger_invalid", "{response}");
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], false, "{response}");
+    assert_eq!(answered["dispatch"]["state"], "not_dispatched");
+    assert_eq!(answered["dispatch"]["resent"], false);
+    assert_eq!(answered["error"]["next_step"], NOTHING_RECORDED_STEP);
+    assert_eq!(scripted.masters().len(), 1, "the person was asked once");
+    // Nothing on disk: no intent, no sidecar.
+    assert_eq!(journal_bytes(directory.path()), before);
+    assert!(!sidecar_of(directory.path(), &batch.batch_id).exists());
+    assert!(state_of(directory.path(), &batch.batch_id).intent.is_none());
+    // The approval was spent under the lock before the append, and is not left
+    // to be redeemed: a later call asks again, and sends nothing before that.
+    assert!(!server.post_approvals.holds(&batch.batch_id));
+    let again = ScriptedApproval::declining();
+    let second = posting(&again, server.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(simulator);
+    assert_eq!(error_code(&second), "master_approval_declined", "{second}");
+    assert_eq!(again.masters().len(), 1, "asked again");
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert_eq!(observed.len(), post_at + before_approval().len());
+}
+
+/// The dispatch intent is written and the append is then reported as failed (a
+/// directory sync that did not hold), so it may be in the file: this call does
+/// not send, the batch is treated as dispatched with the step that reads it
+/// back, the sidecar its digest names is kept, and a later call reconciles it
+/// and never sends.
+#[tokio::test]
+async fn an_intent_that_may_be_in_the_file_is_treated_as_sent_and_a_later_call_never_sends() {
+    let mut plans = through_post(xml(created_one()));
+    let post_at = plans.len() - 1;
+    plans.pop();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let scripted = ScriptedApproval::approving();
+    let (response, unused) = faulting(
+        vec!["master_dispatch_intent_lost_after_write"],
+        posting(
+            &scripted,
+            server.call_tool("post_ledger_creates", args.clone()),
+        ),
+    )
+    .await;
+    let observed = sent(simulator);
+    assert!(unused.is_empty(), "the fault was not reached");
+    assert_eq!(observed.len(), post_at, "every queue read, no POST");
+    assert!(
+        !create_was_sent(&observed, &expected_request()),
+        "no request carried the create's body"
+    );
+    assert_eq!(
+        error_code(&response),
+        "import_dispatch_outcome_unknown",
+        "{response}"
+    );
+    let answered = result(&response);
+    assert_eq!(answered["attempt_recorded"], true, "{response}");
+    assert_eq!(answered["dispatch"]["state"], "reconciliation_required");
+    assert_eq!(answered["dispatch"]["resent"], false);
+    assert_eq!(answered["error"]["next_step"], NEXT_UNCONFIRMED);
+    assert_eq!(scripted.masters().len(), 1, "the person was asked once");
+    assert!(!server.post_approvals.holds(&batch.batch_id));
+    // The intent is in the file, with its sidecar.
+    assert_eq!(
+        record_types(directory.path()),
+        ["master_batch", "master_dispatch_intent"]
+    );
+    assert!(sidecar_of(directory.path(), &batch.batch_id).exists());
+    // A later call reads the book back, asks nobody and sends nothing; the book
+    // is as it was and no mark moved since the intent.
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(7, 3, None))).unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let again = ScriptedApproval::approving();
+    let report = posting(&again, later.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(reads);
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert!(again.masters().is_empty(), "nobody was asked");
+    let reported = result(&report);
+    assert_eq!(reported["state"], "confirmed_absent", "{report}");
+    assert_eq!(reported["verification"]["moment"], "reconcile");
+    assert_eq!(reported["attempt_recorded"], true);
+    assert_eq!(reported["dispatch"]["resent"], false);
+    assert_eq!(
+        record_types(directory.path()),
+        ["master_batch", "master_dispatch_intent", "master_verdict"]
+    );
+}
+
+/// Invalid bytes at the end of the masters journal: a record cut short, with no
+/// newline, which its reader refuses.
+fn corrupt_journal(directory: &std::path::Path) {
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(journal_path(directory))
+        .unwrap();
+    file.write_all(CORRUPT_TAIL).unwrap();
+}
+
+const CORRUPT_TAIL: &[u8] = br#"{"record_type":"master_dispatch_intent","batch_id":"bridge-"#;
+
+/// The journal is corrupt before the call starts: the first read of it refuses
+/// the call before anything is read from Tally, asked or sent.
+#[tokio::test]
+async fn a_corrupt_journal_stops_the_post_at_its_first_read_before_anything_else() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    corrupt_journal(directory.path());
+    let before = journal_bytes(directory.path());
+    let scripted = ScriptedApproval::approving();
+    let response = posting(&scripted, server.call_tool("post_ledger_creates", args)).await;
+    let observed = sent(simulator);
+    assert_eq!(error_code(&response), "master_ledger_invalid", "{response}");
+    // A refusal before the pass has a batch to speak of: it claims nothing
+    // either way about a send.
+    for field in ["attempt_recorded", "dispatch"] {
+        assert!(result(&response).get(field).is_none(), "{response}");
+    }
+    assert!(observed.is_empty(), "nothing reached the wire");
+    assert!(scripted.masters().is_empty(), "nobody was asked");
+    assert_eq!(journal_bytes(directory.path()), before);
+    assert!(!sidecar_of(directory.path(), &batch.batch_id).exists());
+}
+
+/// The journal turns corrupt while the pass reads Tally, so the read just before
+/// the dialog fails for a reason other than a busy lock. That check is skipped,
+/// as the guide says, the person is asked, and the check under the lock refuses
+/// before the intent: no create is on the wire and nothing is recorded.
+#[tokio::test]
+async fn a_corrupt_journal_at_the_check_before_the_dialog_is_skipped_and_the_lock_stops_the_post() {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let prepared = journal_bytes(directory.path());
+    let data_dir = directory.path().to_path_buf();
+    let hook: std::sync::Arc<dyn Fn() + Send + Sync> =
+        std::sync::Arc::new(move || corrupt_journal(&data_dir));
+    let scripted = ScriptedApproval::approving();
+    let response = master_ledger::BEFORE_HOLD_CHECK
+        .scope(
+            hook,
+            posting(&scripted, server.call_tool("post_ledger_creates", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    // Any read error under the lock is the one code, whatever the journal's own.
+    assert_eq!(
+        error_code(&response),
+        "master_ledger_unavailable",
+        "{response}"
+    );
+    assert_eq!(scripted.masters().len(), 1, "the check was skipped");
+    assert_eq!(observed.len(), post_at, "every queue read, and no POST");
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert!(!sidecar_of(directory.path(), &batch.batch_id).exists());
+    // The journal is as the corruption left it: nothing was written after it.
+    assert_eq!(
+        journal_bytes(directory.path()),
+        [prepared, CORRUPT_TAIL.to_vec()].concat()
+    );
+    // The failure answer reads the same corrupt journal, so it cannot say that
+    // no send is recorded. It does not claim one either: the count is null (not
+    // known), never true, and the step is the one that is true in both cases.
+    // (This call itself sent nothing; the answer speaks for the batch.)
+    let answered = result(&response);
+    assert!(answered["attempt_recorded"].is_null(), "{response}");
+    assert_eq!(answered["error"]["next_step"], NEXT_SEND_NOT_KNOWN);
+    assert!(!server.post_approvals.holds(&batch.batch_id));
+}
+
+/// One of two posts made at once.
+struct RacingPost {
+    response: Value,
+    /// How many requests carried the create's body.
+    creates: usize,
+    /// How many requests reached the wire.
+    wire: usize,
+    /// How many times the person was asked.
+    dialogs: usize,
+    /// Whether the approval the call took is still held for redemption.
+    approval_held: bool,
+}
+
+/// Posts `batch_id` from `data_dir` on a thread and a runtime of its own, as a
+/// second process would, with its own Tally endpoint (`plans`) and its own
+/// approval. It waits at `gate` just before the check that precedes the dialog,
+/// so that both posts pass that check before either records an intent.
+/// `while_asked` runs while the dialog is open.
+fn racing_post(
+    data_dir: std::path::PathBuf,
+    batch_id: String,
+    plans: Vec<ScenarioPlan>,
+    gate: std::sync::Arc<std::sync::Barrier>,
+    while_asked: impl Fn() + Send + Sync + 'static,
+) -> std::thread::JoinHandle<RacingPost> {
+    std::thread::spawn(move || {
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let server = server_at(simulator.address(), &data_dir);
+        let scripted = ScriptedApproval::approving_after(while_asked);
+        let waited = std::sync::atomic::AtomicBool::new(false);
+        let hook: std::sync::Arc<dyn Fn() + Send + Sync> = std::sync::Arc::new(move || {
+            if !waited.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                gate.wait();
+            }
+        });
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let response = runtime.block_on(master_ledger::BEFORE_HOLD_CHECK.scope(
+            hook,
+            posting_then(
+                &scripted,
+                book_after(),
+                server.call_tool("post_ledger_creates", json!({"batch_id": batch_id})),
+            ),
+        ));
+        let observed = sent(simulator);
+        RacingPost {
+            response,
+            creates: create_count(&observed),
+            wire: observed.len(),
+            dialogs: scripted.masters().len(),
+            approval_held: server.post_approvals.holds(&batch_id),
+        }
+    })
+}
+
+/// Two posts for one ledger name that both pass the check before the dialog:
+/// `winner` is answered first and sends the create; `loser` is let through its
+/// dialog only once the winner's intent is on file and its lock released, so
+/// which call wins does not depend on timing. The winner's POST answers slowly,
+/// so its dispatch is still open while the loser goes through its queue reads
+/// and reaches the lock. `same_batch` is whether both name one batch id or two
+/// batches of the same name in the same company.
+struct Race {
+    winner: RacingPost,
+    loser: RacingPost,
+    winner_batch: MasterBatch,
+    loser_batch: MasterBatch,
+    directory: tempfile::TempDir,
+}
+
+fn race_two_posts(same_batch: bool) -> Race {
+    let directory = tempfile::tempdir().unwrap();
+    let preparer = unit_server(directory.path());
+    let (winner_batch, _) = saved_batch(&preparer, LEDGER);
+    let loser_batch = if same_batch {
+        winner_batch.clone()
+    } else {
+        saved_batch(&preparer, LEDGER).0
+    };
+    let mut winning = through_post(
+        xml(created_one()).with_delivery(Delivery::SlowHeaders(Duration::from_secs(2))),
+    );
+    winning.extend(clean_read_back());
+    // The loser's POST is scripted too, so that a wrongly sent one is counted.
+    let losing = through_post(xml(created_one()));
+    let gate = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let first = racing_post(
+        directory.path().to_path_buf(),
+        winner_batch.batch_id.clone(),
+        winning,
+        gate.clone(),
+        || {},
+    );
+    let data_dir = directory.path().to_path_buf();
+    let second = racing_post(
+        directory.path().to_path_buf(),
+        loser_batch.batch_id.clone(),
+        losing,
+        gate,
+        move || {
+            let started = std::time::Instant::now();
+            while !(String::from_utf8_lossy(&journal_bytes(&data_dir))
+                .contains("master_dispatch_intent")
+                && ExclusiveAdmission::acquire(&data_dir).is_ok())
+            {
+                assert!(started.elapsed() < Duration::from_secs(20), "no intent");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        },
+    );
+    Race {
+        winner: first.join().unwrap(),
+        loser: second.join().unwrap(),
+        winner_batch,
+        loser_batch,
+        directory,
+    }
+}
+
+/// What both races must show, whichever batch the rival names: the winner sent
+/// the create once and was verified, the loser sent nothing and recorded
+/// nothing, and the one create is the only one on either wire.
+fn assert_one_create_and_a_refused_loser(race: &Race) {
+    let (winner, loser) = (&race.winner, &race.loser);
+    assert_eq!(winner.dialogs, 1);
+    assert_eq!(loser.dialogs, 1, "both passed the check before the dialog");
+    assert_eq!(winner.creates + loser.creates, 1, "one create on the wire");
+    assert_eq!(winner.creates, 1);
+    assert_eq!(loser.creates, 0);
+    assert_eq!(result(&winner.response)["state"], "posted_verified");
+    // The loser reached the lock after every queue read, and sent no POST.
+    assert_eq!(loser.wire, through_post(xml(created_one())).len() - 1);
+    // Its approval was taken and not spent: it lapses, and cannot be redeemed.
+    assert!(!loser.approval_held, "the loser's approval is still held");
+    assert!(!winner.approval_held);
+    assert_eq!(
+        record_types(race.directory.path())
+            .iter()
+            .filter(|kind| *kind == "master_dispatch_intent")
+            .count(),
+        1,
+        "one intent in the journal"
+    );
+}
+
+#[test]
+fn two_batches_of_one_name_through_the_check_together_send_one_create_and_the_other_is_held_off() {
+    let race = race_two_posts(false);
+    assert_one_create_and_a_refused_loser(&race);
+    assert_eq!(
+        error_code(&race.loser.response),
+        OVERLAP_CODE,
+        "{}",
+        race.loser.response
+    );
+    let answered = result(&race.loser.response);
+    assert_eq!(answered["attempt_recorded"], false);
+    assert_eq!(answered["dispatch"]["state"], "not_dispatched");
+    assert_eq!(answered["error"]["hold"], "held");
+    assert_eq!(
+        answered["error"]["blocking_batch_ids"],
+        json!([race.winner_batch.batch_id])
+    );
+    assert!(!sidecar_of(race.directory.path(), &race.loser_batch.batch_id).exists());
+    assert!(state_of(race.directory.path(), &race.loser_batch.batch_id)
+        .intent
+        .is_none());
+    assert!(state_of(race.directory.path(), &race.winner_batch.batch_id)
+        .intent
+        .is_some());
+}
+
+#[test]
+fn the_same_batch_through_the_check_together_twice_sends_one_create_and_the_other_reads_it_back() {
+    let race = race_two_posts(true);
+    assert_one_create_and_a_refused_loser(&race);
+    assert_eq!(
+        error_code(&race.loser.response),
+        "import_already_attempted",
+        "{}",
+        race.loser.response
+    );
+    let answered = result(&race.loser.response);
+    // The check under the lock: a send of this batch is on file, so it may
+    // have been sent, and the step is to read it back.
+    assert_eq!(answered["attempt_recorded"], true);
+    assert_eq!(answered["dispatch"]["state"], "reconciliation_required");
+    assert!(answered["error"].get("hold").is_none());
+    assert_eq!(answered["error"]["next_step"], NEXT_UNCONFIRMED);
+}
+
 /// The wire lock is taken before the intent is recorded and is never waited
 /// for: a busy one records nothing and sends nothing.
 #[tokio::test]
@@ -3457,6 +3864,75 @@ fn the_dispatch_state_a_cancellation_reads_is_the_masters_journal() {
     );
 }
 
+/// A post withdrawn by its caller is answered in the three cases a failure is:
+/// no send recorded, a send recorded, and a journal that cannot say. Only the
+/// second says the create may have been sent; the third does not claim it was
+/// not sent either, and gives the step that is true whichever it was.
+#[test]
+fn a_cancelled_post_is_answered_for_nothing_sent_a_send_recorded_and_not_known() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = unit_server(directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let cancelled = |args: &Value| {
+        let outcome = server
+            .cancelled_post_for_response("post_ledger_creates", args)
+            .unwrap();
+        outcome.payload["result"].clone()
+    };
+    // Nothing sent: no step, as a failure answer with no remedy of its own.
+    let nothing = cancelled(&args);
+    assert_eq!(nothing["attempt_recorded"], false);
+    assert_eq!(nothing["dispatch"]["state"], "not_dispatched");
+    assert_eq!(nothing["dispatch"]["resent"], false);
+    assert_eq!(nothing["error"]["code"], "request_cancelled");
+    assert_eq!(nothing["error"]["message"], CANCELLED_NOT_SENT_MESSAGE);
+    assert!(nothing["error"].get("next_step").is_none());
+    // A send recorded: the step that reads the book back.
+    record_intent_for_test(&server, &batch);
+    let recorded = cancelled(&args);
+    assert_eq!(recorded["attempt_recorded"], true);
+    assert_eq!(recorded["dispatch"]["state"], "reconciliation_required");
+    assert_eq!(recorded["dispatch"]["resent"], false);
+    assert_eq!(recorded["error"]["code"], "request_cancelled");
+    assert_eq!(
+        recorded["error"]["message"],
+        CANCELLED_SEND_RECORDED_MESSAGE
+    );
+    assert_eq!(recorded["error"]["next_step"], NEXT_UNCONFIRMED);
+    // Not known, for a journal that cannot be read and for a batch it lacks.
+    corrupt_journal(directory.path());
+    let unread = cancelled(&args);
+    let unknown_batch = {
+        let other = tempfile::tempdir().unwrap();
+        let other_server = unit_server(other.path());
+        saved_batch(&other_server, "Other Ledger");
+        other_server
+            .cancelled_post_for_response("post_ledger_creates", &args)
+            .unwrap()
+            .payload["result"]
+            .clone()
+    };
+    for not_known in [&unread, &unknown_batch] {
+        assert!(not_known["attempt_recorded"].is_null(), "{not_known}");
+        assert_eq!(not_known["dispatch"]["state"], "reconciliation_required");
+        assert_eq!(not_known["dispatch"]["resent"], false);
+        assert_eq!(not_known["error"]["code"], "request_cancelled");
+        assert_eq!(
+            not_known["error"]["message"],
+            CANCELLED_SEND_NOT_KNOWN_MESSAGE
+        );
+        assert_eq!(not_known["error"]["next_step"], NEXT_SEND_NOT_KNOWN);
+    }
+    // The three are three answers.
+    assert_ne!(CANCELLED_NOT_SENT_MESSAGE, CANCELLED_SEND_RECORDED_MESSAGE);
+    assert_ne!(
+        CANCELLED_SEND_RECORDED_MESSAGE,
+        CANCELLED_SEND_NOT_KNOWN_MESSAGE
+    );
+    assert_ne!(CANCELLED_NOT_SENT_MESSAGE, CANCELLED_SEND_NOT_KNOWN_MESSAGE);
+    assert_ne!(NEXT_UNCONFIRMED, NEXT_SEND_NOT_KNOWN);
+}
+
 /// `tools/call post_ledger_creates` runs the master post, not the voucher
 /// post: an unknown batch is answered by the master tool.
 #[tokio::test]
@@ -3878,6 +4354,10 @@ async fn an_answer_that_cannot_be_recorded_is_reported_as_answered_not_as_maybe_
     let (response, ()) = tokio::join!(post, hold_lock);
     let observed = sent(simulator);
     assert_eq!(create_count(&observed), 1, "one POST on the wire");
+    assert!(
+        observed.len() > post_at + 1,
+        "the read-back was attempted after the POST"
+    );
     let answered = result(&response);
     assert!(answered.get("error").is_none(), "{response}");
     assert_eq!(
@@ -4422,6 +4902,11 @@ async fn a_failed_first_append_does_not_hide_an_altered_count() {
     assert!(done.unused.is_empty(), "the fault was not reached");
     assert_eq!(done.posts, 1, "one POST on the wire");
     assert_eq!(
+        done.reads_after_post,
+        clean_read_back().len(),
+        "the book was read back after the answer was lost"
+    );
+    assert_eq!(
         answered["state"], "posted_into_existing_master",
         "{}",
         done.response
@@ -4446,6 +4931,11 @@ async fn a_loud_state_whose_verdict_is_not_recorded_keeps_its_alert_and_its_own_
     let answered = result(&done.response);
     assert!(done.unused.is_empty(), "a fault was not reached");
     assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        done.reads_after_post,
+        clean_read_back().len(),
+        "the book was read back after the answer was not recorded"
+    );
     assert_eq!(
         answered["state"], "posted_into_existing_master",
         "{}",
@@ -4802,6 +5292,11 @@ async fn an_answer_written_but_reported_failed_is_not_appended_a_second_time() {
     let answered = result(&done.response);
     assert!(done.unused.is_empty(), "the fault was not reached");
     assert_eq!(done.posts, 1, "one POST on the wire");
+    assert_eq!(
+        done.reads_after_post,
+        clean_read_back().len(),
+        "the book was read back after the answer was reported failed"
+    );
     assert_eq!(answered["state"], "posted_verified", "{}", done.response);
     assert_eq!(answered["answer_recorded"], true);
     assert_eq!(answered["verification"]["verdict_recorded"], true);
@@ -4830,6 +5325,10 @@ async fn an_unavailable_read_back_after_a_failed_first_append_still_records_the_
     let answered = result(&done.response);
     assert!(done.unused.is_empty(), "the fault was not reached");
     assert_eq!(done.posts, 1, "one POST on the wire");
+    assert!(
+        done.reads_after_post > 0,
+        "the read-back was attempted after the answer was lost"
+    );
     assert_eq!(
         answered["state"], "masters_after_post_unconfirmed",
         "{}",
@@ -4932,6 +5431,7 @@ async fn a_journal_that_cannot_be_read_after_the_answer_is_answered_from_what_ta
         let answered = result(&done.response);
         assert!(done.unused.is_empty(), "a fault was not reached");
         assert_eq!(done.posts, 1, "one POST on the wire");
+        assert_eq!(done.reads_after_post, 0, "the book was not read back");
         assert!(answered.get("error").is_none(), "{}", done.response);
         assert_eq!(answered["state"], "posted_unverified", "{}", done.response);
         assert_eq!(answered["answer_recorded"], recorded);
@@ -5045,6 +5545,9 @@ fn the_fault_points_are_under_bare_cfg_test() {
         "#[cfg(test)]\n    if test_fault_fires(record.record_type()) {",
         "#[cfg(test)]\n    let lost_after_write =",
         "#[cfg(test)]\n    if lost_after_write && appended.is_ok() {",
+        "#[cfg(test)]\n    if test_fault_fires(\"master_dispatch_intent\") {",
+        "#[cfg(test)]\n    let intent_lost_after_write = test_fault_fires(\"master_dispatch_intent_lost_after_write\");",
+        "#[cfg(test)]\n    if intent_lost_after_write && recorded.is_ok() {",
         "#[cfg(test)]\npub(super) fn test_fault_fires(",
         "#[cfg(test)]\n    fn record_type(&self)",
     ] {

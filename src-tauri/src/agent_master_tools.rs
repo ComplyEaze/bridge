@@ -87,6 +87,17 @@ const MAY_HAVE_BEEN_SENT_NOTE: &str = "This batch may have been sent to Tally on
 /// What a caller is told when a batch was sent and Tally's answer is recorded.
 const ALREADY_SENT_NOTE: &str = "This batch was sent to Tally once and its answer is recorded. Nothing was sent now and nothing will be sent again from this batch. This is what ComplyEaze Bridge recorded; the ledger is NOT verified.";
 
+/// What a post withdrawn by its caller is told, by what the journal showed of
+/// its batch. Nothing was sent: the batch can be posted again.
+const CANCELLED_NOT_SENT_MESSAGE: &str =
+    "The request was cancelled. No send is recorded for this prepared ledger.";
+/// A send is recorded: the create may have reached Tally, and a later call reads
+/// the book back and sends nothing.
+const CANCELLED_SEND_RECORDED_MESSAGE: &str = "The request was cancelled after a send of this batch was recorded. The create may have been sent to Tally: never send this batch again.";
+/// The journal could not be read, or does not hold the batch, so whether a send
+/// was recorded is not known.
+const CANCELLED_SEND_NOT_KNOWN_MESSAGE: &str = "The request was cancelled, and whether a send of this batch was recorded is not known: the journal could not be read just now, or holds no such batch. Check the company's ledgers in Tally.";
+
 /// The refusal code of a [`MasterNameError`].
 fn master_name_code(error: MasterNameError) -> &'static str {
     match error {
@@ -438,15 +449,23 @@ impl Server {
         let mut evidence = empty_evidence();
         evidence.state = "partial";
         evidence.reason_code = Some("request_cancelled".into());
+        // The three cases a failure answer has: nothing sent, a send recorded,
+        // and a journal that could not be read, which does not know.
+        let mut error = json!({"code": "request_cancelled", "message": match attempted {
+            Some(false) => CANCELLED_NOT_SENT_MESSAGE,
+            Some(true) => CANCELLED_SEND_RECORDED_MESSAGE,
+            None => CANCELLED_SEND_NOT_KNOWN_MESSAGE,
+        }});
+        match attempted {
+            Some(false) => {}
+            Some(true) => error["next_step"] = json!(NEXT_UNCONFIRMED),
+            None => error["next_step"] = json!(NEXT_SEND_NOT_KNOWN),
+        }
         Ok(ToolOutcome {
             payload: json!({"result":{
                 "batch_id":batch_id,"attempt_recorded":attempted,
                 "dispatch":{"state":if attempted == Some(false) { "not_dispatched" } else { "reconciliation_required" },"resent":false},
-                "error":{"code":"request_cancelled","message":if attempted == Some(false) {
-                    "The request was cancelled. No send is recorded for this prepared ledger."
-                } else {
-                    "The request was cancelled with an uncertain outcome. The batch may have been sent: never send it again."
-                }}
+                "error": error
             }}),
             evidence,
             company_guid,

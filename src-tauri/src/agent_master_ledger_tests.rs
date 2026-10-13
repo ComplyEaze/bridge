@@ -1120,6 +1120,85 @@ fn confirmed_absent_stops_blocking_a_new_batch_of_the_same_ledger() {
     assert!(read(&journal_text(&[records, again].concat())).is_ok());
 }
 
+/// The two loud terminal verdicts settle a batch as the quiet ones do, so neither
+/// holds its name against a new intent. That is right, and it is the journal's
+/// documented rule (see the module notes): the person is told to check Tally for
+/// both, and what stops a second Create of a name the book now holds is the
+/// absence check against the book, made in the send's own queue, which refuses a
+/// name that exists as `master_name_taken`. Holding would not be safer: a name
+/// held for good by a loud state could never be released by any later call,
+/// because a terminal verdict is the batch's last. Whether a ledger Tally
+/// reported as altered should keep its name held until a person has looked is a
+/// question for the owner, and is not what this pins. Verdicts that leave the
+/// outcome open (`reconciliation_required`, `masters_after_post_unconfirmed`)
+/// still hold, so the test fails if a loud state were mistaken for an open one,
+/// and also if an open one were mistaken for a settled one.
+#[test]
+fn a_batch_that_ended_in_a_loud_state_does_not_hold_its_name_but_an_open_one_does() {
+    use MasterVerdictState::{
+        MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed, PostedIntoExistingMaster,
+        ReconciliationRequired,
+    };
+    for (state, holds) in [
+        (PostedIntoExistingMaster, false),
+        (MasterWriteLocatedElsewhere, false),
+        (ReconciliationRequired, true),
+        (MastersAfterPostUnconfirmed, true),
+    ] {
+        // As a journal read: the same name under a new batch id, by case and by a
+        // separator, is admitted or refused with the open-dispatch overlap.
+        let (first, mut records) = dispatched_batch("Synthetic One");
+        records.push(MasterRecord::Verdict(verdict_for(&first, state)));
+        for name in ["Synthetic One", "SYNTHETIC-ONE"] {
+            let (second, again) = dispatched_batch(name);
+            let text = journal_text(&[records.clone(), again].concat());
+            match read(&text) {
+                Ok(journal) => {
+                    assert!(!holds, "{state:?} should hold {name}");
+                    assert!(journal.state(&first.batch_id).unwrap().is_settled());
+                    assert!(journal.open_dispatch_blockers(&second).is_empty());
+                }
+                Err(error) => {
+                    assert!(holds, "{state:?} should not hold {name}");
+                    assert_eq!(error, MasterLedgerError::OpenDispatchOverlaps);
+                }
+            }
+        }
+        // As the append the post makes under the lock: the new batch's intent is
+        // written, or refused with the same error and nothing written.
+        let directory = tempfile::tempdir().unwrap();
+        let lock = lock();
+        for record in &records {
+            put(directory.path(), &lock, record.clone()).unwrap();
+        }
+        let (second, again) = dispatched_batch("Synthetic One");
+        put(directory.path(), &lock, again[0].clone()).unwrap();
+        let before = std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap();
+        let journal = read_journal(directory.path()).unwrap();
+        assert_eq!(
+            journal.open_dispatch_blockers(&second).is_empty(),
+            !holds,
+            "{state:?}"
+        );
+        let appended = put(directory.path(), &lock, again[1].clone());
+        if holds {
+            assert_eq!(
+                appended.unwrap_err(),
+                MasterLedgerError::OpenDispatchOverlaps
+            );
+            assert_eq!(
+                std::fs::read(directory.path().join(JOURNAL_FILE)).unwrap(),
+                before
+            );
+        } else {
+            appended.unwrap();
+            assert!(read_journal(directory.path())
+                .unwrap()
+                .dispatched(&second.batch_id));
+        }
+    }
+}
+
 #[test]
 fn a_batch_has_one_response() {
     let batch = batch(&batch_id());

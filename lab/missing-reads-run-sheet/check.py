@@ -6,7 +6,9 @@ printed line down, go on. Exit 3 = STOP: a bound, a completeness rule or an iden
 nothing more. Exit 2 = the check could not run (any error at all, a missing file, a missing argument): never a pass.
 One line is printed. `check.py same A B`: 0 when the two files are byte-identical, 1 when not, 2 on an error.
 --census FILE: the census answer of the same day (its row count is the voucher count the read may hold).
---company FILE: this book's book-extent answer (step a02); its GUID must prefix every voucher, stock item and stock group."""
+--company FILE: this book's book-extent answer (step a02 or b02); its GUID must prefix the GUID of every voucher, stock item,
+stock group and tax unit.
+--reference FILE: the answer of step a07; the cap of step a08 is twice its size."""
 import re, sys
 from xml.etree import ElementTree as ET
 
@@ -14,9 +16,10 @@ BOOK = {"a01": "BRIDGE SHAPE LAB", "a02": "BRIDGE SHAPE LAB", "a12": "BRIDGE SHA
         "b01": "BRIDGE CORPUS FOREX", "b02": "BRIDGE CORPUS FOREX", "b05": "BRIDGE CORPUS FOREX"}
 CAPS = {"a01": 8000, "b01": 8000, "a02": 6000, "a12": 6000, "b02": 6000, "b05": 6000, "a04": 24000, "a06": 24000,
         "a09": 60000, "a10": 20000, "a11": 60000, "a13": 40000, "b03": 40000, "b04": 60000}
-PER_VOUCHER = {"a05": (80000, 240000), "a07": (80000, 240000), "a08": (160000, 320000)}
+PER_VOUCHER = {"a05": (80000, 240000), "a07": (80000, 240000)}
 NEEDS_CENSUS = {"a05", "a07", "a08"}
-NEEDS_COMPANY = {"a05", "a07", "a08", "a09", "a10"}
+NEEDS_COMPANY = {"a04", "a05", "a06", "a07", "a08", "a09", "a10", "a11", "b04"}
+NEEDS_REFERENCE = {"a08"}                    # its cap is twice the measured answer of step a07
 
 class Stop(Exception): pass
 class Err(Exception): pass
@@ -57,6 +60,13 @@ def common(step, path):
     collection(root)
     return data, root
 
+def prefix_check(rs, guid, what):
+    """Every row must carry a GUID that starts with this book's GUID: a row of another book, or with no GUID, is a STOP."""
+    for r in rs:
+        g = txt(r, "GUID")
+        if not g: raise Stop(f"a {what} row has no GUID: its book cannot be proved")
+        if not g.startswith(guid): raise Stop(f"a {what} GUID does not start with this book's GUID: wrong company")
+
 def census_rows(path):
     _, root = common("census", path)
     return rows(root, "VOUCHER")
@@ -87,14 +97,17 @@ def run(argv):
     if step in PER_VOUCHER:
         per, ceiling = PER_VOUCHER[step]
         cap = min(n * per, ceiling)
+    if step in NEEDS_REFERENCE:
+        rf = opt("--reference")
+        if not rf: raise Err("needs --reference (the answer of step a07)")
+        cap = min(2 * len(open(rf, "rb").read()), 240000)
     if cap is None: raise Err(f"unknown step {step}")
     if size > cap: raise Stop(f"{size} B is above the cap {cap} B")
     notes.append(f"{size} B (cap {cap})")
     guid = None
-    if step in NEEDS_COMPANY:
-        cf = opt("--company")
-        if not cf: raise Err("needs --company (this book's book-extent answer)")
-        guid = company_guid(cf)
+    cf = opt("--company")
+    if step in NEEDS_COMPANY and not cf: raise Err("needs --company (this book's book-extent answer)")
+    if cf: guid = company_guid(cf)
 
     if step in ("a01", "b01"):
         rs = rows(root, "COMPANY")
@@ -116,13 +129,13 @@ def run(argv):
         notes.append(f"{len(vr)} vouchers (EXPECT {want})")
         if len(vr) > 8: raise Stop("; ".join(notes) + " - more than 8 vouchers on the day: do not send the data read")
         if len(vr) < 1: raise Stop("; ".join(notes) + " - no voucher on the day: do not send the data read, tell us")
+        prefix_check(vr, guid, "voucher")
         if len(vr) != want: bad += 1
     elif step in ("a05", "a07", "a08"):
         vs = rows(root, "VOUCHER")
         notes.append(f"{len(vs)} vouchers (census {n})")
         if len(vs) != n: bad += 1; notes.append("count differs from the census")
-        if any(not txt(v, "GUID").startswith(guid) for v in vs):
-            raise Stop("; ".join(notes) + " - a voucher GUID does not start with this book's GUID: wrong company")
+        prefix_check(vs, guid, "voucher")
         target = "SHAPELAB-C9-costcentre" if step == "a05" else "SHAPELAB-B6-two-batches"
         hit = [v for v in vs if txt(v, "NARRATION") == target]
         if len(hit) != 1:
@@ -155,8 +168,7 @@ def run(argv):
         notes.append(f"{len(rs)} rows; {coded} with an HSN code; {gst} with GST details content")
         want = 11 if step == "a09" else 3
         if len(rs) != want: bad += 1; notes.append(f"EXPECT {want} rows (earlier capture of this book)")
-        if any(not (txt(r, "GUID") or "").startswith(guid) for r in rs if txt(r, "GUID")):
-            raise Stop("; ".join(notes) + " - a GUID does not start with this book's GUID: wrong company")
+        prefix_check(rs, guid, "stock item" if step == "a09" else "stock group")
         if step == "a10":
             marks = {txt(r, "BRIDGECOMPANYGUID") for r in rs}
             if marks != {guid}: raise Stop("; ".join(notes) + f" - BRIDGECOMPANYGUID {sorted(marks)} is not this book's GUID")
@@ -164,14 +176,20 @@ def run(argv):
         rs = rows(root, "TAXUNIT")
         marker = collection(root).get("MSTDEPTYPE")
         notes.append(f"{len(rs)} tax units; type marker {marker}")
-        if not rs and not marker:
-            bad += 1; notes.append("an empty answer without the type marker is not read as none: tell us")
+        prefix_check(rs, guid, "tax unit")
+        if not rs:
+            bad += 1; notes.append("EXPECT at least the default tax unit (every earlier answer had one); an empty answer is not read as none")
     elif step in ("a13", "b03"):
         cs = rows(root, "CURRENCY")
         names = [name_of(c) for c in cs]
         rate_tags = sorted({e.tag for c in cs for e in c.iter() if "RATE" in e.tag})
         notes.append(f"{len(cs)} currencies {names}; rate elements {rate_tags}")
-        if len(cs) < 2 or "$" not in names: bad += 1; notes.append("EXPECT the base and the $ currency master")
+        if guid:
+            gs = [txt(c, "GUID") for c in cs if txt(c, "GUID")]
+            if any(not g.startswith(guid) for g in gs): raise Stop("; ".join(notes) + " - a currency GUID does not start with this book's GUID: wrong company")
+            notes.append(f"{len(gs)} of {len(cs)} rows carry a GUID")
+        if len(cs) < 2: bad += 1; notes.append("EXPECT the base and one foreign currency master")
+        if step == "b03" and "$" not in names: bad += 1; notes.append("EXPECT the $ master on this book")
     return (1 if bad else 0), f"{step}: " + "; ".join(notes)
 
 def main(argv):

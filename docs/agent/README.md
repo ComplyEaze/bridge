@@ -1863,24 +1863,43 @@ import-admission lock for a moment, so a build or post at the same time can be
 refused as lock-busy, and it can be refused by theirs; nothing waits, so nothing
 deadlocks.
 
-- **Whole statements only.** The parse records the statement's own first and
-  last row dates in an optional `window` of the proposals file (`first_row_date`,
-  `last_row_date`, `whole_statement`); the schema string is unchanged, and an
-  older build still reads such a file. A file with no `window`, or a
-  `whole_statement` of `false`, is `not_established` (`window_not_recorded`,
-  `window_narrower_than_statement`), answered from the file once the company is
-  verified. A narrowed window would need the running balance at its edges, which
-  the parse result deliberately never returns.
+- **A whole statement, or whole calendar months of it.** The parse records the
+  statement's own first and last row dates in an optional `window` of the
+  proposals file (`first_row_date`, `last_row_date`, `whole_statement`), and in
+  `window.tie_out` where the file can be compared with the book: either
+  `established`, with the dates and the statement's balance at the start of the
+  first and the end of the last (`first_date`, `last_date`, `opening_balance`,
+  `closing_balance`, basis `statement_rows_by_transaction_date`), or
+  `not_established` with a reason. The schema string is unchanged, and an older
+  build still reads such a file. For the whole statement the dates are its first
+  and last row dates and the balances are the ones the caller supplied. For a
+  `from`/`to` window that leaves rows out they are the window's own dates, which
+  must be whole calendar months (from the 1st to a month's last day,
+  `window_not_whole_calendar_months`) within the statement's rows
+  (`window_beyond_statement_rows`); the opening is the supplied opening plus the
+  net of the rows dated before the window, and the closing the supplied closing
+  less the net of the rows dated after it. These are sums by transaction date,
+  so the order the bank printed the rows in cannot move them, and every row's
+  amount is proved by the running-balance check before they are taken. The
+  tie-out checks the month rule again when it reads the file. For a file that
+  carries `tie_out`, when every row in the window has a voucher in the file, the
+  vouchers must move the bank ledger by exactly the closing less the opening, or
+  the file is refused (`proposals_file_invalid`); an older whole-statement file
+  is not checked this way. A file with no `window` is `not_established`
+  (`window_not_recorded`), and so is a narrowed file written before the parse
+  recorded `tie_out` (`window_narrower_than_statement`), answered from the file
+  once the company is verified.
 - **The file is not bound to a company.** It names a bank ledger, not the
   company it was parsed for; pass the company the statement belongs to.
-- **Three reads of the ledger list**, none of vouchers: the position at the first
-  row's date, at the day after the last row's date, and at the first date again.
-  A change dated before the statement, or an edit to the ledger itself (its
+- **Three reads of the ledger list**, none of vouchers: the position at the
+  window's first date, at the day after its last date, and at the first date
+  again. A change dated before the window, or an edit to the ledger itself (its
   opening balance, name or removal), made between the first and third read, is
-  `book_changed_during_read`; a voucher dated inside the statement and posted
+  `book_changed_during_read`; a voucher dated inside the window and posted
   during the read moves only the end figure and is not caught. No ledger is read
   when the file alone answers (`window_not_recorded`,
-  `window_narrower_than_statement`) or the statement starts before the company's
+  `window_narrower_than_statement`, `window_not_whole_calendar_months`,
+  `window_beyond_statement_rows`) or the window starts before the company's
   books begin (`window_precedes_books_from`).
 - **Three figures**, all in the statement's sign (book less statement: positive
   means the book shows more money in the bank), with the two dates:
@@ -1893,8 +1912,20 @@ deadlocks.
   check a build makes before it writes a file); `after_post` is unaffected.
 - **What the result reveals.** The book's own balances are not returned, but a
   gap plus the statement balance the caller supplied gives the book's balance,
-  so they are derivable. The result also carries the company block, the stage
-  and the reading.
+  so they are derivable. For a window of whole calendar months the reverse also
+  holds: the book's figure (which `ledger_movement` reads) less a gap gives the
+  statement's balance at a month edge, and `change_in_window` with the book's
+  movement gives the statement's net over those months. That is why a narrowed
+  window must be whole calendar months within the statement's rows: what can be
+  learnt this way is the statement's balance at month ends and its net per
+  month, never a part of a month except the part-months at the statement's own
+  start and end, whose net a month edge's balance gives together with the
+  opening and closing supplied to the parse. A month in which every other row's amount is
+  already known still gives that row's amount: a month of one row, or one row
+  beside open cash lines, whose amounts `cash_questions` returns. The parse
+  result already ties such a row to its party and direction through
+  `rows_in_window` and `counterparties`. The result also carries the company block, the
+  stage, the window's two dates (`first_date`, `last_date`) and the reading.
 - **The sign is a type** (`BankSide`): Tally holds a debit balance as a negative
   number, a statement prints money in the account as positive, and
   `BankSide::from_book` is the only conversion.
@@ -1909,7 +1940,10 @@ deadlocks.
   synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
   recorded, in the pull request: the import summary was not captured and no raw
   answers are kept. A statement whose last day is the end of a financial year is
-  still to be run.
+  still to be run, and so is a window of whole calendar months: the book's
+  position read at a month's first day and the day after its last has been
+  measured on some ledgers and dates (protocol reference section 5.5), not on a
+  bank ledger in the middle of its year or after its last voucher.
 
 ## Approved voucher posting
 
@@ -2485,13 +2519,13 @@ Per tool:
     the commitment. None of the individual master, balance or group requests
     is reported on its own.
 - `statement_tie_out` (`src-tauri/src/agent_statement_tie_out.rs`): the company
-  read, and then, when the file records no window or a narrower one, nothing
-  more (evidence `partial`, with that reason). Otherwise:
+  read, and then, when the file records no window or one it cannot compare,
+  nothing more (evidence `partial`, with that reason). Otherwise:
   1. the company read;
-  2. a runtime ledger read (currency masters, ledger export) at the first row's
-     date;
-  3. the same at the day after the last row's date;
-  4. the same again at the first row's date.
+  2. a runtime ledger read (currency masters, ledger export) at the window's
+     first date;
+  3. the same at the day after its last date;
+  4. the same again at its first date.
 
   Each ledger read carries its own deadline and size limits, as for
   `ledger_movement`; none reads vouchers. The result is `partial` when any

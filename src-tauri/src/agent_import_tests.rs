@@ -3183,7 +3183,7 @@ fn refusal_reason_states_the_current_voucher_limit() {
     for code in ["import_review_layout_text", "import_review_format_text"] {
         assert_eq!(
             native_post_refusal_reason(code, 1),
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)",
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name), or a narration too long for one line holds a run of four or more dashes or a number in brackets, which the dialog keeps for its own dashed line and part labels",
             "{code}"
         );
     }

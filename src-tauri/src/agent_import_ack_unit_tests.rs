@@ -154,8 +154,8 @@ fn each_review_cap_refuses_on_its_own() {
 
 #[test]
 fn a_review_too_long_to_show_is_refused_not_truncated() {
-    // Nine entries fit under the narration's heading (#1535); the approval
-    // window fits fewer, so every voucher it posted can be reviewed.
+    // Nine entries fit under the narration's heading (#1535); forty do not,
+    // and the review is refused whole.
     assert!(review_preview(BATCH, MARKER, "Books", &doubt(), &row(9, "Paid")).is_ok());
     assert_eq!(
         review_preview(BATCH, MARKER, "Books", &doubt(), &row(40, "Paid")),

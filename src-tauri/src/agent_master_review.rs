@@ -74,8 +74,8 @@ pub(super) fn master_review_text(
 /// `mask_parties`: the dialog shows the name whole, a result never does.
 ///
 /// Refused exactly when the dialog's own text is: the fit is judged on the
-/// whole name, which is longer than its mask, so a batch is never prepared
-/// under masking that the dialog could not then show.
+/// text with the whole name, never on the masked text, so a batch is never
+/// prepared under masking that the dialog could not then show.
 pub(super) fn masked_review_text(
     item: &LedgerCreateItem,
     company: &VerifiedCompanyIdentity,

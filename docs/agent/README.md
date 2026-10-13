@@ -1896,7 +1896,8 @@ be shown (under `mask_parties` the ledger's name in it is masked; the dialog
 shows it whole); it writes nothing to Tally. `post_ledger_creates` takes that
 `batch_id`, asks the local user in a native dialog, and sends the create once;
 its approval, pending and approved answers behave as `post_import`'s do. A batch
-already sent is never sent again: a later call only reports what was recorded.
+already sent is never sent again: a later call reads the book back, or reports
+what was recorded for a batch already settled.
 With the setting off or posting off, neither tool is listed and a call to either
 is refused `master_writes_disabled`. A name that differs from an existing one
 only in case, spaces or symbols is refused too, because TallyPrime can take such

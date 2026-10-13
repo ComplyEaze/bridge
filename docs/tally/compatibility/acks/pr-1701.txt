@@ -1,0 +1,8 @@
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+src-tauri/Cargo.lock
+src-tauri/crates/tally-protocol-simulator/Cargo.toml
+src-tauri/crates/tally-protocol-simulator/src/fixtures.rs
+src-tauri/crates/tally-protocol-simulator/src/server.rs
+src-tauri/crates/tally-protocol-simulator/tests/protocol_simulator.rs
+tools/Cargo.lock
+reviewer: lamemustafa

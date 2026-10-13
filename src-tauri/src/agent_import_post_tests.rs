@@ -3179,7 +3179,7 @@ fn voucher_block(preview: &str) -> Vec<&str> {
 
 /// A batch of at most ten lists each voucher on one line (#1063): its type,
 /// date, value, the ledger a statement row names (a Receipt's first credit,
-/// any other type's first debit, "+N" for the rest of that side) and its
+/// any other type's first debit, "+N more" for the rest of that side) and its
 /// narration as posted, in the batch file's order.
 #[test]
 fn a_small_batch_lists_each_voucher_on_one_line() {
@@ -3189,8 +3189,8 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
         voucher_block(&preview),
         [
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
-            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
             "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
             "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
@@ -3213,8 +3213,8 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
     assert_eq!(
         voucher_block(&preview)[2..4],
         [
-            "Journal 20260901  12.5  \"Expense\" +1  \"Synthetic test only\"",
-            "Receipt 20260902  40  \"Party C\" +1  \"Synthetic test only\"",
+            "Journal 20260901  12.5  Dr \"Expense\" +1 more  Cr \"Cash\"  \"Synthetic test only\"",
+            "Receipt 20260902  40  \"Party C\" +1 more  \"Synthetic test only\"",
         ],
         "{preview}"
     );
@@ -3241,11 +3241,83 @@ fn a_voucher_line_shows_its_narration_as_posted_and_marks_a_cut() {
     assert_eq!(
         voucher_block(&preview)[2..],
         [
-            "Journal 20260901  12.5  \"Expense\"  \"जुलाई का किराया ₹500\"",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"जुलाई का किराया ₹500\"",
             "Receipt 20260902  40  \"Party A\"  \"NEFT CR 000123456789 SYNTHETIC TRADERS R\"… (+17 characters)",
             "Payment 20260902  15  \"Party B\"  \"जुलाई महीने का किराया बिजली बिल भुगतान क\"… (+22 characters)",
             "Contra 20260902  5  \"Bank\"  (none)",
         ],
+        "{preview}"
+    );
+}
+
+/// A Journal's line names its first debit and first credit ledger, each with
+/// "+N more" for the rest of its side, so the person sees what each Journal
+/// credits; its narration is cut at 20 characters, marked. A Journal line too
+/// wide at every cut down to 10 characters leaves the totals and the reason
+/// line instead, never a cut ledger name.
+#[test]
+fn a_journal_line_names_a_ledger_on_each_side() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Expense","amount":"12.50","side":"Dr"},
+        {"ledger":"Cash","amount":"10.00","side":"Cr"},
+        {"ledger":"Rent","amount":"2.50","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[0].narration = Some("Reclass of July rent to the right head".into());
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert_eq!(
+        voucher_block(&preview)[2],
+        "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\" +1 more  \"Reclass of July rent\"… (+18 characters)",
+        "{preview}"
+    );
+    // The Payment, Receipt and Contra lines still name one side.
+    assert!(voucher_block(&preview)[3].starts_with("Receipt 20260902  40  \"Party A\"  "));
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":format!("Expense {}", "E".repeat(40)),"amount":"12.50","side":"Dr"},
+        {"ledger":format!("Cash {}", "C".repeat(40)),"amount":"12.50","side":"Cr"}]))
+    .unwrap();
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(preview.contains(VOUCHER_LINES_DO_NOT_FIT), "{preview}");
+    assert!(
+        !preview
+            .lines()
+            .any(|shown| shown.starts_with("Journal 2026")),
+        "{preview}"
+    );
+}
+
+/// A Journal whose line would be too wide at the usual 20-character cut
+/// cuts its narration shorter, down to 10 characters, until the line fits,
+/// so the voucher lines stay; one that fits only below 10 leaves the totals.
+#[test]
+fn a_journal_line_cuts_its_narration_shorter_to_fit() {
+    let (mut line, endpoint) = batch_of_every_type();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Depreciation","amount":"300.00","side":"Dr"},
+        {"ledger":"Furniture","amount":"200.00","side":"Cr"},
+        {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[0].narration = Some("Depreciation for September".into());
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let journal = "Journal 20260901  300  Dr \"Depreciation\"  Cr \"Furniture\" +1 more  \"Depreciation f\"… (+12 characters)";
+    assert_eq!(journal.chars().count(), BATCH_REVIEW_MAX_LINE_CHARS);
+    assert_eq!(voucher_block(&preview)[2], journal, "{preview}");
+    // A debit ledger of seventeen characters fits only at a 9-character cut.
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Depreciation 2026","amount":"300.00","side":"Dr"},
+        {"ledger":"Furniture","amount":"200.00","side":"Cr"},
+        {"ledger":"Computers","amount":"100.00","side":"Cr"}]))
+    .unwrap();
+    refresh_batch_sha256(&mut line);
+    let preview = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(preview.contains(VOUCHER_LINES_DO_NOT_FIT), "{preview}");
+    assert!(
+        !preview
+            .lines()
+            .any(|shown| shown.starts_with("Journal 2026")),
         "{preview}"
     );
 }
@@ -3370,7 +3442,7 @@ fn ten_vouchers_are_listed_and_eleven_are_summarised() {
         block[..2],
         [
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
         ]
     );
     let mut eleven = line.clone();
@@ -4766,8 +4838,8 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
             "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
-            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
             "Receipt 20260902  40  \"Party A\"  \"Synthetic test only\"",
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
             "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
@@ -5259,8 +5331,8 @@ fn a_batch_text_with_a_line_break_name_is_shown_whole() {
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
             "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
-            "Each line ends with its narration, quoted exactly as it will be posted.",
-            "Journal 20260901  12.5  \"Expense\"  \"Synthetic test only\"",
+            "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
+            "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
             r#"Receipt 20260902  40  Line break  "Party A\r\n"  "Synthetic test only""#,
             "Payment 20260902  15  \"Party B\"  \"Synthetic test only\"",
             "Contra 20260902  5  \"Bank\"  \"Synthetic test only\"",
@@ -5431,4 +5503,70 @@ fn a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer
         agent_review_preview(&voucher(5, true), &endpoint).unwrap_err(),
         "import_review_too_large"
     );
+}
+
+/// #1573: a post refusal that sent nothing carries the general next step of its
+/// code; one after a send, or after a send that could not be ruled out, carries
+/// none, so no refusal after a send is told what to try next. The codes are
+/// those a post raises whose step no caller was shown before.
+#[test]
+fn only_a_post_refusal_that_sent_nothing_carries_its_codes_next_step() {
+    const RAISED_IN_A_POST: [&str; 7] = [
+        "import_post_window_not_bounded",
+        "voucher_entry_invalid",
+        "voucher_type_shapes_mixed",
+        "empty_book_first_import",
+        "part_census_mismatch",
+        "voucher_window_book_too_large",
+        "tally_date_overflow",
+    ];
+    let nothing_sent = NothingSent::observed(Some(false)).unwrap();
+    for code in RAISED_IN_A_POST {
+        let step = crate::agent::refusal_remediation(code)
+            .unwrap_or_else(|| panic!("{code} has no next step"));
+        let mut payload = reconciliation_failure_payload("batch", Some(false), None, code);
+        attach_next_step(&mut payload, None, nothing_sent);
+        assert_eq!(
+            payload["result"]["error"]["next_step"],
+            json!(step),
+            "{code}"
+        );
+        for attempted in [Some(true), None] {
+            assert!(NothingSent::observed(attempted).is_none(), "{attempted:?}");
+            let payload = reconciliation_failure_payload("batch", attempted, None, code);
+            assert!(
+                payload["result"]["error"].get("next_step").is_none(),
+                "{code} {attempted:?}"
+            );
+        }
+    }
+    // A cause's step when the code has none.
+    let mut payload = reconciliation_failure_payload(
+        "batch",
+        Some(false),
+        None,
+        "voucher_window_part_not_admitted",
+    );
+    attach_next_step(&mut payload, Some("part_census_mismatch"), nothing_sent);
+    assert_eq!(
+        payload["result"]["error"]["next_step"],
+        json!(crate::agent::refusal_remediation("part_census_mismatch").unwrap())
+    );
+    // A step the post set itself is kept, and a refused saved text keeps its
+    // message as its only step.
+    for (code, own) in [
+        ("tally_endpoint_busy", json!(BUSY_BEFORE_ATTEMPT_NEXT_STEP)),
+        (
+            "import_txn_already_posted",
+            json!(TXN_ALREADY_POSTED_NEXT_STEP),
+        ),
+    ] {
+        let mut payload = reconciliation_failure_payload("batch", Some(false), None, code);
+        attach_next_step(&mut payload, None, nothing_sent);
+        assert_eq!(payload["result"]["error"]["next_step"], own, "{code}");
+    }
+    let mut payload =
+        reconciliation_failure_payload("batch", Some(false), None, "voucher_text_invalid");
+    attach_next_step(&mut payload, None, nothing_sent);
+    assert!(payload["result"]["error"].get("next_step").is_none());
 }

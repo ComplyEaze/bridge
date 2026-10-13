@@ -1,4 +1,5 @@
 import React from "react";
+import { coreReadRefusalTitle } from "./core-read-refusals";
 import { formatIdentifier } from "./display-format";
 
 type CapabilityEvidence = {
@@ -81,7 +82,8 @@ function formatCapabilityReason(reason?: string): string {
     return "No reason code was returned.";
   }
 
-  return CAPABILITY_REASON_LABELS[reason] || `Reason: ${formatIdentifier(reason)}.`;
+  const refusal = coreReadRefusalTitle(reason);
+  return CAPABILITY_REASON_LABELS[reason] || (refusal ? `The core read stopped: ${refusal}.` : `Reason: ${formatIdentifier(reason)}.`);
 }
 
 function CapabilityBadge({ evidence }: { evidence?: CapabilityEvidence }) {

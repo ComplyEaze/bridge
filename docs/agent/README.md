@@ -565,7 +565,7 @@ Suspense A/c with a credit balance was not.
 It is **not compared with any other report**: `checks` says `list_complete` and
 `amounts_against_trial_balance` are `not_checked`, so a ledger Tally did not list is not
 shown to be absent, and a listed amount is not shown to equal the ledger's closing
-balance in the trial balance (on the one book measured both did). An empty list is
+balance in the trial balance (on the first book measured both did; on two more books the one ledger listed on each did too). An empty list is
 returned with `state` `not_established` and `reason`
 `negative_ledgers_empty_answer_is_not_a_finding`: Tally's empty answer cannot be told from
 a report that was not rendered, so it never says that no ledger is negative. A non-empty
@@ -587,7 +587,11 @@ measured (a debit as a negative debit amount, a credit as a positive credit amou
 reads (`native_negative_ledgers_changed`), or the book's extent differed before and after the read (`native_ledger_extent_changed`). A window the read could not build a period for is `negative_ledgers_period_not_honoured`. The report has no
 size check and its cost on a large book is not known; one call is one paired read (two requests), never retried. Measured on one
 synthetic TallyPrime 7.1 Silver book (the captures are in the protocol crate's fixtures);
-this tool has not yet been run against Tally.
+this tool has not yet been run against Tally. Two further synthetic books were read the same way for one whole financial year each,
+with Tally's trial balance of the same year read beside the report: each listed one ledger (an expense ledger and a bank ledger, each
+with a credit balance), its amount equalled the ledger's closing balance in the trial balance, and no other ledger of either
+trial balance read on the opposite side to its group. No empty answer, no list of many ledgers, no other group and no shorter
+period was seen on those books.
 
 ### Company settings and currency symbol (`company_features`)
 

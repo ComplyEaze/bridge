@@ -121,6 +121,10 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- Under `mask_parties`, `ledger_masters` with `fields=compliance` now masks the flat `address` of a ledger
+  (and, from the same change, every mailing address line) like a party name: before, the flat address was
+  returned as Tally sent it under every redaction mode. An address Tally returned empty stays empty, and the
+  PIN code, state and country are still returned under every mode.
 - **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
   every other compared field matched and it read `posted_verified`, and a divergent voucher never

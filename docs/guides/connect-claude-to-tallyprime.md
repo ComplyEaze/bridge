@@ -64,8 +64,8 @@ vouchers is off by default. This page is the short path; the
   numbers, IFSC, MSME or Udyam registration numbers, email, phone and address,
   and, when it builds a voucher file, that file's local path (which can include
   your computer user name). The **Response redaction** setting takes one value,
-  not both: shorten party and ledger names and bank account numbers to their
-  first two and last two characters (`mask_parties`; four or fewer become “…”),
+  not both: shorten party and ledger names, bank account numbers and a ledger's
+  address lines to their first two and last two characters (`mask_parties`; four or fewer become “…”),
   or drop narrations (`drop_narration`). Neither hides amounts, company names,
   PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details or
   references, or the last four digits of a bank

@@ -4,10 +4,9 @@ use bridge_tally_protocol::{
     parse_companies_with_evidence, parse_import_result, parse_ledger_source_records_with_evidence,
     parse_ledgers, parse_ledgers_with_evidence, parse_native_ledger_source_records_with_evidence,
     parse_standard_ledger_catalog, parse_standard_ledger_catalog_with_identities,
-    parse_standard_ledger_identity_observation, parse_voucher_source_records_with_evidence,
-    verify_company_context, ParsedSourceIdentityKind, PartyLedgerMasterFieldObservation,
-    StandardLedgerCatalogError, TallyExportStatus, BRIDGE_LEDGER_EXPORT_SCHEMA,
-    BRIDGE_VOUCHER_EXPORT_SCHEMA, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
+    parse_standard_ledger_identity_observation, verify_company_context, ParsedSourceIdentityKind,
+    PartyLedgerMasterFieldObservation, StandardLedgerCatalogError, TallyExportStatus,
+    BRIDGE_LEDGER_EXPORT_SCHEMA, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
 };
 use quick_xml::{events::Event, Reader};
 use tally_protocol_simulator::{encode, Fixture, ScenarioPlan, WireEncoding};
@@ -92,12 +91,6 @@ fn primary_rows_and_company_context_must_use_supported_export_parents() {
         BRIDGE_LEDGER_EXPORT_SCHEMA
     );
     assert!(parse_ledger_source_records_with_evidence(&nested_ledger).is_err());
-
-    let nested_voucher = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><UNEXPECTED><VOUCHER GUID="voucher-guid"><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER></UNEXPECTED></BODY></ENVELOPE>"#,
-        BRIDGE_VOUCHER_EXPORT_SCHEMA
-    );
-    assert!(parse_voucher_source_records_with_evidence(&nested_voucher).is_err());
 
     let nested_context = format!(
         r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><UNEXPECTED><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/></UNEXPECTED><LEDGER NAME="BRIDGE LEDGER" GUID="ledger-guid"><PARENT>Primary</PARENT></LEDGER></BODY></ENVELOPE>"#,
@@ -341,22 +334,6 @@ fn source_record_parsers_preserve_identity_kind_and_exact_fragment_hash() {
             .raw_source_sha256
     );
 
-    let vouchers =
-        parse_voucher_source_records_with_evidence(&Fixture::VoucherExport.body()).unwrap();
-    assert_eq!(
-        vouchers.records[0].identity_kind,
-        Some(ParsedSourceIdentityKind::Guid)
-    );
-    assert_eq!(
-        vouchers.records[0].source_id.as_deref(),
-        Some("00000000-0000-4000-8000-000000000201")
-    );
-    assert_eq!(
-        vouchers.records[0].identities.remote_id.as_deref(),
-        Some("bridge-synthetic-voucher-001")
-    );
-    assert_eq!(vouchers.records[0].raw_source_sha256.len(), 64);
-
     let mixed_case_guid = xml.replace(
         "00000000-0000-4000-8000-000000000101",
         "00000000-0000-4000-8000-000000000AaB",
@@ -373,56 +350,16 @@ fn source_record_parsers_preserve_identity_kind_and_exact_fragment_hash() {
 }
 
 #[test]
-fn nested_voucher_entry_contracts_are_strict() {
-    let voucher_xml = format!(
-        r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><VOUCHER GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="10" ALTERID="13"><DATE>20260701</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>BRIDGE-1</VOUCHERNUMBER><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>2</LEDGERENTRYCOUNT><LEDGERENTRIES><LEDGERENTRY><ENTRYINDEX>1</ENTRYINDEX><LEDGERNAME>Cash</LEDGERNAME><AMOUNT>-100.00</AMOUNT><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE></LEDGERENTRY><LEDGERENTRY><ENTRYINDEX>2</ENTRYINDEX><LEDGERNAME>Sales</LEDGERNAME><AMOUNT>100.00</AMOUNT><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE></LEDGERENTRY></LEDGERENTRIES></VOUCHER></BODY></ENVELOPE>"#,
-        BRIDGE_VOUCHER_EXPORT_SCHEMA
-    );
-    let vouchers = parse_voucher_source_records_with_evidence(&voucher_xml).unwrap();
-    assert_eq!(
-        vouchers.records[0].identities.master_id.as_deref(),
-        Some("10")
-    );
-    assert_eq!(vouchers.records[0].alter_id.as_deref(), Some("13"));
-    assert_eq!(vouchers.records[0].record.ledger_entries.len(), 2);
-    assert_eq!(vouchers.records[0].record.ledger_entries[0].entry_index, 1);
-    assert_eq!(
-        vouchers.records[0].record.ledger_entries[0].amount,
-        "-100.00"
-    );
-    assert_eq!(
-        vouchers.records[0].record.ledger_entries[0]
-            .raw_source_sha256
-            .len(),
-        64
-    );
-
-    let bad_count = voucher_xml.replace(
-        "<LEDGERENTRYCOUNT>2</LEDGERENTRYCOUNT>",
-        "<LEDGERENTRYCOUNT>1</LEDGERENTRYCOUNT>",
-    );
-    assert!(parse_voucher_source_records_with_evidence(&bad_count).is_err());
-
-    let missing_polarity = voucher_xml.replace("<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>", "");
-    assert!(parse_voucher_source_records_with_evidence(&missing_polarity).is_err());
-    let invalid_polarity = voucher_xml.replace(
-        "<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>",
-        "<ISDEEMEDPOSITIVE>Maybe</ISDEEMEDPOSITIVE>",
-    );
-    assert!(parse_voucher_source_records_with_evidence(&invalid_polarity).is_err());
-}
-
-#[test]
 fn a_record_is_identified_by_guid_then_remote_id_then_master_id() {
     let export = |identity_attributes: &str| {
         format!(
-            r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="VOUCHER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><VOUCHER {identity_attributes}><DATE>20260701</DATE><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><VOUCHERNUMBER>BRIDGE-001</VOUCHERNUMBER><PARTYLEDGERNAME>BRIDGE SYNTHETIC LEDGER</PARTYLEDGERNAME><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><LEDGERENTRYCOUNT>0</LEDGERENTRYCOUNT></VOUCHER></BODY></ENVELOPE>"#,
-            BRIDGE_VOUCHER_EXPORT_SCHEMA
+            r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="company-guid" RECORDCOUNT="1"/><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" {identity_attributes}><PARENT>Primary</PARENT></LEDGER></BODY></ENVELOPE>"#,
+            BRIDGE_LEDGER_EXPORT_SCHEMA
         )
     };
 
-    let all_three = parse_voucher_source_records_with_evidence(&export(
-        r#"GUID="voucher-guid" REMOTEID="voucher-remote" MASTERID="7" ALTERID="11""#,
+    let all_three = parse_ledger_source_records_with_evidence(&export(
+        r#"GUID="ledger-guid" REMOTEID="ledger-remote" MASTERID="7" ALTERID="11""#,
     ))
     .unwrap();
     assert_eq!(
@@ -431,12 +368,16 @@ fn a_record_is_identified_by_guid_then_remote_id_then_master_id() {
     );
     assert_eq!(
         all_three.records[0].source_id.as_deref(),
-        Some("voucher-guid")
+        Some("ledger-guid")
+    );
+    assert_eq!(
+        all_three.records[0].identities.master_id.as_deref(),
+        Some("7")
     );
     assert_eq!(all_three.records[0].alter_id.as_deref(), Some("11"));
 
-    let remote_only = parse_voucher_source_records_with_evidence(&export(
-        r#"REMOTEID="bridge-synthetic-voucher-001""#,
+    let remote_only = parse_ledger_source_records_with_evidence(&export(
+        r#"REMOTEID="bridge-synthetic-ledger-001""#,
     ))
     .unwrap();
     let record = &remote_only.records[0];
@@ -446,19 +387,11 @@ fn a_record_is_identified_by_guid_then_remote_id_then_master_id() {
     );
     assert_eq!(
         record.source_id.as_deref(),
-        Some("bridge-synthetic-voucher-001")
+        Some("bridge-synthetic-ledger-001")
     );
-    assert_eq!(
-        record.record.id.as_deref(),
-        Some("bridge-synthetic-voucher-001")
-    );
-    assert_eq!(record.record.date.as_deref(), Some("20260701"));
-    assert_eq!(record.record.cancelled, Some(false));
-    assert_eq!(record.record.ledger_entry_count, Some(0));
 
     let master_only =
-        parse_voucher_source_records_with_evidence(&export(r#"MASTERID="9" ALTERID="12""#))
-            .unwrap();
+        parse_ledger_source_records_with_evidence(&export(r#"MASTERID="9" ALTERID="12""#)).unwrap();
     let record = &master_only.records[0];
     assert_eq!(
         record.identity_kind,
@@ -504,18 +437,21 @@ fn child_and_attribute_metadata_shapes_are_strictly_equivalent() {
     );
     assert_eq!(child.evidence.source_record_count, Some(1));
 
-    let attributes =
-        parse_voucher_source_records_with_evidence(&Fixture::VoucherExport.body()).unwrap();
+    let attribute_shape = format!(
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COMPANYCONTEXT SCHEMA="{}" OBJECTTYPE="LEDGER" NAME="BRIDGE SYNTHETIC BOOK" GUID="00000000-0000-4000-8000-000000000001" RECORDCOUNT="1" /><LEDGER NAME="BRIDGE SYNTHETIC LEDGER" GUID="00000000-0000-4000-8000-000000000101"><PARENT>BRIDGE SYNTHETIC GROUP</PARENT></LEDGER></DATA></BODY></ENVELOPE>"#,
+        BRIDGE_LEDGER_EXPORT_SCHEMA
+    );
+    let attributes = parse_ledgers_with_evidence(&attribute_shape).unwrap();
     assert_eq!(attributes.records.len(), 1);
     assert_eq!(
         attributes.evidence.schema.as_deref(),
-        Some(BRIDGE_VOUCHER_EXPORT_SCHEMA)
+        Some(BRIDGE_LEDGER_EXPORT_SCHEMA)
     );
-    assert_eq!(attributes.evidence.object_type.as_deref(), Some("VOUCHER"));
+    assert_eq!(attributes.evidence.object_type.as_deref(), Some("LEDGER"));
     assert_eq!(attributes.evidence.source_record_count, Some(1));
     assert_eq!(
-        attributes.records[0].record.id.as_deref(),
-        Some("00000000-0000-4000-8000-000000000201")
+        attributes.evidence.company_context,
+        child.evidence.company_context
     );
 }
 
@@ -569,7 +505,7 @@ fn primary_rows_reject_case_insensitive_duplicate_identity_attributes() {
 fn schema_and_object_type_are_bound_to_the_public_parser() {
     let wrong_schema = Fixture::NormalExport
         .body()
-        .replace(BRIDGE_LEDGER_EXPORT_SCHEMA, BRIDGE_VOUCHER_EXPORT_SCHEMA);
+        .replace(BRIDGE_LEDGER_EXPORT_SCHEMA, "bridge.tally.vouchers/3");
     let error = parse_ledgers_with_evidence(&wrong_schema).unwrap_err();
     assert_eq!(
         error.to_string(),

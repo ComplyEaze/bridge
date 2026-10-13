@@ -94,7 +94,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   and bank account numbers to their first two and last two characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
-  MSME or Udyam registration numbers, contact details or references, and a
+  MSME or Udyam registration numbers, contact details or references, or the last
+  four digits of a bank statement's account number (`account_last4`), and a
   shortened name can still be identified, not least from the GSTIN or PAN sent
   beside it. The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the
@@ -113,8 +114,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, and a name written inside a narration or reference stays
-    as it is.
+    addresses or IFSCs, or the last four digits of a bank statement's account
+    number (`account_last4`), and a name written inside a narration or reference
+    stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
@@ -168,6 +170,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
   - **What the reads added since 0.5.0 send, under each setting.**
+    - The read-cost preview (`voucher_read_cost`) sends the company name,
+      its identifier, company number and books-from date, the company's voucher
+      mark, and counts and seconds derived from it, with constant text. It holds
+      no amounts and no narrations, and `mask_parties` has nothing to shorten in it.
     - The company settings read (`company_features`) sends the company name,
       its identifier, company number and books-from date, the cost-centre, GST
       and batch-wise settings as yes, no or not reported, and the currency
@@ -404,8 +410,8 @@ characters it cannot show safely, or do not fit, it refuses. A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference; from the next
 build a Journal's line names its first debit and first credit ledger and up to
-20 characters of its narration, and the line above says a narration may be
-cut) and marks the
+20 characters of its narration, fewer (never under 10) when that makes the line
+fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
 only, with a line saying why, and still asks for your approval, unless a ledger

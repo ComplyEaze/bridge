@@ -54,7 +54,7 @@ async fn malformed_observed_company_numbers_never_authorize_scoped_reads() {
         assert_eq!(
             VerifiedCompanyIdentity::from_observed_companies(
                 selected.name.clone(),
-                GUID.into(),
+                crate::tally::test_company_guid(GUID),
                 selected.company_number.clone().unwrap(),
                 selected.books_from.clone().unwrap(),
                 &companies,

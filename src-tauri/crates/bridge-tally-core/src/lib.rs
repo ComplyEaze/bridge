@@ -4,7 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use bridge_tally_primitives::exact_arithmetic;
 pub use bridge_tally_primitives::{
-    text, DateSpan, ExactDecimal, ReadResponseScope, TallyDate, TallyError, MAX_EXACT_DECIMAL_BYTES,
+    company_guid, text, DateSpan, ExactDecimal, ReadResponseScope, TallyDate, TallyError,
+    MAX_EXACT_DECIMAL_BYTES,
 };
 
 pub mod bills_reconciliation;
@@ -402,14 +403,6 @@ pub trait TallyConnector: Send + Sync {
         &self,
         context: &RequestContext,
     ) -> Result<CanonicalPackWindow, TallyError>;
-    async fn read_core_period_balance_report(
-        &self,
-        _context: &RequestContext,
-    ) -> Result<report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Err(TallyError::Unsupported {
-            code: "core_period_balance_report_not_supported".to_string(),
-        })
-    }
 }
 
 #[cfg(test)]

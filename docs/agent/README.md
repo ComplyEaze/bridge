@@ -91,6 +91,7 @@ The ordinary default tools, in name order:
 - `company_features`
 - `egress_log`
 - `gst_status`
+- `gst_uncertain_vouchers`
 - `ledger_masters`
 - `ledger_movement`
 - `list_companies`
@@ -114,7 +115,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `gst_uncertain_vouchers` and `voucher_read_cost` are in the
 source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
@@ -637,6 +638,44 @@ refused (`gst_status_book_too_large`), because the selection is evaluated on eve
 bound is provisional: the read has been timed only on a book of about thirty vouchers. Measured on one
 synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices (protocol reference
 §9.17 holds the Sales flags and Accept As Is; the by-name selection and the narrow field list are in the fixtures' PROVENANCE.md); a registered buyer, other releases and Gold are not measured, and `excluded` has not been observed.
+
+### Uncertain vouchers of one Sales voucher type (`gst_uncertain_vouchers`)
+
+`gst_uncertain_vouchers` takes `company_guid`, `from`, `to` (YYYYMMDD or YYYY-MM-DD) and `voucher_type_name`, with
+the same checks and refusals as `gst_status` (an exact type name, at most 93 days, a book whose voucher mark is at most
+25,000) and no `limit` or `offset`. It reads the status flags `gst_status` reads and adds each voucher's party and
+amount, and lists two things in one `items` list, each item carrying a `list`: `uncertain` (Tally's uncertain flag reads
+Yes once cancelled, optional and post-dated are decided first) and `overridden` (the acceptance flag, Accept As Is,
+reads Yes, with the `gst_status` the voucher reads now; a voucher that reads uncertain or excluded after it was
+accepted is the row to look at, and one voucher can be on both lists). An item holds `voucher_number`, `date`,
+`party` (the party ledger), `amount` (the invoice total as Tally wrote it, without its sign, an exact decimal) with
+`party_side` (`debit` for a negative amount, `credit` for a positive one), `alter_id`, `master_id` and `gst_status`.
+A party or an amount that is empty, absent, repeated, zero or not a plain decimal (a foreign-currency amount) is
+`{"unread": code}`, never a name or a zero. `counts` are those of `gst_status` over the whole window. The result
+also holds `pre_filing_line`, the line a CA reads before filing, with the number of vouchers Tally marks Uncertain
+and the window's dates, and `filed_period_note`, which says the list may differ from a filed return and to check
+against it. The line and the note are left out, and the result is `partial` (`gst_uncertain_voucher_unread`), whenever any
+voucher was not read (its flags, its acceptance flag, or, for a listed voucher, its party or amount), so the number in
+the line is never short. A cancelled voucher reads an empty party and amount and is not listed.
+
+Two reads are made. The first is `gst_status`'s own read, which counts the window's vouchers; a window above
+1,000 is refused with `gst_uncertain_window_too_large` (the count is in the refusal's `counts`), before the second
+read, which asks for the party and the amount and so makes Tally send each voucher's ledger entries as well
+(about 7.5 KB a voucher on the lab's book). That bound is provisional. Every status is read from the second read
+alone. A count of rows above this server's row limit is refused (`gst_uncertain_rows_over_limit`). The party is
+the party ledger (a cash sale shows the cash ledger); no GSTIN is fetched. The amount is the invoice total on the
+party's entry, tax and round-off included, not the taxable value of the GSTR-1 tables. `mask_parties` masks the
+party names of this tool's answer and not its amounts, and the answer carries both to the assistant, which
+`gst_status` does not.
+
+The reason for uncertainty is not read, and bills missing an HSN/SAC are not split out from the others: they need
+re-saving with the code, not Accept As Is. To verify after someone accepts vouchers in Tally, run the tool again and
+compare by `master_id`: a voucher counts as verified only if an earlier run listed it uncertain and this run lists it
+overridden with `gst_status` included and the same amount. Nothing is kept between runs. Measured on one synthetic
+book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, which changed that voucher alone, for the
+unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
+Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
+Gold and other releases.
 
 ### Stock Summary
 

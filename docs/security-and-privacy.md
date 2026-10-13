@@ -195,6 +195,14 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       post-dated and what its status flags read) and whether it was accepted
       as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
+    - The uncertain-voucher read (`gst_uncertain_vouchers`) sends what the
+      GSTR-1 status read sends, and for each voucher it lists as uncertain
+      or as accepted as it stands, also the party ledger's name and the
+      voucher's invoice total (without its sign) and which side it is on.
+      Unlike the status read, its answer therefore carries party names and
+      amounts to the assistant. `mask_parties` shortens the party names in
+      it and does not shorten the amounts. It holds no narrations and no
+      ledger entries of the voucher.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
   it. The extension's tools reach only the Tally transport. Releases up to

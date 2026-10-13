@@ -21,6 +21,7 @@ DEFAULT_TOOLS = {
     "company_features",
     "egress_log",
     "gst_status",
+    "gst_uncertain_vouchers",
     "ledger_masters",
     "ledger_movement",
     "list_companies",

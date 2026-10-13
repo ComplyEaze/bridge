@@ -1003,6 +1003,28 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
   showed 39 vouchers, 27 included, 7 not relevant and 5 uncertain before the voucher and 40, 28, 7 and 5 at both
   dates after it (1,000.00 more taxable value), as the lab read them off the screen (the screenshots stay on the
   lab PC); the Day Book of 25-Aug-2026 listed the voucher at both dates.
+- **VERIFIED, one book: adding `PARTYLEDGERNAME` and `AMOUNT` to the field list returns the party and the invoice
+  total once per voucher, as direct children, and changes no flag** (lab set W21d, 13 Oct 2026, the same company;
+  evidence on `lab/1342-w21d-answers` (`d1070dea`), answer `aw21d-b`, request SHA-256 `cb037151…`). Read by structure,
+  each of the 32 vouchers carries one `PARTYLEDGERNAME` and one `AMOUNT` directly under the voucher. `AMOUNT` is the
+  invoice total and is **signed negative** on 31 of them (`BP/26-27/0001` -1050.00, `0003` -1051.04, `0016` -210.42,
+  the totals the lab read off the voucher screen, party `BRIDGE Walk-in`); the 32nd, the cancelled `BP/26-27/0041`, reads an
+  empty party and an empty amount, while the optional `BP/26-27/0042` reads its party and -1050.00. Asking for the
+  amount makes Tally return each voucher's ledger entries as well, and `AMOUNT` then also appears under them: only
+  the voucher's own direct child is the invoice total. The answer is 242,632 bytes against 108,442 for the narrow
+  request, about 7.6 KB a voucher; the three status flags, `ISGSTOVERRIDDEN` and `ALTERID` of every voucher equal
+  those of the narrow read.
+- **VERIFIED, one voucher: one Accept As Is, made on Tally's own GSTR-1 screen on that voucher alone, changed that
+  voucher and no other** (W21d, answers `aw21d-b` before and `aw21d-c` after, 242,636 bytes). `BP/26-27/0003` went
+  from uncertain to included with `ISGSTOVERRIDDEN` Yes, `ALTERID` 50 to 69, `AMOUNT` unchanged; no other voucher's
+  XML differs between the two answers. The screen's counts for August went from 39 vouchers, 27 included, 7 not
+  relevant and 5 uncertain to 39, 28, 7 and 4, as the lab read them. The screen grouped the five uncertain vouchers
+  under two reasons, two for an invalid, mismatched or missing HSN/SAC and three (`BP/26-27/0002`, `0003`, `0008`)
+  for a mismatch between the expected and the modified tax amount, which is the reason no field carries. The accept
+  asked one question, which was answered Yes; the screen offered nothing to undo it and none was tried. The company
+  was restored from a backup taken before the accept, and the marks answer after the restore is byte-identical to the
+  first. The before-read already held five vouchers with `ISGSTOVERRIDDEN` Yes (`BP/26-27/0005`, `0006`, `0016`,
+  `0043`, `0044`) whose origin is not recorded, so that nothing but Accept As Is sets the flag is not measured.
 - **NOT established:**
   - a voucher flagged excluded (never observed);
   - a registered buyer;
@@ -1014,6 +1036,9 @@ The answers are committed byte for byte with their hashes (the `gst-status` fixt
   - a Yes on either deleted flag: on this book the Edit Log was not seen to be on, and the one voucher deleted
     left the answer altogether, so a deleted voucher kept by an Edit Log is unmeasured;
   - more than one of `ISCANCELLED`, `ISOPTIONAL` and `ISPOSTDATED` Yes on one voucher;
+  - the party and the amount on an item invoice, a registered buyer, a credit note or another Sales-class type, a
+    foreign-currency voucher or a post-dated voucher, and an accept of several vouchers at once: the party and
+    amount reads above rest on one book of unregistered-buyer Sales invoices;
   - a voucher both cancelled and optional, and whether Tally lists a cancelled voucher anywhere in the return,
     such as among the documents issued;
   - the cost of the selection on a large book: it was timed on about thirty vouchers, so any size bound a

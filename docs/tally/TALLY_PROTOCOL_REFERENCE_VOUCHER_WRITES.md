@@ -292,9 +292,51 @@ against `CONTENT-LENGTH`).
 - From that branch's notes, not from an answer: that Tally asked the same two confirmations at
   each switch, and that on the way to the behaviour field the row `Automatic`, already set, was
   selected again in "Method of Voucher Numbering".
-- **Not established:** a batch of several vouchers under "Renumber Vouchers"; a voucher that
-  carries a number; Journal, Payment and Contra; a deletion; a type holding more than a handful of
-  vouchers; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post.
+- **Not established:** Journal, Payment and Contra; a deletion; a type holding more than a handful
+  of vouchers; Gold; other releases; macOS; the same through ComplyEaze Bridge's own post. A file
+  of two vouchers and a voucher that carries a number were measured later the same day (next
+  paragraph).
+
+**A file of two vouchers, and a voucher that carries a number, each changed numbers already in
+the book under "Renumber Vouchers", and neither supplied number was kept: verified 2026-10-13 on
+one book and one voucher type (PARTIAL).** On the same synthetic book, after the run above had
+been restored, three more imports of Receipts were sent, one per step, in that run's shape (branch
+`lab/724-m9j-batch-and-numbered-answers`, `703dd35e`, bridge#724; every figure was read from the
+marks, voucher, series and import answers with an XML parser, with each size checked against
+`CONTENT-LENGTH`). A numbered Receipt carried one `VOUCHERNUMBER` element after
+`PARTYLEDGERNAME`, where ComplyEaze Bridge's builder places it (read in the builder's code). Both
+supplied numbers were text with letters, not held by any voucher of the book.
+
+- **VERIFIED:** with the series at `Auto Retain`, a Receipt that carried the number `M9J-C1`,
+  dated before three existing ones, read back number 8, the next number, and no other voucher's
+  number changed. This is the control, on the book as found; it agrees with the table at the head
+  of this section, which was measured on another book.
+- **VERIFIED:** with the series at `Auto Renumber`, one file of two Receipts without numbers, the
+  later-dated first, answered `CREATED` 2, `ALTERED` 0. Both were numbered by their dates (6 July
+  took 5, 8 July took 7), and four Receipts already in the book changed number: the one dated
+  between the two went up by one and the three later-dated ones by two. `MASTERID` and `ALTERID`
+  followed the order of the file (14 for the first voucher in it, 15 for the second).
+- **VERIFIED:** with the series at `Auto Renumber`, a Receipt that carried the number `M9J-N1`,
+  dated 4 July, read back number 4, the number its place in date order gives, and each of the
+  seven later-dated Receipts went up by one. Its answer read `CREATED` 1, `ALTERED` 0.
+- **VERIFIED:** no voucher row read either supplied number at any of the seven voucher reads. No
+  existing voucher's `ALTERID`, `MASTERID` or GUID changed at any step. `ALTVCHID` rose only by
+  the vouchers created (12, 13, 15, 16), and `ALTMSTID` moved by 2 at each save of the type (235,
+  237, 239) and at no import.
+- **VERIFIED:** the two saves of the type changed six numbers and then ten, into date order and
+  back into `MASTERID` order. No voucher of another type changed, and the other 23 types' series
+  read the same in all four series answers. After the book was restored from a backup taken at
+  the start, the marks, the Receipt series and the twelve vouchers read as at the start.
+- So on this run, under `Auto Renumber`, a supplied voucher number did not keep a voucher, or the
+  vouchers already in the book, from being renumbered, and a file of two vouchers renumbered as a
+  single voucher did. Under `Auto Retain` nothing already in the book was renumbered.
+- From that branch's notes, not from an answer: that the two switches were made on Tally's own
+  Receipt type screen, and that Tally asked the same two confirmations at each.
+- **Not established:** a file of more than two vouchers; a file that mixes numbered and numberless
+  vouchers; a supplied number made of digits only; a number that an existing voucher already holds;
+  a supplied number under Manual with duplicates allowed and under Automatic (Manual Override);
+  Journal, Payment and Contra; a deletion; a type holding more than a handful of vouchers; Gold;
+  other releases; macOS; the same through ComplyEaze Bridge's own post.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**
@@ -354,8 +396,8 @@ numbers every voucher it creates.
   first two kept their numbers and AlterIDs, and a later read-back still read them `posted_verified`.
 - Not established: Receipt and Contra under Manual numbering; a batch; Automatic (Manual Override);
   Multi-user Auto; Gold; a file imported through Tally's Import menu. Automatic set to renumber on
-  insertion was measured on 2026-10-13 for one voucher type, by hand entry and by a raw import,
-  not by a native post (above).
+  insertion was measured on 2026-10-13 for one voucher type, by hand entry and by raw imports (one
+  voucher, a file of two, and a voucher carrying a number), not by a native post (above).
 - Evidence: the never-merged branches `lab/724-m-manual-numbering-answers` (`2fd954f9`),
   `lab/724-m3-second-voucher-answers` (`6ab6a667`) and `lab/724-m4-m5-numbering-answers`
   (`3684c58c`, under `m5/`); bridge#724.
@@ -489,9 +531,11 @@ measurement ran on. Each of the three is admitted with two or more entries, at l
 and one credit, no ledger on both sides, and every leg classified (bridge#466: the multi-entry
 rule and party choice are the owner's decisions of 2026-09-22; one Bridge-built three-entry Receipt
 was imported over the gateway and verified live, and Tally read the bank ledger back as its party,
-but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), carrying neither a supplied voucher number nor a `REFERENCE`: no file carrying either has been
-imported and read back on these types, and `verify_import` compares accounting entries rather
-than those annotations, so nothing downstream would notice Tally dropping or rewriting one.
+but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu), carrying neither a supplied voucher number nor a `REFERENCE`: no file carrying a `REFERENCE` has been
+imported and read back on these types. A Receipt carrying a voucher number was, raw, on 2026-10-13
+(§9.8: Tally discarded the number under both settings of Automatic numbering); `verify_import`
+compares accounting entries rather than those annotations, so nothing downstream would notice
+Tally dropping or rewriting one.
 
 Both legs are classified, not just the funding one:
 

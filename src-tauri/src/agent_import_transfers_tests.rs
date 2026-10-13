@@ -6,6 +6,7 @@ use crate::agent::transfer_pairing::{
     DoubleBooked, EndpointOrigin, LedgerGuid, LineageId, ParseWindow, Side, SkipFact, SkipKey,
     StatementRowId, TxnId,
 };
+use bridge_bank_statement::bank::BankReference;
 
 fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).unwrap()
@@ -132,8 +133,12 @@ fn every_state() -> TransferFacts {
         skip("st-reversed", "20260109", "555.55"),
         skip("st-outside", "20260301", "666.66"),
         skip("st-matched", "20260302", "888.88"),
+        skip("st-differs", "20260111", "999.99"),
     ];
     skips[4].reversed_same_day = true;
+    let printing = |digits: &str| BankReference::from_recorded(digits);
+    skips[7].reference = printing("600000000001");
+    assert!(skips[7].reference.is_some());
     let mut unverified = contra("batch-2", "t2", "20260106", "222.22");
     unverified.status = BatchStatus::NotVerified {
         batch: BatchId::new("batch-2"),
@@ -152,6 +157,17 @@ fn every_state() -> TransferFacts {
         },
         // the one Contra of its day and amount, on a day no window holds
         contra("batch-7", "t7", "20260302", "888.88"),
+        // two Contras of a row's day and amount, each of another reference
+        {
+            let mut other = contra("batch-11", "t11", "20260111", "999.99");
+            other.reference = printing("600000000003");
+            other
+        },
+        {
+            let mut other = contra("batch-10", "t10", "20260111", "999.99");
+            other.reference = printing("600000000002");
+            other
+        },
     ];
     let mut facts = facts_of(skips, contras);
     facts.held_elsewhere = vec![(
@@ -174,8 +190,9 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
     else {
         panic!("computed");
     };
-    // one pair; six skips and the held one are open; the three retired are counted
-    assert_eq!((*paired, *skips_open, *retired), (1, 7, 3));
+    // one pair; seven skips and the held one are open, each counted once however
+    // many rows list it; the three retired are counted
+    assert_eq!((*paired, *skips_open, *retired), (1, 8, 3));
     let row = |id: &str, day: &str, state, batch: Option<&str>| {
         (
             id.to_string(),
@@ -200,6 +217,19 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
             // both Contras of the double booking, each naming the other batch
             row("t5", "20260110", "double_booked", Some("batch-6")),
             row("t6", "20260110", "double_booked", Some("batch-5")),
+            // one row for each batch that holds a Contra of another reference
+            row(
+                "st-differs",
+                "20260111",
+                "reference_differs",
+                Some("batch-10")
+            ),
+            row(
+                "st-differs",
+                "20260111",
+                "reference_differs",
+                Some("batch-11")
+            ),
             row("st-outside", "20260301", "not_established", None),
             row(
                 "st-matched",
@@ -216,12 +246,25 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
     let section = summary_of(&every_state()).render(usize::MAX);
     assert_eq!(section["state"], "computed");
     assert_eq!(section["skips_paired"], 1);
-    assert_eq!(section["skips_open"], 7);
+    assert_eq!(section["skips_open"], 8);
     assert_eq!(section["retired"], 3);
     assert_eq!(section["open_omitted"], 0);
     let text = section.to_string();
     for secret in [
-        "111.11", "222.22", "333.33", "444.44", "555.55", "666.66", "777.77", "888.88", "b1", "b2",
+        "111.11",
+        "222.22",
+        "333.33",
+        "444.44",
+        "555.55",
+        "666.66",
+        "777.77",
+        "888.88",
+        "999.99",
+        "600000000001",
+        "600000000002",
+        "600000000003",
+        "b1",
+        "b2",
     ] {
         assert!(!text.contains(secret), "{secret} in {text}");
     }
@@ -258,17 +301,19 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
             "double_booked",
             "not_established",
             "matched_unconfirmed",
+            "reference_differs",
         ])
     );
 }
 
-const EVERY_OPEN_STATE: [OpenState; 8] = [
+const EVERY_OPEN_STATE: [OpenState; 9] = [
     OpenState::NotFound,
     OpenState::Ambiguous,
     OpenState::OtherSideUnverified,
     OpenState::NotEstablished,
     OpenState::ReversedSameDay,
     OpenState::MatchedUnconfirmed,
+    OpenState::ReferenceDiffers,
     OpenState::HeldElsewhere,
     OpenState::DoubleBooked,
 ];

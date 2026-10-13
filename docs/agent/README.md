@@ -1788,14 +1788,26 @@ refused as `proposals_legacy` (parse the statement again).
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
   `batch_id` where one is involved: `not_found`, `ambiguous`,
   `other_side_unverified`, `held_elsewhere`, `matched_unconfirmed`,
-  `reversed_same_day`, `not_established`, or `double_booked` for a Contra
-  booked from both statements. No amount, reference, instrument, party or
-  ledger is returned.
+  `reference_differs`, `reversed_same_day`, `not_established`, or
+  `double_booked` for a Contra booked from both statements. No amount,
+  reference, instrument, party or ledger is returned.
 - **What `not_found` claims.** Only that the other account's statement went
-  through ComplyEaze Bridge, was verified for that day, and holds no Contra for
-  the row dated the same day. A row pairs by an equal reference, or by an equal
-  date (k = 0 until two real statements of one transfer have been measured), so
-  a Contra the other bank printed on another day is not matched.
+  through ComplyEaze Bridge, was verified for that day, and holds no Contra of
+  the row's day, amount, ledgers and direction that is not already paired with
+  another row, whatever its reference. A row pairs by an equal reference, or by
+  an equal date (k = 0 until two real statements of one transfer have been
+  measured), so a Contra the other bank printed on another day is not matched.
+- **What `reference_differs` means.** The person sees the row listed once for
+  each batch holding a Contra of the same day and amount whose reference
+  differs from the row's, verifies that batch if it is not verified yet, and
+  checks that Contra in Tally, because ComplyEaze Bridge cannot tell whether it
+  is the row's other side: they keep the skip if it is, and may name the row in
+  `withdraw_skips` if it is not.
+- **What `double_booked` compares.** Two Contras of one amount between the same
+  two ledgers and the same way, one booked from each statement: where their
+  references are equal, whatever their dates (the second build is refused as
+  `transfer_double_booked`), and where their dates are equal and at least one
+  of them carries no reference (both are listed). Nothing else is compared.
 - **What `matched_unconfirmed` means.** The person sees the row listed with the
   batch whose verified Contra matches it by day and amount, where the statement
   records of the two accounts do not both cover that day, and keeps the skip:
@@ -1822,13 +1834,16 @@ refused as `proposals_legacy` (parse the statement again).
 - **`withdraw_skips`.** Names skipped rows a build posts anyway, only when the
   person confirms the other account's statement does not carry them. A
   withdrawal is refused while exactly one verified Contra matches the row.
-  Where more than one verified Contra matches, or the amount reverses the same
-  day, ComplyEaze Bridge cannot tell which entry the row belongs to: the
-  withdrawal is then the person's explicit choice, and every matching Contra is
-  listed for them. While the only match is not yet verified, the withdrawal is
-  refused and the step says to verify that entry first. So is one with any
-  match in a batch not yet verified, whatever the row's state: the person can
-  confirm only what Tally holds. The refusal is `withdraw_skip_paired`, and
+  Where more than one verified Contra matches, the amount reverses the same
+  day, or the only match carries a different reference and is verified,
+  ComplyEaze Bridge cannot tell which entry the row belongs to: the withdrawal
+  is then the person's explicit choice, and every matching Contra is listed for
+  them. While the only match is not yet verified, the withdrawal is refused and
+  the step says to verify that entry first. So is one with any match in a batch
+  not yet verified, whatever the row's state: the person can confirm only what
+  Tally holds. A match of another reference is listed on the row itself, as
+  `reference_differs`; the others are listed as `double_booked` once the build
+  is written. The refusal is `withdraw_skip_paired`, and
   its `paired_rows` names each such batch with the row's state there (`paired`,
   `matched_unconfirmed` or `other_side_unverified`). A Contra matches by an
   equal reference, or by the same date and amount; one dated another day, or

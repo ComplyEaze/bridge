@@ -1175,6 +1175,167 @@ async fn a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_con
     assert_nothing_secret(section);
 }
 
+const OTHER_REFERENCE: &str = "600000000002";
+
+const REFERENCE_DIFFERS_STEP: &str = "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.";
+
+#[tokio::test]
+async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_another_reference_is_unverified(
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    let built = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(OTHER_REFERENCE),
+        ))
+        .await;
+    assert_eq!(built["voucher_count"], 1, "{built}");
+    let other = built["batch_id"].as_str().unwrap().to_string();
+    let refused = rig.build(withdrawing(directory.path())).await;
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
+    assert_eq!(
+        refused["paired_rows"],
+        json!([{"bridge_txn_id": SKIPPED, "batch_id": other, "state": "other_side_unverified"}])
+    );
+    assert_eq!(
+        refused["next_step"],
+        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row."
+    );
+    rig.finish();
+    // what the other statement's build said of the row: listed with that
+    // batch, under its own state and step
+    let section = &built["transfers"];
+    assert_eq!(section["skips_open"], 1, "{built}");
+    assert_eq!(
+        open_rows(section),
+        vec![open_row(SKIPPED, "reference_differs", Some(&other))],
+        "{built}"
+    );
+    assert_eq!(
+        section["next_steps"],
+        json!({"reference_differs": REFERENCE_DIFFERS_STEP})
+    );
+    assert_nothing_secret(section);
+    assert!(!section.to_string().contains(OTHER_REFERENCE));
+}
+
+#[tokio::test]
+async fn a_skip_beside_a_verified_contra_of_another_reference_is_listed_and_withdrawn_on_the_persons_word(
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+            two_bank_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    let built = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(OTHER_REFERENCE),
+        ))
+        .await;
+    let other = built["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &other);
+    // the row is not said to have no Contra: it is listed with the batch that
+    // holds the Contra of another reference
+    let again = rig
+        .build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    let section = &again["transfers"];
+    assert_eq!(section["skips_paired"], 0, "{again}");
+    assert_eq!(section["skips_open"], 1, "{again}");
+    assert_eq!(
+        open_rows(section),
+        vec![open_row(SKIPPED, "reference_differs", Some(&other))],
+        "{again}"
+    );
+    assert_eq!(
+        section["next_steps"],
+        json!({"reference_differs": REFERENCE_DIFFERS_STEP})
+    );
+    assert_nothing_secret(section);
+    // that Contra is verified, so the person may name the row: the build is
+    // written, and the row is then held by the new batch
+    let mut posting = contra_statement(directory.path(), BANK_A, SKIPPED, Some(REFERENCE));
+    posting["withdraw_skips"] = json!([SKIPPED]);
+    let posted = rig.build(posting).await;
+    rig.finish();
+    assert_eq!(posted["voucher_count"], 1, "{posted}");
+    let holder = posted["batch_id"].as_str().unwrap();
+    assert_eq!(
+        open_rows(&posted["transfers"]),
+        vec![open_row(SKIPPED, "held_elsewhere", Some(holder))],
+        "{posted}"
+    );
+}
+
+#[tokio::test]
+async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference() {
+    const UNREFERENCED: &str = "st-20260901-00000000000000b0";
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            skip_only_plans(),
+            admission_plans(),
+        ]
+        .concat(),
+    );
+    let rows = [(UNREFERENCED, None), (SKIPPED, Some(REFERENCE))];
+    rig.build(a_skips(directory.path(), &rows)).await;
+    let built = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(OTHER_REFERENCE),
+        ))
+        .await;
+    let carrying = built["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrying);
+    // the one Contra pairs by date with the row that prints no reference, and
+    // is then no Contra of the other row
+    let again = rig.build(a_skips(directory.path(), &rows)).await;
+    let section = &again["transfers"];
+    assert_eq!(section["skips_paired"], 1, "{again}");
+    assert_eq!(section["skips_open"], 1, "{again}");
+    assert_eq!(
+        open_rows(section),
+        vec![open_row(SKIPPED, "not_found", None)],
+        "{again}"
+    );
+    // and the paired row is not one to withdraw
+    let mut posting = contra_statement(directory.path(), BANK_A, UNREFERENCED, None);
+    posting["withdraw_skips"] = json!([UNREFERENCED]);
+    let refused = rig.build(posting).await;
+    rig.finish();
+    assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
+    assert_eq!(
+        refused["paired_rows"],
+        json!([{"bridge_txn_id": UNREFERENCED, "batch_id": carrying, "state": "paired"}])
+    );
+}
+
 /// Bank B's statement building `rows` as Contras, none with a reference.
 fn b_contras(directory: &Path, rows: &[&str]) -> Value {
     statement_v2(

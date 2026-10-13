@@ -64,6 +64,7 @@ pub(super) enum OpenState {
     NotEstablished,
     ReversedSameDay,
     MatchedUnconfirmed,
+    ReferenceDiffers,
     HeldElsewhere,
     DoubleBooked,
 }
@@ -77,6 +78,7 @@ impl OpenState {
             Self::NotEstablished => "not_established",
             Self::ReversedSameDay => "reversed_same_day",
             Self::MatchedUnconfirmed => "matched_unconfirmed",
+            Self::ReferenceDiffers => "reference_differs",
             Self::HeldElsewhere => "held_elsewhere",
             Self::DoubleBooked => "double_booked",
         }
@@ -90,6 +92,7 @@ impl OpenState {
             Self::Ambiguous => "More than one Contra could carry this row. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip: the row needs no action. If the person knows this row is a different transfer from that Contra, enter it in Tally by hand.",
+            Self::ReferenceDiffers => "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.",
             Self::HeldElsewhere => "The batch named posts this row, which a statement skipped. Verify that batch; once it is found posted the skip is retired.",
             Self::DoubleBooked => "Two statements each booked this transfer as a Contra. Check both in Tally and keep one.",
             Self::NotEstablished => NOT_ESTABLISHED_STEP,
@@ -129,32 +132,38 @@ impl TransferSummary {
             .map(|skip| (&skip.key, &skip.date))
             .collect();
         for (key, state) in &view.skips {
-            let (state, batch) = match state {
+            let (state, batches): (OpenState, BTreeSet<Option<&BatchId>>) = match state {
                 SkipState::Paired { .. } => {
                     paired += 1;
                     continue;
                 }
-                SkipState::NotFound => (OpenState::NotFound, None),
-                SkipState::Ambiguous { .. } => (OpenState::Ambiguous, None),
-                SkipState::OtherSideUnverified { batch } => (
-                    OpenState::OtherSideUnverified,
-                    Some(batch.as_str().to_string()),
+                SkipState::NotFound => (OpenState::NotFound, [None].into()),
+                SkipState::Ambiguous { .. } => (OpenState::Ambiguous, [None].into()),
+                SkipState::OtherSideUnverified { batch } => {
+                    (OpenState::OtherSideUnverified, [Some(batch)].into())
+                }
+                SkipState::NotEstablished => (OpenState::NotEstablished, [None].into()),
+                SkipState::MatchedUnconfirmed { contra } => {
+                    (OpenState::MatchedUnconfirmed, [Some(&contra.batch)].into())
+                }
+                SkipState::ReversedSameDay { .. } => (OpenState::ReversedSameDay, [None].into()),
+                // one row for each batch that holds such a Contra
+                SkipState::ReferenceDiffers { candidates } => (
+                    OpenState::ReferenceDiffers,
+                    candidates
+                        .iter()
+                        .map(|candidate| Some(&candidate.batch))
+                        .collect(),
                 ),
-                SkipState::NotEstablished => (OpenState::NotEstablished, None),
-                SkipState::MatchedUnconfirmed { contra } => (
-                    OpenState::MatchedUnconfirmed,
-                    Some(contra.batch.as_str().to_string()),
-                ),
-                SkipState::ReversedSameDay { .. } => (OpenState::ReversedSameDay, None),
             };
             skips_open += 1;
             if let Some(date) = dates.get(key) {
-                open.push(OpenRow {
+                open.extend(batches.into_iter().map(|batch| OpenRow {
                     id: key.row.as_str().to_string(),
                     date: (*date).clone(),
                     state,
-                    batch,
-                });
+                    batch: batch.map(|batch| batch.as_str().to_string()),
+                }));
             }
         }
         for (key, holder, date) in &facts.held_elsewhere {
@@ -592,8 +601,9 @@ impl Server {
         // Contra matches by date, or one a Contra may carry once it is verified,
         // is not one to withdraw. A person can confirm only what Tally holds, so
         // any candidate not yet verified refuses, whatever the state: each of
-        // their batches is named. Not found, not established, and ambiguous or
-        // reversed the same day among verified Contras only, are.
+        // their batches is named. Not found, not established, and ambiguous,
+        // reversed the same day or of another reference among verified Contras
+        // only, are.
         // One row can be skipped under several keys (two endpoints, two bank
         // ledgers): every one of them is read, live or not, which can only
         // refuse more.
@@ -620,7 +630,8 @@ impl Server {
                             vec![(batch, Carrier::OtherSideUnverified)]
                         }
                         SkipState::Ambiguous { candidates }
-                        | SkipState::ReversedSameDay { candidates } => candidates
+                        | SkipState::ReversedSameDay { candidates }
+                        | SkipState::ReferenceDiffers { candidates } => candidates
                             .iter()
                             .filter(|candidate| !verified.contains(candidate))
                             .map(|candidate| (&candidate.batch, Carrier::OtherSideUnverified))

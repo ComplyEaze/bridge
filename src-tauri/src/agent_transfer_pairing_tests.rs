@@ -141,6 +141,33 @@ fn matched_unconfirmed(batch: &str, txn: &str) -> SkipState {
     }
 }
 
+fn reference_differs(candidates: &[(&str, &str)]) -> SkipState {
+    SkipState::ReferenceDiffers {
+        candidates: candidates
+            .iter()
+            .map(|(batch, txn)| contra_key(batch, txn))
+            .collect(),
+    }
+}
+
+const U1: &str = "600000000001";
+const U2: &str = "600000000002";
+const U3: &str = "600000000003";
+
+/// The skipped row, printing the network reference `digits`.
+fn skip_printing(row: &str, digits: &str) -> SkipFact {
+    let mut fact = skip(row);
+    fact.reference = Some(reference(digits));
+    fact
+}
+
+/// b1's Contra, printing the network reference `digits`.
+fn contra_printing(batch: &str, txn: &str, digits: &str) -> ContraFact {
+    let mut fact = contra(batch, txn);
+    fact.reference = Some(reference(digits));
+    fact
+}
+
 fn ambiguous(candidates: &[(&str, &str)]) -> SkipState {
     SkipState::Ambiguous {
         candidates: candidates
@@ -241,13 +268,179 @@ fn transfer_pairing_equal_references_pair_in_round_one_whatever_the_date() {
 
 #[test]
 fn transfer_pairing_references_that_differ_never_pair() {
-    // equal amount, equal date, a reference on each side, and not the same one
-    let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
-    let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000002"));
-    let view = view_of(&[s], &[c], &january_covered(), 0);
+    // equal amount, equal date, a reference on each side, and not the same one:
+    // no pair, and the Contra is not said to be absent
+    let view = view_of(
+        &[skip_printing("st-1", U1)],
+        &[contra_printing("batch-1", "t1", U2)],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reference_differs(&[("batch-1", "t1")])
+    );
+}
+
+#[test]
+fn transfer_pairing_a_contra_of_another_reference_is_listed_whatever_is_covered_or_verified() {
+    for coverage in [january_covered(), Coverage::default()] {
+        for other in [
+            contra_printing("batch-1", "t1", U2),
+            unverified(contra_printing("batch-1", "t1", U2)),
+        ] {
+            let view = view_of(&[skip_printing("st-1", U1)], &[other], &coverage, 0);
+            assert_eq!(
+                state_of(&view, "st-1"),
+                reference_differs(&[("batch-1", "t1")])
+            );
+        }
+    }
+    // every such Contra is listed, in key order whatever the input order
+    let view = view_of(
+        &[skip_printing("st-1", U1)],
+        &[
+            contra_printing("batch-2", "t2", U3),
+            contra_printing("batch-1", "t1", U2),
+        ],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reference_differs(&[("batch-1", "t1"), ("batch-2", "t2")])
+    );
+    // a row flagged as reversed the same day is listed the same way: the
+    // flag decides only among candidates found by date
+    let mut flagged = skip_printing("st-1", U1);
+    flagged.reversed_same_day = true;
+    let view = view_of(
+        &[flagged],
+        &[contra_printing("batch-1", "t1", U2)],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reference_differs(&[("batch-1", "t1")])
+    );
+}
+
+#[test]
+fn transfer_pairing_only_a_contra_the_row_could_match_is_one_of_another_reference() {
+    let skipped = skip_printing("st-1", U1);
+    let mut next_day = contra_printing("batch-1", "t1", U2);
+    next_day.date = date("20260106");
+    let mut own_statement = contra_printing("batch-1", "t1", U2);
+    own_statement.statement_bank_ledger = ledger("b2");
+    let mut own_lineage = contra_printing("batch-1", "t1", U2);
+    own_lineage.lineage = skipped.lineage.clone();
+    let mut other_amount = contra_printing("batch-1", "t1", U2);
+    other_amount.amount = ExactDecimal::parse("500.01").unwrap();
+    for other in [next_day.clone(), own_statement, own_lineage, other_amount] {
+        let view = view_of(
+            std::slice::from_ref(&skipped),
+            &[other],
+            &january_covered(),
+            0,
+        );
+        assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+    }
+    // the next day is within reach once k is 1
+    let view = view_of(&[skipped], &[next_day], &january_covered(), 1);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reference_differs(&[("batch-1", "t1")])
+    );
+}
+
+#[test]
+fn transfer_pairing_a_contra_paired_with_another_row_is_not_one_of_another_reference() {
+    // paired by reference with its own row
+    let view = view_of(
+        &[skip_printing("st-1", U1), skip_printing("st-2", U2)],
+        &[contra_printing("batch-1", "t1", U1)],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        paired(PairRound::Reference, "batch-1", "t1")
+    );
+    assert_eq!(state_of(&view, "st-2"), SkipState::NotFound);
+    // paired by date with a row that prints no reference: that row still pairs
+    let rows = [skip("st-0"), skip_printing("st-1", U1)];
+    let other = [contra_printing("batch-1", "t1", U2)];
+    let view = view_of(&rows, &other, &january_covered(), 0);
+    assert_eq!(
+        state_of(&view, "st-0"),
+        paired(PairRound::NoReference, "batch-1", "t1")
+    );
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+    // matched by date on a day no window holds, it is still that row's Contra
+    let view = view_of(&rows, &other, &Coverage::default(), 0);
+    assert_eq!(
+        state_of(&view, "st-0"),
+        matched_unconfirmed("batch-1", "t1")
+    );
+    assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
+}
+
+#[test]
+fn transfer_pairing_two_rows_and_two_contras_each_with_its_own_reference_pair_by_reference() {
+    let view = view_of(
+        &[skip_printing("st-1", U1), skip_printing("st-2", U2)],
+        &[
+            contra_printing("batch-1", "t1", U1),
+            contra_printing("batch-1", "t2", U2),
+        ],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        paired(PairRound::Reference, "batch-1", "t1")
+    );
+    assert_eq!(
+        state_of(&view, "st-2"),
+        paired(PairRound::Reference, "batch-1", "t2")
+    );
+}
+
+#[test]
+fn transfer_pairing_a_row_with_a_reference_or_date_candidate_gains_none_of_another_reference() {
+    // a candidate by reference, not yet verified, beside a verified Contra of
+    // another reference: the row is open for the candidate it has
+    let view = view_of(
+        &[skip_printing("st-1", U1)],
+        &[
+            unverified(contra_printing("batch-1", "t1", U1)),
+            contra_printing("batch-2", "t2", U2),
+        ],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        SkipState::OtherSideUnverified {
+            batch: BatchId::new("batch-1")
+        }
+    );
+    // two candidates by date beside a Contra of another reference
+    let view = view_of(
+        &[skip_printing("st-1", U1)],
+        &[
+            contra("batch-1", "t1"),
+            contra_printing("batch-2", "t2", U2),
+            contra("batch-3", "t3"),
+        ],
+        &january_covered(),
+        0,
+    );
+    assert_eq!(
+        state_of(&view, "st-1"),
+        ambiguous(&[("batch-1", "t1"), ("batch-3", "t3")])
+    );
 }
 
 #[test]
@@ -838,7 +1031,9 @@ fn transfer_pairing_no_state_names_a_removed_contra() {
                 SkipState::Paired { contra, .. } | SkipState::MatchedUnconfirmed { contra } => {
                     assert_ne!(contra, &gone);
                 }
-                SkipState::Ambiguous { candidates } | SkipState::ReversedSameDay { candidates } => {
+                SkipState::Ambiguous { candidates }
+                | SkipState::ReversedSameDay { candidates }
+                | SkipState::ReferenceDiffers { candidates } => {
                     assert!(!candidates.contains(&gone));
                 }
                 SkipState::OtherSideUnverified { batch } => assert_ne!(batch, &gone.batch),
@@ -1588,11 +1783,15 @@ fn transfer_pairing_a_flag_does_not_veto_an_equal_network_reference() {
             paired(PairRound::Reference, "batch-1", "t1")
         );
     }
-    // a reference that differs is still no pair, flag or none
+    // a reference that differs is still no pair, flag or none: the Contra is
+    // listed as one of another reference
     let mut other = flagged.clone();
     other.reference = Some(reference("600000000002"));
     let view = view_of(&[referenced], &[other], &january_covered(), 0);
-    assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
+    assert_eq!(
+        state_of(&view, "st-1"),
+        reference_differs(&[("batch-1", "t1")])
+    );
 }
 
 /// A transfer from b2 to b1 in the morning and one back in the evening, the

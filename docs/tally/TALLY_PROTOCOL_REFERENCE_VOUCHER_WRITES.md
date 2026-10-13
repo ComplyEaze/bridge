@@ -188,7 +188,8 @@ screenshot is on the branch.
   unchanged, including the save with no field changed. In every series answer read after a save,
   the type's own `ALTERID` equals the `ALTMSTID` read with it, and no other type's `ALTERID` moved.
   So on this book every save of that type's screen moved `ALTMSTID`; a save of another type was not
-  measured. A moved `ALTMSTID` does not show that a setting changed.
+  measured in this run (the run in the next paragraph saved Receipt twice). A moved `ALTMSTID` does
+  not show that a setting changed.
 - **VERIFIED:** the series `NUMBERINGMETHOD` prints `Automatic (Manual Override)` and
   `Multi-user Auto` exactly as the screen names them, in plain ASCII; Multi-user Auto was offered
   on this Silver licence. A type switched to `Manual` with the screen's default left reads
@@ -203,9 +204,51 @@ screenshot is on the branch.
   the first read, reads `None` throughout. This agrees with the 9 October reading above. Not
   established: whether the save that changed nothing flips it on its own (no series answer was
   read between it and the next save).
-- **Not established:** the same on a type that holds vouchers; what `Auto Renumber` does to numbers
-  already in the book; Gold; other releases; macOS; the same answers through ComplyEaze Bridge's
+- **Not established:** a save of a type other than Contra and Receipt (the next paragraph measured
+  two saves of Receipt, which held vouchers; both changed its numbering behaviour, and `ALTMSTID`
+  moved by 2 at each); Gold; other releases; macOS; the same answers through ComplyEaze Bridge's
   own read.
+
+**"Renumber Vouchers" changed the numbers of vouchers already in the book without moving their
+`ALTERID`: verified 2026-10-13 on one book and one voucher type (PARTIAL).** On the same synthetic
+book, the Receipt type held one voucher. Six more Receipts were entered by hand on Tally's own
+screen, one per step, with no number typed, and the type's "Numbering behaviour on
+insertion/deletion" was set to "Renumber Vouchers" and back between them. The company's marks and
+ComplyEaze Bridge's own voucher export for July 2026 (`render_native_voucher_export_request`,
+1,778 bytes as sent) were read after every act, and the series request above (1,116 bytes as
+sent) at each setting (branch `lab/724-m8r-renumber-answers`, `6726047a`, bridge#724; every figure
+was read from the marks, voucher and series answers with an XML parser, with each size checked
+against `CONTENT-LENGTH`).
+
+- **VERIFIED:** with the series at `Auto Retain` ("Retain Original Voucher No."), each new Receipt
+  took the next number, a back-dated one included (twice), and no other voucher's number changed.
+- **VERIFIED:** saving the type with "Renumber Vouchers" (the series then read `Auto Renumber`)
+  put the four Receipts in the book into date order: three of them changed number. A back-dated
+  Receipt entered under it took number 2 and moved three later-dated Receipts up by one; a Receipt
+  dated after every other took the next number and moved nothing. Saving the type back to Retain
+  changed four of the six Receipts again, into the order they were entered (`MASTERID` order).
+- **VERIFIED:** in all ten changes of number the voucher's `ALTERID`, `MASTERID` and GUID stayed as
+  they were. `ALTVCHID` did not move at either save of the type; it moved by one for each voucher
+  entered. `ALTMSTID` moved by 2 at each save (231, 233, 235) and the type's own `ALTERID` read the
+  new `ALTMSTID` (233, then 235). So on this run a voucher's `ALTERID` and `ALTVCHID` did not show a
+  renumbering. The master mark and the type's `ALTERID` moved at each save, as they did at each
+  save of Contra and Receipt (the paragraph above), so they do not show one either.
+- **VERIFIED:** what the answers did show is which behaviour was set, in two places. The series'
+  `NUMBERINGSUBMETHOD` read `Auto Retain`, then `Auto Renumber`, then `Auto Retain`. And every
+  voucher row of the export carried `NUMBERINGSTYLE`: on each Receipt it read the setting in force
+  when the row was read, `Auto Retain` before the first save, `Auto Renumber` while the setting was
+  on (also on the two whose numbers never changed) and `Auto Retain` after the second; on the two
+  Payments, whose type is Manual, it read `Manual`, and on the three Journals `Auto Retain`
+  throughout. Neither value says that a number has changed.
+- **VERIFIED:** no voucher of another type changed (two Payments, three Journals), and the other
+  23 types' series read the same in all four series answers.
+- From that branch's notes, not from an answer: that each Receipt was entered by hand with no
+  number typed, and which screen setting was changed; that Tally asked two confirmations at each
+  switch on this type, one on choosing the behaviour and one on accepting the screen; and that
+  before accepting a Receipt the entry screen showed the number it then took.
+- **Not established:** a voucher that arrives by import while the type is on "Renumber Vouchers"
+  (every entry here was by hand); a deletion; Journal, Payment and Contra; a type holding more than
+  a handful of vouchers; Gold; other releases; macOS; "Set/Alter additional numbering details".
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**

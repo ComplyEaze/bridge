@@ -623,7 +623,7 @@ A voucher whose flags, or whose cancelled, optional or post-dated flag, are abse
 spelled another way keeps its row with
 `{"unread": code}` (`gst_status_not_reported` or `gst_status_unreadable`) in place of the value and is never read as
 `included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). So does a voucher whose `ISDELETED` or
-`ISDELETEDVCHRETAINED` flag reads Yes (`gst_status_voucher_deleted`): Tally returns
+`ISDELETEDVCHRETAINED` flag reads Yes (`gst_status_voucher_deleted`, which its acceptance flag carries too, so it is not counted as accepted): Tally returns
 the two flags without being asked, No on every voucher the lab read, a Yes was never measured, and what
 `ISDELETEDVCHRETAINED` means rests on its name. On the lab's book, where no Edit Log was seen to be on, one deleted
 voucher left the answer altogether. Both flags absent is allowed; one absent beside the other is unread. An answer in which a voucher

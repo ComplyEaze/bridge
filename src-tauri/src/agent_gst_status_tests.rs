@@ -894,11 +894,11 @@ fn a_cancelled_optional_or_post_dated_flag_decides_the_state_and_an_unreadable_o
 fn a_voucher_tally_marks_deleted_has_no_state_and_the_two_flags_absent_are_allowed() {
     let yes = |element: &str| element.replace(">No<", ">Yes<");
     for flag in [DELETED, RETAINED] {
-        // Yes was never measured: the voucher keeps its row and its acceptance, with no state.
+        // Yes was never measured: the voucher keeps its row, with no state and no acceptance.
         let target = target_after(|block| once(&block, flag, &yes(flag)));
         assert_eq!(
             (target.status, target.overridden),
-            (Err(DELETED_VOUCHER), Ok(false)),
+            (Err(DELETED_VOUCHER), Err(DELETED_VOUCHER)),
             "{flag}"
         );
         // One of the two absent beside the other is never No.
@@ -936,7 +936,7 @@ fn a_voucher_tally_marks_deleted_has_no_state_and_the_two_flags_absent_are_allow
             );
         }
     }
-    // The acceptance flag is read on a deleted voucher as on any other.
+    // The acceptance flag of a deleted voucher is not read: it is not counted as accepted.
     let accepted = target_after(|block| {
         once(
             &once(&block, DELETED, &yes(DELETED)),
@@ -946,7 +946,7 @@ fn a_voucher_tally_marks_deleted_has_no_state_and_the_two_flags_absent_are_allow
     });
     assert_eq!(
         (accepted.status, accepted.overridden),
-        (Err(DELETED_VOUCHER), Ok(true))
+        (Err(DELETED_VOUCHER), Err(DELETED_VOUCHER))
     );
     // Both removed, as when Tally does not volunteer them: read as before. Both Yes: no state.
     let neither = target_after(|block| once(&once(&block, DELETED, ""), RETAINED, ""));

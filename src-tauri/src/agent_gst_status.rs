@@ -323,7 +323,8 @@ pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static st
                 flag("VCHGSTSTATUSISEXCLUDED")?,
             );
             let flags = (flags.0.as_deref(), flags.1.as_deref(), flags.2.as_deref());
-            let status = not_deleted(deleted.0.as_deref(), deleted.1.as_deref()).and_then(|()| {
+            let deleted_check = not_deleted(deleted.0.as_deref(), deleted.1.as_deref());
+            let status = deleted_check.and_then(|()| {
                 status_of_voucher(
                     kind.0.as_deref(),
                     kind.1.as_deref(),
@@ -339,11 +340,13 @@ pub(super) fn parse_status_rows(xml: &str) -> Result<Vec<StatusRow>, &'static st
                 }
                 _ => None,
             };
-            Ok((
-                status,
-                status_flags,
-                overridden_of(flag("ISGSTOVERRIDDEN")?.as_deref()),
-            ))
+            // A voucher Tally marks deleted is not accepted as it stands in any return: its
+            // acceptance flag is as unread as its state.
+            let overridden = match deleted_check {
+                Err(code @ "gst_status_voucher_deleted") => Err(code),
+                _ => overridden_of(flag("ISGSTOVERRIDDEN")?.as_deref()),
+            };
+            Ok((status, status_flags, overridden))
         };
         let (status, status_flags, overridden) = match (nested, read()) {
             (false, Ok(read)) => read,
@@ -527,7 +530,7 @@ impl Server {
                 "cancelled means Tally's ISCANCELLED reads Yes and optional that its ISOPTIONAL reads Yes. Each is decided before the three status flags and is never counted as included, uncertain, excluded or not_in_return: on the lab's book a cancelled Sales voucher read the included flag Yes and an optional one read all three No (one voucher each). Whether Tally lists a cancelled voucher anywhere in the return, such as among the documents issued, is not measured",
                 "post_dated means Tally's ISPOSTDATED reads Yes, which is not the same as a date still ahead: on the lab's book the flag read Yes on a Sales voucher marked post-dated by hand (Ctrl+T) and dated the day Tally's current date (the date set with F2, not the calendar's) had been set to, and that voucher read the included flag Yes (one voucher). It is decided before the three status flags, as cancelled and optional are, and is never counted as included, uncertain, excluded or not_in_return. Whether Tally's return lists a post-dated voucher, while Tally's current date is before the voucher's date or once it has reached it, is not measured, and ComplyEaze Bridge states neither: look at the return in Tally. A voucher that reads more than one of cancelled, optional and post-dated Yes is unread",
                 "status_flags, on a cancelled, optional or post_dated voucher only, is what Tally's three status flags read on it (included, uncertain, excluded or not_in_return). It is returned so that nothing read is hidden, and it is not counted: it does not say that the return lists the voucher",
-                "A voucher whose ISDELETED or ISDELETEDVCHRETAINED flag reads Yes is unread (gst_status_voucher_deleted). Tally returns the two flags without being asked, No on every voucher the lab read; a Yes was never measured, and what ISDELETEDVCHRETAINED means rests on its name. On the lab's book, where no Edit Log was seen to be on, one deleted voucher left the answer altogether. Both flags absent is allowed; one absent beside the other is unread",
+                "A voucher whose ISDELETED or ISDELETEDVCHRETAINED flag reads Yes is unread (gst_status_voucher_deleted), and so is whether it was accepted as it stands, which is not counted. Tally returns the two flags without being asked, No on every voucher the lab read; a Yes was never measured, and what ISDELETEDVCHRETAINED means rests on its name. On the lab's book, where no Edit Log was seen to be on, one deleted voucher left the answer altogether. Both flags absent is allowed; one absent beside the other is unread",
                 "A total of 0 may mean no voucher of that name in the window or a type name that matched nothing; the name is not checked against the book's voucher types, take it from masters",
                 "Each page is a new read of Tally: a voucher saved between two pages can shift the offsets, so a page may repeat or skip one. Read all the pages in one sitting, or narrow the window",
                 "Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured",

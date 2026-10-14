@@ -29,6 +29,17 @@ These changes are in source and not yet in a published build.
   not a measured ratio; a large book may be read in more parts or refused as too large. Measured on one 14-ledger lab book of TallyPrime 7.1 Silver and not yet run through this tool on a
   live Tally.
 
+- `masters` can list a company's stock items (`kind` `stock_items`): each row carries the item's own dated HSN
+  entries (`hsn`) and GST rate entries (`gst`) as Tally sent them, nothing choosing the code or the rate for a date
+  (part of #1233). An empty or missing list is not "no HSN or GST": a code keyed on a stock group did not appear on
+  its items' lists, the group's and the company's setting is not read, and every row says so
+  (`inherited_from_group_or_company: not_read`). A defect in one item's list marks that list `unreadable` with its
+  defect and the read stands; a Tally `ERROR`, markup inside a value or a cut-off list refuses the read. Item names
+  and parents are masked under `mask_parties`; HSN codes, descriptions and rates are returned as sent. A book is read
+  only up to a master mark of 489. Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
+  with two dated entries in each list); a state row other than `Any`, slab rates, another release and a larger book
+  are not measured. `stock_summary` is unchanged.
+
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
   Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
   and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,

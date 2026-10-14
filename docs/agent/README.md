@@ -379,12 +379,13 @@ reads. Use `ledger_movement` with narrow dates when voucher detail is needed.
 ### Masters
 
 Use `masters` with `company_guid` and one `kind`: `voucher_types`, `godowns`,
-`units`, `stock_groups`, `cost_centres`, `cost_categories` or `groups`. It lists a company's masters of that
+`units`, `stock_groups`, `stock_items`, `cost_centres`, `cost_categories` or `groups`. It lists a company's masters of that
 kind, for example a voucher type's numbering method (`automatic`, `manual` or
 `default`, as Tally reports it) and its `active` and `optional` flags. Each row
 carries `name`, `guid`, `master_id`, `alter_id` and `parent`; units add
 `decimal_places` and `simple`; cost centres add `category` (always present: a centre without one is refused as `masters_row_field_invalid:category`) and
-cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`.
+cost categories `allocates_revenue`, `allocates_non_revenue` and `affects_stock`;
+stock items add `hsn` and `gst` (below).
 Cost centres and categories are returned whether or not the company's Cost
 Centres setting is on: a book whose setting read No still returned its two
 centres and two categories (one synthetic book), and a book whose setting read Yes
@@ -399,8 +400,38 @@ cost collections must carry the `MSTDEPTYPE` Tally printed on every captured ans
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
 type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
-and a cost centre's category are masked, as godown and stock-group names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
-reads those allocations yet. A `groups` row carries `name`,
+and a cost centre's category are masked, as godown, stock-group and stock-item names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
+reads those allocations yet.
+
+A `stock_items` row carries the item's own dated `hsn` and `gst` lists, each as Tally
+sent it, and `inherited_from_group_or_company: not_read`. Each list is an `observation`:
+`entries` (sorted by `applicable_from`, every entry as sent; an HSN entry has its
+`hsn_code` as exact text, never trimmed, cut or read as a number, a `description`
+Tally fills from its own list and a `source`; a GST entry has `taxability`, `source`,
+`itc_eligible` (true, false or null, never filled in) and its state rows, each rate
+being `absent`, `empty`, `zero` or a `value` with its `raw` text and `decimal`, never
+merged), `unreadable` with its `defect` (an undated entry, an invalid date, a repeated
+field, two different entries on one date, a rate that is not a plain decimal, a credit
+flag other than Yes or No, a repeated state or duty-head row, or content only of a kind
+not modelled; that list of that item only, and the read and the row stand) or
+`not_observed` (the row had no such list). Nothing chooses the code or the rate for
+a date. An empty list, or `not_observed`, is not a statement that the item has no HSN
+code or no GST rate: a code keyed on the item's stock group did not appear on the
+items' lists (one synthetic book, one release), and the group's and the company's
+setting is not read. Tally adds an entry of its own (dated 1 April 2025, source
+`As per Company/Stock Group`, no code, no rate) when an item is first saved. `state_name` and
+`valuation_type` carry the reserved-character marker (U+FFFD `#4;`) where Tally sends
+`Any` and `Not Applicable`. `itc_eligible` was present on one entry of an item and absent
+on the other, and did not follow the screen's setting. A Tally `ERROR` or `LINEERROR`
+anywhere in a list, markup inside a value, or a list cut off refuses the whole read
+(`masters_tally_reported_failure`, `masters_scalar_not_text_only`,
+`masters_xml_invalid_escape`, `masters_row_unterminated`). The collection must carry
+`MSTDEPTYPE` 512 (a choice made like the cost collections', not a measurement: no
+zero-row stock-item answer was captured). Under `mask_parties` item names and parents are
+masked; HSN codes, descriptions and rates are not names and are returned as sent.
+Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row other than
+`Any`, slab rates, another release and a larger book are not measured (protocol
+reference §12a.19). A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
@@ -413,16 +444,16 @@ its read in memory and a later page continues from it while the extent is
 unchanged (`snapshot`, `snapshot_id`, `listing_snapshot_changed`), as
 `trial_balance` does.
 
-Godowns, units, stock groups, cost centres and cost categories are read whole only when the master-alteration
+Godowns, units, stock groups, stock items, cost centres and cost categories are read whole only when the master-alteration
 mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
 mark counts the masters of every kind, so a book with few of this kind can be
 refused. That admits a mark of at most 1,152 for godowns, 1,168 for units,
-1,160 for stock groups, 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
+1,160 for stock groups, 489 for stock items (their row is allowed for several dated entries: 10,200 UTF-16 units against 4,373 measured), 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
 read at). Retrying refuses again. Both stock-heavy client books measured, with
-marks of about 100,000 and 300,000, refuse godowns, units and stock groups (cost
-centres and categories were not tried on them); how common such
+marks of about 100,000 and 300,000, refuse godowns, units and stock groups, and by the same arithmetic stock items (cost
+centres, categories and stock items were not tried on them); how common such
 marks are across live books is unmeasured (protocol reference §12a.12). `voucher_types` and `groups` have no size check
 before the read: voucher types keep the policy of Bridge's other voucher-type
 read, and groups that of the group read `profit_and_loss` and `balance_sheet`
@@ -456,7 +487,7 @@ unverified: absence from it is not evidence that a voucher type is absent from
 the book. The size bound rests on assumed limits (128
 characters a name, four aliases a master) that no capture has measured; a row
 that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
-hints (the company's `NUM*` fields), stock items or writes are part of this tool.
+hints (the company's `NUM*` fields), stock-item quantities or values (use `stock_summary`) or writes are part of this tool.
 
 Under `mask_parties`, godown, stock-group, cost-centre and cost-category names, their `parent`
 values and a cost centre's `category` are masked like a party name, because a job-work

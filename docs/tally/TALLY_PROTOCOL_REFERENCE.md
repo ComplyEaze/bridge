@@ -426,6 +426,9 @@ base revision.
 <a id="12a18-the-company-collections-settings-and-currency-symbol"></a>
 
 [12a.18 The Company collection's settings and currency symbol](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a18-the-company-collections-settings-and-currency-symbol)
+<a id="12a19-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-a-groups-or-the-companys-code-is-not-on-them"></a>
+
+[12a.19 Stock items carry their own dated HSN and GST lists in a masters read; a group's or the company's code is not on them](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a19-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-a-groups-or-the-companys-code-is-not-on-them)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

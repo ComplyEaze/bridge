@@ -529,8 +529,7 @@ async fn an_unknown_amendment_target_is_refused_before_any_tally_read() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let mut input = serde_json::to_value(payload()).unwrap();
     input["amends_batch_id"] = json!(ORIGINAL);
@@ -557,8 +556,7 @@ fn simulated_server(directory: &std::path::Path, port: u16) -> Server {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     })
 }
 

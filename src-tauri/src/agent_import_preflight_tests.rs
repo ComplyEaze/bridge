@@ -81,8 +81,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         let error = server
             .build_import_xml(&serde_json::to_value(input).unwrap())

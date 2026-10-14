@@ -245,8 +245,7 @@ fn server_redacting(
         max_bytes: 200_000,
         redaction,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     })
 }
 
@@ -648,22 +647,6 @@ async fn a_batch_changed_while_approval_is_pending_is_refused_by_name() {
     .await;
 }
 
-fn batch_server_at(address: std::net::SocketAddr, directory: &std::path::Path) -> Server {
-    Server::new(crate::agent::Settings {
-        endpoint: TallyEndpointConfig {
-            host: address.ip().to_string(),
-            port: address.port(),
-        },
-        data_dir: directory.to_path_buf(),
-        max_rows: 10,
-        max_bytes: 200_000,
-        redaction: crate::agent::Redaction::None,
-        import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: true,
-    })
-}
-
 /// `saved_batch`, with a second Journal on the same ledgers and day.
 fn saved_batch_of_two(server: &Server) -> (ImportLedgerLine, Value) {
     saved_batch_with_second(server, |second| {
@@ -712,7 +695,7 @@ async fn race_a_batch_id_during_approval(
     plans.extend(after_approval(xml(created_one())));
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_batch_of_two(&server);
     let mut earlier = line.clone();
     earlier.batch_id = "bridge-00000000-0000-4000-8000-000000000585".into();
@@ -778,7 +761,7 @@ async fn a_batch_post_records_its_step_verdict_before_the_readback() {
     plans.push(xml(company_marks(12, 50, "WR2 Unicode Lab")));
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_batch_of_two(&server);
     let scripted = ScriptedApproval::approving();
     let response = SCRIPTED_APPROVAL
@@ -824,7 +807,7 @@ async fn a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt() 
         plans.extend(readback);
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
-        let server = batch_server_at(simulator.address(), directory.path());
+        let server = server_at(simulator.address(), directory.path());
         let (line, args) = saved_batch_of_two(&server);
         let response = SCRIPTED_APPROVAL
             .scope(
@@ -853,12 +836,14 @@ async fn a_batch_post_whose_readback_failed_names_the_cause_in_its_step_doubt() 
     }
 }
 
-/// With batch posting off, a batch of two is refused before any request.
+/// With posting on and the retired batch setting still in the environment
+/// (#1090), a saved batch is refused in band, by name, before any request.
 #[tokio::test]
-async fn a_batch_is_refused_while_batch_posting_is_off() {
+async fn a_batch_is_refused_while_the_retired_batch_setting_is_present() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = server_at(simulator.address(), directory.path());
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.posting = crate::agent::Posting::RetiredSettingPresent;
     let (_, args) = saved_batch_of_two(&server);
     let response = SCRIPTED_APPROVAL
         .scope(
@@ -867,11 +852,39 @@ async fn a_batch_is_refused_while_batch_posting_is_off() {
         )
         .await;
     assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"],
-        "import_post_requires_one_voucher",
+        response["structuredContent"]["result"]["error"]["code"], "setting_retired",
         "{response}"
     );
     assert!(sent(simulator).is_empty());
+}
+
+/// The retired setting refuses a one-voucher post too, not only a batch, and
+/// leaves `acknowledge_post_review` to its own checks (#1090).
+#[tokio::test]
+async fn the_retired_batch_setting_refuses_one_voucher_but_not_a_review() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.posting = crate::agent::Posting::RetiredSettingPresent;
+    let (_, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "setting_retired",
+        "{response}"
+    );
+    assert!(sent(simulator).is_empty());
+    let review = server.call_tool("acknowledge_post_review", args).await;
+    // Its own first refusal for a batch never posted: the call reached the
+    // review's handler rather than a gate in front of it.
+    assert_eq!(
+        review["structuredContent"]["result"]["error"]["code"], "ack_batch_not_posted",
+        "{review}"
+    );
 }
 
 /// The same REMOTEID recorded by another process while the dialog is open is
@@ -1190,8 +1203,7 @@ async fn a_dispatch_admission_that_fails_sends_nothing() {
             max_bytes: 200_000,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: true,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::On,
         });
         other.append_import_ledger(&changed).unwrap();
     });
@@ -4479,7 +4491,7 @@ async fn a_refusal_for_a_row_already_in_the_book_names_the_row() {
 async fn same_day_twins_in_one_batch_pass_the_check_before_the_dialog() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_batch_with_second(&server, |second| {
         second.narration = Some("Second payee, same amount".into());
     });
@@ -4528,8 +4540,7 @@ async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
         max_bytes: crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET - 1,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     });
     let (_line, args) = saved_batch(&server);
     let refused = server.call_tool("post_import", args).await;
@@ -5340,7 +5351,7 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     let expected_requests = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_partial_batch(&server);
     let posted = SCRIPTED_APPROVAL
         .scope(
@@ -5459,7 +5470,7 @@ async fn post_batch_rejected(answer: String, after_mark: u64) -> Value {
     let expected_requests = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (_, args) = saved_partial_batch(&server);
     let posted = SCRIPTED_APPROVAL
         .scope(
@@ -5539,7 +5550,7 @@ async fn batch_posted_then_verified_later_with(
     plans.extend(span_readback(window.clone(), after_mark));
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_partial_batch(&server);
     let _ = SCRIPTED_APPROVAL
         .scope(
@@ -5560,7 +5571,7 @@ async fn batch_posted_then_verified_later_with(
     let later_plans = span_readback(window, after_mark);
     let expected_requests = later_plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(later_plans)).unwrap();
-    let later_server = batch_server_at(simulator.address(), directory.path());
+    let later_server = server_at(simulator.address(), directory.path());
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let later_origin =
         super::super::super::canonical_loopback_origin(&later_server.settings.endpoint).unwrap();

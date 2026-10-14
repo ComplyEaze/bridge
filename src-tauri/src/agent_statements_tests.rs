@@ -140,8 +140,7 @@ async fn call_with(
         max_bytes: 200_000,
         redaction,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     });
     let response = server
         .call_tool(

@@ -3214,3 +3214,78 @@ fn the_batches_that_were_sent_are_listed() {
         BTreeSet::from([BatchId::new(batch_id(3))])
     );
 }
+
+// ---- a retired batch ---------------------------------------------------------------
+
+fn proof() -> ledger::ProofName {
+    ledger::ProofName::of(b"proof", chrono::Utc::now())
+}
+
+impl Journal {
+    /// A read of Tally found the batch absent: it is retired.
+    fn retired(self, build: &Build) -> Self {
+        let mut line = build.line();
+        line.status = "verification_incomplete".into();
+        self.push(&ledger::StatusRecord::retired(&line, proof()))
+    }
+    /// A verification after the retire that saw a voucher carrying the batch's own tag.
+    fn saw_its_own_tag(self, build: &Build) -> Self {
+        let mut line = build.line();
+        line.status = "verification_incomplete".into();
+        self.push(&ledger::StatusRecord::verified(&line, proof()).with_own_tag_observed())
+    }
+}
+
+fn facts_of_journal(journal: &Journal) -> TransferFacts {
+    read_scoped(journal, None, None, &BTreeSet::new())
+}
+
+#[test]
+fn a_retired_batch_leaves_the_facts_whole() {
+    let holder = posts_row_one(3);
+    let without = facts_of_journal(&Journal::default());
+    let retired = facts_of_journal(&Journal::default().batch(&holder).retired(&holder));
+    // no hold, no Contra, no blocked day: as if the batch had never been built
+    assert!(retired.held_elsewhere.is_empty());
+    assert!(retired.contras.is_empty());
+    assert_eq!(retired.skips.len(), without.skips.len());
+    assert_eq!(retired.skips.len(), 1);
+    assert_eq!(
+        format!("{:?}", retired.coverage),
+        format!("{:?}", without.coverage)
+    );
+    // the same batch not retired does hold the row and book its Contra
+    let held = facts_of_journal(&Journal::default().batch(&holder));
+    assert_eq!(held.held_elsewhere.len(), 1);
+    assert_eq!(held.contras.len(), 1);
+}
+
+#[test]
+fn an_own_tag_observation_after_a_retire_returns_the_batch_to_the_facts() {
+    let holder = posts_row_one(3);
+    let seen = facts_of_journal(
+        &Journal::default()
+            .batch(&holder)
+            .retired(&holder)
+            .saw_its_own_tag(&holder),
+    );
+    assert_eq!(seen.held_elsewhere.len(), 1);
+    assert_eq!(seen.contras.len(), 1);
+    // a verification that saw nothing of its own tag changes nothing
+    let blind = facts_of_journal(
+        &Journal::default()
+            .batch(&holder)
+            .retired(&holder)
+            .status(&holder, "verification_incomplete"),
+    );
+    assert!(blind.held_elsewhere.is_empty() && blind.contras.is_empty());
+    // a readback that found it posted brings it back whole
+    let found = facts_of_journal(
+        &Journal::default()
+            .batch(&holder)
+            .retired(&holder)
+            .status(&holder, "posted_verified"),
+    );
+    assert_eq!(found.retired_skips, 1);
+    assert_eq!(found.contras.len(), 1);
+}

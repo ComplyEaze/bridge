@@ -105,11 +105,22 @@ enum StatusKind {
     /// vouchers, or why it was refused. At most one per batch, after its
     /// response; it never changes the batch's status.
     PostSpanVerdict,
+    /// A read of Tally found none of a never-sent batch's vouchers, and the
+    /// batch was retired: its saved file is gone and it is never sent. The
+    /// record is the verification of that read (it sets the status and names
+    /// the proof, as a verification record does), and in one record so there is
+    /// no state in which the verification is written and the retirement is not.
+    /// A binary that does not know this kind refuses the whole journal.
+    #[serde(rename = "import_batch_retired")]
+    BatchRetired,
 }
 
 /// The status a post-span verdict record carries. It is not a batch status:
 /// readers keep the batch's own status when they meet it.
 const POST_SPAN_VERDICT_STATUS: &str = "post_span_verdict";
+
+/// The status a verification gives a batch whose vouchers are all in Tally.
+const POSTED_VERIFIED: &str = "posted_verified";
 
 /// What binding a batch's native post decided, as journaled.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -161,6 +172,14 @@ pub(in crate::agent) struct StatusRecord {
     /// (`deny_unknown_fields`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     proof: Option<ProofName>,
+    /// A verification of a batch already retired saw a voucher carrying the
+    /// batch's own narration tag: the batch is in Tally after all and counts
+    /// again in the transfer view. Written only then, and only on a
+    /// verification record, so a journal gains it only after a retirement. A
+    /// binary older than this field refuses a journal holding one
+    /// (`deny_unknown_fields`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    own_tag_observed: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -199,6 +218,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
+            own_tag_observed: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -249,6 +269,29 @@ impl StatusRecord {
             bindings,
             binding_refusal,
             proof: None,
+            own_tag_observed: None,
+        }
+    }
+
+    /// The verification of a read that found a never-sent batch absent, which
+    /// retires it. `batch.status` is the verdict that read gave; `proof` names
+    /// the pair the read saved.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn retired(batch: &ImportLedgerLine, proof: ProofName) -> Self {
+        Self {
+            record_type: StatusKind::BatchRetired,
+            proof: Some(proof),
+            ..Self::verification(batch)
+        }
+    }
+
+    /// This verification record also says the read saw a voucher carrying the
+    /// batch's own tag.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) fn with_own_tag_observed(self) -> Self {
+        Self {
+            own_tag_observed: Some(true),
+            ..self
         }
     }
 
@@ -261,7 +304,11 @@ impl StatusRecord {
     /// The proof this record names current: a verification record names its
     /// own, or the legacy file when an older build wrote it; others none.
     fn current_proof(&self) -> Option<CurrentProof> {
-        matches!(self.record_type, StatusKind::VerificationStatus).then(|| {
+        matches!(
+            self.record_type,
+            StatusKind::VerificationStatus | StatusKind::BatchRetired
+        )
+        .then(|| {
             self.proof
                 .clone()
                 .map_or(CurrentProof::Legacy, CurrentProof::Saved)
@@ -290,6 +337,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
+            own_tag_observed: None,
         }
     }
 }
@@ -318,6 +366,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
+            own_tag_observed: None,
         }
     }
 }
@@ -336,6 +385,12 @@ pub(super) struct VerificationGeneration(usize);
 pub(super) struct BatchSnapshot {
     pub(super) batch: ImportLedgerLine,
     pub(super) dispatched: bool,
+    /// A read of Tally found the batch absent and it was retired: it is never
+    /// sent.
+    pub(super) retired: bool,
+    /// Some record of the batch, at any time, said it was found posted. The
+    /// latest status forgets that; this does not.
+    pub(super) ever_found: bool,
     pub(super) response: Option<DispatchResponse>,
     /// The REMOTEID recorded with the native dispatch intent, if any.
     pub(super) native_remote_id: Option<String>,
@@ -382,6 +437,9 @@ pub(super) fn read_snapshot(
                 dispatched: selected
                     .as_ref()
                     .is_some_and(|snapshot| snapshot.dispatched),
+                retired: selected.as_ref().is_some_and(|snapshot| snapshot.retired),
+                ever_found: batch.status == POSTED_VERIFIED
+                    || selected.as_ref().is_some_and(|snapshot| snapshot.ever_found),
                 batch: *batch,
                 generation,
             });
@@ -395,6 +453,7 @@ pub(super) fn read_snapshot(
                 snapshot.response = Some(response);
             }
             snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
+            snapshot.retired |= matches!(update.record_type, StatusKind::BatchRetired);
             if update.native_remote_id.is_some() {
                 snapshot.native_remote_id = update.native_remote_id.clone();
             }
@@ -408,6 +467,7 @@ pub(super) fn read_snapshot(
                 snapshot.current_proof = proof;
             }
             if update.sets_status() {
+                snapshot.ever_found |= update.status == POSTED_VERIFIED;
                 snapshot.batch.status = update.status;
             }
             snapshot.generation = generation;
@@ -439,6 +499,9 @@ pub(super) fn read_lineage(
                     snapshot.current_proof.clone()
                 }),
                 dispatched: prior.is_some_and(|snapshot| snapshot.dispatched),
+                retired: prior.is_some_and(|snapshot| snapshot.retired),
+                ever_found: batch.status == POSTED_VERIFIED
+                    || prior.is_some_and(|snapshot| snapshot.ever_found),
                 batch: *batch,
                 generation,
             };
@@ -457,6 +520,7 @@ pub(super) fn read_lineage(
                     snapshot.response = Some(response);
                 }
                 snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
+                snapshot.retired |= matches!(update.record_type, StatusKind::BatchRetired);
                 if update.native_remote_id.is_some() {
                     snapshot.native_remote_id = update.native_remote_id.clone();
                 }
@@ -470,6 +534,7 @@ pub(super) fn read_lineage(
                     snapshot.current_proof = proof;
                 }
                 if update.sets_status() {
+                    snapshot.ever_found |= update.status == POSTED_VERIFIED;
                     snapshot.batch.status = update.status;
                 }
                 snapshot.generation = generation;
@@ -560,7 +625,8 @@ pub(super) struct Settlement {
     /// vouchers was refused: matched by content only, they stay unsettled for
     /// good (#1039).
     pub(super) unsettled_binding_refused: usize,
-    /// Batches with no recorded dispatch that were never found posted. That
+    /// Batches with no recorded dispatch that were never found posted and
+    /// were not retired. That
     /// includes a batch imported by hand whose verification is incomplete, which
     /// may well be in Tally: this is what the journal holds, not what Tally
     /// holds, and no deletion may rest on it. Their saved file is what
@@ -579,6 +645,8 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         /// A readback found the batch posted at some point.
         found: bool,
         binding_refused: bool,
+        /// A read of Tally found the batch absent and it was retired.
+        retired: bool,
     }
     let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
     scan_records(reader, |record, _| match record {
@@ -596,6 +664,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
                     progress.binding_refused = update.binding_refusal.is_some();
                 }
                 StatusKind::VerificationStatus => {}
+                StatusKind::BatchRetired => progress.retired = true,
             }
             // The latest status of every kind is the batch's status, as
             // `read_snapshot` takes it: a dispatch intent or a response after a
@@ -617,7 +686,11 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     Ok(Settlement {
         batches: batches.len(),
         sent_or_found,
-        no_dispatch_never_verified: batches.len() - sent_or_found,
+        // A retired batch is settled: it was read absent and is never sent.
+        no_dispatch_never_verified: batches
+            .values()
+            .filter(|progress| !(progress.dispatched || progress.found || progress.retired))
+            .count(),
         unsettled_no_response: unsettled
             .clone()
             .filter(|progress| !progress.responded)
@@ -776,6 +849,7 @@ pub(super) fn rows_held_as_vouchers(
 /// The facts the transfer pairing view takes for one company: the journal
 /// (every record admitted, as for every other read) and the skip-only file,
 /// with a build about to be written, if any, read as the newest record.
+#[cfg(test)]
 pub(super) fn transfer_facts(
     journal: impl BufRead,
     skips_file: impl BufRead,
@@ -811,11 +885,19 @@ pub(super) fn transfer_facts_scoped(
         Record::Batch(batch) if Some(batch.batch_id.as_str()) == subject => {}
         Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
         Record::Status(update) if Some(update.batch_id.as_str()) == subject => {}
-        Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
-            sent: matches!(update.record_type, StatusKind::DispatchIntent),
-            batch_id: update.batch_id,
-            status: update.status,
-        }),
+        Record::Status(update) if update.sets_status() => {
+            if matches!(update.record_type, StatusKind::BatchRetired) {
+                events.push(JournalEvent::BatchRetired {
+                    batch_id: update.batch_id.clone(),
+                });
+            }
+            events.push(JournalEvent::Status {
+                sent: matches!(update.record_type, StatusKind::DispatchIntent),
+                own_tag: update.own_tag_observed == Some(true),
+                batch_id: update.batch_id,
+                status: update.status,
+            });
+        }
         Record::Status(_) => {}
     })
     .map_err(|code| TransferFactsError::JournalUnreadable { code })?;
@@ -918,6 +1000,19 @@ fn scan_records(
             }
             // A saved proof belongs only to a verification status record.
             if update.proof.is_some()
+                && !matches!(
+                    update.record_type,
+                    StatusKind::VerificationStatus | StatusKind::BatchRetired
+                )
+            {
+                return Err("import_ledger_invalid".into());
+            }
+            // A retirement is a verification: it names the proof it saved. The
+            // own-tag note belongs to a verification record alone.
+            if matches!(update.record_type, StatusKind::BatchRetired) && update.proof.is_none() {
+                return Err("import_ledger_invalid".into());
+            }
+            if update.own_tag_observed.is_some()
                 && !matches!(update.record_type, StatusKind::VerificationStatus)
             {
                 return Err("import_ledger_invalid".into());
@@ -1109,6 +1204,13 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
             let dispatched = latest
                 .get(&batch.batch_id)
                 .is_some_and(|index| batches[*index].dispatched);
+            let retired = latest
+                .get(&batch.batch_id)
+                .is_some_and(|index| batches[*index].retired);
+            let ever_found = batch.status == POSTED_VERIFIED
+                || latest
+                    .get(&batch.batch_id)
+                    .is_some_and(|index| batches[*index].ever_found);
             let response = latest
                 .get(&batch.batch_id)
                 .and_then(|index| batches.get(*index))
@@ -1130,6 +1232,8 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
                 span_verdict,
                 current_proof,
                 dispatched,
+                retired,
+                ever_found,
                 batch: *batch,
                 generation,
             });
@@ -1140,6 +1244,7 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
                 snapshot.response = Some(response);
             }
             snapshot.dispatched |= matches!(update.record_type, StatusKind::DispatchIntent);
+            snapshot.retired |= matches!(update.record_type, StatusKind::BatchRetired);
             if update.native_remote_id.is_some() {
                 snapshot.native_remote_id = update.native_remote_id.clone();
             }
@@ -1153,6 +1258,7 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
                 snapshot.current_proof = proof;
             }
             if update.sets_status() {
+                snapshot.ever_found |= update.status == POSTED_VERIFIED;
                 snapshot.batch.status = update.status;
             }
             snapshot.generation = generation;

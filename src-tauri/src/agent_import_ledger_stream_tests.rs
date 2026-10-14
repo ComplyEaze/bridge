@@ -435,6 +435,33 @@ fn a_batch_intent_records_distinct_remoteids_that_the_journal_finds() {
     );
 }
 
+#[test]
+fn a_retired_batch_is_settled_and_not_counted_as_never_verified() {
+    let never = batch("never", "n");
+    let retired = batch("retired", "n");
+    let mut incomplete = retired.clone();
+    incomplete.status = "verification_incomplete".into();
+    let name = ProofName::of(b"proof", chrono::Utc::now());
+    let mut bytes = record(&never);
+    bytes.extend(record(&retired));
+    assert_eq!(
+        settlement(Cursor::new(bytes.clone())).unwrap().no_dispatch_never_verified,
+        2
+    );
+    bytes.extend(record(&StatusRecord::retired(&incomplete, name)));
+    assert_eq!(
+        settlement(Cursor::new(bytes)).unwrap(),
+        Settlement {
+            batches: 2,
+            sent_or_found: 0,
+            unsettled: 0,
+            unsettled_no_response: 0,
+            unsettled_binding_refused: 0,
+            no_dispatch_never_verified: 1
+        }
+    );
+}
+
 /// What a deletion would have to keep (#local-data): the settlement counts.
 #[test]
 fn settlement_counts_sent_and_unsettled_batches() {

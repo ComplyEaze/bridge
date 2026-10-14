@@ -539,7 +539,11 @@ pub(super) enum JournalEvent {
         batch_id: String,
         status: String,
         sent: bool,
+        /// A verification saw a voucher carrying the batch's own tag.
+        own_tag: bool,
     },
+    /// A read of Tally found the never-sent batch absent and it was retired.
+    BatchRetired { batch_id: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -669,6 +673,10 @@ struct Batch {
     status: String,
     sent: bool,
     found: bool,
+    /// Retired by a read of Tally that found it absent.
+    retired: bool,
+    /// A verification since the retirement saw a voucher carrying its own tag.
+    own_tag: bool,
 }
 
 impl Batch {
@@ -757,6 +765,8 @@ fn fold_batches(
                             line,
                             facts,
                             sent: false,
+                            retired: false,
+                            own_tag: false,
                         });
                     }
                 }
@@ -766,16 +776,28 @@ fn fold_batches(
                 batch_id,
                 status,
                 sent,
+                own_tag,
             } => {
                 if let Some(&at) = index.get(&batch_id) {
                     let batch = &mut batches[at];
                     batch.found |= status == POSTED_VERIFIED;
                     batch.sent |= sent;
+                    batch.own_tag |= own_tag;
                     batch.status = status;
+                }
+            }
+            JournalEvent::BatchRetired { batch_id } => {
+                if let Some(&at) = index.get(&batch_id) {
+                    batches[at].retired = true;
                 }
             }
         }
     }
+    // A retired batch was read absent from Tally and is never sent, so it
+    // leaves the facts whole: no hold, no Contra, no skip mention, no blocked
+    // day. It comes back as soon as a verification sees a voucher carrying its
+    // own tag, or finds it posted, since then it may be in the book after all.
+    batches.retain(|batch| !batch.retired || batch.own_tag || batch.found);
     Ok(batches)
 }
 

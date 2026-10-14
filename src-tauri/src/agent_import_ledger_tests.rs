@@ -783,3 +783,75 @@ fn a_stored_date_that_is_not_yyyymmdd_refuses_the_journal() {
         }
     }
 }
+
+// ---- a retired batch ---------------------------------------------------------------
+
+#[test]
+fn a_retired_record_names_its_proof_sets_the_status_and_marks_the_batch_retired() {
+    let line = batch();
+    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    let retired = ledger::StatusRecord::retired(&incomplete, name.clone());
+    let text = format!("{}{}", record(&line), record(&retired));
+    let value: Value = serde_json::from_str(text.lines().nth(1).unwrap()).unwrap();
+    assert_eq!(value["record_type"], "import_batch_retired");
+    let snapshot = &ledger::parse_snapshots(&text).unwrap()[0];
+    assert!(snapshot.retired);
+    assert!(!snapshot.dispatched);
+    assert_eq!(snapshot.batch.status, "verification_incomplete");
+    assert_eq!(snapshot.current_proof, ledger::CurrentProof::Saved(name));
+    // a batch with no such record is not retired
+    assert!(!ledger::parse_snapshots(&record(&line)).unwrap()[0].retired);
+    // it names a proof, or the journal is refused
+    let mut nameless = value.clone();
+    nameless.as_object_mut().unwrap().remove("proof");
+    assert_eq!(
+        ledger::parse_snapshots(&format!("{}{}", record(&line), record(&nameless))).err(),
+        Some("import_ledger_invalid".to_string())
+    );
+}
+
+#[test]
+fn an_own_tag_observation_is_written_only_on_a_verification_record() {
+    let line = batch();
+    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
+    let seen = ledger::StatusRecord::verified(&line, name).with_own_tag_observed();
+    let value = serde_json::to_value(&seen).unwrap();
+    assert_eq!(value["own_tag_observed"], true);
+    let text = format!("{}{}", record(&line), record(&seen));
+    assert!(ledger::parse_snapshots(&text).is_ok());
+    // never on a dispatch intent
+    let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch(&line)).unwrap();
+    intent["own_tag_observed"] = json!(true);
+    assert_eq!(
+        ledger::parse_snapshots(&format!("{}{}", record(&line), record(&intent))).err(),
+        Some("import_ledger_invalid".to_string())
+    );
+}
+
+#[test]
+fn a_batch_found_once_stays_found_whatever_a_later_status_says() {
+    let line = batch();
+    let at = |status: &str| {
+        let mut line = line.clone();
+        line.status = status.into();
+        record(ledger::StatusRecord::from(&line))
+    };
+    let journal = |statuses: &[&str]| {
+        let mut text = record(&line);
+        for status in statuses {
+            text.push_str(&at(status));
+        }
+        ledger::parse_snapshots(&text).unwrap().remove(0)
+    };
+    assert!(!journal(&[]).ever_found);
+    assert!(!journal(&["verification_incomplete"]).ever_found);
+    let found_then_incomplete = journal(&["posted_verified", "verification_incomplete"]);
+    assert!(found_then_incomplete.ever_found);
+    assert_eq!(found_then_incomplete.batch.status, "verification_incomplete");
+    // a full record that was posted when written counts too
+    let mut posted = line.clone();
+    posted.status = "posted_verified".into();
+    assert!(ledger::parse_snapshots(&record(&posted)).unwrap()[0].ever_found);
+}

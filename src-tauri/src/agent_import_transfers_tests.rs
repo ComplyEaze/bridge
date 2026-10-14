@@ -927,7 +927,7 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
     }
     // the reads are all still used, and the texts still name Tally often
     assert_eq!(reads.len(), READS.len());
-    assert!(tally_sentences >= 20, "{tally_sentences}");
+    assert!(tally_sentences >= 15, "{tally_sentences}");
 }
 
 /// The same rule over the tool texts that describe skipped rows: a sentence

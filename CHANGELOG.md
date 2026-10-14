@@ -233,11 +233,11 @@ These changes are in source and not yet in a published build.
 
 - `parse_bank_statement`, `build_import_xml` and the agent guide now tell the assistant to import a bank
   statement in whole-day batches: cut a batch only between days, at most 50 vouchers. `post_import` refuses a
-  whole batch with `import_preexisting_identity` when a voucher has a same-day, same-amount, same-ledger twin
-  that an earlier batch posted, while twins inside one batch pass together; a statement cut across two batches on
-  one day hit that refusal. A day with more than 50 rows does not fit one batch, and the text says to ask you.
-  Batch posting is off by default, so same-day twins post together only with it on or through a hand import of
-  the built file. Wording only: no new refusal and no change to the check (#1614).
+  whole batch with `import_preexisting_identity` when a voucher has a twin with the same date, type, ledgers and
+  amounts that an earlier batch posted, while twins inside one batch pass together; a statement cut across two
+  batches on one day hit that refusal. A day with more than 50 rows does not fit one batch, and the text says to
+  ask you. Batch posting is off by default, so same-day twins post together only with it on or through a hand
+  import of the built file. Wording only: no new refusal and no change to the check (#1614).
 
 - `verify_import`'s description now says in plain words that after a restore from a backup, a native voucher
   keyed again with the same content before any check can read verified, that no identifier a read returns tells
@@ -288,9 +288,10 @@ These changes are in source and not yet in a published build.
   requested. Only the 1st, 2nd and 31st of a month are accepted as a balance-period end, so a typed 30 June ends
   on 1 July and that day's vouchers are inside the balances; the notice says so (#1531).
 
-- The security and privacy notes in the repository now say the 0.5.1 Terms refusal (every tool answers
-  `terms_not_accepted`, naming the setting) was seen on one Mac with a test package and on one Windows computer
-  with the build our checks made for 0.5.1; they had said it was not yet checked on Windows (#1543).
+- The security and privacy notes in the repository now say the 0.5.1 Terms refusal (`terms_not_accepted`, naming
+  the setting) was the answer the tools the assistant called gave on one Mac with a test package and on one
+  Windows computer with the build our checks made for 0.5.1; they had said it was not yet checked on Windows
+  (#1543).
 
 - The README's table of tools now has a row for each of the 27 tools offered with posting off (25 reading tools
   and 2 for import files), adding `company_features`, `gst_status` and `voucher_read_cost`, and says that those
@@ -341,9 +342,9 @@ These changes are in source and not yet in a published build.
 
 - A Tally read that timed out, or whose response body failed after Tally had begun answering, is now sent once
   instead of up to three times: a client timeout does not stop the work Tally is doing, so a further send could
-  queue behind the first. This covers the three company-discovery reads, the ledger read, the ledger listing and
-  the desktop snapshot's reads. A read whose connection or send failed, or that Tally answered with a server
-  error or a rate limit, is still retried (#1538, #1556).
+  queue behind the first. This covers the company-list reads, the ledger listing's extent read and the desktop
+  snapshot's small reads. A read whose connection or send failed, or that Tally answered with a server error or a
+  rate limit, is still retried (#1538, #1556).
 
 - The desktop core snapshot sends each of its group, ledger, voucher-type and voucher-window exports once: when
   the connection closes after the request was sent, it returns the error instead of sending the export up to

@@ -1641,6 +1641,24 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   if it is a placeholder (no name) and its `BILLDATE` is not validated; if it has a
   name, it refuses the read (`bill_allocation_field_missing`).
 
+### Cost-centre allocations in voucher reads
+
+Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of
+`{"category": ..., "cost_centre": ..., "amount": ...}` as Tally sent them, one row per centre, in Tally's order
+(protocol reference §8.2g). The amount is signed as sent; the rows of one entry are not checked against the entry's
+own amount.
+
+- An entry without allocations has no such key. In the one capture of the read the vouchers tool sends, Tally printed no allocation element for such an entry.
+- **A list that cannot be read whole does not refuse the read.** The entry carries
+  `cost_centre_allocations_unreadable` with one reason, and no partial list; the rest of the response is unchanged.
+  The reasons: `cost_centre_name_missing`, `cost_centre_amount_missing` (an empty amount is never read as zero),
+  `cost_centre_amount_unparsable`, `cost_centre_duplicate` (one centre named twice in one category),
+  `cost_category_missing`, `cost_category_without_centres`, `cost_centre_field_duplicated` and
+  `cost_centre_text_undecodable`.
+- No request changed: the allocations were already in the answers the read asks for, and were dropped.
+- Like the bill allocations above, this reaches every reader that shares the voucher parser and whose fetch asks for the
+  entry wildcard; `ledger_movement`, whose fetch names three entry fields, never carries it.
+
 ## Voucher-file preparation and verification
 
 The MCPB extension exposes `verify_import` by default as a recovery tool (it

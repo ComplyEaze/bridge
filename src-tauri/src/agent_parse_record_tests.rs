@@ -438,6 +438,11 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, AARAV)
     ));
     rows.push(row!(
+        "voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
         "vouchers_agst_ref_reopen_live.utf16le.xml",
         "parse_agent_rows(BILL_ALLOCATION_LAB)",
         |_, t| agent_rows(t, BILL_ALLOCATION_LAB)

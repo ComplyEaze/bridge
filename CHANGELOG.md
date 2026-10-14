@@ -18,6 +18,11 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- Voucher reads now carry cost-centre allocations: an entry that has them gets `cost_centre_allocations` (`category`,
+  `cost_centre`, `amount`, as Tally sent them). A list that cannot be read whole (a centre with no name or no
+  amount, an amount that is not a decimal, a centre named twice) does not refuse the read: the entry carries
+  `cost_centre_allocations_unreadable` with a reason and no partial list. No request changed; the allocations were
+  already in the answers and were dropped (part of #1231).
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
   carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,

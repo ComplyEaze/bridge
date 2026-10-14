@@ -1,0 +1,12 @@
+6edc141b5d6070bace779921ab60712e6401b5b2330ae0e109e33b91bcb562af  .gitattributes  75
+51a3e7671a3032bd0d2b3cfc273411d6faf1dd15e418df37f2a2e4a4ca393784  README.md  1057
+4e140cdda4f04d8e6d0b7c6c3cea90d295c9320dab6e27c98632f1c92f17e8ac  WINDOWS-724-M9P.md  27517
+d05e8a290d6d123e9cc3c388b7d56d42fedb361b2453664ac0f75a5bb4020fe2  requests/imp-jc.utf16le.xml  1896
+dd2a48c5d9e506722b87a33ac72a0e63879bae5f8e3adbf9caefacada3134a2b  requests/imp-jd.utf16le.xml  1896
+1cebcf37255078df3aa5dfa7e0c47d837d00fe0c959314e13c7abb4f6d79a51f  requests/imp-jf.utf16le.xml  1898
+2f8d1d73390b1eed762d2155686d3c1f96fac0ce2b97f31811cd3056a11b1385  requests/imp-jg.utf16le.xml  1896
+7eac0087b3fc21e54acc99f72a79a510383dbe2f681526afceeedbb5893be2c4  requests/imp-pa.utf16le.xml  2066
+4aac61dce6f998511a3308fc3ac2db2a973ad385fa95ea64c315c313fba53463  requests/imp-pb.utf16le.xml  2066
+30d2d3acddb676e8b0c64bda49aa060b80a07cac0744d03192bc91d72e433d99  requests/marks.utf16le.xml  1002
+cf85e0518bcd4b250697a197c0185300b2cb29fee4730e37e5aa2e1f4c3780b4  requests/series.utf16le.xml  1116
+09e0123de22c7da464d2c94989cc2bef3517111d0f4f0c2bc20befd69665ca74  requests/vch.utf16le.xml  1778

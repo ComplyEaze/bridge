@@ -998,7 +998,7 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         } else {
             assert_eq!(
                 step,
-                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
+                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet and was never sent. Run verify_import on that batch first. If it will not be sent, run verify_import on it with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it. Do not post this row.",
                 "{case}"
             );
         }
@@ -1324,7 +1324,7 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
     );
     assert_eq!(
         refused["next_step"],
-        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row."
+        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet and was never sent. Run verify_import on that batch first. If it will not be sent, run verify_import on it with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it. Do not post this row."
     );
     rig.finish();
     // what the other statement's build said of the row: listed with that
@@ -1536,7 +1536,7 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
         assert_eq!(refused["paired_rows"], json!(expected), "{case}");
         assert_eq!(
             refused["next_step"],
-            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
+            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet and was never sent. Run verify_import on that batch first. If it will not be sent, run verify_import on it with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it. Do not post this row.",
             "{case}"
         );
     }
@@ -1784,6 +1784,6 @@ async fn the_step_for_carried_rows_counts_the_rows_the_list_leaves_out() {
         transfers::Carrier::refusal_step(&BTreeSet::from([
             transfers::Carrier::Paired,
             transfers::Carrier::OtherSideUnverified,
-        ]))
+        ]), transfers::Unverified { sent: false, never_sent: true })
     );
 }

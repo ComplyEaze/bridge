@@ -586,6 +586,7 @@ fn many_open(count: usize) -> TransferSummary {
                 date: date("20260105"),
                 state: OpenState::NotFound,
                 batch: None,
+                sent: false,
             })
             .collect(),
     }
@@ -784,7 +785,9 @@ fn trimming_a_section_adds_to_what_was_already_left_out() {
 
 #[test]
 fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
-    let step = |kinds: &[Carrier]| Carrier::refusal_step(&kinds.iter().copied().collect());
+    let step = |kinds: &[Carrier]| {
+        Carrier::refusal_step(&kinds.iter().copied().collect(), NEVER_SENT)
+    };
     let paired = step(&[Carrier::Paired]);
     let waiting = step(&[Carrier::OtherSideUnverified]);
     let matched = step(&[Carrier::MatchedUnconfirmed]);
@@ -796,22 +799,28 @@ fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
     ]);
     assert!(paired.contains("already carries this row as a Contra"));
     assert!(!paired.contains("not verified yet"));
-    assert!(waiting.contains("which is not verified yet. Run verify_import on that batch first"));
+    assert!(waiting.contains(
+        "which is not verified yet and was never sent. Run verify_import on that batch first"
+    ));
     assert!(!waiting.contains("already carries"));
     assert_eq!(
         both,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet and was never sent: run verify_import on that batch first, or, if it will not be sent, run verify_import on it with if_absent set to retire. Do not post these rows."
     );
     // a mix says what each state among the rows needs, and one state alone is
     // told in its own words
     assert_eq!(
         all,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet and was never sent: run verify_import on that batch first, or, if it will not be sent, run verify_import on it with if_absent set to retire. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is. Do not post these rows."
     );
     let texts = [&paired, &waiting, &matched, &both, &all];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());
     for step in texts {
-        assert!(step.contains("do not post this row") || step.contains("Do not post these rows"));
+        assert!(
+            step.contains("do not post this row")
+                || step.contains("Do not post this row")
+                || step.contains("Do not post these rows")
+        );
         assert!(step.starts_with("No file was written and nothing was recorded. "));
     }
 }
@@ -830,4 +839,115 @@ fn a_section_that_did_not_run_names_the_call_that_made_it() {
         recorded["next_steps"]["check_not_run"],
         "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
     );
+}
+
+// ---- a carrier that was sent, and one that never was ----------------------------
+
+fn unverified_contra(batch: &str, txn: &str, day: &str, amount: &str) -> ContraFact {
+    let mut contra = contra(batch, txn, day, amount);
+    contra.status = BatchStatus::NotVerified {
+        batch: BatchId::new(batch),
+    };
+    contra
+}
+
+const NEVER_SENT: Unverified = Unverified {
+    sent: false,
+    never_sent: true,
+};
+const SENT: Unverified = Unverified {
+    sent: true,
+    never_sent: false,
+};
+const EITHER: Unverified = Unverified {
+    sent: true,
+    never_sent: true,
+};
+
+#[test]
+fn the_never_sent_step_points_at_retire() {
+    let step = Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), NEVER_SENT);
+    assert!(step.starts_with("No file was written and nothing was recorded. "));
+    assert!(step.contains("was never sent"), "{step}");
+    assert!(step.contains("run verify_import on it with if_absent set to retire"), "{step}");
+    assert!(step.contains("Do not post this row."), "{step}");
+    let among = Carrier::refusal_step(
+        &[Carrier::OtherSideUnverified, Carrier::Paired].into(),
+        NEVER_SENT,
+    );
+    assert!(among.contains("if_absent set to retire"), "{among}");
+    assert!(among.contains("Do not post these rows."), "{among}");
+}
+
+#[test]
+fn the_sent_step_says_the_batch_was_sent_and_names_no_retire() {
+    let step = Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), SENT);
+    assert!(step.contains("was sent to Tally and ComplyEaze Bridge has not settled it"), "{step}");
+    assert!(step.contains("Run verify_import on that batch first"), "{step}");
+    assert!(!step.contains("retire") && !step.contains("if_absent"), "{step}");
+    let among = Carrier::refusal_step(
+        &[Carrier::OtherSideUnverified, Carrier::Paired].into(),
+        SENT,
+    );
+    assert!(among.contains("was sent to Tally"), "{among}");
+    assert!(!among.contains("if_absent"), "{among}");
+    // both kinds named: each is told what it needs
+    let either = Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), EITHER);
+    assert!(either.contains("if_absent set to retire"), "{either}");
+    assert!(either.contains("cannot be retired yet"), "{either}");
+    let texts = [step, either, Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), NEVER_SENT)];
+    assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), 3);
+}
+
+#[test]
+fn the_section_tells_a_sent_carrier_from_one_never_sent() {
+    let step_of = |sent: &[&str]| {
+        let mut facts = facts_of(
+            vec![
+                skip("st-one", "20260106", "222.22"),
+                skip("st-two", "20260107", "333.33"),
+            ],
+            vec![
+                unverified_contra("batch-1", "t1", "20260106", "222.22"),
+                unverified_contra("batch-2", "t2", "20260107", "333.33"),
+            ],
+        );
+        facts.sent_batches = sent.iter().map(|batch| BatchId::new(*batch)).collect();
+        let section = summary_of(&facts).render(usize::MAX);
+        assert_eq!(section["open"].as_array().unwrap().len(), 2, "{section}");
+        section["next_steps"]["other_side_unverified"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    let never = step_of(&[]);
+    assert!(never.contains("was never sent") && never.contains("if_absent set to retire"), "{never}");
+    let sent = step_of(&["batch-1", "batch-2"]);
+    assert!(sent.contains("was sent to Tally") && !sent.contains("if_absent"), "{sent}");
+    let mixed = step_of(&["batch-1"]);
+    assert!(mixed.contains("cannot be retired yet") && mixed.contains("if_absent"), "{mixed}");
+    // every variant still says what the section's step always said
+    for step in [&never, &sent, &mixed] {
+        assert!(step.contains("Run verify_import on that batch"), "{step}");
+        assert!(step.contains("Do not build or post either statement"), "{step}");
+    }
+}
+
+#[test]
+fn no_carrier_or_section_step_tells_a_person_to_enter_or_import_by_hand() {
+    let mut texts = vec![OpenState::OtherSideUnverified.step().to_string()];
+    for unverified in [NEVER_SENT, SENT, EITHER] {
+        texts.push(OpenState::OtherSideUnverified.step_for(unverified).to_string());
+        for kinds in [
+            vec![Carrier::OtherSideUnverified],
+            vec![Carrier::OtherSideUnverified, Carrier::Paired, Carrier::MatchedUnconfirmed],
+        ] {
+            texts.push(Carrier::refusal_step(&kinds.into_iter().collect(), unverified));
+        }
+    }
+    for text in texts {
+        for forbidden in ["import it", "enter it", "enter this", "by hand", "manually", "Gateway of Tally"] {
+            assert!(!text.contains(forbidden), "{forbidden}: {text}");
+        }
+    }
 }

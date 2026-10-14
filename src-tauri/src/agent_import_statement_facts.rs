@@ -661,7 +661,6 @@ pub(super) struct TransferFacts {
     /// The batches that were sent to Tally, whether or not a readback found
     /// them: a step that names a carrier tells a sent batch from one that was
     /// never sent.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) sent_batches: BTreeSet<BatchId>,
 }
 

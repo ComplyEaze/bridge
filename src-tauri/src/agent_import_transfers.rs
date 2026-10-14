@@ -85,9 +85,25 @@ impl OpenState {
     }
 
     /// What to do about an open row of this state, for the assistant to follow.
+    /// A row waiting on a batch not verified yet is told by whether that batch
+    /// was sent; this is the step for rows of both kinds.
+    #[cfg(test)]
     pub(super) fn step(self) -> &'static str {
+        self.step_for(Unverified {
+            sent: true,
+            never_sent: true,
+        })
+    }
+
+    /// [`Self::step`], for the rows waiting on a batch not verified yet that
+    /// are of the kinds given.
+    pub(super) fn step_for(self, unverified: Unverified) -> &'static str {
         match self {
-            Self::OtherSideUnverified => "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on that batch. Do not build or post either statement again for this row.",
+            Self::OtherSideUnverified => unverified.pick(
+                SECTION_UNVERIFIED_NEVER_SENT_STEP,
+                SECTION_UNVERIFIED_SENT_STEP,
+                SECTION_UNVERIFIED_EITHER_STEP,
+            ),
             Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day; a Contra dated another day is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
             Self::Ambiguous => "Each batch named holds a Contra that could carry this row: more than one Contra could, or the one that could is also claimed by another row or booked twice. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
@@ -99,6 +115,45 @@ impl OpenState {
         }
     }
 }
+
+/// Whether the batches that a refusal or a section names as not verified yet
+/// were sent to Tally or never were. A batch that was never sent can be retired
+/// by reading Tally for it; a sent one is settled by verifying it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct Unverified {
+    pub(super) sent: bool,
+    pub(super) never_sent: bool,
+}
+
+impl Unverified {
+    pub(super) fn of(sent: bool) -> Self {
+        Self {
+            sent,
+            never_sent: !sent,
+        }
+    }
+
+    pub(super) fn and(self, other: Self) -> Self {
+        Self {
+            sent: self.sent || other.sent,
+            never_sent: self.never_sent || other.never_sent,
+        }
+    }
+
+    /// The text for the kinds present; for both, or for none, the one that
+    /// covers both.
+    fn pick(self, never_sent: &'static str, sent: &'static str, either: &'static str) -> &'static str {
+        match (self.sent, self.never_sent) {
+            (true, false) => sent,
+            (false, true) => never_sent,
+            _ => either,
+        }
+    }
+}
+
+const SECTION_UNVERIFIED_NEVER_SENT_STEP: &str = "The other account's Contra for this row is in the batch named, which is not verified yet and was never sent. Run verify_import on that batch. If it will not be sent, run verify_import on it with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it. Do not build or post either statement again for this row.";
+const SECTION_UNVERIFIED_SENT_STEP: &str = "The other account's Contra for this row is in the batch named, which was sent to Tally and has not been settled. Run verify_import on that batch. Do not build or post either statement again for this row.";
+const SECTION_UNVERIFIED_EITHER_STEP: &str = "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on that batch. A batch that was never sent and will not be can be run with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it; a batch that was sent to Tally cannot be retired yet. Do not build or post either statement again for this row.";
 
 /// The batches that hold the Contras that could carry a row, each once: the
 /// row is listed once for each. A row nothing could carry is listed once,
@@ -119,6 +174,9 @@ pub(super) struct OpenRow {
     date: TallyDate,
     state: OpenState,
     batch: Option<String>,
+    /// The batch was sent to Tally. Meaningful for a row waiting on a batch
+    /// not verified yet.
+    sent: bool,
 }
 
 /// What the view said, as counts and open rows, before it is cut to a budget.
@@ -180,6 +238,7 @@ impl TransferSummary {
                     date: (*date).clone(),
                     state,
                     batch: batch.map(|batch| batch.as_str().to_string()),
+                    sent: batch.is_some_and(|batch| facts.sent_batches.contains(batch)),
                 }));
             }
         }
@@ -189,6 +248,7 @@ impl TransferSummary {
                 date: date.clone(),
                 state: OpenState::HeldElsewhere,
                 batch: Some(holder.as_str().to_string()),
+                sent: false,
             });
         }
         // Each Contra of a pair booked from two statements is listed, naming the
@@ -209,6 +269,7 @@ impl TransferSummary {
                         date: (*date).clone(),
                         state: OpenState::DoubleBooked,
                         batch: Some(other.batch.as_str().to_string()),
+                        sent: false,
                     });
                 }
             }
@@ -236,10 +297,18 @@ impl TransferSummary {
             return check_not_run_section(false);
         };
         let mut next_steps = serde_json::Map::new();
+        // rows waiting on a batch not verified yet are told by whether that
+        // batch was sent, over every such row, listed or not
+        let unverified = open
+            .iter()
+            .filter(|row| row.state == OpenState::OtherSideUnverified)
+            .fold(Unverified::default(), |kinds, row| {
+                kinds.and(Unverified::of(row.sent))
+            });
         for row in open {
             next_steps
                 .entry(row.state.label())
-                .or_insert_with(|| json!(row.state.step()));
+                .or_insert_with(|| json!(row.state.step_for(unverified)));
         }
         let frame = json!({
             "state": "computed", "skips_paired": paired, "skips_open": skips_open,
@@ -461,33 +530,47 @@ impl Carrier {
 
     /// What to do when every refused row is of this kind, after the sentence
     /// that nothing was written.
-    fn step(self) -> &'static str {
+    fn step(self, unverified: Unverified) -> &'static str {
         match self {
             Self::Paired => "The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.",
-            Self::OtherSideUnverified => "The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
+            Self::OtherSideUnverified => unverified.pick(
+                "The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet and was never sent. Run verify_import on that batch first. If it will not be sent, run verify_import on it with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it. Do not post this row.",
+                "The other account's statement may carry this row as a Contra in the batch named in paired_rows. That batch was sent to Tally and ComplyEaze Bridge has not settled it. Run verify_import on that batch first. Do not post this row.",
+                "The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first. A batch that was never sent and will not be can be run with if_absent set to retire: ComplyEaze Bridge retires it only if Tally does not hold it; a batch that was sent to Tally cannot be retired yet. Do not post this row.",
+            ),
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.",
         }
     }
 
     /// The same, for a row of this kind among rows of other kinds.
-    fn among(self) -> &'static str {
+    fn among(self, unverified: Unverified) -> &'static str {
         match self {
             Self::Paired => "the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first.",
-            Self::OtherSideUnverified => "the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it.",
+            Self::OtherSideUnverified => unverified.pick(
+                "the other account's statement may carry it as a Contra in the batch named, which is not verified yet and was never sent: run verify_import on that batch first, or, if it will not be sent, run verify_import on it with if_absent set to retire.",
+                "the other account's statement may carry it as a Contra in the batch named, which was sent to Tally and has not been settled: run verify_import on that batch first.",
+                "the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first. One that was never sent and will not be can be run with if_absent set to retire, and one that was sent to Tally cannot be retired yet.",
+            ),
             Self::MatchedUnconfirmed => "a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.",
         }
     }
 
     /// What to do about withdrawn rows that are refused, by every kind among
     /// them: the rows a list leaves out count too.
-    pub(super) fn refusal_step(kinds: &BTreeSet<Self>) -> String {
+    pub(super) fn refusal_step(kinds: &BTreeSet<Self>, unverified: Unverified) -> String {
         let mut each = kinds.iter();
         if let (Some(only), None) = (each.next(), each.next()) {
-            return format!("{NOTHING_WRITTEN} {}", only.step());
+            return format!("{NOTHING_WRITTEN} {}", only.step(unverified));
         }
         let rows: String = kinds
             .iter()
-            .map(|kind| format!(" For a row with state {}, {}", kind.label(), kind.among()))
+            .map(|kind| {
+                format!(
+                    " For a row with state {}, {}",
+                    kind.label(),
+                    kind.among(unverified)
+                )
+            })
             .collect();
         format!("{NOTHING_WRITTEN}{rows} Do not post these rows.")
     }
@@ -683,7 +766,15 @@ impl Server {
             .collect();
         if !carried.is_empty() {
             let kinds = carried.iter().map(|&(_, _, carrier)| carrier).collect();
-            let next_step = Carrier::refusal_step(&kinds);
+            // a batch not verified yet that was sent is settled by verifying
+            // it; one never sent can also be retired
+            let unverified = carried
+                .iter()
+                .filter(|&&(_, _, carrier)| carrier == Carrier::OtherSideUnverified)
+                .fold(Unverified::default(), |kinds, &(_, batch, _)| {
+                    kinds.and(Unverified::of(before.sent_batches.contains(batch)))
+                });
+            let next_step = Carrier::refusal_step(&kinds, unverified);
             let rows = carried
                 .into_iter()
                 .map(|(row, batch, carrier)| {

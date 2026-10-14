@@ -326,11 +326,11 @@ cannot be diffed meaningfully at all.
 
 ## 9. Real-world validation
 
-Beyond the committed synthetic golden fixture that CI compares on every run, this crate's parity
-with the reference implementation has been checked locally against several real client books, with
-zero differences reported by the comparison in section 7. That run, and the client data it reads,
-are never committed: results are kept privately, consistent with the rule that no client name,
-figure or byte enters this repository or its CI.
+CI compares this crate with the reference implementation on the committed synthetic golden
+fixture only, on every run. A local comparison against several real client books reported zero
+differences in the comparison of section 7; that run, and the client data it reads, are never
+committed (no client name, figure or byte enters this repository or its CI), so the claim of
+parity on real books is UNVERIFIED here and the checked claim is the synthetic one.
 
 ## 10. Extending this spec to a new test
 

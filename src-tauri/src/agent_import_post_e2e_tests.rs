@@ -5821,7 +5821,7 @@ async fn a_clean_batch_of_five_says_all_five_are_confirmed() {
     let expected_requests = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = batch_server_at(simulator.address(), directory.path());
+    let server = server_at(simulator.address(), directory.path());
     let (_, args) = saved_journal_batch(&server, &amounts);
     let posted = SCRIPTED_APPROVAL
         .scope(

@@ -3716,8 +3716,7 @@ async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
         max_bytes: 200_000,
         redaction: super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let built = server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).expect("input"))

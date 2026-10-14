@@ -6,6 +6,7 @@ use crate::agent::transfer_pairing::{
     DoubleBooked, EndpointOrigin, LedgerGuid, LineageId, ParseWindow, Side, SkipFact, SkipKey,
     StatementRowId, TxnId,
 };
+use bridge_bank_statement::bank::BankReference;
 
 fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).unwrap()
@@ -106,7 +107,10 @@ fn summary_of(facts: &TransferFacts) -> TransferSummary {
     TransferSummary::of(facts, &view)
 }
 
-fn rows_of(summary: &TransferSummary) -> Vec<(String, String, &'static str, Option<String>)> {
+/// An open row as the summary lists it: id, date, state label and batch.
+type OpenListed = (String, String, &'static str, Option<String>);
+
+fn rows_of(summary: &TransferSummary) -> Vec<OpenListed> {
     let TransferSummary::Computed { open, .. } = summary else {
         panic!("a computed summary");
     };
@@ -115,7 +119,7 @@ fn rows_of(summary: &TransferSummary) -> Vec<(String, String, &'static str, Opti
             (
                 row.id.clone(),
                 row.date.as_str().to_string(),
-                row.state,
+                row.state.label(),
                 row.batch.clone(),
             )
         })
@@ -131,8 +135,13 @@ fn every_state() -> TransferFacts {
         skip("st-ambiguous", "20260108", "444.44"),
         skip("st-reversed", "20260109", "555.55"),
         skip("st-outside", "20260301", "666.66"),
+        skip("st-matched", "20260302", "888.88"),
+        skip("st-differs", "20260111", "999.99"),
     ];
     skips[4].reversed_same_day = true;
+    let printing = |digits: &str| BankReference::from_recorded(digits);
+    skips[7].reference = printing("600000000001");
+    assert!(skips[7].reference.is_some());
     let mut unverified = contra("batch-2", "t2", "20260106", "222.22");
     unverified.status = BatchStatus::NotVerified {
         batch: BatchId::new("batch-2"),
@@ -147,6 +156,19 @@ fn every_state() -> TransferFacts {
         {
             let mut other = contra("batch-6", "t6", "20260110", "777.77");
             other.statement_bank_ledger = LedgerGuid::new("b2");
+            other
+        },
+        // the one Contra of its day and amount, on a day no window holds
+        contra("batch-7", "t7", "20260302", "888.88"),
+        // two Contras of a row's day and amount, each of another reference
+        {
+            let mut other = contra("batch-11", "t11", "20260111", "999.99");
+            other.reference = printing("600000000003");
+            other
+        },
+        {
+            let mut other = contra("batch-10", "t10", "20260111", "999.99");
+            other.reference = printing("600000000002");
             other
         },
     ];
@@ -171,8 +193,9 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
     else {
         panic!("computed");
     };
-    // one pair; five skips and the held one are open; the three retired are counted
-    assert_eq!((*paired, *skips_open, *retired), (1, 6, 3));
+    // one pair; seven skips and the held one are open, each counted once however
+    // many rows list it; the three retired are counted
+    assert_eq!((*paired, *skips_open, *retired), (1, 8, 3));
     let row = |id: &str, day: &str, state, batch: Option<&str>| {
         (
             id.to_string(),
@@ -192,14 +215,194 @@ fn the_summary_lists_every_open_state_by_date_then_id_with_the_batch_it_names() 
                 Some("batch-2")
             ),
             row("st-notfound", "20260107", "not_found", None),
-            row("st-ambiguous", "20260108", "ambiguous", None),
+            // one row for each batch that holds a Contra that could carry it
+            row("st-ambiguous", "20260108", "ambiguous", Some("batch-3")),
+            row("st-ambiguous", "20260108", "ambiguous", Some("batch-4")),
+            // nothing matches this one, so it names no batch
             row("st-reversed", "20260109", "reversed_same_day", None),
             // both Contras of the double booking, each naming the other batch
             row("t5", "20260110", "double_booked", Some("batch-6")),
             row("t6", "20260110", "double_booked", Some("batch-5")),
+            // one row for each batch that holds a Contra of another reference
+            row(
+                "st-differs",
+                "20260111",
+                "reference_differs",
+                Some("batch-10")
+            ),
+            row(
+                "st-differs",
+                "20260111",
+                "reference_differs",
+                Some("batch-11")
+            ),
             row("st-outside", "20260301", "not_established", None),
+            row(
+                "st-matched",
+                "20260302",
+                "matched_unconfirmed",
+                Some("batch-7")
+            ),
         ]
     );
+}
+
+fn open_count(summary: &TransferSummary) -> usize {
+    let TransferSummary::Computed { skips_open, .. } = summary else {
+        panic!("a computed summary");
+    };
+    *skips_open
+}
+
+fn listed(id: &str, day: &str, state: &'static str, batch: Option<&str>) -> OpenListed {
+    (
+        id.to_string(),
+        day.to_string(),
+        state,
+        batch.map(str::to_string),
+    )
+}
+
+#[test]
+fn a_row_more_than_one_contra_could_carry_is_listed_once_for_each_batch_holding_one() {
+    // three Contras of the row's day and amount, two of them in one batch
+    let facts = facts_of(
+        vec![skip("st-several", "20260108", "444.44")],
+        vec![
+            contra("batch-4", "t4", "20260108", "444.44"),
+            contra("batch-3", "t3", "20260108", "444.44"),
+            contra("batch-4", "t5", "20260108", "444.44"),
+        ],
+    );
+    let summary = summary_of(&facts);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed("st-several", "20260108", "ambiguous", Some("batch-3")),
+            listed("st-several", "20260108", "ambiguous", Some("batch-4")),
+        ]
+    );
+    // the row is one open skip, however many rows list it
+    assert_eq!(open_count(&summary), 1);
+}
+
+#[test]
+fn a_row_whose_amount_reverses_the_same_day_is_listed_once_for_each_batch_holding_a_candidate() {
+    let mut with_two = skip("st-reversed-two", "20260109", "555.55");
+    with_two.reversed_same_day = true;
+    let mut with_none = skip("st-reversed-none", "20260110", "556.55");
+    with_none.reversed_same_day = true;
+    let facts = facts_of(
+        vec![with_two, with_none],
+        vec![
+            contra("batch-6", "t6", "20260109", "555.55"),
+            contra("batch-5", "t5", "20260109", "555.55"),
+        ],
+    );
+    let summary = summary_of(&facts);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed(
+                "st-reversed-two",
+                "20260109",
+                "reversed_same_day",
+                Some("batch-5")
+            ),
+            listed(
+                "st-reversed-two",
+                "20260109",
+                "reversed_same_day",
+                Some("batch-6")
+            ),
+            // nothing matches this one: one row, and no batch
+            listed("st-reversed-none", "20260110", "reversed_same_day", None),
+        ]
+    );
+    assert_eq!(open_count(&summary), 2);
+}
+
+#[test]
+fn two_contras_of_one_batch_list_the_row_once_for_that_batch() {
+    let printing = |digits: &str| BankReference::from_recorded(digits);
+    let mut reversed = skip("st-reversed", "20260109", "555.55");
+    reversed.reversed_same_day = true;
+    let mut differs = skip("st-differs", "20260111", "999.99");
+    differs.reference = printing("600000000001");
+    assert!(differs.reference.is_some());
+    let of_another_reference = |txn: &str, digits: &str| {
+        let mut other = contra("batch-3", txn, "20260111", "999.99");
+        other.reference = printing(digits);
+        other
+    };
+    let facts = facts_of(
+        vec![skip("st-several", "20260108", "444.44"), reversed, differs],
+        vec![
+            contra("batch-1", "t1", "20260108", "444.44"),
+            contra("batch-1", "t2", "20260108", "444.44"),
+            contra("batch-2", "t3", "20260109", "555.55"),
+            contra("batch-2", "t4", "20260109", "555.55"),
+            of_another_reference("t5", "600000000002"),
+            of_another_reference("t6", "600000000003"),
+        ],
+    );
+    let summary = summary_of(&facts);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed("st-several", "20260108", "ambiguous", Some("batch-1")),
+            listed(
+                "st-reversed",
+                "20260109",
+                "reversed_same_day",
+                Some("batch-2")
+            ),
+            listed(
+                "st-differs",
+                "20260111",
+                "reference_differs",
+                Some("batch-3")
+            ),
+        ]
+    );
+    assert_eq!(open_count(&summary), 3);
+}
+
+#[test]
+fn a_row_of_such_a_state_with_no_candidate_keeps_one_row_without_a_batch() {
+    let facts = facts_of(
+        vec![
+            skip("st-a", "20260108", "444.44"),
+            skip("st-b", "20260109", "555.55"),
+        ],
+        Vec::new(),
+    );
+    let view = TransferView {
+        skips: BTreeMap::from([
+            (
+                skip_key("st-a"),
+                SkipState::Ambiguous {
+                    candidates: Vec::new(),
+                },
+            ),
+            (
+                skip_key("st-b"),
+                SkipState::ReversedSameDay {
+                    candidates: Vec::new(),
+                },
+            ),
+        ]),
+        double_booked: Vec::new(),
+    };
+    let summary = TransferSummary::of(&facts, &view);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            listed("st-a", "20260108", "ambiguous", None),
+            listed("st-b", "20260109", "reversed_same_day", None),
+        ]
+    );
+    assert_eq!(open_count(&summary), 2);
 }
 
 #[test]
@@ -207,12 +410,25 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
     let section = summary_of(&every_state()).render(usize::MAX);
     assert_eq!(section["state"], "computed");
     assert_eq!(section["skips_paired"], 1);
-    assert_eq!(section["skips_open"], 6);
+    assert_eq!(section["skips_open"], 8);
     assert_eq!(section["retired"], 3);
     assert_eq!(section["open_omitted"], 0);
     let text = section.to_string();
     for secret in [
-        "111.11", "222.22", "333.33", "444.44", "555.55", "666.66", "777.77", "b1", "b2",
+        "111.11",
+        "222.22",
+        "333.33",
+        "444.44",
+        "555.55",
+        "666.66",
+        "777.77",
+        "888.88",
+        "999.99",
+        "600000000001",
+        "600000000002",
+        "600000000003",
+        "b1",
+        "b2",
     ] {
         assert!(!text.contains(secret), "{secret} in {text}");
     }
@@ -248,19 +464,81 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
             "reversed_same_day",
             "double_booked",
             "not_established",
+            "matched_unconfirmed",
+            "reference_differs",
         ])
+    );
+}
+
+const EVERY_OPEN_STATE: [OpenState; 9] = [
+    OpenState::NotFound,
+    OpenState::Ambiguous,
+    OpenState::OtherSideUnverified,
+    OpenState::NotEstablished,
+    OpenState::ReversedSameDay,
+    OpenState::MatchedUnconfirmed,
+    OpenState::ReferenceDiffers,
+    OpenState::HeldElsewhere,
+    OpenState::DoubleBooked,
+];
+
+/// Each state, read from its place in `EVERY_OPEN_STATE`. A state added to
+/// `OpenState` does not compile here until it has an arm, and an arm whose
+/// index is past the end of the list does not compile. An arm given an index
+/// already in use compiles and leaves the list short: nothing here stops that.
+fn from_the_list(state: OpenState) -> OpenState {
+    match state {
+        OpenState::NotFound => EVERY_OPEN_STATE[0],
+        OpenState::Ambiguous => EVERY_OPEN_STATE[1],
+        OpenState::OtherSideUnverified => EVERY_OPEN_STATE[2],
+        OpenState::NotEstablished => EVERY_OPEN_STATE[3],
+        OpenState::ReversedSameDay => EVERY_OPEN_STATE[4],
+        OpenState::MatchedUnconfirmed => EVERY_OPEN_STATE[5],
+        OpenState::ReferenceDiffers => EVERY_OPEN_STATE[6],
+        OpenState::HeldElsewhere => EVERY_OPEN_STATE[7],
+        OpenState::DoubleBooked => EVERY_OPEN_STATE[8],
+    }
+}
+
+/// With the labels being distinct (below), a list as long as the arms above
+/// holds every state.
+#[test]
+fn the_list_of_every_open_state_holds_each_state_at_its_own_place() {
+    for state in EVERY_OPEN_STATE {
+        assert_eq!(from_the_list(state), state);
+    }
+}
+
+#[test]
+fn every_open_state_has_its_own_label_and_its_own_step() {
+    let labels: BTreeSet<&str> = EVERY_OPEN_STATE.iter().map(|state| state.label()).collect();
+    let steps: BTreeSet<&str> = EVERY_OPEN_STATE.iter().map(|state| state.step()).collect();
+    assert_eq!(labels.len(), EVERY_OPEN_STATE.len());
+    assert_eq!(steps.len(), EVERY_OPEN_STATE.len());
+    // a refused withdrawal uses the section's own labels, though not always the
+    // one the section gives the row: a row it reads ambiguous, reversed_same_day
+    // or reference_differs is listed in paired_rows as other_side_unverified
+    // when one of its candidates is not verified
+    assert_eq!(Carrier::Paired.label(), "paired");
+    assert_eq!(
+        Carrier::OtherSideUnverified.label(),
+        OpenState::OtherSideUnverified.label()
+    );
+    assert_eq!(
+        Carrier::MatchedUnconfirmed.label(),
+        OpenState::MatchedUnconfirmed.label()
     );
 }
 
 #[test]
 fn each_next_step_says_what_was_decided() {
-    let step = |state| next_step(state);
-    assert!(step("other_side_unverified").contains("Run verify_import on that batch"));
-    assert!(step("other_side_unverified").contains("Do not build or post either statement"));
-    assert!(step("not_found").contains("withdraw the skip on exactly one side"));
-    assert!(step("not_found").contains("Do not enter this transfer in Tally by hand"));
-    assert!(step("ambiguous").contains("does not choose"));
-    let reversed = step("reversed_same_day");
+    let step = |state: OpenState| state.step();
+    assert!(step(OpenState::OtherSideUnverified).contains("Run verify_import on that batch"));
+    assert!(step(OpenState::OtherSideUnverified).contains("Do not build or post either statement"));
+    assert!(step(OpenState::NotFound).contains("withdraw the skip on exactly one side"));
+    assert!(step(OpenState::NotFound).contains("Do not enter this transfer in Tally by hand"));
+    assert!(step(OpenState::Ambiguous).contains("does not choose"));
+    let reversed = step(OpenState::ReversedSameDay);
     assert!(reversed.contains("a reversal and a pair of real transfers look alike"));
     assert!(reversed.contains("Check in Tally which rows are transfers"));
     assert!(reversed.contains(
@@ -268,20 +546,12 @@ fn each_next_step_says_what_was_decided() {
     ));
     // it never says the row is not a transfer
     assert!(!reversed.contains("not a transfer"), "{reversed}");
-    assert!(step("held_elsewhere").contains("once it is found posted the skip is retired"));
-    assert!(step("double_booked").contains("keep one"));
-    let open = step("not_established");
+    assert!(step(OpenState::HeldElsewhere).contains("once it is found posted the skip is retired"));
+    assert!(step(OpenState::DoubleBooked).contains("keep one"));
+    let open = step(OpenState::NotEstablished);
     assert!(open.contains("Verify any batch of the other account's statement for this date first"));
     assert!(open.contains("build that statement only if no batch of it exists"));
-    for state in [
-        "other_side_unverified",
-        "not_found",
-        "ambiguous",
-        "reversed_same_day",
-        "held_elsewhere",
-        "double_booked",
-        "not_established",
-    ] {
+    for state in EVERY_OPEN_STATE {
         // the product is never called by its short name
         let text = step(state);
         assert!(
@@ -313,7 +583,7 @@ fn many_open(count: usize) -> TransferSummary {
             .map(|n| OpenRow {
                 id: format!("st-20260105-{n:016x}"),
                 date: date("20260105"),
-                state: "not_found",
+                state: OpenState::NotFound,
                 batch: None,
             })
             .collect(),
@@ -513,20 +783,35 @@ fn trimming_a_section_adds_to_what_was_already_left_out() {
 
 #[test]
 fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
-    let row = |state: &str| json!({"bridge_txn_id": "st-x", "batch_id": "b", "state": state});
-    let paired = withdraw_paired_step(&[row("paired")]);
-    let waiting = withdraw_paired_step(&[row("other_side_unverified")]);
-    let both = withdraw_paired_step(&[row("paired"), row("other_side_unverified")]);
+    let step = |kinds: &[Carrier]| Carrier::refusal_step(&kinds.iter().copied().collect());
+    let paired = step(&[Carrier::Paired]);
+    let waiting = step(&[Carrier::OtherSideUnverified]);
+    let matched = step(&[Carrier::MatchedUnconfirmed]);
+    let both = step(&[Carrier::OtherSideUnverified, Carrier::Paired]);
+    let all = step(&[
+        Carrier::Paired,
+        Carrier::OtherSideUnverified,
+        Carrier::MatchedUnconfirmed,
+    ]);
     assert!(paired.contains("already carries this row as a Contra"));
     assert!(!paired.contains("not verified yet"));
     assert!(waiting.contains("which is not verified yet. Run verify_import on that batch first"));
     assert!(!waiting.contains("already carries"));
-    assert!(both.contains("state paired") && both.contains("state other_side_unverified"));
-    assert_ne!(paired, waiting);
-    assert_ne!(both, paired);
-    assert_ne!(both, waiting);
-    for step in [paired, waiting, both] {
+    assert_eq!(
+        both,
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. Do not post these rows."
+    );
+    // a mix says what each state among the rows needs, and one state alone is
+    // told in its own words
+    assert_eq!(
+        all,
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is. Do not post these rows."
+    );
+    let texts = [&paired, &waiting, &matched, &both, &all];
+    assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());
+    for step in texts {
         assert!(step.contains("do not post this row") || step.contains("Do not post these rows"));
+        assert!(step.starts_with("No file was written and nothing was recorded. "));
     }
 }
 

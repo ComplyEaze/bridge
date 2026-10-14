@@ -1137,6 +1137,16 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "build_import_xml",
+            "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+            "a skip one verified Contra matches is not withdrawn",
+        ),
+        (
+            "build_import_xml",
+            "or the only match carries a different reference and is verified",
+            "a Contra of another reference leaves the choice to the person only once it is verified",
+        ),
+        (
+            "build_import_xml",
             "is refused as withdraw_skip_paired, naming each such batch",
             "a skip the other account's statement carries is not withdrawn into a second booking",
         ),
@@ -1204,6 +1214,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "local_data_report",
             "never suggest deleting them",
             "the journal and imports folder are what was already sent to Tally",
+        ),
+        (
+            "local_data_report",
+            "the skipped-rows file agent-import-statement-skips.jsonl",
+            "the record of skipped statement rows is not offered for deletion",
         ),
         (
             "verify_import",
@@ -1365,6 +1380,36 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         assert!(
             description_of(tool).contains(phrase),
             "{tool} lost a safety sentence ({why}): {phrase:?}"
+        );
+    }
+
+    // build_import_xml states the withdrawal rule twice: in its description and
+    // on its withdraw_skips argument. Each sentence of the rule is pinned in
+    // both, so neither text can change and leave the other behind.
+    let build = description_of("build_import_xml");
+    let argument = definitions
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|entry| entry["name"] == "build_import_xml")
+        })
+        .and_then(|tool| tool.pointer("/inputSchema/properties/withdraw_skips/description"))
+        .and_then(Value::as_str)
+        .expect("the withdraw_skips description");
+    for sentence in [
+        "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+        "Where more than one verified Contra matches, the match is also claimed by another row or booked twice, the amount reverses the same day and the match is by date, or the only match carries a different reference and is verified, ComplyEaze Bridge cannot tell which entry the row belongs to: the withdrawal is then the person's explicit choice, and the batch of every matching Contra is listed on the row in the transfers section.",
+        "While the only match is not yet verified, the withdrawal is refused and the step says to verify that entry first.",
+        "So is one with any match in a batch not yet verified, whatever the row's state: a person can confirm only what Tally holds.",
+    ] {
+        assert!(
+            build.contains(sentence),
+            "build_import_xml lost a sentence of the withdrawal rule: {sentence:?}"
+        );
+        assert!(
+            argument.contains(sentence),
+            "withdraw_skips lost a sentence of the withdrawal rule: {sentence:?}"
         );
     }
 

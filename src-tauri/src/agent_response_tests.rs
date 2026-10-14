@@ -915,3 +915,31 @@ fn a_result_with_no_computed_section_takes_the_old_path() {
         assert!(fit_response(&mut none, "", 20, |value| len_of(value)).is_err());
     }
 }
+
+/// A written build has no page to trim. When it fits without its section but
+/// not beside the note that the check did not run, it is answered without the
+/// section and reported as cut: it is never turned into an error after its
+/// file and journal record are written.
+#[test]
+fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_it() {
+    let bare = json!({"result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let mut response = bare.clone();
+    response["result"]["transfers"] = transfers_section(40);
+    let cap = len_of(&bare) + 10;
+    let mut noted = bare.clone();
+    noted["result"]["transfers"] = check_not_run_section(false);
+    assert!(len_of(&noted) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response, bare);
+    // through the cap itself: answered, and reported as cut
+    let mut with_section = bare.clone();
+    with_section["result"]["transfers"] = transfers_section(40);
+    let (fitted, truncated, _) = enforce_response_byte_cap(with_section, cap).unwrap();
+    assert!(truncated);
+    assert!(fitted["result"].get("transfers").is_none(), "{fitted}");
+    assert_eq!(fitted["result"]["batch_id"], "bridge-x");
+    // a result too large without its section is still too large
+    let mut too_big = bare.clone();
+    too_big["result"]["transfers"] = transfers_section(40);
+    assert!(fit_response(&mut too_big, "", 100, |value| len_of(value)).is_err());
+}

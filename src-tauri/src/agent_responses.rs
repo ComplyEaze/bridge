@@ -333,10 +333,22 @@ fn fit_response(
             return Ok(true);
         }
     }
-    let (shape, width) = response
-        .pointer(structured_path)
-        .and_then(page_shape)
-        .ok_or_else(|| "agent_response_too_large".to_string())?;
+    let Some((shape, width)) = response.pointer(structured_path).and_then(page_shape) else {
+        // A result with no page (a written build) has nothing to trim. If it
+        // fits without its section it is answered without it, and reported as
+        // cut: a build whose file and journal record are written is never
+        // turned into an error by the section.
+        if section.is_some() {
+            let dropped = response
+                .pointer_mut(&format!("{structured_path}/result"))
+                .and_then(Value::as_object_mut)
+                .is_some_and(|result| result.remove("transfers").is_some());
+            if dropped && encoded_len(response) <= max_bytes {
+                return Ok(true);
+            }
+        }
+        return Err("agent_response_too_large".to_string());
+    };
     let mut original = response.clone();
     if let Some(section) = &section {
         // A result with a page is a batch's or a verification's, never a

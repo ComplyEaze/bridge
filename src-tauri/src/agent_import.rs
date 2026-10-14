@@ -1355,8 +1355,12 @@ impl Server {
                     "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
                 }});
-            // Computed before the append, with this build in it: nothing after
-            // the append can turn a written build into a refusal.
+            // The summary was computed before the append, with this build in it,
+            // so nothing after the append refuses a written build. It is drawn
+            // here into the room the essential result leaves. The response
+            // cap's fitter can still cut it, down to leaving it out, but only
+            // for a result that fits without it (and then the answer is marked
+            // cut): the section never turns a written build into an error.
             let essential = payload.to_string().len();
             payload["result"]["transfers"] = transfers.render(transfers::transfers_budget(
                 self.settings.max_bytes,

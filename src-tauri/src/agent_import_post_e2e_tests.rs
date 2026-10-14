@@ -320,8 +320,10 @@ fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedger
     (line, args)
 }
 
-/// A saved batch whose voucher type is declared and not qualified is refused by
-/// verification before any request, with the code the build and the post use.
+/// A saved batch, never sent, whose voucher type is declared and not qualified
+/// is refused by verification before any request, with the code the build and
+/// the post use. (A batch that was sent is still verified: the stop tests
+/// release one by it.)
 #[tokio::test]
 async fn verification_refuses_a_voucher_type_that_is_not_qualified_before_any_request() {
     let directory = tempfile::tempdir().unwrap();

@@ -732,6 +732,12 @@ enum Sibling {
 /// that Contra's content, with no tag. Another batch of another lineage holds
 /// the same statement row as `sibling` says. Returns the retirement's answer.
 async fn retire_beside(sibling: Sibling) -> Value {
+    retire_beside_counting(sibling).await.0
+}
+
+/// [`retire_beside`], and how many of the scripted Tally answers the retirement
+/// used, with how many there were.
+async fn retire_beside_counting(sibling: Sibling) -> (Value, usize, usize) {
     use super::transfer_flow_tests::{contra_statement, Rig, BANK_B, BOOKED};
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(directory.path(), two_bank_plans());
@@ -766,14 +772,27 @@ async fn retire_beside(sibling: Sibling) -> Value {
                 .unwrap();
         }
     }
-    let (_simulator, server) = reading_from(
-        directory.path(),
-        &batch_id,
-        book_holding(CONTRA_IN_TALLY)[32..].to_vec(),
-        None,
-    );
+    let plans = book_holding(CONTRA_IN_TALLY)[32..].to_vec();
+    let scripted = plans.len();
+    let (simulator, server) = reading_from(directory.path(), &batch_id, plans, None);
     let response = retire(&server, &batch_id).await;
-    response["structuredContent"]["result"]["retire"].clone()
+    (
+        response["structuredContent"]["result"]["retire"].clone(),
+        simulator.received(),
+        scripted,
+    )
+}
+
+/// A retirement asserts an absence, so the licence is qualified again after the
+/// read whatever the read found: here nothing was not found, and the closing
+/// probe is still sent.
+#[tokio::test]
+async fn the_closing_licence_probe_is_sent_even_when_nothing_was_not_found() {
+    for sibling in [Sibling::Found, Sibling::Absent] {
+        let (retire, received, scripted) = retire_beside_counting(sibling).await;
+        assert!(retire["state"].is_string(), "{retire}");
+        assert_eq!(received, scripted, "{retire}");
+    }
 }
 
 /// A content match is the sibling's, not the batch's, only when the sibling is
@@ -793,4 +812,37 @@ async fn a_content_match_is_credited_to_a_sibling_only_when_it_is_found() {
     let alone = retire_beside(Sibling::Absent).await;
     assert_eq!(alone["state"], "not_retired", "{alone}");
     assert_eq!(alone["reason"], "voucher_in_tally", "{alone}");
+}
+
+/// The record of the retirement is appended and the publication's marker then
+/// cannot be removed: the record is in the journal, so the answer is that it is
+/// not established whether the batch is retired, not that nothing was retired.
+#[cfg(unix)]
+#[tokio::test]
+async fn an_error_after_the_record_is_appended_is_not_established() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    let marker = directory.path().join("imports").join(".proof-publication");
+    let hook_marker = marker.clone();
+    let hook: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+        fs::set_permissions(&hook_marker, fs::Permissions::from_mode(0o500)).unwrap();
+    });
+    let response = AFTER_RECORD_APPENDED
+        .scope(hook, retire(&server, &batch_id))
+        .await;
+    fs::set_permissions(&marker, fs::Permissions::from_mode(0o700)).unwrap();
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "not_established", "{response}");
+    assert_eq!(
+        retire["reason"], "proof_publication_recovery_required",
+        "{response}"
+    );
+    assert!(retire["next_step"]
+        .as_str()
+        .unwrap()
+        .contains("could not confirm that the record of it was written"));
+    // the record is in the journal, as the answer allows for
+    let kinds = records_of(directory.path(), &batch_id);
+    assert_eq!(kinds.last().unwrap(), "import_batch_retired", "{kinds:?}");
 }

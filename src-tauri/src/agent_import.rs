@@ -84,6 +84,13 @@ tokio::task_local! {
     pub(super) static AFTER_RETIRE_DELETE: std::sync::Arc<dyn Fn() + Send + Sync>;
 }
 
+#[cfg(test)]
+tokio::task_local! {
+    /// Run right after a verification's record is appended and before the
+    /// publication's marker is removed, so a test can make that fail.
+    pub(super) static AFTER_RECORD_APPENDED: std::sync::Arc<dyn Fn() + Send + Sync>;
+}
+
 /// What a verification is recorded as.
 enum PersistKind {
     /// A verification; `own_tag_observed` when the batch is retired and the
@@ -2248,6 +2255,8 @@ impl Server {
                 let appended_now = self.append_import_record_while_admitted(record);
                 if appended_now.is_ok() {
                     appended.store(true, std::sync::atomic::Ordering::SeqCst);
+                    #[cfg(test)]
+                    let _ = AFTER_RECORD_APPENDED.try_with(|hook| hook());
                 }
                 appended_now
             },

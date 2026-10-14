@@ -2568,6 +2568,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 coverage,
                 contra_rows,
                 skip_rows,
+                withdrawn: _,
             } = serde_json::from_value(recorded.clone()).unwrap();
             if let Some(StatementWindow { from: _, to: _ }) = coverage {}
             for ContraRow {
@@ -2621,6 +2622,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             instrument: Some("000418".into()),
             reversed_same_day: true,
         }],
+        withdrawn: vec!["st-20260901-0000000000000002".into()],
     }));
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
@@ -2675,6 +2677,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             "statement.skip_rows[].other_ledger_guid",
             "statement.skip_rows[].reference",
             "statement.skip_rows[].reversed_same_day",
+            "statement.withdrawn",
             "status",
             "txn_ids",
             "vouchers",

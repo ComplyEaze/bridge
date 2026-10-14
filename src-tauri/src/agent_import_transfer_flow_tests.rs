@@ -655,6 +655,7 @@ fn spoil_the_skip_file(directory: &Path) {
         bank_ledger_guid: "g1".into(),
         coverage: None,
         contra_rows: Vec::new(),
+        withdrawn: Vec::new(),
         skip_rows: vec![statement_facts::SkipRow {
             bridge_txn_id: SKIPPED.into(),
             date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
@@ -1061,6 +1062,26 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
     assert!(rows
         .iter()
         .any(|row| row["bridge_txn_id"] == SKIPPED && row["state"] == "held_elsewhere"));
+}
+
+#[tokio::test]
+async fn a_build_records_the_rows_it_withdraws() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)])).await;
+    let withdrawn = rig.build(withdrawing(directory.path())).await;
+    let plain = rig
+        .build(contra_statement(directory.path(), BANK_B, BOOKED, None))
+        .await;
+    rig.finish();
+    let saved = latest(directory.path(), withdrawn["batch_id"].as_str().unwrap());
+    assert_eq!(saved.statement.unwrap()["withdrawn"], json!([SKIPPED]));
+    // a build that withdraws nothing records no such field
+    let saved = latest(directory.path(), plain["batch_id"].as_str().unwrap());
+    assert!(saved.statement.unwrap().get("withdrawn").is_none());
 }
 
 #[tokio::test]

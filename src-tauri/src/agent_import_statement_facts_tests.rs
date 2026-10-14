@@ -181,6 +181,7 @@ fn facts(bank: &str) -> StatementFacts {
         coverage: None,
         contra_rows: Vec::new(),
         skip_rows: Vec::new(),
+        withdrawn: Vec::new(),
     }
 }
 
@@ -363,6 +364,7 @@ fn each_failed_check_has_a_name_of_its_own() {
         FactsError::BankLedgerUnbound,
         FactsError::BadRecordId,
         FactsError::NotSkipOnly,
+        FactsError::WithdrawnInadmissible { txn: txn() },
     ];
     let names: BTreeSet<_> = checks.iter().map(FactsError::variant).collect();
     assert_eq!(names.len(), checks.len());
@@ -3027,4 +3029,63 @@ fn the_first_holding_batch_in_id_order_is_named() {
         held(&journal, None, &[1]),
         Some((batch_id(130), vec![st(1)]))
     );
+}
+
+// ---- the rows a build withdraws -------------------------------------------------
+
+#[test]
+fn withdrawn_rows_round_trip_and_are_left_out_when_empty() {
+    let mut statement = valid();
+    assert!(!serde_json::to_string(&statement).unwrap().contains("withdrawn"));
+    statement.withdrawn = vec![st(3), st(4)];
+    let text = serde_json::to_string(&statement).unwrap();
+    assert!(text.contains("\"withdrawn\""), "{text}");
+    assert_eq!(serde_json::from_str::<StatementFacts>(&text).unwrap(), statement);
+    // a record written before the field existed reads as none
+    let old = serde_json::to_string(&valid()).unwrap();
+    assert!(serde_json::from_str::<StatementFacts>(&old)
+        .unwrap()
+        .withdrawn
+        .is_empty());
+}
+
+#[test]
+fn a_skip_only_record_carrying_withdrawn_is_refused() {
+    let mut statement = facts(B1).skip(skip_row(&st(1), "500.00", B2, None));
+    let record = |statement: &StatementFacts| {
+        skip_record(1, ENDPOINT, "2026-09-01T10:00:00Z", statement.clone())
+    };
+    assert!(validate_skip_record(&record(&statement)).is_ok());
+    statement.withdrawn = vec![st(1)];
+    assert_eq!(
+        validate_skip_record(&record(&statement)).unwrap_err(),
+        FactsError::NotSkipOnly
+    );
+}
+
+#[test]
+fn withdrawn_rows_must_be_sorted_statement_rows_the_batch_posts() {
+    let vouchers = [slim(payment(&st(5), "500.00")), slim(payment(&st(6), "500.00"))];
+    let identities = bound(&[(N1, B1), (N2, B2)]);
+    let check = |withdrawn: Vec<String>| {
+        let mut statement = facts(B1);
+        statement.withdrawn = withdrawn;
+        validate_statement_facts(&statement, Some(shape(&vouchers, Some(&identities))))
+            .map(|_| ())
+    };
+    assert_eq!(check(vec![]), Ok(()));
+    assert_eq!(check(vec![st(5), st(6)]), Ok(()));
+    // not a voucher of the batch
+    assert_eq!(
+        check(vec![st(7)]),
+        Err(FactsError::WithdrawnInadmissible { txn: st(7) })
+    );
+    // not a statement row id
+    assert_eq!(
+        check(vec!["manual-1".into()]),
+        Err(FactsError::WithdrawnInadmissible { txn: "manual-1".into() })
+    );
+    // unsorted, or repeated
+    assert!(check(vec![st(6), st(5)]).is_err());
+    assert!(check(vec![st(5), st(5)]).is_err());
 }

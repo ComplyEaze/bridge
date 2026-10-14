@@ -999,7 +999,7 @@ impl Server {
             let slim_vouchers = statement_facts::BuildVoucher::of_vouchers(&payload.vouchers);
             let statement_record = match &resolved.statement {
                 Some(statement) => {
-                    let facts = StatementFacts::of_statement(statement, &build_binding);
+                    let mut facts = StatementFacts::of_statement(statement, &build_binding);
                     if let Err(error) = statement_facts::validate_statement_facts(
                         &facts,
                         Some(statement_facts::LineShape {
@@ -1014,6 +1014,10 @@ impl Server {
                             &company_guid,
                         ));
                     }
+                    // Recorded after the checks above: a withdrawal that names a row
+                    // the build does not post is refused by the transfer admission
+                    // below, with its own reason, before the record is read again.
+                    facts.withdrawn = withdraw.iter().cloned().collect();
                     Some(statement_facts::statement_record(&facts))
                 }
                 None => None,

@@ -93,6 +93,15 @@ pub(super) struct StatementFacts {
     pub(super) contra_rows: Vec<ContraRow>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) skip_rows: Vec<SkipRow>,
+    /// The `st-` rows the build posts although a statement skipped them, in
+    /// order: what the person confirmed the other account does not carry. A
+    /// batch records them so a later read of the journal can tell a withdrawn
+    /// skip from one written after the build. A statement of only skipped rows
+    /// never holds any. A release that does not read this field refuses the
+    /// company's whole transfer view once one record holds it
+    /// (`deny_unknown_fields`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) withdrawn: Vec<String>,
 }
 
 /// The value a saved batch holds as its `statement`. The batch keeps the JSON,
@@ -162,6 +171,7 @@ impl StatementFacts {
                     reversed_same_day: skip.reversed_same_day,
                 })
                 .collect(),
+            withdrawn: Vec::new(),
         }
     }
 }
@@ -211,6 +221,8 @@ pub(super) enum FactsError {
     BadRecordId,
     #[error("a skip-only record must hold skipped rows and no Contra row")]
     NotSkipOnly,
+    #[error("a withdrawn row is not a distinct, sorted statement row the batch posts")]
+    WithdrawnInadmissible { txn: String },
 }
 
 impl FactsError {
@@ -230,6 +242,7 @@ impl FactsError {
             Self::BankLedgerUnbound => "bank_ledger_unbound",
             Self::BadRecordId => "bad_record_id",
             Self::NotSkipOnly => "not_skip_only",
+            Self::WithdrawnInadmissible { .. } => "withdrawn_inadmissible",
             Self::Unparsable => "unparsable",
         }
     }
@@ -380,6 +393,18 @@ pub(super) fn validate_statement_facts(
                 });
             }
         }
+        // Sorted and so distinct; each is a statement row the batch posts.
+        let mut previous: Option<&str> = None;
+        for txn in &facts.withdrawn {
+            let sorted = previous.is_none_or(|before| before < txn.as_str());
+            if !sorted
+                || !is_statement_txn_id(txn)
+                || !shape.vouchers.iter().any(|voucher| voucher.txn_id == *txn)
+            {
+                return Err(FactsError::WithdrawnInadmissible { txn: txn.clone() });
+            }
+            previous = Some(txn);
+        }
         if !shape.ledger_identities.is_some_and(|identities| {
             identities
                 .iter()
@@ -410,7 +435,10 @@ pub(super) fn validate_skip_record(record: &SkipOnlyRecord) -> Result<ValidFacts
     if !canonical_id {
         return Err(FactsError::BadRecordId);
     }
-    if !record.statement.contra_rows.is_empty() || record.statement.skip_rows.is_empty() {
+    if !record.statement.contra_rows.is_empty()
+        || record.statement.skip_rows.is_empty()
+        || !record.statement.withdrawn.is_empty()
+    {
         return Err(FactsError::NotSkipOnly);
     }
     validate_statement_facts(&record.statement, None)

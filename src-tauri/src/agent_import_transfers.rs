@@ -542,10 +542,14 @@ impl Server {
 
     /// The facts of one company and the view over them, with a candidate read as
     /// the newest record when one is given.
+    ///
+    /// `subject` and `withdrawn` are as for `ledger::transfer_facts_scoped`.
     fn transfer_view_while_admitted(
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,
+        subject: Option<&str>,
+        withdrawn: &BTreeSet<String>,
     ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
         let journal: Box<dyn std::io::BufRead> = match self.import_journal_while_admitted() {
             Ok(Some(reader)) => Box::new(reader),
@@ -555,7 +559,14 @@ impl Server {
         let skips = self
             .skip_file_while_admitted()
             .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
-        let facts = ledger::transfer_facts(journal, skips, company_guid, candidate)?;
+        let facts = ledger::transfer_facts_scoped(
+            journal,
+            skips,
+            company_guid,
+            candidate,
+            subject,
+            withdrawn,
+        )?;
         let view = transfer_pairing_view(
             &facts.skips,
             &facts.contras,
@@ -592,9 +603,15 @@ impl Server {
                 }
             }
         }
-        // C5a: the skips there are before this build.
-        let (before, before_view) =
-            match self.transfer_view_while_admitted(&input.company_guid, None) {
+        // C5a: the skips there are before this build. A row this build
+        // withdraws is judged as if no batch that was neither sent nor found
+        // held it or booked it: this build proposes to book it itself.
+        let (before, before_view) = match self.transfer_view_while_admitted(
+            &input.company_guid,
+            None,
+            None,
+            &input.withdraw,
+        ) {
                 Ok(view) => view,
                 Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
             };
@@ -698,11 +715,15 @@ impl Server {
         // C6: the view with this build in it.
         let candidate_batch = input.candidate_build().map(str::to_string);
         let needs_the_view = input.needs_the_view();
-        let (facts, view) =
-            match self.transfer_view_while_admitted(&input.company_guid, Some(input.candidate)) {
-                Ok(view) => view,
-                Err(error) => return Ok(without_facts(needs_the_view, &error)),
-            };
+        let (facts, view) = match self.transfer_view_while_admitted(
+            &input.company_guid,
+            Some(input.candidate),
+            None,
+            &BTreeSet::new(),
+        ) {
+            Ok(view) => view,
+            Err(error) => return Ok(without_facts(needs_the_view, &error)),
+        };
         let other_batch = candidate_batch
             .as_deref()
             .and_then(|ours| double_booked_with(&view, ours));
@@ -730,8 +751,13 @@ impl Server {
             guard
                 .ok()
                 .and_then(|_lock| {
-                    self.transfer_view_while_admitted(&canonical_batch_guid(company_guid), None)
-                        .ok()
+                    self.transfer_view_while_admitted(
+                        &canonical_batch_guid(company_guid),
+                        None,
+                        None,
+                        &BTreeSet::new(),
+                    )
+                    .ok()
                 })
                 .map_or(TransferSummary::NotEstablished, |(facts, view)| {
                     TransferSummary::of(&facts, &view)

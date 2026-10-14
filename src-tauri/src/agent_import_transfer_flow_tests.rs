@@ -1064,6 +1064,86 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
         .any(|row| row["bridge_txn_id"] == SKIPPED && row["state"] == "held_elsewhere"));
 }
 
+/// A build that withdrew a skip, never sent, must not shield the same
+/// withdrawal built again once the other statement's Contra is verified.
+#[tokio::test]
+async fn a_rebuild_with_the_same_withdrawal_is_refused_once_the_other_contra_is_verified() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            two_bank_plans(),
+            admission_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    // the row is not carried yet, so it may be withdrawn
+    let first = rig.build(withdrawing(directory.path())).await;
+    assert_eq!(first["voucher_count"], 1, "{first}");
+    // the other account's statement books the transfer and is found
+    let carrying = rig
+        .build(contra_statement(directory.path(), BANK_B, BOOKED, None))
+        .await;
+    let carrier = carrying["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &carrier);
+    // the same withdrawal again is judged as if the first build never held the row
+    let again = rig.build(withdrawing(directory.path())).await;
+    rig.finish();
+    assert_eq!(again["state"], "refused", "{again}");
+    assert_eq!(again["reason"], "withdraw_skip_paired", "{again}");
+    let rows = again["paired_rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "{again}");
+    assert_eq!(rows[0]["bridge_txn_id"], SKIPPED);
+    assert_eq!(rows[0]["batch_id"], carrier.as_str());
+    assert!(
+        ["paired", "matched_unconfirmed"].contains(&rows[0]["state"].as_str().unwrap()),
+        "{again}"
+    );
+}
+
+/// Where two verified Contras could carry the row, the withdrawal is the
+/// person's explicit choice, and choosing it again is allowed too. The second
+/// build is followed only to the end of its admission (a simulator holds at
+/// most 128 requests), where a refusal would have named the rule.
+#[tokio::test]
+async fn two_verified_contras_let_both_withdrawing_builds_through() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            two_bank_plans(),
+            admission_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    let carrying = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([contra_voucher(BOOKED), contra_voucher(OTHER_BOOKED)]),
+            json!([
+                contra_record(BOOKED, None),
+                contra_record(OTHER_BOOKED, None)
+            ]),
+        ))
+        .await;
+    mark_found(directory.path(), carrying["batch_id"].as_str().unwrap());
+    let first = rig.build(withdrawing(directory.path())).await;
+    assert_eq!(first["voucher_count"], 1, "{first}");
+    let second = rig.build(withdrawing(directory.path())).await;
+    assert_ne!(second["state"], "refused", "{second}");
+    assert_ne!(second["reason"], "withdraw_skip_paired", "{second}");
+}
+
 #[tokio::test]
 async fn a_build_records_the_rows_it_withdraws() {
     let directory = tempfile::tempdir().unwrap();

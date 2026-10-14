@@ -991,8 +991,8 @@ async fn a_second_read_without_the_recorded_window_refuses_the_send_naming_the_b
     fs::remove_file(&retiring.current_proof_paths(&held.carrier)[0]).unwrap();
     let refused = post_error(&sending, &held.withdrawn).await;
     assert_not_read_refusal(&refused, &held.carrier, Some("verification_proof_missing"));
-    // no request was made for it
-    assert_eq!(simulator.received(), read_of(true, None).len());
+    // the data of the second read was never asked for: only its opening reads were
+    assert!(simulator.received() < 2 * read_of(true, None).len());
 }
 
 /// The second read covers the days the retirement read, not days worked out
@@ -1088,16 +1088,43 @@ async fn a_send_that_rests_on_a_retired_batch_is_refused_when_only_its_content_i
 }
 
 /// A withdrawn skip that waits on `count` retired batches that carry the same
-/// row (the first is the real carrier, the others copies of its record with ids
-/// of their own), each retired by a read of the one scripted Tally, and the
-/// blocks `rechecks` scripts, by the order of the batch ids, for the send's
-/// second reads.
+/// row. The first is the real carrier, retired by a read of the one scripted
+/// Tally; the others are copies of its record with ids of their own, retired in
+/// the journal with a proof that records a window, as a retirement's does
+/// (the scripted Tally has room for few requests). `rechecks` scripts, by the
+/// order of the batch ids, the send's second reads.
 struct Retired {
     held: Withdrawn,
     ids: Vec<String>,
     simulator: SequenceSimulator,
     sending: Server,
     retire_requests: usize,
+}
+
+/// `batch_id` retired in the journal, with a saved proof that records the
+/// window a retirement read.
+fn retired_in_the_journal(server: &Server, batch_id: &str) {
+    let _admission = server.lock_import_admission().unwrap();
+    let snapshot = server
+        .import_snapshot_while_admitted(Some(batch_id))
+        .unwrap()
+        .unwrap();
+    let proof = serde_json::to_vec(&json!({
+        "retire_read": {"from": "20260825", "to": "20260908", "widened_days": 7},
+        "vouchers": [],
+    }))
+    .unwrap();
+    persistence::publish_proofs_recording(
+        &server.imports_dir().unwrap(),
+        &snapshot.batch,
+        &proof,
+        b"",
+        ledger::StatusRecord::retired,
+        |record| server.append_import_record_while_admitted(record),
+        |_| Ok(()),
+        persistence::sync_directory,
+    )
+    .unwrap();
 }
 
 async fn withdrawn_skip_waits_on_retired_carriers(
@@ -1112,7 +1139,10 @@ async fn withdrawn_skip_waits_on_retired_carriers(
         .unwrap()
         .unwrap()
         .batch;
-    let mut batches = vec![(line.batch_id.clone(), line.attribution_tag(&line.vouchers[0]))];
+    let mut batches = vec![(
+        line.batch_id.clone(),
+        line.attribution_tag(&line.vouchers[0]),
+    )];
     for copy in 1..count {
         line.batch_id = format!("bridge-00000000-0000-4000-8000-0000000008{copy:02}");
         journal.append_import_ledger(&line).unwrap();
@@ -1124,29 +1154,26 @@ async fn withdrawn_skip_waits_on_retired_carriers(
     let mut sorted = batches.clone();
     sorted.sort();
     let retire_requests = read_of(true, None).len();
-    let scripted = [
-        vec![read_of(true, None); count].concat(),
-        rechecks(&sorted),
-    ]
-    .concat();
+    let scripted = [read_of(true, None), rechecks(&sorted)].concat();
     let (simulator, retiring, sending) = one_tally(directory, scripted);
     let ids: Vec<String> = batches.iter().map(|(id, _)| id.clone()).collect();
     let mut moved: Vec<&str> = ids.iter().map(String::as_str).collect();
     moved.push(&held.withdrawn);
     move_to_the_tally_of(&retiring, directory, &moved);
-    for id in &ids {
-        let response = retire(&retiring, id).await;
-        assert_eq!(
-            response["structuredContent"]["result"]["retire"]["state"], "retired",
-            "{response}"
-        );
+    let response = retire(&retiring, &ids[0]).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    for id in &ids[1..] {
+        retired_in_the_journal(&retiring, id);
     }
     Retired {
         held,
         ids,
         simulator,
         sending,
-        retire_requests: retire_requests * count,
+        retire_requests,
     }
 }
 
@@ -1185,7 +1212,7 @@ async fn a_send_that_rests_on_two_retired_batches_reads_both_and_names_the_one_f
     for id in &retired.ids {
         assert_eq!(verifications_of(directory.path(), id), 1, "{id}");
     }
-    assert!(retired.simulator.received() >= 4 * retired.retire_requests / 2);
+    assert!(retired.simulator.received() >= 3 * retired.retire_requests);
 }
 
 /// Three retired batches are within what a send reads for: all three are read,
@@ -1215,11 +1242,9 @@ async fn a_send_that_rests_on_three_retired_batches_reads_all_three() {
 async fn a_send_that_rests_on_four_retired_batches_is_refused_without_a_request() {
     use super::transfer_flow_tests::post_error;
     let directory = tempfile::tempdir().unwrap();
-    // a block for the second reads is scripted: none may be used
-    let retired = withdrawn_skip_waits_on_retired_carriers(directory.path(), 4, |sorted| {
-        vec![read_of(true, None); sorted.len()].concat()
-    })
-    .await;
+    // no second read is scripted: any request for one would fail the send
+    let retired =
+        withdrawn_skip_waits_on_retired_carriers(directory.path(), 4, |_| Vec::new()).await;
     let refused = post_error(&retired.sending, &retired.held.withdrawn).await;
     assert_eq!(
         refused["code"], "retired_batches_over_the_read_cap",

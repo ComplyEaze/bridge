@@ -861,7 +861,7 @@ fn the_proofs_of_a_batchs_verifications_are_listed_once_each_in_order() {
         proofs,
         [
             ledger::CurrentProof::Saved(first.clone()),
-            ledger::CurrentProof::Saved(second)
+            ledger::CurrentProof::Saved(second.clone())
         ]
     );
     // another batch's verifications are not listed

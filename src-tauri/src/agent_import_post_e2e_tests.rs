@@ -5684,6 +5684,10 @@ async fn a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog(
     assert!(step.starts_with(SENT_FIRST), "{step}");
     assert!(step.ends_with(SENT_LAST), "{step}");
     assert!(!step.contains("No file was written"), "{step}");
+    // the batch is saved: it is not a build that posts the row
+    for build_wording in ["This build", "this build", "nothing was recorded"] {
+        assert!(!step.contains(build_wording), "{step}");
+    }
     assert_eq!(observed.len(), 0);
     assert_eq!(journal(directory.path()), before);
 }

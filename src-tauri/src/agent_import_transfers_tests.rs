@@ -996,3 +996,56 @@ fn no_carrier_or_section_step_tells_a_person_to_enter_or_import_by_hand() {
         }
     }
 }
+
+// ---- what a refusal at send says -------------------------------------------------------
+
+/// A batch about to be sent is a saved batch, not a build in progress: its
+/// refusals say nothing was sent, never that a file was not written or that a
+/// build posts or skips a row, and end by saying the statement is built again.
+#[test]
+fn a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build() {
+    let build_wording = [
+        "This build",
+        "this build",
+        "in this build",
+        "No file was written",
+        "nothing was recorded",
+    ];
+    let mut steps = Vec::new();
+    for reason in [
+        "skip_row_already_posted",
+        "skip_row_paired_elsewhere",
+        "withdraw_skip_invalid",
+        "transfer_double_booked",
+    ] {
+        // whatever the build said, the send says its own
+        let refusal = TransferRefusal {
+            reason,
+            detail: json!({}),
+            next_step: format!("{NOTHING_WRITTEN} This build posts a row."),
+        };
+        steps.push((reason, refusal.for_send().into_parts().2));
+    }
+    for kinds in [
+        BTreeSet::from([Carrier::Paired]),
+        BTreeSet::from([Carrier::OtherSideUnverified]),
+        BTreeSet::from([Carrier::MatchedUnconfirmed]),
+        BTreeSet::from([Carrier::Paired, Carrier::OtherSideUnverified]),
+    ] {
+        for unverified in [Unverified::of(true), Unverified::of(false)] {
+            let refusal = TransferRefusal {
+                reason: "withdraw_skip_paired",
+                detail: json!({}),
+                next_step: Carrier::refusal_step(&kinds, unverified),
+            };
+            steps.push(("withdraw_skip_paired", refusal.for_send().into_parts().2));
+        }
+    }
+    for (reason, step) in steps {
+        assert!(step.starts_with(NOTHING_SENT), "{reason}: {step}");
+        assert!(step.ends_with(SEND_ENDING), "{reason}: {step}");
+        for wording in build_wording {
+            assert!(!step.contains(wording), "{reason}: {wording}: {step}");
+        }
+    }
+}

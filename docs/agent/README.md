@@ -1951,7 +1951,9 @@ with a `cause` when one is known. `post_catalogue_unreadable` says the ledger an
 group names read again after the approval differ between the two readings or
 cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
 `master_approval_timed_out` say the person declined the dialog, the dialog could
-not be shown, or the person did not answer in time. In an answer,
+not be shown, or the person did not answer in time; each says nothing was sent,
+and a declined or timed-out answer's `next_step` says that the next call with the
+same `batch_id` opens a new dialog. In an answer,
 `verification.verdict_written` is true when this call appended the verdict (an
 open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not
@@ -2019,8 +2021,9 @@ say to call again later, which only reads, and to create nothing in Tally by han
 meanwhile. A failure answer that says the create may have been sent says the same.
 When the journal could not be read for that answer, it says it is not known
 whether a send was recorded: call `post_ledger_creates` with the same `batch_id`
-again, which reads the book back and sends nothing if a send is on file, and
-otherwise asks for approval again before anything is sent; create nothing in Tally by hand
+again, which reads the book back and sends nothing if a send is on file,
+otherwise asks for approval again before anything is sent, and is refused as
+`master_batch_not_found`, sending nothing, if ComplyEaze Bridge holds no such batch; create nothing in Tally by hand
 meanwhile. Of the party fields the read-back fetches, no PAN, bank detail, e-mail
 address or phone number is put in an answer or a record; a GSTIN the caller
 supplied, which contains the party's PAN, is in the preview and in the batch's

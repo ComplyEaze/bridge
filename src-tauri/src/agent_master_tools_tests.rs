@@ -1400,7 +1400,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
     row(
         "failure, journal unread",
         failure(None),
-        "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.",
+        "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.",
         false,
         true,
     );
@@ -1408,6 +1408,35 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "failure, nothing sent",
         failure(Some(false)),
         NOTHING_RECORDED_STEP,
+        false,
+        false,
+    );
+    // An approval box that closed unanswered, or was declined: nothing was sent,
+    // and the next call opens a new box.
+    let unanswered = |code: &str| {
+        master_failure_outcome(
+            "bridge-x",
+            GUID,
+            ToolFailure::from(code.to_string()),
+            empty_evidence(),
+            Some(false),
+        )
+        .payload["result"]["error"]["next_step"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    };
+    row(
+        "approval timed out",
+        unanswered("master_approval_timed_out"),
+        "Nothing was sent: the approval box closed unanswered when its time ran out. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
+        false,
+        false,
+    );
+    row(
+        "approval declined",
+        unanswered("master_approval_declined"),
+        "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         false,
         false,
     );
@@ -1621,7 +1650,7 @@ fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
         "make sure Tally is idle and answering",
         // The failure answers.
         "A failure answer that says the create may have been sent says the same.",
-        "When the journal could not be read for that answer, it says it is not known whether a send was recorded: call post_ledger_creates with the same batch_id again, which reads the book back and sends nothing if a send is on file, and otherwise asks for approval again before anything is sent",
+        "When the journal could not be read for that answer, it says it is not known whether a send was recorded: call post_ledger_creates with the same batch_id again, which reads the book back and sends nothing if a send is on file, otherwise asks for approval again before anything is sent, and is refused as master_batch_not_found, sending nothing, if ComplyEaze Bridge holds no such batch",
     ] {
         assert!(guide.contains(sentence), "guide: {sentence}");
         assert!(description.contains(sentence), "description: {sentence}");
@@ -2940,6 +2969,10 @@ async fn an_intent_the_journal_refuses_before_writing_records_nothing_and_sends_
     let second = posting(&again, server.call_tool("post_ledger_creates", args)).await;
     let observed = sent(simulator);
     assert_eq!(error_code(&second), "master_approval_declined", "{second}");
+    assert_eq!(
+        result(&second)["error"]["next_step"],
+        "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box."
+    );
     assert_eq!(again.masters().len(), 1, "asked again");
     assert!(!create_was_sent(&observed, &expected_request()));
     assert_eq!(observed.len(), post_at + before_approval().len());
@@ -3164,7 +3197,9 @@ fn racing_post(
 /// dialog only once the winner's intent is on file and its lock released, so
 /// which call wins does not depend on timing. The winner's POST answers slowly,
 /// so its dispatch is still open while the loser goes through its queue reads
-/// and reaches the lock. `same_batch` is whether both name one batch id or two
+/// and reaches the lock. That part is timed: a loser slower than the winner's
+/// two-second answer meets a settled winner instead, and the test then fails
+/// loudly (a second create is counted); it cannot pass wrongly. `same_batch` is whether both name one batch id or two
 /// batches of the same name in the same company.
 struct Race {
     winner: RacingPost,

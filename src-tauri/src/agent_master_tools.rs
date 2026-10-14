@@ -1381,6 +1381,12 @@ fn master_next_step(code: &str) -> Option<&'static str> {
         "master_ledger_invalid" | "master_pre_image_write_failed" | "master_pre_image_unrecorded" => Some(
             "Nothing was sent and nothing was recorded for this batch. Call prepare_ledger_creates for a new batch and ask for approval again.",
         ),
+        "master_approval_timed_out" => Some(
+            "Nothing was sent: the approval box closed unanswered when its time ran out. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
+        ),
+        "master_approval_declined" => Some(
+            "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
+        ),
         "master_pre_image_remove_failed" => Some(
             "Nothing was sent. A working file of ComplyEaze Bridge for this batch could not be removed from its local folder; do not retry this batch. Call prepare_ledger_creates for a new batch.",
         ),

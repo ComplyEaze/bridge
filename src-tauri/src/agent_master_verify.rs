@@ -43,7 +43,7 @@ pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger o
 /// whether a send was recorded is not known. A later call is the right one
 /// either way: with a send on file it only reads the book back, and with none
 /// it asks for approval again before anything is sent.
-pub(super) const NEXT_SEND_NOT_KNOWN: &str = "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.";
+pub(super) const NEXT_SEND_NOT_KNOWN: &str = "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.";
 pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again later to read it back (it sends nothing), or look at the company's ledgers in Tally. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it. Never post this batch again.";
 /// The read-back found no ledger of this name, and the outcome is still open.
 /// The only step that tells the person to create the ledger by hand.

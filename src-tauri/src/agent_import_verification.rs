@@ -696,8 +696,9 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
 pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.";
 
 /// The next step of an unbound post's voucher that its content cannot find when
-/// the post's own answer from Tally is on record and was not clean (it created
-/// fewer or more than were sent, or reported an exception or an error): the
+/// the post's own answer from Tally is on record and was not clean (it did not
+/// parse, created fewer or more than were sent, or reported an exception or an
+/// error): the
 /// shared line without its edit example, because that answer makes an edit no
 /// likelier than a voucher Tally did not create (bridge#1108). Which voucher a
 /// partly created post left out is not claimed: a count does not say.

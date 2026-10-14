@@ -5427,7 +5427,7 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
     // an edit in Tally, and names no cause (bridge#1108).
     assert_eq!(
         voucher("partial-2")["next_step"],
-        super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP,
+        "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.",
         "{posted}"
     );
     let verdicts = String::from_utf8(journal(directory.path()))
@@ -5476,6 +5476,27 @@ async fn post_batch_rejected(answer: String, after_mark: u64) -> Value {
         .await;
     assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
     posted
+}
+
+/// A post whose answer from Tally does not parse is not clean, as the post
+/// reads it: its vouchers' line drops the edit example too (bridge#1108).
+#[tokio::test]
+async fn a_post_whose_answer_does_not_parse_drops_the_edit_example() {
+    let posted = post_batch_rejected("not an import answer".to_string(), 10).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(
+        result["dispatch"]["response_state"], "response_not_clean",
+        "{posted}"
+    );
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{posted}");
+    let steps = result["vouchers"]
+        .as_array()
+        .expect("the result lists its vouchers")
+        .iter()
+        .map(|voucher| voucher["next_step"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{posted}");
 }
 
 #[tokio::test]

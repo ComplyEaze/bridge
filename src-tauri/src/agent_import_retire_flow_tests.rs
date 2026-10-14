@@ -893,7 +893,12 @@ async fn a_send_that_rests_on_a_retired_batch_is_refused_when_its_tag_is_found()
             >= 1
     );
     let again = post_error(&sending, &held.withdrawn).await;
-    assert_ne!(again["code"], "retired_batch_found_in_tally", "{again}");
+    assert_eq!(again["code"], "withdraw_skip_paired", "{again}");
+    assert_eq!(
+        again["paired_rows"][0]["batch_id"],
+        held.carrier.as_str(),
+        "{again}"
+    );
 }
 
 /// Whatever fails in the send's second read of a retired batch, the send is
@@ -1193,6 +1198,11 @@ fn the_tool_text_states_the_retire_read_and_its_three_answers() {
     }
     assert!(
         text.contains("`not_established`: the batch may be retired"),
+        "{text}"
+    );
+    // the same caveat as the step after a record that may exist
+    assert!(
+        text.contains("shows where it stands, unless the import folder is marked as needing recovery, which refuses verify_import for the batch until it is cleared"),
         "{text}"
     );
 }

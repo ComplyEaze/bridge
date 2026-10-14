@@ -80,7 +80,7 @@ pub(super) const RETIRED_UNKNOWN_STEP: &str = "This batch is retired: ComplyEaze
 pub(super) const RETIRED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found no voucher with its narration tag or its content, removed its saved file and will not send it. Build this statement again if its rows are still to be posted.";
 pub(super) const KEPT_STEP: &str = "The read of Tally did not find this batch absent: a voucher carries its narration tag, matches its content, or could not be read as absent (`reason` says which), so it was not retired and still counts. Its saved file is removed, so a new post_import call for it is refused; a send already waiting for approval is not stopped by the removal.";
 const UNFINISHED_STEP: &str = "The read of Tally did not finish, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused. Call verify_import on it again with if_absent set to retire.";
-const UNFINISHED_FINAL_STEP: &str = "The read of Tally was refused for a reason that a repeat will not change, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused; a repeat will not help until the read limit or the licence mode that stopped the read changes.";
+const UNFINISHED_FINAL_STEP: &str = "The read of Tally was refused for a reason that a repeat will not change, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused; a repeat will not help until the read limit or the licence mode that stopped the read changes, and no step inside ComplyEaze Bridge releases the batch yet.";
 const CONFLICT_STEP: &str = "Another record of this batch was written meanwhile, so nothing was retired. Call verify_import on it again.";
 const RECORD_UNCONFIRMED_STEP: &str = "The read of Tally finished, but ComplyEaze Bridge could not confirm that the record of it was written, so it is not established whether the batch is retired. The import folder is marked as needing recovery, and verify_import is refused for this batch until that is cleared, so there is no call to make on it now. Nothing sends it meanwhile: its saved file is removed. Report this with the reason named here.";
 
@@ -511,6 +511,12 @@ mod tests {
             assert!(
                 !step.contains("Call verify_import on it again with if_absent"),
                 "{step}"
+            );
+            // a batch stranded by such a refusal is told so, with no way out named
+            // that does not exist
+            assert!(
+                step.contains("no step inside ComplyEaze Bridge releases the batch yet"),
+                "{code}: {step}"
             );
         }
         // a transient refusal, and two that cannot arrive after the delete, do

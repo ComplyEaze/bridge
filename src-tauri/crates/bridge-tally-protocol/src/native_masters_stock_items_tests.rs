@@ -275,20 +275,38 @@ fn the_row_bound_is_derived_from_the_measured_largest_item_and_admits_a_stated_m
 
 // A list absent from a row, empty, or empty of text.
 
+/// The capture with every `tag` element of the item's row removed.
+fn without_lists(tag: &str) -> String {
+    let text = two_dates();
+    let start = text.find(&format!("<STOCKITEM NAME=\"{ITEM}\"")).unwrap();
+    let end = start + text[start..].find("</STOCKITEM>").unwrap();
+    let (open, close) = (format!("<{tag}>"), format!("</{tag}>"));
+    let mut row = text[start..end].to_string();
+    while let Some(at) = row.find(&open) {
+        let to = at + row[at..].find(&close).unwrap() + close.len();
+        row.replace_range(at..to, "");
+    }
+    format!("{}{row}{}", &text[..start], &text[end..])
+}
+
 #[test]
 fn a_row_with_no_list_element_at_all_is_not_observed_and_one_list_does_not_imply_the_other() {
-    let mut text = two_dates();
-    // Remove both HSN entries of the item; its GST entries stay.
-    for _ in 0..2 {
-        let start = edited(&text, "<HSNDETAILS.LIST>", "\u{0}");
-        let at = start.find('\u{0}').unwrap();
-        let end = at + start[at..].find("</HSNDETAILS.LIST>").unwrap() + "</HSNDETAILS.LIST>".len();
-        text = format!("{}{}", &start[..at], &start[end..]);
-    }
-    let masters = parse(&text).unwrap();
+    // No HSN element: not observed, with the GST entries intact.
+    let masters = parse(&without_lists("HSNDETAILS.LIST")).unwrap();
     let (hsn, gst) = lists(row(&masters, ITEM));
     assert_eq!(*hsn, HsnDetailsObservation::NotObserved);
     assert_eq!(gst_entries(gst).len(), 2);
+    // No GST element: not observed, with the HSN entries intact.
+    let masters = parse(&without_lists("GSTDETAILS.LIST")).unwrap();
+    let (hsn, gst) = lists(row(&masters, ITEM));
+    assert_eq!(hsn_entries(hsn).len(), 2);
+    assert_eq!(*gst, GstDetailsObservation::NotObserved);
+    // The other rows still carry both, as empty placeholders.
+    let other = row(&masters, "Soda Ash Light");
+    assert_eq!(
+        *lists(other).0,
+        HsnDetailsObservation::Entries { entries: vec![] }
+    );
 }
 
 #[test]

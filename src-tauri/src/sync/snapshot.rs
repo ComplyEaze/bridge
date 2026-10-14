@@ -7,15 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bridge_tally_core::report_tie_out::{
-    assess_core_period_report, scoped_mismatch_record_alias, TieOutState,
-};
 use bridge_tally_core::{
     CanonicalText, CapabilityPackId, CapabilityProfile, CapabilityState, CompanyRef,
     EvidenceConfidence, Freshness, PackBatch, PackSchemaVersion, ProofManifest, ReadResponseScope,
     ReadWindow, RequestContext, TallyConnector, TallyError, TransportId,
 };
-use bridge_tally_protocol::xml_read_profiles::EDUCATION_REPORT_FAMILY_UNSUPPORTED;
 use chrono::{Duration as ChronoDuration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -31,8 +27,7 @@ use crate::sync::reconciliation::{
     build_reconciliation, build_terminal_proof, canonicalize_window, proof_record_counts_sha256,
     CanonicalWindowContext, CommitBatchInput, CommitBatchParts, ComparisonScope, EndProfileCheck,
     ExternalReferenceCatalog, ReconciliationDecision, ReconciliationError, ReconciliationInput,
-    ReconciliationMismatch, ReportTieOutEvidence, SourceStabilityCheck, TerminalKind,
-    WindowEvidence,
+    SourceStabilityCheck, TerminalKind, WindowEvidence,
 };
 use crate::tally::core_snapshot_start_authorized;
 use crate::warning_codes::WarningCode;
@@ -2385,54 +2380,13 @@ where
         let mut attempted_leaf_ids = BTreeSet::new();
         while let Some(planned_owned) = state.executable_leaves().into_iter().find(|planned| {
             !attempted_leaf_ids.contains(&planned.id)
-                && !state.windows.get(&planned.id).is_some_and(|window| {
-                    window.phase == WindowPhase::Complete
-                        && (plan.pack != CapabilityPackId::CoreAccounting
-                            || window
-                                .evidence
-                                .as_ref()
-                                .and_then(|evidence| evidence.report_tie_out.as_ref())
-                                .is_some())
-                })
+                && !state
+                    .windows
+                    .get(&planned.id)
+                    .is_some_and(|window| window.phase == WindowPhase::Complete)
         }) {
             attempted_leaf_ids.insert(planned_owned.id.clone());
             let planned = &planned_owned;
-            let completed_with_required_evidence =
-                state.windows.get(&planned.id).is_some_and(|window| {
-                    window.phase == WindowPhase::Complete
-                        && (plan.pack != CapabilityPackId::CoreAccounting
-                            || window
-                                .evidence
-                                .as_ref()
-                                .and_then(|evidence| evidence.report_tie_out.as_ref())
-                                .is_some())
-                });
-            if completed_with_required_evidence {
-                continue;
-            }
-            if let Some(progress) = state.windows.get_mut(&planned.id) {
-                if progress.phase == WindowPhase::Complete {
-                    if plan.pack != CapabilityPackId::CoreAccounting
-                        || progress
-                            .evidence
-                            .as_ref()
-                            .and_then(|evidence| evidence.report_tie_out.as_ref())
-                            .is_some()
-                    {
-                        return Err(SnapshotError::StateInvariant(
-                            "completed_window_report_retry",
-                        ));
-                    }
-                    // Reopen the evidence-gathering path. Normalized mirror
-                    // membership remains immutable and the next completed
-                    // attempt must observe every prior identity again.
-                    progress.phase = WindowPhase::Pending;
-                    progress.stage_receipt = None;
-                    progress.evidence = None;
-                    state.set_phase(SnapshotPhase::PlanWindows, Some(planned.id.clone()));
-                    self.state_store.save(&mut state).await?;
-                }
-            }
             if cancellation.is_cancelled() {
                 return Ok(PhaseOutcome::Finished(Box::new(
                     self.finish_terminal(plan, state, TerminalKind::Cancelled, "run_cancelled")
@@ -2575,121 +2529,12 @@ where
                 if core.has_foreign_master_text_diagnostics() {
                     attempt_warning_codes.insert(WarningCode::ForeignMasterTextRenderingDegraded);
                 }
-                let report_result = match self
-                    .await_connector(
-                        &state,
-                        cancellation,
-                        self.connector.read_core_period_balance_report(&context),
-                    )
-                    .await?
-                {
-                    ConnectorAwait::Completed(result) => result,
-                    ConnectorAwait::Cancelled => {
-                        return Ok(PhaseOutcome::Finished(Box::new(
-                            self.finish_terminal(
-                                plan,
-                                state,
-                                TerminalKind::Cancelled,
-                                "run_cancelled",
-                            )
-                            .await?,
-                        )));
-                    }
-                };
-                match report_result {
-                    Ok(report) => {
-                        state.gap_codes.remove("report_tie_out_unavailable");
-                        state.gap_codes.remove("report_tie_out_evidence_invalid");
-                        state.gap_codes.remove(EDUCATION_REPORT_FAMILY_UNSUPPORTED);
-                        let report_sha256 = sha256_json(&report)?;
-                        match assess_core_period_report(
-                            core,
-                            &plan.company.identity,
-                            &planned.range,
-                            &report,
-                        ) {
-                            Ok(assessment) => {
-                                canonical.evidence.report_tie_out_scope =
-                                    if assessment.state == TieOutState::Passed {
-                                        crate::sync::reconciliation::ComparisonScope::Window
-                                    } else {
-                                        crate::sync::reconciliation::ComparisonScope::Unavailable
-                                    };
-                                canonical.evidence.report_tie_out = Some(ReportTieOutEvidence {
-                                    source_identity: plan.company.identity.clone(),
-                                    pack: plan.pack,
-                                    pack_schema_version: plan.pack_schema_version,
-                                    query_profile: planned.query_profile.clone(),
-                                    filters_sha256: planned.filters_sha256.clone(),
-                                    from_yyyymmdd: planned.range.from_yyyymmdd.clone(),
-                                    to_yyyymmdd: planned.range.to_yyyymmdd.clone(),
-                                    report_sha256,
-                                    state: assessment.state,
-                                    compared_ledger_count: assessment.compared_ledger_count,
-                                    source_reported_count: report.source_reported_count,
-                                    core_ledger_count: core.ledgers.len() as u64,
-                                });
-                                match assessment.state {
-                                    TieOutState::Passed => {}
-                                    TieOutState::Unavailable => {
-                                        state
-                                            .gap_codes
-                                            .insert("period_report_profile_unobserved".to_string());
-                                    }
-                                    TieOutState::Mismatch => {
-                                        let mut source_ids = assessment
-                                            .mismatched_ledger_source_ids
-                                            .iter()
-                                            .map(|source_id| {
-                                                scoped_mismatch_record_alias(
-                                                    &plan.company.identity.observed_fingerprint,
-                                                    &plan.run_id,
-                                                    &planned.id,
-                                                    source_id,
-                                                )
-                                            })
-                                            .collect::<Vec<_>>();
-                                        source_ids.sort();
-                                        source_ids.dedup();
-                                        source_ids.truncate(20);
-                                        for code in assessment.safe_reason_codes {
-                                            canonical.evidence.mismatches.push(
-                                                ReconciliationMismatch {
-                                                    safe_reason_code: code.to_string(),
-                                                    safe_record_ids: source_ids.clone(),
-                                                },
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                            Err(_) => {
-                                state
-                                    .gap_codes
-                                    .insert("report_tie_out_evidence_invalid".to_string());
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        // Leave evidence absent so a resumed run retries this
-                        // corroborating read before commit. The durable gap
-                        // keeps a one-shot failure truthful if the run proceeds.
-                        state
-                            .gap_codes
-                            .insert("report_tie_out_unavailable".to_string());
-                        // Refused before sending in Education (bridge#45): say
-                        // why, so the gap is not read as a Tally failure.
-                        if matches!(
-                            &error,
-                            TallyError::Unsupported { code }
-                                if code == EDUCATION_REPORT_FAMILY_UNSUPPORTED
-                        ) {
-                            state
-                                .gap_codes
-                                .insert(EDUCATION_REPORT_FAMILY_UNSUPPORTED.to_string());
-                        }
-                    }
-                }
+                // The corroborating period-balance report is not sent: some
+                // Tally builds cannot evaluate it. The run records the tie-out
+                // as unavailable, so it cannot claim the report agreed.
+                state
+                    .gap_codes
+                    .insert("report_tie_out_unavailable".to_string());
             }
             set_window_phase(
                 &mut state,
@@ -3654,7 +3499,6 @@ pub(crate) fn tally_error_code(error: &TallyError) -> &'static str {
             "group_export_invalid" => "group_export_invalid",
             "http_status_failure" => "http_status_failure",
             "ledger_export_invalid" => "ledger_export_invalid",
-            "period_report_invalid" => "period_report_invalid",
             "response_content_encoding_unsupported" => "response_content_encoding_unsupported",
             "response_encoding_invalid" => "response_encoding_invalid",
             "response_read_failed" => "response_read_failed",
@@ -3678,8 +3522,6 @@ pub(crate) fn tally_error_code(error: &TallyError) -> &'static str {
             "company_identity_mismatch" => "company_identity_mismatch",
             "connector_context_invalid" => "connector_context_invalid",
             "endpoint_invalid" => "endpoint_invalid",
-            "period_report_identity_missing" => "period_report_identity_missing",
-            "period_report_scope_mismatch" => "period_report_scope_mismatch",
             "request_size_limit_exceeded" => "request_size_limit_exceeded",
             _ => "response_parse_failed",
         },

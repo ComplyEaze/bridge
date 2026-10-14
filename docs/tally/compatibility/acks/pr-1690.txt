@@ -1,0 +1,7 @@
+docs/step-by-step-roadmap.md
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+src-tauri/Cargo.lock
+src-tauri/crates/tally-protocol-simulator/Cargo.toml
+src-tauri/crates/tally-protocol-simulator/README.md
+tools/Cargo.lock
+reviewer: lamemustafa

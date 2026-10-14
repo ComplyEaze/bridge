@@ -812,7 +812,9 @@ consumption authority is immutable.
 - JSONEX valid arrays.
 - Canonical semantic-projection fixtures that explicitly exclude transport
   provenance; the existing synthetic JSON reference is not an official Tally
-  JSONEX envelope and does not prove XML/JSONEX parity.
+  JSONEX envelope and does not prove XML/JSONEX parity. (2026-10-13 note: that
+  fixture was deleted in #1701; the only thing that read it was a test of its
+  own contents.)
 - unsupported capability.
 
 #### Acceptance
@@ -1279,7 +1281,9 @@ mirror/checkpoint/proof state, or supports writes. `Matched` remains
   is enabled by the production application.
 - The old Bridge-shaped JSON simulator fixture is explicitly labelled a
   synthetic semantic reference. It is not an official Tally JSONEX envelope
-  and supplies no capability or parity evidence.
+  and supplies no capability or parity evidence. (2026-10-13 note: that fixture
+  was deleted in #1701; the only thing that read it was a test of its own
+  contents.)
 
 #### Acceptance
 
@@ -1549,6 +1553,12 @@ database, resume, UI, benchmark, and budget evidence remain unavailable.
 
 #### Implemented PR13B1 boundary
 
+(2026-10-13 note: the receipt described here, its tool
+`tools/bridge-tally-qualification` and its CI step were deleted on 2026-10-12
+in #1566, and the simulator's voucher-window generator on 2026-10-13 in #1670;
+see item 11 of `docs/step-by-step-roadmap.md`. The text below records the
+contract as it was designed.)
+
 The first performance-evidence slice is a portable repository-synthetic parser
 qualification harness. A bounded generator streams deterministic UTF-8 voucher
 windows to temporary files before measurement. Closed scenarios cover a CI
@@ -1615,6 +1625,13 @@ BOM-qualified UTF-16LE/BE. A deterministic master generator preflights up to
 10,000-ledger corpus traverses the production decoder and strict ledger parser;
 an independently derived digest proves every parsed identity and accounting
 field matches the generator expectation and remains identical across encodings.
+(2026-10-13 note: the master generator described here was deleted in #1690, and
+with it the digest and the "generator expectation" in the last sentence. The
+10,000-ledger test remains in
+`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`: it builds
+its rows itself, decodes them in UTF-8, UTF-16LE and UTF-16BE, and compares each
+parsed field with the row it built, with no digest. See item 12 of
+`docs/step-by-step-roadmap.md`.)
 
 Protocol hardening rejects duplicate/misplaced export header status fields and
 DTD/processing constructs. Import result parsing accepts Tally's documented
@@ -1632,6 +1649,8 @@ Tauri/runtime path, and native runtime tests cannot execute locally because
 database/reconcile/resume/UI cost, comparable performance baselines, and a
 read-only live Education compatibility receipt remain follow-on work. The
 existing PR13B1 receipt is not retroactively granted runtime-cap authority.
+(2026-10-12 note: that receipt was deleted; see the note under "Implemented
+PR13B1 boundary".)
 
 ---
 
@@ -1683,7 +1702,8 @@ A release may not broaden its support claim unless the matrix has current eviden
 
 - `bridge-tally-compatibility` now owns a separate, closed, privacy-reduced
   live-read receipt schema. It does not broaden the parser-only qualification
-  receipt and cannot itself emit a support claim.
+  receipt and cannot itself emit a support claim. (2026-10-12 note: that
+  receipt was deleted; see the note under "Implemented PR13B1 boundary".)
 - Eleven exact machine-readable Windows/Tally cells cover the initial release, mode,
   transport, ODBC, company-state, locale/encoding, data-tier, and platform
   dimensions. Every cell remains `unknown`; no live support evidence has been

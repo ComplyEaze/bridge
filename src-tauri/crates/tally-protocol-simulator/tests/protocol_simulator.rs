@@ -593,21 +593,6 @@ fn delayed_reset_after_processing_is_explicitly_ambiguous() {
 }
 
 #[test]
-fn synthetic_json_reference_contains_selected_xml_fixture_values() {
-    let xml = Fixture::NormalExport.body();
-    let json: serde_json::Value =
-        serde_json::from_str(&Fixture::SyntheticJsonSemanticReference.body())
-            .expect("valid synthetic JSON reference");
-
-    assert!(xml.contains(json["company"]["guid"].as_str().unwrap()));
-    assert!(xml.contains(json["company"]["name"].as_str().unwrap()));
-    let ledger = &json["ledgers"][0];
-    for field in ["name", "opening_balance", "parent", "guid"] {
-        assert!(xml.contains(ledger[field].as_str().unwrap()));
-    }
-}
-
-#[test]
 fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
     let empty = Fixture::EmptyExport.body();
     assert!(empty.contains("<RECORDCOUNT>0</RECORDCOUNT>"));
@@ -623,20 +608,6 @@ fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
     let duplicate = Fixture::DuplicateExportMetadata.body();
     assert!(duplicate.contains("SCHEMA=\"bridge.tally.ledgers/1\""));
     assert!(duplicate.contains("<SCHEMA>bridge.tally.ledgers/1</SCHEMA>"));
-
-    let voucher = Fixture::VoucherExport.body();
-    assert!(voucher.contains("SCHEMA=\"bridge.tally.vouchers/2\""));
-    assert!(voucher.contains("OBJECTTYPE=\"VOUCHER\""));
-    for forbidden in [
-        "NARRATION",
-        "ADDRESS",
-        "EMAIL",
-        "PHONE",
-        "MOBILE",
-        "PINCODE",
-    ] {
-        assert!(!voucher.contains(forbidden));
-    }
 }
 
 #[test]
@@ -653,7 +624,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::EmptyExport,
         Fixture::DuplicateIdentity,
         Fixture::WrongCompany,
-        Fixture::VoucherExport,
         Fixture::RecordCountMismatch,
         Fixture::MalformedExportMetadata,
         Fixture::DuplicateExportMetadata,
@@ -663,7 +633,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::ImportPartial,
         Fixture::MalformedXml,
         Fixture::TruncatedXml,
-        Fixture::SyntheticJsonSemanticReference,
         Fixture::UnsupportedCapability,
     ];
     for fixture in fixtures {

@@ -1,0 +1,7 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_ENVIRONMENT_AND_REQUESTS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-core/src/report_tie_out.rs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/src/sync/snapshot.rs
+reviewer: lamemustafa

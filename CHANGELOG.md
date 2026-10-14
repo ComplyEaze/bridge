@@ -18,6 +18,17 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
+  any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
+  carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,
+  with a rate that is `absent`, `empty`, `zero` or a `value` (the text as sent and the decimal), never merged
+  (part of #1342). HSN/SAC and type of supply are not returned because no capture shows them, the place of
+  supply stays in the registration history, and slab rates are only flagged. Without the flag the requests, the
+  sizing and the result are unchanged. With it the read is admitted at 8,000 bytes a ledger instead of 3,750, a
+  margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element),
+  not a measured ratio; a large book may be read in more parts or refused as too large. Measured on one 14-ledger lab book of TallyPrime 7.1 Silver and not yet run through this tool on a
+  live Tally.
+
 - `stock_summary` now returns an item's closing quantity, `closing.quantity` with its `amount` and `unit`, where
   Tally's own plain Stock Summary has exactly one line with the item's name and shows the same quantity, unit
   and amount; every other item says why none is returned (`none_sent`, `unread`, `inside_stock_group`,
@@ -32,11 +43,30 @@ These changes are in source and not yet in a published build.
   book whose report lists a group and an item under the root side by side, an item inside a stock group, a
   compound unit, other dates, other releases, macOS, and a group that carries an item's name.
 
+- `statement_tie_out` is a new read-only tool: after `parse_bank_statement`, it says whether the bank ledger in
+  Tally stands where the statement says it stood at the start and at the end of the statement's dates, as three
+  gaps (book less statement): the opening gap, the closing gap, and the change in between, before an import or
+  after one made by hand. It covers a whole statement, or whole calendar months of it, names no cause and writes
+  nothing. It returns the two dates and the gaps, not the balances, though a gap plus the statement's balance at
+  that date (for a whole statement, the balance you supplied) gives the book's. The parse's proposals file now also
+  records the statement's first and last dates (part of #1211). It is not yet proved against a live book: one run
+  on two synthetic companies by an outside contributor is only partly recorded (see the pull request).
+- `statement_tie_out` can check whole calendar months of a longer statement: a file parsed with `from` and `to` (or
+  one of them) from the 1st of a month to the last day of a month, within the statement's rows, is compared with the
+  book at those dates, against the statement's balance there as worked out from its own rows. Any other narrowed
+  window is `not_established` (`window_not_whole_calendar_months`, `window_beyond_statement_rows`). With the book's
+  figures, the gaps then give the statement's balance at those month ends and its net over those months: never a
+  part of a month except the part-months at the statement's own start and end (whose net a month-end balance gives
+  together with the opening and closing supplied to the parse), though a month in which every other row's amount is already known (one row alone, or one row
+  beside open cash lines, whose amounts the parse returns) gives that row's amount (part of #1211). No month window
+  has been run against a live book.
+
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
-  return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  return (measured for Receipts only), or is cancelled, optional or post-dated (decided first from Tally's own flags, never
+  counted as included, with what its status flags read returned beside it; #1655, #1664), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
   judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
-  whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
+  whose flags are absent or odd, or whose deleted flag reads Yes (never seen), is returned as unread, never as included. The voucher type is named exactly (a
   type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher
   mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered
   buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
@@ -49,6 +79,16 @@ These changes are in source and not yet in a published build.
   settings are the ones Tally holds today, not what the books contain or what they were during a year. The
   currency is a symbol, not a currency code. Measured on three synthetic books of one TallyPrime 7.1 Silver;
   a setting changed inside a sitting, Education mode and other releases are not measured.
+
+- `voucher_read_cost` says, before a call, the most census reads one call of `vouchers`, `ledger_movement` or
+  `verify_import` will send on a company (a read can be refused before its census ends), and the least time a call
+  that is not refused earlier spends on the gaps between them (part of #1465, after #1239). It reads the company's
+  identity and then its marks (the opening every windowed call makes) and sends no census and no voucher request. The census follows the book's voucher mark, not the window, so the figure is for
+  one call: a narrower window does not lower it, and N calls pay it N times. The count and the floor are derived
+  from the mark and the read's own rules, not measured on the book, and they leave out the data parts and the
+  wider re-read an empty window gets in `vouchers` and `ledger_movement`; no estimate is made. Beside them are the
+  whole calls the protocol reference records, with their census reads and data parts (one book, about 250,000
+  vouchers, 31 census reads), as data marked as not a bound. Nothing is refused on it. Not measured: Windows hosts, and any book other than that one.
 
 - `parse_bank_statement` reads Bank of Baroda statements in one measured layout (`bank: "bob"`; Part of #1457). The layout was measured on
   two real statements, held privately, and the profile follows what was seen there:
@@ -65,6 +105,16 @@ These changes are in source and not yet in a published build.
   account types and branches, statements printed oldest first, other wordings, and a statement downloaded another way.
 
 **Changed**
+
+- **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
+  differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
+  every other compared field matched and it read `posted_verified`, and a divergent voucher never
+  listed a narration difference. A narration edited in Tally after the post therefore leaves the
+  batch unsettled until the narration in Tally matches the approved text again. The read-back, the post's span binding and the amendment
+  check now share one comparison: the text as written (trimmed, with its `[BRIDGE:…]` tag for a
+  file imported by hand) against the text read, byte for byte; a narration Tally holds none of
+  equals only an empty one written. Whether Tally changes trailing spaces or line breaks on import
+  is unmeasured; the first live run will show it (#1608).
 
 - On Windows, `parse_bank_statement` now refuses a password file owned by neither you nor
   Administrators, or that anyone but you, SYSTEM and Administrators can read or change
@@ -107,12 +157,21 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A `post_import` refusal made before anything was sent now says what to do next.** Its
+  `error.next_step` carries the same step every other tool gives for that refusal: its code's,
+  or else its cause's. Before, a code raised inside the post, such as a date range too large to
+  check in one request, came back with no step. Only when the journal shows nothing was sent: a
+  refusal after a send, or when a send could not be ruled out, still carries no such step, and is
+  reconciled with `verify_import`. The steps the post already gave (a busy port, a row another
+  batch posted) are unchanged (#1573).
+
 - **A batch approval's Journal lines now name a ledger on each side, and the window no longer
   says narrations are shown exactly.** In a batch of up to ten, each Journal's line named only
   its first debit ledger, so the person could not see what each Journal credited; it now shows
   `Dr "<first debit>" +N more  Cr "<first credit>" +M more`, with up to 20 characters of its
-  narration (other types keep 40). A Journal line that does not fit leaves the totals and the
-  reason line, as any line that does not fit does. The line above the voucher lines said each
+  narration (other types keep 40), cut shorter, never under 10, when that makes the line fit. A
+  Journal line that fits at no such cut leaves the totals and the reason line, as any line that
+  does not fit does. The line above the voucher lines said each
   narration was quoted "exactly as it will be posted", above narrations cut at 40 characters;
   it now says a cut narration is marked. Payment, Receipt and Contra lines still name one
   ledger. On every line, the further entries on a side now read "+N more", never a bare "+N"
@@ -153,6 +212,32 @@ These changes are in source and not yet in a published build.
   and an empty window next to a busy day still cannot reach `complete`. The other reasons
   (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
   `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
+
+**Safer or fixed**
+
+- When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
+  not a valid key, the app now says so with its own codes (`tally_mirror_key_missing`,
+  `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
+  credential prompt and retry. Restoring the credential (the macOS login keychain, or that user's Windows
+  Credential Manager) or opening the app as the same computer user is what recovers the mirror. The
+  app deletes nothing, and no reset exists yet (#1563). A key is also no longer created when the mirror file's
+  existence cannot be checked. Not measured on a real
+  credential store: what the macOS keychain or the Windows Credential Manager returns after a keychain reset
+  or a profile move.
+- A later check (`verify_import`, a repeated `post_import`, or the check
+  before a review is recorded) of a post that Tally answered as creating none
+  of its vouchers no longer suggests the voucher was edited in Tally. Its
+  status is unchanged (`sent_not_attributed`, the batch still
+  `reconciliation_required`), but the voucher's next step now says that Tally
+  reported it as not created when it was sent, that it is not found for these
+  dates now, and to look for it in Tally before entering it by hand, since it
+  may have been entered in another form meanwhile. This reads what the post
+  left on record: its saved answer (every counter reported, none created, one
+  exception for each voucher sent, nothing else counted) and, for a batch,
+  its own verdict that the voucher step matched. A partly created batch, and
+  a batch whose voucher mark moved across the post, keep the earlier line.
+  Measured live once, on a single voucher refused whole; a batch is not
+  measured live (#1108).
 
 ## [0.5.1] - 2026-10-09
 

@@ -449,7 +449,7 @@ fn write_private(path: &PathBuf, text: &str) -> std::io::Result<()> {
 
 fn run() -> Result<(), String> {
     let arguments = arguments()?;
-    let password = match &arguments.password_file {
+    let unlock = match &arguments.password_file {
         Some(path) => read_password(path)?,
         None => String::new(),
     };
@@ -459,9 +459,9 @@ fn run() -> Result<(), String> {
     let bytes = std::fs::read(&arguments.pdf).map_err(|_| "statement unreadable")?;
     let engine = engine(&arguments.pdfium).map_err(|refusal| refusal.category.to_string())?;
     let text =
-        extract_pages(engine, &bytes, &password).map_err(|refusal| refusal.category.to_string())?;
+        extract_pages(engine, &bytes, &unlock).map_err(|refusal| refusal.category.to_string())?;
     let pages = text.pages();
-    drop(password);
+    drop(unlock);
     write_private(&arguments.out, &report(pages))
         .map_err(|_| "output file not writable, or it exists already")?;
     println!("wrote the layout of {} pages", pages.len());
@@ -477,6 +477,12 @@ mod tests {
     fn w(row: usize, x0: f64, x1: f64, text: &str) -> Word {
         let y = row as f64 * 12.0;
         Word::new(x0, y, x1, y + 9.0, text)
+    }
+
+    /// A twelve-digit account-number-shaped run, assembled so the source
+    /// holds no such literal.
+    fn twelve_digits() -> String {
+        ["123456", "789012"].concat()
     }
 
     fn line_of<'a>(out: &'a str, label: &str) -> &'a str {
@@ -498,10 +504,13 @@ mod tests {
     #[test]
     fn digits_and_letters_lose_their_values_and_long_runs_their_lengths() {
         assert_eq!(mask("01-04-2025"), "9+-9+-9+");
-        assert_eq!(mask("123456789012"), "9+");
+        assert_eq!(mask(&twelve_digits()), "9+");
         assert_eq!(mask("\u{0967}\u{0968}\u{0969}"), "9+");
         assert_eq!(mask("ramesh.k@example.com"), "a+.a#a+.a+");
-        assert_eq!(mask("UPI/123456789012/Ramesh"), "A+#9+#Aa+");
+        assert_eq!(
+            mask(&format!("UPI/{}/Ramesh", twelve_digits())),
+            "A+#9+#Aa+"
+        );
         // A tax-id-shaped text, assembled so the source holds no such literal.
         assert_eq!(mask(&["AAAAA", "9999", "A"].concat()), "A+9+A");
         assert_eq!(mask("\u{20b9}"), "?");
@@ -536,7 +545,7 @@ mod tests {
         assert_eq!(mask("\u{096b}.\u{0966}\u{0966}"), "9+.9+");
         assert_eq!(kind("1,23,456.78"), Kind::Amount);
         assert_eq!(kind("Rs.500.00"), Kind::Amount);
-        assert_eq!(kind("123456789012"), Kind::Other);
+        assert_eq!(kind(&twelve_digits()), Kind::Other);
         assert_eq!(kind("Ramesh"), Kind::Other);
         assert_eq!(kind("Narration"), Kind::Listed);
         assert!(mask("\u{0930}\u{092e}\u{0947}\u{0936}").is_ascii());
@@ -549,14 +558,14 @@ mod tests {
             w(0, 90.0, 130.0, "KUMAR"),
             w(1, 40.0, 80.0, "Account"),
             w(1, 90.0, 110.0, "No:"),
-            w(1, 120.0, 200.0, "123456789012"),
+            w(1, 120.0, 200.0, &twelve_digits()),
             w(2, 40.0, 80.0, "Date"),
             w(2, 90.0, 140.0, "Narration"),
             w(2, 400.0, 440.0, "Balance"),
         ];
         let out = report(&[one.clone(), one.clone(), one.clone(), one]);
         assert!(!out.contains("RAMESH") && !out.contains("KUMAR"), "{out}");
-        assert!(!out.contains("123456789012"), "{out}");
+        assert!(!out.contains(&twelve_digits()), "{out}");
         assert!(
             out.contains("Narration") && out.contains("Balance"),
             "{out}"

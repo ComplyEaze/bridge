@@ -1,0 +1,11 @@
+# One line per request to the Tally port, one at a time, none abandoned: UTC time the answer was complete, step, request file (or GET /status), curl exit code, HTTP status, bytes downloaded, seconds (curl time_total), sha256 of the answer.
+2026-10-14T19:24:55.412Z	0b	r01-company-extent.xml	exit=0	http=200	bytes=4000	s=0.010930	sha256=0cb23618073bc5eeddbc3441fd4f0da9e84c55699cd206b66d1410b304f8d147
+2026-10-14T19:25:04.702Z	1	r02-marks.xml	exit=0	http=200	bytes=3394	s=0.008389	sha256=8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+2026-10-14T19:25:13.746Z	2a	r15-verification-window.xml	exit=0	http=200	bytes=87884	s=0.224022	sha256=b42a98cd6268f7ee4f4d589b68c777d96d7243a0657b20126d90cd1ac6128093
+2026-10-14T19:25:21.531Z	2s	/status	exit=0	http=200	bytes=51	s=0.004257	sha256=655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800
+2026-10-14T19:25:29.173Z	2b	r15-verification-window.xml	exit=0	http=200	bytes=87884	s=0.130399	sha256=b42a98cd6268f7ee4f4d589b68c777d96d7243a0657b20126d90cd1ac6128093
+2026-10-14T19:27:02.854Z	3a	w01-verification-window-widened.xml	exit=0	http=200	bytes=250716	s=0.101535	sha256=994def1db057b803282035c8e3116d4bb5bb726aa88d0f0e51299d8091a9af5a
+2026-10-14T19:27:08.737Z	3s	/status	exit=0	http=200	bytes=51	s=0.002248	sha256=655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800
+2026-10-14T19:27:13.376Z	3b	w01-verification-window-widened.xml	exit=0	http=200	bytes=250716	s=0.060335	sha256=994def1db057b803282035c8e3116d4bb5bb726aa88d0f0e51299d8091a9af5a
+2026-10-14T19:27:18.333Z	4	r02-marks.xml	exit=0	http=200	bytes=3394	s=0.003837	sha256=8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+2026-10-14T19:27:23.126Z	5	r01-company-extent.xml	exit=0	http=200	bytes=4000	s=0.004450	sha256=0cb23618073bc5eeddbc3441fd4f0da9e84c55699cd206b66d1410b304f8d147

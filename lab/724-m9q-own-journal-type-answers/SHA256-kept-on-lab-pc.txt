@@ -1,0 +1,30 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/01-m9q.png
+366b5eaf301703bd6393bdb57ab5908789193acf8994593adfbaf6f1c23084eb  61921  screenshots/02-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/03-m9q.png
+47c647296118c376a7f1356573c15cb5c029261d69e02c760eab9fe6525a47dd  115267  screenshots/04-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/05-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/06-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/07-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/08-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/09-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/10-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/11-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/12-m9q.png
+443f441377af2f4e1cbc32ee2d49a9a003add914f3b7a634afcf27243c4ffe62  54973  screenshots/13-m9q.png
+71bbe51f01d6c4af498ef955cbf2bb446e5eaf9672fec2ec9c23b5fbaea01c03  52372  screenshots/14-m9q.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/15-m9q.png
+366b5eaf301703bd6393bdb57ab5908789193acf8994593adfbaf6f1c23084eb  61921  screenshots/16-m9q.png
+8c98917553ff8eb6804f8c3ba3689ad0b39c1b6654a530132919220e07475d32  96386  screenshots/17-m9q.png
+c81a9eb165de0c124c12dd3693c01fa69b3d47f34113fa234cc19eaef3dc5dce  30750  backups/N1-B8/TDBK1800_100058.001
+c748c2f42d87559177b3ee6e7a4db9c1155406c98d4e1eb0c77d0053a8784bde  3418  working-summary.txt
+1fcae61f09264a00935bbeaa07b057445a785875545b6d0ba61a15b4ec01c98d  44682  working-log.txt
+f25d460aaea507e7c8b40e4417ef4eda88071327a0e48d2d487531818083e3c5  624  step0/m9q-data-folder-100058-after-restore-end.txt
+42bf4ed1c54280d1e4045488f1181c2876d839b46c5fc46b1663266c6c366e8f  804  step0/m9q-data-folder-100058-before-restore-end.txt
+e90cb197aadc292acc7ddd299be6d3f9e08b93471d5df2c4aaff2ce262f39cab  10579  step0/m9q-s0-after-restore-netstat.txt
+4926ea04cb58db301da657a07ce69ae9a927048462fafe224c42ad729772464f  48  step0/m9q-s0-after-restore-tasklist.txt
+e0c9ff0674024ef9adfaa5f41d78fa2e0c3fdfbde61eedf8d8bfcbb4027495eb  10801  step0/m9q-s0-end-netstat.txt
+d2c40992c369f0109e7585d12491239cb4c62c456a0a50c49e94b79e07190d5b  48  step0/m9q-s0-end-tasklist.txt
+5fd1cae6f31d4bb91bfec27de5b861c67ad284dd121d288527c23ce9a8aaadfe  11358  step0/m9q-s0-start-netstat.txt
+31a434424cc26ab3ca7f53d4ea6c73d2f39dea60e1c784d57ba0b40530b7605c  48  step0/m9q-s0-start-tasklist.txt

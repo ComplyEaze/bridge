@@ -1,0 +1,5 @@
+﻿# 4 VOUCHER rows by MASTERID: DATE, TYPE, NUMBER (exact), MASTERID, ALTERID, GUID, NUMBERINGSTYLE, VOUCHERRETAINKEY, ISOPTIONAL, ISCANCELLED, VCHKEY || entries
+20260701, Receipt, "1", M1, A1, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000001, style Auto Retain, retainkey 1, optional No, cancelled No, vchkey cbe97898-88e6-42ee-b48f-5e1c3246105c-0000b47b:00000008 || Lab Seed Income, 1.00, No || Cash, -1.00, Yes
+20260715, Payment, "1", M2, A2, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000002, style Manual, retainkey 1, optional No, cancelled No, vchkey cbe97898-88e6-42ee-b48f-5e1c3246105c-0000b489:00000008 || Lab Charges, -10.00, Yes || Lab Bank, 10.00, No
+20260715, Journal, "1", M3, A3, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000003, style Manual, retainkey 1, optional No, cancelled No, vchkey cbe97898-88e6-42ee-b48f-5e1c3246105c-0000b489:00000010 || Lab Charges, -10.00, Yes || Suspense, 10.00, No
+20260720, Journal, "M9Q-P1", M4, A4, cbe97898-88e6-42ee-b48f-5e1c3246105c-00000004, style Manual, retainkey 5, optional No, cancelled No, vchkey cbe97898-88e6-42ee-b48f-5e1c3246105c-0000b48e:00000008 || Lab Charges, -51.00, Yes || Suspense, 51.00, No

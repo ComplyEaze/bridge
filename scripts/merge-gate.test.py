@@ -14,6 +14,7 @@ merge operation is used.
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shlex
 import shutil
@@ -932,6 +933,201 @@ class PrivacyLocationAndCommentBlockTests(unittest.TestCase):
         parsed = load_diff_module().parse(diff.split("\n"))
         self.assertEqual(parsed["added_payload"], ["added one", "added two", "added three", "tail"])
         self.assertEqual(parsed["added_locations"], [["a.txt", 2], ["a.txt", 4], ["a.txt", 5], ["a.txt", 44]])
+
+
+def load_verdict_module():
+    spec = importlib.util.spec_from_file_location("merge_gate_verdict", ROOT / "scripts" / "merge_gate_verdict.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class MergeVerdictEvaluator(unittest.TestCase):
+    """scripts/merge_gate_verdict.py: the owner's two machine lines, spec v3 (every case is a document the gate would build)."""
+
+    OWNER = 57982425
+    LOGIN = "lamemustafa"
+    HEAD = "1" * 40
+    BASE = "2" * 40
+    CLEAN = "MERGE-VERDICT CLEAN head=" + "1" * 40 + " base=" + "2" * 40
+    RECOMMEND = "MERGE-ADVERSARY RECOMMEND head=" + "1" * 40 + " base=" + "2" * 40
+    T = ["2026-10-14T0%d:00:00Z" % n for n in range(1, 10)]
+
+    def setUp(self):
+        self.mod = load_verdict_module()
+
+    def user(self, uid=None, kind="User"):
+        return {"id": self.OWNER if uid is None else uid, "type": kind}
+
+    def comment(self, body, at, uid=None, kind="User", app=None):
+        return {"user": self.user(uid, kind), "body": body, "created_at": at, "performed_via_github_app": app}
+
+    def review(self, body, at, uid=None, kind="User", state="COMMENTED"):
+        return {"user": self.user(uid, kind), "body": body, "submitted_at": at, "state": state}
+
+    def doc(self, reviews=(), comments=(), inline=(), title="t", body="b", commits=("c",), added=("a",),
+            reviews_graph=(), comments_graph=(), events=(), complete=True):
+        return {"head": self.HEAD, "base": self.BASE, "owner_login": self.LOGIN, "reviews": list(reviews), "comments": list(comments),
+                "inline_comments": list(inline),
+                "texts": {"title": title, "body": body, "commit_messages": list(commits), "added_lines": list(added)},
+                "graphql": {"complete": complete, "reviews": list(reviews_graph), "comments": list(comments_graph), "events": list(events)}}
+
+    def both(self):
+        return self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])
+
+    def status(self, doc):
+        return self.mod.evaluate(doc)["status"]
+
+    def test_both_lines_pass_as_comments_reviews_or_one_of_each(self):
+        self.assertEqual(self.status(self.both()), "pass")
+        self.assertEqual(self.status(self.doc(reviews=[self.review(self.CLEAN, self.T[1]), self.review(self.RECOMMEND, self.T[2])])), "pass")
+        self.assertEqual(self.status(self.doc(reviews=[self.review(self.CLEAN, self.T[1])], comments=[self.comment(self.RECOMMEND, self.T[2])])), "pass")
+
+    def test_either_line_alone_blocks(self):
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.CLEAN, self.T[1])])), "block")
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.RECOMMEND, self.T[1])])), "block")
+        self.assertEqual(self.status(self.doc()), "block")
+
+    def test_a_line_for_another_head_or_base_does_not_count(self):
+        other_head = self.CLEAN.replace("head=" + "1" * 40, "head=" + "3" * 40)
+        other_base = self.RECOMMEND.replace("base=" + "2" * 40, "base=" + "4" * 40)
+        self.assertEqual(self.status(self.doc(comments=[self.comment(other_head, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])), "block")
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(other_base, self.T[2])])), "block")
+
+    def test_only_a_body_that_is_exactly_the_line_counts(self):
+        bad = [self.CLEAN + " ok", " " + self.CLEAN, self.CLEAN + "\n\n", "x\n" + self.CLEAN, self.CLEAN + "\n" + self.RECOMMEND,
+               self.CLEAN.upper(), self.CLEAN.replace("1" * 40, "1" * 39), self.CLEAN.replace("CLEAN", "CLEAN,"),
+               "> " + self.CLEAN, "`" + self.CLEAN + "`", "<!-- " + self.CLEAN + " -->", self.CLEAN.replace("1" * 40, "G" * 40)]
+        for body in bad:
+            with self.subTest(body=body[:60]):
+                self.assertEqual(self.status(self.doc(comments=[self.comment(body, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])), "block")
+
+    def test_crlf_and_one_trailing_newline_are_accepted(self):
+        for body in (self.CLEAN + "\n", self.CLEAN + "\r\n"):
+            with self.subTest(body=repr(body[-3:])):
+                self.assertEqual(self.status(self.doc(comments=[self.comment(body, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])), "pass")
+
+    def test_a_line_by_anyone_else_is_refused_not_just_ignored(self):
+        for uid, kind, app in ((123, "User", None), (self.OWNER, "Bot", None), (self.OWNER, "User", {"id": 1}), (str(self.OWNER), "User", None), (True, "User", None)):
+            with self.subTest(uid=uid, kind=kind, app=app):
+                result = self.mod.evaluate(self.doc(comments=[self.comment(self.CLEAN, self.T[1], uid=uid, kind=kind, app=app), self.comment(self.RECOMMEND, self.T[2])]))
+                self.assertEqual(result["status"], "block")
+                self.assertTrue(result["refusals"])
+        nobody = {"user": None, "body": self.CLEAN, "created_at": self.T[1]}
+        self.assertEqual(self.status(self.doc(comments=[nobody, self.comment(self.RECOMMEND, self.T[2])])), "block")
+
+    def test_the_tokens_anywhere_in_the_pull_request_text_are_refused_even_with_both_lines(self):
+        for field in ("title", "body"):
+            for token in ("MERGE-VERDICT", "MERGE-ADVERSARY"):
+                with self.subTest(field=field, token=token):
+                    result = self.mod.evaluate(dict(self.both(), texts=dict(self.both()["texts"], **{field: "see " + token})))
+                    self.assertEqual(result["status"], "block")
+                    self.assertTrue(result["refusals"])
+        for texts in ({"commit_messages": ["MERGE-ADVERSARY"]}, {"added_lines": ["x MERGE-VERDICT CLEAN"]}):
+            with self.subTest(texts=texts):
+                result = self.mod.evaluate(dict(self.both(), texts=dict(self.both()["texts"], **texts)))
+                self.assertEqual(result["status"], "block")
+
+    def test_a_non_owner_review_comment_or_inline_comment_with_a_token_is_refused(self):
+        stranger = {"user": self.user(7), "body": "MERGE-VERDICT CLEAN", "created_at": self.T[3], "submitted_at": self.T[3]}
+        for kwargs in ({"comments": [stranger]}, {"reviews": [stranger]}, {"inline": [stranger]}):
+            with self.subTest(where=list(kwargs)[0]):
+                doc = self.both()
+                key = {"inline": "inline_comments"}.get(list(kwargs)[0], list(kwargs)[0])
+                doc[key] = doc[key] + list(kwargs.values())[0]
+                self.assertEqual(self.status(doc), "block")
+
+    def test_an_owner_inline_comment_with_a_token_voids_what_is_older_and_is_never_a_verdict(self):
+        inline = {"user": self.user(), "body": self.CLEAN, "created_at": self.T[5]}
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2])], inline=[inline])), "block")
+        only_inline = self.doc(comments=[self.comment(self.RECOMMEND, self.T[2])], inline=[dict(inline, created_at=self.T[0])])
+        self.assertEqual(self.status(only_inline), "block")
+
+    def test_a_later_not_clean_or_retraction_voids_and_a_newer_pair_restores(self):
+        for line in ("MERGE-VERDICT NOT-CLEAN head=" + "1" * 40 + " base=" + "2" * 40, "MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40,
+                     "MERGE-ADVERSARY REJECT head=" + "1" * 40 + " base=" + "2" * 40, "MERGE-ADVERSARY RETRACT head=" + "1" * 40 + " base=" + "2" * 40,
+                     "MERGE-VERDICT SOMETHING ELSE"):
+            with self.subTest(line=line[:40]):
+                comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(line, self.T[3])]
+                self.assertEqual(self.status(self.doc(comments=comments)), "block")
+                renewed = comments + [self.comment(self.CLEAN, self.T[4]), self.comment(self.RECOMMEND, self.T[5])]
+                self.assertEqual(self.status(self.doc(comments=renewed)), "pass")
+                only_one_renewed = comments + [self.comment(self.CLEAN, self.T[4])]
+                self.assertEqual(self.status(self.doc(comments=only_one_renewed)), "block")
+
+    def test_a_void_at_the_same_second_as_a_verdict_voids_it(self):
+        comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]
+        self.assertEqual(self.status(self.doc(comments=comments)), "block")
+
+    def test_both_verdicts_voided_at_their_own_second_do_not_stand(self):
+        comments = [self.comment(self.CLEAN, self.T[2]), self.comment(self.RECOMMEND, self.T[2]),
+                    self.comment("MERGE-ADVERSARY RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]
+        self.assertEqual(self.status(self.doc(comments=comments)), "block")
+        self.assertEqual(self.status(self.doc(comments=comments[:2])), "pass")
+
+    def test_a_dismissal_event_alone_voids_what_is_older_and_not_what_is_newer(self):
+        late = {"type": "ReviewDismissedEvent", "createdAt": self.T[6], "authorLogin": self.LOGIN}
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[late]))), "block")
+        early = dict(late, createdAt=self.T[0])
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[early]))), "pass")
+        someone_else = dict(late, authorLogin="someone")
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[someone_else]))), "pass")
+
+    def test_the_owner_login_is_compared_without_case(self):
+        doc = dict(self.both(), owner_login="LameMustafa")
+        doc["graphql"] = dict(doc["graphql"], comments=[{"authorLogin": "lamemustafa", "lastEditedAt": self.T[6], "editCount": 1}])
+        self.assertEqual(self.status(doc), "block")
+
+    def test_an_edit_of_any_owner_item_after_a_verdict_voids_it_and_an_older_edit_or_anyone_elses_does_not(self):
+        late = [{"authorLogin": "LameMustafa", "lastEditedAt": self.T[6], "editCount": 1}]
+        early = [{"authorLogin": self.LOGIN, "lastEditedAt": self.T[0], "editCount": 1}]
+        other = [{"authorLogin": "someone", "lastEditedAt": self.T[8], "editCount": 1}]
+        for graph_key in ("comments_graph", "reviews_graph"):
+            with self.subTest(item=graph_key):
+                self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], **{graph_key.replace("_graph", ""): late}))), "block")
+                self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], **{graph_key.replace("_graph", ""): early}))), "pass")
+                self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], **{graph_key.replace("_graph", ""): other}))), "pass")
+        unknown_time = [{"authorLogin": self.LOGIN, "lastEditedAt": None, "editCount": 2}]
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], comments=unknown_time))), "block")
+        never_edited = [{"authorLogin": self.LOGIN, "lastEditedAt": None, "editCount": 0}]
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], comments=never_edited))), "pass")
+
+    def test_a_deleted_owner_comment_voids_and_someone_elses_does_not(self):
+        deleted = {"type": "CommentDeletedEvent", "createdAt": self.T[6], "authorLogin": self.LOGIN}
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[deleted]))), "block")
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[dict(deleted, authorLogin="someone")]))), "pass")
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[dict(deleted, createdAt=self.T[0])]))), "pass")
+
+    def test_a_dismissed_owner_review_voids_with_or_without_its_event(self):
+        dismissed = self.review("looks fine", self.T[0], state="DISMISSED")
+        event = {"type": "ReviewDismissedEvent", "createdAt": self.T[6], "authorLogin": self.LOGIN}
+        doc = self.both(); doc["reviews"] = [dismissed]
+        self.assertEqual(self.status(dict(doc, graphql=dict(doc["graphql"], events=[event]))), "block")
+        self.assertEqual(self.status(doc), "block")
+        early = dict(event, createdAt=self.T[0])
+        self.assertEqual(self.status(dict(doc, graphql=dict(doc["graphql"], events=[early]))), "pass")
+
+    def test_unreadable_evidence_is_indeterminate(self):
+        self.assertEqual(self.status(self.doc(comments=self.both()["comments"], complete=False)), "indeterminate")
+        no_graph = self.both(); no_graph.pop("graphql")
+        self.assertEqual(self.status(no_graph), "indeterminate")
+        bad_time = self.doc(comments=[self.comment(self.CLEAN, "yesterday"), self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(bad_time), "indeterminate")
+        bad_event = dict(self.both(), graphql=dict(self.both()["graphql"], events=[{"type": "CommentDeletedEvent", "authorLogin": self.LOGIN}]))
+        self.assertEqual(self.status(bad_event), "indeterminate")
+
+    def test_the_command_line_exit_codes(self):
+        script = str(ROOT / "scripts" / "merge_gate_verdict.py")
+        run = lambda text: subprocess.run(["python3", script], input=text, capture_output=True, text=True)
+        self.assertEqual(run(json.dumps(self.both())).returncode, 0)
+        self.assertEqual(run(json.dumps(self.doc())).returncode, 1)
+        self.assertEqual(run(json.dumps(self.doc(complete=False))).returncode, 2)
+        for text in ("not json", "{}", "[]"):
+            with self.subTest(text=text):
+                self.assertEqual(run(text).returncode, 2)
+
+    def test_the_owner_id_is_the_numeric_id_of_the_owner_account(self):
+        self.assertEqual(self.mod.OWNER_ID, 57982425)
 
 
 if __name__ == "__main__":

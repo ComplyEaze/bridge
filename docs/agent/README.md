@@ -1897,7 +1897,8 @@ refused as `proposals_legacy` (parse the statement again).
   changes. Another record written to the batch meanwhile also retires nothing;
   call `verify_import` again. If the error came once the record may already
   have been written, `state` is `not_established`: the batch may be retired,
-  and `verify_import` without `if_absent` shows where it stands. A release that does not know the retirement record refuses
+  and `verify_import` without `if_absent` shows where it stands, unless the import folder is marked as
+  needing recovery, which refuses `verify_import` for the batch until it is cleared. A release that does not know the retirement record refuses
   the whole import journal.
 - **At send.** A batch built from a bank statement is checked against these
   records when `post_import` sends it as well as when it was built, with the

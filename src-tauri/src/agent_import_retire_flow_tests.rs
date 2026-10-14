@@ -832,6 +832,7 @@ fn the_tool_text_states_the_retire_read_and_its_three_answers() {
         "voucher_window_volume_unestimated",
         "verification_window_day_not_readable",
         "verification_mode_unqualified",
+        "window_part_boundary_unsupported_in_education",
     ] {
         assert!(text.contains(code), "{code}: {text}");
     }
@@ -878,9 +879,15 @@ async fn retire_beside(sibling: Sibling) -> Value {
     retire_beside_counting(sibling).await.0
 }
 
-/// [`retire_beside`], and how many of the scripted Tally answers the retirement
-/// used, with how many there were.
-async fn retire_beside_counting(sibling: Sibling) -> (Value, usize, usize) {
+/// [`retire_beside`], and the requests the retirement made, with how many
+/// answers were scripted.
+async fn retire_beside_counting(
+    sibling: Sibling,
+) -> (
+    Value,
+    Vec<tally_protocol_simulator::ObservedRequest>,
+    usize,
+) {
     use super::transfer_flow_tests::{contra_statement, Rig, BANK_B, BOOKED};
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(directory.path(), two_bank_plans());
@@ -919,22 +926,64 @@ async fn retire_beside_counting(sibling: Sibling) -> (Value, usize, usize) {
     let scripted = plans.len();
     let (simulator, server) = reading_from(directory.path(), &batch_id, plans, None);
     let response = retire(&server, &batch_id).await;
+    assert_eq!(simulator.received(), scripted, "{response}");
     (
         response["structuredContent"]["result"]["retire"].clone(),
-        simulator.received(),
+        simulator.finish().expect("requests"),
         scripted,
     )
 }
 
+/// The licence no longer qualifies when the closing probe asks: the file is
+/// already removed, nothing is recorded, and the answer says a repeat will not
+/// help until the mode changes.
+#[tokio::test]
+async fn a_closing_probe_that_does_not_qualify_is_reported_after_the_removal() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_build, server, batch_id) = built(directory.path(), qualified_import_cycle_plans()).await;
+    let mut plans = read_of(true, None);
+    plans.truncate(plans.len() - 2);
+    plans.extend(super::mode_tests::import_profile_probe("product"));
+    let (_read, reader) = reading_from(directory.path(), &batch_id, plans, None);
+    let response = retire(&reader, &batch_id).await;
+    assert_ne!(response["isError"], true, "{response}");
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "not_retired", "{response}");
+    assert_eq!(retire["reason"], "verification_mode_unqualified", "{response}");
+    assert_eq!(retire["file_removed"], true, "{response}");
+    assert_eq!(retire["verification_recorded"], false, "{response}");
+    assert!(
+        retire["next_step"]
+            .as_str()
+            .unwrap()
+            .contains("a repeat will not help until"),
+        "{response}"
+    );
+    assert!(!saved_file(&server, &batch_id).exists());
+    assert!(!records_of(directory.path(), &batch_id).contains(&"import_batch_retired".into()));
+}
+
 /// A retirement asserts an absence, so the licence is qualified again after the
 /// read whatever the read found: here nothing was not found, and the closing
-/// probe is still sent.
+/// probe is still sent. It is the request the opening probe was, not another
+/// read.
 #[tokio::test]
 async fn the_closing_licence_probe_is_sent_even_when_nothing_was_not_found() {
     for sibling in [Sibling::Found, Sibling::Absent] {
-        let (retire, received, scripted) = retire_beside_counting(sibling).await;
+        let (retire, observed, scripted) = retire_beside_counting(sibling).await;
         assert!(retire["state"].is_string(), "{retire}");
-        assert_eq!(received, scripted, "{retire}");
+        assert_eq!(observed.len(), scripted, "{retire}");
+        let request = |at: usize| {
+            let seen = &observed[at];
+            (
+                seen.method.clone(),
+                seen.path.clone(),
+                seen.request_body_sha256.clone(),
+            )
+        };
+        let last = observed.len() - 1;
+        assert_eq!(request(last - 1), request(0), "{retire}");
+        assert_eq!(request(last), request(1), "{retire}");
     }
 }
 
@@ -979,10 +1028,24 @@ async fn an_error_after_the_record_is_appended_is_not_established() {
         retire["reason"], "proof_publication_recovery_required",
         "{response}"
     );
-    assert!(retire["next_step"]
-        .as_str()
-        .unwrap()
-        .contains("could not confirm that the record of it was written"));
+    let step = retire["next_step"].as_str().unwrap();
+    assert_eq!(
+        step,
+        "The read of Tally finished, but ComplyEaze Bridge could not confirm that the record of it was written, so it is not established whether the batch is retired. The import folder is marked as needing recovery, and verify_import is refused for this batch until that is cleared, so there is no call to make on it now. Nothing sends it meanwhile: its saved file is removed. Report this with the reason named here."
+    );
+    // the call the step used to advise is refused while the marker stands
+    let plain = server
+        .call_tool_response(
+            "verify_import",
+            json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id}),
+        )
+        .await
+        .value;
+    assert_eq!(
+        error_code(&plain),
+        "proof_publication_recovery_required",
+        "{plain}"
+    );
     // the record is in the journal, as the answer allows for
     let kinds = records_of(directory.path(), &batch_id);
     assert_eq!(kinds.last().unwrap(), "import_batch_retired", "{kinds:?}");

@@ -82,7 +82,7 @@ pub(super) const KEPT_STEP: &str = "The read of Tally did not find this batch ab
 const UNFINISHED_STEP: &str = "The read of Tally did not finish, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused. Call verify_import on it again with if_absent set to retire.";
 const UNFINISHED_FINAL_STEP: &str = "The read of Tally was refused for a reason that a repeat will not change, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused; a repeat will not help until the read limit or the licence mode that stopped the read changes.";
 const CONFLICT_STEP: &str = "Another record of this batch was written meanwhile, so nothing was retired. Call verify_import on it again.";
-const RECORD_UNCONFIRMED_STEP: &str = "The read of Tally finished, but ComplyEaze Bridge could not confirm that the record of it was written, so it is not established whether the batch is retired. Call verify_import on it without if_absent to see where it stands.";
+const RECORD_UNCONFIRMED_STEP: &str = "The read of Tally finished, but ComplyEaze Bridge could not confirm that the record of it was written, so it is not established whether the batch is retired. The import folder is marked as needing recovery, and verify_import is refused for this batch until that is cleared, so there is no call to make on it now. Nothing sends it meanwhile: its saved file is removed. Report this with the reason named here.";
 
 /// The code a failure carries when the record of the retirement may already be
 /// in the journal.
@@ -90,12 +90,15 @@ pub(super) const RECORD_MAY_EXIST: &str = "retire_record_may_exist";
 
 /// A refusal of the read that a repeat of the call cannot change: the window
 /// is over the read limits (the plan refuses it, or one part is over the
-/// transport's size), or the licence does not qualify an absence. The list is
-/// the refusals that the window read and the closing qualification can raise
-/// after the file is removed; a refusal that can only arrive before that
+/// transport's size, or a part starts or ends on a day the licence does not
+/// serve), or the licence does not qualify an absence. The list is the
+/// refusals that the plan and the window read can raise, and the closing
+/// qualification; a refusal that can only arrive before the read
 /// (`import_post_window_not_bounded` belongs to the check before a post) or
 /// after the record is written (`verification_too_large_to_report` belongs to
-/// serving the page) is not here, nor is a transient one such as a busy port.
+/// serving the page) is not here, nor is a transient one such as a busy port,
+/// nor `voucher_window_volume_unestimated`, which a census that timed out or
+/// was too large raises and a later census may not.
 fn repeat_cannot_help(code: &str) -> bool {
     matches!(
         code,
@@ -105,6 +108,7 @@ fn repeat_cannot_help(code: &str) -> bool {
             | "verification_window_day_not_readable"
             | "response_size_limit_exceeded"
             | "verification_mode_unqualified"
+            | "window_part_boundary_unsupported_in_education"
     )
 }
 
@@ -492,6 +496,7 @@ mod tests {
             "verification_window_day_not_readable",
             "response_size_limit_exceeded",
             "verification_mode_unqualified",
+            "window_part_boundary_unsupported_in_education",
         ] {
             let retire = answer(code, false);
             assert_eq!(retire["reason"], code);
@@ -566,7 +571,9 @@ mod tests {
             step.contains("could not confirm that the record of it was written"),
             "{step}"
         );
-        assert!(step.contains("verify_import"), "{step}");
+        // the call it used to advise is refused while the marker stands
+        assert!(step.contains("verify_import is refused"), "{step}");
+        assert!(!step.contains("without if_absent"), "{step}");
         assert!(!step.contains("nothing was retired"), "{step}");
         assert!(!step.contains("no longer be sent"), "{step}");
     }

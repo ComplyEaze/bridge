@@ -1762,11 +1762,6 @@ impl Server {
                     books_from.as_ref(),
                 )
                 .ok_or_else(|| "import_retire_window_unavailable".to_string())?;
-                persistence::remove_saved_import(&self.imports_dir()?, &line.batch_id)
-                    .map_err(|_| "import_retire_file_not_removed".to_string())?;
-                removed.store(true, std::sync::atomic::Ordering::SeqCst);
-                #[cfg(test)]
-                let _ = AFTER_RETIRE_DELETE.try_with(|hook| hook());
                 Some(window)
             } else {
                 None
@@ -1775,14 +1770,58 @@ impl Server {
                 (&line.date_from, &line.date_to),
                 |(from, to)| (from, to),
             );
-            let observed_read = self
-                .read_verification_window(
-                    &identity,
-                    &company.name,
-                    window,
-                    super::WindowPlanSource::Estimate { known_marks: None },
-                )
-                .await?;
+            let planned = if retiring {
+                match self
+                    .plan_verification_window(
+                        &identity,
+                        &company.name,
+                        window,
+                        super::WindowPlanSource::Estimate { known_marks: None },
+                    )
+                    .await
+                {
+                    Ok(planned) => Some(planned),
+                    // The plan refused the read: the saved file is still where it
+                    // was, and nothing is recorded.
+                    Err(failure) if retire::refused_by_the_plan(&failure.code) => {
+                        if let Some(prior) = failure.evidence {
+                            accumulated = combine_evidence(accumulated.clone(), *prior);
+                        }
+                        return Ok(retire::planned_refusal_outcome(
+                            company_json(&company, std::slice::from_ref(&company)),
+                            &line.batch_id,
+                            &failure.code,
+                            accumulated.clone(),
+                            guid,
+                        ));
+                    }
+                    Err(failure) => return Err(failure),
+                }
+            } else {
+                None
+            };
+            if retiring {
+                persistence::remove_saved_import(&self.imports_dir()?, &line.batch_id)
+                    .map_err(|_| "import_retire_file_not_removed".to_string())?;
+                removed.store(true, std::sync::atomic::Ordering::SeqCst);
+                #[cfg(test)]
+                let _ = AFTER_RETIRE_DELETE.try_with(|hook| hook());
+            }
+            let observed_read = match planned {
+                Some(planned) => {
+                    self.read_planned_verification_window(&identity, &company.name, planned)
+                        .await?
+                }
+                None => {
+                    self.read_verification_window(
+                        &identity,
+                        &company.name,
+                        window,
+                        super::WindowPlanSource::Estimate { known_marks: None },
+                    )
+                    .await?
+                }
+            };
             if let Some(preflight) = observed_read.preflight_evidence {
                 accumulated = combine_evidence(accumulated.clone(), preflight);
             }
@@ -2423,21 +2462,51 @@ impl Server {
         &self,
         identity: &super::VerifiedCompanyIdentity,
         company: &str,
-        (from, to): (&TallyDate, &TallyDate),
+        window: (&TallyDate, &TallyDate),
         source: super::WindowPlanSource,
     ) -> Result<VerificationWindowRead, ToolFailure> {
+        let planned = self
+            .plan_verification_window(identity, company, window, source)
+            .await?;
+        self.read_planned_verification_window(identity, company, planned)
+            .await
+    }
+
+    /// The first half of [`Self::read_verification_window`]: the window's volume
+    /// estimated and its parts planned and sized, with every refusal that
+    /// depends only on the book raised, and no data part requested.
+    async fn plan_verification_window(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company: &str,
+        (from, to): (&TallyDate, &TallyDate),
+        source: super::WindowPlanSource,
+    ) -> Result<super::PlannedWindow, ToolFailure> {
         let shape = super::VoucherReadShape::ImportVerification;
+        self.plan_voucher_window(
+            identity,
+            company,
+            from,
+            to,
+            shape,
+            source,
+            super::WindowReadLimits::for_shape(shape),
+        )
+        .await
+    }
+
+    /// The second half: the planned parts read, and their rows admitted once
+    /// over the union.
+    async fn read_planned_verification_window(
+        &self,
+        identity: &super::VerifiedCompanyIdentity,
+        company: &str,
+        planned: super::PlannedWindow,
+    ) -> Result<VerificationWindowRead, ToolFailure> {
         let read = self
-            .read_voucher_window(
-                identity,
-                company,
-                from,
-                to,
-                shape,
-                source,
-                super::WindowReadLimits::for_shape(shape),
-                |xml| parse_import_voucher_rows(xml, identity.company_guid()),
-            )
+            .read_planned_voucher_window(identity, company, planned, |xml| {
+                parse_import_voucher_rows(xml, identity.company_guid())
+            })
             .await?;
         let all_evidence = read.all_evidence();
         let source = ImportReadSource::admit(read.rows)

@@ -108,6 +108,52 @@ fn repeat_cannot_help(code: &str) -> bool {
     )
 }
 
+/// A refusal the plan of the window read raises, before any data part is asked
+/// for. It arrives before the saved file is removed, so it leaves the batch as
+/// it was. The list is the refusals that depend on the book and the licence
+/// alone.
+pub(super) fn refused_by_the_plan(code: &str) -> bool {
+    matches!(
+        code,
+        "voucher_window_book_too_large"
+            | "voucher_window_too_many_reads"
+            | "voucher_window_part_over_budget"
+            | "voucher_window_volume_unestimated"
+            | "window_part_boundary_unsupported_in_education"
+    )
+}
+
+const PLAN_REFUSED_STEP: &str = "The read of Tally was refused before anything was changed: the saved file of this batch is still in place, it was not retired and it still counts. A repeat will not help until the read limit or the licence mode that stopped the read changes.";
+const PLAN_REFUSED_REPEATABLE_STEP: &str = "The read of Tally was refused before anything was changed: the saved file of this batch is still in place, it was not retired and it still counts. Call verify_import on it again with if_absent set to retire.";
+
+/// The answer when the plan of the read refused it: the batch is exactly as it
+/// was. Nothing is verified, so there is no page to serve.
+pub(super) fn planned_refusal_outcome(
+    company: Value,
+    batch_id: &str,
+    code: &str,
+    accumulated: Evidence,
+    guid: &str,
+) -> ToolOutcome {
+    let step = if repeat_cannot_help(code) {
+        PLAN_REFUSED_STEP
+    } else {
+        PLAN_REFUSED_REPEATABLE_STEP
+    };
+    ToolOutcome {
+        payload: json!({"company": company, "result": {"batch_id": batch_id, "retire": {
+            "state": "not_retired", "reason": code, "file_removed": false,
+            "verification_recorded": false, "next_step": step}}}),
+        evidence: Evidence {
+            state: "partial",
+            reason_code: Some(code.to_string()),
+            ..accumulated
+        },
+        company_guid: Some(guid.to_string()),
+        truncated: false,
+    }
+}
+
 /// The answer when the saved file is gone and the read, or the record, did not
 /// complete. Nothing is verified, so there is no page to serve. What it says
 /// follows what is known: that nothing was retired (the read, or the record
@@ -382,8 +428,8 @@ mod tests {
         assert_eq!(wide, None);
     }
 
-    fn answer(code: &str, record_may_exist: bool) -> Value {
-        let evidence = Evidence {
+    fn evidence() -> Evidence {
+        Evidence {
             request_sha256: "a".repeat(64),
             response_sha256: "b".repeat(64),
             bytes: 0,
@@ -391,13 +437,16 @@ mod tests {
             read_at: None,
             duration_ms: None,
             reason_code: None,
-        };
+        }
+    }
+
+    fn answer(code: &str, record_may_exist: bool) -> Value {
         let outcome = unfinished_outcome(
             json!({}),
             "bridge-x",
             code,
             record_may_exist,
-            evidence,
+            evidence(),
             "guid",
         );
         assert!(unfinished(&outcome.payload));
@@ -466,6 +515,44 @@ mod tests {
             let retire = answer(code, false);
             let step = retire["next_step"].as_str().unwrap();
             assert!(!step.contains("will not help"), "{code}: {step}");
+        }
+    }
+
+    /// A refusal of the plan arrives before the file is removed: the answer
+    /// says the batch is unchanged, serves no page, and says a repeat is
+    /// useless only for the refusals a repeat cannot clear.
+    #[test]
+    fn a_refusal_by_the_plan_says_the_batch_is_unchanged() {
+        for code in [
+            "voucher_window_book_too_large",
+            "voucher_window_too_many_reads",
+            "voucher_window_part_over_budget",
+            "voucher_window_volume_unestimated",
+            "window_part_boundary_unsupported_in_education",
+        ] {
+            assert!(refused_by_the_plan(code), "{code}");
+            let outcome =
+                planned_refusal_outcome(json!({}), "bridge-x", code, evidence(), "guid");
+            assert!(unfinished(&outcome.payload), "{code}");
+            let retire = &outcome.payload["result"]["retire"];
+            assert_eq!(retire["state"], "not_retired", "{code}");
+            assert_eq!(retire["reason"], code);
+            assert_eq!(retire["file_removed"], false, "{code}");
+            assert_eq!(retire["verification_recorded"], false, "{code}");
+            let step = retire["next_step"].as_str().unwrap();
+            assert!(step.contains("before anything was changed"), "{code}: {step}");
+            assert!(step.contains("still in place"), "{code}: {step}");
+            assert_eq!(
+                step.contains("repeat will not help until"),
+                repeat_cannot_help(code),
+                "{code}: {step}"
+            );
+        }
+        // a census that was not served may be served on the next call
+        assert!(!repeat_cannot_help("voucher_window_volume_unestimated"));
+        // neither a transient refusal nor a refusal of the read itself is the plan's
+        for code in ["tally_endpoint_busy", "response_size_limit_exceeded"] {
+            assert!(!refused_by_the_plan(code), "{code}");
         }
     }
 

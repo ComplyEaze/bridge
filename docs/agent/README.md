@@ -1873,8 +1873,11 @@ refused as `proposals_legacy` (parse the statement again).
   before it began, not past today unless the batch's own last day is), then
   moved further out to the nearest day the licence accepts as a boundary, as an
   Education licence does for day 1, 2 or 31; the call is refused when no such
-  window exists), after removing the batch's saved file so it
-  cannot be imported by hand during the read. If no voucher carries the
+  window exists), after planning and sizing that read and then removing the batch's saved file so it
+  cannot be imported by hand during the read. A refusal of the plan (the book
+  too large to count, a window needing too many requests, a part over the
+  budget, a part boundary the licence cannot serve) leaves the file in place and
+  the batch unchanged, and says so. If no voucher carries the
   batch's own narration tag, and each of its vouchers is not found (a content
   match keeps the batch counting, whatever another batch holds), one journal
   record both saves the verification and retires

@@ -829,6 +829,7 @@ fn the_tool_text_states_the_retire_read_and_its_three_answers() {
     for code in [
         "voucher_window_too_many_reads",
         "voucher_window_part_over_budget",
+        "voucher_window_volume_unestimated",
         "verification_window_day_not_readable",
         "verification_mode_unqualified",
     ] {
@@ -985,4 +986,81 @@ async fn an_error_after_the_record_is_appended_is_not_established() {
     // the record is in the journal, as the answer allows for
     let kinds = records_of(directory.path(), &batch_id);
     assert_eq!(kinds.last().unwrap(), "import_batch_retired", "{kinds:?}");
+}
+
+/// The plans of a read of the retire's shape: the opening licence probe, the
+/// window, and the closing probe. `empty` is a Tally that holds none of the
+/// batch; `tag`, if given, replaces the tag the captured voucher carries, so the
+/// book holds a voucher with that batch's narration tag.
+fn read_of(empty: bool, tag: Option<&str>) -> Vec<ScenarioPlan> {
+    book(empty)[32..]
+        .iter()
+        .cloned()
+        .map(|mut plan| {
+            if let (Some(tag), Fixture::SyntheticXml(body)) = (tag, &plan.fixture) {
+                plan.fixture = Fixture::SyntheticXml(
+                    body.replace("[BRIDGE:txn-001]", &format!("[BRIDGE:{tag}]")),
+                );
+            }
+            plan
+        })
+        .collect()
+}
+
+/// The plans of the retire's read in a book whose voucher high-water mark is
+/// past what can be counted in bounded requests.
+fn read_of_a_book_too_large_to_count() -> Vec<ScenarioPlan> {
+    read_of(true, None)
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                plan.fixture = Fixture::SyntheticXml(
+                    body.replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>3000000</ALTVCHID>"),
+                );
+            }
+            plan
+        })
+        .collect()
+}
+
+/// The window is planned and sized before the saved file is removed: a read the
+/// plan refuses leaves the file where it was, retires nothing, records nothing,
+/// and says the batch is unchanged.
+#[tokio::test]
+async fn a_window_plan_refusal_leaves_the_saved_file_and_says_nothing_changed() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_build, server, batch_id) = built(directory.path(), qualified_import_cycle_plans()).await;
+    let before = records_of(directory.path(), &batch_id);
+    let (_read, reader) = reading_from(
+        directory.path(),
+        &batch_id,
+        read_of_a_book_too_large_to_count(),
+        None,
+    );
+    let response = retire(&reader, &batch_id).await;
+    assert_ne!(response["isError"], true, "{response}");
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "not_retired", "{response}");
+    assert_eq!(retire["reason"], "voucher_window_book_too_large", "{response}");
+    assert_eq!(retire["file_removed"], false, "{response}");
+    assert_eq!(retire["verification_recorded"], false, "{response}");
+    assert_eq!(
+        retire["next_step"],
+        "The read of Tally was refused before anything was changed: the saved file of this batch is still in place, it was not retired and it still counts. A repeat will not help until the read limit or the licence mode that stopped the read changes.",
+        "{response}"
+    );
+    assert!(saved_file(&server, &batch_id).exists());
+    // nothing was recorded but the move to this endpoint
+    let after = records_of(directory.path(), &batch_id);
+    assert_eq!(after.len(), before.len() + 1, "{after:?}");
+    assert!(!after.contains(&"import_batch_retired".into()), "{after:?}");
+    assert!(!after.contains(&"verification_status".into()), "{after:?}");
+    // the batch can still be sent from its file: it is not retired
+    assert!(
+        !server
+            .latest_import_snapshot(&batch_id)
+            .unwrap()
+            .unwrap()
+            .retired
+    );
 }

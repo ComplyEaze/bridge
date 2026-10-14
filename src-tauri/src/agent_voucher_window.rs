@@ -1074,6 +1074,15 @@ impl<'r, R: WindowReader> TimedReader<'r, R> {
         }
     }
 
+    /// A reader that goes on timing a read whose planning `timings` already
+    /// hold.
+    fn resumed(inner: &'r R, timings: WindowReadTimings) -> Self {
+        Self {
+            inner,
+            timings: std::sync::Mutex::new(timings),
+        }
+    }
+
     fn timings(&self) -> std::sync::MutexGuard<'_, WindowReadTimings> {
         self.timings
             .lock()
@@ -1585,6 +1594,48 @@ fn audit_window_failure(
 }
 
 impl Server {
+    /// Plan a voucher window through the agent's own paired read. See
+    /// [`plan_voucher_window_with`].
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn plan_voucher_window(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        from: &TallyDate,
+        to: &TallyDate,
+        shape: VoucherReadShape,
+        source: WindowPlanSource,
+        limits: WindowReadLimits,
+    ) -> Result<PlannedWindow, ToolFailure> {
+        plan_voucher_window_with(
+            &AgentReader(self),
+            identity,
+            company,
+            from,
+            to,
+            shape,
+            source,
+            limits,
+        )
+        .await
+    }
+
+    /// Read the parts of a planned window through the agent's own paired read.
+    /// See [`read_planned_window_with`].
+    pub(super) async fn read_planned_voucher_window<T, P>(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        planned: PlannedWindow,
+        parse: P,
+    ) -> Result<WindowReadOutcome<T>, ToolFailure>
+    where
+        T: WindowRow,
+        P: FnMut(&str) -> Result<Vec<T>, String>,
+    {
+        read_planned_window_with(&AgentReader(self), identity, company, planned, parse).await
+    }
+
     /// Read a voucher window through the agent's own paired read. See
     /// [`read_voucher_window_with`].
     #[allow(clippy::too_many_arguments)]
@@ -1657,6 +1708,59 @@ where
     T: WindowRow,
     P: FnMut(&str) -> Result<Vec<T>, String>,
 {
+    let planned =
+        plan_voucher_window_with(reader, identity, company, from, to, shape, source, limits)
+            .await?;
+    read_planned_window_with(reader, identity, company, planned, parse).await
+}
+
+/// A window read whose volume is estimated and whose parts are planned, and of
+/// which no data part has been requested. The plan's refusals (a book too large
+/// to count, a window needing more requests than one read may spend, a part over
+/// the budget, a part boundary the licence cannot serve) have all been raised
+/// already, so a caller that must do something before the data is read can do
+/// it knowing the plan stands. See [`plan_voucher_window_with`].
+pub(super) struct PlannedWindow {
+    plan: WindowPlan,
+    from: TallyDate,
+    to: TallyDate,
+    shape: VoucherReadShape,
+    limits: WindowReadLimits,
+    timings: WindowReadTimings,
+}
+
+/// What a window read decides before it asks for any data.
+struct WindowPlan {
+    preflight: Option<Evidence>,
+    opening: Option<CompanyMarks>,
+    boundary: Option<DateBoundaryProfile>,
+    census: Option<WindowCensus>,
+    ceiling: u64,
+    bytes_per_voucher: u64,
+    /// A stack whose pops are in order and whose parts always tile the part of
+    /// the window not yet read, so the rows arrive in order.
+    pending: Vec<WindowPart>,
+    replaying: bool,
+}
+
+/// Estimate and plan a voucher window of `shape`, sending the reads that
+/// planning needs (the company's marks, and a census when the book is too large
+/// to read without one) and no data part. [`read_planned_window_with`] reads the
+/// parts; together they are [`read_voucher_window_with`].
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn plan_voucher_window_with<R>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    source: WindowPlanSource,
+    limits: WindowReadLimits,
+) -> Result<PlannedWindow, ToolFailure>
+where
+    R: WindowReader,
+{
     reader.begin_window();
     if reader.seals_its_reads()
         && !matches!(source, WindowPlanSource::Estimate { known_marks: None })
@@ -1664,8 +1768,56 @@ where
         return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
     }
     let timed = TimedReader::new(reader, from, to);
-    let read = read_voucher_window_timed(
-        &timed, identity, company, from, to, shape, source, limits, parse,
+    let planned =
+        plan_window_timed(&timed, identity, company, from, to, source, limits).await;
+    let timings = timed.into_timings();
+    match planned {
+        Ok(plan) => Ok(PlannedWindow {
+            plan,
+            from: from.clone(),
+            to: to.clone(),
+            shape,
+            limits,
+            timings,
+        }),
+        Err(mut failure) => {
+            failure.window_timings = Some(Box::new(timings));
+            Err(failure)
+        }
+    }
+}
+
+/// Read the parts of a window [`plan_voucher_window_with`] planned.
+pub(super) async fn read_planned_window_with<R, T, P>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    planned: PlannedWindow,
+    parse: P,
+) -> Result<WindowReadOutcome<T>, ToolFailure>
+where
+    R: WindowReader,
+    T: WindowRow,
+    P: FnMut(&str) -> Result<Vec<T>, String>,
+{
+    let PlannedWindow {
+        plan,
+        from,
+        to,
+        shape,
+        limits,
+        timings,
+    } = planned;
+    let timed = TimedReader::resumed(reader, timings);
+    let read = read_planned_window_timed(
+        &timed,
+        identity,
+        company,
+        (&from, &to),
+        shape,
+        limits,
+        plan,
+        parse,
     )
     .await;
     let timings = timed.into_timings();
@@ -1684,23 +1836,19 @@ where
     }
 }
 
-/// [`read_voucher_window_with`] once admitted, every request timed.
+/// [`plan_voucher_window_with`] once admitted, every request timed.
 #[allow(clippy::too_many_arguments)]
-async fn read_voucher_window_timed<R, T, P>(
+async fn plan_window_timed<R>(
     reader: &TimedReader<'_, R>,
     identity: &VerifiedCompanyIdentity,
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    shape: VoucherReadShape,
     source: WindowPlanSource,
     limits: WindowReadLimits,
-    mut parse: P,
-) -> Result<WindowReadOutcome<T>, ToolFailure>
+) -> Result<WindowPlan, ToolFailure>
 where
     R: WindowReader,
-    T: WindowRow,
-    P: FnMut(&str) -> Result<Vec<T>, String>,
 {
     let first = day_of(from)?;
     let last = day_of(to)?;
@@ -1713,14 +1861,14 @@ where
     let mut boundary: Option<DateBoundaryProfile> = None;
     let mut census = None;
     let mut ceiling = 0;
-    let mut bytes_per_voucher = limits.default_bytes_per_voucher;
+    let bytes_per_voucher = limits.default_bytes_per_voucher;
     // A stack whose pops are in order and whose parts always tile the part
     // of the window not yet read, so the rows arrive in order.
     // A replay reads exactly the parts it was given: it never re-plans from
     // a measurement, which could merge parts back into a request the first
     // read already found Tally could not serve.
     let replaying = matches!(source, WindowPlanSource::Replay { .. });
-    let mut pending: Vec<WindowPart> = match source {
+    let pending: Vec<WindowPart> = match source {
         WindowPlanSource::Replay { parts, witness } => {
             for part in &parts {
                 if part.from > part.to {
@@ -1813,6 +1961,53 @@ where
             }
         }
     };
+    // A plan whose first stretch the licence cannot serve is refused here,
+    // before any data is asked for: the same check the read makes before each
+    // part, over everything still to be read.
+    if let Some((next, rest)) = pending.split_last() {
+        admit_plan_boundaries(boundary, next, rest)
+            .map_err(|failure| with_prior(failure, &preflight, &None))?;
+    }
+    Ok(WindowPlan {
+        preflight,
+        opening,
+        boundary,
+        census,
+        ceiling,
+        bytes_per_voucher,
+        pending,
+        replaying,
+    })
+}
+
+/// [`read_planned_window_with`] once admitted, every request timed.
+#[allow(clippy::too_many_arguments)]
+async fn read_planned_window_timed<R, T, P>(
+    reader: &TimedReader<'_, R>,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    (from, to): (&TallyDate, &TallyDate),
+    shape: VoucherReadShape,
+    limits: WindowReadLimits,
+    plan: WindowPlan,
+    mut parse: P,
+) -> Result<WindowReadOutcome<T>, ToolFailure>
+where
+    R: WindowReader,
+    T: WindowRow,
+    P: FnMut(&str) -> Result<Vec<T>, String>,
+{
+    let last = day_of(to)?;
+    let WindowPlan {
+        preflight,
+        opening,
+        mut boundary,
+        census,
+        ceiling,
+        mut bytes_per_voucher,
+        mut pending,
+        replaying,
+    } = plan;
     let mut rows = Vec::new();
     let mut evidence: Option<Evidence> = None;
     let mut reads: Vec<WindowPart> = Vec::new();

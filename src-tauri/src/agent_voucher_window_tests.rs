@@ -7037,3 +7037,107 @@ fn a_ledger_name_with_colons_survives_the_trip_through_the_refusal_string() {
         Some("Acme: North, Ltd: Unit 2")
     );
 }
+
+// ---------------------------------------------------------------------------
+// Planning a window and reading it are two steps (a caller that must do
+// something between them, such as a retirement removing a saved file, knows the
+// plan stands before it does).
+// ---------------------------------------------------------------------------
+
+/// A book too small to count is planned without a request, and the plan is then
+/// read as the one undivided read it would have been.
+#[tokio::test]
+async fn a_planned_window_sends_nothing_until_it_is_read() {
+    let simulator = SequenceSimulator::spawn(paired(&xml_plan(three_vouchers()))).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let identity = identity();
+    let (from, to) = (tally_date("20260801"), tally_date("20260801"));
+    let planned = server
+        .plan_voucher_window(
+            &identity,
+            identity.display_name(),
+            &from,
+            &to,
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Estimate {
+                known_marks: Some(marks_of(3)),
+            },
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+        )
+        .await
+        .unwrap();
+    assert_eq!(simulator.received(), 0, "planning sent a data request");
+    let outcome = server
+        .read_planned_voucher_window(&identity, identity.display_name(), planned, |xml| {
+            parse_agent_rows(xml, GUID)
+        })
+        .await
+        .unwrap();
+    assert_eq!(outcome.rows.len(), 3);
+    assert_eq!(outcome.reads, [part("20260801", "20260801", None)]);
+    assert_eq!(simulator.finish().unwrap().len(), 6);
+}
+
+/// The refusals that depend on the book alone are raised by the plan, with only
+/// the census sent: no data part has been asked for when they arrive.
+#[tokio::test]
+async fn a_window_the_plan_refuses_is_refused_before_any_data_part() {
+    let limits = one_read_of(2);
+    let simulator = SequenceSimulator::spawn(paired(&xml_plan(three_vouchers()))).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let identity = identity();
+    let failure = server
+        .plan_voucher_window(
+            &identity,
+            identity.display_name(),
+            &tally_date("20260801"),
+            &tally_date("20260801"),
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Estimate {
+                known_marks: Some(marks_of(limits.census_capacity() + 1)),
+            },
+            limits,
+        )
+        .await
+        .err()
+        .expect("refused");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert!(failure.evidence.is_some(), "the census read is kept");
+    // the first census span only
+    assert_eq!(simulator.finish().unwrap().len(), 6);
+}
+
+/// A plan with a part boundary Education does not honour is refused by the plan,
+/// after the census whose bracket reports Education and before any part.
+#[tokio::test]
+async fn an_education_plan_with_an_unaccepted_part_boundary_is_refused_by_the_plan() {
+    let census = relabelled(
+        &three_vouchers(),
+        &[(1, "20260801"), (2, "20260802"), (3, "20260810")],
+    );
+    let simulator =
+        SequenceSimulator::spawn(education_paired(&xml_plan(census))).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let identity = identity();
+    let failure = server
+        .plan_voucher_window(
+            &identity,
+            identity.display_name(),
+            &tally_date("20260801"),
+            &tally_date("20260831"),
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Estimate {
+                known_marks: Some(marks_of(3)),
+            },
+            three_a_read(),
+        )
+        .await
+        .err()
+        .expect("refused");
+    assert_eq!(failure.code, EDUCATION_BOUNDARY_UNSUPPORTED);
+    assert!(failure.evidence.is_some(), "the census is accounted for");
+    assert_eq!(simulator.finish().unwrap().len(), 6);
+}

@@ -25,8 +25,8 @@ These changes are in source and not yet in a published build.
   records the rows its build withdrew, and a row a build withdraws is judged as if no batch that was neither sent
   nor found held it or booked it, so a rebuild with the same withdrawal can no longer pass a check the first build
   passed before the other account's Contra was verified (part of #1703).
-- `verify_import` takes `if_absent` set to `retire`, for a batch that was never sent and will not be. It removes the
-  batch's saved file, then reads Tally over the batch's days and a week either side (limited to the book, then moved further out to the nearest day the licence accepts as a boundary; refused when no such window exists), and if no voucher carries the
+- `verify_import` takes `if_absent` set to `retire`, for a batch that was never sent and will not be. It plans and sizes the read, removes the
+  batch's saved file (a refusal of the plan leaves the file in place), then reads Tally over the batch's days and a week either side (limited to the book, then moved further out to the nearest day the licence accepts as a boundary; refused when no such window exists), and if no voucher carries the
   batch's own narration tag and each of its vouchers is not found (a content match keeps the batch counting), it
   records the batch retired in the same journal record as that
   verification. `post_import` then refuses the batch (`import_batch_retired`), and its Contras and holds leave the

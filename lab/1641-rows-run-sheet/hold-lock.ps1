@@ -1,7 +1,7 @@
 # hold-lock.ps1: hold a Windows file lock the way ComplyEaze Bridge takes one, and report whether it was granted.
 # Opens an EXISTING file (never creates one), shared for reading and writing only, then LockFileEx over the whole file
 # (offset 0, length 2^64-1), failing at once if another holder has it. Holds for -Seconds or until -StopFile exists.
-# Writes one line per event to -Log (UTC time, event). Exit codes: 0 held and released, 3 busy, 4 file could not be opened.
+# Writes one line per event to -Log (UTC time, event). Exit codes: 0 held and released, 3 busy (win32=33 is a held lock), 4 file could not be opened, 5 the lock code could not be loaded.
 param(
     [Parameter(Mandatory = $true)][string]$Path,
     [ValidateSet('Exclusive', 'Shared')][string]$Mode = 'Exclusive',
@@ -11,6 +11,11 @@ param(
     [switch]$Probe
 )
 
+function Say([string]$Text) {
+    ('{0} {1}' -f [DateTime]::UtcNow.ToString('o'), $Text) | Add-Content -Path $Log -Encoding ASCII
+}
+
+try {
 Add-Type -TypeDefinition @'
 using System;
 using System.IO;
@@ -48,9 +53,9 @@ public static class HoldLock
     }
 }
 '@
-
-function Say([string]$Event) {
-    ('{0} {1}' -f [DateTime]::UtcNow.ToString('o'), $Event) | Add-Content -Path $Log -Encoding ASCII
+} catch {
+    Say ("INSTRUMENT_FAILED {0}" -f $_.Exception.Message)
+    exit 5
 }
 
 Say ("START pid={0} mode={1} path={2}" -f $PID, $Mode, $Path)
@@ -67,7 +72,7 @@ if ($Probe) {
 try {
     $stream = [HoldLock]::Open($Path)
 } catch {
-    Say ("OPEN_FAILED {0}" -f $_.Exception.GetType().Name)
+    Say ("OPEN_FAILED {0}" -f $_.Exception.Message)
     exit 4
 }
 

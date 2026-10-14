@@ -536,7 +536,7 @@ failure:
 | Numbering method | Your `<VOUCHERNUMBER>` | A failed Alter |
 | --- | --- | --- |
 | Automatic | **discarded** — Tally assigns its own | **silently duplicates** |
-| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim** | **cleanly rejected** |
+| **Manual + `PREVENTDUPLICATES=Yes`** | **preserved verbatim**, except a space at its end, which did not read back (§9.8) | **cleanly rejected** |
 
 Under automatic numbering a client-supplied key is thrown away while the create still reports
 `CREATED=1, ERRORS=0`. Any dedupe built on it is silently ineffective.

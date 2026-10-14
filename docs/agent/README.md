@@ -1869,8 +1869,9 @@ refused as `proposals_legacy` (parse the statement again).
   `if_absent` set to `retire`).** Until Tally has been read for it, such a
   batch counts as carrying its transfers, so the other account's statement
   cannot withdraw a skip it may carry. The call reads Tally for that one
-  batch, over its days and seven days either side (moved outward to a day an
-  Education licence admits), after removing the batch's saved file so it
+  batch, over its days and up to seven days either side (within the book and
+  not past today, and moved outward to a day an Education licence admits; the
+  call is refused when the licence admits no such window), after removing the batch's saved file so it
   cannot be imported by hand during the read. If no voucher carries the
   batch's own narration tag, and each of its vouchers is either not found or
   matches by content a row that a batch of another lineage, sent or found

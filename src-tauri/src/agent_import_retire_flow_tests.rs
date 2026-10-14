@@ -604,3 +604,73 @@ async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends() {
     let code = sent["code"].as_str().unwrap_or_default();
     assert!(!TRANSFER_REASONS.contains(&code), "{sent}");
 }
+
+/// A hand import of the saved file, re-dated a few days past the batch's last
+/// day, is seen only by a read wider than the batch's own days.
+#[tokio::test]
+async fn a_voucher_with_the_batchs_tag_dated_past_its_days_blocks_the_retire() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_build, server, batch_id) = built(directory.path(), qualified_import_cycle_plans()).await;
+    let line = server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let tag = line.attribution_tag(&line.vouchers[0]);
+    let past = (chrono::NaiveDate::parse_from_str(line.date_to.as_str(), "%Y%m%d").unwrap()
+        + chrono::Duration::days(3))
+    .format("%Y%m%d")
+    .to_string();
+    let first_day = line.vouchers[0].date.as_str().to_string();
+    let plans = book(false)[32..]
+        .iter()
+        .cloned()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                plan.fixture = Fixture::SyntheticXml(body.replace(
+                    &format!("<DATE>{first_day}</DATE>"),
+                    &format!("<DATE>{past}</DATE>"),
+                ));
+            }
+            plan
+        })
+        .collect();
+    let (_read, reader) = reading_from(directory.path(), &batch_id, plans, Some(&tag));
+    let response = retire(&reader, &batch_id).await;
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "not_retired", "{response}");
+    assert_eq!(retire["reason"], "own_tag_in_tally", "{response}");
+    assert!(!records_of(directory.path(), &batch_id).contains(&"import_batch_retired".into()));
+    // the read covered the days past the batch's own
+    let proof: Value = serde_json::from_slice(
+        &fs::read(reader.current_proof_paths(&batch_id)[0].clone()).unwrap(),
+    )
+    .unwrap();
+    assert!(
+        proof["retire_read"]["to"].as_str().unwrap() >= past.as_str(),
+        "{proof}"
+    );
+}
+
+/// The tool text says what the code reads: up to a week either side, within
+/// the book and not past today, and no window at all when the licence admits
+/// none.
+#[test]
+fn the_tool_text_states_the_retire_window_as_it_is_built() {
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let tool = definitions
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "verify_import")
+        .expect("verify_import");
+    let text = tool["description"].as_str().unwrap();
+    assert!(
+        text.contains(
+            "up to 7 days either side of the batch's dates, within the book and not past today"
+        ),
+        "{text}"
+    );
+    assert!(text.contains("import_retire_window_unavailable"), "{text}");
+    assert!(!text.contains("covers 7 days"), "{text}");
+}

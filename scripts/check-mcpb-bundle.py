@@ -16,6 +16,7 @@ import zipfile
 
 RESOURCES = ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt", "THIRD_PARTY_LICENSES_RUST.txt")
 DEFAULT_TOOLS = {
+    "audit_test_run",
     "balance_sheet",
     "cash_flow",
     "company_features",

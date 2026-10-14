@@ -213,10 +213,6 @@ pub(crate) enum AuditPartShape {
 /// that needs a book-state witness brackets the part with the company's
 /// AlterID marks itself.
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "used by the audit_read orchestrator, plan step 7")
-)]
 pub(crate) struct AuditPart {
     pub(crate) encoded_body: Vec<u8>,
     pub(crate) encoded_sha256: String,

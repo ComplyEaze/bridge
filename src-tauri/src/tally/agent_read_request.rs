@@ -102,10 +102,6 @@ impl AgentReadRequest {
     /// variable, it comes from a verified identity, and it is validated and
     /// escaped. The response still has to be admitted by GUID, because Tally
     /// resolves the `ID` by name.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "sent by the audit_read orchestrator, plan step 7")
-    )]
     pub(crate) fn company_object(
         identity: &super::VerifiedCompanyIdentity,
     ) -> Result<Self, AgentReadRequestError> {

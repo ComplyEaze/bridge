@@ -94,6 +94,7 @@ bridge-bank-statement = { path = "crates/bridge-bank-statement" }
 bridge-tally-core = { path = "crates/bridge-tally-core" }
 bridge-tally-protocol = { path = "crates/bridge-tally-protocol" }
 bridge-tally-transport = { path = "crates/bridge-tally-transport" }
+bridge-tax-audit = { path = "crates/bridge-tax-audit" }
 chrono = { version = "0.4", features = ["serde"] }
 getrandom = "0.4"
 icu_properties = "2.3"

@@ -109,6 +109,8 @@ use change_parse::*;
 #[path = "agent_read_profiles.rs"]
 mod read_profiles;
 use read_profiles::*;
+#[path = "agent_audit_read.rs"]
+mod audit_read;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
 #[path = "agent_read_cost_preview.rs"]

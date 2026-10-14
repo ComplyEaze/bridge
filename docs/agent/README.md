@@ -1874,7 +1874,7 @@ refused as `proposals_legacy` (parse the statement again).
   call is refused when the licence admits no such window), after removing the batch's saved file so it
   cannot be imported by hand during the read. If no voucher carries the
   batch's own narration tag, and each of its vouchers is either not found or
-  matches by content a row that a batch of another lineage, sent or found
+  matches by content a row that a batch of another lineage, found
   posted, holds, one journal record both saves the verification and retires
   the batch: `post_import` refuses it (`import_batch_retired`) and its Contras
   and holds leave the transfer facts. The answer's `retire` block names the

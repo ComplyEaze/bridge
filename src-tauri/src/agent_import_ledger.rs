@@ -849,10 +849,12 @@ pub(super) fn rows_held_as_vouchers(
 }
 
 /// The statement rows among `rows` that a batch of the company holds as a
-/// voucher, of a lineage other than `own_lineage`, which was sent to Tally or
-/// found posted. A voucher of Tally's matching one of those rows by content
-/// alone is that batch's, not the asker's. Each batch's latest full record
-/// decides what it holds. The whole journal is admitted on the way.
+/// voucher, of a lineage other than `own_lineage`, which was found posted. A
+/// voucher of Tally's matching one of those rows by content alone is that
+/// batch's, not the asker's. A batch that was only sent is not counted: Tally
+/// may have created nothing for it, and the match may be the asker's own. Each
+/// batch's latest full record decides what it holds. The whole journal is
+/// admitted on the way.
 pub(super) fn other_lineage_holders(
     reader: impl BufRead,
     company_guid: &str,
@@ -860,7 +862,7 @@ pub(super) fn other_lineage_holders(
     rows: &BTreeSet<String>,
 ) -> Result<BTreeSet<String>, String> {
     let mut held: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let mut sent_or_found = BTreeSet::new();
+    let mut found = BTreeSet::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(batch) => {
             if batch.company_guid.eq_ignore_ascii_case(company_guid)
@@ -877,20 +879,18 @@ pub(super) fn other_lineage_holders(
                 );
             }
             if batch.status == POSTED_VERIFIED {
-                sent_or_found.insert(batch.batch_id.clone());
+                found.insert(batch.batch_id.clone());
             }
         }
         Record::Status(update) => {
-            if matches!(update.record_type, StatusKind::DispatchIntent)
-                || update.status == POSTED_VERIFIED
-            {
-                sent_or_found.insert(update.batch_id.clone());
+            if update.status == POSTED_VERIFIED {
+                found.insert(update.batch_id.clone());
             }
         }
     })?;
     Ok(held
         .into_iter()
-        .filter(|(id, _)| sent_or_found.contains(id))
+        .filter(|(id, _)| found.contains(id))
         .flat_map(|(_, rows)| rows)
         .collect())
 }

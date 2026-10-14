@@ -144,7 +144,7 @@ impl Keep {
 ///
 /// No voucher carries the batch's own tag, and every voucher of the batch is
 /// either not found, or matches by content alone a voucher that a batch of
-/// another lineage, sent or found posted, holds for the same statement row:
+/// another lineage, found posted, holds for the same statement row:
 /// that batch's own post accounts for the match, and it is not this batch's
 /// voucher. Anything else (a content match nothing accounts for, a voucher
 /// found by its tag, a duplicate) keeps the batch counting.
@@ -246,7 +246,7 @@ mod tests {
             judge(std::slice::from_ref(&content), &none),
             Err(Keep::VoucherInTally)
         );
-        // a sent or found batch of another lineage holds the same row
+        // a found batch of another lineage holds the same row
         assert_eq!(judge(&[content.clone(), absent.clone()], &siblings), Ok(()));
         // a row that is not a statement row is never accounted for that way
         let by_hand = row(

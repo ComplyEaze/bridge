@@ -674,3 +674,88 @@ fn the_tool_text_states_the_retire_window_as_it_is_built() {
     assert!(text.contains("import_retire_window_unavailable"), "{text}");
     assert!(!text.contains("covers 7 days"), "{text}");
 }
+
+const CONTRA_IN_TALLY: &str = "<VOUCHER REMOTEID=\"tally-assigned-9\"><DATE>20260901</DATE><VOUCHERNUMBER>CV-1</VOUCHERNUMBER><VOUCHERTYPENAME>Contra</VOUCHERTYPENAME><GUID>61c6de69-1748-461c-ad3f-162cb949df9f-00000009</GUID><MASTERID>9</MASTERID><ALTERID>12</ALTERID><NARRATION></NARRATION><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><ALLLEDGERENTRIES.LIST><LEDGERNAME>Bridge Nested Debtor WR4</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-12.50</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12.50</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER>";
+
+/// The plans with every voucher a read returns replaced by `voucher`.
+fn book_holding(voucher: &str) -> Vec<ScenarioPlan> {
+    let envelope = format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>{voucher}</COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    book(false)
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<VOUCHER ") {
+                    plan.fixture = Fixture::SyntheticXml(envelope.clone());
+                }
+            }
+            plan
+        })
+        .collect()
+}
+
+/// What another batch of the statement's rows is in the journal.
+#[derive(Clone, Copy)]
+enum Sibling {
+    Absent,
+    SentOnly,
+    Found,
+}
+
+/// A never-sent batch holding a statement Contra; Tally holds a voucher of
+/// that Contra's content, with no tag. Another batch of another lineage holds
+/// the same statement row as `sibling` says. Returns the retirement's answer.
+async fn retire_beside(sibling: Sibling) -> Value {
+    use super::transfer_flow_tests::{contra_statement, Rig, BANK_B, BOOKED};
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(directory.path(), two_bank_plans());
+    let built = rig
+        .build(contra_statement(directory.path(), BANK_B, BOOKED, None))
+        .await;
+    let batch_id = built["batch_id"].as_str().unwrap().to_string();
+    let mut other = rig
+        .server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
+    other.batch_id = "bridge-00000000-0000-4000-8000-0000000007f1".into();
+    if !matches!(sibling, Sibling::Absent) {
+        rig.server.append_import_ledger(&other).unwrap();
+        let record = match sibling {
+            Sibling::Found => {
+                other.status = "posted_verified".into();
+                ledger::StatusRecord::from(&other)
+            }
+            _ => ledger::StatusRecord::dispatch(&other),
+        };
+        let _admission = rig.server.lock_import_admission().unwrap();
+        rig.server
+            .append_import_record_while_admitted(&record)
+            .unwrap();
+    }
+    let (_simulator, server) = reading_from(
+        directory.path(),
+        &batch_id,
+        book_holding(CONTRA_IN_TALLY)[32..].to_vec(),
+        None,
+    );
+    let response = retire(&server, &batch_id).await;
+    response["structuredContent"]["result"]["retire"].clone()
+}
+
+/// A content match is the sibling's, not the batch's, only when the sibling is
+/// found posted. A sibling that was only sent may have created nothing, so the
+/// match may be the batch's own voucher and the batch keeps counting.
+#[tokio::test]
+async fn a_content_match_is_credited_to_a_sibling_only_when_it_is_found() {
+    let found = retire_beside(Sibling::Found).await;
+    assert_eq!(found["state"], "retired", "{found}");
+    let sent = retire_beside(Sibling::SentOnly).await;
+    assert_eq!(sent["state"], "not_retired", "{sent}");
+    assert_eq!(sent["reason"], "voucher_in_tally", "{sent}");
+    let alone = retire_beside(Sibling::Absent).await;
+    assert_eq!(alone["state"], "not_retired", "{alone}");
+    assert_eq!(alone["reason"], "voucher_in_tally", "{alone}");
+}

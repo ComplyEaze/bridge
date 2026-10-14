@@ -92,15 +92,22 @@ const RECORD_UNCONFIRMED_STEP: &str = "The read of Tally finished, but ComplyEaz
 /// in the journal.
 pub(super) const RECORD_MAY_EXIST: &str = "retire_record_may_exist";
 
-/// A refusal of the read that a repeat of the call cannot change: the window is
-/// over the read limits, or the licence does not qualify an absence.
+/// A refusal of the read that a repeat of the call cannot change: the window
+/// is over the read limits (the plan refuses it, or one part is over the
+/// transport's size), or the licence does not qualify an absence. The list is
+/// the refusals that the window read and the closing qualification can raise
+/// after the file is removed; a refusal that can only arrive before that
+/// (`import_post_window_not_bounded` belongs to the check before a post) or
+/// after the record is written (`verification_too_large_to_report` belongs to
+/// serving the page) is not here, nor is a transient one such as a busy port.
 fn repeat_cannot_help(code: &str) -> bool {
     matches!(
         code,
         "voucher_window_book_too_large"
+            | "voucher_window_too_many_reads"
+            | "voucher_window_part_over_budget"
+            | "verification_window_day_not_readable"
             | "response_size_limit_exceeded"
-            | "import_post_window_not_bounded"
-            | "verification_too_large_to_report"
             | "verification_mode_unqualified"
     )
 }
@@ -440,6 +447,9 @@ mod tests {
     fn a_refusal_a_repeat_cannot_change_says_so() {
         for code in [
             "voucher_window_book_too_large",
+            "voucher_window_too_many_reads",
+            "voucher_window_part_over_budget",
+            "verification_window_day_not_readable",
             "response_size_limit_exceeded",
             "verification_mode_unqualified",
         ] {
@@ -455,11 +465,17 @@ mod tests {
                 "{step}"
             );
         }
-        let transient = answer("tally_endpoint_busy", false);
-        assert!(!transient["next_step"]
-            .as_str()
-            .unwrap()
-            .contains("will not help"));
+        // a transient refusal, and two that cannot arrive after the delete, do
+        // not claim that a repeat is useless
+        for code in [
+            "tally_endpoint_busy",
+            "import_post_window_not_bounded",
+            "verification_too_large_to_report",
+        ] {
+            let retire = answer(code, false);
+            let step = retire["next_step"].as_str().unwrap();
+            assert!(!step.contains("will not help"), "{code}: {step}");
+        }
     }
 
     #[test]

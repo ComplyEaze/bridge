@@ -1869,9 +1869,11 @@ refused as `proposals_legacy` (parse the statement again).
   `if_absent` set to `retire`).** Until Tally has been read for it, such a
   batch counts as carrying its transfers, so the other account's statement
   cannot withdraw a skip it may carry. The call reads Tally for that one
-  batch, over its days and up to seven days either side (within the book and
-  not past today, and moved outward to a day an Education licence admits; the
-  call is refused when the licence admits no such window), after removing the batch's saved file so it
+  batch, over its days and seven days either side (limited to the book: not
+  before it began, not past today unless the batch's own last day is), then
+  moved further out to the nearest day the licence accepts as a boundary, as an
+  Education licence does for day 1, 2 or 31; the call is refused when no such
+  window exists), after removing the batch's saved file so it
   cannot be imported by hand during the read. If no voucher carries the
   batch's own narration tag, and each of its vouchers is either not found or
   matches by content a row that a batch of another lineage, found
@@ -1885,8 +1887,13 @@ refused as `proposals_legacy` (parse the statement again).
   Refused before anything is removed: a batch that was sent, was ever found
   posted, is already retired, was built for another endpoint or recorded no
   voucher mark, and any call while the writes setting is off. A read that does
-  not finish after the file is removed retires nothing and says so; the call
-  may be repeated. A release that does not know the retirement record refuses
+  not finish after the file is removed retires nothing and says so
+  (`state: not_retired`), and a repeat can help except after a refusal of the
+  read's size or limits or of the licence, which it will not clear until that
+  changes. Another record written to the batch meanwhile also retires nothing;
+  call `verify_import` again. If the error came once the record may already
+  have been written, `state` is `not_established`: the batch may be retired,
+  and `verify_import` without `if_absent` shows where it stands. A release that does not know the retirement record refuses
   the whole import journal.
 - **At send.** A batch built from a bank statement is checked against these
   records when `post_import` sends it as well as when it was built, with the

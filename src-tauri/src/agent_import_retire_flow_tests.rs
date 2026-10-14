@@ -656,11 +656,11 @@ async fn a_voucher_with_the_batchs_tag_dated_past_its_days_blocks_the_retire() {
     );
 }
 
-/// The tool text says what the code reads: up to a week either side, within
-/// the book and not past today, and no window at all when the licence admits
-/// none.
+/// The tool text says what the code reads and what it answers: the window as
+/// `widened_window` builds it, the three states, and which refusals a repeat
+/// of the call cannot clear.
 #[test]
-fn the_tool_text_states_the_retire_window_as_it_is_built() {
+fn the_tool_text_states_the_retire_read_and_its_three_answers() {
     let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
     let tool = definitions
         .as_array()
@@ -670,13 +670,32 @@ fn the_tool_text_states_the_retire_window_as_it_is_built() {
         .expect("verify_import");
     let text = tool["description"].as_str().unwrap();
     assert!(
+        text.contains("7 days either side of the batch's dates, limited to the book (not before it began, not past today unless the batch's own last day is), then moved further out to the nearest day the licence accepts as a boundary; refused when no such window exists (`import_retire_window_unavailable`)"),
+        "{text}"
+    );
+    assert!(!text.contains("covers up to 7 days"), "{text}");
+    assert!(
+        text.contains("`state` (`retired`, `not_retired` or `not_established`)"),
+        "{text}"
+    );
+    assert!(
         text.contains(
-            "up to 7 days either side of the batch's dates, within the book and not past today"
+            "a repeat of the call can help, except after a refusal of the read's size or limits"
         ),
         "{text}"
     );
-    assert!(text.contains("import_retire_window_unavailable"), "{text}");
-    assert!(!text.contains("covers 7 days"), "{text}");
+    for code in [
+        "voucher_window_too_many_reads",
+        "voucher_window_part_over_budget",
+        "verification_window_day_not_readable",
+        "verification_mode_unqualified",
+    ] {
+        assert!(text.contains(code), "{code}: {text}");
+    }
+    assert!(
+        text.contains("`not_established`: the batch may be retired"),
+        "{text}"
+    );
 }
 
 const CONTRA_IN_TALLY: &str = "<VOUCHER REMOTEID=\"tally-assigned-9\"><DATE>20260901</DATE><VOUCHERNUMBER>CV-1</VOUCHERNUMBER><VOUCHERTYPENAME>Contra</VOUCHERTYPENAME><GUID>61c6de69-1748-461c-ad3f-162cb949df9f-00000009</GUID><MASTERID>9</MASTERID><ALTERID>12</ALTERID><NARRATION></NARRATION><ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL><ALLLEDGERENTRIES.LIST><LEDGERNAME>Bridge Nested Debtor WR4</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-12.50</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>WR2 Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12.50</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER>";

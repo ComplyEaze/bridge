@@ -849,7 +849,10 @@ fn a_batch_found_once_stays_found_whatever_a_later_status_says() {
     assert!(!journal(&["verification_incomplete"]).ever_found);
     let found_then_incomplete = journal(&["posted_verified", "verification_incomplete"]);
     assert!(found_then_incomplete.ever_found);
-    assert_eq!(found_then_incomplete.batch.status, "verification_incomplete");
+    assert_eq!(
+        found_then_incomplete.batch.status,
+        "verification_incomplete"
+    );
     // a full record that was posted when written counts too
     let mut posted = line.clone();
     posted.status = "posted_verified".into();

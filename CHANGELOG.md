@@ -18,6 +18,24 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- A batch built from a bank statement is checked against the company's skipped rows and Contras when `post_import`
+  sends it, as it was when it was built, with the same refusals (`withdraw_skip_paired`,
+  `skip_row_paired_elsewhere`, `skip_row_already_posted`, `withdraw_skip_invalid`, `transfer_double_booked`,
+  `transfer_view_not_established`): once before the person is asked and again under the admission lock. A batch
+  records the rows its build withdrew, and a row a build withdraws is judged as if no batch that was neither sent
+  nor found held it or booked it, so a rebuild with the same withdrawal can no longer pass a check the first build
+  passed before the other account's Contra was verified (part of #1703).
+- `verify_import` takes `if_absent` set to `retire`, for a batch that was never sent and will not be. It removes the
+  batch's saved file, then reads Tally over the batch's days and a week either side, and if no voucher carries the
+  batch's own narration tag and each of its vouchers is not found (or is a content match that a sent or found
+  batch of another lineage accounts for), it records the batch retired in the same journal record as that
+  verification. `post_import` then refuses the batch (`import_batch_retired`), and its Contras and holds leave the
+  transfer facts, so the other account's statement can withdraw the skip it was waiting on. The answer lists the
+  Contra rows to skip when the statement is built again. A sent batch is not retired, and the call is refused
+  while the writes setting is off. A step that names a batch not verified yet now says whether it was sent. A
+  release that does not know the new journal record refuses the whole import journal once one is written, so a
+  later release must keep reading it (and the `withdrawn` field of a statement's facts).
+
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
   carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,

@@ -785,9 +785,8 @@ fn trimming_a_section_adds_to_what_was_already_left_out() {
 
 #[test]
 fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
-    let step = |kinds: &[Carrier]| {
-        Carrier::refusal_step(&kinds.iter().copied().collect(), NEVER_SENT)
-    };
+    let step =
+        |kinds: &[Carrier]| Carrier::refusal_step(&kinds.iter().copied().collect(), NEVER_SENT);
     let paired = step(&[Carrier::Paired]);
     let waiting = step(&[Carrier::OtherSideUnverified]);
     let matched = step(&[Carrier::MatchedUnconfirmed]);
@@ -869,7 +868,10 @@ fn the_never_sent_step_points_at_retire() {
     let step = Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), NEVER_SENT);
     assert!(step.starts_with("No file was written and nothing was recorded. "));
     assert!(step.contains("was never sent"), "{step}");
-    assert!(step.contains("run verify_import on it with if_absent set to retire"), "{step}");
+    assert!(
+        step.contains("run verify_import on it with if_absent set to retire"),
+        "{step}"
+    );
     assert!(step.contains("Do not post this row."), "{step}");
     let among = Carrier::refusal_step(
         &[Carrier::OtherSideUnverified, Carrier::Paired].into(),
@@ -882,9 +884,18 @@ fn the_never_sent_step_points_at_retire() {
 #[test]
 fn the_sent_step_says_the_batch_was_sent_and_names_no_retire() {
     let step = Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), SENT);
-    assert!(step.contains("was sent to Tally and ComplyEaze Bridge has not settled it"), "{step}");
-    assert!(step.contains("Run verify_import on that batch first"), "{step}");
-    assert!(!step.contains("retire") && !step.contains("if_absent"), "{step}");
+    assert!(
+        step.contains("was sent to Tally and ComplyEaze Bridge has not settled it"),
+        "{step}"
+    );
+    assert!(
+        step.contains("Run verify_import on that batch first"),
+        "{step}"
+    );
+    assert!(
+        !step.contains("retire") && !step.contains("if_absent"),
+        "{step}"
+    );
     let among = Carrier::refusal_step(
         &[Carrier::OtherSideUnverified, Carrier::Paired].into(),
         SENT,
@@ -895,7 +906,11 @@ fn the_sent_step_says_the_batch_was_sent_and_names_no_retire() {
     let either = Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), EITHER);
     assert!(either.contains("if_absent set to retire"), "{either}");
     assert!(either.contains("cannot be retired yet"), "{either}");
-    let texts = [step, either, Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), NEVER_SENT)];
+    let texts = [
+        step,
+        either,
+        Carrier::refusal_step(&[Carrier::OtherSideUnverified].into(), NEVER_SENT),
+    ];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), 3);
 }
 
@@ -921,15 +936,27 @@ fn the_section_tells_a_sent_carrier_from_one_never_sent() {
             .to_string()
     };
     let never = step_of(&[]);
-    assert!(never.contains("was never sent") && never.contains("if_absent set to retire"), "{never}");
+    assert!(
+        never.contains("was never sent") && never.contains("if_absent set to retire"),
+        "{never}"
+    );
     let sent = step_of(&["batch-1", "batch-2"]);
-    assert!(sent.contains("was sent to Tally") && !sent.contains("if_absent"), "{sent}");
+    assert!(
+        sent.contains("was sent to Tally") && !sent.contains("if_absent"),
+        "{sent}"
+    );
     let mixed = step_of(&["batch-1"]);
-    assert!(mixed.contains("cannot be retired yet") && mixed.contains("if_absent"), "{mixed}");
+    assert!(
+        mixed.contains("cannot be retired yet") && mixed.contains("if_absent"),
+        "{mixed}"
+    );
     // every variant still says what the section's step always said
     for step in [&never, &sent, &mixed] {
         assert!(step.contains("Run verify_import on that batch"), "{step}");
-        assert!(step.contains("Do not build or post either statement"), "{step}");
+        assert!(
+            step.contains("Do not build or post either statement"),
+            "{step}"
+        );
     }
 }
 
@@ -937,16 +964,34 @@ fn the_section_tells_a_sent_carrier_from_one_never_sent() {
 fn no_carrier_or_section_step_tells_a_person_to_enter_or_import_by_hand() {
     let mut texts = vec![OpenState::OtherSideUnverified.step().to_string()];
     for unverified in [NEVER_SENT, SENT, EITHER] {
-        texts.push(OpenState::OtherSideUnverified.step_for(unverified).to_string());
+        texts.push(
+            OpenState::OtherSideUnverified
+                .step_for(unverified)
+                .to_string(),
+        );
         for kinds in [
             vec![Carrier::OtherSideUnverified],
-            vec![Carrier::OtherSideUnverified, Carrier::Paired, Carrier::MatchedUnconfirmed],
+            vec![
+                Carrier::OtherSideUnverified,
+                Carrier::Paired,
+                Carrier::MatchedUnconfirmed,
+            ],
         ] {
-            texts.push(Carrier::refusal_step(&kinds.into_iter().collect(), unverified));
+            texts.push(Carrier::refusal_step(
+                &kinds.into_iter().collect(),
+                unverified,
+            ));
         }
     }
     for text in texts {
-        for forbidden in ["import it", "enter it", "enter this", "by hand", "manually", "Gateway of Tally"] {
+        for forbidden in [
+            "import it",
+            "enter it",
+            "enter this",
+            "by hand",
+            "manually",
+            "Gateway of Tally",
+        ] {
             assert!(!text.contains(forbidden), "{forbidden}: {text}");
         }
     }

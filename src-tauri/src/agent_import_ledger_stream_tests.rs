@@ -445,7 +445,9 @@ fn a_retired_batch_is_settled_and_not_counted_as_never_verified() {
     let mut bytes = record(&never);
     bytes.extend(record(&retired));
     assert_eq!(
-        settlement(Cursor::new(bytes.clone())).unwrap().no_dispatch_never_verified,
+        settlement(Cursor::new(bytes.clone()))
+            .unwrap()
+            .no_dispatch_never_verified,
         2
     );
     bytes.extend(record(&StatusRecord::retired(&incomplete, name)));

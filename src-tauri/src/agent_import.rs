@@ -1072,6 +1072,7 @@ impl Server {
                     .map(|voucher| voucher.bridge_txn_id.clone())
                     .collect(),
                 withdraw,
+                subject: None,
                 own_lineage: amends_batch_id.clone(),
                 candidate: statement_facts::Candidate::Build(Box::new(statement_facts::BuildLine {
                     batch_id: batch_id.clone(),
@@ -1471,6 +1472,7 @@ impl Server {
                     .collect(),
                 voucher_rows: BTreeSet::new(),
                 withdraw,
+                subject: None,
                 own_lineage: None,
                 carries_statement: true,
             })
@@ -2076,13 +2078,15 @@ impl Server {
         match result {
             // The saved file is gone and nothing was recorded: say so, as an
             // answer, since the batch can no longer be sent from its file.
-            Err(failure) if removed.load(std::sync::atomic::Ordering::SeqCst) => Ok(retire::unfinished_outcome(
-                company_json(&company, std::slice::from_ref(&company)),
-                &line.batch_id,
-                &failure.code,
-                accumulated,
-                guid,
-            )),
+            Err(failure) if removed.load(std::sync::atomic::Ordering::SeqCst) => {
+                Ok(retire::unfinished_outcome(
+                    company_json(&company, std::slice::from_ref(&company)),
+                    &line.batch_id,
+                    &failure.code,
+                    accumulated,
+                    guid,
+                ))
+            }
             result => result.map_err(|failure| failure.with_prior_evidence(accumulated)),
         }
     }

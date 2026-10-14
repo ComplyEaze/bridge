@@ -3260,10 +3260,10 @@ mod qualification_tests;
 #[path = "agent_import_bank_tests.rs"]
 mod bank_tests;
 
-#[path = "agent_import_transfer_flow_tests.rs"]
-mod transfer_flow_tests;
 #[path = "agent_import_retire_flow_tests.rs"]
 mod retire_flow_tests;
+#[path = "agent_import_transfer_flow_tests.rs"]
+mod transfer_flow_tests;
 
 #[path = "agent_import_bill_wise_build_tests.rs"]
 mod bill_wise_build_tests;

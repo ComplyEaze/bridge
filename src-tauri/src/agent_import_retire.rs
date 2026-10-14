@@ -36,11 +36,7 @@ pub(super) struct Retirement {
 /// paired with, may be carried by, or waits on. Retiring the batch leaves each
 /// of them to that other statement, so the batch's own statement is built again
 /// with them skipped.
-pub(super) fn carried_rows(
-    facts: &TransferFacts,
-    view: &TransferView,
-    batch: &str,
-) -> Vec<String> {
+pub(super) fn carried_rows(facts: &TransferFacts, view: &TransferView, batch: &str) -> Vec<String> {
     let ours = |key: &ContraKey| key.batch.as_str() == batch;
     let mut rows = BTreeSet::new();
     for (key, state) in &view.skips {
@@ -159,8 +155,7 @@ pub(super) fn judge(rows: &[Value], siblings: &BTreeSet<String>) -> Result<(), K
     for row in rows {
         let accounted_for = || {
             row["bridge_txn_id"].as_str().is_some_and(|row| {
-                bridge_bank_statement::proposals::is_statement_txn_id(row)
-                    && siblings.contains(row)
+                bridge_bank_statement::proposals::is_statement_txn_id(row) && siblings.contains(row)
             })
         };
         match row["status"].as_str() {
@@ -244,14 +239,21 @@ mod tests {
         let none = BTreeSet::new();
         let siblings = BTreeSet::from([ROW.to_string()]);
         let absent = row(ROW, "not_found", "");
-        assert_eq!(judge(&[absent.clone()], &none), Ok(()));
+        assert_eq!(judge(std::slice::from_ref(&absent), &none), Ok(()));
         let content = row(ROW, "matching_content_observed", "accounting_fingerprint");
         // nothing accounts for a content match
-        assert_eq!(judge(&[content.clone()], &none), Err(Keep::VoucherInTally));
+        assert_eq!(
+            judge(std::slice::from_ref(&content), &none),
+            Err(Keep::VoucherInTally)
+        );
         // a sent or found batch of another lineage holds the same row
         assert_eq!(judge(&[content.clone(), absent.clone()], &siblings), Ok(()));
         // a row that is not a statement row is never accounted for that way
-        let by_hand = row("hand-1", "matching_content_observed", "accounting_fingerprint");
+        let by_hand = row(
+            "hand-1",
+            "matching_content_observed",
+            "accounting_fingerprint",
+        );
         let hand = BTreeSet::from(["hand-1".to_string()]);
         assert_eq!(judge(&[by_hand], &hand), Err(Keep::VoucherInTally));
     }
@@ -259,14 +261,27 @@ mod tests {
     #[test]
     fn a_voucher_with_the_batchs_own_tag_blocks_whatever_else_is_accounted_for() {
         let siblings = BTreeSet::from([ROW.to_string()]);
-        for status in ["posted_verified", "posted_divergent", "not_attributable", "duplicate_fingerprint"] {
+        for status in [
+            "posted_verified",
+            "posted_divergent",
+            "not_attributable",
+            "duplicate_fingerprint",
+        ] {
             let tagged = row(ROW, status, "narration_tag");
-            assert_eq!(judge(&[tagged.clone()], &siblings), Err(Keep::OwnTag), "{status}");
+            assert_eq!(
+                judge(std::slice::from_ref(&tagged), &siblings),
+                Err(Keep::OwnTag),
+                "{status}"
+            );
             assert!(sees_its_own_tag(&[tagged]));
         }
         assert!(!sees_its_own_tag(&[row(ROW, "not_found", "")]));
         // any other status keeps the batch counting
-        for status in ["posted_not_effective", "duplicate_fingerprint", "bound_not_in_window"] {
+        for status in [
+            "posted_not_effective",
+            "duplicate_fingerprint",
+            "bound_not_in_window",
+        ] {
             assert_eq!(
                 judge(&[row(ROW, status, "accounting_fingerprint")], &siblings),
                 Err(Keep::VoucherInTally),
@@ -278,7 +293,13 @@ mod tests {
     #[test]
     fn the_window_is_widened_a_week_either_side_within_the_book() {
         let any = DateBoundaryProfile::ModeAgnostic;
-        let wide = widened_window(&day("20260910"), &day("20260915"), any, &day("20261201"), None);
+        let wide = widened_window(
+            &day("20260910"),
+            &day("20260915"),
+            any,
+            &day("20261201"),
+            None,
+        );
         assert_eq!(wide, Some((day("20260903"), day("20260922"))));
         // not before the book began, and not past today
         let wide = widened_window(
@@ -290,7 +311,13 @@ mod tests {
         );
         assert_eq!(wide, Some((day("20260401"), day("20260918"))));
         // a batch dated today reads to today
-        let wide = widened_window(&day("20260915"), &day("20260915"), any, &day("20260915"), None);
+        let wide = widened_window(
+            &day("20260915"),
+            &day("20260915"),
+            any,
+            &day("20260915"),
+            None,
+        );
         assert_eq!(wide, Some((day("20260908"), day("20260915"))));
     }
 

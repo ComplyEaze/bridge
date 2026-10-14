@@ -439,7 +439,9 @@ pub(super) fn read_snapshot(
                     .is_some_and(|snapshot| snapshot.dispatched),
                 retired: selected.as_ref().is_some_and(|snapshot| snapshot.retired),
                 ever_found: batch.status == POSTED_VERIFIED
-                    || selected.as_ref().is_some_and(|snapshot| snapshot.ever_found),
+                    || selected
+                        .as_ref()
+                        .is_some_and(|snapshot| snapshot.ever_found),
                 batch: *batch,
                 generation,
             });

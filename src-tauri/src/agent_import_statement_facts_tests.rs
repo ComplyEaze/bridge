@@ -3036,11 +3036,16 @@ fn the_first_holding_batch_in_id_order_is_named() {
 #[test]
 fn withdrawn_rows_round_trip_and_are_left_out_when_empty() {
     let mut statement = valid();
-    assert!(!serde_json::to_string(&statement).unwrap().contains("withdrawn"));
+    assert!(!serde_json::to_string(&statement)
+        .unwrap()
+        .contains("withdrawn"));
     statement.withdrawn = vec![st(3), st(4)];
     let text = serde_json::to_string(&statement).unwrap();
     assert!(text.contains("\"withdrawn\""), "{text}");
-    assert_eq!(serde_json::from_str::<StatementFacts>(&text).unwrap(), statement);
+    assert_eq!(
+        serde_json::from_str::<StatementFacts>(&text).unwrap(),
+        statement
+    );
     // a record written before the field existed reads as none
     let old = serde_json::to_string(&valid()).unwrap();
     assert!(serde_json::from_str::<StatementFacts>(&old)
@@ -3065,13 +3070,15 @@ fn a_skip_only_record_carrying_withdrawn_is_refused() {
 
 #[test]
 fn withdrawn_rows_must_be_sorted_statement_rows_the_batch_posts() {
-    let vouchers = [slim(payment(&st(5), "500.00")), slim(payment(&st(6), "500.00"))];
+    let vouchers = [
+        slim(payment(&st(5), "500.00")),
+        slim(payment(&st(6), "500.00")),
+    ];
     let identities = bound(&[(N1, B1), (N2, B2)]);
     let check = |withdrawn: Vec<String>| {
         let mut statement = facts(B1);
         statement.withdrawn = withdrawn;
-        validate_statement_facts(&statement, Some(shape(&vouchers, Some(&identities))))
-            .map(|_| ())
+        validate_statement_facts(&statement, Some(shape(&vouchers, Some(&identities)))).map(|_| ())
     };
     assert_eq!(check(vec![]), Ok(()));
     assert_eq!(check(vec![st(5), st(6)]), Ok(()));
@@ -3083,7 +3090,9 @@ fn withdrawn_rows_must_be_sorted_statement_rows_the_batch_posts() {
     // not a statement row id
     assert_eq!(
         check(vec!["manual-1".into()]),
-        Err(FactsError::WithdrawnInadmissible { txn: "manual-1".into() })
+        Err(FactsError::WithdrawnInadmissible {
+            txn: "manual-1".into()
+        })
     );
     // unsorted, or repeated
     assert!(check(vec![st(6), st(5)]).is_err());
@@ -3104,9 +3113,11 @@ fn skip_of_row_one() -> String {
 }
 
 fn posts_row_one(id: u32) -> Build {
-    build(id)
-        .voucher(contra(&st(1), N2, N1, "500.00"))
-        .facts(facts(B1).window("20260901", "20260930").contra(&st(1), None))
+    build(id).voucher(contra(&st(1), N2, N1, "500.00")).facts(
+        facts(B1)
+            .window("20260901", "20260930")
+            .contra(&st(1), None),
+    )
 }
 
 fn withdrawing_row_one() -> BTreeSet<String> {
@@ -3332,10 +3343,7 @@ fn the_siblings_are_the_rows_a_sent_or_found_batch_of_another_lineage_holds() {
         BTreeSet::from([st(1), st(2), st(4)])
     );
     // asked from inside the lineage that holds row 4: its own rows are not siblings'
-    assert_eq!(
-        siblings(&journal, 144, &[4]),
-        BTreeSet::new()
-    );
+    assert_eq!(siblings(&journal, 144, &[4]), BTreeSet::new());
     // only the rows asked for are named
     assert_eq!(siblings(&journal, 150, &[2]), BTreeSet::from([st(2)]));
 }

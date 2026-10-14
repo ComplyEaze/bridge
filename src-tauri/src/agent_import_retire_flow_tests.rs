@@ -51,10 +51,7 @@ fn server_at(directory: &Path, port: u16, writes_enabled: bool) -> Server {
 
 /// A batch built and never sent, the server that built it and the simulator
 /// that answers its read.
-async fn built(
-    directory: &Path,
-    plans: Vec<ScenarioPlan>,
-) -> (SequenceSimulator, Server, String) {
+async fn built(directory: &Path, plans: Vec<ScenarioPlan>) -> (SequenceSimulator, Server, String) {
     let simulator = SequenceSimulator::spawn(plans).expect("simulator");
     let server = server_at(directory, simulator.address().port(), true);
     let built = server
@@ -110,8 +107,7 @@ fn error_code(response: &Value) -> &Value {
 #[tokio::test]
 async fn an_absent_batch_is_retired_its_file_removed_and_post_refuses() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
     let file = saved_file(&server, &batch_id);
     assert!(file.exists());
     let response = retire(&server, &batch_id).await;
@@ -126,7 +122,13 @@ async fn an_absent_batch_is_retired_its_file_removed_and_post_refuses() {
         1,
         "{kinds:?}"
     );
-    assert!(server.latest_import_snapshot(&batch_id).unwrap().unwrap().retired);
+    assert!(
+        server
+            .latest_import_snapshot(&batch_id)
+            .unwrap()
+            .unwrap()
+            .retired
+    );
     // the page served is that read's verification
     assert!(result["verification_status"].is_string(), "{response}");
     // post never sends it, and asks nothing
@@ -143,15 +145,20 @@ async fn an_absent_batch_is_retired_its_file_removed_and_post_refuses() {
 async fn a_voucher_in_tally_blocks_the_retire() {
     // the captured book holds a voucher with this batch's content
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(false)).await;
+    let (_simulator, server, batch_id) = built(directory.path(), book(false)).await;
     let response = retire(&server, &batch_id).await;
     let retire = &response["structuredContent"]["result"]["retire"];
     assert_eq!(retire["state"], "not_retired", "{response}");
     assert_eq!(retire["reason"], "voucher_in_tally", "{response}");
     assert!(!saved_file(&server, &batch_id).exists());
     assert!(!records_of(directory.path(), &batch_id).contains(&"import_batch_retired".into()));
-    assert!(!server.latest_import_snapshot(&batch_id).unwrap().unwrap().retired);
+    assert!(
+        !server
+            .latest_import_snapshot(&batch_id)
+            .unwrap()
+            .unwrap()
+            .retired
+    );
     // the verification is still recorded
     assert!(response["structuredContent"]["result"]["verification_status"].is_string());
 }
@@ -179,9 +186,12 @@ async fn an_incomplete_read_retires_nothing_and_says_the_file_is_gone() {
 #[tokio::test]
 async fn a_sent_batch_is_refused_before_the_delete() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
-    let line = server.latest_import_snapshot(&batch_id).unwrap().unwrap().batch;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    let line = server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
     {
         let _admission = server.lock_import_admission().unwrap();
         server
@@ -189,7 +199,11 @@ async fn a_sent_batch_is_refused_before_the_delete() {
             .unwrap();
     }
     let response = retire(&server, &batch_id).await;
-    assert_eq!(error_code(&response), "import_retire_batch_sent", "{response}");
+    assert_eq!(
+        error_code(&response),
+        "import_retire_batch_sent",
+        "{response}"
+    );
     assert!(saved_file(&server, &batch_id).exists());
 }
 
@@ -198,9 +212,12 @@ async fn a_sent_batch_is_refused_before_the_delete() {
 #[tokio::test]
 async fn a_batch_once_found_is_refused_and_keeps_its_file() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
-    let line = server.latest_import_snapshot(&batch_id).unwrap().unwrap().batch;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    let line = server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
     for status in ["posted_verified", "verification_incomplete"] {
         let mut update = line.clone();
         update.status = status.into();
@@ -210,7 +227,11 @@ async fn a_batch_once_found_is_refused_and_keeps_its_file() {
             .unwrap();
     }
     let response = retire(&server, &batch_id).await;
-    assert_eq!(error_code(&response), "import_retire_batch_found", "{response}");
+    assert_eq!(
+        error_code(&response),
+        "import_retire_batch_found",
+        "{response}"
+    );
     assert!(saved_file(&server, &batch_id).exists());
 }
 
@@ -219,8 +240,7 @@ async fn a_batch_once_found_is_refused_and_keeps_its_file() {
 #[tokio::test]
 async fn a_batch_built_for_another_endpoint_is_refused_and_keeps_its_file() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
     let elsewhere = server_at(directory.path(), 9, true);
     let response = retire(&elsewhere, &batch_id).await;
     assert_eq!(
@@ -234,9 +254,12 @@ async fn a_batch_built_for_another_endpoint_is_refused_and_keeps_its_file() {
 #[tokio::test]
 async fn a_batch_with_no_recorded_mark_is_refused_and_keeps_its_file() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
-    let mut line = server.latest_import_snapshot(&batch_id).unwrap().unwrap().batch;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    let mut line = server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
     line.pre_import_mark.value = None;
     server.append_import_ledger(&line).unwrap();
     let response = retire(&server, &batch_id).await;
@@ -251,35 +274,42 @@ async fn a_batch_with_no_recorded_mark_is_refused_and_keeps_its_file() {
 #[tokio::test]
 async fn retire_is_refused_while_writes_are_off() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
     let off = server_at(directory.path(), 9, false);
     let response = retire(&off, &batch_id).await;
-    assert_eq!(error_code(&response), "import_posting_disabled", "{response}");
+    assert_eq!(
+        error_code(&response),
+        "import_posting_disabled",
+        "{response}"
+    );
     assert!(saved_file(&server, &batch_id).exists());
 }
 
 #[tokio::test]
 async fn retiring_twice_is_refused_the_second_time() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
     let first = retire(&server, &batch_id).await;
-    assert_eq!(first["structuredContent"]["result"]["retire"]["state"], "retired");
+    assert_eq!(
+        first["structuredContent"]["result"]["retire"]["state"],
+        "retired"
+    );
     let again = retire(&server, &batch_id).await;
-    assert_eq!(error_code(&again), "import_retire_already_retired", "{again}");
+    assert_eq!(
+        error_code(&again),
+        "import_retire_already_retired",
+        "{again}"
+    );
 }
 
 #[tokio::test]
 async fn a_delete_of_a_file_already_gone_counts_as_done() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
     fs::remove_file(saved_file(&server, &batch_id)).unwrap();
     let response = retire(&server, &batch_id).await;
     assert_eq!(
-        response["structuredContent"]["result"]["retire"]["state"],
-        "retired",
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
         "{response}"
     );
 }
@@ -290,9 +320,12 @@ async fn a_delete_of_a_file_already_gone_counts_as_done() {
 #[tokio::test]
 async fn a_dispatch_intent_between_the_delete_and_the_record_refuses_the_record() {
     let directory = tempfile::tempdir().unwrap();
-    let (_simulator, server, batch_id) =
-        built(directory.path(), book(true)).await;
-    let line = server.latest_import_snapshot(&batch_id).unwrap().unwrap().batch;
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    let line = server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
     let raced = Server::new(server.settings.clone());
     let hook: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
         let _admission = raced.lock_import_admission().unwrap();
@@ -305,7 +338,10 @@ async fn a_dispatch_intent_between_the_delete_and_the_record_refuses_the_record(
         .await;
     let retire = &response["structuredContent"]["result"]["retire"];
     assert_eq!(retire["state"], "not_retired", "{response}");
-    assert_eq!(retire["reason"], "import_verification_conflict_retry", "{response}");
+    assert_eq!(
+        retire["reason"], "import_verification_conflict_retry",
+        "{response}"
+    );
     let kinds = records_of(directory.path(), &batch_id);
     assert!(!kinds.contains(&"import_batch_retired".into()), "{kinds:?}");
     assert!(kinds.contains(&"dispatch_intent".into()), "{kinds:?}");
@@ -316,8 +352,7 @@ fn last_record(directory: &Path, batch_id: &str) -> Value {
         .unwrap()
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .filter(|record| record["batch_id"] == batch_id)
-        .last()
+        .rfind(|record| record["batch_id"] == batch_id)
         .unwrap()
 }
 
@@ -402,7 +437,10 @@ async fn a_retired_batch_whose_own_tag_is_seen_again_is_recorded_so() {
         qualified_import_cycle_plans()[verify_from..].to_vec(),
         Some(&tag),
     );
-    let seen = tagged.call_tool_response("verify_import", plain).await.value;
+    let seen = tagged
+        .call_tool_response("verify_import", plain)
+        .await
+        .value;
     assert_ne!(seen["isError"], true, "{seen}");
     let record = last_record(directory.path(), &batch_id);
     assert_eq!(record["own_tag_observed"], true, "{record}");
@@ -420,26 +458,28 @@ async fn a_retired_batch_whose_own_tag_is_seen_again_is_recorded_so() {
 /// this statement again with it skipped, not booked a second time from here.
 #[tokio::test]
 async fn the_answer_lists_the_rows_the_other_statement_carries() {
-    use super::transfer_flow_tests::{
-        a_skips, contra_statement, Rig, BANK_B, BOOKED, SKIPPED,
-    };
+    use super::transfer_flow_tests::{a_skips, contra_statement, Rig, BANK_B, BOOKED, SKIPPED};
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
         [skip_only_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, Some("600000000001"))]))
-        .await;
+    rig.build(a_skips(
+        directory.path(),
+        &[(SKIPPED, Some("600000000001"))],
+    ))
+    .await;
     let carrying = rig
-        .build(contra_statement(directory.path(), BANK_B, BOOKED, Some("600000000001")))
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some("600000000001"),
+        ))
         .await;
     let batch_id = carrying["batch_id"].as_str().unwrap().to_string();
-    let (_simulator, server) = reading_from(
-        directory.path(),
-        &batch_id,
-        book(true)[32..].to_vec(),
-        None,
-    );
+    let (_simulator, server) =
+        reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
     // the other account's skip was recorded for the endpoint the batch was
     // built for, which is this Tally now
     let moved = server.latest_import_snapshot(&batch_id).unwrap().unwrap();
@@ -485,9 +525,18 @@ async fn an_unreadable_view_retires_all_the_same_and_lists_nothing() {
     let retire = &response["structuredContent"]["result"]["retire"];
     assert_eq!(retire["state"], "retired", "{response}");
     assert!(retire.get("carried_rows").is_none(), "{response}");
-    assert_eq!(retire["carried_rows_state"], "not_established", "{response}");
+    assert_eq!(
+        retire["carried_rows_state"], "not_established",
+        "{response}"
+    );
     assert_eq!(retire["next_step"], retire::RETIRED_UNKNOWN_STEP);
-    assert!(server.latest_import_snapshot(&batch_id).unwrap().unwrap().retired);
+    assert!(
+        server
+            .latest_import_snapshot(&batch_id)
+            .unwrap()
+            .unwrap()
+            .retired
+    );
 }
 
 #[tokio::test]
@@ -511,4 +560,47 @@ async fn if_absent_takes_one_value_and_no_proof_page() {
         .await
         .value;
     assert_eq!(other["isError"], true, "{other}");
+}
+
+/// The other account's statement is built and never sent, so it counts as
+/// carrying the transfer and the batch that withdrew the skip cannot be sent.
+/// Once a read of Tally has retired it, that batch goes through.
+#[tokio::test]
+async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends() {
+    use super::transfer_flow_tests::{
+        a_skips, contra_statement, post_error, withdrawing, Rig, BANK_B, BOOKED, SKIPPED,
+        TRANSFER_REASONS,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    let first = rig.build(withdrawing(directory.path())).await;
+    let withdrawn = first["batch_id"].as_str().unwrap().to_string();
+    let carrying = rig
+        .build(contra_statement(directory.path(), BANK_B, BOOKED, None))
+        .await;
+    let carrier = carrying["batch_id"].as_str().unwrap().to_string();
+    // waiting on a batch never sent: refused, and the step points at the retire
+    let refused = post_error(&rig.server, &withdrawn).await;
+    assert_eq!(refused["code"], "withdraw_skip_paired", "{refused}");
+    assert_eq!(refused["paired_rows"][0]["batch_id"], carrier.as_str());
+    assert_eq!(refused["paired_rows"][0]["state"], "other_side_unverified");
+    let step = refused["next_step"].as_str().unwrap();
+    assert!(step.contains("if_absent set to retire"), "{step}");
+    // a read of a Tally that holds none of it retires the carrier
+    let (_simulator, server) =
+        reading_from(directory.path(), &carrier, book(true)[32..].to_vec(), None);
+    let response = retire(&server, &carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    // now the batch passes the transfer check (it fails later, at the network)
+    let sent = post_error(&rig.server, &withdrawn).await;
+    let code = sent["code"].as_str().unwrap_or_default();
+    assert!(!TRANSFER_REASONS.contains(&code), "{sent}");
 }

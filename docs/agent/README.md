@@ -1887,6 +1887,17 @@ refused as `proposals_legacy` (parse the statement again).
   not finish after the file is removed retires nothing and says so; the call
   may be repeated. A release that does not know the retirement record refuses
   the whole import journal.
+- **At send.** A batch built from a bank statement is checked against these
+  records when `post_import` sends it as well as when it was built, with the
+  same refusals, once before the person is asked and again under the admission
+  lock. The step of each begins by saying nothing was sent and the approval was
+  not used, and ends by saying the statement must be built again. A refusal
+  under the lock carries its code and a step that sends the caller back to
+  `post_import` for the whole reason. The batch is judged as it was built, so
+  the status a verification before the send wrote does not change the
+  decision, and a row it withdraws is judged as if no batch that was neither
+  sent nor found held it or booked it. A batch that is not about transfers (no
+  statement row, no statement, no withdrawal) is not checked.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
   build that needs the view (`transfer_view_not_established`); builds that do

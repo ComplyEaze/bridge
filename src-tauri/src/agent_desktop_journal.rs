@@ -53,14 +53,14 @@ impl DesktopJournalService {
         let review = self.review_snapshot(snapshot)?;
         // A missing file is named only for a batch not yet sent, which retiring
         // settles; a sent one is reconciled and keeps the text it always had.
-        let persisted = self
-            .read_persisted_xml(&review.batch_id)
-            .map_err(|code| match code.as_str() {
-                "import_saved_file_missing" if dispatched => {
-                    "import_persisted_file_unavailable".to_string()
-                }
-                _ => code,
-            })?;
+        let persisted =
+            self.read_persisted_xml(&review.batch_id)
+                .map_err(|code| match code.as_str() {
+                    "import_saved_file_missing" if dispatched => {
+                        "import_persisted_file_unavailable".to_string()
+                    }
+                    _ => code,
+                })?;
         if persisted != selected {
             return Err("import_selected_file_not_exact".into());
         }

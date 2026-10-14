@@ -289,16 +289,21 @@ fn saved_batch(server: &Server) -> (ImportLedgerLine, Value) {
 /// The saved Journal of `saved_batch`, as any build may have saved it, with
 /// `narration`.
 fn saved_batch_with_narration(server: &Server, narration: &str) -> (ImportLedgerLine, Value) {
+    saved_batch_of_row(server, "journal-583", narration)
+}
+
+/// The same batch holding one voucher under the transaction id `txn`.
+fn saved_batch_of_row(server: &Server, txn: &str, narration: &str) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000583", "identity_scheme":"batch_v1",
         "company_guid":GUID,
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
-        "txn_ids":["journal-583"],"date_from":"20260901","date_to":"20260901",
+        "txn_ids":[txn],"date_from":"20260901","date_to":"20260901",
         "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
-        "vouchers":[{"bridge_txn_id":"journal-583","date":"20260901","voucher_type":"Journal",
+        "vouchers":[{"bridge_txn_id":txn,"date":"20260901","voucher_type":"Journal",
             "narration":narration,"entries":[
                 {"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
                 {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]
@@ -5603,6 +5608,176 @@ async fn an_unsent_batch_with_no_saved_file_is_told_to_retire() {
     assert!(
         error["next_step"].as_str().unwrap().contains("if_absent"),
         "{response}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+// ---- the transfer check at send ---------------------------------------------------
+
+const STATEMENT_ROW: &str = "st-20260901-00000000000000d1";
+
+/// A statement of only skipped rows, recorded for this company through the
+/// server's endpoint, that skips `STATEMENT_ROW` as carried by another account.
+fn skip_the_row(server: &Server) {
+    use std::io::Write;
+    let record = statement_facts::SkipOnlyRecord {
+        record_id: format!("skips-{}", Uuid::new_v4().hyphenated()),
+        company_guid: canonical_batch_guid(GUID),
+        endpoint_origin: super::super::super::canonical_loopback_origin(&server.settings.endpoint)
+            .unwrap(),
+        built_at: "2026-09-22T00:00:01Z".into(),
+        statement: statement_facts::StatementFacts {
+            bank_ledger_guid: "guid-bank-a".into(),
+            coverage: None,
+            contra_rows: Vec::new(),
+            skip_rows: vec![statement_facts::SkipRow {
+                bridge_txn_id: STATEMENT_ROW.into(),
+                date: TallyDate::parse("20260901").unwrap(),
+                amount: "12.50".into(),
+                direction: statement_facts::RowDirection::Outflow,
+                other_ledger_guid: "guid-bank-b".into(),
+                reference: None,
+                instrument: None,
+                reversed_same_day: false,
+            }],
+            withdrawn: Vec::new(),
+        },
+    };
+    let mut bytes = serde_json::to_vec(&record).unwrap();
+    bytes.push(b'\n');
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(server.settings.data_dir.join(statement_facts::SKIPS_FILE))
+        .unwrap()
+        .write_all(&bytes)
+        .unwrap();
+}
+
+const SENT_FIRST: &str = "Nothing was sent to Tally and the approval was not used. ";
+const SENT_LAST: &str = " This batch cannot be sent as built: build the statement again.";
+
+/// A row another statement of the company skipped is refused when the batch
+/// holding it is sent, as it was refused when a build would have posted it:
+/// from the journal alone, before any Tally request and before the person is
+/// asked; nothing is appended.
+#[tokio::test]
+async fn a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    skip_the_row(&server);
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "skip_row_paired_elsewhere", "{response}");
+    assert_eq!(error["skipped_rows"], json!([STATEMENT_ROW]), "{response}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.ends_with(SENT_LAST), "{step}");
+    assert!(!step.contains("No file was written"), "{step}");
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+/// The skip is recorded while the dialog is open: the check under the
+/// admission lock refuses with the same code, before the intent, and its step is
+/// the fixed one that sends the caller back for the whole reason.
+#[tokio::test]
+async fn a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock() {
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    let recorder = Server::new(server.settings.clone());
+    let scripted = ScriptedApproval::approving_after(move || skip_the_row(&recorder));
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted, server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "skip_row_paired_elsewhere",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed, post_at, "the POST is never sent: {response}");
+    assert_eq!(
+        result["error"]["next_step"],
+        "The transfer records changed after this batch was checked and before it was sent; nothing was sent and the approval was not used. Call post_import again: it gives the whole reason before asking.",
+        "{response}"
+    );
+    let intents = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .filter(|record| record.contains("\"dispatch_intent\""))
+        .count();
+    assert_eq!(intents, 0);
+}
+
+/// A batch that posts no statement row and carries no statement is not about
+/// transfers, and a view that cannot be read does not stop it.
+#[tokio::test]
+async fn a_batch_that_is_not_about_transfers_is_not_held_by_an_unreadable_view() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch(&server);
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let code = &response["structuredContent"]["result"]["error"]["code"];
+    assert_ne!(code, "transfer_view_not_established", "{response}");
+}
+
+/// A batch that does post a statement row is held: nothing is sent while
+/// ComplyEaze Bridge cannot read its own record of the skipped rows.
+#[tokio::test]
+async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    std::fs::write(
+        directory.path().join(statement_facts::SKIPS_FILE),
+        b"not a record\n",
+    )
+    .unwrap();
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "transfer_view_not_established", "{response}");
+    let step = error["next_step"].as_str().unwrap();
+    assert!(step.starts_with(SENT_FIRST), "{step}");
+    assert!(step.contains("could not read its own record"), "{step}");
+    assert!(
+        step.contains("no batch of this company that posts a statement row can be sent"),
+        "{step}"
     );
     assert_eq!(observed.len(), 0);
     assert_eq!(journal(directory.path()), before);

@@ -14,7 +14,9 @@ use crate::agent::transfer_pairing::{
     transfer_pairing_view, BatchId, BatchStatus, ContraKey, DoubleBookedClass, SkipState,
     TransferView,
 };
-use statement_facts::{Candidate, TransferFacts, TransferFactsError};
+use statement_facts::{
+    BuildLine, Candidate, FactsError, StatementFacts, TransferFacts, TransferFactsError,
+};
 
 /// How many days apart the two statements may print one transfer and still
 /// pair it by date. Zero until a real statement pair has been measured: k comes
@@ -142,7 +144,12 @@ impl Unverified {
 
     /// The text for the kinds present; for both, or for none, the one that
     /// covers both.
-    fn pick(self, never_sent: &'static str, sent: &'static str, either: &'static str) -> &'static str {
+    fn pick(
+        self,
+        never_sent: &'static str,
+        sent: &'static str,
+        either: &'static str,
+    ) -> &'static str {
         match (self.sent, self.never_sent) {
             (true, false) => sent,
             (false, true) => never_sent,
@@ -420,7 +427,39 @@ pub(super) struct TransferRefusal {
     next_step: String,
 }
 
+/// A refusal made when a batch is sent, not when it is built.
+const NOTHING_SENT: &str = "Nothing was sent to Tally and the approval was not used.";
+const SEND_ENDING: &str = "This batch cannot be sent as built: build the statement again.";
+const TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP: &str = "Nothing was sent to Tally and the approval was not used. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this batch books a transfer twice. error, check and record_id name what failed, without any value from the record. Report it with the error named here: no batch of this company that posts a statement row can be sent until it is fixed, as it already blocks every build that needs the view.";
+/// What a refusal under the admission lock says: the reason is its code alone.
+pub(super) const TRANSFERS_CHANGED_UNDER_LOCK_STEP: &str = "The transfer records changed after this batch was checked and before it was sent; nothing was sent and the approval was not used. Call post_import again: it gives the whole reason before asking.";
+
 impl TransferRefusal {
+    pub(super) fn reason(&self) -> &'static str {
+        self.reason
+    }
+
+    /// The same refusal for a batch about to be sent: one function maps every
+    /// build step, so the two cannot drift.
+    pub(super) fn for_send(self) -> Self {
+        let next_step = if self.reason == "transfer_view_not_established" {
+            TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP.to_string()
+        } else {
+            let middle = self
+                .next_step
+                .strip_prefix(NOTHING_WRITTEN)
+                .unwrap_or(&self.next_step)
+                .trim();
+            format!("{NOTHING_SENT} {middle} {SEND_ENDING}")
+        };
+        Self { next_step, ..self }
+    }
+
+    /// The reason, what the refusal lists, and what to do about it.
+    pub(super) fn into_parts(self) -> (&'static str, Value, String) {
+        (self.reason, self.detail, self.next_step)
+    }
+
     pub(super) fn outcome(
         self,
         company: &bridge_tally_protocol::TallyCompany,
@@ -461,6 +500,11 @@ pub(super) struct TransferInput {
     pub(super) own_lineage: Option<String>,
     /// The build carries a statement's facts.
     pub(super) carries_statement: bool,
+    /// A batch already in the journal that is being judged again, the one about
+    /// to be sent: its records are left out of the facts and it is the
+    /// `candidate`, so the journal reads as it did when the batch was built, plus
+    /// whatever was written since.
+    pub(super) subject: Option<String>,
 }
 
 impl TransferInput {
@@ -692,12 +736,12 @@ impl Server {
         let (before, before_view) = match self.transfer_view_while_admitted(
             &input.company_guid,
             None,
-            None,
+            input.subject.as_deref(),
             &input.withdraw,
         ) {
-                Ok(view) => view,
-                Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
-            };
+            Ok(view) => view,
+            Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
+        };
         let live: BTreeSet<&str> = before
             .live_skips
             .iter()
@@ -809,7 +853,7 @@ impl Server {
         let (facts, view) = match self.transfer_view_while_admitted(
             &input.company_guid,
             Some(input.candidate),
-            None,
+            input.subject.as_deref(),
             &BTreeSet::new(),
         ) {
             Ok(view) => view,
@@ -826,6 +870,67 @@ impl Server {
             }));
         }
         Ok(Admission::Admitted(TransferSummary::of(&facts, &view)))
+    }
+
+    /// A saved batch about to be sent, judged as its build was and against the
+    /// journal as it is now. `None` when the batch is admitted, or is not about
+    /// transfers at all (it posts no statement row, carries no statement and
+    /// withdraws nothing), as the build decides it. Called with the admission
+    /// lock held, shared or exclusive.
+    pub(super) fn transfers_refusal_for_send_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<Option<TransferRefusal>, String> {
+        let statement = match &line.statement {
+            Some(recorded) => match serde_json::from_value::<StatementFacts>(recorded.clone()) {
+                Ok(facts) => Some(facts),
+                Err(_) => {
+                    let error = TransferFactsError::Facts {
+                        source_id: line.batch_id.clone(),
+                        error: FactsError::Unparsable,
+                    };
+                    return Ok(match without_facts(true, &error) {
+                        Admission::Refused(refusal) => Some(refusal.for_send()),
+                        Admission::Admitted(_) => None,
+                    });
+                }
+            },
+            None => None,
+        };
+        // judged as it was built
+        let mut candidate = BuildLine::of(line);
+        candidate.status = "built".to_string();
+        let input = TransferInput {
+            company_guid: canonical_batch_guid(&line.company_guid),
+            candidate: Candidate::Build(Box::new(candidate)),
+            skip_rows: statement
+                .iter()
+                .flat_map(|statement| &statement.skip_rows)
+                .map(|skip| skip.bridge_txn_id.clone())
+                .collect(),
+            voucher_rows: line
+                .vouchers
+                .iter()
+                .filter(|voucher| {
+                    bridge_bank_statement::proposals::is_statement_txn_id(&voucher.bridge_txn_id)
+                })
+                .map(|voucher| voucher.bridge_txn_id.clone())
+                .collect(),
+            withdraw: statement
+                .iter()
+                .flat_map(|statement| statement.withdrawn.iter().cloned())
+                .collect(),
+            own_lineage: line.amends_batch_id.clone(),
+            carries_statement: statement.is_some(),
+            subject: Some(line.batch_id.clone()),
+        };
+        if !input.needs_the_view() {
+            return Ok(None);
+        }
+        Ok(match self.admit_transfers_while_admitted(input)? {
+            Admission::Refused(refusal) => Some(refusal.for_send()),
+            Admission::Admitted(_) => None,
+        })
     }
 
     /// The section for the first page of a verification: computed after the

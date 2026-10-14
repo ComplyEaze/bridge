@@ -102,11 +102,13 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "purchase_register",
         "read_evidence",
         "sales_register",
+        "statement_tie_out",
         "stock_summary",
         "tally_status",
         "trial_balance",
         "validate_masters",
         "voucher_presence",
+        "voucher_read_cost",
         "voucher_schema",
         "vouchers",
     ];
@@ -1297,6 +1299,26 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "gst_status",
             "The reason for a status is not available",
             "the tool names no reason for a status",
+        ),
+        (
+            "voucher_read_cost",
+            "a narrower window does not lower it",
+            "the census follows the book's mark, so a shorter window is not a cheaper call",
+        ),
+        (
+            "voucher_read_cost",
+            "It is as of this call's own read of the mark",
+            "the figure is not a promise about the next call",
+        ),
+        (
+            "voucher_read_cost",
+            "No estimate is made",
+            "the measured runs are data, not a computed figure",
+        ),
+        (
+            "voucher_read_cost",
+            "`vouchers`, `ledger_movement` or `verify_import`",
+            "the tools the figure covers",
         ),
     ];
     let definitions = registered_tool_definitions(true, true);

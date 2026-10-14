@@ -226,6 +226,10 @@ or an owner decision to amend the requirement instead:
    now have no reader or writer, including the legacy rows the Consequences section says remain
    readable. Connecting `0003` later means restoring that code from history. Which contract is
    authoritative stays open.
+   2026-10-12: the repository methods for the canary tables of migrations `0015`–`0021` had
+   no caller since #139 removed the canary coordinator, and were removed. The tables remain,
+   with no reader or writer. Row 11 stays Not met and follow-up 1 is unchanged; which contract
+   is authoritative stays open.
 7. **Write capability in the Passport (row 1).** Decide whether a verified post
    should become observed write evidence, and under what rule.
 8. **Concurrent external changes, #239. Narrowed.** Tally offers no conditional import, so

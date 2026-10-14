@@ -129,6 +129,14 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
+  - A bank-statement check over whole calendar months (`statement_tie_out`, in
+    source and not yet in a published build) can show, with the book's figures,
+    the statement's balance at the month ends and its net over those months,
+    under every setting: never a part of a month except the part-months at the
+    statement's own start and end (whose net a month-end balance gives together
+    with the opening and closing supplied to the parse), but a month in which
+    every other row's amount is already known (a single row, or one row beside open
+    cash lines, whose amounts the parse returns) gives that row's amount.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and
@@ -170,6 +178,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
   - **What the reads added since 0.5.0 send, under each setting.**
+    - The read-cost preview (`voucher_read_cost`) sends the company name,
+      its identifier, company number and books-from date, the company's voucher
+      mark, and counts and seconds derived from it, with constant text. It holds
+      no amounts and no narrations, and `mask_parties` has nothing to shorten in it.
     - The company settings read (`company_features`) sends the company name,
       its identifier, company number and books-from date, the cost-centre, GST
       and batch-wise settings as yes, no or not reported, and the currency
@@ -179,8 +191,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and
       change number, and the voucher's GSTR-1 status (included, uncertain,
-      excluded or not in the return) and whether it was accepted as it
-      stands. It holds no amounts, no party or ledger names and no
+      excluded or not in the return, or that it is cancelled, optional or
+      post-dated and what its status flags read) and whether it was accepted
+      as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
@@ -407,8 +420,8 @@ characters it cannot show safely, or do not fit, it refuses. A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference; from the next
 build a Journal's line names its first debit and first credit ledger and up to
-20 characters of its narration, and the line above says a narration may be
-cut) and marks the
+20 characters of its narration, fewer (never under 10) when that makes the line
+fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
 only, with a line saying why, and still asks for your approval, unless a ledger

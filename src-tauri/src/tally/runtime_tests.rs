@@ -36,7 +36,7 @@ fn captured_aarav_company_list_and_identity() -> (String, VerifiedCompanyIdentit
         .unwrap();
     let identity = VerifiedCompanyIdentity::from_observed_companies(
         row.name.clone(),
-        row.guid.clone().unwrap(),
+        crate::tally::test_company_guid(&row.guid.clone().unwrap()),
         row.company_number.clone().unwrap(),
         row.books_from.clone().unwrap(),
         &rows,
@@ -70,6 +70,9 @@ fn party_ledger_master_evidence_includes_currency_probe_and_source_responses() {
         currency_decimal_places: 2,
         from: TallyDate::parse("20260401").expect("source from"),
         to: TallyDate::parse("20260731").expect("source to"),
+        balance_date_basis: BalanceDateBasis::HostToday(
+            TallyDate::parse("20260731").expect("source to"),
+        ),
         last_voucher_date: TallyDate::parse("20260731").expect("source to"),
         rows: Vec::new(),
         request_sha256: "0".repeat(64),
@@ -1021,7 +1024,7 @@ async fn the_outstandings_read_refuses_a_non_loopback_endpoint() {
         host: "not-a-loopback-endpoint".to_string(),
         port: 9000,
     };
-    let identity = verified_identity("Synthetic Company", "synthetic-guid");
+    let identity = verified_identity("Synthetic Company", "9d4e7b13-2a58-4c61-b0f9-6e1c3a8d5f27");
     let as_of = TallyDate::parse("20260731").unwrap();
     let error = runtime
         .fetch_operator_outstandings(config, &identity, as_of, OutstandingsAgeingAnchor::DueDate)
@@ -1641,4 +1644,72 @@ fn unallocated_rows_carry_the_ledgers_flag_and_opening_and_a_composition_that_is
     let text = without_names.to_string().to_ascii_lowercase();
     assert!(!text.contains("on_account"));
     assert!(!text.contains("on account"));
+}
+
+/// Pins Bridge's handling of a read whose connection closes after the whole
+/// request was received and before any response: the transport calls it
+/// `RequestFailed`, and the read retry policy sends it again, three sends in
+/// all. The read retry policy also serves the connector's reads; see #1658.
+/// The double is local; this measures Bridge's mapping and retry count, not
+/// what a real Tally does when it closes.
+#[tokio::test]
+async fn a_read_is_sent_three_times_when_its_connection_closes_after_the_request_was_received() {
+    const MAX_HOST_ABORT_ATTEMPTS: usize = 3;
+    for attempt in 1..=MAX_HOST_ABORT_ATTEMPTS {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the local double");
+        let address = listener.local_addr().expect("double address");
+        let received = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = std::sync::Arc::clone(&received);
+        let double = tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.expect("accept a send");
+                let request =
+                    crate::tally::connection::tests::read_complete_http_request(&mut socket).await;
+                assert!(request.starts_with(b"POST "), "a Tally read is a POST");
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                // Close with the request fully read and nothing answered.
+                drop(socket);
+            }
+        });
+        let runtime = TallyRuntime::default();
+        let config = TallyConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        };
+
+        let (result, trail) =
+            crate::request_trail::with_request_trail(Box::pin(runtime.fetch_companies(config)))
+                .await;
+        double.abort();
+        let received = received.load(std::sync::atomic::Ordering::SeqCst);
+        let trail = trail.expect("the sends are on the call's trail");
+        // Windows endpoint-security software can abort a new loopback flow
+        // before the request reaches the double, as in the transport tests.
+        // Only that case, a send the double never received, reruns the whole
+        // call on a fresh double; the production retry policy is unchanged.
+        if attempt < MAX_HOST_ABORT_ATTEMPTS && trail["sent"].as_u64() != Some(received as u64) {
+            continue;
+        }
+
+        let error = result.expect_err("a read that is never answered must fail");
+        assert!(matches!(
+            error
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<TallyTransportError>()),
+            Some(TallyTransportError::RequestFailed)
+        ));
+        assert_eq!(classify_failure(&error), ReadFailureClass::RequestFailed);
+        assert_eq!(received, 3);
+        assert_eq!(trail["sent"], 3);
+        assert_eq!(trail["failed"], 3);
+        let sends = trail["last"].as_array().expect("trail sends");
+        assert_eq!(sends.len(), 3);
+        for send in sends {
+            assert_eq!(send["outcome"], "request_failed");
+        }
+        return;
+    }
+    unreachable!("bounded attempts always return")
 }

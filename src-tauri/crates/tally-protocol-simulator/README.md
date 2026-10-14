@@ -23,20 +23,6 @@ The simulators always bind an ephemeral `127.0.0.1` port. Production code does
 not depend on this crate. `Simulator` handles exactly one request;
 `SequenceSimulator` handles an explicit ordered plan of 1–64 requests.
 
-The versioned voucher generator is a separate scale-test input. It writes a
-bounded corpus one window at a time, rejects a window above the 32 MiB encoded
-body limit before touching the caller's writer, and returns only counts, byte
-length, and a domain-separated SHA-256 digest. It never turns simulator output
-into live-Tally evidence. The qualification controller pre-generates these
-windows before starting a fresh parser worker so generator memory and time are
-outside the measured process.
-
-The master generator produces up to 50,000 deterministic ledger masters with
-strict company/schema/count evidence. It preflights the selected UTF-8 or
-BOM-qualified UTF-16 wire representation against the same 32 MiB encoded-body
-ceiling before returning bytes. Its counts and hashes are repository-synthetic
-evidence, not a claim that a real Tally profile can export that size.
-
 ```rust
 use std::time::Duration;
 use tally_protocol_simulator::{Delivery, Fixture, ScenarioPlan, Simulator};

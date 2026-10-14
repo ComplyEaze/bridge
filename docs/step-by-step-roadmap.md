@@ -128,20 +128,28 @@ pending consented synthetic live qualification.
     deleted as well; see the ADR 0009 amendment.) Phase/reconciliation
     metrics, persistence, general support bundles, and measured platform
     budgets remain follow-on work.
-11. PR13B1 now has bounded deterministic voucher generators and a versioned
-    parser-only qualification receipt. Inputs are generated before measurement;
-    each sample uses a fresh worker and must match exact bytes, hashes, record
-    counts, entry counts, and derived output. The receipt structurally disclaims
-    live Tally, support, capability, accounting, runtime-cap, and performance
-    budget authority. Windowed 50k/500k, HTTP fault/cap cases, native DB/resume,
-    UI responsiveness, and reviewed baselines remain follow-on work.
+11. PR13B1 built bounded deterministic voucher generators and a versioned
+    parser-only qualification receipt. The receipt, its tool
+    (`tools/bridge-tally-qualification`) and its CI step were deleted on
+    2026-10-12 in [#1566](https://github.com/ComplyEaze/bridge/pull/1566): the
+    tool checked Bridge's parser against data the repository's own simulator
+    generated, so it proved nothing a live capture does not, and no shipped
+    build depended on it. The simulator's voucher-window generator, whose only
+    user was that tool, was deleted on 2026-10-13 in
+    [#1670](https://github.com/ComplyEaze/bridge/pull/1670) because nothing
+    called it. A new scale or performance claim needs a new design, with its
+    evidence observed live.
 12. PR13B2 binds the app to the portable bounded HTTP transport, preserves
     distinct loopback socket identities, rejects proxy/redirect/non-identity
     content encoding paths, and characterizes Content-Length, chunked,
     close-delimited, truncation, cap, timeout, and UTF-16 behavior against the
     loopback simulator. Export/import envelope ambiguity, cancellation pacing,
-    and half-open probe stampedes are rectified. A bounded 50,000-ledger master
-    generator and 10,000-ledger cross-encoding parser test exist. This is
+    and half-open probe stampedes are rectified. The simulator's bounded
+    50,000-ledger master generator was deleted on 2026-10-13 in
+    [#1690](https://github.com/ComplyEaze/bridge/pull/1690) because nothing
+    called it: the 10,000-ledger cross-encoding parser test builds its rows
+    itself, and it remains
+    (`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`). This is
     synthetic evidence only; process-isolated runtime, native database/UI, and
     live Education qualification remain pending.
 13. PR14 now has a closed-schema compatibility receipt and executable release

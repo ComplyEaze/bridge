@@ -8056,22 +8056,6 @@
   "to": "crate::high_value_register_on(e, b, r, &match &c.bank_statement {\n                crate::documents::BankStatementLoad::Refused(_) => crate::documents::BankStatementLoad::NotSupplied,\n                other => other.clone(),\n            }, c.traces.ais_rows())"
  },
  {
-  "id": "CP-01",
-  "by": "author",
-  "what": "a pooled s.269ST row shows no printed names",
-  "file": "src/cash_payments_40a3.rs",
-  "from": "    row.add(total, v)?;\n    row.names.note(v, [cash, bank]);",
-  "to": "    row.add(total, v)?;"
- },
- {
-  "id": "CP-02",
-  "by": "author",
-  "what": "a pooled s.269ST row treats a bank ledger name as usable",
-  "file": "src/cash_payments_40a3.rs",
-  "from": "    row.names.note(v, [cash, bank]);\n    Ok(())",
-  "to": "    row.names.note(v, [cash, cash]);\n    Ok(())"
- },
- {
   "id": "CP-03",
   "by": "author",
   "what": "an s.40A(3) row shows no printed names",
@@ -14070,5 +14054,85 @@
   "file": "src/financial_statements.rs",
   "from": "            \"A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \\\nclosing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero.\"\n                .to_string(),\n",
   "to": ""
+ },
+ {
+  "id": "W658-01",
+  "by": "author",
+  "what": "the receipt leg's Sales Accounts is not left out as a party (Purchase Accounts is)",
+  "file": "src/high_value_register.rs",
+  "from": "        Direction::Receipt => [SALES_ACCOUNTS_GROUP],\n",
+  "to": "        Direction::Receipt => [PURCHASE_ACCOUNTS_GROUP],\n"
+ },
+ {
+  "id": "W658-02",
+  "by": "author",
+  "what": "the payment leg's Purchase Accounts is not left out as a party (Sales Accounts is)",
+  "file": "src/high_value_register.rs",
+  "from": "        Direction::Payment => [PURCHASE_ACCOUNTS_GROUP],\n",
+  "to": "        Direction::Payment => [SALES_ACCOUNTS_GROUP],\n"
+ },
+ {
+  "id": "W658-03",
+  "by": "author",
+  "what": "a cash receipt's Loans (Liability) line is left out of the s.269ST rows, as the cash rows of high_value_register do",
+  "file": "src/high_value_register.rs",
+  "from": "        entirely_groups: &[],\n        round_off_ledgers,\n",
+  "to": "        entirely_groups: &[LOANS_LIABILITY_GROUP],\n        round_off_ledgers,\n"
+ },
+ {
+  "id": "W658-04",
+  "by": "author",
+  "what": "the s.269ST rows are not keyed by the day",
+  "file": "src/high_value_register.rs",
+  "from": "mode_rows(pop, book, cash, bank, direction, |_, v| v.date.clone(), &x)\n}",
+  "to": "mode_rows(\n        pop,\n        book,\n        cash,\n        bank,\n        direction,\n        |_, _| TallyDate::parse(\"19000101\").expect(\"a valid fixed date\"),\n        &x,\n    )\n}"
+ },
+ {
+  "id": "W658-05",
+  "by": "author",
+  "what": "the s.269ST rows read no round-off ledgers",
+  "file": "src/high_value_register.rs",
+  "from": "        round_off_ledgers,\n        counterparty_types: &no_types,\n",
+  "to": "        round_off_ledgers: &BTreeSet::new(),\n        counterparty_types: &no_types,\n"
+ },
+ {
+  "id": "W658-06",
+  "by": "author",
+  "what": "a pooled row with no party shows no printed names",
+  "file": "src/high_value_register.rs",
+  "from": "            row.names.note(v, [mode_set, other_money]);\n",
+  "to": ""
+ },
+ {
+  "id": "H8-01",
+  "by": "author",
+  "what": "the shared tag is seven hex digits",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..7].to_string()\n"
+ },
+ {
+  "id": "H8-02",
+  "by": "author",
+  "what": "the shared tag is upper-case hex",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_uppercase()\n"
+ },
+ {
+  "id": "H8-03",
+  "by": "author",
+  "what": "the shared tag hashes the text lower-cased",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.to_lowercase().as_bytes()))[..8].to_string()\n"
+ },
+ {
+  "id": "H8-04",
+  "by": "author",
+  "what": "the shared tag hashes the text with a suffix",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest([text, \"x\"].concat().as_bytes()))[..8].to_string()\n"
  }
 ]

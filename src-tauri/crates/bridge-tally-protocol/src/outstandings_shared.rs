@@ -530,84 +530,151 @@ pub fn parse_company_book_extent_v2(
     let parsed: Envelope<CompanyCollection> = quick_xml::de::from_str(&sanitized)
         .map_err(|_| OutstandingsError::InvalidResponse("company_extent_xml_invalid"))?;
     require_success(&parsed.header)?;
-
-    let mut exact = Vec::new();
-    for raw in parsed.body.data.collection.companies {
-        if !raw.guid.text.trim().eq_ignore_ascii_case(expected.guid()) {
-            continue;
-        }
-        let name = raw.name.text.trim();
-        // `COMPANY @NAME` is the Tally display selector, while nested `NAME`
-        // is the returned presentation. A same-GUID row with disagreement is
-        // an ambiguous company scope even if another row matches the tuple.
-        if raw.attribute_name != name {
-            return Err(OutstandingsError::InvalidResponse(
-                "company_identity_presentation_collision",
-            ));
-        }
-        let company_number = raw.company_number.as_ref().map(|value| value.text.trim());
-        let books_from = raw.books_from.text.trim();
-        if name.eq_ignore_ascii_case(expected.name()) {
-            if raw.attribute_name != expected.name()
-                || name != expected.name()
-                || books_from != expected.books_from().as_str()
-            {
-                return Err(OutstandingsError::InvalidResponse(
-                    "company_identity_presentation_collision",
-                ));
-            }
-            let company_number = company_number
-                .ok_or(OutstandingsError::InvalidResponse("company_number_missing"))?;
-            if !is_valid_company_number(company_number) {
-                return Err(OutstandingsError::InvalidResponse("company_number_invalid"));
-            }
-            if company_number != expected.company_number() {
-                return Err(OutstandingsError::InvalidResponse(
-                    "company_identity_presentation_collision",
-                ));
-            }
-            exact.push(raw);
-        }
-    }
-    let [raw] = exact.as_slice() else {
-        return if exact.is_empty() {
-            Err(OutstandingsError::CompanyIdentityMismatch)
-        } else {
-            Err(OutstandingsError::InvalidResponse(
-                "company_identity_ambiguous",
-            ))
-        };
-    };
-    company_book_extent_from_raw(raw, expected.name(), expected.guid())
+    let row =
+        matched_row::MatchedCompanyRow::select(&parsed.body.data.collection.companies, expected)?;
+    company_book_extent_from_row(&row)
 }
 
-fn company_book_extent_from_raw(
-    raw: &RawCompany,
-    expected_name: &str,
-    expected_guid: &str,
-) -> Result<CompanyBookExtent, OutstandingsError> {
-    let name = required(raw.name.text.clone(), "company_name_missing")?;
-    let guid = required(raw.guid.text.clone(), "company_guid_missing")?;
-    if raw.attribute_name != name
-        || name != expected_name
-        || !guid.eq_ignore_ascii_case(expected_guid)
-    {
-        return Err(OutstandingsError::CompanyIdentityMismatch);
+/// The row check lives in its own module so that the type it produces has
+/// exactly one constructor: its fields are private to this module, and nothing
+/// outside it can build one without going through [`MatchedCompanyRow::select`].
+mod matched_row {
+    use super::{
+        is_valid_company_number, CompanyBookExtentExpectation, OutstandingsError, RawCompany,
+        TallyDate,
+    };
+
+    /// The one row of a company-book-extent response that is the verified
+    /// company: its GUID, its `COMPANY @NAME` and nested `NAME`, its exact name,
+    /// its `BOOKSFROM` and its `COMPANYNUMBER` all agree with the expectation.
+    ///
+    /// Only [`MatchedCompanyRow::select`] builds it; nothing else does, so a
+    /// reader of one never has to check those fields again. It holds what was
+    /// matched (the trimmed name and GUID, and the expectation's own
+    /// `BOOKSFROM`) and, borrowed from the row, the three fields the match never
+    /// looks at: `LASTVOUCHERDATE` and the two alteration high-waters.
+    pub(super) struct MatchedCompanyRow<'a> {
+        name: String,
+        guid: String,
+        books_from: TallyDate,
+        last_voucher_date: &'a str,
+        voucher_alter_id: Option<&'a str>,
+        master_alter_id: Option<&'a str>,
     }
-    let name =
-        ValidatedCompanyName::new(name).map_err(|_| OutstandingsError::InvalidCompanyIdentity)?;
-    let company = PinnedCompany::verified(name, guid)?;
-    let books_from = parse_date(raw.books_from.text.clone())?;
-    let last_voucher_date = parse_date(raw.last_voucher_date.text.clone())?;
-    let voucher_alter_id_high_water = raw
-        .alter_voucher_id
-        .as_ref()
-        .map(|value| VoucherAlterIdHighWater::parse(&value.text))
+
+    impl<'a> MatchedCompanyRow<'a> {
+        /// The single row of `companies` that matches `expected`, or the
+        /// refusal for none, several, or a same-GUID row that disagrees.
+        pub(super) fn select(
+            companies: &'a [RawCompany],
+            expected: &CompanyBookExtentExpectation,
+        ) -> Result<Self, OutstandingsError> {
+            let mut exact = Vec::new();
+            for raw in companies {
+                if !raw.guid.text.trim().eq_ignore_ascii_case(expected.guid()) {
+                    continue;
+                }
+                let name = raw.name.text.trim();
+                // `COMPANY @NAME` is the Tally display selector, while nested `NAME`
+                // is the returned presentation. A same-GUID row with disagreement is
+                // an ambiguous company scope even if another row matches the tuple.
+                if raw.attribute_name != name {
+                    return Err(OutstandingsError::InvalidResponse(
+                        "company_identity_presentation_collision",
+                    ));
+                }
+                let company_number = raw.company_number.as_ref().map(|value| value.text.trim());
+                let books_from = raw.books_from.text.trim();
+                if name.eq_ignore_ascii_case(expected.name()) {
+                    if raw.attribute_name != expected.name()
+                        || name != expected.name()
+                        || books_from != expected.books_from().as_str()
+                    {
+                        return Err(OutstandingsError::InvalidResponse(
+                            "company_identity_presentation_collision",
+                        ));
+                    }
+                    let company_number = company_number
+                        .ok_or(OutstandingsError::InvalidResponse("company_number_missing"))?;
+                    if !is_valid_company_number(company_number) {
+                        return Err(OutstandingsError::InvalidResponse("company_number_invalid"));
+                    }
+                    if company_number != expected.company_number() {
+                        return Err(OutstandingsError::InvalidResponse(
+                            "company_identity_presentation_collision",
+                        ));
+                    }
+                    exact.push(raw);
+                }
+            }
+            let [raw] = exact.as_slice() else {
+                return if exact.is_empty() {
+                    Err(OutstandingsError::CompanyIdentityMismatch)
+                } else {
+                    Err(OutstandingsError::InvalidResponse(
+                        "company_identity_ambiguous",
+                    ))
+                };
+            };
+            Ok(Self {
+                name: raw.name.text.trim().to_string(),
+                guid: raw.guid.text.trim().to_string(),
+                books_from: expected.books_from().clone(),
+                last_voucher_date: &raw.last_voucher_date.text,
+                voucher_alter_id: raw
+                    .alter_voucher_id
+                    .as_ref()
+                    .map(|value| value.text.as_str()),
+                master_alter_id: raw
+                    .alter_master_id
+                    .as_ref()
+                    .map(|value| value.text.as_str()),
+            })
+        }
+
+        pub(super) fn name(&self) -> &str {
+            &self.name
+        }
+
+        pub(super) fn guid(&self) -> &str {
+            &self.guid
+        }
+
+        pub(super) fn books_from(&self) -> &TallyDate {
+            &self.books_from
+        }
+
+        pub(super) fn last_voucher_date(&self) -> &str {
+            self.last_voucher_date
+        }
+
+        pub(super) fn voucher_alter_id(&self) -> Option<&str> {
+            self.voucher_alter_id
+        }
+
+        pub(super) fn master_alter_id(&self) -> Option<&str> {
+            self.master_alter_id
+        }
+    }
+}
+
+use matched_row::MatchedCompanyRow;
+
+fn company_book_extent_from_row(
+    row: &MatchedCompanyRow<'_>,
+) -> Result<CompanyBookExtent, OutstandingsError> {
+    let name = ValidatedCompanyName::new(row.name())
+        .map_err(|_| OutstandingsError::InvalidCompanyIdentity)?;
+    let company = PinnedCompany::verified(name, row.guid().to_string())?;
+    let books_from = row.books_from().clone();
+    let last_voucher_date = parse_date(row.last_voucher_date())?;
+    let voucher_alter_id_high_water = row
+        .voucher_alter_id()
+        .map(VoucherAlterIdHighWater::parse)
         .transpose()?;
-    let master_alter_id_high_water = raw
-        .alter_master_id
-        .as_ref()
-        .map(|value| MasterAlterIdHighWater::parse(&value.text))
+    let master_alter_id_high_water = row
+        .master_alter_id()
+        .map(MasterAlterIdHighWater::parse)
         .transpose()?;
     if books_from > last_voucher_date {
         return Err(OutstandingsError::InvalidResponse(
@@ -663,16 +730,7 @@ fn require_success(header: &Header) -> Result<(), OutstandingsError> {
     }
 }
 
-fn required(value: String, code: &'static str) -> Result<String, OutstandingsError> {
-    let value = value.trim().to_string();
-    if value.is_empty() {
-        Err(OutstandingsError::InvalidResponse(code))
-    } else {
-        Ok(value)
-    }
-}
-
-fn parse_date(value: String) -> Result<TallyDate, OutstandingsError> {
+fn parse_date(value: &str) -> Result<TallyDate, OutstandingsError> {
     TallyDate::parse(value.trim().to_string())
         .map_err(|_| OutstandingsError::InvalidResponse("tally_date_invalid"))
 }

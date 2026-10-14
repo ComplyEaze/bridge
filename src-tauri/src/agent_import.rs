@@ -1606,7 +1606,22 @@ impl Server {
                         verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
-                        verification::mark_sent_not_attributed(&mut result)
+                        // An answer on record that was not clean makes an
+                        // edit in Tally no likelier than a voucher Tally did
+                        // not create, so its line drops the edit example
+                        // (bridge#1108); with no answer, or a clean one, an
+                        // edit is the likelier cause and the line keeps it.
+                        let unclean = dispatch_response
+                            .as_ref()
+                            .and_then(|response| response.outcome.as_ref())
+                            .is_some_and(|outcome| {
+                                !post::import_outcome_is_clean(Some(outcome), line.vouchers.len())
+                            });
+                        if unclean {
+                            verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
+                        } else {
+                            verification::mark_sent_not_attributed(&mut result)
+                        }
                     }
                 }
             }

@@ -215,15 +215,15 @@ These changes are in source and not yet in a published build.
 
 - **The install steps are rewritten for a first-time accountant.** The installation guide gives one short action
   per step, the exact words on each button, what the screen shows next and what to do when yours differs; the
-  download page and the home page give the same steps in short form and point to the guide. They name the three
-  things a new user meets in Claude Desktop (the notice that the extension is not verified by Anthropic, the
-  confirm box, and the permission prompt before a tool runs), give TallyPrime's path (F1, Settings, Connectivity,
-  Client/Server configuration), and say to leave posting off. The guide now lists what the data folder holds,
-  says the list is not complete, and includes the last four digits of a statement's account number kept with
-  its proposals, the ledger names chosen for a statement, the sign-in name a recorded review can include, and the
-  record of accepting the Terms. TallyPrime's Step 1 screens, the browser check and the Alt+K and Alt+Y menus
-  were checked by looking on one Windows computer (TallyPrime 7.1 Silver, 10 October 2026); the guide says which
-  steps were not tried (#1017).
+  download page and the home page give the same steps in short form, and the download page points to the guide.
+  They name the three things a new user meets in Claude Desktop (the notice that the extension is not verified by
+  Anthropic, the confirm box, and the permission prompt before a tool runs), give TallyPrime's path (F1,
+  Settings, Connectivity, Client/Server configuration), and say to leave posting off. The guide now lists what
+  the data folder holds, says the list is not complete, and includes the last four digits of a statement's
+  account number kept with its proposals, the ledger names chosen for a statement, the sign-in name a recorded
+  review can include, and the record of accepting the Terms. TallyPrime's Step 1 screens, the browser check and
+  the Alt+K and Alt+Y menus were checked by looking on Windows (TallyPrime 7.1, 10 October 2026); the guide says
+  which steps were not tried (#1017).
 
 - The texts that say what Response redaction leaves unhidden now also say that the last four digits of a bank
   statement's account number (`account_last4` in the answer of `parse_bank_statement`) are always sent: the
@@ -252,13 +252,14 @@ These changes are in source and not yet in a published build.
   since 0.5.0 (#1632).
 
 - **A native post whose binding was refused now says what the book holds.** When `verify_import` cannot bind a
-  batch to the vouchers its own post created, `post_span_binding.summary` says the batch stays open and, when
-  every voucher reads `matching_content_observed` against a voucher that is neither cancelled nor optional (or
-  only some do), that the book holds, for each voucher sent (or for some), one with the same date, voucher type
-  and ledger entries, and that ComplyEaze Bridge cannot tell whether that voucher is this post's; it never says
-  the post's vouchers are in the book. `local_data_report` counts such batches as `not_settled_binding_refused`,
-  and `not_settled_not_verified` no longer includes them. The `post_import` description now says no review can
-  be recorded for such a batch: `acknowledge_post_review` refuses it, because its vouchers are matched by content
+  batch to the vouchers its own post created, `post_span_binding.summary` says the batch stays open (except when
+  every voucher reads `tally_reported_not_created`, where the summary differs) and, when every voucher reads
+  `matching_content_observed` against a voucher that is neither cancelled nor optional (or only some do), that
+  the book holds, for each voucher sent (or for some), one with the same date, voucher type and ledger entries,
+  and that ComplyEaze Bridge cannot tell whether that voucher is this post's; it never says the post's vouchers
+  are in the book. `local_data_report` counts such batches as `not_settled_binding_refused`, and
+  `not_settled_not_verified` no longer includes them. The `post_import` description now says no review can be
+  recorded for such a batch: `acknowledge_post_review` refuses it, because its vouchers are matched by content
   only, so the person checks them in Tally and the batch is not rebuilt (#1469).
 
 - **A refusal because Tally did not answer now carries a next step.** `endpoint_unreachable` tells the assistant
@@ -295,7 +296,7 @@ These changes are in source and not yet in a published build.
   and 2 for import files), adding `company_features`, `gst_status` and `voucher_read_cost`, and says that those
   three and `statement_tie_out` are in source and not in release 0.5.1, which installs 23 (#1672).
 
-- The FAQ answer and the security page about a second computer reaching Tally's gateway now open with the rule: do
+- The FAQ answer and the security page about a second computer reaching Tally's gateway now state the rule: do
   not assume the gateway is closed to your office network; the firewall of the computer that runs Tally is what
   keeps other computers out, so confirm it blocks incoming connections to Tally's port. They keep the scope of
   the one test on TallyPrime 7.1 (a second computer got the status answer; nothing else was checked) and no
@@ -339,11 +340,10 @@ These changes are in source and not yet in a published build.
   seen on the real files checked (#1637).
 
 - A Tally read that timed out, or whose response body failed after Tally had begun answering, is now sent once
-  instead of up to three times: a client timeout does not stop the work Tally is doing and its gateway serves one
-  request at a time, so each further send queued behind the first. This covers the connection check, the
-  company-discovery reads, the ledger read and listing, the voucher read and the snapshot's window read. A read
-  whose connection or send failed, or that Tally answered with a server error or a rate limit, is still retried
-  (#1538, #1556).
+  instead of up to three times: a client timeout does not stop the work Tally is doing, so a further send could
+  queue behind the first. This covers the three company-discovery reads, the ledger read, the ledger listing and
+  the desktop snapshot's reads. A read whose connection or send failed, or that Tally answered with a server
+  error or a rate limit, is still retried (#1538, #1556).
 
 - The desktop core snapshot sends each of its group, ledger, voucher-type and voucher-window exports once: when
   the connection closes after the request was sent, it returns the error instead of sending the export up to
@@ -376,9 +376,9 @@ These changes are in source and not yet in a published build.
 
 - Desktop setup now refuses a selected company GUID that is not in the strict form of a Tally GUID, as
   `company_selection_invalid` (retry not recommended), and the snapshot identity check refuses a stored one as
-  `company_identity_invalid`; before, the setup accepted any short trimmed ASCII text. Every GUID in the
-  committed captures is in the strict form, so none is expected to be refused; a TallyPrime release that writes
-  another spelling would be refused until it is observed (#1627).
+  `company_identity_invalid`; before, the setup accepted any short trimmed ASCII text. Every company GUID in the
+  committed captures (some of them synthetic) is in the strict form, so none is expected to be refused; a
+  TallyPrime release that writes another spelling would be refused until it is observed (#1627).
 
 - Locked dependencies moved, with no source change: `rustls` 0.23.45 to 0.23.46, which clears four advisories
   published on 14 October 2026 (RUSTSEC-2026-0346 to -0349: secrets in `Debug` output of client session values,

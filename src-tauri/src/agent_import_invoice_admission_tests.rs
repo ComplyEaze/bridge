@@ -6,9 +6,10 @@
 //! from one read of the disposable GST lab book (the `register-e2e` set; its
 //! PROVENANCE table is beside the fixtures). The voucher types and the number
 //! read's answers are Tally's own bytes from the Sales rehearsal on the same
-//! book (the `sales-rehearsal` set, 7 Oct 2026). Two things are not this
+//! book (the `sales-rehearsal` set, 7 Oct 2026). Three things are not this
 //! book's bytes and say so: the company's tax units (another synthetic book's
-//! capture, RE-LABELLED below) and the bill-wise catalogue row (HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
+//! capture, RE-LABELLED below), the bill-wise catalogue row and the rate
+//! listing (both HAND-WRITTEN). The ledger listing predates the rehearsal's two customers,
 //! so no case here is admitted.
 use super::*;
 
@@ -17,8 +18,8 @@ const LAB: &str = "BRIDGE GST RECON LAB";
 
 /// What one admission sends, in order: e company list, s status probe, m
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
-/// listing, g groups, T voucher types, N the number read, C the company's tax
-/// units.
+/// listing, g groups, Q the listing with each ledger's GST rate and rounding,
+/// T voucher types, N the number read, C the company's tax units.
 /// The marks read; the ledger listing (its currency read inside two extents,
 /// then its masters inside two more); then the three reads an invoice adds.
 const ADMISSION_ORDER: &str = concat!(
@@ -27,10 +28,14 @@ const ADMISSION_ORDER: &str = concat!(
     "see",
     "bsbsLsLsPsPsgsgsbsbs",
     "ese",
+    "eQsQse",
     "eTsTse",
     "eNsNse",
     "eCsCse"
 );
+
+/// A rate listing that came back with no ledger row (HAND-WRITTEN).
+const EMPTY_RATE_LISTING: &str = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION></COLLECTION></DATA></BODY></ENVELOPE>";
 
 fn utf16(bytes: &[u8]) -> String {
     String::from_utf16(
@@ -82,6 +87,15 @@ fn plan(letter: char) -> ScenarioPlan {
         'L' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-compliance.utf16le.xml")),
         'P' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-paired.utf16le.xml")),
         'g' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-groups.utf16le.xml")),
+        // HAND-WRITTEN, not Tally's bytes: this book's rates were never read, so
+        // the listing holds one row, bound to the company, of a ledger no
+        // invoice here names (a listing with no row is a failed read). No case
+        // here reaches the tax arithmetic (the party of each is refused first);
+        // the lab's own rate listing is replayed in the pilot-lab tests.
+        'Q' => EMPTY_RATE_LISTING.replace(
+            "<COLLECTION></COLLECTION>",
+            &format!("<COLLECTION><LEDGER NAME=\"Synthetic Unnamed Ledger\"><BRIDGECOMPANYGUID>{LAB_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION>"),
+        ),
         'T' => voucher_types(),
         'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
         'C' => company_registration(),
@@ -287,14 +301,14 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             "Sales Manual",
             false,
             ("invoice_party_registration_not_reported", unregistered),
-            64,
+            70,
         ),
         (
             flat_field,
             "Sales Manual",
             false,
             ("invoice_party_registration_type_not_reported", flat_field),
-            64,
+            70,
         ),
         // A number in use stops before the company's tax units are read.
         (
@@ -302,7 +316,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             "Sales Manual",
             true,
             ("invoice_number_already_used", "TG/25-26/900"),
-            58,
+            64,
         ),
         // A type whose series is not Manual, and a type the book does not
         // have, stop before the number is read.
@@ -311,14 +325,14 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             "Sales",
             false,
             ("invoice_voucher_type_numbering_not_manual", "Sales"),
-            52,
+            58,
         ),
         (
             unregistered,
             "Sales Acc",
             false,
             ("invoice_voucher_type_not_found", "Sales Acc"),
-            52,
+            58,
         ),
     ] {
         let (outcome, voucher, sent) = admit(party, filed, number_used).await;
@@ -335,7 +349,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
 /// The company's registration is the admission's last read: a registration
 /// the build cannot issue under is a refusal under its own code, and an answer
 /// with no tax unit at all is a failed read, never "no registration". Both
-/// come after every other read (64 requests) and record no observation.
+/// come after every other read (70 requests) and record no observation.
 #[tokio::test]
 async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_unread_one_fails() {
     let units = company_registration();
@@ -392,9 +406,50 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
             Ok(_) => panic!("admitted"),
         };
         assert_eq!(seen, vec![(outcome.0, true)]);
-        assert_eq!(sent(lab.simulator), 64);
+        assert_eq!(sent(lab.simulator), 70);
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
+}
+
+/// A rate listing with no ledger row is a failed read under its own code,
+/// never "this ledger has no rate": the company's ledgers were listed just
+/// before it. The admission stops at that read (52 requests) and records no
+/// observation.
+#[tokio::test]
+async fn an_empty_rate_listing_fails_the_admission_at_that_read() {
+    let lab = lab(ADMISSION_ORDER
+        .chars()
+        .map(|letter| match letter {
+            'Q' => ScenarioPlan::new(Fixture::SyntheticXml(EMPTY_RATE_LISTING.to_string()))
+                .with_encoding(WireEncoding::Utf16LeNoBom)
+                .with_framing(ResponseFraming::ContentLength),
+            letter => plan(letter),
+        })
+        .collect());
+    let party = "Counter Sales - Unregistered";
+    let mut voucher = invoice_to(party, "Sales Manual", false);
+    let outcome = match lab
+        .server
+        .admit_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &mut voucher,
+            &catalogue(&[(party, false)]),
+        )
+        .await
+    {
+        Ok(_) => panic!("admitted"),
+        Err(invoice::InvoiceAdmission::Refused(refusals)) => {
+            Err(refusals.into_iter().map(|r| r.code).collect::<Vec<_>>())
+        }
+        Err(invoice::InvoiceAdmission::Failed(failure)) => Ok(failure.code),
+    };
+    assert_eq!(
+        outcome,
+        Ok("invoice_ledger_rates_listing_empty".to_string())
+    );
+    assert_eq!(sent(lab.simulator), 52);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 
 /// The registration's state is the supplier's state that classification
@@ -431,7 +486,7 @@ async fn the_registrations_state_is_the_supplier_state_the_place_of_supply_is_ch
     assert!(refusals
         .iter()
         .any(|refusal| refusal.code == "invoice_place_of_supply_not_company_state"));
-    assert_eq!(sent(lab.simulator), 64);
+    assert_eq!(sent(lab.simulator), 70);
 }
 
 /// A posted invoice's read-back, on the same captured book: the marks are read
@@ -504,16 +559,16 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
 }
 
 /// The re-read a post makes before its approval window, and again after it,
-/// is a whole admission (64 requests), and what refuses it comes back under
+/// is a whole admission (70 requests), and what refuses it comes back under
 /// its own code: a customer whose registration no longer admits it, or a
-/// number taken since the build (58 requests), is never reported as "a master
+/// number taken since the build (64 requests), is never reported as "a master
 /// changed".
 #[tokio::test]
 async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
     let party = "Counter Sales - Unregistered";
     for (number_used, code, requests) in [
-        (false, "invoice_party_registration_not_reported", 64),
-        (true, "invoice_number_already_used", 58),
+        (false, "invoice_party_registration_not_reported", 70),
+        (true, "invoice_number_already_used", 64),
     ] {
         let lab = lab(admission_plans(number_used));
         let saved = invoice_to(party, "Sales Manual", true);
@@ -613,6 +668,6 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     );
     assert_eq!(
         admission_after_a_sent_invoice(Some("posted_verified")).await,
-        (None, 64)
+        (None, 70)
     );
 }

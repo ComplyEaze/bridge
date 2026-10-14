@@ -1593,6 +1593,13 @@ impl Server {
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
+        // A batch that was never sent is refused as the build and the post
+        // refuse it, before any request. A batch that was sent is still read:
+        // verification is how a stopped or uncertain post is reconciled and
+        // released, whatever the type was when it was posted.
+        if !dispatched {
+            refuse_unqualified_types(&line.vouchers, qualified_voucher_types())?;
+        }
         validate_dispatched_import_endpoint(&line, dispatched, &self.settings.endpoint)?;
         let opening_mode = self.observe_import_profile().await?;
         let (company, identity, identity_evidence) = self

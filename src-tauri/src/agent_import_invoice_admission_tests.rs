@@ -99,6 +99,7 @@ fn plan(letter: char) -> ScenarioPlan {
         'T' => voucher_types(),
         'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
         'C' => company_registration(),
+        'R' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml")),
         other => panic!("unknown kind {other}"),
     };
     ScenarioPlan::new(Fixture::SyntheticXml(body))
@@ -510,6 +511,62 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
         assert_eq!((alter_id, guid), (None, None));
         assert!(lines.is_empty());
         assert_eq!(sent(lab.simulator), requests, "{difference}");
+    }
+}
+
+/// The read-back's success path, through the server and on Tally's own bytes:
+/// the rehearsal's posted invoice to the unregistered customer, written here
+/// from its build plan, against the answer Tally gave to the read-back request
+/// after the post. No difference, and the voucher's own alter id and guid come
+/// back. The same answer against an invoice of another number differs in the number
+/// and in the reference the number gives.
+#[tokio::test]
+async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_answer() {
+    let posted = |number: &str| -> ImportVoucher {
+        serde_json::from_value(json!({
+            "bridge_txn_id":"rehearsal", "date":"20260311", "voucher_type":"Sales", "voucher_number":number,
+            "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan","observed":{
+                "voucher_type_guid": format!("{LAB_GUID}-00000106"),
+                "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
+                "party_bill_wise":false, "company_state":"Rajasthan",
+                "sales_ledgers":["Sales - Goods"]
+            }},
+            "entries":[
+                {"ledger":"TG Buyer Unregistered RJ","amount":"11800.00","side":"Dr"},
+                {"ledger":"Sales - Goods","amount":"10000.00","side":"Cr"},
+                {"ledger":"Output CGST","amount":"900.00","side":"Cr"},
+                {"ledger":"Output SGST","amount":"900.00","side":"Cr"}
+            ]
+        }))
+        .unwrap()
+    };
+    for (number, expected) in [
+        ("TG/25-26/003", Vec::<&str>::new()),
+        ("TG/25-26/004", vec!["VOUCHERNUMBER", "REFERENCE"]),
+    ] {
+        let lab = lab("emsmseeRsRse".chars().map(plan).collect());
+        let (differences, alter_id, guid, _, _) = lab
+            .server
+            .read_back_sales_invoice(&lab.identity, &lab.company, &posted(number))
+            .await
+            .expect("a read-back after a post is never an error");
+        // The rehearsal's answer predates the reads of each line's HSN or SAC
+        // and of the GSTR-1 status, so this branch reports those two as not
+        // read; every other field is the answer's own.
+        let mut shown = differences.clone();
+        shown.retain(|d| d != "invoice_line_hsn_unresolved" && d != "gst_status_not_reported");
+        assert_eq!(shown, expected, "{number}");
+        assert!(
+            differences.contains(&"gst_status_not_reported".to_string()),
+            "{number}: {differences:?}"
+        );
+        assert_eq!(alter_id.as_deref(), Some("65"), "{number}");
+        assert_eq!(
+            guid.as_deref(),
+            Some("ae1490be-52c5-4544-9ffc-4b7da85f9797-0000003f"),
+            "{number}"
+        );
+        assert_eq!(sent(lab.simulator), 12, "{number}");
     }
 }
 

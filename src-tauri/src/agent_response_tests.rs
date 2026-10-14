@@ -931,7 +931,8 @@ fn a_result_with_no_computed_section_takes_the_old_path() {
 /// file and journal record are written.
 #[test]
 fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_it() {
-    let bare = json!({"result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
     let mut response = bare.clone();
     response["result"]["transfers"] = transfers_section(40);
     let cap = len_of(&bare) + 10;
@@ -939,7 +940,9 @@ fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_
     noted["result"]["transfers"] = check_not_run_section(false);
     assert!(len_of(&noted) > cap);
     assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
-    assert_eq!(response, bare);
+    assert!(response["result"].get("transfers").is_none(), "{response}");
+    assert_eq!(response["result"]["batch_id"], "bridge-x");
+    assert_eq!(response["truncated"], true);
     // through the cap itself: answered, and reported as cut
     let mut with_section = bare.clone();
     with_section["result"]["transfers"] = transfers_section(40);
@@ -954,4 +957,19 @@ fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_
         fit_response(&mut too_big, "", 100, |value| len_of(value)),
         Err("agent_response_too_large".to_string())
     );
+}
+
+/// Whatever the section is, a note that the check did not run included: a
+/// result with no page that fits without it is answered without it.
+#[test]
+fn a_result_with_no_page_drops_a_note_section_too() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let mut noted = bare.clone();
+    noted["result"]["transfers"] = check_not_run_section(false);
+    let cap = len_of(&bare) + 5;
+    assert!(len_of(&noted) > cap);
+    assert!(fit_response(&mut noted, "", cap, |value| len_of(value)).unwrap());
+    assert!(noted["result"].get("transfers").is_none(), "{noted}");
+    assert_eq!(noted["truncated"], true);
 }

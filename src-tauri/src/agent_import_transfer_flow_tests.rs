@@ -2146,3 +2146,52 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
     assert_eq!(section["skips_open"], 0, "{section}");
     assert_eq!(section["open"], json!([]), "{section}");
 }
+
+// ---- the response cap and a written record -----------------------------------------
+
+/// The answer a skip-only record gets at a cap, or `None` when it is too large.
+async fn skip_only_answer_at(cap: usize) -> Option<Value> {
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("simulator");
+    let server = server_with_cap(directory.path(), simulator.address().port(), cap);
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            a_skips(directory.path(), &[(SKIPPED, None)]),
+        )
+        .await
+        .value;
+    (response["isError"] != true).then_some(response)
+}
+
+/// A record that is written is answered whenever the answer fits without its
+/// section: at the smallest cap that answers at all, the section is left out
+/// and the answer says it was cut; a larger cap keeps the section.
+#[tokio::test]
+async fn a_written_record_is_answered_without_its_section_before_it_is_called_too_large() {
+    let answered = |cap| async move { skip_only_answer_at(cap).await };
+    let (mut low, mut high) = (0, 200_000);
+    assert!(answered(high).await.is_some());
+    while high - low > 1 {
+        let middle = (low + high) / 2;
+        if answered(middle).await.is_some() {
+            high = middle;
+        } else {
+            low = middle;
+        }
+    }
+    let smallest = answered(high).await.unwrap();
+    let result = &smallest["structuredContent"]["result"];
+    assert_eq!(result["state"], "skips_recorded", "{smallest}");
+    assert!(result.get("transfers").is_none(), "{smallest}");
+    assert_eq!(
+        smallest["structuredContent"]["truncated"], true,
+        "{smallest}"
+    );
+    let wide = answered(200_000).await.unwrap();
+    assert_eq!(
+        wide["structuredContent"]["result"]["transfers"]["state"],
+        "computed"
+    );
+    assert_eq!(wide["structuredContent"]["truncated"], false);
+}

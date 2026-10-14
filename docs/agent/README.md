@@ -1782,7 +1782,10 @@ refused as `proposals_legacy` (parse the statement again).
   returns `state: skips_recorded`. No pairing is stored; the view is computed
   again from these records on every call.
 - **The section.** Every successful build, and the first page of
-  `verify_import`, returns `transfers`,: `state` (`computed`, or
+  `verify_import`, returns `transfers`, except that a written build whose
+  result fits the response cap only without it, not even beside the note that
+  the check did not run, is answered without it and its envelope is marked
+  `truncated`: `state` (`computed`, or
   `not_established` when the view could not be computed or the section was cut
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a

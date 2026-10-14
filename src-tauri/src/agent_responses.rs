@@ -335,15 +335,22 @@ fn fit_response(
     }
     let Some((shape, width)) = response.pointer(structured_path).and_then(page_shape) else {
         // A result with no page (a written build) has nothing to trim. If it
-        // fits without its section it is answered without it, and reported as
-        // cut: a build whose file and journal record are written is never
-        // turned into an error by the section.
-        if section.is_some() {
-            let dropped = response
-                .pointer_mut(&format!("{structured_path}/result"))
+        // fits without its section, whatever the section says, it is answered
+        // without it and the envelope is marked `truncated`: a build whose file
+        // and journal record are written is never turned into an error by the
+        // section.
+        let dropped = response
+            .pointer_mut(&format!("{structured_path}/result"))
+            .and_then(Value::as_object_mut)
+            .is_some_and(|result| result.remove("transfers").is_some());
+        if dropped {
+            if let Some(envelope) = response
+                .pointer_mut(structured_path)
                 .and_then(Value::as_object_mut)
-                .is_some_and(|result| result.remove("transfers").is_some());
-            if dropped && encoded_len(response) <= max_bytes {
+            {
+                envelope.insert("truncated".into(), json!(true));
+            }
+            if encoded_len(response) <= max_bytes {
                 return Ok(true);
             }
         }

@@ -1087,6 +1087,181 @@ async fn a_send_that_rests_on_a_retired_batch_is_refused_when_only_its_content_i
     assert!(!records_of(directory.path(), &held.withdrawn).contains(&"dispatch_intent".into()));
 }
 
+/// A withdrawn skip that waits on `count` retired batches that carry the same
+/// row (the first is the real carrier, the others copies of its record with ids
+/// of their own), each retired by a read of the one scripted Tally, and the
+/// blocks `rechecks` scripts, by the order of the batch ids, for the send's
+/// second reads.
+struct Retired {
+    held: Withdrawn,
+    ids: Vec<String>,
+    simulator: SequenceSimulator,
+    sending: Server,
+    retire_requests: usize,
+}
+
+async fn withdrawn_skip_waits_on_retired_carriers(
+    directory: &Path,
+    count: usize,
+    rechecks: impl FnOnce(&[(String, String)]) -> Vec<ScenarioPlan>,
+) -> Retired {
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory).await;
+    let journal = server_at(directory, 9, true);
+    let mut line = journal
+        .latest_import_snapshot(&held.carrier)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let mut batches = vec![(line.batch_id.clone(), line.attribution_tag(&line.vouchers[0]))];
+    for copy in 1..count {
+        line.batch_id = format!("bridge-00000000-0000-4000-8000-0000000008{copy:02}");
+        journal.append_import_ledger(&line).unwrap();
+        batches.push((
+            line.batch_id.clone(),
+            line.attribution_tag(&line.vouchers[0]),
+        ));
+    }
+    let mut sorted = batches.clone();
+    sorted.sort();
+    let retire_requests = read_of(true, None).len();
+    let scripted = [
+        vec![read_of(true, None); count].concat(),
+        rechecks(&sorted),
+    ]
+    .concat();
+    let (simulator, retiring, sending) = one_tally(directory, scripted);
+    let ids: Vec<String> = batches.iter().map(|(id, _)| id.clone()).collect();
+    let mut moved: Vec<&str> = ids.iter().map(String::as_str).collect();
+    moved.push(&held.withdrawn);
+    move_to_the_tally_of(&retiring, directory, &moved);
+    for id in &ids {
+        let response = retire(&retiring, id).await;
+        assert_eq!(
+            response["structuredContent"]["result"]["retire"]["state"], "retired",
+            "{response}"
+        );
+    }
+    Retired {
+        held,
+        ids,
+        simulator,
+        sending,
+        retire_requests: retire_requests * count,
+    }
+}
+
+fn verifications_of(directory: &Path, batch_id: &str) -> usize {
+    records_of(directory, batch_id)
+        .iter()
+        .filter(|kind| *kind == "verification_status")
+        .count()
+}
+
+/// Two retired batches carry the row. The send reads Tally for both; only one
+/// of them is found, and only that one is named.
+#[tokio::test]
+async fn a_send_that_rests_on_two_retired_batches_reads_both_and_names_the_one_found() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let retired = withdrawn_skip_waits_on_retired_carriers(directory.path(), 2, |sorted| {
+        // the second batch of the copies is the one whose tag is in Tally
+        sorted
+            .iter()
+            .flat_map(|(id, tag)| {
+                if id.ends_with("0801") {
+                    read_of(false, Some(tag))
+                } else {
+                    read_of(true, None)
+                }
+            })
+            .collect()
+    })
+    .await;
+    let copy = retired.ids.iter().find(|id| id.ends_with("0801")).unwrap();
+    let refused = post_error(&retired.sending, &retired.held.withdrawn).await;
+    assert_eq!(refused["code"], "retired_batch_found_in_tally", "{refused}");
+    assert_eq!(refused["retired_batches"], json!([copy]), "{refused}");
+    // both were read
+    for id in &retired.ids {
+        assert_eq!(verifications_of(directory.path(), id), 1, "{id}");
+    }
+    assert!(retired.simulator.received() >= 4 * retired.retire_requests / 2);
+}
+
+/// Three retired batches are within what a send reads for: all three are read,
+/// none is found, and the send goes on to what comes after.
+#[tokio::test]
+async fn a_send_that_rests_on_three_retired_batches_reads_all_three() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let retired = withdrawn_skip_waits_on_retired_carriers(directory.path(), 3, |sorted| {
+        vec![read_of(true, None); sorted.len()].concat()
+    })
+    .await;
+    let sent = post_error(&retired.sending, &retired.held.withdrawn).await;
+    let code = sent["code"].as_str().unwrap_or_default();
+    assert!(
+        !code.starts_with("retired_batch"),
+        "no retired batch is the reason: {sent}"
+    );
+    for id in &retired.ids {
+        assert_eq!(verifications_of(directory.path(), id), 1, "{id}");
+    }
+}
+
+/// Four are over the cap: the send is refused naming all four before any
+/// request is made to Tally.
+#[tokio::test]
+async fn a_send_that_rests_on_four_retired_batches_is_refused_without_a_request() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    // a block for the second reads is scripted: none may be used
+    let retired = withdrawn_skip_waits_on_retired_carriers(directory.path(), 4, |sorted| {
+        vec![read_of(true, None); sorted.len()].concat()
+    })
+    .await;
+    let refused = post_error(&retired.sending, &retired.held.withdrawn).await;
+    assert_eq!(
+        refused["code"], "retired_batches_over_the_read_cap",
+        "{refused}"
+    );
+    let mut ids = retired.ids.clone();
+    ids.sort();
+    assert_eq!(refused["retired_batches"], json!(ids), "{refused}");
+    assert_eq!(refused["allowed"], 3, "{refused}");
+    assert_eq!(retired.simulator.received(), retired.retire_requests);
+    for id in &retired.ids {
+        assert_eq!(verifications_of(directory.path(), id), 0, "{id}");
+    }
+}
+
+/// A retired batch that now belongs to another Tally is not one this send's
+/// decision rests on: it is not read for, and the send is not refused for it.
+#[tokio::test]
+async fn a_retired_batch_on_another_endpoint_is_not_read_for_at_send() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let retired = withdrawn_skip_waits_on_retired_carriers(directory.path(), 1, |_| {
+        read_of(false, Some("not-this-batchs-tag"))
+    })
+    .await;
+    let carrier = &retired.ids[0];
+    let elsewhere = server_at(directory.path(), 9, true);
+    let mut line = elsewhere
+        .latest_import_snapshot(carrier)
+        .unwrap()
+        .unwrap()
+        .batch;
+    line.endpoint_origin =
+        Some(crate::agent::canonical_loopback_origin(&elsewhere.settings.endpoint).unwrap());
+    elsewhere.append_import_ledger(&line).unwrap();
+    let before = records_of(directory.path(), carrier);
+    let sent = post_error(&retired.sending, &retired.held.withdrawn).await;
+    let code = sent["code"].as_str().unwrap_or_default();
+    assert!(!code.starts_with("retired_batch"), "{sent}");
+    assert_eq!(records_of(directory.path(), carrier), before);
+}
+
 /// A retired batch whose exclusion changes nothing for this send is not read
 /// for: no request is made to Tally and nothing is written for it.
 #[tokio::test]

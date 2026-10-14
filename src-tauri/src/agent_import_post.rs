@@ -1145,7 +1145,7 @@ impl Server {
                         // A retired batch this decision now rests on that Tally was
                         // not read for before the dialog: the retirement came in
                         // meanwhile, and the next call reads for it.
-                        if !checked.rests_on_retired.is_subset(&rechecked_retired) {
+                        if checked.rests_on_a_batch_not_in(&rechecked_retired) {
                             return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
                                 "retired_batch_not_read_again",
                             )));

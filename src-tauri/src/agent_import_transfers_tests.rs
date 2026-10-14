@@ -1049,3 +1049,91 @@ fn a_refusal_at_send_speaks_of_the_batch_and_not_of_a_build() {
         }
     }
 }
+
+// ---- the retired batches a send rests on ------------------------------------------------
+
+fn names(ids: &[&str]) -> BTreeSet<String> {
+    ids.iter().map(|id| id.to_string()).collect()
+}
+
+/// The decision to send rests on each retired batch that refuses it when it
+/// alone is counted; when none does alone and all together do, on all of them;
+/// and when counting none refuses, on none, without asking when none is retired.
+#[test]
+fn a_decision_rests_on_the_retired_batches_that_refuse_it_alone_or_all_together() {
+    let rests_on = |retired: &[&str], refuses: &dyn Fn(&BTreeSet<String>) -> bool| {
+        let mut asked = 0;
+        let found = batches_a_decision_rests_on(&names(retired), |counted| {
+            asked += 1;
+            Ok(refuses(&counted))
+        })
+        .unwrap();
+        (found, asked)
+    };
+    // nothing retired: nothing is asked
+    assert_eq!(rests_on(&[], &|_| true), (names(&[]), 0));
+    // one of three matters
+    assert_eq!(
+        rests_on(&["a", "b", "c"], &|counted| counted.contains("b")),
+        (names(&["b"]), 3)
+    );
+    // two of three matter
+    assert_eq!(
+        rests_on(&["a", "b", "c"], &|counted| counted.contains("a")
+            || counted.contains("c")),
+        (names(&["a", "c"]), 3)
+    );
+    // none alone, all together: all of them, after the singles and the whole
+    assert_eq!(
+        rests_on(&["a", "b", "c"], &|counted| counted.len() > 1),
+        (names(&["a", "b", "c"]), 4)
+    );
+    // all together refuse only when all three are counted: still all three
+    assert_eq!(
+        rests_on(&["a", "b", "c"], &|counted| counted.len() > 2),
+        (names(&["a", "b", "c"]), 4)
+    );
+    // counting them changes nothing
+    assert_eq!(
+        rests_on(&["a", "b"], &|_| false),
+        (names(&[]), 3)
+    );
+    // a failure to judge is the caller's
+    assert_eq!(
+        batches_a_decision_rests_on(&names(&["a"]), |_| Err("import_ledger_invalid".into())),
+        Err("import_ledger_invalid".to_string())
+    );
+}
+
+/// Under the lock the decision may rest on a retired batch that was not read for
+/// before the dialog; one already read for, or none, does not refuse.
+#[test]
+fn a_retired_batch_not_read_before_the_dialog_is_found_under_the_lock() {
+    let check = |ids: &[&str]| SendCheck {
+        refusal: None,
+        rests_on_retired: names(ids),
+    };
+    assert!(!check(&[]).rests_on_a_batch_not_in(&names(&[])));
+    assert!(!check(&["a"]).rests_on_a_batch_not_in(&names(&["a", "b"])));
+    assert!(check(&["a", "c"]).rests_on_a_batch_not_in(&names(&["a"])));
+    assert!(check(&["a"]).rests_on_a_batch_not_in(&names(&[])));
+}
+
+/// A decision resting on more retired batches than are read for is refused by a
+/// typed refusal that names them all, says no request was made, and names no
+/// hand entry.
+#[test]
+fn a_decision_over_the_cap_is_refused_naming_every_batch_and_no_request() {
+    assert_eq!(MAX_RECHECKED_RETIRED, 3);
+    let batches = names(&["a", "b", "c", "d"]);
+    let (reason, detail, step) = too_many_retired_batches(&batches).into_parts();
+    assert_eq!(reason, "retired_batches_over_the_read_cap");
+    assert_eq!(detail["retired_batches"], json!(["a", "b", "c", "d"]));
+    assert_eq!(detail["allowed"], 3);
+    assert!(step.starts_with(NOTHING_SENT), "{step}");
+    assert!(step.contains("4 batches"), "{step}");
+    assert!(step.contains("No request was made to Tally"), "{step}");
+    for by_hand in ["by hand", "enter the voucher", "import the file"] {
+        assert!(!step.contains(by_hand), "{step}");
+    }
+}

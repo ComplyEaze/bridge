@@ -502,6 +502,12 @@ impl SendCheck {
         }
     }
 
+    /// Whether the decision now rests on a retired batch that was not among
+    /// those `read` already read Tally for: a retirement came in meanwhile.
+    pub(super) fn rests_on_a_batch_not_in(&self, read: &BTreeSet<String>) -> bool {
+        !self.rests_on_retired.is_subset(read)
+    }
+
     fn refused(refusal: TransferRefusal) -> Self {
         Self {
             refusal: Some(refusal),
@@ -520,6 +526,45 @@ pub(super) fn retired_batch_found(batches: &[String]) -> TransferRefusal {
         detail: json!({"retired_batches": batches}),
         next_step: RETIRED_BATCH_FOUND_STEP.into(),
     }
+}
+
+/// The most retired batches a send reads Tally for again before it goes on.
+/// A decision that rests on more is refused before any request is made.
+pub(super) const MAX_RECHECKED_RETIRED: usize = 3;
+
+const NO_REQUEST_FOR_TOO_MANY: &str = "No request was made to Tally. No step inside ComplyEaze Bridge reduces the number yet; report it with the batches named here.";
+
+/// The refusal of a send whose decision rests on more retired batches than the
+/// second read is made for.
+pub(super) fn too_many_retired_batches(batches: &BTreeSet<String>) -> TransferRefusal {
+    TransferRefusal {
+        reason: "retired_batches_over_the_read_cap",
+        detail: json!({"retired_batches": batches, "allowed": MAX_RECHECKED_RETIRED}),
+        next_step: format!(
+            "Nothing was sent to Tally and the approval was not used. This batch can be sent only because {} batches of this company were retired after a read of Tally found them absent, and ComplyEaze Bridge reads Tally again for at most {MAX_RECHECKED_RETIRED} of them before a send: retired_batches names them. {NO_REQUEST_FOR_TOO_MANY}",
+            batches.len()
+        ),
+    }
+}
+
+/// The retired batches a send's decision rests on: those that, counted alone,
+/// would refuse it according to `refuses`; and, if none does alone but all
+/// together do, all of them. `refuses` is given the set of retired batches to
+/// count and says whether the send would then be refused.
+pub(super) fn batches_a_decision_rests_on(
+    retired: &BTreeSet<String>,
+    mut refuses: impl FnMut(BTreeSet<String>) -> Result<bool, String>,
+) -> Result<BTreeSet<String>, String> {
+    let mut rests_on = BTreeSet::new();
+    for batch in retired {
+        if refuses(BTreeSet::from([batch.clone()]))? {
+            rests_on.insert(batch.clone());
+        }
+    }
+    if rests_on.is_empty() && !retired.is_empty() && refuses(retired.clone())? {
+        rests_on = retired.clone();
+    }
+    Ok(rests_on)
 }
 
 const RETIRED_BATCH_NOT_READ_STEP: &str = "Nothing was sent to Tally and the approval was not used. This batch can be sent only because a batch of this company was retired after a read of Tally found it absent, and ComplyEaze Bridge could not read Tally again for that retired batch before sending: retired_batches names it and cause says why the read failed. The retired batch is still out of the company's transfer records, and this batch is not sent until it has been read again. Call post_import again; if cause names a refusal that a repeat will not change, report it with the cause named here.";
@@ -1025,14 +1070,11 @@ impl Server {
             }
             None => BTreeSet::new(),
         };
-        let mut rests_on = BTreeSet::new();
-        for batch in &retired {
-            if refuses(judge(BTreeSet::from([batch.clone()]))?) {
-                rests_on.insert(batch.clone());
-            }
-        }
-        if rests_on.is_empty() && !retired.is_empty() && refuses(judge(retired.clone())?) {
-            rests_on = retired;
+        let rests_on = batches_a_decision_rests_on(&retired, |counted| {
+            Ok(refuses(judge(counted)?))
+        })?;
+        if rests_on.len() > MAX_RECHECKED_RETIRED {
+            return Ok(SendCheck::refused(too_many_retired_batches(&rests_on)));
         }
         Ok(SendCheck {
             refusal: None,

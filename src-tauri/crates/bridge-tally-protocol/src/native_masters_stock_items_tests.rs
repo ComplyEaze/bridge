@@ -552,6 +552,14 @@ fn content_this_reader_does_not_model_is_flagged_and_alone_it_fails_the_list() {
         "<HSNDETAILS.LIST>\u{a0}</HSNDETAILS.LIST><HSNDETAILS.LIST>",
         HsnDetailsDefect::UnrecognisedContent,
     );
+    // So are an entity reference and CDATA directly in a list.
+    for content in ["&amp;", "<![CDATA[x]]>"] {
+        assert_hsn_unreadable(
+            "<HSNDETAILS.LIST>",
+            &format!("<HSNDETAILS.LIST>{content}</HSNDETAILS.LIST><HSNDETAILS.LIST>"),
+            HsnDetailsDefect::UnrecognisedContent,
+        );
+    }
 }
 
 #[test]

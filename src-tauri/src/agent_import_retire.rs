@@ -84,21 +84,54 @@ pub(super) const RETIRED_UNKNOWN_STEP: &str = "This batch is retired: ComplyEaze
 pub(super) const RETIRED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Build this statement again if its rows are still to be posted.";
 pub(super) const KEPT_STEP: &str = "Tally holds a voucher of this batch, so it was not retired and still counts. Its saved file is removed, so ComplyEaze Bridge will not send it.";
 const UNFINISHED_STEP: &str = "The read of Tally did not finish, so nothing was retired and the batch still counts. Its saved file is removed, so the batch can no longer be sent from it. Call verify_import on it again with if_absent set to retire.";
+const UNFINISHED_FINAL_STEP: &str = "The read of Tally was refused for a reason that a repeat will not change, so nothing was retired and the batch still counts. Its saved file is removed, so the batch can no longer be sent from it; a repeat will not help until the read limit or the licence mode that stopped the read changes.";
+const CONFLICT_STEP: &str = "Another record of this batch was written meanwhile, so nothing was retired. Call verify_import on it again.";
+const RECORD_UNCONFIRMED_STEP: &str = "The read of Tally finished, but ComplyEaze Bridge could not confirm that the record of it was written, so it is not established whether the batch is retired. Call verify_import on it without if_absent to see where it stands.";
+
+/// The code a failure carries when the record of the retirement may already be
+/// in the journal.
+pub(super) const RECORD_MAY_EXIST: &str = "retire_record_may_exist";
+
+/// A refusal of the read that a repeat of the call cannot change: the window is
+/// over the read limits, or the licence does not qualify an absence.
+fn repeat_cannot_help(code: &str) -> bool {
+    matches!(
+        code,
+        "voucher_window_book_too_large"
+            | "response_size_limit_exceeded"
+            | "import_post_window_not_bounded"
+            | "verification_too_large_to_report"
+            | "verification_mode_unqualified"
+    )
+}
 
 /// The answer when the saved file is gone and the read, or the record, did not
-/// complete: nothing is retired, nothing was verified, and the call may be
-/// repeated.
+/// complete. Nothing is verified, so there is no page to serve. What it says
+/// follows what is known: that nothing was retired (the read, or the record
+/// refused before it was appended), that another record of the batch was
+/// written meanwhile, that a repeat cannot help, or, when the record may
+/// already be in the journal, that it is not established.
 pub(super) fn unfinished_outcome(
     company: Value,
     batch_id: &str,
     code: &str,
+    record_may_exist: bool,
     accumulated: Evidence,
     guid: &str,
 ) -> ToolOutcome {
+    let (state, step) = if record_may_exist {
+        ("not_established", RECORD_UNCONFIRMED_STEP)
+    } else if code == "import_verification_conflict_retry" {
+        ("not_retired", CONFLICT_STEP)
+    } else if repeat_cannot_help(code) {
+        ("not_retired", UNFINISHED_FINAL_STEP)
+    } else {
+        ("not_retired", UNFINISHED_STEP)
+    };
     ToolOutcome {
         payload: json!({"company": company, "result": {"batch_id": batch_id, "retire": {
-            "state": "not_retired", "reason": code, "file_removed": true,
-            "verification_recorded": false, "next_step": UNFINISHED_STEP}}}),
+            "state": state, "reason": code, "file_removed": true,
+            "verification_recorded": false, "next_step": step}}}),
         evidence: Evidence {
             state: "partial",
             reason_code: Some(code.to_string()),
@@ -352,5 +385,95 @@ mod tests {
             Some(&day("20260403")),
         );
         assert_eq!(wide, None);
+    }
+
+    fn answer(code: &str, record_may_exist: bool) -> Value {
+        let evidence = Evidence {
+            request_sha256: "a".repeat(64),
+            response_sha256: "b".repeat(64),
+            bytes: 0,
+            state: "complete",
+            read_at: None,
+            duration_ms: None,
+            reason_code: None,
+        };
+        let outcome = unfinished_outcome(
+            json!({}),
+            "bridge-x",
+            code,
+            record_may_exist,
+            evidence,
+            "guid",
+        );
+        assert!(unfinished(&outcome.payload));
+        outcome.payload["result"]["retire"].clone()
+    }
+
+    #[test]
+    fn a_read_that_did_not_finish_says_the_file_is_gone_and_the_call_may_be_repeated() {
+        let retire = answer("window_not_corroborated", false);
+        assert_eq!(retire["state"], "not_retired");
+        assert_eq!(retire["reason"], "window_not_corroborated");
+        assert_eq!(retire["file_removed"], true);
+        let step = retire["next_step"].as_str().unwrap();
+        assert!(step.contains("can no longer be sent from it"), "{step}");
+        assert!(
+            step.contains("Call verify_import on it again with if_absent set to retire"),
+            "{step}"
+        );
+    }
+
+    #[test]
+    fn a_record_written_meanwhile_does_not_claim_the_batch_cannot_be_sent() {
+        let retire = answer("import_verification_conflict_retry", false);
+        assert_eq!(retire["state"], "not_retired");
+        assert_eq!(retire["reason"], "import_verification_conflict_retry");
+        let step = retire["next_step"].as_str().unwrap();
+        assert_eq!(
+            step,
+            "Another record of this batch was written meanwhile, so nothing was retired. Call verify_import on it again."
+        );
+        assert!(!step.contains("no longer be sent"), "{step}");
+    }
+
+    #[test]
+    fn a_refusal_a_repeat_cannot_change_says_so() {
+        for code in [
+            "voucher_window_book_too_large",
+            "response_size_limit_exceeded",
+            "verification_mode_unqualified",
+        ] {
+            let retire = answer(code, false);
+            assert_eq!(retire["reason"], code);
+            let step = retire["next_step"].as_str().unwrap();
+            assert!(
+                step.contains("a repeat will not help until"),
+                "{code}: {step}"
+            );
+            assert!(
+                !step.contains("Call verify_import on it again with if_absent"),
+                "{step}"
+            );
+        }
+        let transient = answer("tally_endpoint_busy", false);
+        assert!(!transient["next_step"]
+            .as_str()
+            .unwrap()
+            .contains("will not help"));
+    }
+
+    #[test]
+    fn a_record_that_may_have_been_written_is_not_established() {
+        let retire = answer("proof_publication_recovery_required", true);
+        assert_eq!(retire["state"], "not_established");
+        assert_eq!(retire["reason"], "proof_publication_recovery_required");
+        let step = retire["next_step"].as_str().unwrap();
+        assert!(
+            step.contains("could not confirm that the record of it was written"),
+            "{step}"
+        );
+        assert!(step.contains("verify_import"), "{step}");
+        assert!(!step.contains("nothing was retired"), "{step}");
+        assert!(!step.contains("no longer be sent"), "{step}");
     }
 }

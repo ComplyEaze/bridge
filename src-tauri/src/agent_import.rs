@@ -2049,8 +2049,23 @@ impl Server {
                     own_tag_observed: retired && retire::sees_its_own_tag(&rows),
                 }
             };
-            let retirement =
-                self.persist_verification_as(&payload["result"], &line, status, generation, kind)?;
+            let record_may_exist = std::sync::atomic::AtomicBool::new(false);
+            let retirement = self
+                .persist_verification_as(
+                    &payload["result"],
+                    &line,
+                    status,
+                    generation,
+                    kind,
+                    &record_may_exist,
+                )
+                .map_err(|code| {
+                    let mut failure = ToolFailure::from(code);
+                    if retiring && record_may_exist.load(std::sync::atomic::Ordering::SeqCst) {
+                        failure.cause = Some(retire::RECORD_MAY_EXIST);
+                    }
+                    failure
+                })?;
             if let Some(decision) = retirement {
                 payload["result"]["retire"] = match decision {
                     Ok(retirement) => match retirement.carried_rows {
@@ -2083,6 +2098,7 @@ impl Server {
                     company_json(&company, std::slice::from_ref(&company)),
                     &line.batch_id,
                     &failure.code,
+                    failure.cause == Some(retire::RECORD_MAY_EXIST),
                     accumulated,
                     guid,
                 ))
@@ -2141,6 +2157,7 @@ impl Server {
             PersistKind::Verification {
                 own_tag_observed: false,
             },
+            &std::sync::atomic::AtomicBool::new(false),
         )
         .map(|_| ())
     }
@@ -2155,6 +2172,7 @@ impl Server {
         status: VerificationStatus,
         expected_generation: ledger::VerificationGeneration,
         kind: PersistKind,
+        record_may_exist: &std::sync::atomic::AtomicBool,
     ) -> Result<Option<Result<retire::Retirement, retire::Keep>>, String> {
         let mut update = line.clone();
         update.status = status.as_str().into();
@@ -2213,7 +2231,8 @@ impl Server {
         let json = serde_json::to_vec_pretty(&local_proof)
             .map_err(|_| "proof_serialization_failed".to_string())?;
         let markdown = render_proof_markdown(&local_proof);
-        persistence::publish_proofs_recording(
+        let appended = std::sync::atomic::AtomicBool::new(false);
+        let published = persistence::publish_proofs_recording(
             &imports,
             update,
             &json,
@@ -2225,10 +2244,26 @@ impl Server {
                 }
                 (false, false) => ledger::StatusRecord::verified(batch, name),
             },
-            |record| self.append_import_record_while_admitted(record),
+            |record| {
+                let appended_now = self.append_import_record_while_admitted(record);
+                if appended_now.is_ok() {
+                    appended.store(true, std::sync::atomic::Ordering::SeqCst);
+                }
+                appended_now
+            },
             |_| Ok(()),
             persistence::sync_directory,
-        )?;
+        );
+        // After the append, or when its rollback failed, the record may be in the
+        // journal whatever the error says.
+        if let Err(code) = &published {
+            if appended.load(std::sync::atomic::Ordering::SeqCst)
+                || code == "proof_publication_rollback_failed"
+            {
+                record_may_exist.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+        published?;
         // The first verified ALTERID of each voucher, for a later amendment to
         // compare against (#239). Kept beside the proof, not in the journal, so
         // an older binary still reads the journal after a rollback. A failed

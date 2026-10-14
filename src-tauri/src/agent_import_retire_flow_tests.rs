@@ -342,6 +342,10 @@ async fn a_dispatch_intent_between_the_delete_and_the_record_refuses_the_record(
         retire["reason"], "import_verification_conflict_retry",
         "{response}"
     );
+    // the batch was just sent: the answer does not say it can no longer be sent
+    let step = retire["next_step"].as_str().unwrap();
+    assert!(!step.contains("no longer be sent"), "{step}");
+    assert!(step.contains("Call verify_import on it again."), "{step}");
     let kinds = records_of(directory.path(), &batch_id);
     assert!(!kinds.contains(&"import_batch_retired".into()), "{kinds:?}");
     assert!(kinds.contains(&"dispatch_intent".into()), "{kinds:?}");

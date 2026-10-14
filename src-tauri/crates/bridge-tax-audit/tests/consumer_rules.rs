@@ -448,3 +448,288 @@ fn a_voucher_party_gstin_is_read_and_stripped() {
     assert_eq!(gstin("CS/1"), "27invent0000a1y1");
     assert_eq!(gstin("R/1"), "");
 }
+
+// C11: every voucher of the read has a GUID, and no two share one (trimmed, compared without
+// case), whatever their status. The refusal sits in `load_book`, after every voucher part has
+// passed C8, C9 and C2-name and before the company part's C5; Books built directly (the edge
+// books) never pass through it.
+
+const GUID_PREFIX: &str = "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-";
+const APRIL_PART: &str = "vouchers-2025-04-01";
+
+fn guid(n: &str) -> String {
+    format!("{GUID_PREFIX}{n}")
+}
+
+/// Rewrite the April part's one voucher whose GUID ends in `n`, restating the manifest's hashes.
+fn rewrite_voucher(scratch: &common::ScratchRead, n: &str, f: impl FnOnce(&str) -> String) {
+    let text = std::fs::read_to_string(scratch.dir.join("parts/vouchers_h1.xml")).unwrap();
+    let start = text
+        .find(&format!("<VOUCHER REMOTEID=\"{}\"", guid(n)))
+        .unwrap_or_else(|| panic!("no April voucher {n}"));
+    let len = text[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
+    let block = &text[start..start + len];
+    scratch.edit_part(APRIL_PART, block, &f(block), true);
+}
+
+/// The voucher without any GUID: no REMOTEID attribute and an empty GUID element.
+fn drop_guid(scratch: &common::ScratchRead, n: &str) {
+    rewrite_voucher(scratch, n, |b| {
+        b.replace(&format!(" REMOTEID=\"{}\"", guid(n)), "")
+            .replace(&format!("<GUID>{}</GUID>", guid(n)), "<GUID></GUID>")
+    });
+}
+
+/// The voucher takes `to` as its GUID, in the GUID element and the REMOTEID attribute alike.
+fn set_guid(scratch: &common::ScratchRead, n: &str, to: &str) {
+    rewrite_voucher(scratch, n, |b| {
+        b.replace(
+            &format!("REMOTEID=\"{}\"", guid(n)),
+            &format!("REMOTEID=\"{to}\""),
+        )
+        .replace(
+            &format!("<GUID>{}</GUID>", guid(n)),
+            &format!("<GUID>{to}</GUID>"),
+        )
+    });
+}
+
+/// The refusal's rule code and detail; any other outcome fails the test.
+fn refusal(result: bridge_tax_audit::Result<Value>) -> (&'static str, String) {
+    match result {
+        Err(AuditError::Refused { code, detail }) => (code, detail),
+        Err(other) => panic!("not a rule refusal: {other:?}"),
+        Ok(_) => panic!("the read was admitted"),
+    }
+}
+
+fn run_refused(scratch: &common::ScratchRead) -> (&'static str, String) {
+    refusal(common::run(&scratch.dir, false))
+}
+
+#[test]
+fn c11_a_voucher_with_no_guid_is_refused() {
+    let scratch = common::ScratchRead::new("c11-blank");
+    drop_guid(&scratch, "00000001");
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-blank-guid");
+    assert_eq!(
+        detail,
+        "1 voucher(s) have no GUID, first dated 2025-04-05 in vouchers_h1.xml"
+    );
+}
+
+#[test]
+fn c11_every_voucher_with_no_guid_is_counted_and_the_first_in_the_read_is_named() {
+    let scratch = common::ScratchRead::new("c11-blank-two");
+    drop_guid(&scratch, "00000003"); // 2025-05-02, edited first
+    drop_guid(&scratch, "00000002"); // 2025-04-18, earlier in the part
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-blank-guid");
+    assert_eq!(
+        detail,
+        "2 voucher(s) have no GUID, first dated 2025-04-18 in vouchers_h1.xml"
+    );
+}
+
+#[test]
+fn c11_a_guid_of_only_whitespace_is_no_guid() {
+    // An empty GUID element falls back to the REMOTEID attribute, which is read as written
+    // (spaces only: XML turns a tab in an attribute value into a space).
+    let scratch = common::ScratchRead::new("c11-blank-space");
+    rewrite_voucher(&scratch, "00000001", |b| {
+        b.replace(
+            &format!("REMOTEID=\"{}\"", guid("00000001")),
+            "REMOTEID=\"   \"",
+        )
+        .replace(
+            &format!("<GUID>{}</GUID>", guid("00000001")),
+            "<GUID></GUID>",
+        )
+    });
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-blank-guid");
+    assert_eq!(
+        detail,
+        "1 voucher(s) have no GUID, first dated 2025-04-05 in vouchers_h1.xml"
+    );
+}
+
+#[test]
+fn c11_one_guid_twice_in_one_part_is_refused() {
+    let scratch = common::ScratchRead::new("c11-repeat");
+    set_guid(&scratch, "00000002", &guid("00000001"));
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-repeated-guid");
+    assert_eq!(
+        detail,
+        format!(
+            "GUID {} is held by two vouchers, in vouchers_h1.xml and vouchers_h1.xml",
+            guid("00000001")
+        )
+    );
+}
+
+#[test]
+fn c11_one_guid_in_two_parts_is_refused_and_both_parts_are_named() {
+    // April's second voucher carries the GUID of one the second-half part holds.
+    let scratch = common::ScratchRead::new("c11-two-parts");
+    set_guid(&scratch, "00000002", &guid("0000000d"));
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-repeated-guid");
+    assert_eq!(
+        detail,
+        format!(
+            "GUID {} is held by two vouchers, in vouchers_h1.xml and vouchers_h2.xml.gz",
+            guid("0000000d")
+        )
+    );
+}
+
+#[test]
+fn c11_guids_are_compared_without_case() {
+    let scratch = common::ScratchRead::new("c11-case");
+    let upper = guid("00000001").to_uppercase();
+    set_guid(&scratch, "00000002", &upper);
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-repeated-guid");
+    // The message gives the later voucher's GUID as written.
+    assert_eq!(
+        detail,
+        format!("GUID {upper} is held by two vouchers, in vouchers_h1.xml and vouchers_h1.xml")
+    );
+}
+
+#[test]
+fn c11_guids_are_compared_without_surrounding_whitespace() {
+    // The REMOTEID attribute is read as written, so the whitespace survives to the check.
+    let scratch = common::ScratchRead::new("c11-trim");
+    let padded = format!("  {} ", guid("00000001"));
+    rewrite_voucher(&scratch, "00000002", |b| {
+        b.replace(
+            &format!("REMOTEID=\"{}\"", guid("00000002")),
+            &format!("REMOTEID=\"{padded}\""),
+        )
+        .replace(
+            &format!("<GUID>{}</GUID>", guid("00000002")),
+            "<GUID></GUID>",
+        )
+    });
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-repeated-guid");
+    assert_eq!(
+        detail,
+        format!("GUID {padded} is held by two vouchers, in vouchers_h1.xml and vouchers_h1.xml")
+    );
+}
+
+#[test]
+fn c11_a_cancelled_copy_is_refused_too() {
+    // A cancelled voucher is outside the books population (POP-5 never sees it), but Tally
+    // cancels in place under the GUID, so it still counts.
+    let scratch = common::ScratchRead::new("c11-cancelled");
+    rewrite_voucher(&scratch, "00000002", |b| {
+        b.replace(
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+            "<ISCANCELLED TYPE=\"Logical\">Yes</ISCANCELLED>",
+        )
+    });
+    set_guid(&scratch, "00000002", &guid("00000001"));
+    assert_eq!(run_refused(&scratch).0, "C11-repeated-guid");
+}
+
+#[test]
+fn c11_a_cancelled_voucher_with_no_guid_is_refused_too() {
+    let scratch = common::ScratchRead::new("c11-cancelled-blank");
+    rewrite_voucher(&scratch, "00000002", |b| {
+        b.replace(
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+            "<ISCANCELLED TYPE=\"Logical\">Yes</ISCANCELLED>",
+        )
+    });
+    drop_guid(&scratch, "00000002");
+    let (code, detail) = run_refused(&scratch);
+    assert_eq!(code, "C11-blank-guid");
+    assert_eq!(
+        detail,
+        "1 voucher(s) have no GUID, first dated 2025-04-18 in vouchers_h1.xml"
+    );
+}
+
+#[test]
+fn c11_an_optional_or_postdated_copy_is_refused_too() {
+    // The side list marks the second-half vouchers 0x10 optional and 0x11 postdated.
+    for (tag, n) in [("optional", "00000010"), ("postdated", "00000011")] {
+        let scratch = common::ScratchRead::new(&format!("c11-{tag}"));
+        set_guid(&scratch, "00000002", &guid(n));
+        let (code, detail) = run_refused(&scratch);
+        assert_eq!(code, "C11-repeated-guid", "{tag}");
+        assert!(detail.contains(&guid(n)), "{tag}: {detail}");
+    }
+}
+
+#[test]
+fn c11_a_voucher_with_no_guid_is_named_before_a_repeat() {
+    let scratch = common::ScratchRead::new("c11-blank-first");
+    set_guid(&scratch, "00000002", &guid("00000001")); // a repeat
+    drop_guid(&scratch, "00000003"); // and, later in the part, a voucher with none
+    assert_eq!(run_refused(&scratch).0, "C11-blank-guid");
+}
+
+#[test]
+fn c11_is_checked_before_the_company_part_identity() {
+    // C5 alone: the manifest names another company.
+    let scratch = common::ScratchRead::new("c11-before-c5");
+    let mut m = scratch.manifest();
+    // Another company: the manifest's own GUID with its last hex digit changed.
+    let mut other = m["company"]["guid"].as_str().unwrap().to_string();
+    let last = other.pop().unwrap();
+    other.push(if last == '0' { '1' } else { '0' });
+    m["company"]["guid"] = json!(other);
+    scratch.set_manifest(&m);
+    assert_eq!(code_of(common::run(&scratch.dir, false)), "C5-identity");
+    // With a voucher that has no GUID as well, the voucher refusal comes first.
+    drop_guid(&scratch, "00000001");
+    assert_eq!(run_refused(&scratch).0, "C11-blank-guid");
+}
+
+#[test]
+fn c11_is_checked_after_every_part_has_passed_its_own_rules() {
+    // April holds a voucher with no GUID; the second-half part declares a wrong row count.
+    // C9 is part-local and runs while the parts load, so it is the refusal, as in the reference.
+    let scratch = common::ScratchRead::new("c11-after-c9");
+    drop_guid(&scratch, "00000001");
+    let mut m = scratch.manifest();
+    part_mut(&mut m, "vouchers-2025-10-01")["rows"] = json!(11);
+    scratch.set_manifest(&m);
+    assert_eq!(code_of(common::run(&scratch.dir, false)), "C9-rows");
+}
+
+#[test]
+fn c11_a_part_that_fails_c8_is_refused_by_c8_whatever_its_guids() {
+    let scratch = common::ScratchRead::new("c11-after-c8");
+    drop_guid(&scratch, "00000001");
+    scratch.edit_part(
+        APRIL_PART,
+        "<DATE TYPE=\"Date\">20250928</DATE>",
+        "<DATE TYPE=\"Date\">20251003</DATE>",
+        true,
+    );
+    assert_eq!(code_of(common::run(&scratch.dir, false)), "C8-window");
+}
+
+#[test]
+fn c11_a_read_whose_guids_are_all_its_own_is_admitted() {
+    let scratch = common::ScratchRead::new("c11-clean");
+    let book = bridge_tax_audit::load_book(&common::engagement(&scratch.dir, false)).unwrap();
+    assert_eq!(book.vouchers.len(), 53);
+    let mut keys: Vec<String> = book
+        .vouchers
+        .iter()
+        .map(|v| v.guid.to_lowercase())
+        .collect();
+    assert!(keys.iter().all(|k| !k.trim().is_empty()));
+    keys.sort();
+    keys.dedup();
+    assert_eq!(keys.len(), 53);
+}

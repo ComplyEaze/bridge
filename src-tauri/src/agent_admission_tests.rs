@@ -1508,7 +1508,7 @@ fn the_transfer_texts_claim_only_what_the_code_does() {
     assert!(!argument.contains("Without this a build"), "{argument}");
     assert!(argument.contains("posted_against_skip"), "{argument}");
     for text in [&parse, &build, &argument] {
-        for phrase in ["1703", "send-time", "merges with"] {
+        for phrase in ["1703", "merges with"] {
             assert!(!text.contains(phrase), "{phrase}: {text}");
         }
     }

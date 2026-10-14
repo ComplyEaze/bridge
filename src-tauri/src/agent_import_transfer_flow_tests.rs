@@ -2000,7 +2000,9 @@ fn book_holding_the_contra(tag: &str) -> String {
 
 /// A build that amends a statement batch is admitted, and it is the same
 /// lineage as the batch it amends: the Contra it decides replaces the
-/// original's in the view instead of booking the transfer a second time.
+/// original's in the view. Had it a lineage of its own, its unsent Contra would
+/// be superseded by the original's verified one, and the skip would read paired
+/// instead of waiting on the amendment.
 #[tokio::test]
 async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
     let directory = tempfile::tempdir().unwrap();
@@ -2053,7 +2055,8 @@ async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
     amending["amends_batch_id"] = json!(original);
     let rig = Rig::new(directory.path(), plans);
     // an amendment is admitted only at the endpoint its lineage was built at,
-    // and a simulator's port is new each time: the records are moved to it
+    // and a simulator's port is new each time: the records' endpoint text is
+    // moved to it, in the journal and the skip file
     let endpoint = format!("http://127.0.0.1:{}", rig.simulator.address().port());
     for name in ["agent-import-ledger.jsonl", statement_facts::SKIPS_FILE] {
         let path = directory.path().join(name);
@@ -2068,8 +2071,7 @@ async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
     );
     let batch = amended["batch_id"].as_str().unwrap().to_string();
     assert_ne!(batch, original);
-    // the transfer is booked once: the skip waits on the amendment, which now
-    // decides the Contra, and nothing is double booked
+    // the skip waits on the amendment, which now decides the Contra
     let section = &amended["transfers"];
     assert_eq!(
         open_rows(section),
@@ -2145,6 +2147,45 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
     assert_eq!(section["retired"], 1, "{section}");
     assert_eq!(section["skips_open"], 0, "{section}");
     assert_eq!(section["open"], json!([]), "{section}");
+}
+
+/// The same row posted by the build that was found posted, with no withdrawal:
+/// it stays open, and the verification's section lists it.
+#[tokio::test]
+async fn a_row_posted_without_the_withdrawal_stays_open_in_the_verification_section() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_booking_and_skipping(directory.path())).await;
+    let second = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_A,
+            window(),
+            json!([contra_voucher(OTHER_BOOKED), contra_voucher(SKIPPED)]),
+            json!([
+                contra_record(OTHER_BOOKED, None),
+                contra_record(SKIPPED, None)
+            ]),
+        ))
+        .await;
+    rig.finish();
+    let holder = second["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &holder);
+    let section = journal(directory.path()).transfers_for_verification(CAPTURED_GUID, 0);
+    assert_eq!(section["state"], "computed", "{section}");
+    assert_eq!(section["retired"], 0, "{section}");
+    assert_eq!(
+        open_rows(&section),
+        vec![open_row(SKIPPED, "posted_against_skip", Some(&holder))],
+        "{section}"
+    );
+    assert!(section["next_steps"]["posted_against_skip"]
+        .as_str()
+        .unwrap()
+        .contains("no step inside ComplyEaze Bridge"));
 }
 
 // ---- the response cap and a written record -----------------------------------------

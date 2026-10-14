@@ -349,7 +349,7 @@ pub(super) struct ImportLedgerLine {
     /// `ledger_identities_2`; each finds none here and refuses the batch as
     /// built before this record (`import_batch_predates_ledger_binding`),
     /// which is their one refusal of a record they cannot check. They do not
-    /// read `statement` or the two records below, so without this they would
+    /// read `statement` or the records below, so without this they would
     /// post a batch this build saved without the checks those records feed.
     /// Both earlier names are still read, for a batch one of them saved. No
     /// writer may write two names: a record carrying two does not parse, and

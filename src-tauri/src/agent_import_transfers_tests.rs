@@ -866,19 +866,112 @@ fn every_step_text() -> Vec<String> {
     texts
 }
 
+/// Every sentence a person or an assistant is told to follow about a skipped
+/// row, with the five refusals' next steps and the notes of the section.
+fn every_sentence_to_follow() -> Vec<String> {
+    let mut texts = every_step_text();
+    texts.extend(
+        [
+            SKIP_ROW_ALREADY_POSTED_NEXT_STEP,
+            SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP,
+            WITHDRAW_SKIP_INVALID_NEXT_STEP,
+            TRANSFER_DOUBLE_BOOKED_NEXT_STEP,
+            TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP,
+            NOT_ESTABLISHED_STEP,
+            CHECK_NOT_RUN_STEP,
+            CHECK_NOT_RUN_RECORDED_STEP,
+            OPEN_OMITTED_STEP,
+        ]
+        .map(str::to_string),
+    );
+    texts
+        .iter()
+        .flat_map(|text| {
+            text.replace("; ", ". ")
+                .split(". ")
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// A sentence that names Tally is a prohibition or a disclosure (it holds a
+/// negation), or one of the named reads below. Anything else is a new
+/// instruction about Tally and has to be looked at: a step may tell a person to
+/// look in Tally, never to enter, edit, delete or import there.
 #[test]
-fn no_step_sends_a_person_to_change_tally_by_hand() {
-    for text in every_step_text() {
-        for phrase in [
-            "Check both in Tally",
-            "keep one",
-            "import it and verify it",
-            "enter it in Tally",
-            "delete",
-        ] {
-            assert!(!text.contains(phrase), "{phrase:?} in {text}");
+fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read() {
+    const READS: [&str; 4] = [
+        "Check in Tally which rows are transfers",
+        "check in Tally which Contra carries this transfer",
+        "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
+        "This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended",
+    ];
+    let negations = [" not ", " no step ", "Do not", " never ", " cannot "];
+    let mut tally_sentences = 0;
+    let mut reads = BTreeSet::new();
+    for sentence in every_sentence_to_follow() {
+        if !sentence.contains("Tally") {
+            continue;
+        }
+        tally_sentences += 1;
+        let padded = format!(" {sentence} ");
+        if negations.iter().any(|negation| padded.contains(negation)) {
+            continue;
+        }
+        let read = READS
+            .iter()
+            .find(|read| sentence.trim_end_matches('.') == **read)
+            .unwrap_or_else(|| panic!("a new sentence about Tally: {sentence:?}"));
+        reads.insert(*read);
+    }
+    // the reads are all still used, and the texts still name Tally often
+    assert_eq!(reads.len(), READS.len());
+    assert!(tally_sentences >= 20, "{tally_sentences}");
+}
+
+/// The same rule over the tool texts that describe skipped rows: a sentence
+/// that names a skip and gives an instruction to enter, edit, delete or import
+/// is a prohibition.
+#[test]
+fn the_tool_texts_about_skipped_rows_give_no_instruction_to_change_tally() {
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let tools = definitions.as_array().unwrap();
+    let text_of = |name: &str| {
+        tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    let build = text_of("build_import_xml");
+    let texts = [
+        text_of("parse_bank_statement")["description"].clone(),
+        build["description"].clone(),
+        build
+            .pointer("/inputSchema/properties/withdraw_skips/description")
+            .unwrap()
+            .clone(),
+    ];
+    let mut checked = 0;
+    for text in texts {
+        let text = text.as_str().unwrap().replace("; ", ". ");
+        for sentence in text
+            .split(". ")
+            .filter(|sentence| sentence.contains("skip"))
+        {
+            checked += 1;
+            let padded = format!(" {sentence} ");
+            let instructs = [" enter ", " edit ", " delete ", " import it "]
+                .iter()
+                .any(|verb| padded.contains(verb));
+            let prohibits = [" not ", " no step ", " never "]
+                .iter()
+                .any(|negation| padded.contains(negation));
+            assert!(!instructs || prohibits, "{sentence:?}");
         }
     }
+    assert!(checked >= 10, "{checked}");
 }
 
 #[test]

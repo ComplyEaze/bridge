@@ -1,0 +1,11 @@
+.github/workflows/ci.yml
+docs/step-by-step-roadmap.md
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+src-tauri/crates/bridge-tally-core/src/lib.rs
+src-tauri/crates/bridge-tally-primitives/src/exact_arithmetic.rs
+src-tauri/crates/bridge-tally-protocol/Cargo.toml
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+tools/bridge-tally-compatibility/src/lib.rs
+removed-pin: src-tauri/crates/bridge-tally-core/src/bills_reconciliation.rs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/bills_payments_observation.rs
+reviewer: lamemustafa

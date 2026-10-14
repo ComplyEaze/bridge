@@ -489,10 +489,9 @@ impl BuildLine {
 
 impl BuildVoucher {
     /// The vouchers a transfer can be made of: Contras, Journals and statement
-    /// rows. A Journal is kept because the protocol reference does not establish
-    /// that none can move money between two bank ledgers (§9.13 covers Payment,
-    /// Receipt and Contra only), so one that names two statement banks is treated
-    /// as a possible transfer.
+    /// rows. Reference §9.13 records one Journal between two bank ledgers
+    /// accepted (PARTIAL, one run), so a Journal that names two statement banks
+    /// is treated as a possible transfer.
     pub(super) fn of_vouchers(vouchers: &[ImportVoucher]) -> Vec<Self> {
         vouchers
             .iter()

@@ -1828,7 +1828,8 @@ refused as `proposals_legacy` (parse the statement again).
   `transfer_double_booked`), and where their dates are equal and at least one
   of them carries no reference (both are listed). Nothing else is compared: a
   Receipt or Payment that posts a skipped row is reported as
-  `posted_against_skip`, not here.
+  `posted_against_skip`, not here. No step inside ComplyEaze Bridge removes a
+  voucher already in Tally yet; the step says not to send a batch not yet sent.
 - **What `matched_unconfirmed` means.** The person sees the row listed with the
   batch whose verified Contra matches it by day and amount, where the statement
   records of the two accounts do not both cover that day, and keeps the skip.
@@ -1854,7 +1855,11 @@ refused as `proposals_legacy` (parse the statement again).
   endpoint, so such a record can turn every skip across its days
   `not_established`. A blocked day removes the whole window it falls in. A
   statement build blocks the days of its rows until it is verified, so one
-  abandoned unsent keeps them `not_established`.
+  abandoned unsent keeps them `not_established`, and no step inside ComplyEaze
+  Bridge clears it yet. A statement build whose send Tally rejected also stays
+  unverified, and building that statement again is refused as
+  `import_txn_already_posted`: a row waiting on it (`other_side_unverified`)
+  has no step inside ComplyEaze Bridge either.
 - **Refused before anything is written:** `skip_row_already_posted`,
   `skip_row_paired_elsewhere`, `transfer_double_booked`, `withdraw_skip_invalid`,
   `withdraw_skip_paired` and `transfer_view_not_established`, each with a

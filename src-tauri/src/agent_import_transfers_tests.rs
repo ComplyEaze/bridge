@@ -555,7 +555,8 @@ fn each_next_step_says_what_was_decided() {
     let posted = step(OpenState::PostedAgainstSkip);
     assert!(posted.contains("no build named it in withdraw_skips"));
     assert!(posted.contains("booked twice"));
-    assert!(step(OpenState::DoubleBooked).contains("keep one"));
+    let double = step(OpenState::DoubleBooked);
+    assert!(double.contains("If either batch named has not been sent to Tally, do not send it"));
     let open = step(OpenState::NotEstablished);
     assert!(open.contains("Verify any batch of the other account's statement for this date first"));
     assert!(open.contains("build that statement only if no batch of it exists"));
@@ -807,13 +808,13 @@ fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
     assert!(!waiting.contains("already carries"));
     assert_eq!(
         both,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. Do not post these rows."
     );
     // a mix says what each state among the rows needs, and one state alone is
     // told in its own words
     assert_eq!(
         all,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is. Do not post these rows."
     );
     let texts = [&paired, &waiting, &matched, &both, &all];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());
@@ -837,6 +838,60 @@ fn a_section_that_did_not_run_names_the_call_that_made_it() {
         recorded["next_steps"]["check_not_run"],
         "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
     );
+}
+
+// ---- a next step names something ComplyEaze Bridge does, or says none does ------
+
+/// Every text a person or an assistant is told to follow about a skipped row.
+fn every_step_text() -> Vec<String> {
+    let mut texts: Vec<String> = EVERY_OPEN_STATE
+        .iter()
+        .map(|state| state.step().to_string())
+        .collect();
+    let kinds = [
+        Carrier::Paired,
+        Carrier::OtherSideUnverified,
+        Carrier::MatchedUnconfirmed,
+    ];
+    for kind in kinds {
+        texts.push(Carrier::refusal_step(&BTreeSet::from([kind])));
+    }
+    texts.push(Carrier::refusal_step(&kinds.into_iter().collect()));
+    texts
+}
+
+#[test]
+fn no_step_sends_a_person_to_change_tally_by_hand() {
+    for text in every_step_text() {
+        for phrase in [
+            "Check both in Tally",
+            "keep one",
+            "import it and verify it",
+            "enter it in Tally",
+            "delete",
+        ] {
+            assert!(!text.contains(phrase), "{phrase:?} in {text}");
+        }
+    }
+}
+
+#[test]
+fn a_state_with_no_way_out_inside_the_product_says_so() {
+    let none = "no step inside complyeaze bridge";
+    let lower = |text: &str| text.to_lowercase();
+    // two Contras already booked
+    assert!(lower(OpenState::DoubleBooked.step()).contains(none));
+    // the other statement's send was rejected: a rebuild is refused
+    assert!(lower(OpenState::OtherSideUnverified.step()).contains(none));
+    assert!(OpenState::OtherSideUnverified.step().contains("rejected"));
+    let waiting = Carrier::refusal_step(&BTreeSet::from([Carrier::OtherSideUnverified]));
+    assert!(lower(&waiting).contains(none), "{waiting}");
+    assert!(waiting.contains("import_txn_already_posted"), "{waiting}");
+    // a statement build abandoned unsent keeps its days uncovered for good
+    let matched = OpenState::MatchedUnconfirmed.step();
+    assert!(lower(matched).contains(none) && matched.contains("abandoned"));
+    let carried = Carrier::refusal_step(&BTreeSet::from([Carrier::MatchedUnconfirmed]));
+    assert!(lower(&carried).contains(none) && carried.contains("abandoned"));
 }
 
 #[test]

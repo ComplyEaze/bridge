@@ -997,7 +997,7 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         } else {
             assert_eq!(
                 step,
-                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
+                "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. If that batch was never sent to Tally and will not be, build that statement again, post it and verify it. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
                 "{case}"
             );
         }
@@ -1110,7 +1110,7 @@ fn b_contra_read_over(directory: &Path, coverage: Value) -> Value {
     )
 }
 
-const MATCHED_UNCONFIRMED_STEP: &str = "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.";
+const MATCHED_UNCONFIRMED_STEP: &str = "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.";
 
 #[tokio::test]
 async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_the_windows_cover() {
@@ -1125,7 +1125,7 @@ async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_th
         (
             Value::Null,
             "matched_unconfirmed",
-            "No file was written and nothing was recorded. A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.",
+            "No file was written and nothing was recorded. A verified Contra of the same day and amount as this row, booked from the other account's statement, is in the batch named in paired_rows. Whether it is the only one is not established, so the skip stays: do not post this row. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.",
         ),
     ] {
         let directory = tempfile::tempdir().unwrap();
@@ -1223,7 +1223,7 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
     );
     assert_eq!(
         refused["next_step"],
-        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row."
+        "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. If that batch was never sent to Tally and will not be, build that statement again, post it and verify it. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet."
     );
     rig.finish();
     // what the other statement's build said of the row: listed with that
@@ -1435,7 +1435,7 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
         assert_eq!(refused["paired_rows"], json!(expected), "{case}");
         assert_eq!(
             refused["next_step"],
-            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first (if it was never imported and will not be, build that statement again, import it and verify it); do not post this row.",
+            "No file was written and nothing was recorded. The other account's statement may carry this row as a Contra in the batch named in paired_rows, which is not verified yet. Run verify_import on that batch first; do not post this row. If that batch was never sent to Tally and will not be, build that statement again, post it and verify it. If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
             "{case}"
         );
     }

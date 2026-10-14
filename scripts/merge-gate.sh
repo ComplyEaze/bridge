@@ -99,13 +99,14 @@ fi
 # .gitattributes conversion) and be committed.
 gate_tree=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null) || gate_tree=""
 fetch_status=0
-fetch_err=$(git -C "$gate_tree" fetch -q origin refs/heads/master 2>&1 >/dev/null) || fetch_status=$?
+fetch_err=$(git -C "$gate_tree" fetch -q origin +refs/heads/master:refs/merge-gate/master 2>&1 >/dev/null) || fetch_status=$?
 if [ -z "$gate_tree" ] || [ "$fetch_status" -ne 0 ]; then
   echo "could not fetch the branch master of origin to compare this gate with it: ${fetch_err:0:300}" >&2
   exit 2
 fi
-if ! git -C "$gate_tree" rev-parse --verify -q FETCH_HEAD >/dev/null 2>&1 \
-   || ! git -C "$gate_tree" diff --quiet FETCH_HEAD -- scripts 2>/dev/null \
+if [ "$(cd "$script_dir" && pwd -P)" != "$(cd "$gate_tree" && pwd -P)/scripts" ] \
+   || ! git -C "$gate_tree" rev-parse --verify -q refs/merge-gate/master >/dev/null 2>&1 \
+   || ! git -C "$gate_tree" diff --quiet refs/merge-gate/master -- scripts 2>/dev/null \
    || [ -n "$(git -C "$gate_tree" status --porcelain --untracked-files=all -- scripts 2>/dev/null)" ]; then
   echo "run this gate from origin/master's tree (freshly fetched; everything under scripts/ must equal it, untracked files included): a pull request must not run the program that judges it" >&2
   exit 2
@@ -124,7 +125,7 @@ die() { echo "$1" >&2; exit 2; }
 # outer shape before extracting fields so jq errors cannot become empty values.
 : >"$errfile"
 if ! meta=$(gh pr view "$PR" --repo "$REPO" \
-        --json headRefOid,baseRefName,title,body,changedFiles 2>"$errfile"); then
+        --json headRefOid,baseRefName,title,body,changedFiles,headRefName 2>"$errfile"); then
   die "could not read PR #$PR in $REPO"
 fi
 if ! jq -e '
@@ -137,6 +138,7 @@ if ! jq -e '
   die "PR metadata was not a valid complete JSON object"
 fi
 head=$(jq -r '.headRefOid' <<<"$meta")
+head_ref=$(jq -r '.headRefName // ""' <<<"$meta")
 base=$(jq -r '.baseRefName' <<<"$meta")
 changed_files_expected=$(jq -r '.changedFiles' <<<"$meta")
 short=${head:0:7}
@@ -815,6 +817,17 @@ verdict_pages() {
 verdict_reviews=$(verdict_pages "repos/$REPO/pulls/$PR/reviews?per_page=100") || verdict_status=$?
 verdict_comments=$(verdict_pages "repos/$REPO/issues/$PR/comments?per_page=100") || verdict_status=$?
 verdict_inline=$(verdict_pages "repos/$REPO/pulls/$PR/comments?per_page=100") || verdict_status=$?
+verdict_commit_comments="[]"
+verdict_shas=$(verdict_pages "repos/$REPO/pulls/$PR/commits?per_page=100" | jq -r '.[].sha') || verdict_status=$?
+if [ "$(printf '%s\n' "$verdict_shas" | sed '/^$/d' | wc -l | tr -d ' ')" -gt 60 ]; then
+  verdict_status=1
+  echo "more than 60 commits: their comments are not read" >>"$errfile"
+fi
+while IFS= read -r verdict_sha; do
+  [[ "$verdict_sha" =~ ^[0-9a-f]{40}$ ]] || continue
+  verdict_page=$(verdict_pages "repos/$REPO/commits/$verdict_sha/comments?per_page=100") || { verdict_status=$?; continue; }
+  verdict_commit_comments=$(jq -c -n --argjson a "$verdict_commit_comments" --argjson b "$verdict_page" '$a + $b') || verdict_status=$?
+done <<<"$verdict_shas"
 verdict_query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
  reviews(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
  comments(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
@@ -827,17 +840,22 @@ else
   printf '%s' "$verdict_reviews" >"$tmpdir/v-reviews.json"
   printf '%s' "$verdict_comments" >"$tmpdir/v-comments.json"
   printf '%s' "$verdict_inline" >"$tmpdir/v-inline.json"
+  printf '%s' "$verdict_commit_comments" >"$tmpdir/v-commit-comments.json"
+  printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)" >"$tmpdir/v-filenames.txt"
   printf '%s' "$verdict_history" >"$tmpdir/v-history.json"
   printf '%s' "${sanitized_message_json:-[]}" >"$tmpdir/v-commits.json"
   verdict_doc_status=0
   jq -n -c --slurpfile reviews "$tmpdir/v-reviews.json" --slurpfile comments "$tmpdir/v-comments.json" --slurpfile inline "$tmpdir/v-inline.json" \
     --slurpfile history "$tmpdir/v-history.json" --slurpfile commits "$tmpdir/v-commits.json" --rawfile added "$added_payload" \
+    --slurpfile commitcomments "$tmpdir/v-commit-comments.json" --rawfile filenames "$tmpdir/v-filenames.txt" --arg headref "$head_ref" \
     --arg title "$title" --arg body "$raw_prbody" --arg head "$head" --arg base "$merge_base" '
     ($history[0].data.repository.pullRequest // null) as $pr |
     def edits: [(.nodes // [])[] | {authorId: (.author.databaseId // null), lastEditedAt: .lastEditedAt, editCount: (.userContentEdits.totalCount // 0)}];
     {head: $head, base: $base,
      reviews: $reviews[0], comments: $comments[0], inline_comments: $inline[0],
-     texts: {title: $title, body: $body, commit_messages: $commits[0], added_lines: ($added | split("\n"))},
+     commit_comments: $commitcomments[0],
+     texts: {title: $title, body: $body, head_ref: $headref, filenames: ($filenames | split("\n") | map(select(length > 0))),
+             commit_messages: $commits[0], added_lines: ($added | split("\n"))},
      graphql: {complete: (($history[0].errors == null) and ($pr != null)
                           and ($pr.reviews.pageInfo.hasNextPage == false) and ($pr.comments.pageInfo.hasNextPage == false)
                           and ($pr.timelineItems.pageInfo.hasNextPage == false)),

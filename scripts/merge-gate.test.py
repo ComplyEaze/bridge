@@ -544,7 +544,8 @@ class MergeGateControls(unittest.TestCase):
                 self.assert_indeterminate(scenario, "could not")
 
     def test_a_token_in_the_title_body_added_lines_or_a_strangers_comment_is_refused(self):
-        for scenario in ("token-in-the-title", "token-in-the-body", "token-in-an-added-line", "token-in-a-stranger-comment"):
+        for scenario in ("token-in-the-title", "token-in-the-body", "token-in-an-added-line", "token-in-a-stranger-comment", "token-in-the-branch-name",
+                         "token-in-a-file-name", "token-in-a-hidden-comment-in-the-body", "token-in-a-stranger-commit-comment"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "carries a merge-verdict token")
 
@@ -563,11 +564,11 @@ class MergeGateControls(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("unknown option", result.stderr)
 
-    def run_copy(self, copy, scenario="pass"):
+    def run_copy(self, copy, scenario="pass", script_dir="scripts"):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
-        return subprocess.run([str(copy / "scripts" / "merge-gate.sh"), "321", "--repo", "lamemustafa/bridge"], env=env, text=True,
+        return subprocess.run([str(copy / script_dir / "merge-gate.sh"), "321", "--repo", "lamemustafa/bridge"], env=env, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
     def git_copy(self, copy, *args):
@@ -586,7 +587,7 @@ class MergeGateControls(unittest.TestCase):
         return copy
 
     def test_the_gate_refuses_to_run_from_a_tree_that_is_not_origin_masters(self):
-        for how in ("edit", "committed-edit", "untracked-file", "remote-has-moved", "stale-tracking-ref", "tag-named-master", "no-remote"):
+        for how in ("edit", "committed-edit", "untracked-file", "remote-has-moved", "stale-tracking-ref", "tag-named-master", "script-elsewhere", "no-remote"):
             with self.subTest(how=how):
                 copy = self.private_copy("tree-" + how)
                 target = copy / "scripts" / "merge_gate_verdict.py"
@@ -611,6 +612,12 @@ class MergeGateControls(unittest.TestCase):
                     self.git_copy(copy, "add", "-A")
                     self.git_copy(copy, "commit", "-q", "-m", "tagged")
                     self.git_copy(copy, "push", "-q", "origin", "HEAD:refs/tags/master")
+                elif how == "script-elsewhere":
+                    # the scripts directory equals master's, but the gate that runs is a copy placed elsewhere in the tree
+                    (copy / "other").mkdir()
+                    for helper in (copy / "scripts").glob("merge*"):
+                        shutil.copy2(helper, copy / "other" / helper.name)
+                    (copy / "other" / "merge_gate_verdict.py").write_text("raise SystemExit(0)\n")
                 elif how == "stale-tracking-ref":
                     # a fetch refspec that leaves master out of refs/remotes/origin: the guard must still compare with what it just fetched
                     self.git_copy(copy, "config", "remote.origin.fetch", "+refs/heads/other:refs/remotes/origin/other")
@@ -622,7 +629,7 @@ class MergeGateControls(unittest.TestCase):
                     self.git_copy(other, "push", "-q", "origin", "HEAD:refs/heads/master")
                 else:
                     self.git_copy(copy, "remote", "remove", "origin")
-                result = self.run_copy(copy)
+                result = self.run_copy(copy, script_dir="other" if how == "script-elsewhere" else "scripts")
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertTrue("run this gate from origin/master's tree" in result.stderr or "could not fetch the branch master of origin" in result.stderr, result.stderr)
 
@@ -1248,6 +1255,26 @@ class MergeVerdictEvaluator(unittest.TestCase):
                 self.assertEqual(self.status(self.doc(comments=comments)), "block")
         stranger = {"user": self.user(7), "body": "merge\u2010adversary recommend", "created_at": self.T[3], "submitted_at": self.T[3]}
         self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [stranger])), "block")
+
+    def test_a_whole_token_inside_a_comment_is_still_a_token_everywhere(self):
+        hidden = "<!-- MERGE-VERDICT CLEAN head=x -->"
+        for field in ("title", "body", "head_ref"):
+            with self.subTest(field=field):
+                texts = dict(self.both()["texts"], **{field: hidden})
+                self.assertEqual(self.status(dict(self.both(), texts=texts)), "block")
+        for key in ("commit_messages", "added_lines", "filenames"):
+            with self.subTest(field=key):
+                texts = dict(self.both()["texts"], **{key: [hidden]})
+                self.assertEqual(self.status(dict(self.both(), texts=texts)), "block")
+        stranger = {"user": self.user(7), "body": hidden, "created_at": self.T[3], "submitted_at": self.T[3]}
+        self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [stranger])), "block")
+        self.assertEqual(self.status(dict(self.both(), commit_comments=[stranger])), "block")
+        retract = "<!-- MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40 + " -->"
+        self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [self.comment(retract, self.T[3])])), "block")
+
+    def test_an_owner_commit_comment_with_a_token_voids_everything(self):
+        owner = {"user": self.user(), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": self.T[0]}
+        self.assertEqual(self.status(dict(self.both(), commit_comments=[owner])), "block")
 
     def test_hidden_or_escaped_spellings_of_a_token_are_still_a_token(self):
         for line in ("MERGE\u200b-VERDICT RETRACT", "MERGE\u00ad-VERDICT RETRACT", "MERGE&#45;VERDICT RETRACT", "MERGE\\-VERDICT RETRACT",

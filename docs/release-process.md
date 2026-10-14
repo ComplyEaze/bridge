@@ -517,17 +517,22 @@ history and deletion are not read (only deleting it lifts that). Edits, deletion
 of items other accounts posted are ignored, except that an author the gate cannot read (a bot, a
 deleted account) is treated as possibly the owner and voids; the owner is matched by numeric id,
 not by login. The gate refuses a
-pull request whose title, body, commit messages or added lines carry either token, or on
-which anyone but the owner posted a review or comment that does, so a stranger's comment
-that carries a token blocks the pull request until it is deleted. The tokens are read without
-case, with look-alike hyphens, hidden characters, HTML comments and character references folded
-away, so a pull request that quotes one in its title, body, commits or added lines (this very
-section included) cannot pass the gate: its merge is the owner's own act. History it cannot read
+pull request whose title, body, branch name, changed file names, commit messages, added lines
+or commit comments carry either token, or on which anyone but the owner posted a review or
+comment (an inline review comment included) that does, so a stranger's comment that carries a
+token blocks the pull request until it is deleted; an owner's commit comment or inline comment
+that carries one voids every verdict instead. The tokens are read without case, with look-alike
+hyphens, hidden characters and character references folded away, and both with and without HTML
+comments removed (a token hidden inside a comment is still a token), so a pull request that quotes
+one in any of those places (this very section included) cannot pass the gate: its merge is the
+owner's own act. Not scanned: ignored files and the contents of files the gate does not read as
+text. History it cannot read
 completely (more than one page of reviews, comments or timeline events included) is
 `INDETERMINATE`, never a pass.
 
 The gate is run only from origin/master's tree, never from the pull request's checkout: it
-fetches the branch `master` of `origin` itself and refuses to run (exit 2) unless everything under `scripts/`
+fetches the branch `master` of `origin` itself into a ref of its own and refuses to run (exit 2) unless
+the directory the gate runs from is this tree's `scripts/` and everything under `scripts/`
 equals it, untracked files included, and its helpers run with an isolated Python interpreter
 so that a file placed beside them cannot replace a standard-library module. A pull request
 that changes or renames away `scripts/merge-gate*`, `scripts/merge_gate*.py` or anything

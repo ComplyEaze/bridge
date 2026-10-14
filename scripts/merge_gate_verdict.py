@@ -54,10 +54,15 @@ def has_token(text):
     """Whether the text carries either token, read without case and with every dash look-alike folded to a hyphen."""
     if not isinstance(text, str):
         return False
-    plain = html.unescape(re.sub(r"<!--.*?-->", "", text, flags=re.S)).replace("\\", "")
-    plain = "".join(c for c in plain if unicodedata.category(c) != "Cf")
-    folded = unicodedata.normalize("NFKC", plain).translate(DASHES).upper()
-    return any(token in folded for token in TOKENS)
+    readings = (re.sub(r"<!--.*?-->", "", text, flags=re.S),      # what a renderer shows
+                text.replace("<!--", "").replace("-->", ""))        # a token hidden inside a comment is still a token
+    for reading in readings:
+        plain = html.unescape(reading).replace("\\", "")
+        plain = "".join(c for c in plain if unicodedata.category(c) != "Cf")
+        folded = unicodedata.normalize("NFKC", plain).translate(DASHES).upper()
+        if any(token in folded for token in TOKENS):
+            return True
+    return False
 
 
 def is_owner_id(value):
@@ -109,9 +114,17 @@ def evaluate(doc):
             else:
                 voids.append(at)  # a NOT-CLEAN, a RETRACT or any malformed owner line
 
-    for label, text in (("title", doc["texts"]["title"]), ("body", doc["texts"]["body"])):
+    for label, text in (("title", doc["texts"]["title"]), ("body", doc["texts"]["body"]), ("branch name", doc["texts"].get("head_ref", ""))):
         if has_token(text):
             refusals.append("the pull request %s carries a merge-verdict token" % label)
+    if any(has_token(name) for name in doc["texts"].get("filenames", [])):
+        refusals.append("a changed file name carries a merge-verdict token")
+    for item in doc.get("commit_comments", []):
+        if has_token(item.get("body") or ""):
+            if is_owner(item):
+                voids.append(FOREVER)  # an owner's commit comment is never a verdict and its history is not read
+            else:
+                refusals.append("a commit comment by someone other than the owner carries a merge-verdict token")
     if any(has_token(m) for m in doc["texts"]["commit_messages"]):
         refusals.append("a commit message carries a merge-verdict token")
     if any(has_token(line) for line in doc["texts"]["added_lines"]):

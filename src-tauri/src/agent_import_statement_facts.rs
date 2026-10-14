@@ -654,6 +654,11 @@ pub(super) struct TransferFacts {
     /// a skip a person has acted on. A skip only built is superseded by the
     /// next build of its statement and is not live.
     pub(super) live_skips: BTreeSet<SkipKey>,
+    /// The batches that were sent to Tally, whether or not a readback found
+    /// them: a step that names a carrier tells a sent batch from one that was
+    /// never sent.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(super) sent_batches: BTreeSet<BatchId>,
 }
 
 /// A batch as the journal leaves it.
@@ -1131,10 +1136,17 @@ fn block_voucher(
 
 /// Fold the journal's records and the skip-only file into the facts of one
 /// company. Records of any other company are neither read nor checked.
+///
+/// `withdrawn` names the rows the build being judged posts although a skip
+/// holds them. For those rows only, a batch neither sent nor found does not
+/// hold the row and the Contra it books for it is left out: the build proposes
+/// to book that row itself, so an earlier unsent proposal of the same row must
+/// not stand between it and the other statement's Contra.
 pub(super) fn build_transfer_facts(
     events: Vec<JournalEvent>,
     skip_records: Vec<SkipOnlyRecord>,
     company_guid: &str,
+    withdrawn: &BTreeSet<String>,
 ) -> Result<TransferFacts, TransferFactsError> {
     let company = CompanyGuid::new(canonical_batch_guid(company_guid));
     let batches = fold_batches(events, company_guid)?;
@@ -1148,7 +1160,11 @@ pub(super) fn build_transfer_facts(
     // every batch holding a row as a voucher, whatever its lineage
     let mut holders: BTreeMap<&str, Held> = BTreeMap::new();
     for (at, batch) in batches.iter().enumerate() {
+        let proposal_only = !batch.sent && !batch.found;
         for voucher in &batch.line.vouchers {
+            if proposal_only && withdrawn.contains(voucher.txn_id.as_str()) {
+                continue;
+            }
             let held = holders
                 .entry(voucher.txn_id.as_str())
                 .or_insert_with(|| Held {
@@ -1298,6 +1314,9 @@ pub(super) fn build_transfer_facts(
     let mut kept = Vec::new();
     for decided in contras {
         let batch = &batches[decided.deciding];
+        if !batch.sent && !batch.found && withdrawn.contains(decided.txn.as_str()) {
+            continue;
+        }
         let superseded = !batch.sent
             && !batch.found
             && is_statement_txn_id(&decided.txn)
@@ -1347,6 +1366,11 @@ pub(super) fn build_transfer_facts(
         contras_without_facts,
         contras_superseded,
         live_skips,
+        sent_batches: batches
+            .iter()
+            .filter(|batch| batch.sent)
+            .map(|batch| BatchId::new(batch.line.batch_id.as_str()))
+            .collect(),
     })
 }
 

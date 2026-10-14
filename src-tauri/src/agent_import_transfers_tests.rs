@@ -93,6 +93,7 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
         contras_without_facts: 0,
         contras_superseded: 0,
         live_skips: BTreeSet::new(),
+        sent_batches: BTreeSet::new(),
     }
 }
 

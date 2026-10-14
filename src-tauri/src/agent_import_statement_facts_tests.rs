@@ -3089,3 +3089,128 @@ fn withdrawn_rows_must_be_sorted_statement_rows_the_batch_posts() {
     assert!(check(vec![st(6), st(5)]).is_err());
     assert!(check(vec![st(5), st(5)]).is_err());
 }
+
+// ---- the rows a build withdraws, and the batch being sent -------------------------
+
+/// Bank One's statement skipped `st(1)` (a skip-only record), and these unsent
+/// builds each post it as a Contra into Bank Two.
+fn skip_of_row_one() -> String {
+    skip_file(&[skip_record(
+        1,
+        ENDPOINT,
+        "2026-09-01T09:00:00Z",
+        facts(B1).skip(skip_row(&st(1), "500.00", B2, None)),
+    )])
+}
+
+fn posts_row_one(id: u32) -> Build {
+    build(id)
+        .voucher(contra(&st(1), N2, N1, "500.00"))
+        .facts(facts(B1).window("20260901", "20260930").contra(&st(1), None))
+}
+
+fn withdrawing_row_one() -> BTreeSet<String> {
+    BTreeSet::from([st(1)])
+}
+
+fn read_scoped(
+    journal: &Journal,
+    candidate: Option<Candidate>,
+    subject: Option<u32>,
+    withdrawn: &BTreeSet<String>,
+) -> TransferFacts {
+    let subject = subject.map(batch_id);
+    ledger::transfer_facts_scoped(
+        Cursor::new(journal.0.as_bytes()),
+        Cursor::new(skip_of_row_one().as_bytes()),
+        COMPANY,
+        candidate,
+        subject.as_deref(),
+        withdrawn,
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_withdrawn_row_an_unsent_batch_holds_stays_a_skip() {
+    let journal = Journal::default().batch(&posts_row_one(3));
+    let plain = read_scoped(&journal, None, None, &BTreeSet::new());
+    assert!(plain.skips.is_empty());
+    assert_eq!(plain.held_elsewhere.len(), 1);
+    let judged = read_scoped(&journal, None, None, &withdrawing_row_one());
+    assert_eq!(judged.held_elsewhere.len(), 0);
+    let [skip] = &judged.skips[..] else {
+        panic!("the row is a skip again");
+    };
+    assert_eq!(skip.key, key(B1, 1));
+    assert!(judged.live_skips.contains(&key(B1, 1)));
+}
+
+#[test]
+fn an_unsent_holders_contra_for_a_withdrawn_row_is_left_out() {
+    let journal = Journal::default().batch(&posts_row_one(3));
+    assert_eq!(
+        read_scoped(&journal, None, None, &BTreeSet::new())
+            .contras
+            .len(),
+        1
+    );
+    let judged = read_scoped(&journal, None, None, &withdrawing_row_one());
+    assert!(judged.contras.is_empty());
+    // a row that was not withdrawn is not touched
+    let other = BTreeSet::from([st(9)]);
+    assert_eq!(read_scoped(&journal, None, None, &other).contras.len(), 1);
+}
+
+#[test]
+fn a_sent_or_found_holder_still_holds_a_withdrawn_row() {
+    let holder = posts_row_one(3);
+    let sent = Journal::default().batch(&holder).sent(&holder);
+    let judged = read_scoped(&sent, None, None, &withdrawing_row_one());
+    assert_eq!(judged.held_elsewhere.len(), 1);
+    assert!(judged.skips.is_empty());
+    assert_eq!(judged.contras.len(), 1);
+    let found = Journal::default().batch(&posts_row_one(3).status("posted_verified"));
+    let judged = read_scoped(&found, None, None, &withdrawing_row_one());
+    assert_eq!(judged.retired_skips, 1);
+    assert_eq!(judged.contras.len(), 1);
+}
+
+#[test]
+fn the_subject_batch_is_left_out_of_the_facts_and_read_again_as_the_candidate() {
+    let subject = posts_row_one(3);
+    let journal = Journal::default()
+        .batch(&subject)
+        .status(&subject, "verification_incomplete");
+    let none = BTreeSet::new();
+    let without = read_scoped(&journal, None, Some(3), &none);
+    assert!(without.contras.is_empty() && without.held_elsewhere.is_empty());
+    let candidate = Candidate::Build(Box::new(BuildLine::of(&subject.line())));
+    let with = read_scoped(&journal, Some(candidate), Some(3), &none);
+    let as_built = read_scoped(&Journal::default().batch(&subject), None, None, &none);
+    assert_eq!(with.contras.len(), as_built.contras.len());
+    assert_eq!(with.held_elsewhere, as_built.held_elsewhere);
+}
+
+#[test]
+fn two_unsent_holders_are_both_left_out() {
+    let journal = Journal::default()
+        .batch(&posts_row_one(3))
+        .batch(&posts_row_one(4));
+    let judged = read_scoped(&journal, None, Some(3), &withdrawing_row_one());
+    assert!(judged.contras.is_empty());
+    assert_eq!(judged.skips.len(), 1);
+    assert!(judged.held_elsewhere.is_empty());
+}
+
+#[test]
+fn the_batches_that_were_sent_are_listed() {
+    let sent = posts_row_one(3);
+    let unsent = posts_row_one(4);
+    let journal = Journal::default().batch(&sent).sent(&sent).batch(&unsent);
+    let facts = read_scoped(&journal, None, None, &BTreeSet::new());
+    assert_eq!(
+        facts.sent_batches,
+        BTreeSet::from([BatchId::new(batch_id(3))])
+    );
+}

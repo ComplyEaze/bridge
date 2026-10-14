@@ -782,10 +782,35 @@ pub(super) fn transfer_facts(
     company_guid: &str,
     candidate: Option<statement_facts::Candidate>,
 ) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
+    transfer_facts_scoped(
+        journal,
+        skips_file,
+        company_guid,
+        candidate,
+        None,
+        &BTreeSet::new(),
+    )
+}
+
+/// [`transfer_facts`] for judging one build. `subject` is a batch already in
+/// the journal that is being judged again (the one about to be sent): every
+/// record of it is left out, so the journal reads as it did when that batch was
+/// built, and it is given as `candidate`. `withdrawn` is as for
+/// [`statement_facts::build_transfer_facts`].
+pub(super) fn transfer_facts_scoped(
+    journal: impl BufRead,
+    skips_file: impl BufRead,
+    company_guid: &str,
+    candidate: Option<statement_facts::Candidate>,
+    subject: Option<&str>,
+    withdrawn: &BTreeSet<String>,
+) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
     use statement_facts::{BuildLine, Candidate, JournalEvent, TransferFactsError};
     let mut events = Vec::new();
     scan_records(journal, |record, _| match record {
+        Record::Batch(batch) if Some(batch.batch_id.as_str()) == subject => {}
         Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
+        Record::Status(update) if Some(update.batch_id.as_str()) == subject => {}
         Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
             sent: matches!(update.record_type, StatusKind::DispatchIntent),
             batch_id: update.batch_id,
@@ -801,7 +826,7 @@ pub(super) fn transfer_facts(
         Some(Candidate::SkipOnly(record)) => skip_records.push(*record),
         None => {}
     }
-    statement_facts::build_transfer_facts(events, skip_records, company_guid)
+    statement_facts::build_transfer_facts(events, skip_records, company_guid, withdrawn)
 }
 
 fn scan_records(

@@ -233,7 +233,7 @@ In the builds this version describes, Bridge does the following to reduce risk:
 
 - It connects to Tally only at an address on your computer, and refuses any other address, proxy or redirect.
 - The desktop app's window is not allowed to load anything from the internet.
-- **Posting is off by default in new installations.** In the Claude Desktop extension, the posting setting is new in 0.6.0 and starts off, so a choice saved under 0.5.1 or earlier does not carry over: turn it on again only if you want posting, which now includes batches of up to 50 vouchers. If you set `BRIDGE_AGENT_ENABLE_WRITES` yourself outside the extension, it carries over and now also allows batches.
+- **Posting is off by default in new installations.** In the Claude Desktop extension, the posting setting is new in 0.6.0 and starts off, so a choice saved under 0.5.1 or earlier does not carry over: turn it on again only if you want posting, which now includes batches of up to 50 vouchers. If you set `BRIDGE_AGENT_ENABLE_WRITES` yourself outside the extension, it carries over and now also allows batches; if you also set `BRIDGE_AGENT_ENABLE_BATCH_POST`, which 0.6.0 retires, to any value, Bridge refuses every posting your AI Assistant asks for until you remove it and restart Bridge.
 - When posting is on, each posting waits for your approval in a separate window on your computer; a batch of up to 50 vouchers is approved once, from its summary.
 - Bridge gives your AI Assistant no way to approve a posting. Software that can control your screen could still click the button, so do not let such software run while a posting is waiting.
 - An approval is used once, stays valid for at most 15 minutes after you give it, and is kept only in memory.

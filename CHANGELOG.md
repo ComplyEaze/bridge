@@ -34,12 +34,16 @@ These changes are in source and not yet in a published build.
   join or premise refusal. The type-level `numbering_method` stays as it was, with its limitation.
   Measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named
   `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with
-  duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override), seen once on a real
-  book on 28 September 2026 and on no captured response, more than one series, Multi-user Auto, a single series not
-  named `Default`, a type created new and other releases are not measured, and the two requests have not yet been
-  run together as one tool call on a live Tally (part of #724). `sub_method` was measured on a second synthetic
-  book of the same release and edition, on one voucher type (Receipt, set to "Renumber Vouchers" and back); any
-  other wording, a series that prints none, Gold and other releases are not measured.
+  duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override) through this tool (it is
+  mapped from the series text measured on a synthetic book on 13 October 2026), more than one series, Multi-user
+  Auto, a single series not named `Default`, a type created new and other releases are not measured. The two
+  requests were run live as one tool call on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver,
+  Windows; 24 voucher types each, exactly one series per type, its name not read): the read was not refused, and on
+  the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with
+  duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's
+  defaults and not checked on screen, read Automatic (part of #724). `sub_method` was measured on a second
+  synthetic book of the same release and edition, on one voucher type (Receipt, set to "Renumber Vouchers" and
+  back); any other wording, a series that prints none, Gold and other releases are not measured.
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
@@ -86,10 +90,10 @@ These changes are in source and not yet in a published build.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
-  return (measured for Receipts only), or is cancelled or optional (decided first from Tally's own flags, never
-  counted as included; #1655), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  return (measured for Receipts only), or is cancelled, optional or post-dated (decided first from Tally's own flags, never
+  counted as included, with what its status flags read returned beside it; #1655, #1664), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
   judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
-  whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
+  whose flags are absent or odd, or whose deleted flag reads Yes (never seen), is returned as unread, never as included. The voucher type is named exactly (a
   type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher
   mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered
   buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
@@ -284,6 +288,15 @@ These changes are in source and not yet in a published build.
 
 **Safer or fixed**
 
+- When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
+  not a valid key, the app now says so with its own codes (`tally_mirror_key_missing`,
+  `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
+  credential prompt and retry. Restoring the credential (the macOS login keychain, or that user's Windows
+  Credential Manager) or opening the app as the same computer user is what recovers the mirror. The
+  app deletes nothing, and no reset exists yet (#1563). A key is also no longer created when the mirror file's
+  existence cannot be checked. Not measured on a real
+  credential store: what the macOS keychain or the Windows Credential Manager returns after a keychain reset
+  or a profile move.
 - A later check (`verify_import`, a repeated `post_import`, or the check
   before a review is recorded) of a post that Tally answered as creating none
   of its vouchers no longer suggests the voucher was edited in Tally. Its

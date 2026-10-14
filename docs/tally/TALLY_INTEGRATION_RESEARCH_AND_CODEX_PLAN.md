@@ -812,7 +812,9 @@ consumption authority is immutable.
 - JSONEX valid arrays.
 - Canonical semantic-projection fixtures that explicitly exclude transport
   provenance; the existing synthetic JSON reference is not an official Tally
-  JSONEX envelope and does not prove XML/JSONEX parity.
+  JSONEX envelope and does not prove XML/JSONEX parity. (2026-10-13 note: that
+  fixture was deleted in #1701; the only thing that read it was a test of its
+  own contents.)
 - unsupported capability.
 
 #### Acceptance
@@ -1279,7 +1281,9 @@ mirror/checkpoint/proof state, or supports writes. `Matched` remains
   is enabled by the production application.
 - The old Bridge-shaped JSON simulator fixture is explicitly labelled a
   synthetic semantic reference. It is not an official Tally JSONEX envelope
-  and supplies no capability or parity evidence.
+  and supplies no capability or parity evidence. (2026-10-13 note: that fixture
+  was deleted in #1701; the only thing that read it was a test of its own
+  contents.)
 
 #### Acceptance
 
@@ -1306,6 +1310,8 @@ mirror/checkpoint/proof state, or supports writes. `Matched` remains
 ---
 
 ### India Tax raw-observation authority slice
+
+**Amended 2026-10-14:** the parser described below was deleted in [#1710](https://github.com/ComplyEaze/bridge/pull/1710), because it had no request artifact and no caller outside itself, and no shipped build compiled it. The text below is kept as the design record and no longer describes the repository.
 
 Research against Tally's current GST setup, Release 3.0 schema, party-ledger,
 override, and report documentation also showed that the existing
@@ -1621,6 +1627,13 @@ BOM-qualified UTF-16LE/BE. A deterministic master generator preflights up to
 10,000-ledger corpus traverses the production decoder and strict ledger parser;
 an independently derived digest proves every parsed identity and accounting
 field matches the generator expectation and remains identical across encodings.
+(2026-10-13 note: the master generator described here was deleted in #1690, and
+with it the digest and the "generator expectation" in the last sentence. The
+10,000-ledger test remains in
+`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`: it builds
+its rows itself, decodes them in UTF-8, UTF-16LE and UTF-16BE, and compares each
+parsed field with the row it built, with no digest. See item 12 of
+`docs/step-by-step-roadmap.md`.)
 
 Protocol hardening rejects duplicate/misplaced export header status fields and
 DTD/processing constructs. Import result parsing accepts Tally's documented
@@ -1787,6 +1800,8 @@ partial-failure byte plumbing, property/fuzz testing, and live profile evidence
 remain P1/P2 follow-on work.
 
 #### Implemented PR16 boundary — Party Outstanding Confidence Receipt v1
+
+**Amended 2026-10-14:** the observation parser and the confidence engine described below were deleted in [#1710](https://github.com/ComplyEaze/bridge/pull/1710), because nothing outside them used them and no shipped build compiled the parser. The canonical model this section describes (Bills & Payments schema v2, the typed canonicalization and the shared reconciliation result shape) remains. The text below is kept as the design record and describes the repository only for that model.
 
 PR16 establishes a portable, read-only foundation for bill allocations and
 party outstandings. The version-2 canonical model preserves all four known

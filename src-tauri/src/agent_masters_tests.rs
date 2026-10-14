@@ -432,11 +432,13 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
         "the series level is now returned"
     );
     assert!(description.contains("a single series not named `Default`"));
-    assert!(description.contains("has not yet been run on a live Tally"));
     // The sub-method: where it is returned, and what was not measured.
     assert!(description.contains("`sub_method`"));
     assert!(description.contains("when one was sent by import without a number"));
     assert!(description.contains("the same through ComplyEaze Bridge's own post are not measured"));
+    assert!(description.contains("was run live on two synthetic books on 14 October 2026"));
+    assert!(!description.contains("has not yet been run on a live Tally"));
+    assert!(!description.contains("seen once on a real book"));
 }
 
 #[tokio::test]
@@ -1351,12 +1353,17 @@ async fn each_voucher_type_row_carries_the_numbering_of_its_own_series() {
     assert!(shipped("a single series not named `Default`"));
     assert!(shipped("a voucher type created new"));
     assert!(shipped("An `unrecognised` series method is never `manual`"));
-    assert!(shipped("has not yet been run on a live Tally"));
     assert!(shipped(
         "Under `automatic`, and under no other method, series_numbering carries `sub_method`"
     ));
     assert!(shipped("when one was sent by import without a number"));
     assert!(shipped("the same through ComplyEaze Bridge's own post"));
+    assert!(shipped(
+        "was run live on 14 October 2026 on two synthetic books"
+    ));
+    assert!(!shipped("has not yet been run on a live Tally"));
+    assert!(shipped("Automatic (Manual Override) through this tool"));
+    assert!(!shipped("seen once on a real book"));
     assert_eq!(one.requests(), VOUCHER_TYPE_PAGE_REQUESTS);
 }
 

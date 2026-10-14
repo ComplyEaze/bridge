@@ -5,16 +5,18 @@ A verdict is a pull request review or an issue comment (never an inline review c
 most one trailing newline, is exactly one line, lowercase hex:
     MERGE-VERDICT CLEAN head=<40> base=<40>
     MERGE-ADVERSARY RECOMMEND head=<40> base=<40>
-posted by the owner's numeric user id (a real User, not through an app). Both are needed for the current head and base; each is the
-newest by server time; any edit, deletion or dismissal of ANY owner item, and any later owner line that is not a positive one, voids
+posted by the owner's numeric user id (a real User, not through an app). Both are needed; the NEWEST line of each kind by server
+time is the one that counts, and it must name the current head and base; any edit, deletion or dismissal of ANY owner item, and any later owner line that is not a positive one, voids
 every verdict that is not strictly newer. A pull request that carries either token in its title, body, commit messages, added lines or
 anyone else's review or comment is refused. Unreadable evidence is indeterminate, never a pass.
 
 Usage: merge_gate_verdict.py < DOC.json   (prints one JSON object; exit 0 pass, 1 block, 2 indeterminate)
 """
+import html
 import json
 import re
 import sys
+import unicodedata
 from datetime import datetime, timezone
 
 OWNER_ID = 57982425
@@ -22,7 +24,6 @@ TOKENS = ("MERGE-VERDICT", "MERGE-ADVERSARY")
 HEX40 = r"([0-9a-f]{40})"
 CLEAN_RE = re.compile(r"MERGE-VERDICT CLEAN head=" + HEX40 + r" base=" + HEX40)
 RECOMMEND_RE = re.compile(r"MERGE-ADVERSARY RECOMMEND head=" + HEX40 + r" base=" + HEX40)
-VOID_RE = re.compile(r"MERGE-(?:VERDICT (?:NOT-CLEAN|RETRACT)|ADVERSARY (?:REJECT|RETRACT)) head=" + HEX40 + r" base=" + HEX40)
 FOREVER = datetime.max.replace(tzinfo=timezone.utc)
 
 
@@ -46,8 +47,21 @@ def one_line(body):
     return None if "\n" in text or "\r" in text else text
 
 
+DASHES = dict.fromkeys(list(range(0x2010, 0x2016)) + [0x2212, 0xFE58, 0xFE63, 0xFF0D], "-")
+
+
 def has_token(text):
-    return isinstance(text, str) and any(token in text for token in TOKENS)
+    """Whether the text carries either token, read without case and with every dash look-alike folded to a hyphen."""
+    if not isinstance(text, str):
+        return False
+    plain = html.unescape(re.sub(r"<!--.*?-->", "", text, flags=re.S)).replace("\\", "")
+    plain = "".join(c for c in plain if unicodedata.category(c) != "Cf")
+    folded = unicodedata.normalize("NFKC", plain).translate(DASHES).upper()
+    return any(token in folded for token in TOKENS)
+
+
+def is_owner_id(value):
+    return type(value) is int and value == OWNER_ID
 
 
 def is_owner(item):
@@ -61,7 +75,6 @@ def is_owner(item):
 
 def evaluate(doc):
     head, base = doc["head"], doc["base"]
-    owner_login = str(doc["owner_login"]).lower()
     reasons, refusals, unreadable = [], [], []
     voids = []
     positives = {"clean": [], "recommend": []}
@@ -84,7 +97,10 @@ def evaluate(doc):
                 continue
             line = one_line(body)
             if kind == "inline":
-                voids.append(at)  # an owner's inline comment is never a verdict; carrying the token voids what is older
+                voids.append(FOREVER)  # never a verdict; its time (a draft's) and its history are not read, so it voids everything
+                continue
+            if kind == "review" and item.get("state") in ("CHANGES_REQUESTED", "DISMISSED"):
+                voids.append(at)  # a review that asks for changes or was dismissed is not a verdict, whatever its body says
                 continue
             if line is not None and CLEAN_RE.fullmatch(line):
                 positives["clean"].append((at, CLEAN_RE.fullmatch(line).groups()))
@@ -108,7 +124,8 @@ def evaluate(doc):
         try:
             for kind in ("reviews", "comments"):
                 for node in graph[kind]:
-                    if str(node.get("authorLogin") or "").lower() != owner_login:
+                    unknown_author = node.get("authorId") is None
+                    if not is_owner_id(node.get("authorId")) and not unknown_author:
                         continue
                     edited = node.get("lastEditedAt")
                     if edited is not None:
@@ -116,14 +133,13 @@ def evaluate(doc):
                     elif node.get("editCount"):
                         voids.append(FOREVER)
             for event in graph["events"]:
-                if event.get("type") == "CommentDeletedEvent" and str(event.get("authorLogin") or "").lower() == owner_login:
-                    voids.append(when(event.get("createdAt")))
-                elif event.get("type") == "ReviewDismissedEvent" and str(event.get("authorLogin") or "").lower() == owner_login:
+                # an author that cannot be read (a deleted account) could be the owner: fail closed, it voids
+                if event.get("type") in ("CommentDeletedEvent", "ReviewDismissedEvent") and (is_owner_id(event.get("authorId")) or event.get("authorId") is None):
                     voids.append(when(event.get("createdAt")))
             for review in doc["reviews"]:
                 if is_owner(review) and review.get("state") == "DISMISSED":
                     dismissed = [when(e["createdAt"]) for e in graph["events"]
-                                 if e.get("type") == "ReviewDismissedEvent" and str(e.get("authorLogin") or "").lower() == owner_login]
+                                 if e.get("type") == "ReviewDismissedEvent" and is_owner_id(e.get("authorId"))]
                     voids.append(max(dismissed) if dismissed else FOREVER)
         except (KeyError, TypeError, Unreadable) as error:
             unreadable.append("the edit, deletion and dismissal history was malformed (%s)" % type(error).__name__)
@@ -131,11 +147,12 @@ def evaluate(doc):
     newest_void = max(voids) if voids else None
     stands = {}
     for name, found in positives.items():
-        mine = [at for at, (h, b) in found if h == head and b == base]
-        if not mine:
+        newest = max(found, key=lambda entry: entry[0]) if found else None
+        ambiguous = bool(found) and len({entry[1] for entry in found if entry[0] == newest[0]}) > 1
+        if newest is None or ambiguous or newest[1] != (head, base):
             stands[name] = False
-            reasons.append("no owner %s line for this head and merge base" % ("MERGE-VERDICT CLEAN" if name == "clean" else "MERGE-ADVERSARY RECOMMEND"))
-        elif newest_void is not None and not max(mine) > newest_void:
+            reasons.append("the newest owner %s line is missing or names another head or merge base" % ("MERGE-VERDICT CLEAN" if name == "clean" else "MERGE-ADVERSARY RECOMMEND"))
+        elif newest_void is not None and not newest[0] > newest_void:
             stands[name] = False
             reasons.append("the newest owner %s line is voided by a later or simultaneous edit, deletion, dismissal or withdrawal"
                            % ("MERGE-VERDICT CLEAN" if name == "clean" else "MERGE-ADVERSARY RECOMMEND"))
@@ -154,7 +171,7 @@ def evaluate(doc):
 if __name__ == "__main__":
     try:
         result = evaluate(json.load(sys.stdin))
-    except (KeyError, TypeError, ValueError) as error:
+    except Exception as error:
         print(json.dumps({"status": "indeterminate", "unreadable": ["the evidence document was malformed (%s)" % type(error).__name__],
                           "reasons": [], "refusals": [], "clean": False, "recommend": False}))
         raise SystemExit(2)

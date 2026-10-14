@@ -161,9 +161,9 @@ looked at in the review.
   the head and requires the same `pr-<N>.txt`. It measures removed and added pins
   against the pull request's merge base (not the base tip), and reads the base tip
   only to know which files are pinned there, so a branch that is behind a
-  master commit that added a pin is not reported as indeterminate. It also
-  requires a review or comment that names the head commit, the acknowledgement
-  path and every touched path. The `reviewer:` login must be that review's author.
+  master commit that added a pin is not reported as indeterminate. It no longer
+  matches a review to the acknowledgement's `reviewer:` line (the line is still read for
+  its shape); the owner's merge verdict, below, replaces the old review-naming checks.
 - **Branch history, in both checks.** The diff against the base cannot see a pin
   the branch added and then lost, for example when a merge of master is resolved by
   taking master's pin list: at the head the list equals the base's. So
@@ -493,25 +493,76 @@ before it is still redacted; an address placed inside the block is still counted
 so, strip the block from a merge commit message (or edit it with `git commit`) so it
 carries no noise.
 
+**The owner's merge verdict.** The gate no longer reads a reviewer's comment for its name or its
+head. Two machine lines count, each the whole body of a pull request review or an issue
+comment (never an inline review comment) posted by the owner's account (a numeric user id
+the script holds, a real user, not an app; the gate fails closed if the id cannot be
+read), after CRLF becomes LF and at most one trailing newline, exactly one line of
+lowercase hex:
+
+    MERGE-VERDICT CLEAN head=<40 hex> base=<40 hex>
+    MERGE-ADVERSARY RECOMMEND head=<40 hex> base=<40 hex>
+
+The newest line of each kind by server time is the one that counts, and it must name the
+pull request's current head and the merge base the gate computes itself from a freshly
+fetched base tip, so merging master into the branch voids a verdict while a master that
+moved under an unchanged branch does not (the merge queue's own run on the merged tree
+guards that case). Both lines are needed. An edit or deletion of any review or issue
+comment the owner's account posted, by whoever made it, a dismissal of an owner review, and
+any later owner line that is not a positive one (`MERGE-VERDICT NOT-CLEAN`, `MERGE-VERDICT
+RETRACT`, `MERGE-ADVERSARY REJECT`, `MERGE-ADVERSARY RETRACT` or any malformed line that
+carries either token) void every verdict that is not strictly newer; an owner's inline
+review comment that carries a token voids every verdict whatever its time, because its edit
+history and deletion are not read (only deleting it lifts that). Edits, deletions and dismissals
+of items other accounts posted are ignored, except that an author the gate cannot read (a bot, a
+deleted account) is treated as possibly the owner and voids; the owner is matched by numeric id,
+not by login. The gate refuses a
+pull request whose title, body, commit messages or added lines carry either token, or on
+which anyone but the owner posted a review or comment that does, so a stranger's comment
+that carries a token blocks the pull request until it is deleted. The tokens are read without
+case, with look-alike hyphens, hidden characters, HTML comments and character references folded
+away, so a pull request that quotes one in its title, body, commits or added lines (this very
+section included) cannot pass the gate: its merge is the owner's own act. History it cannot read
+completely (more than one page of reviews, comments or timeline events included) is
+`INDETERMINATE`, never a pass.
+
+The gate is run only from origin/master's tree, never from the pull request's checkout: it
+fetches the branch `master` of `origin` itself and refuses to run (exit 2) unless everything under `scripts/`
+equals it, untracked files included, and its helpers run with an isolated Python interpreter
+so that a file placed beside them cannot replace a standard-library module. A pull request
+that changes or renames away `scripts/merge-gate*`, `scripts/merge_gate*.py` or anything
+under `.github/` is the owner's own act: a verdict about the gate cannot clear a change to
+the gate. For a pull request that the owner did not author, the two lines must
+come from separately run reviewers, and each reviewer records in its own log which line it posted;
+the gate cannot check that. The gate trusts the `origin` remote of the clone it runs in, and
+ignored files (caches, logs) are not part of the tree comparison, which is harmless because the
+helpers run isolated. A root `.gitattributes` can change the bytes of the gate's files in a working
+tree; that can only break the gate (it then fails), not make it pass.
+
+Accepted residual risks, stated here so nobody reads the gate as stronger than it is: the lines bind
+the head and the merge base, not the name of the branch the pull request targets, so retargeting a
+pull request to another branch with the same merge base keeps the verdict; a
+reviewer session that has been tricked into obeying text it was asked to review can post
+both lines under the owner's account; a review posted by the owner's account through an
+application token cannot be told from one typed by the owner, because a review object carries
+no application field (an issue comment does, and one posted through an application is not
+accepted); the contributor's repository administration rights (deliberate) can bypass any
+gate.
+
 **Binary files.** Git shows a file it reads as binary (a NUL byte, so every UTF-16
 fixture, images, archives) as `Binary files differ` or a `GIT binary patch`, with no
-text to scan. The gate cannot read those bytes, so it holds the PR until a human
-attests: the merger runs
-`scripts/merge-gate.sh <PR> --binary-review-sha <head> --independent-review-sha <head>`
-with the full 40-hex head SHA. The two flags are an operator's statement, never read
-from the PR body or from a comment, and each must equal the head the gate is running
-on, so a later push invalidates them.
-- `--binary-review-sha`: the merger states that they read every binary addition or
-  change (the bytes, not the file name), its ownership and licence, and its NOTICE
-  obligation. For a captured fixture this means its `PROVENANCE` entry matches the
-  bytes (`scripts/check-fixture-provenance.mjs`) and the capture is synthetic.
-- `--independent-review-sha`: a second person, who is not the author, states the same
-  reading of the same head.
-A review or comment by a reviewer (V4 included) is evidence for the merger, not the
-attestation: the gate does not look at comments for these flags. The gate lists the
-first eight binary paths in its message so the merger knows what to read. Letting a
-named review comment carry the attestation, as the acknowledgement review does, would
-be a separate change to the gate.
+text to scan. The gate cannot read those bytes, so it holds the PR until the owner
+attests: `scripts/merge-gate.sh <PR> --binary-review-sha <head>` with the full 40-hex
+head SHA. This flag is the owner's own act, never read from the PR body or from a
+comment (the gate cannot tell who typed it: that it is the owner is kept by who runs the
+command), and no verdict line can stand in for it: a diff never shows binary bytes,
+licence or NOTICE obligations. It must equal the head the gate is running on, so a later
+push invalidates it. It states that the owner read every binary addition or change (the
+bytes, not the file name), its ownership and licence and its NOTICE obligation; for a
+captured fixture this means its `PROVENANCE` entry matches the bytes
+(`scripts/check-fixture-provenance.mjs`) and the capture is synthetic. The gate lists
+the first eight binary paths in its message so the merger knows what to read. The former
+`--independent-review-sha` flag is gone.
 
 ## Signing and publication
 

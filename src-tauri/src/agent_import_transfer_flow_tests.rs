@@ -8,7 +8,7 @@ use super::bank_tests::{
 };
 use super::*;
 
-const BANK_A: &str = "WR2 Sales";
+pub(super) const BANK_A: &str = "WR2 Sales";
 pub(super) const BANK_B: &str = "Bridge Nested Debtor WR4";
 /// A row bank A's statement skipped as carried by bank B's Contra.
 pub(super) const SKIPPED: &str = "st-20260901-00000000000000b1";

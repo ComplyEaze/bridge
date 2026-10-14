@@ -484,6 +484,44 @@ impl TransferRefusal {
     }
 }
 
+/// What the transfer check at send decided about a saved batch.
+pub(super) struct SendCheck {
+    /// Why the batch is refused, when it is.
+    pub(super) refusal: Option<TransferRefusal>,
+    /// When it is not refused: the retired batches the decision rests on,
+    /// because counting any of them would refuse it. The send reads Tally for
+    /// each before it goes on.
+    pub(super) rests_on_retired: BTreeSet<String>,
+}
+
+impl SendCheck {
+    fn clear() -> Self {
+        Self {
+            refusal: None,
+            rests_on_retired: BTreeSet::new(),
+        }
+    }
+
+    fn refused(refusal: TransferRefusal) -> Self {
+        Self {
+            refusal: Some(refusal),
+            rests_on_retired: BTreeSet::new(),
+        }
+    }
+}
+
+const RETIRED_BATCH_FOUND_STEP: &str = "Nothing was sent to Tally and the approval was not used. This batch can be sent only because a batch of this company was retired after a read of Tally found it absent, and ComplyEaze Bridge read Tally again for that batch before sending: a voucher there carries the narration tag of a batch named in retired_batches. That batch counts again, so this batch cannot be sent as built. Run verify_import on the batch named in retired_batches, then build the statement again.";
+
+/// The refusal of a send whose second read of Tally found a retired batch's own
+/// tag: the batches it found are named.
+pub(super) fn retired_batch_found(batches: &[String]) -> TransferRefusal {
+    TransferRefusal {
+        reason: "retired_batch_found_in_tally",
+        detail: json!({"retired_batches": batches}),
+        next_step: RETIRED_BATCH_FOUND_STEP.into(),
+    }
+}
+
 pub(super) enum Admission {
     Admitted(TransferSummary),
     Refused(TransferRefusal),
@@ -508,6 +546,9 @@ pub(super) struct TransferInput {
     /// `candidate`, so the journal reads as it did when the batch was built, plus
     /// whatever was written since.
     pub(super) subject: Option<String>,
+    /// Batches the journal retired that are read as if it had not: they count
+    /// as they did before a read of Tally found them absent.
+    pub(super) count_retired: BTreeSet<String>,
 }
 
 impl TransferInput {
@@ -685,13 +726,15 @@ impl Server {
     /// The facts of one company and the view over them, with a candidate read as
     /// the newest record when one is given.
     ///
-    /// `subject` and `withdrawn` are as for `ledger::transfer_facts_scoped`.
+    /// `subject`, `withdrawn` and `counted_retired` are as for
+    /// `ledger::transfer_facts_scoped`.
     pub(super) fn transfer_view_while_admitted(
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,
         subject: Option<&str>,
         withdrawn: &BTreeSet<String>,
+        counted_retired: &BTreeSet<String>,
     ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
         let journal: Box<dyn std::io::BufRead> = match self.import_journal_while_admitted() {
             Ok(Some(reader)) => Box::new(reader),
@@ -708,6 +751,7 @@ impl Server {
             candidate,
             subject,
             withdrawn,
+            counted_retired,
         )?;
         let view = transfer_pairing_view(
             &facts.skips,
@@ -753,6 +797,7 @@ impl Server {
             None,
             input.subject.as_deref(),
             &input.withdraw,
+            &input.count_retired,
         ) {
             Ok(view) => view,
             Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
@@ -870,6 +915,7 @@ impl Server {
             Some(input.candidate),
             input.subject.as_deref(),
             &BTreeSet::new(),
+            &input.count_retired,
         ) {
             Ok(view) => view,
             Err(error) => return Ok(without_facts(needs_the_view, &error)),
@@ -888,14 +934,16 @@ impl Server {
     }
 
     /// A saved batch about to be sent, judged as its build was and against the
-    /// journal as it is now. `None` when the batch is admitted, or is not about
-    /// transfers at all (it posts no statement row, carries no statement and
-    /// withdraws nothing), as the build decides it. Called with the admission
-    /// lock held, shared or exclusive.
-    pub(super) fn transfers_refusal_for_send_while_admitted(
+    /// journal as it is now. No refusal when the batch is admitted, or is not
+    /// about transfers at all (it posts no statement row, carries no statement
+    /// and withdraws nothing), as the build decides it. When it is admitted, the
+    /// check also names the retired batches that decision rests on: those whose
+    /// being counted would refuse it. Called with the admission lock held,
+    /// shared or exclusive.
+    pub(super) fn transfers_check_for_send_while_admitted(
         &self,
         line: &ImportLedgerLine,
-    ) -> Result<Option<TransferRefusal>, String> {
+    ) -> Result<SendCheck, String> {
         let statement = match &line.statement {
             Some(recorded) => match serde_json::from_value::<StatementFacts>(recorded.clone()) {
                 Ok(facts) => Some(facts),
@@ -905,46 +953,77 @@ impl Server {
                         error: FactsError::Unparsable,
                     };
                     return Ok(match without_facts(true, &error) {
-                        Admission::Refused(refusal) => Some(refusal.for_send()),
-                        Admission::Admitted(_) => None,
+                        Admission::Refused(refusal) => SendCheck::refused(refusal.for_send()),
+                        Admission::Admitted(_) => SendCheck::clear(),
                     });
                 }
             },
             None => None,
         };
-        // judged as it was built
-        let mut candidate = BuildLine::of(line);
-        candidate.status = "built".to_string();
-        let input = TransferInput {
-            company_guid: canonical_batch_guid(&line.company_guid),
-            candidate: Candidate::Build(Box::new(candidate)),
-            skip_rows: statement
-                .iter()
-                .flat_map(|statement| &statement.skip_rows)
-                .map(|skip| skip.bridge_txn_id.clone())
-                .collect(),
-            voucher_rows: line
-                .vouchers
-                .iter()
-                .filter(|voucher| {
-                    bridge_bank_statement::proposals::is_statement_txn_id(&voucher.bridge_txn_id)
-                })
-                .map(|voucher| voucher.bridge_txn_id.clone())
-                .collect(),
-            withdraw: statement
-                .iter()
-                .flat_map(|statement| statement.withdrawn.iter().cloned())
-                .collect(),
-            own_lineage: line.amends_batch_id.clone(),
-            carries_statement: statement.is_some(),
-            subject: Some(line.batch_id.clone()),
+        // judged as it was built, with the retired batches in `count_retired`
+        // read as the journal did not retire them
+        let judge = |count_retired: BTreeSet<String>| -> Result<Option<Admission>, String> {
+            let mut candidate = BuildLine::of(line);
+            candidate.status = "built".to_string();
+            let input = TransferInput {
+                company_guid: canonical_batch_guid(&line.company_guid),
+                candidate: Candidate::Build(Box::new(candidate)),
+                skip_rows: statement
+                    .iter()
+                    .flat_map(|statement| &statement.skip_rows)
+                    .map(|skip| skip.bridge_txn_id.clone())
+                    .collect(),
+                voucher_rows: line
+                    .vouchers
+                    .iter()
+                    .filter(|voucher| {
+                        bridge_bank_statement::proposals::is_statement_txn_id(
+                            &voucher.bridge_txn_id,
+                        )
+                    })
+                    .map(|voucher| voucher.bridge_txn_id.clone())
+                    .collect(),
+                withdraw: statement
+                    .iter()
+                    .flat_map(|statement| statement.withdrawn.iter().cloned())
+                    .collect(),
+                own_lineage: line.amends_batch_id.clone(),
+                carries_statement: statement.is_some(),
+                subject: Some(line.batch_id.clone()),
+                count_retired,
+            };
+            if !input.needs_the_view() {
+                return Ok(None);
+            }
+            self.admit_transfers_while_admitted(input).map(Some)
         };
-        if !input.needs_the_view() {
-            return Ok(None);
+        let refuses = |admission: Option<Admission>| matches!(admission, Some(Admission::Refused(_)));
+        match judge(BTreeSet::new())? {
+            None => return Ok(SendCheck::clear()),
+            Some(Admission::Refused(refusal)) => return Ok(SendCheck::refused(refusal.for_send())),
+            Some(Admission::Admitted(_)) => {}
         }
-        Ok(match self.admit_transfers_while_admitted(input)? {
-            Admission::Refused(refusal) => Some(refusal.for_send()),
-            Admission::Admitted(_) => None,
+        // Admitted with every retired batch out of the facts. It rests on one
+        // whose being counted would refuse it. If none does alone but all
+        // together do, it rests on all of them.
+        let retired = match self.import_journal_while_admitted()? {
+            Some(reader) => {
+                ledger::retired_batches(reader, &canonical_batch_guid(&line.company_guid))?
+            }
+            None => BTreeSet::new(),
+        };
+        let mut rests_on = BTreeSet::new();
+        for batch in &retired {
+            if refuses(judge(BTreeSet::from([batch.clone()]))?) {
+                rests_on.insert(batch.clone());
+            }
+        }
+        if rests_on.is_empty() && !retired.is_empty() && refuses(judge(retired.clone())?) {
+            rests_on = retired;
+        }
+        Ok(SendCheck {
+            refusal: None,
+            rests_on_retired: rests_on,
         })
     }
 
@@ -966,6 +1045,7 @@ impl Server {
                         &canonical_batch_guid(company_guid),
                         None,
                         None,
+                        &BTreeSet::new(),
                         &BTreeSet::new(),
                     )
                     .ok()

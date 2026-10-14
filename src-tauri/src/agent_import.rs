@@ -110,6 +110,12 @@ enum VerifyIntent {
     /// The tool with `if_absent` set to `retire`: a read of Tally that retires
     /// a batch that was never sent if Tally does not hold it.
     Retire,
+    /// The read a send makes for a batch that was retired, when the decision to
+    /// send rests on its being out of the transfer facts: the retirement's own
+    /// window and licence qualification, nothing removed and nothing retired,
+    /// and recorded as a verification, which counts the batch again if its own
+    /// tag is seen.
+    RetiredRecheck,
 }
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
@@ -1080,6 +1086,7 @@ impl Server {
                     .collect(),
                 withdraw,
                 subject: None,
+                count_retired: BTreeSet::new(),
                 own_lineage: amends_batch_id.clone(),
                 candidate: statement_facts::Candidate::Build(Box::new(statement_facts::BuildLine {
                     batch_id: batch_id.clone(),
@@ -1480,6 +1487,7 @@ impl Server {
                 voucher_rows: BTreeSet::new(),
                 withdraw,
                 subject: None,
+                count_retired: BTreeSet::new(),
                 own_lineage: None,
                 carries_statement: true,
             })
@@ -1702,6 +1710,9 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         let current_dispatch = intent == VerifyIntent::AfterPost;
         let retiring = intent == VerifyIntent::Retire;
+        // Both read the retirement's window and assert an absence when nothing
+        // is found, so both are qualified as an absence is.
+        let rechecking = intent == VerifyIntent::RetiredRecheck;
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
         let ledger::BatchSnapshot {
@@ -1727,6 +1738,14 @@ impl Server {
         if retiring {
             self.refuse_retire_from_the_journal(&line, dispatched, retired, ever_found)?;
         }
+        if rechecking {
+            // Only a batch the journal retired is read for again, and only on the
+            // Tally it was built for, and with the mark that read depends on.
+            if !retired || dispatched {
+                return Err("import_verification_conflict_retry".to_string().into());
+            }
+            self.refuse_unreadable_retire_from_the_journal(&line)?;
+        }
         validate_dispatched_import_endpoint(&line, dispatched, &self.settings.endpoint)?;
         let opening_mode = self.observe_import_profile().await?;
         let (company, identity, identity_evidence) = self
@@ -1744,7 +1763,7 @@ impl Server {
             // after the saved file is gone, so a hand import of that file cannot
             // begin during the read. Everything that can be decided before the
             // file is removed has been.
-            let widened = if retiring {
+            let widened = if retiring || rechecking {
                 if let Err(refusal) = opening_mode.qualification {
                     return Err(refusal.verification_code().to_string().into());
                 }
@@ -1944,7 +1963,10 @@ impl Server {
             let mut closing_mode_evidence = None;
             // A retirement asserts absence whatever the read found, so it is
             // qualified as an absence is.
-            if retiring || result["counts"]["not_found"].as_u64().unwrap_or(0) > 0 {
+            if retiring
+                || rechecking
+                || result["counts"]["not_found"].as_u64().unwrap_or(0) > 0
+            {
                 // Positive rows are direct observations. Absence additionally requires
                 // the product, release and licence tier qualified by the live slice.
                 if let Err(refusal) = opening_mode.qualification {
@@ -1977,7 +1999,7 @@ impl Server {
             });
             // This call's own check, or the doubt recorded when this batch was
             // posted: a later readback, which compares by name, never clears it.
-            if retiring {
+            if retiring || rechecking {
                 proof["retire_read"] = json!({
                     "from": window.0.as_str(),
                     "to": window.1.as_str(),
@@ -2160,6 +2182,16 @@ impl Server {
         if ever_found {
             return Err("import_retire_batch_found".to_string().into());
         }
+        self.refuse_unreadable_retire_from_the_journal(line)
+    }
+
+    /// What a read for a retired or retiring batch is refused for by the batch's
+    /// own record: the Tally here is not the one it was built for, or the read
+    /// has no mark to attribute vouchers by.
+    fn refuse_unreadable_retire_from_the_journal(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<(), ToolFailure> {
         // A read of another Tally says nothing of the one the batch was built for.
         let origin = super::canonical_loopback_origin(&self.settings.endpoint)
             .map_err(|_| "host_setting_invalid".to_string())?;
@@ -2173,6 +2205,41 @@ impl Server {
             return Err("import_retire_mark_missing".to_string().into());
         }
         Ok(())
+    }
+
+    /// Reads Tally for each retired batch of `ids`, over its retirement window,
+    /// and names those that now show a voucher carrying their own tag. Each
+    /// read is recorded as a verification, so a batch seen again counts in the
+    /// transfer view once more.
+    pub(super) async fn retired_batches_seen_again(
+        &self,
+        ids: &BTreeSet<String>,
+        company_guid: &str,
+        accumulated: &mut Evidence,
+    ) -> Result<Vec<String>, ToolFailure> {
+        let mut seen = Vec::new();
+        for id in ids {
+            let args = json!({"company_guid": company_guid, "batch_id": id});
+            let outcome = self
+                .verify_import_with_dispatch(
+                    &args,
+                    VerifyIntent::RetiredRecheck,
+                    &mut None,
+                    None,
+                    &mut None,
+                    None,
+                )
+                .await?;
+            *accumulated = combine_evidence(accumulated.clone(), outcome.evidence);
+            let rows = outcome.payload["result"]["vouchers"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            if retire::sees_its_own_tag(&rows) {
+                seen.push(id.clone());
+            }
+        }
+        Ok(seen)
     }
 
     /// Publishes the proof files and the ledger line recording `status`, the
@@ -2232,6 +2299,7 @@ impl Server {
                         &canonical_batch_guid(&request.company_guid),
                         None,
                         None,
+                        &BTreeSet::new(),
                         &BTreeSet::new(),
                     )
                     .ok()

@@ -3138,6 +3138,7 @@ fn read_scoped(
         candidate,
         subject.as_deref(),
         withdrawn,
+        &BTreeSet::new(),
     )
     .unwrap()
 }
@@ -3269,6 +3270,47 @@ fn a_retired_batch_leaves_the_facts_whole() {
     let held = facts_of_journal(&Journal::default().batch(&holder));
     assert_eq!(held.held_elsewhere.len(), 1);
     assert_eq!(held.contras.len(), 1);
+}
+
+/// A caller that must know what a retirement changes reads the journal as if a
+/// named batch had not been retired: it holds and books as it did before, and
+/// the journal lists the batches it retired.
+#[test]
+fn a_retired_batch_is_read_as_counting_when_the_caller_names_it() {
+    let holder = posts_row_one(3);
+    let other = build(160).voucher(payment(&st(2), "500.00"));
+    let journal = Journal::default()
+        .batch(&holder)
+        .retired(&holder)
+        .batch(&other);
+    let counted = |ids: &[u32]| {
+        let names: BTreeSet<String> = ids.iter().map(|id| batch_id(*id)).collect();
+        ledger::transfer_facts_scoped(
+            Cursor::new(journal.0.as_bytes()),
+            Cursor::new(skip_of_row_one().as_bytes()),
+            COMPANY,
+            None,
+            None,
+            &BTreeSet::new(),
+            &names,
+        )
+        .unwrap()
+    };
+    let retired = ledger::retired_batches(Cursor::new(journal.0.as_bytes()), COMPANY).unwrap();
+    assert_eq!(retired, BTreeSet::from([batch_id(3)]));
+    // another company's retirements are not listed
+    assert_eq!(
+        ledger::retired_batches(Cursor::new(journal.0.as_bytes()), OTHER_COMPANY).unwrap(),
+        BTreeSet::new()
+    );
+    assert!(counted(&[]).held_elsewhere.is_empty());
+    assert_eq!(counted(&[3]).held_elsewhere.len(), 1);
+    assert_eq!(counted(&[3]).contras.len(), 1);
+    // naming a batch the journal did not retire changes nothing
+    assert_eq!(
+        counted(&[160]).held_elsewhere.len(),
+        counted(&[]).held_elsewhere.len()
+    );
 }
 
 #[test]

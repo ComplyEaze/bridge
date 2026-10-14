@@ -1913,7 +1913,15 @@ refused as `proposals_legacy` (parse the statement again).
   the status a verification before the send wrote does not change the
   decision, and a row it withdraws is judged as if no batch that was neither
   sent nor found held it or booked it. A batch that is not about transfers (no
-  statement row, no statement, no withdrawal) is not checked.
+  statement row, no statement, no withdrawal) is not checked. When the decision
+  to send rests on a retired batch being out of these records (counting it
+  would refuse the batch), Tally is read again, before the person is asked, for
+  that retired batch's own narration tag, over the window its retirement read
+  and with the same size limits. A batch whose tag is found counts again, and
+  the send is refused as `retired_batch_found_in_tally` with the batches named in
+  `retired_batches`; a retirement that arrives after that read refuses under the
+  lock as `retired_batch_not_read_again`. The cost of that second read on a live
+  Tally is not measured yet.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
   build that needs the view (`transfer_view_not_established`); builds that do

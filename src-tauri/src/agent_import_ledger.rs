@@ -891,6 +891,7 @@ pub(super) fn transfer_facts(
         candidate,
         None,
         &BTreeSet::new(),
+        &BTreeSet::new(),
     )
 }
 
@@ -898,7 +899,9 @@ pub(super) fn transfer_facts(
 /// the journal that is being judged again (the one about to be sent): every
 /// record of it is left out, so the journal reads as it did when that batch was
 /// built, and it is given as `candidate`. `withdrawn` is as for
-/// [`statement_facts::build_transfer_facts`].
+/// [`statement_facts::build_transfer_facts`]. A batch in `counted_retired` is
+/// read as if the journal had not retired it: it counts as it did before a read
+/// of Tally found it absent.
 pub(super) fn transfer_facts_scoped(
     journal: impl BufRead,
     skips_file: impl BufRead,
@@ -906,6 +909,7 @@ pub(super) fn transfer_facts_scoped(
     candidate: Option<statement_facts::Candidate>,
     subject: Option<&str>,
     withdrawn: &BTreeSet<String>,
+    counted_retired: &BTreeSet<String>,
 ) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
     use statement_facts::{BuildLine, Candidate, JournalEvent, TransferFactsError};
     let mut events = Vec::new();
@@ -914,7 +918,9 @@ pub(super) fn transfer_facts_scoped(
         Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
         Record::Status(update) if Some(update.batch_id.as_str()) == subject => {}
         Record::Status(update) if update.sets_status() => {
-            if matches!(update.record_type, StatusKind::BatchRetired) {
+            if matches!(update.record_type, StatusKind::BatchRetired)
+                && !counted_retired.contains(&update.batch_id)
+            {
                 events.push(JournalEvent::BatchRetired {
                     batch_id: update.batch_id.clone(),
                 });
@@ -937,6 +943,32 @@ pub(super) fn transfer_facts_scoped(
         None => {}
     }
     statement_facts::build_transfer_facts(events, skip_records, company_guid, withdrawn)
+}
+
+/// The batches of the company that the journal retired, in the whole journal
+/// admitted on the way.
+pub(super) fn retired_batches(
+    reader: impl BufRead,
+    company_guid: &str,
+) -> Result<BTreeSet<String>, String> {
+    let mut company_of: BTreeMap<String, bool> = BTreeMap::new();
+    let mut retired = BTreeSet::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(batch) => {
+            company_of.insert(
+                batch.batch_id.clone(),
+                batch.company_guid.eq_ignore_ascii_case(company_guid),
+            );
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::BatchRetired)
+                && company_of.get(&update.batch_id) == Some(&true)
+            {
+                retired.insert(update.batch_id.clone());
+            }
+        }
+    })?;
+    Ok(retired)
 }
 
 fn scan_records(

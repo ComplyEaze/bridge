@@ -24,7 +24,10 @@ These changes are in source and not yet in a published build.
   `transfer_view_not_established`): once before the person is asked and again under the admission lock. A batch
   records the rows its build withdrew, and a row a build withdraws is judged as if no batch that was neither sent
   nor found held it or booked it, so a rebuild with the same withdrawal can no longer pass a check the first build
-  passed before the other account's Contra was verified (part of #1703).
+  passed before the other account's Contra was verified. When that decision rests on a batch the journal retired
+  (counting it would refuse the batch), `post_import` first reads Tally again for the retired batch's own narration tag
+  and refuses with `retired_batch_found_in_tally` if it is found; the cost of that read on a live Tally is not
+  measured yet (part of #1703).
 - `verify_import` takes `if_absent` set to `retire`, for a batch that was never sent and will not be. It plans and sizes the read, removes the
   batch's saved file (a refusal of the plan leaves the file in place), then reads Tally over the batch's days and a week either side (limited to the book, then moved further out to the nearest day the licence accepts as a boundary; refused when no such window exists), and if no voucher carries the
   batch's own narration tag and each of its vouchers is not found (a content match keeps the batch counting), it

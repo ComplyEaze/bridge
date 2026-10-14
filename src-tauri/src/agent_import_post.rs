@@ -587,6 +587,8 @@ impl Server {
         let mut send_transfer_refusal: Option<(Value, String)> = None;
         // The transfer check under the admission lock refused: its code only.
         let mut transfers_changed_under_lock = false;
+        // The retired batches Tally was read for again before the person was asked.
+        let mut rechecked_retired: BTreeSet<String> = BTreeSet::new();
         let operation: Result<Step, ToolFailure> = async {
             // Before the saved file or anything else is read: a read of Tally
             // found this batch absent and it was retired, so it is never sent.
@@ -748,14 +750,30 @@ impl Server {
             // The transfer view, as the build judged it, against the journal as it
             // is now: refused before the person is asked, with the build's code.
             // The check that binds runs under the exclusive lock below.
-            let transfers_refused = {
+            let transfers_checked = {
                 let _lock = self.lock_import_admission_shared()?;
-                self.transfers_refusal_for_send_while_admitted(&line)?
+                self.transfers_check_for_send_while_admitted(&line)?
             };
-            if let Some(refusal) = transfers_refused {
+            if let Some(refusal) = transfers_checked.refusal {
                 let (code, detail, step) = refusal.into_parts();
                 send_transfer_refusal = Some((detail, step));
                 return Err(code.to_string().into());
+            }
+            // The decision to send may rest on a batch the journal retired, which
+            // is out of the facts because a read of Tally found it absent. That
+            // read was of a moment: before the person is asked, Tally is read
+            // again for that batch's own tag, over the window the retirement
+            // read, and a batch seen again counts again.
+            rechecked_retired = transfers_checked.rests_on_retired;
+            if !rechecked_retired.is_empty() {
+                let seen = self
+                    .retired_batches_seen_again(&rechecked_retired, guid, &mut accumulated)
+                    .await?;
+                if !seen.is_empty() {
+                    let (code, detail, step) = transfers::retired_batch_found(&seen).into_parts();
+                    send_transfer_refusal = Some((detail, step));
+                    return Err(code.to_string().into());
+                }
             }
             let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
             // Number matching precedence is not qualified for native Create.
@@ -1103,12 +1121,20 @@ impl Server {
                         // The transfer records again, between the check before the
                         // dialog and the intent: the approval is withdrawn and the
                         // next call gives the whole reason before asking.
-                        if let Some(refusal) = self
-                            .transfers_refusal_for_send_while_admitted(&current.batch)
-                            .map_err(BeforeDispatchError::Other)?
-                        {
+                        let checked = self
+                            .transfers_check_for_send_while_admitted(&current.batch)
+                            .map_err(BeforeDispatchError::Other)?;
+                        if let Some(refusal) = checked.refusal {
                             return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
                                 refusal.reason(),
+                            )));
+                        }
+                        // A retired batch this decision now rests on that Tally was
+                        // not read for before the dialog: the retirement came in
+                        // meanwhile, and the next call reads for it.
+                        if !checked.rests_on_retired.is_subset(&rechecked_retired) {
+                            return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
+                                "retired_batch_not_read_again",
                             )));
                         }
                         // Before the approval is spent: a refusal here withdraws it,

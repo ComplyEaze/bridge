@@ -682,26 +682,53 @@ async fn if_absent_takes_one_value_and_no_proof_page() {
     assert_eq!(other["isError"], true, "{other}");
 }
 
-/// The other account's statement is built and never sent, so it counts as
-/// carrying the transfer and the batch that withdrew the skip cannot be sent.
-/// Once a read of Tally has retired it, that batch goes through.
-#[tokio::test]
-async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends() {
+/// Moves `batches` and the skip file of a data folder to the Tally `server`
+/// reads, so that a run of calls over several batches meets one simulator.
+fn move_to_the_tally_of(server: &Server, directory: &Path, batches: &[&str]) {
+    let now = crate::agent::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    for batch_id in batches {
+        let mut line = server
+            .latest_import_snapshot(batch_id)
+            .unwrap()
+            .unwrap()
+            .batch;
+        line.endpoint_origin = Some(now.clone());
+        server.append_import_ledger(&line).unwrap();
+    }
+    let skips = directory.join(statement_facts::SKIPS_FILE);
+    if let Ok(text) = fs::read_to_string(&skips) {
+        let before = text
+            .split("\"endpoint_origin\":\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .unwrap()
+            .to_string();
+        fs::write(&skips, text.replace(&before, &now)).unwrap();
+    }
+}
+
+/// A statement that withdrew a skip while the other account's statement was
+/// built and never sent, and that statement, on one folder; the Tally of the
+/// returned simulator is scripted for what follows.
+struct Withdrawn {
+    withdrawn: String,
+    carrier: String,
+    carrier_tag: String,
+}
+
+async fn a_withdrawn_skip_waits_on_an_unsent_carrier(directory: &Path) -> Withdrawn {
     use super::transfer_flow_tests::{
         a_skips, contra_statement, post_error, withdrawing, Rig, BANK_B, BOOKED, SKIPPED,
-        TRANSFER_REASONS,
     };
-    let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
-        directory.path(),
+        directory,
         [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
-        .await;
-    let first = rig.build(withdrawing(directory.path())).await;
+    rig.build(a_skips(directory, &[(SKIPPED, None)])).await;
+    let first = rig.build(withdrawing(directory)).await;
     let withdrawn = first["batch_id"].as_str().unwrap().to_string();
     let carrying = rig
-        .build(contra_statement(directory.path(), BANK_B, BOOKED, None))
+        .build(contra_statement(directory, BANK_B, BOOKED, None))
         .await;
     let carrier = carrying["batch_id"].as_str().unwrap().to_string();
     // waiting on a batch never sent: refused, and the step points at the retire
@@ -711,18 +738,173 @@ async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends() {
     assert_eq!(refused["paired_rows"][0]["state"], "other_side_unverified");
     let step = refused["next_step"].as_str().unwrap();
     assert!(step.contains("if_absent set to retire"), "{step}");
+    let line = rig
+        .server
+        .latest_import_snapshot(&carrier)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let carrier_tag = line.attribution_tag(&line.vouchers[0]);
+    Withdrawn {
+        withdrawn,
+        carrier,
+        carrier_tag,
+    }
+}
+
+/// The two servers over one scripted Tally: one that may retire, one that
+/// sends as the bank rig does.
+fn one_tally(directory: &Path, plans: Vec<ScenarioPlan>) -> (SequenceSimulator, Server, Server) {
+    let simulator = SequenceSimulator::spawn(plans).expect("simulator");
+    let port = simulator.address().port();
+    (
+        simulator,
+        server_at(directory, port, true),
+        server_at(directory, port, false),
+    )
+}
+
+/// The other account's statement is built and never sent, so it counts as
+/// carrying the transfer and the batch that withdrew the skip cannot be sent.
+/// Once a read of Tally has retired it, the send reads Tally again for the
+/// retired batch's own tag before it goes on, and goes on when there is none.
+#[tokio::test]
+async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends_after_a_second_read() {
+    use super::transfer_flow_tests::{post_error, TRANSFER_REASONS};
+    let directory = tempfile::tempdir().unwrap();
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
+    let scripted = [read_of(true, None), read_of(true, None)].concat();
+    let total = scripted.len();
+    let (simulator, retiring, sending) = one_tally(directory.path(), scripted);
+    move_to_the_tally_of(&retiring, directory.path(), &[&held.carrier, &held.withdrawn]);
     // a read of a Tally that holds none of it retires the carrier
-    let (_simulator, server) =
-        reading_from(directory.path(), &carrier, book(true)[32..].to_vec(), None);
-    let response = retire(&server, &carrier).await;
+    let response = retire(&retiring, &held.carrier).await;
     assert_eq!(
         response["structuredContent"]["result"]["retire"]["state"], "retired",
         "{response}"
     );
-    // now the batch passes the transfer check (it fails later, at the network)
-    let sent = post_error(&rig.server, &withdrawn).await;
+    // the send reads Tally again for the carrier, finds nothing, and goes on
+    // (it fails later, at the network)
+    let sent = post_error(&sending, &held.withdrawn).await;
     let code = sent["code"].as_str().unwrap_or_default();
     assert!(!TRANSFER_REASONS.contains(&code), "{sent}");
+    assert_ne!(code, "retired_batch_found_in_tally", "{sent}");
+    assert!(
+        simulator.received() >= total,
+        "the second read was made: {} of {total}",
+        simulator.received()
+    );
+}
+
+/// The second read finds a voucher with the retired batch's own tag: nothing
+/// is sent, the refusal names the batch and tells no one to enter anything in
+/// Tally, and the batch counts again.
+#[tokio::test]
+async fn a_send_that_rests_on_a_retired_batch_is_refused_when_its_tag_is_found() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
+    let scripted = [read_of(true, None), read_of(false, Some(&held.carrier_tag))].concat();
+    let (_simulator, retiring, sending) = one_tally(directory.path(), scripted);
+    move_to_the_tally_of(&retiring, directory.path(), &[&held.carrier, &held.withdrawn]);
+    let response = retire(&retiring, &held.carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    let refused = post_error(&sending, &held.withdrawn).await;
+    assert_eq!(refused["code"], "retired_batch_found_in_tally", "{refused}");
+    assert_eq!(
+        refused["retired_batches"],
+        json!([held.carrier.as_str()]),
+        "{refused}"
+    );
+    let step = refused["next_step"].as_str().unwrap();
+    assert!(
+        step.starts_with("Nothing was sent to Tally and the approval was not used. "),
+        "{step}"
+    );
+    for by_hand in ["by hand", "enter the voucher", "import the file", "in Tally itself"] {
+        assert!(!step.contains(by_hand), "{step}");
+    }
+    // nothing was sent
+    assert!(!records_of(directory.path(), &held.withdrawn).contains(&"dispatch_intent".into()));
+    // and the retired batch counts again: the next send meets the ordinary refusal
+    assert!(
+        records_of(directory.path(), &held.carrier)
+            .iter()
+            .filter(|kind| *kind == "verification_status")
+            .count()
+            >= 1
+    );
+    let again = post_error(&sending, &held.withdrawn).await;
+    assert_ne!(again["code"], "retired_batch_found_in_tally", "{again}");
+}
+
+/// A retired batch whose exclusion changes nothing for this send is not read
+/// for: no request is made to Tally and nothing is written for it.
+#[tokio::test]
+async fn a_send_that_does_not_rest_on_a_retired_batch_makes_no_second_read() {
+    use super::transfer_flow_tests::{
+        contra_statement, post_error, Rig, BANK_A, BANK_B, BOOKED, TRANSFER_REASONS,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), two_bank_plans()].concat(),
+    );
+    let first = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some("600000000001"),
+        ))
+        .await;
+    let carrier = first["batch_id"].as_str().unwrap().to_string();
+    let other = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_A,
+            "st-20260901-00000000000000c9",
+            Some("600000000002"),
+        ))
+        .await;
+    let other = other["batch_id"].as_str().unwrap().to_string();
+    let line = rig
+        .server
+        .latest_import_snapshot(&carrier)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let tag = line.attribution_tag(&line.vouchers[0]);
+    // a second read, if one were made, would find the tag
+    let scripted = [read_of(true, None), read_of(false, Some(&tag))].concat();
+    let first_block = read_of(true, None).len();
+    let (simulator, retiring, sending) = one_tally(directory.path(), scripted);
+    move_to_the_tally_of(&retiring, directory.path(), &[&carrier, &other]);
+    let response = retire(&retiring, &carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    let before = records_of(directory.path(), &carrier);
+    let sent = post_error(&sending, &other).await;
+    let code = sent["code"].as_str().unwrap_or_default();
+    assert!(!TRANSFER_REASONS.contains(&code), "{sent}");
+    assert_ne!(code, "retired_batch_found_in_tally", "{sent}");
+    assert_eq!(records_of(directory.path(), &carrier), before);
+    // the retired batch was not read for: its tag is still unseen
+    assert!(
+        simulator.received() >= first_block,
+        "the retirement's own read was made"
+    );
+    assert!(
+        !last_record(directory.path(), &carrier)
+            .as_object()
+            .unwrap()
+            .contains_key("own_tag_observed")
+    );
 }
 
 /// A hand import of the saved file, re-dated a few days past the batch's last

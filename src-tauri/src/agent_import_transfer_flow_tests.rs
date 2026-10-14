@@ -1686,3 +1686,91 @@ async fn the_step_for_carried_rows_counts_the_rows_the_list_leaves_out() {
         ]))
     );
 }
+
+// ---- a skip a posted voucher contradicts is not retired in silence ---------------
+
+/// A statement skips a row that an unsent build of the company posts: nothing
+/// refuses it, because the build was never sent. Once that build is found
+/// posted the skip is contradicted by a posted voucher, and no withdrawal ever
+/// named it, so it stays open and is listed.
+#[tokio::test]
+async fn a_skip_that_a_batch_found_posted_contradicts_stays_open_and_is_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), skip_only_plans(), skip_only_plans()].concat(),
+    );
+    let posting = rig
+        .build(contra_statement(directory.path(), BANK_A, SKIPPED, None))
+        .await;
+    let holder = posting["batch_id"].as_str().unwrap().to_string();
+    let skipped = rig
+        .build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .await;
+    assert_eq!(skipped["state"], "skips_recorded", "{skipped}");
+    mark_found(directory.path(), &holder);
+    let later = rig
+        .build(a_skips(directory.path(), &[(OTHER_BOOKED, None)]))
+        .await;
+    rig.finish();
+    let section = &later["transfers"];
+    assert_eq!(section["retired"], 0, "{later}");
+    assert_eq!(section["skips_open"], 2, "{later}");
+    assert!(
+        open_rows(section).contains(&open_row(SKIPPED, "posted_against_skip", Some(&holder))),
+        "{later}"
+    );
+    assert_nothing_secret(section);
+}
+
+/// A skip held by a batch not found posted is judged against the other
+/// account's Contras when a build withdraws it again, as any skip is.
+#[tokio::test]
+async fn a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_paired_contra() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [
+            skip_only_plans(),
+            two_bank_plans(),
+            two_bank_plans(),
+            admission_plans(),
+        ]
+        .concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    // withdrawn once, while nothing of the other account is known: the new
+    // batch holds the row and has only been built
+    let mut first = contra_statement(directory.path(), BANK_A, SKIPPED, Some("600000000002"));
+    first["withdraw_skips"] = json!([SKIPPED]);
+    let held = rig.build(first).await;
+    let held_id = held["batch_id"].as_str().unwrap().to_string();
+    assert_eq!(
+        open_rows(&held["transfers"]),
+        vec![open_row(SKIPPED, "held_elsewhere", Some(&held_id))],
+        "{held}"
+    );
+    // the other account's statement books the transfer and is found posted
+    let booked = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(REFERENCE),
+        ))
+        .await;
+    let booked_id = booked["batch_id"].as_str().unwrap().to_string();
+    mark_found(directory.path(), &booked_id);
+    // naming the same row again is refused: that Contra carries it
+    let mut again = contra_statement(directory.path(), BANK_A, SKIPPED, Some("600000000003"));
+    again["withdraw_skips"] = json!([SKIPPED]);
+    let refused = rig.build(again).await;
+    rig.finish();
+    assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
+    assert_eq!(
+        refused["paired_rows"],
+        json!([{"bridge_txn_id": SKIPPED, "batch_id": booked_id, "state": "paired"}]),
+        "{refused}"
+    );
+}

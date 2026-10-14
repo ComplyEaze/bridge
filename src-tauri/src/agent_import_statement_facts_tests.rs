@@ -73,6 +73,7 @@ struct Build {
     vouchers: Vec<Value>,
     identities: Option<Vec<(&'static str, &'static str)>>,
     statement: Option<StatementFacts>,
+    withdrawn: Vec<String>,
     status: &'static str,
 }
 
@@ -85,6 +86,7 @@ fn build(id: u32) -> Build {
         vouchers: Vec::new(),
         identities: Some(vec![(N1, B1), (N2, B2), (N3, B3)]),
         statement: None,
+        withdrawn: Vec::new(),
         status: "built",
     }
 }
@@ -118,6 +120,11 @@ impl Build {
         self.status = status;
         self
     }
+    /// The build records that a person named these rows in `withdraw_skips`.
+    fn withdrew(mut self, rows: &[String]) -> Self {
+        self.withdrawn = rows.to_vec();
+        self
+    }
     fn line(&self) -> ImportLedgerLine {
         let txn_ids: Vec<String> = self
             .vouchers
@@ -148,6 +155,7 @@ impl Build {
                 .collect()
         });
         line.statement = self.statement.as_ref().map(statement_record);
+        line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
         line
     }
 }
@@ -260,6 +268,21 @@ fn skip_file(records: &[SkipOnlyRecord]) -> String {
     records
         .iter()
         .map(|record| format!("{}\n", serde_json::to_string(record).unwrap()))
+        .collect()
+}
+
+/// The skips a batch holds, as key, holder and date.
+fn held_tuples(found: &TransferFacts) -> Vec<(SkipKey, BatchId, TallyDate)> {
+    found
+        .held
+        .iter()
+        .map(|held| {
+            (
+                held.fact.key.clone(),
+                held.holder.clone(),
+                held.fact.date.clone(),
+            )
+        })
         .collect()
 }
 
@@ -715,6 +738,7 @@ fn a_skip_found_posted_in_another_batch_is_retired() {
     let skipped = build(60).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
     let posted = build(61)
         .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
         .status("posted_verified");
     let found = Journal::default()
         .batch(&skipped)
@@ -723,13 +747,15 @@ fn a_skip_found_posted_in_another_batch_is_retired() {
         .unwrap();
     assert!(found.skips.is_empty());
     assert_eq!(found.retired_skips, 1);
-    assert!(found.held_elsewhere.is_empty());
+    assert!(found.held.is_empty());
 }
 
 #[test]
 fn a_skip_found_posted_at_some_time_is_retired_whatever_the_status_now() {
     let skipped = build(62).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
-    let posted = build(63).voucher(payment(&st(6), "500.00"));
+    let posted = build(63)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
     let journal = Journal::default()
         .batch(&skipped)
         .batch(&posted)
@@ -750,7 +776,7 @@ fn a_skip_held_by_a_batch_only_built_or_only_sent_is_held_elsewhere() {
         assert!(found.skips.is_empty());
         assert_eq!(found.retired_skips, 0);
         assert_eq!(
-            found.held_elsewhere,
+            held_tuples(&found),
             vec![(key(B1, 6), BatchId::new(batch_id(65)), date("20260901"))]
         );
     }
@@ -1469,6 +1495,7 @@ fn a_skip_only_record_is_retired_like_a_batch_skip() {
     );
     let posted = build(141)
         .voucher(payment(&st(15), "500.00"))
+        .withdrew(&[st(15)])
         .status("posted_verified");
     let found = Journal::default()
         .batch(&posted)
@@ -2191,8 +2218,11 @@ fn a_batch_found_posted_stays_found_when_its_record_is_appended_again() {
     let skipped = build(170).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
     let posted = build(171)
         .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
         .status("posted_verified");
-    let again = build(171).voucher(payment(&st(6), "500.00"));
+    let again = build(171)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
     let found = Journal::default()
         .batch(&skipped)
         .batch(&posted)
@@ -2310,7 +2340,7 @@ fn a_skip_held_by_two_batches_names_the_latest_in_the_journal() {
         .read()
         .unwrap();
     assert_eq!(
-        found.held_elsewhere,
+        held_tuples(&found),
         vec![(key(B1, 6), BatchId::new(batch_id(176)), date("20260901"))]
     );
 }
@@ -2417,9 +2447,12 @@ fn a_contra_keyed_by_something_other_than_a_statement_id_is_still_a_statement_co
 #[test]
 fn a_batch_first_written_unverified_and_written_again_verified_is_found() {
     let skipped = build(191).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
-    let first = build(192).voucher(payment(&st(6), "500.00"));
+    let first = build(192)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
     let again = build(192)
         .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
         .status("posted_verified");
     let found = Journal::default()
         .batch(&skipped)
@@ -2497,6 +2530,7 @@ fn a_window_over_a_row_an_unverified_build_decides_is_no_cover() {
     let b0 = build(200)
         .voucher(contra(&st(50), N2, N1, "500.00"))
         .facts(facts(B2).contra(&st(50), None))
+        .withdrew(&[st(50)])
         .status("posted_verified");
     let b1 = build(201)
         .amends(200)
@@ -2874,14 +2908,16 @@ fn a_skip_only_record_is_live() {
 #[test]
 fn a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not() {
     let sent = skipping(94, 9);
-    let held = build(95).voucher(payment(&st(9), "500.00"));
+    let held = build(95)
+        .voucher(payment(&st(9), "500.00"))
+        .withdrew(&[st(9)]);
     let found = Journal::default()
         .batch(&sent)
         .sent(&sent)
         .batch(&held)
         .read()
         .unwrap();
-    assert_eq!(found.held_elsewhere.len(), 1);
+    assert_eq!(found.held.len(), 1);
     assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
     // not sent: held elsewhere but not live
     let built = skipping(96, 9);
@@ -2890,7 +2926,7 @@ fn a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not() {
         .batch(&held)
         .read()
         .unwrap();
-    assert_eq!(found.held_elsewhere.len(), 1);
+    assert_eq!(found.held.len(), 1);
     assert!(found.live_skips.is_empty());
     // the holder found posted retires the skip, which is then no skip at all
     let found = Journal::default()
@@ -2911,7 +2947,7 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
     let journal = Journal::default().batch(&skipped).sent(&skipped);
     let without = journal.read().unwrap();
     assert_eq!(without.skips.len(), 1);
-    assert!(without.held_elsewhere.is_empty());
+    assert!(without.held.is_empty());
     // with a candidate that posts the row, the skip is held by the candidate
     let with = journal
         .read_candidate(
@@ -2922,7 +2958,7 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
         .unwrap();
     assert!(with.skips.is_empty());
     assert_eq!(
-        with.held_elsewhere,
+        held_tuples(&with),
         vec![(key(B1, 9), BatchId::new(batch_id(97)), date("20260901"))]
     );
     // a candidate skip-only record is a skip of its own
@@ -3027,4 +3063,154 @@ fn the_first_holding_batch_in_id_order_is_named() {
         held(&journal, None, &[1]),
         Some((batch_id(130), vec![st(1)]))
     );
+}
+
+// ---- a skip a posted voucher contradicts is retired only when it was withdrawn ----
+
+fn holder_of_row_nine(id: u32) -> Build {
+    build(id).voucher(payment(&st(9), "500.00"))
+}
+
+#[test]
+fn a_skip_whose_row_a_batch_found_posted_holds_stays_open_unless_a_build_recorded_the_withdrawal() {
+    let skipped = skipping(100, 9);
+    // nobody named the row in withdraw_skips: the posted voucher contradicts the skip
+    let posted = holder_of_row_nine(101).status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .sent(&skipped)
+        .batch(&posted)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    assert!(found.skips.is_empty());
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    assert_eq!(held.holder, BatchId::new(batch_id(101)));
+    assert_eq!(held.fact.key, key(B1, 9));
+    assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
+    // the same, a skip that was only built
+    let built = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .read()
+        .unwrap();
+    assert_eq!(built.held.len(), 1);
+    assert_eq!(built.retired_skips, 0);
+    // a build that recorded the withdrawal retires it
+    let withdrawn = holder_of_row_nine(102)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawn)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+    // while that batch is not found posted the skip is held as before
+    let unverified = holder_of_row_nine(103).withdrew(&[st(9)]);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&unverified)
+        .read()
+        .unwrap();
+    assert_eq!(found.held.len(), 1);
+    assert_eq!(found.held[0].by, HeldBy::UnverifiedBatch);
+}
+
+#[test]
+fn every_batch_found_posted_that_holds_the_row_must_have_recorded_the_withdrawal() {
+    let skipped = skipping(104, 9);
+    let withdrawn = holder_of_row_nine(105)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let other = holder_of_row_nine(106).status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawn)
+        .batch(&other)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    // the batch named is the posted one that did not record the withdrawal
+    assert_eq!(
+        (held.by, &held.holder),
+        (HeldBy::PostedBatch, &BatchId::new(batch_id(106)))
+    );
+}
+
+#[test]
+fn an_amendment_is_covered_by_the_withdrawal_its_lineage_recorded() {
+    let skipped = skipping(107, 9);
+    let original = holder_of_row_nine(108).withdrew(&[st(9)]);
+    let amendment = holder_of_row_nine(109)
+        .amends(108)
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&original)
+        .batch(&amendment)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+#[test]
+fn a_withdrawn_row_must_be_a_statement_row_the_batch_holds() {
+    let skipped = skipping(110, 9);
+    for (withdrew, why) in [
+        (st(8), "a statement row the batch does not hold"),
+        ("txn-001".to_string(), "not a statement row id"),
+    ] {
+        let batch = holder_of_row_nine(111).withdrew(std::slice::from_ref(&withdrew));
+        let error = Journal::default()
+            .batch(&skipped)
+            .batch(&batch)
+            .read()
+            .unwrap_err();
+        assert_eq!(
+            error,
+            TransferFactsError::Facts {
+                source_id: batch_id(111),
+                error: FactsError::WithdrawnRowNotVoucher { txn: withdrew },
+            },
+            "{why}"
+        );
+        assert_eq!(error.variant(), "facts");
+        assert_eq!(error.check(), Some("withdrawn_row_not_voucher"));
+    }
+    // a record that changes what was withdrawn is a changed record
+    let first = holder_of_row_nine(112).withdrew(&[st(9)]);
+    let changed = holder_of_row_nine(112);
+    let error = Journal::default()
+        .batch(&first)
+        .batch(&changed)
+        .read()
+        .unwrap_err();
+    assert_eq!(
+        error,
+        TransferFactsError::BatchRecordChanged {
+            batch_id: batch_id(112)
+        }
+    );
+}
+
+#[test]
+fn the_withdrawn_rows_are_kept_on_the_record_and_an_older_record_reads_as_none() {
+    let line = holder_of_row_nine(113).withdrew(&[st(9)]).line();
+    let text = serde_json::to_string(&line).unwrap();
+    let back: ImportLedgerLine = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.withdrawn_skips, Some(vec![st(9)]));
+    assert_eq!(BuildLine::of(&back).withdrawn, BTreeSet::from([st(9)]));
+    let plain = holder_of_row_nine(114).line();
+    let text = serde_json::to_string(&plain).unwrap();
+    assert!(!text.contains("withdrawn_skips"), "{text}");
+    let back: ImportLedgerLine = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.withdrawn_skips, None);
+    assert!(BuildLine::of(&back).withdrawn.is_empty());
 }

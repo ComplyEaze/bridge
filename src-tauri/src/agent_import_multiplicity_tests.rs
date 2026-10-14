@@ -47,6 +47,7 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,

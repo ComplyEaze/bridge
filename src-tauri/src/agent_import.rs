@@ -397,6 +397,14 @@ pub(super) struct ImportLedgerLine {
     /// from posting the batch (see `ledger_identities`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     statement: Option<Value>,
+    /// The statement rows this build posts although a skip of the company names
+    /// them, as the person's `withdraw_skips` named them. Absent when none was
+    /// named, and on all older records. Only the fact builder reads it: a skip
+    /// that a batch found posted holds is retired when that batch recorded its
+    /// withdrawal, and otherwise stays open. A release older than this field
+    /// does not read it (this struct does not deny unknown fields).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    withdrawn_skips: Option<Vec<String>>,
 }
 
 /// A ledger a bank cash answer named as cash in hand, and the voucher built
@@ -1018,6 +1026,7 @@ impl Server {
                 }
                 None => None,
             };
+            let withdrawn_skips = (!withdraw.is_empty()).then(|| withdraw.iter().cloned().collect());
             let transfers = match self.admit_transfers_while_admitted(transfers::TransferInput {
                 company_guid: company_guid.clone(),
                 carries_statement: statement_record.is_some(),
@@ -1037,7 +1046,7 @@ impl Server {
                     })
                     .map(|voucher| voucher.bridge_txn_id.clone())
                     .collect(),
-                withdraw,
+                withdraw: withdraw.clone(),
                 own_lineage: amends_batch_id.clone(),
                 candidate: statement_facts::Candidate::Build(Box::new(statement_facts::BuildLine {
                     batch_id: batch_id.clone(),
@@ -1049,6 +1058,7 @@ impl Server {
                     vouchers: slim_vouchers,
                     ledger_identities: Some(build_binding.clone()),
                     statement: statement_record.clone(),
+                    withdrawn: withdraw,
                 })),
             })? {
                 transfers::Admission::Refused(refusal) => {
@@ -1251,6 +1261,7 @@ impl Server {
                 ),
                 on_account_approved: Some(on_account_approved),
                 statement: statement_record,
+                withdrawn_skips,
             };
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));

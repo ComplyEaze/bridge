@@ -1787,7 +1787,7 @@ refused as `proposals_legacy` (parse the statement again).
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
   `batch_id` where one is involved: `not_found`, `ambiguous`,
-  `other_side_unverified`, `held_elsewhere`, `matched_unconfirmed`,
+  `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
   `reference_differs`, `reversed_same_day`, `not_established`, or
   `double_booked` for a Contra booked from both statements. No amount,
   reference, instrument, party or ledger is returned.
@@ -1798,6 +1798,19 @@ refused as `proposals_legacy` (parse the statement again).
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
+  a batch holds as a voucher is not a skip to pair. While no batch holding the
+  row is found posted it reads `held_elsewhere`, with the batch to verify. Once
+  a batch is found posted, the skip is retired (counted in `retired`) only if a
+  build recorded that the person named the row in `withdraw_skips`: the batch
+  keeps those names. Otherwise the posted voucher contradicts the skip, and the
+  row stays open as `posted_against_skip`, with that batch: the other account's
+  Contra may carry the transfer too, ComplyEaze Bridge does not compare the
+  two, and no step inside ComplyEaze Bridge removes a voucher already in Tally
+  yet. Two builds made before either is sent are both admitted, so this is how
+  a skip and a posting of one row that were built apart are reported once both
+  are sent and one is found posted. A build that names a row held this way in
+  `withdraw_skips` is judged against the other account's Contras like any skip.
 - **What `reference_differs` means.** The person sees the row listed once for
   each batch holding a Contra of the same day and amount whose reference
   differs from the row's, verifies that batch if it is not verified yet, and
@@ -1813,7 +1826,9 @@ refused as `proposals_legacy` (parse the statement again).
   two ledgers and the same way, one booked from each statement: where their
   references are equal, whatever their dates (the second build is refused as
   `transfer_double_booked`), and where their dates are equal and at least one
-  of them carries no reference (both are listed). Nothing else is compared.
+  of them carries no reference (both are listed). Nothing else is compared: a
+  Receipt or Payment that posts a skipped row is reported as
+  `posted_against_skip`, not here.
 - **What `matched_unconfirmed` means.** The person sees the row listed with the
   batch whose verified Contra matches it by day and amount, where the statement
   records of the two accounts do not both cover that day, and keeps the skip.

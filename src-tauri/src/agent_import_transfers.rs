@@ -11,10 +11,10 @@
 //! leaves this module.
 use super::*;
 use crate::agent::transfer_pairing::{
-    transfer_pairing_view, BatchId, BatchStatus, ContraKey, DoubleBookedClass, SkipState,
+    transfer_pairing_view, BatchId, BatchStatus, ContraKey, DoubleBookedClass, SkipFact, SkipState,
     TransferView,
 };
-use statement_facts::{Candidate, TransferFacts, TransferFactsError};
+use statement_facts::{Candidate, HeldBy, TransferFacts, TransferFactsError};
 
 /// How many days apart the two statements may print one transfer and still
 /// pair it by date. Zero until a real statement pair has been measured: k comes
@@ -66,6 +66,7 @@ pub(super) enum OpenState {
     MatchedUnconfirmed,
     ReferenceDiffers,
     HeldElsewhere,
+    PostedAgainstSkip,
     DoubleBooked,
 }
 
@@ -80,6 +81,7 @@ impl OpenState {
             Self::MatchedUnconfirmed => "matched_unconfirmed",
             Self::ReferenceDiffers => "reference_differs",
             Self::HeldElsewhere => "held_elsewhere",
+            Self::PostedAgainstSkip => "posted_against_skip",
             Self::DoubleBooked => "double_booked",
         }
     }
@@ -93,7 +95,8 @@ impl OpenState {
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is.",
             Self::ReferenceDiffers => "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.",
-            Self::HeldElsewhere => "The batch named posts this row, which a statement skipped. Verify that batch; once it is found posted the skip is retired.",
+            Self::HeldElsewhere => "The batch named posts this row, which a statement skipped, and has not been found posted. Verify that batch. Once it is found posted, the skip is retired if a build named this row in withdraw_skips, and otherwise the row reads posted_against_skip.",
+            Self::PostedAgainstSkip => "A statement skipped this row as carried by the other account's Contra, and the batch named, found posted, posts it as a voucher although no build named it in withdraw_skips. If the other account's Contra also carries this transfer, it is booked twice. ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet: do not build or post anything further for this row, and tell the person.",
             Self::DoubleBooked => "Two statements each booked this transfer as a Contra. Check both in Tally and keep one.",
             Self::NotEstablished => NOT_ESTABLISHED_STEP,
         }
@@ -137,7 +140,7 @@ pub(super) enum TransferSummary {
 impl TransferSummary {
     pub(super) fn of(facts: &TransferFacts, view: &TransferView) -> Self {
         let mut paired = 0;
-        let mut skips_open = facts.held_elsewhere.len();
+        let mut skips_open = facts.held.len();
         let mut open = Vec::new();
         let dates: BTreeMap<_, _> = facts
             .skips
@@ -183,12 +186,15 @@ impl TransferSummary {
                 }));
             }
         }
-        for (key, holder, date) in &facts.held_elsewhere {
+        for held in &facts.held {
             open.push(OpenRow {
-                id: key.row.as_str().to_string(),
-                date: date.clone(),
-                state: OpenState::HeldElsewhere,
-                batch: Some(holder.as_str().to_string()),
+                id: held.fact.key.row.as_str().to_string(),
+                date: held.fact.date.clone(),
+                state: match held.by {
+                    HeldBy::UnverifiedBatch => OpenState::HeldElsewhere,
+                    HeldBy::PostedBatch => OpenState::PostedAgainstSkip,
+                },
+                batch: Some(held.holder.as_str().to_string()),
             });
         }
         // Each Contra of a pair booked from two statements is listed, naming the
@@ -542,7 +548,7 @@ impl Server {
 
     /// The facts of one company and the view over them, with a candidate read as
     /// the newest record when one is given.
-    fn transfer_view_while_admitted(
+    pub(super) fn transfer_view_while_admitted(
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,
@@ -633,6 +639,21 @@ impl Server {
             .filter(|contra| contra.status == BatchStatus::PostedVerified)
             .map(|contra| &contra.key)
             .collect();
+        // A skip whose row a batch holds is outside the view. Naming it again
+        // is judged as any skip is, against the same Contras, in a view of the
+        // held skips alone: beside other skips a Contra they compete for could
+        // read ambiguous, which a withdrawal may pass.
+        let held_view = if input.withdraw.is_empty() {
+            None
+        } else {
+            let held: Vec<SkipFact> = before.held.iter().map(|held| held.fact.clone()).collect();
+            match transfer_pairing_view(&held, &before.contras, &before.coverage, TRANSFER_K_DAYS) {
+                Ok(view) => Some(view),
+                Err(error) => {
+                    return Ok(without_facts(input.needs_the_view(), &error.into()));
+                }
+            }
+        };
         let carried: Vec<(&String, &BatchId, Carrier)> = input
             .withdraw
             .iter()
@@ -640,6 +661,7 @@ impl Server {
                 let carriers: BTreeSet<(&BatchId, Carrier)> = before_view
                     .skips
                     .iter()
+                    .chain(held_view.iter().flat_map(|view| view.skips.iter()))
                     .filter(|(key, _)| key.row.as_str() == row)
                     .flat_map(|(_, state)| match state {
                         SkipState::Paired { contra, .. } => vec![(&contra.batch, Carrier::Paired)],

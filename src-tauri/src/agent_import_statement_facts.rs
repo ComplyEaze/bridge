@@ -211,6 +211,8 @@ pub(super) enum FactsError {
     BadRecordId,
     #[error("a skip-only record must hold skipped rows and no Contra row")]
     NotSkipOnly,
+    #[error("a withdrawn skip is not a statement row the batch posts")]
+    WithdrawnRowNotVoucher { txn: String },
 }
 
 impl FactsError {
@@ -230,6 +232,7 @@ impl FactsError {
             Self::BankLedgerUnbound => "bank_ledger_unbound",
             Self::BadRecordId => "bad_record_id",
             Self::NotSkipOnly => "not_skip_only",
+            Self::WithdrawnRowNotVoucher { .. } => "withdrawn_row_not_voucher",
             Self::Unparsable => "unparsable",
         }
     }
@@ -448,6 +451,8 @@ pub(super) struct BuildLine {
     pub(super) vouchers: Vec<BuildVoucher>,
     pub(super) ledger_identities: Option<Vec<BoundLedger>>,
     pub(super) statement: Option<Value>,
+    /// The statement rows the batch posts although a skip names them.
+    pub(super) withdrawn: BTreeSet<String>,
 }
 
 impl BuildLine {
@@ -462,6 +467,22 @@ impl BuildLine {
             vouchers: BuildVoucher::of_vouchers(&line.vouchers),
             ledger_identities: line.ledger_identities.clone(),
             statement: line.statement.clone(),
+            withdrawn: line.withdrawn_skips.iter().flatten().cloned().collect(),
+        }
+    }
+
+    /// The same check at write and at read: a withdrawn row is a statement row
+    /// the batch holds as a voucher.
+    fn check_withdrawn(&self) -> Result<(), TransferFactsError> {
+        match self.withdrawn.iter().find(|row| {
+            !is_statement_txn_id(row)
+                || !self.vouchers.iter().any(|voucher| &voucher.txn_id == *row)
+        }) {
+            Some(row) => Err(TransferFactsError::Facts {
+                source_id: self.batch_id.clone(),
+                error: FactsError::WithdrawnRowNotVoucher { txn: row.clone() },
+            }),
+            None => Ok(()),
         }
     }
 }
@@ -598,11 +619,11 @@ pub(super) struct TransferFacts {
     pub(super) skips: Vec<SkipFact>,
     pub(super) contras: Vec<ContraFact>,
     pub(super) coverage: Coverage,
-    /// Skips dropped because a batch found posted holds the row.
+    /// Skips dropped because a batch found posted holds the row and recorded
+    /// that a person withdrew the skip.
     pub(super) retired_skips: usize,
-    /// Skips whose row a batch not found posted holds: not established, the
-    /// batch that holds it, and the skipped row's date.
-    pub(super) held_elsewhere: Vec<(SkipKey, BatchId, TallyDate)>,
+    /// Skips whose row a batch holds as a voucher, and that are not retired.
+    pub(super) held: Vec<HeldSkip>,
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
     // Counted for the tests; no tool reports it, since the coverage rule already
@@ -626,6 +647,28 @@ pub(super) struct TransferFacts {
     /// a skip a person has acted on. A skip only built is superseded by the
     /// next build of its statement and is not live.
     pub(super) live_skips: BTreeSet<SkipKey>,
+}
+
+/// What is true of the batch that holds a skipped row as a voucher.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum HeldBy {
+    /// No batch holding the row was found posted: it may yet be, and until then
+    /// the skip is not established.
+    UnverifiedBatch,
+    /// A batch found posted holds the row, and no build recorded that a person
+    /// withdrew the skip: the posted voucher contradicts the skip, and the
+    /// other account's Contra may carry the same transfer.
+    PostedBatch,
+}
+
+/// A skipped row that a batch holds as a voucher.
+#[derive(Debug, Clone)]
+pub(super) struct HeldSkip {
+    pub(super) fact: SkipFact,
+    /// The batch that holds the row: the latest one, or for a posted holder
+    /// the first found posted that did not record the withdrawal.
+    pub(super) holder: BatchId,
+    pub(super) by: HeldBy,
 }
 
 /// A batch as the journal leaves it.
@@ -703,6 +746,7 @@ fn fold_batches(
                         let batch = &mut batches[at];
                         if batch.line.vouchers != line.vouchers
                             || batch.line.statement != line.statement
+                            || batch.line.withdrawn != line.withdrawn
                         {
                             return Err(TransferFactsError::BatchRecordChanged {
                                 batch_id: line.batch_id,
@@ -711,11 +755,13 @@ fn fold_batches(
                         // the batch keeps its place, and its content is the latest record's
                         batch.found |= line.status == POSTED_VERIFIED;
                         batch.status = line.status.clone();
+                        line.check_withdrawn()?;
                         batch.facts = admit_facts(&line)?;
                         batch.line = *line;
                     }
                     None => {
                         let line = *line;
+                        line.check_withdrawn()?;
                         let facts = admit_facts(&line)?;
                         index.insert(line.batch_id.clone(), batches.len());
                         batches.push(Batch {
@@ -1240,24 +1286,50 @@ pub(super) fn build_transfer_facts(
         }
     }
 
-    // a skipped row that a batch posted, or may yet post, is not a skip
+    // A skipped row that a batch posted, or may yet post, is not a skip. One a
+    // batch found posted holds is retired only when every such batch's lineage
+    // recorded that a person withdrew the skip; otherwise the posted voucher
+    // contradicts the skip and it stays open.
+    let mut withdrawn_by: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for batch in &batches {
+        withdrawn_by
+            .entry(batch.line.lineage.as_str())
+            .or_default()
+            .extend(batch.line.withdrawn.iter().map(String::as_str));
+    }
     let mut skips = Vec::new();
     let mut retired_skips = 0;
-    let mut held_elsewhere = Vec::new();
+    let mut held = Vec::new();
     let mut live_skips = BTreeSet::new();
     for (key, mention) in mentions {
         let live = mention.live;
         match holders.get(mention.row.as_str()) {
             None => skips.push(mention.fact),
-            Some(held) if held.batches.iter().any(|&at| batches[at].found) => {
-                retired_skips += 1;
-                continue;
+            Some(holding) => {
+                let contradicting = holding.batches.iter().copied().find(|&at| {
+                    batches[at].found
+                        && !withdrawn_by
+                            .get(batches[at].line.lineage.as_str())
+                            .is_some_and(|rows| rows.contains(mention.row.as_str()))
+                });
+                let any_posted = holding.batches.iter().any(|&at| batches[at].found);
+                match (contradicting, any_posted) {
+                    (None, true) => {
+                        retired_skips += 1;
+                        continue;
+                    }
+                    (Some(at), _) => held.push(HeldSkip {
+                        fact: mention.fact,
+                        holder: BatchId::new(batches[at].line.batch_id.as_str()),
+                        by: HeldBy::PostedBatch,
+                    }),
+                    (None, false) => held.push(HeldSkip {
+                        fact: mention.fact,
+                        holder: BatchId::new(batches[holding.latest].line.batch_id.as_str()),
+                        by: HeldBy::UnverifiedBatch,
+                    }),
+                }
             }
-            Some(held) => held_elsewhere.push((
-                key.clone(),
-                BatchId::new(batches[held.latest].line.batch_id.as_str()),
-                mention.fact.date.clone(),
-            )),
         }
         if live {
             live_skips.insert(key);
@@ -1314,7 +1386,7 @@ pub(super) fn build_transfer_facts(
         contras: kept,
         coverage,
         retired_skips,
-        held_elsewhere,
+        held,
         contras_not_two_leg,
         contras_without_facts,
         contras_superseded,

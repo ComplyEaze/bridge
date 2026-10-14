@@ -7,6 +7,7 @@ use crate::agent::transfer_pairing::{
     StatementRowId, TxnId,
 };
 use bridge_bank_statement::bank::BankReference;
+use statement_facts::HeldSkip;
 
 fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).unwrap()
@@ -88,7 +89,7 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
         contras,
         coverage: coverage(),
         retired_skips: 3,
-        held_elsewhere: Vec::new(),
+        held: Vec::new(),
         contras_not_two_leg: 0,
         contras_without_facts: 0,
         contras_superseded: 0,
@@ -173,11 +174,11 @@ fn every_state() -> TransferFacts {
         },
     ];
     let mut facts = facts_of(skips, contras);
-    facts.held_elsewhere = vec![(
-        skip_key("st-held"),
-        BatchId::new("batch-9"),
-        date("20260104"),
-    )];
+    facts.held = vec![HeldSkip {
+        fact: skip("st-held", "20260104", "100.00"),
+        holder: BatchId::new("batch-9"),
+        by: HeldBy::UnverifiedBatch,
+    }];
     facts
 }
 
@@ -470,7 +471,7 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
     );
 }
 
-const EVERY_OPEN_STATE: [OpenState; 9] = [
+const EVERY_OPEN_STATE: [OpenState; 10] = [
     OpenState::NotFound,
     OpenState::Ambiguous,
     OpenState::OtherSideUnverified,
@@ -480,6 +481,7 @@ const EVERY_OPEN_STATE: [OpenState; 9] = [
     OpenState::ReferenceDiffers,
     OpenState::HeldElsewhere,
     OpenState::DoubleBooked,
+    OpenState::PostedAgainstSkip,
 ];
 
 /// Each state, read from its place in `EVERY_OPEN_STATE`. A state added to
@@ -497,6 +499,7 @@ fn from_the_list(state: OpenState) -> OpenState {
         OpenState::ReferenceDiffers => EVERY_OPEN_STATE[6],
         OpenState::HeldElsewhere => EVERY_OPEN_STATE[7],
         OpenState::DoubleBooked => EVERY_OPEN_STATE[8],
+        OpenState::PostedAgainstSkip => EVERY_OPEN_STATE[9],
     }
 }
 
@@ -546,7 +549,12 @@ fn each_next_step_says_what_was_decided() {
     ));
     // it never says the row is not a transfer
     assert!(!reversed.contains("not a transfer"), "{reversed}");
-    assert!(step(OpenState::HeldElsewhere).contains("once it is found posted the skip is retired"));
+    let held = step(OpenState::HeldElsewhere);
+    assert!(held.contains("retired if a build named this row in withdraw_skips"));
+    assert!(held.contains("posted_against_skip"));
+    let posted = step(OpenState::PostedAgainstSkip);
+    assert!(posted.contains("no build named it in withdraw_skips"));
+    assert!(posted.contains("booked twice"));
     assert!(step(OpenState::DoubleBooked).contains("keep one"));
     let open = step(OpenState::NotEstablished);
     assert!(open.contains("Verify any batch of the other account's statement for this date first"));
@@ -828,5 +836,40 @@ fn a_section_that_did_not_run_names_the_call_that_made_it() {
     assert_eq!(
         recorded["next_steps"]["check_not_run"],
         "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
+}
+
+#[test]
+fn a_skip_a_posted_voucher_contradicts_is_listed_open_with_the_batch_that_posts_it() {
+    let mut facts = facts_of(vec![], vec![]);
+    facts.held = vec![HeldSkip {
+        fact: skip("st-posted", "20260105", "100.00"),
+        holder: BatchId::new("batch-4"),
+        by: HeldBy::PostedBatch,
+    }];
+    let summary = summary_of(&facts);
+    let TransferSummary::Computed {
+        paired,
+        skips_open,
+        retired,
+        ..
+    } = &summary
+    else {
+        panic!("computed");
+    };
+    assert_eq!((*paired, *skips_open, *retired), (0, 1, 3));
+    assert_eq!(
+        rows_of(&summary),
+        vec![(
+            "st-posted".to_string(),
+            "20260105".to_string(),
+            "posted_against_skip",
+            Some("batch-4".to_string())
+        )]
+    );
+    let section = summary.render(usize::MAX);
+    assert_eq!(
+        section["next_steps"]["posted_against_skip"],
+        OpenState::PostedAgainstSkip.step()
     );
 }

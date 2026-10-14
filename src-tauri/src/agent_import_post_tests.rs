@@ -2475,6 +2475,9 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 /// so this name is what keeps them from posting a batch saved here without
 /// those checks (ADR 0004).
 ///
+/// `withdrawn_skips` was added in the same unreleased change as `statement`
+/// and the `_3` name, so no release holds `_3` without it.
+///
 /// If this test stops compiling or its list has to change because a field
 /// was added, removed or renamed, the releases before that change will not
 /// read the new record either: give the binding a new written name again
@@ -2514,6 +2517,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             cash_in_hand_ledgers,
             on_account_approved,
             statement,
+            withdrawn_skips: _,
         } = line;
         if let Some(ImportCompanyTuple {
             name: _,
@@ -2622,6 +2626,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             reversed_same_day: true,
         }],
     }));
+    line.withdrawn_skips = Some(vec!["st-20260901-0000000000000002".into()]);
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2688,6 +2693,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             "vouchers[].reference",
             "vouchers[].voucher_number",
             "vouchers[].voucher_type",
+            "withdrawn_skips",
         ],
         "{written}"
     );

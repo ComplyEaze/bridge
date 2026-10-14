@@ -44,6 +44,7 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
+        withdrawn_skips: None,
         endpoint_origin: None,
         identity_scheme: None,
         amends_batch_id: None,

@@ -488,9 +488,11 @@ impl BuildLine {
 }
 
 impl BuildVoucher {
-    /// The vouchers a transfer can be made of: Contras, Journals (Tally
-    /// accepted a Journal between two bank ledgers at its default settings,
-    /// measured on one synthetic book) and statement rows.
+    /// The vouchers a transfer can be made of: Contras, Journals and statement
+    /// rows. A Journal is kept because the protocol reference does not establish
+    /// that none can move money between two bank ledgers (§9.13 covers Payment,
+    /// Receipt and Contra only), so one that names two statement banks is treated
+    /// as a possible transfer.
     pub(super) fn of_vouchers(vouchers: &[ImportVoucher]) -> Vec<Self> {
         vouchers
             .iter()

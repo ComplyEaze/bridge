@@ -442,7 +442,9 @@ fn persist(
         "records": parsed.build.records,
     });
     // Optional, and not part of the schema's required shape: the loader reads
-    // fields by name, so an older binary still reads a file that carries it.
+    // fields by name, so a reader of this schema version still reads a file that
+    // carries it. An older binary refuses the version itself, so going back to it
+    // needs a fresh parse.
     // The statement's own first and last row dates, whether this parse's
     // from/to window left any row out, and where statement_tie_out may compare
     // it with the book. None of it is returned in the summary.

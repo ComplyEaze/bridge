@@ -1327,6 +1327,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "import_retire_already_retired" => {
             Some("This batch is already retired. Nothing was changed.")
         }
+        "import_retire_proof_unreadable" => Some(
+            "A saved verification of this batch could not be read, or no longer matches the \
+             digest in its name, so it is not known whether Tally held a voucher of this batch. \
+             Nothing was changed; the batch keeps counting.",
+        ),
         "import_retire_endpoint_mismatch" => Some(
             "This batch was built for a different Tally endpoint, so a read here says nothing \
              about it. Nothing was changed. Connect to that endpoint and call again.",

@@ -36,9 +36,9 @@ These changes are in source and not yet in a published build.
   transfer facts, so the other account's statement can withdraw the skip it was waiting on. The answer lists the
   Contra rows to skip when the statement is built again. A sent batch is not retired, and the call is refused
   while the writes setting is off. A step that names a batch not verified yet now says whether it was sent. A
-  release without this change refuses the whole import journal once a retirement record, or a verification
-  record carrying `own_tag_observed` or `vouchers_found`, is written in it, so a later release must keep reading
-  them. It does read a journal that holds only the `withdrawn` field of a statement's facts, which sits inside the
+  release without this change refuses the whole import journal once a retirement record is written
+  in it (the `own_tag_observed` note on a verification can only follow a retirement), so a later release must
+  keep reading them; an ordinary verification or post writes nothing it does not read. It does read a journal that holds only the `withdrawn` field of a statement's facts, which sits inside the
   statement's opaque JSON, and it ignores that field: it applies none of the rules that field brings, at build or
   at send, and it does not refuse the journal for it. Downgrading is not a rollback of those rules.
 

@@ -836,54 +836,69 @@ fn an_own_tag_observation_is_written_only_on_a_verification_record() {
     );
 }
 
-/// A verification that found some voucher of the batch but left it short of
-/// posted is a record that Tally held it: the note survives the status, and is
-/// read only on a verification record, never as false.
+/// The proofs a batch's verification records name are listed in journal order,
+/// each once, and an ordinary verification record carries no field an older
+/// release does not read: what a verification found is in its proof.
 #[test]
-fn a_verification_that_found_a_voucher_marks_the_batch_found_whatever_its_status() {
+fn the_proofs_of_a_batchs_verifications_are_listed_once_each_in_order() {
     let line = batch();
     let mut incomplete = line.clone();
     incomplete.status = "verification_incomplete".into();
-    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
-    let noted = ledger::StatusRecord::verified(&incomplete, name.clone()).with_vouchers_found();
-    let value = serde_json::to_value(&noted).unwrap();
-    assert_eq!(value["vouchers_found"], true);
-    let snapshot = ledger::parse_snapshots(&format!("{}{}", record(&line), record(&noted)))
-        .unwrap()
-        .remove(0);
-    assert_eq!(snapshot.batch.status, "verification_incomplete");
-    assert!(snapshot.ever_found);
-    // a verification without the note found nothing the status does not say
-    let plain = ledger::StatusRecord::verified(&incomplete, name.clone());
-    assert!(serde_json::to_value(&plain)
-        .unwrap()
-        .get("vouchers_found")
-        .is_none());
-    let snapshot = ledger::parse_snapshots(&format!("{}{}", record(&line), record(&plain)))
-        .unwrap()
-        .remove(0);
-    assert!(!snapshot.ever_found);
-    // it belongs to a verification record alone, and is never false
-    let parse =
-        |each: &Value| ledger::parse_snapshots(&format!("{}{}", record(&line), record(each)));
-    let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch(&line)).unwrap();
-    intent["vouchers_found"] = json!(true);
-    assert_eq!(
-        parse(&intent).err(),
-        Some("import_ledger_invalid".to_string())
+    let first = ledger::ProofName::of(b"first", chrono::Utc::now());
+    let second = ledger::ProofName::of(b"second", chrono::Utc::now());
+    let record_of = |name: &ledger::ProofName| ledger::StatusRecord::verified(&incomplete, name.clone());
+    let text = format!(
+        "{}{}{}{}{}",
+        record(&line),
+        record(record_of(&first)),
+        record(ledger::StatusRecord::dispatch(&line)),
+        record(record_of(&second)),
+        record(record_of(&first)),
     );
-    let mut retired =
-        serde_json::to_value(ledger::StatusRecord::retired(&incomplete, name)).unwrap();
-    retired["vouchers_found"] = json!(true);
+    let proofs = ledger::verification_proofs(std::io::Cursor::new(text.as_bytes()), &line.batch_id)
+        .unwrap();
     assert_eq!(
-        parse(&retired).err(),
-        Some("import_ledger_invalid".to_string())
+        proofs,
+        [
+            ledger::CurrentProof::Saved(first.clone()),
+            ledger::CurrentProof::Saved(second)
+        ]
     );
-    let mut denied = value;
-    denied["vouchers_found"] = json!(false);
+    // another batch's verifications are not listed
+    assert!(ledger::verification_proofs(std::io::Cursor::new(text.as_bytes()), "other")
+        .unwrap()
+        .is_empty());
+    // an older build's record names the legacy file
+    let legacy = format!("{}{}", record(&line), record(ledger::StatusRecord::from(&incomplete)));
     assert_eq!(
-        parse(&denied).err(),
-        Some("import_ledger_invalid".to_string())
+        ledger::verification_proofs(std::io::Cursor::new(legacy.as_bytes()), &line.batch_id)
+            .unwrap(),
+        [ledger::CurrentProof::Legacy]
+    );
+    // nothing is added to the record
+    let mut keys: Vec<String> = serde_json::to_value(record_of(&first))
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        ["batch_id", "batch_sha256", "proof", "record_type", "status"]
+    );
+    // the retirement's proof is the one its record names
+    let retired = ledger::StatusRecord::retired(&incomplete, second.clone());
+    let text = format!("{}{}", record(&line), record(&retired));
+    assert_eq!(
+        ledger::retirement_proof(std::io::Cursor::new(text.as_bytes()), &line.batch_id).unwrap(),
+        Some(second)
+    );
+    assert_eq!(
+        ledger::retirement_proof(std::io::Cursor::new(record(&line).as_bytes()), &line.batch_id)
+            .unwrap(),
+        None
     );
 }
 

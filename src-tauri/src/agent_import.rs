@@ -2182,7 +2182,39 @@ impl Server {
         if ever_found {
             return Err("import_retire_batch_found".to_string().into());
         }
-        self.refuse_unreadable_retire_from_the_journal(line)
+        self.refuse_unreadable_retire_from_the_journal(line)?;
+        self.refuse_retire_if_a_saved_proof_found_a_voucher(&line.batch_id)
+    }
+
+    /// A saved verification of the batch that found any voucher of it, in any
+    /// of its proofs, refuses the retirement: the status the journal keeps
+    /// forgets a find that left the batch short of posted, and a voucher
+    /// re-dated or edited since is not seen by this read. A proof that cannot
+    /// be read, or no longer matches its digest, refuses as well: what it found
+    /// is not known.
+    fn refuse_retire_if_a_saved_proof_found_a_voucher(
+        &self,
+        batch_id: &str,
+    ) -> Result<(), ToolFailure> {
+        let proofs = {
+            let _admission = self.lock_import_admission_shared()?;
+            match self.import_journal_while_admitted()? {
+                Some(reader) => ledger::verification_proofs(reader, batch_id)?,
+                None => Vec::new(),
+            }
+        };
+        for proof in &proofs {
+            let unreadable = || "import_retire_proof_unreadable".to_string();
+            let bytes = self.read_proof_file(batch_id, proof).map_err(|_| unreadable())?;
+            let saved: Value = serde_json::from_slice(&bytes).map_err(|_| unreadable())?;
+            if !saved["vouchers"].is_array() {
+                return Err(unreadable().into());
+            }
+            if retire::found_a_voucher(&saved["vouchers"]) {
+                return Err("import_retire_batch_found".to_string().into());
+            }
+        }
+        Ok(())
     }
 
     /// What a read for a retired or retiring batch is refused for by the batch's
@@ -2314,9 +2346,6 @@ impl Server {
                 own_tag_observed: true
             }
         );
-        // Whether this read saw any voucher of the batch, for a later retirement
-        // to remember: the status alone forgets it when only some were found.
-        let vouchers_found = !retiring && retire::found_a_voucher(&proof["vouchers"]);
         let imports = self.imports_dir()?;
         // Saved with its party-name marks, so a page served from it masks
         // names as the response's redaction requires.
@@ -2333,19 +2362,12 @@ impl Server {
             update,
             &json,
             markdown.as_bytes(),
-            |batch, name| {
-                let record = match (retiring, own_tag_observed) {
-                    (true, _) => return ledger::StatusRecord::retired(batch, name),
-                    (false, true) => {
-                        ledger::StatusRecord::verified(batch, name).with_own_tag_observed()
-                    }
-                    (false, false) => ledger::StatusRecord::verified(batch, name),
-                };
-                if vouchers_found {
-                    record.with_vouchers_found()
-                } else {
-                    record
+            |batch, name| match (retiring, own_tag_observed) {
+                (true, _) => ledger::StatusRecord::retired(batch, name),
+                (false, true) => {
+                    ledger::StatusRecord::verified(batch, name).with_own_tag_observed()
                 }
+                (false, false) => ledger::StatusRecord::verified(batch, name),
             },
             |record| {
                 let appended_now = self.append_import_record_while_admitted(record);
@@ -2824,14 +2846,23 @@ impl Server {
     /// recorded proof name, so a caller's argument never becomes a path on
     /// its own. A saved proof must hash to the digest its name records.
     fn read_persisted_proof(&self, batch_id: &str) -> Result<Vec<u8>, String> {
-        const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
         let snapshot = self
             .latest_import_snapshot(batch_id)?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
-        let recorded = &snapshot.batch.batch_id;
-        let path = self.imports_dir()?.join(match &snapshot.current_proof {
-            ledger::CurrentProof::Saved(name) => name.json_file(recorded),
-            ledger::CurrentProof::Legacy => format!("{recorded}.proof.json"),
+        self.read_proof_file(&snapshot.batch.batch_id, &snapshot.current_proof)
+    }
+
+    /// One saved proof of `batch_id`, read whole: the file the journal's
+    /// record names, with the digest its name records checked.
+    fn read_proof_file(
+        &self,
+        batch_id: &str,
+        proof: &ledger::CurrentProof,
+    ) -> Result<Vec<u8>, String> {
+        const MAX_PERSISTED_PROOF_BYTES: usize = 32 * 1024 * 1024;
+        let path = self.imports_dir()?.join(match proof {
+            ledger::CurrentProof::Saved(name) => name.json_file(batch_id),
+            ledger::CurrentProof::Legacy => format!("{batch_id}.proof.json"),
         });
         let file = super::local_file::open_local_file(&path, false)
             .map_err(|_| "verification_proof_missing".to_string())?;
@@ -2844,7 +2875,7 @@ impl Server {
         if bytes.len() > MAX_PERSISTED_PROOF_BYTES {
             return Err("verification_proof_too_large".into());
         }
-        if let ledger::CurrentProof::Saved(name) = &snapshot.current_proof {
+        if let ledger::CurrentProof::Saved(name) = proof {
             if sha256_hex(&bytes) != name.sha256() {
                 return Err("verification_proof_altered".into());
             }

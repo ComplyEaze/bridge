@@ -1888,8 +1888,10 @@ refused as `proposals_legacy` (parse the statement again).
   keeps counting. A later verification that sees a voucher carrying the
   retired batch's own tag counts it again; `post_import` still refuses it.
   Refused before anything is removed: a batch that was sent, had any voucher
-  found in Tally by an earlier verification (even one that left it short of
-  posted), is already retired, was built for another endpoint or recorded no
+  found in Tally by an earlier verification (read from the saved proof each of
+  its verifications names, even one that left it short of posted; a proof that
+  cannot be read or no longer matches its digest refuses too, as
+  `import_retire_proof_unreadable`), is already retired, was built for another endpoint or recorded no
   voucher mark, and any call while the writes setting is off. A read that does
   not finish after the file is removed retires nothing and says so
   (`state: not_retired`), and a repeat can help except after a refusal of the
@@ -1899,8 +1901,8 @@ refused as `proposals_legacy` (parse the statement again).
   have been written, `state` is `not_established`: the batch may be retired,
   and `verify_import` without `if_absent` shows where it stands, unless the import folder is marked as
   needing recovery, which refuses `verify_import` for the batch until it is cleared. A release without this change
-  refuses the whole import journal once it holds a retirement record, or a verification record carrying
-  `own_tag_observed` or `vouchers_found`; it reads a statement's `withdrawn` field as nothing (the field sits
+  refuses the whole import journal once it holds a retirement record (the `own_tag_observed` note on
+  a verification can only follow one), and reads an ordinary verification or post as before; it reads a statement's `withdrawn` field as nothing (the field sits
   inside the statement's opaque JSON), so it applies none of the withdrawal rules and does not refuse the journal
   for them.
 - **At send.** A batch built from a bank statement is checked against these

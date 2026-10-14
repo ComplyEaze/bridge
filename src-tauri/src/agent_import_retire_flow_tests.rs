@@ -241,7 +241,8 @@ async fn a_batch_once_found_is_refused_and_keeps_its_file() {
 /// A verification that found any voucher of the batch, even one that left the
 /// batch short of posted, is a record that Tally held it: a later read that no
 /// longer sees the voucher (it was re-dated out of the window, say) does not
-/// retire the batch.
+/// retire the batch. The record is the ordinary one: the find is in the proof
+/// it names, not in a note of the journal an older release would refuse.
 #[tokio::test]
 async fn a_batch_a_verification_found_a_voucher_of_is_not_retired_by_a_later_read() {
     let directory = tempfile::tempdir().unwrap();
@@ -268,6 +269,18 @@ async fn a_batch_a_verification_found_a_voucher_of_is_not_retired_by_a_later_rea
     assert_ne!(verified["isError"], true, "{verified}");
     let snapshot = server.latest_import_snapshot(&batch_id).unwrap().unwrap();
     assert_eq!(snapshot.batch.status, "verification_incomplete");
+    let mut keys: Vec<String> = last_record(directory.path(), &batch_id)
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        ["batch_id", "batch_sha256", "proof", "record_type", "status"],
+        "an ordinary verification record carries nothing new"
+    );
     // a later read, of a Tally that no longer shows it, is refused up front
     let (_absent, later) = reading_from(
         directory.path(),
@@ -321,16 +334,52 @@ async fn a_verification_that_found_nothing_does_not_stop_a_retirement() {
             .status,
         "verification_incomplete"
     );
-    assert!(!last_record(directory.path(), &batch_id)
-        .as_object()
-        .unwrap()
-        .contains_key("vouchers_found"));
     let (_b, later) = reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
     let response = retire(&later, &batch_id).await;
     assert_eq!(
         response["structuredContent"]["result"]["retire"]["state"], "retired",
         "{response}"
     );
+}
+
+/// A saved verification that can no longer be read, or no longer matches the
+/// digest in its name, leaves it unknown whether Tally held a voucher of the
+/// batch: the retirement is refused before anything is removed.
+#[tokio::test]
+async fn a_saved_verification_that_cannot_be_read_refuses_the_retire_and_keeps_the_file() {
+    for damage in ["removed", "altered"] {
+        let directory = tempfile::tempdir().unwrap();
+        let (_build, server, batch_id) =
+            built(directory.path(), qualified_import_cycle_plans()).await;
+        let (_a, verifier) =
+            reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
+        let plain = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+        let verified = verifier
+            .call_tool_response("verify_import", plain)
+            .await
+            .value;
+        assert_ne!(verified["isError"], true, "{verified}");
+        let proof = server.current_proof_paths(&batch_id)[0].clone();
+        match damage {
+            "removed" => fs::remove_file(&proof).unwrap(),
+            _ => {
+                let mut bytes = fs::read(&proof).unwrap();
+                bytes.extend_from_slice(b" ");
+                fs::remove_file(&proof).unwrap();
+                fs::write(&proof, bytes).unwrap();
+            }
+        }
+        let (_b, later) =
+            reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
+        let response = retire(&later, &batch_id).await;
+        assert_eq!(
+            error_code(&response),
+            "import_retire_proof_unreadable",
+            "{damage}: {response}"
+        );
+        assert!(saved_file(&server, &batch_id).exists(), "{damage}");
+        assert!(!records_of(directory.path(), &batch_id).contains(&"import_batch_retired".into()));
+    }
 }
 
 /// Tally here is not the one the batch was built for, so a read of it proves

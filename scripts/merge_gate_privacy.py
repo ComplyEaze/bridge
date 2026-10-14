@@ -128,17 +128,14 @@ def read_scan_input():
     Input that starts with a UTF-16 byte order mark is scanned twice over, as UTF-16
     and as UTF-8, one after the other: the mark does not prove the rest is one
     encoding, so reading it as UTF-16 must never hide what the UTF-8 reading shows.
-    Anything else, including a mark that is not followed by whole UTF-16 code units,
-    is read as UTF-8, as it always was.
+    Anything else must be UTF-8, and so must the rest of a marked input that is not
+    whole UTF-16 code units: bytes that are not raise ``UnicodeError``, which ``main``
+    reports as indeterminate, whatever the locale of the process.
     """
     raw = sys.stdin.buffer.read()
-    as_utf8 = raw.decode("utf-8", "surrogateescape")
     if raw[:2] in UTF16_BOMS:
-        try:
-            return raw.decode("utf-16") + "\n" + as_utf8
-        except UnicodeError:
-            pass
-    return as_utf8
+        return raw.decode("utf-16") + "\n" + raw.decode("utf-8", "surrogateescape")
+    return raw.decode("utf-8")
 
 
 def result_record():

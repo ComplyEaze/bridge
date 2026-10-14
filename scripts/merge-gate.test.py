@@ -1340,10 +1340,11 @@ class PrivacyScanDecodesUtf16(unittest.TestCase):
     def blockers(self, text):
         return self.privacy.scan(text, HEAD)["blockers"]
 
-    def run_main(self, raw):
+    def run_main(self, raw, locale="C"):
+        # A stream is decoded by the process locale unless the reader decodes the bytes itself.
         done = subprocess.run(
             ["python3", "-I", str(PRIVACY_MODULE_PATH), "--head", HEAD],
-            input=raw, capture_output=True,
+            input=raw, capture_output=True, env=dict(os.environ, LC_ALL=locale, LANG=locale),
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         return json.loads(done.stdout)
@@ -1424,12 +1425,14 @@ class PrivacyScanDecodesUtf16(unittest.TestCase):
         self.assertEqual([h["where"] for h in result["hits"]], ["docs/example.md:5"])
         self.assertNotIn(self.RUN, json.dumps(result))
 
-    def test_a_bom_in_front_of_bytes_that_are_not_whole_utf16_is_read_as_before(self):
-        # An odd length cannot be UTF-16: the input is read as bytes of UTF-8, as it always was.
-        record = self.run_main(b"\xff\xfe" + b"abc")
-        self.assertEqual(record["blockers"], [])
-        self.assertEqual(record["indeterminate"], [])
-        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+    def test_bytes_that_are_not_utf8_are_indeterminate_whatever_the_locale(self):
+        unreadable = ["could not read privacy scan input"]
+        for locale in ("C", "en_US.UTF-8"):
+            for raw in (b"\x80\x81 not text", b"\xff\xfe" + b"abc"):
+                with self.subTest(locale=locale, raw=raw):
+                    record = self.run_main(raw, locale)
+                    self.assertEqual(record["indeterminate"], unreadable)
+                    self.assertEqual(record["blockers"], [])
 
 
 if __name__ == "__main__":

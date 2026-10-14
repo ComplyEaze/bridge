@@ -88,9 +88,9 @@ impl Server {
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "One kind per call; no counts or hints; a master's aliases are not returned",
             if marks_party_text(kind) {
-                "Under mask_parties, godown, stock-group, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
+                "Under mask_parties, godown, stock-group, stock-item, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
             } else {
-                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, cost-centre and cost-category names are masked)"
+                "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, stock-item, cost-centre and cost-category names are masked)"
             },
         ];
         match kind {
@@ -110,6 +110,7 @@ impl Server {
                     "Measured on three synthetic books for cost centres and two for cost categories (the first two on one release; the third was captured in a separate sitting, and that sitting's own status read recorded TallyPrime 7.1, licence Silver, Education mode off; the status answer is not committed); centres nested more than one level deep, a centre with an alias beyond its own name and a larger book are not measured, and a larger book is refused when its master mark is too large for the response budget",
                 ]);
             }
+            MastersKind::Native(NativeMasterKind::StockItems) => limitations.extend(STOCK_ITEM_LIMITATIONS),
             MastersKind::Groups => limitations.push(
                 "Groups are read whole from the group snapshot, with no size check before the read",
             ),
@@ -135,18 +136,31 @@ impl Server {
     }
 }
 
-/// Whether `mask_parties` masks this kind's names and parents. Godown and
-/// stock-group names are free text a user types, and a job-work godown or a
-/// supplier-named stock group can carry a party's name, so they go out under
-/// the party-name marker. Voucher-type and unit names are Tally configuration
-/// labels, and account groups are read from the group snapshot as the group
-/// tree is: none of these is marked.
+/// What a `stock_items` answer says about its two lists. The size line names the
+/// master mark above which the kind is refused: the response budget over the
+/// kind's worst row (`masters_worst_row_bytes`), asserted equal in the tests.
+const STOCK_ITEM_LIMITATIONS: [&str; 6] = [
+    "hsn and gst are the item's own dated lists as Tally sent them: entries sorted by applicable_from, each as sent, one observation per list (entries, unreadable with its defect, or not_observed when the row had no such list). Nothing chooses the code or the rate for a date, adds a rate up or fills in a value Tally did not send",
+    "An empty list (entries: []) or a missing one (not_observed) is not a statement that the item has no HSN code or no GST rate: a code or rate set on the item's stock group or on the company is not on the item's list (measured: after a code was keyed on a stock group, its items' lists did not change), and that setting is not read here. Every row says so with inherited_from_group_or_company: not_read",
+    "Tally adds an HSN entry and a GST entry of its own, dated 1 Apr 2025 with source `As per Company/Stock Group` and no code or rate, when an item is first saved: such an entry says the item defers to its group or the company, not that a code or rate exists",
+    "state_name and valuation_type carry the reserved-character marker U+FFFD `#4;` where Tally sends its own `Any` and `Not Applicable`; itc_eligible is present on some entries only and is never filled in (on one item it was Yes on the entry the screen showed as No and absent on the entry the screen showed as Yes, so it is not the screen's setting); a rate is absent, empty, zero or a value, never merged",
+    "A list with a defect (an undated entry, a repeated field, a rate that is not a plain decimal, two different entries on one date) is returned as unreadable with its defect for that item's list only; a Tally ERROR, markup inside a value or a cut-off list refuses the whole read. HSN codes, descriptions and rates are not masked by mask_parties: they are not names",
+    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release and a larger book are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row); a larger book is refused as masters_too_large, and an item with more dated entries than that row allows is refused as masters_row_exceeds_bound",
+];
+
+/// Whether `mask_parties` masks this kind's names and parents. Godown,
+/// stock-group and stock-item names are text a user types, and a job-work
+/// godown or a supplier-named stock group or item can carry a party's name, so
+/// they go out under the party-name marker. Voucher-type and unit names are
+/// Tally configuration labels, and account groups are read from the group
+/// snapshot as the group tree is: none of these is marked.
 const fn marks_party_text(kind: MastersKind) -> bool {
     matches!(
         kind,
         MastersKind::Native(
             NativeMasterKind::Godowns
                 | NativeMasterKind::StockGroups
+                | NativeMasterKind::StockItems
                 | NativeMasterKind::CostCentres
                 | NativeMasterKind::CostCategories
         )
@@ -197,6 +211,13 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
         } => {
             json["decimal_places"] = json!(decimal_places);
             json["simple"] = json!(simple);
+        }
+        NativeMasterDetail::StockItem { hsn, gst } => {
+            // The key is on every row: an empty list is the item's own and says
+            // nothing about its stock group or the company.
+            json["hsn"] = json!(hsn);
+            json["gst"] = json!(gst);
+            json["inherited_from_group_or_company"] = json!("not_read");
         }
         NativeMasterDetail::CostCentre { category } => {
             json["category"] = json!(category);

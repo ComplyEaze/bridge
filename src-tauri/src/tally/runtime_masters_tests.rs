@@ -35,6 +35,10 @@ fn capture(kind: NativeMasterKind) -> String {
         NativeMasterKind::StockGroups => include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
         ),
+        // The item list with an item that carries two dated HSN and two dated GST entries.
+        NativeMasterKind::StockItems => include_bytes!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+        ),
         NativeMasterKind::CostCentres => include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
         ),
@@ -52,6 +56,7 @@ fn captured_rows(kind: NativeMasterKind) -> usize {
         NativeMasterKind::Godowns => 2,
         NativeMasterKind::Units => 4,
         NativeMasterKind::StockGroups => 3,
+        NativeMasterKind::StockItems => 12,
         NativeMasterKind::CostCentres | NativeMasterKind::CostCategories => 2,
     }
 }
@@ -132,10 +137,11 @@ fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
 
 /// The kinds sized by the master mark before their request. Voucher types are
 /// not: they are held by the checks after the read only.
-const SIZED_KINDS: [NativeMasterKind; 5] = [
+const SIZED_KINDS: [NativeMasterKind; 6] = [
     NativeMasterKind::Godowns,
     NativeMasterKind::Units,
     NativeMasterKind::StockGroups,
+    NativeMasterKind::StockItems,
     NativeMasterKind::CostCentres,
     NativeMasterKind::CostCategories,
 ];
@@ -146,6 +152,10 @@ fn the_admission_edge_is_the_largest_mark_that_fits_and_the_next_refuses() {
         (NativeMasterKind::Godowns, 1_152),
         (NativeMasterKind::Units, 1_168),
         (NativeMasterKind::StockGroups, 1_160),
+        // The item row is allowed for several dated entries (its fixed allowance is
+        // 10,200 UTF-16 units against 4,373 measured), so the admitted mark is
+        // the lowest of the kinds. The largest AlterID in the capture is 294.
+        (NativeMasterKind::StockItems, 489),
         (NativeMasterKind::CostCentres, 1_037),
         (NativeMasterKind::CostCategories, 1_264),
     ] {
@@ -581,4 +591,67 @@ async fn a_zero_row_capture_reads_as_an_empty_collection_through_every_bracket()
     };
     assert!(masters.rows.is_empty());
     assert_eq!(dispatched, 18);
+}
+
+#[tokio::test]
+async fn a_tally_error_inside_a_stock_item_list_is_refused_at_once() {
+    // `ERROR` inside a rate row of a list the parser now reads: the read is
+    // refused with Tally's reported failure, never skipped as unmodelled
+    // content and never held behind the closing extent read.
+    let captured = capture(NativeMasterKind::StockItems);
+    let at = captured.find("<RATEDETAILS.LIST>").unwrap() + "<RATEDETAILS.LIST>".len();
+    let failed = format!(
+        "{}<LINEERROR>x</LINEERROR>{}",
+        &captured[..at],
+        &captured[at..]
+    );
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(failed));
+    let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
+
+    let error = result.err().expect("refused");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::TallyReportedFailure)
+    );
+    // Mode probe and identity (3), opening extent (4), the collection pair (4).
+    assert_eq!(dispatched, 11);
+}
+
+#[tokio::test]
+async fn a_stock_item_row_over_its_bound_is_the_parsers_typed_refusal() {
+    // A filler the parser does not read, in a row: only the row's own length can
+    // refuse it. The first closing tag is the item count in the company
+    // information, outside any row, and the second is the first item's.
+    let filler = "x".repeat(masters_worst_row_bytes(NativeMasterKind::StockItems));
+    let long_row = capture(NativeMasterKind::StockItems).replacen(
+        "</STOCKITEM>",
+        &format!("<FILLER>{filler}</FILLER></STOCKITEM>"),
+        2,
+    );
+    let mut plans = opening(extents());
+    pair(&mut plans, xml(long_row));
+    let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
+
+    let error = result.err().expect("refused");
+    assert_eq!(
+        cause::<NativeMastersError>(&error),
+        Some(&NativeMastersError::RowExceedsBound),
+        "{error:?}"
+    );
+    assert_eq!(dispatched, 11);
+}
+
+#[test]
+fn stock_items_are_named_by_their_kind_and_only_by_it() {
+    assert_eq!(
+        MastersKind::parse("stock_items"),
+        Some(MastersKind::Native(NativeMasterKind::StockItems))
+    );
+    for kind in NativeMasterKind::ALL {
+        let name = MastersKind::Native(kind).as_str();
+        assert_eq!(MastersKind::parse(name), Some(MastersKind::Native(kind)));
+    }
+    assert_eq!(MastersKind::parse("stock_item"), None);
+    assert_eq!(MastersKind::parse("Stock_Items"), None);
 }

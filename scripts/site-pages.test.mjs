@@ -28,7 +28,7 @@ function visibleText(html) {
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {
-  assert.deepEqual(pages, ["blog-bank-statement-ledger-names.html", "blog-ten-questions.html", "blog-where-does-client-data-go.html", "blog-who-approves-a-post.html", "blog.html", "capabilities.html", "changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html", "security.html"]);
+  assert.deepEqual(pages, ["bank-statement-pdf-to-tallyprime-vouchers.html", "blog-bank-statement-ledger-names.html", "blog-ten-questions.html", "blog-where-does-client-data-go.html", "blog-who-approves-a-post.html", "blog.html", "capabilities.html", "changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html", "security.html"]);
 });
 
 test("every page carries the same header and footer, apart from which link is the current page", () => {
@@ -148,7 +148,7 @@ test("no file that ships carries an internal working label", () => {
 });
 
 // What a search engine or an AI assistant reads about the site without running its script.
-const indexed = ["index.html", "download.html", "faq.html", "capabilities.html", "releases.html", "security.html", ...pages.filter((name) => name.startsWith("blog"))];
+const indexed = ["index.html", "download.html", "faq.html", "capabilities.html", "bank-statement-pdf-to-tallyprime-vouchers.html", "releases.html", "security.html", ...pages.filter((name) => name.startsWith("blog"))];
 const metaContent = (html, property) => html.match(new RegExp(`<meta property="${property}" content="([^"]*)" />`))?.[1];
 
 test("each indexed page names its own address, and its social card repeats the page's own title and description", () => {

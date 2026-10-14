@@ -24,8 +24,14 @@
 //!   of lower-case letters `a+` (one letter stays `A` or `a`), `@` and `/` become
 //!   `#`, and any non-ASCII symbol `?`; other punctuation is kept. An amount (a
 //!   number with a point and one or two places, with whatever sign, bracket,
-//!   currency sign or `Cr`/`Dr` around it) becomes `9+.99` with those affixes
-//!   masked by the same rules, so a debit and a credit look alike;
+//!   currency sign or `Cr`/`Dr` around it) becomes `9+.99` with the text before
+//!   and after the number put through those same rules: letters collapse (`Cr`
+//!   and `Dr` both print `Aa`) and a currency sign prints `?`, but an ASCII
+//!   sign or bracket is kept as typed (`-1,000.00` prints `-9+.99`, `(500.00)`
+//!   prints `(9+.99)`, `500.00-` prints `9+.99-`). So on a statement that marks
+//!   a debit, or an overdrawn balance, with a minus or brackets, each printed
+//!   amount line shows which it is; a layout needs to know which marking a bank
+//!   uses;
 //! * the left edge of a word is printed only on a line of nothing but listed words
 //!   (a header row): on any other line it can depend on the width of a masked word
 //!   or of a centred or right-aligned line. A right edge is never printed on a
@@ -190,7 +196,9 @@ fn allowed(text: &str) -> bool {
 
 /// The masked form of an amount: a number with a point and one or two places, with
 /// anything around it (a sign, brackets, a currency sign, `Cr`, `Dr`, `Rs.`). The
-/// affixes are masked by the general rules, so a debit and a credit look alike. A
+/// affixes go through the general rules: letters collapse (`Cr` and `Dr` both give
+/// `Aa`) and a non-ASCII symbol gives `?`, but ASCII punctuation, so a minus, a plus
+/// or a bracket, is kept, and a debit marked that way still differs from a credit. A
 /// number with no point is not an amount (an account number, a phone number, a page
 /// number, a year) and goes through the digit rule.
 fn amount(text: &str) -> Option<String> {
@@ -510,6 +518,10 @@ mod tests {
         assert_eq!(mask("Rs.500.00"), "Aa.9+.99");
         assert_eq!(mask("500.00-"), "9+.99-");
         assert_eq!(mask("+500.00"), "+9+.99");
+        // Letters collapse to one mark; a sign or a bracket is kept as typed.
+        assert_eq!(mask("500.00Cr"), mask("500.00Dr"));
+        assert_ne!(mask("-500.00"), mask("500.00"));
+        assert_ne!(mask("(500.00)"), mask("500.00"));
         assert_eq!(mask("\u{20b9}1,000.00"), "?9+.99");
         assert_eq!(mask("\u{2212}1,000.00"), "?9+.99");
         assert_eq!(mask("1,00,000"), "9+");

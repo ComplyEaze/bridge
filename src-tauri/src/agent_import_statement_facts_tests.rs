@@ -3301,61 +3301,7 @@ fn an_own_tag_observation_after_a_retire_returns_the_batch_to_the_facts() {
     assert_eq!(found.contras.len(), 1);
 }
 
-// ---- the rows a sibling holds, and a retired batch against the two guards -----------
-
-fn siblings(journal: &Journal, own: u32, rows: &[u32]) -> BTreeSet<String> {
-    let rows: BTreeSet<String> = rows.iter().map(|row| st(*row)).collect();
-    ledger::other_lineage_holders(
-        Cursor::new(journal.0.as_bytes()),
-        COMPANY,
-        &batch_id(own),
-        &rows,
-    )
-    .unwrap()
-}
-
-#[test]
-fn the_siblings_are_the_rows_a_found_batch_of_another_lineage_holds() {
-    let sent = build(140).voucher(payment(&st(1), "500.00"));
-    let found = build(141)
-        .voucher(payment(&st(2), "500.00"))
-        .status("posted_verified");
-    let unsent = build(142).voucher(payment(&st(3), "500.00"));
-    let own_amendment = build(143)
-        .amends(144)
-        .voucher(payment(&st(4), "500.00"))
-        .status("posted_verified");
-    let other_company = build(145)
-        .company(OTHER_COMPANY)
-        .voucher(payment(&st(5), "500.00"));
-    // found once, then read not found: it no longer accounts for a match
-    let lost = build(146)
-        .voucher(payment(&st(6), "500.00"))
-        .status("posted_verified");
-    let journal = Journal::default()
-        .batch(&lost)
-        .status(&lost, "verification_incomplete")
-        .batch(&sent)
-        .sent(&sent)
-        .batch(&found)
-        .batch(&unsent)
-        .batch(&own_amendment)
-        .batch(&other_company)
-        .sent(&other_company);
-    let all = [1, 2, 3, 4, 5, 6];
-    // asked by a batch of a lineage of its own: the rows a batch holds whose
-    // latest status is found posted
-    // (the amendment's lineage is another lineage), not those of one only
-    // sent, nor an unsent one, nor another company's
-    assert_eq!(
-        siblings(&journal, 150, &all),
-        BTreeSet::from([st(2), st(4)])
-    );
-    // asked from inside the lineage that holds row 4: its own rows are not siblings'
-    assert_eq!(siblings(&journal, 144, &[4]), BTreeSet::new());
-    // only the rows asked for are named
-    assert_eq!(siblings(&journal, 150, &[2]), BTreeSet::from([st(2)]));
-}
+// ---- a retired batch against the two guards -----------
 
 /// Retiring a never-sent batch changes neither guard against posting a row
 /// twice: the rebuild that skips the row, and the build that posts it, are

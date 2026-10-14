@@ -27,8 +27,8 @@ These changes are in source and not yet in a published build.
   passed before the other account's Contra was verified (part of #1703).
 - `verify_import` takes `if_absent` set to `retire`, for a batch that was never sent and will not be. It removes the
   batch's saved file, then reads Tally over the batch's days and a week either side (limited to the book, then moved further out to the nearest day the licence accepts as a boundary; refused when no such window exists), and if no voucher carries the
-  batch's own narration tag and each of its vouchers is not found (or is a content match that a batch of another lineage
-  whose latest status is found posted accounts for), it records the batch retired in the same journal record as that
+  batch's own narration tag and each of its vouchers is not found (a content match keeps the batch counting), it
+  records the batch retired in the same journal record as that
   verification. `post_import` then refuses the batch (`import_batch_retired`), and its Contras and holds leave the
   transfer facts, so the other account's statement can withdraw the skip it was waiting on. The answer lists the
   Contra rows to skip when the statement is built again. A sent batch is not retired, and the call is refused

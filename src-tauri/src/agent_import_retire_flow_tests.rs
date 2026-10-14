@@ -795,23 +795,21 @@ async fn the_closing_licence_probe_is_sent_even_when_nothing_was_not_found() {
     }
 }
 
-/// A content match is the sibling's, not the batch's, only when the sibling is
-/// found posted. A sibling that was only sent may have created nothing, so the
-/// match may be the batch's own voucher and the batch keeps counting.
+/// A voucher in Tally that matches the batch by content alone keeps the batch
+/// counting, whatever another batch of the company holds in the journal: a
+/// retirement credits a content match to no other batch.
 #[tokio::test]
-async fn a_content_match_is_credited_to_a_sibling_only_when_it_is_found() {
-    let found = retire_beside(Sibling::Found).await;
-    assert_eq!(found["state"], "retired", "{found}");
-    let sent = retire_beside(Sibling::SentOnly).await;
-    assert_eq!(sent["state"], "not_retired", "{sent}");
-    assert_eq!(sent["reason"], "voucher_in_tally", "{sent}");
-    // found once and read not found since: not found now, so not credited
-    let lost = retire_beside(Sibling::FoundThenLost).await;
-    assert_eq!(lost["state"], "not_retired", "{lost}");
-    assert_eq!(lost["reason"], "voucher_in_tally", "{lost}");
-    let alone = retire_beside(Sibling::Absent).await;
-    assert_eq!(alone["state"], "not_retired", "{alone}");
-    assert_eq!(alone["reason"], "voucher_in_tally", "{alone}");
+async fn a_content_match_keeps_the_batch_whatever_another_batch_holds() {
+    for sibling in [
+        Sibling::Absent,
+        Sibling::SentOnly,
+        Sibling::Found,
+        Sibling::FoundThenLost,
+    ] {
+        let kept = retire_beside(sibling).await;
+        assert_eq!(kept["state"], "not_retired", "{kept}");
+        assert_eq!(kept["reason"], "voucher_in_tally", "{kept}");
+    }
 }
 
 /// The record of the retirement is appended and the publication's marker then

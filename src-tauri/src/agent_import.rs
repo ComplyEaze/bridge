@@ -2036,17 +2036,6 @@ impl Server {
             let kind = if retiring {
                 PersistKind::Retire(retire::Request {
                     company_guid: line.company_guid.clone(),
-                    own_lineage: line.identity_batch_id().to_string(),
-                    statement_rows: line
-                        .vouchers
-                        .iter()
-                        .filter(|voucher| {
-                            bridge_bank_statement::proposals::is_statement_txn_id(
-                                &voucher.bridge_txn_id,
-                            )
-                        })
-                        .map(|voucher| voucher.bridge_txn_id.clone())
-                        .collect(),
                     rows: rows.clone(),
                 })
             } else {
@@ -2190,18 +2179,7 @@ impl Server {
             return Err("import_verification_conflict_retry".into());
         }
         let decision = match &kind {
-            PersistKind::Retire(request) => {
-                let siblings = match self.import_journal_while_admitted()? {
-                    Some(reader) => ledger::other_lineage_holders(
-                        reader,
-                        &request.company_guid,
-                        &request.own_lineage,
-                        &request.statement_rows,
-                    )?,
-                    None => BTreeSet::new(),
-                };
-                Some(retire::judge(&request.rows, &siblings))
-            }
+            PersistKind::Retire(request) => Some(retire::judge(&request.rows)),
             PersistKind::Verification { .. } => None,
         };
         let retiring = matches!(decision, Some(Ok(())));

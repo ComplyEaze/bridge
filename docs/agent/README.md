@@ -1875,9 +1875,9 @@ refused as `proposals_legacy` (parse the statement again).
   Education licence does for day 1, 2 or 31; the call is refused when no such
   window exists), after removing the batch's saved file so it
   cannot be imported by hand during the read. If no voucher carries the
-  batch's own narration tag, and each of its vouchers is either not found or
-  matches by content a row that a batch of another lineage, whose latest
-  status is found posted, holds, one journal record both saves the verification and retires
+  batch's own narration tag, and each of its vouchers is not found (a content
+  match keeps the batch counting, whatever another batch holds), one journal
+  record both saves the verification and retires
   the batch: `post_import` refuses it (`import_batch_retired`) and its Contras
   and holds leave the transfer facts. The answer's `retire` block names the
   Contra rows another statement was waiting on (`carried_rows`), which the

@@ -14,13 +14,9 @@ use super::*;
 use crate::agent::transfer_pairing::{ContraKey, SkipState, TransferView};
 use chrono::{Duration, NaiveDate};
 
-/// What the read of Tally is judged on, and what it is judged against.
+/// What the read of Tally is judged on.
 pub(super) struct Request {
     pub(super) company_guid: String,
-    /// The lineage of the batch being read for.
-    pub(super) own_lineage: String,
-    /// The batch's statement rows: the only ones a sibling can account for.
-    pub(super) statement_rows: BTreeSet<String>,
     /// The verification's row for each voucher of the batch.
     pub(super) rows: Vec<Value>,
 }
@@ -167,7 +163,7 @@ pub(super) enum Keep {
     /// imported, in whole or part.
     OwnTag,
     /// A voucher in Tally has this batch's content, or is the batch's under
-    /// some other mark, and nothing accounts for it.
+    /// some other mark.
     VoucherInTally,
 }
 
@@ -183,28 +179,18 @@ impl Keep {
 /// Whether the rows of a verification of a never-sent batch show it absent.
 ///
 /// No voucher carries the batch's own tag, and every voucher of the batch is
-/// either not found, or matches by content alone a voucher that a batch of
-/// another lineage, whose latest status is found posted, holds for the same statement row:
-/// that batch's own post accounts for the match, and it is not this batch's
-/// voucher. Anything else (a content match nothing accounts for, a voucher
-/// found by its tag, a duplicate) keeps the batch counting.
-pub(super) fn judge(rows: &[Value], siblings: &BTreeSet<String>) -> Result<(), Keep> {
+/// not found. Anything else (a voucher found by its tag, a content match, a
+/// duplicate) keeps the batch counting: a content match is credited to no other
+/// batch, because nothing compares the matched voucher with another batch's.
+pub(super) fn judge(rows: &[Value]) -> Result<(), Keep> {
     if rows.iter().any(|row| row["marker"] == "narration_tag") {
         return Err(Keep::OwnTag);
     }
-    for row in rows {
-        let accounted_for = || {
-            row["bridge_txn_id"].as_str().is_some_and(|row| {
-                bridge_bank_statement::proposals::is_statement_txn_id(row) && siblings.contains(row)
-            })
-        };
-        match row["status"].as_str() {
-            Some("not_found") => {}
-            Some("matching_content_observed") if accounted_for() => {}
-            _ => return Err(Keep::VoucherInTally),
-        }
+    if rows.iter().all(|row| row["status"].as_str() == Some("not_found")) {
+        Ok(())
+    } else {
+        Err(Keep::VoucherInTally)
     }
-    Ok(())
 }
 
 /// Whether any voucher row of a verification carries the batch's own tag.
@@ -275,32 +261,25 @@ mod tests {
     const ROW: &str = "st-20260901-00000000000000a1";
 
     #[test]
-    fn only_absence_or_a_sibling_accounted_match_retires() {
-        let none = BTreeSet::new();
-        let siblings = BTreeSet::from([ROW.to_string()]);
+    fn only_absence_retires() {
         let absent = row(ROW, "not_found", "");
-        assert_eq!(judge(std::slice::from_ref(&absent), &none), Ok(()));
+        assert_eq!(judge(std::slice::from_ref(&absent)), Ok(()));
+        // a content match is credited to nothing
         let content = row(ROW, "matching_content_observed", "accounting_fingerprint");
-        // nothing accounts for a content match
         assert_eq!(
-            judge(std::slice::from_ref(&content), &none),
+            judge(std::slice::from_ref(&content)),
             Err(Keep::VoucherInTally)
         );
-        // a found batch of another lineage holds the same row
-        assert_eq!(judge(&[content.clone(), absent.clone()], &siblings), Ok(()));
-        // a row that is not a statement row is never accounted for that way
-        let by_hand = row(
-            "hand-1",
-            "matching_content_observed",
-            "accounting_fingerprint",
+        assert_eq!(judge(&[content, absent]), Err(Keep::VoucherInTally));
+        // a row that names no status keeps the batch counting
+        assert_eq!(
+            judge(&[json!({"bridge_txn_id": ROW})]),
+            Err(Keep::VoucherInTally)
         );
-        let hand = BTreeSet::from(["hand-1".to_string()]);
-        assert_eq!(judge(&[by_hand], &hand), Err(Keep::VoucherInTally));
     }
 
     #[test]
-    fn a_voucher_with_the_batchs_own_tag_blocks_whatever_else_is_accounted_for() {
-        let siblings = BTreeSet::from([ROW.to_string()]);
+    fn a_voucher_with_the_batchs_own_tag_blocks_the_retire() {
         for status in [
             "posted_verified",
             "posted_divergent",
@@ -309,7 +288,7 @@ mod tests {
         ] {
             let tagged = row(ROW, status, "narration_tag");
             assert_eq!(
-                judge(std::slice::from_ref(&tagged), &siblings),
+                judge(std::slice::from_ref(&tagged)),
                 Err(Keep::OwnTag),
                 "{status}"
             );
@@ -323,7 +302,7 @@ mod tests {
             "bound_not_in_window",
         ] {
             assert_eq!(
-                judge(&[row(ROW, status, "accounting_fingerprint")], &siblings),
+                judge(&[row(ROW, status, "accounting_fingerprint")]),
                 Err(Keep::VoucherInTally),
                 "{status}"
             );

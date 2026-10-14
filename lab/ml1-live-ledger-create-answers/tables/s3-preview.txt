@@ -1,0 +1,9 @@
+Create ONE ledger in "BRIDGE MASTERS LAB"
+Company GUID: f107e523-3d6b-4516-bd24-5b1a14498fa6
+Company number: 100060  Books from: 20260401
+Tally: http://127.0.0.1:9001
+
+Create ledger "MLab Live Suspense" under Suspense A/c
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.

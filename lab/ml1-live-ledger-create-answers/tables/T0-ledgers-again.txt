@@ -1,0 +1,20 @@
+﻿# 19 LEDGER rows by GUID: GUID | NAME attribute | names in order | PARENT | ISBILLWISEON | ALTERID
+f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e | "Profit & Loss A/c" (17) | "Profit & Loss A/c" (17) | "Primary" (7) | No | 31
+f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f | "Cash" (4) | "Cash" (4) | "Cash-in-Hand" (12) | No | 32
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce | "MLab Exact Target" (17) | "MLab Exact Target" (17) | "Sundry Debtors" (14) | No | 232
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf | "MLab Alias Target" (17) | "MLab Alias Target" (17) ; "MLab Alias Name" (15) ; "MLab Alias Two" (14) | "Sundry Creditors" (16) | Yes | 233
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0 | "MLAB CASE TARGET" (16) | "MLAB CASE TARGET" (16) | "Sundry Creditors" (16) | Yes | 219
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1 | "MLab  Space Target" (18) | "MLab  Space Target" (18) | "Sundry Creditors" (16) | Yes | 220
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2 | "MLab Dash Target" (16) | "MLab Dash Target" (16) | "Sundry Creditors" (16) | Yes | 221
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3 | "MLab Slash Target" (17) | "MLab Slash Target" (17) | "Sundry Creditors" (16) | Yes | 222
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5 | "MLab FreshParty" (15) | "MLab FreshParty" (15) | "Sundry Debtors" (14) | No | 234
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6 | "MLab Group Target" (17) | "MLab Group Target" (17) | "Sundry Creditors" (16) | Yes | 223
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 | "MLab M1 Party" (13) | "MLab M1 Party" (13) | "Sundry Debtors" (14) | Yes | 224
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 | "MLab M1 Suspense" (16) | "MLab M1 Suspense" (16) | "Suspense A/c" (12) | No | 225
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 | "MLab M1 Duty CGST" (17) | "MLab M1 Duty CGST" (17) | "Duties & Taxes" (14) | No | 226
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da | "MLab M1 Duty IGST" (17) | "MLab M1 Duty IGST" (17) | "Duties & Taxes" (14) | No | 227
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db | "MLab M1 Duty State Tax" (22) | "MLab M1 Duty State Tax" (22) | "Duties & Taxes" (14) | No | 228
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc | "MLab M1 Duty SGST UTGST" (23) | "MLab M1 Duty SGST UTGST" (23) | "Duties & Taxes" (14) | No | 229
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd | "MLab M1 Duty UT Tax" (19) | "MLab M1 Duty UT Tax" (19) | "Duties & Taxes" (14) | No | 230
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de | "MLab M1 Duty Cess" (17) | "MLab M1 Duty Cess" (17) | "Duties & Taxes" (14) | No | 231
+f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df | "MLab Probe Pvt Ltd" (18) | "MLab Probe Pvt Ltd" (18) | "Sundry Debtors" (14) | No | 236

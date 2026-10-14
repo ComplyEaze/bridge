@@ -1,0 +1,165 @@
+== ml1-s0-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s1-groups.xml | 56068 bytes | sha256 11f236ec1d9adddf7ebbcc82e4d84f41a3cd95ea37302639e072bc391bd73d11
+   rows under COLLECTION: COMPANY 0, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+
+== ml1-s1-ledgers.xml | 28046 bytes | sha256 9d2fd93775f2890a1bcae771957b138925499fc3c96b7a000f85a006db5620dc
+   rows under COLLECTION: COMPANY 0, LEDGER 19, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "MLab Alias Target" (17) | NAME elements: "MLab Alias Target" (17), "MLab Alias Name" (15), "MLab Alias Two" (14) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf | parent "Sundry Creditors" (16) | ALTERID 233
+   LEDGER "MLAB CASE TARGET" (16) | NAME elements: "MLAB CASE TARGET" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0 | parent "Sundry Creditors" (16) | ALTERID 219
+   LEDGER "MLab Dash Target" (16) | NAME elements: "MLab Dash Target" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2 | parent "Sundry Creditors" (16) | ALTERID 221
+   LEDGER "MLab Exact Target" (17) | NAME elements: "MLab Exact Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce | parent "Sundry Debtors" (14) | ALTERID 232
+   LEDGER "MLab FreshParty" (15) | NAME elements: "MLab FreshParty" (15) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5 | parent "Sundry Debtors" (14) | ALTERID 234
+   LEDGER "MLab Group Target" (17) | NAME elements: "MLab Group Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6 | parent "Sundry Creditors" (16) | ALTERID 223
+   LEDGER "MLab M1 Duty Cess" (17) | NAME elements: "MLab M1 Duty Cess" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de | parent "Duties & Taxes" (14) | ALTERID 231
+   LEDGER "MLab M1 Duty CGST" (17) | NAME elements: "MLab M1 Duty CGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 | parent "Duties & Taxes" (14) | ALTERID 226
+   LEDGER "MLab M1 Duty IGST" (17) | NAME elements: "MLab M1 Duty IGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da | parent "Duties & Taxes" (14) | ALTERID 227
+   LEDGER "MLab M1 Duty SGST UTGST" (23) | NAME elements: "MLab M1 Duty SGST UTGST" (23) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc | parent "Duties & Taxes" (14) | ALTERID 229
+   LEDGER "MLab M1 Duty State Tax" (22) | NAME elements: "MLab M1 Duty State Tax" (22) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db | parent "Duties & Taxes" (14) | ALTERID 228
+   LEDGER "MLab M1 Duty UT Tax" (19) | NAME elements: "MLab M1 Duty UT Tax" (19) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd | parent "Duties & Taxes" (14) | ALTERID 230
+   LEDGER "MLab M1 Party" (13) | NAME elements: "MLab M1 Party" (13) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 | parent "Sundry Debtors" (14) | ALTERID 224
+   LEDGER "MLab M1 Suspense" (16) | NAME elements: "MLab M1 Suspense" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 | parent "Suspense A/c" (12) | ALTERID 225
+   LEDGER "MLab Probe Pvt Ltd" (18) | NAME elements: "MLab Probe Pvt Ltd" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df | parent "Sundry Debtors" (14) | ALTERID 236
+   LEDGER "MLab Slash Target" (17) | NAME elements: "MLab Slash Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3 | parent "Sundry Creditors" (16) | ALTERID 222
+   LEDGER "MLab  Space Target" (18) | NAME elements: "MLab  Space Target" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1 | parent "Sundry Creditors" (16) | ALTERID 220
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e | parent " Primary" (8) | ALTERID 31
+
+== ml1-s1-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s1-marks-after-backup.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s2-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s3-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s4b-stop-ledgers.xml | 28046 bytes | sha256 9d2fd93775f2890a1bcae771957b138925499fc3c96b7a000f85a006db5620dc
+   rows under COLLECTION: COMPANY 0, LEDGER 19, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "MLab Alias Target" (17) | NAME elements: "MLab Alias Target" (17), "MLab Alias Name" (15), "MLab Alias Two" (14) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf | parent "Sundry Creditors" (16) | ALTERID 233
+   LEDGER "MLAB CASE TARGET" (16) | NAME elements: "MLAB CASE TARGET" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0 | parent "Sundry Creditors" (16) | ALTERID 219
+   LEDGER "MLab Dash Target" (16) | NAME elements: "MLab Dash Target" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2 | parent "Sundry Creditors" (16) | ALTERID 221
+   LEDGER "MLab Exact Target" (17) | NAME elements: "MLab Exact Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce | parent "Sundry Debtors" (14) | ALTERID 232
+   LEDGER "MLab FreshParty" (15) | NAME elements: "MLab FreshParty" (15) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5 | parent "Sundry Debtors" (14) | ALTERID 234
+   LEDGER "MLab Group Target" (17) | NAME elements: "MLab Group Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6 | parent "Sundry Creditors" (16) | ALTERID 223
+   LEDGER "MLab M1 Duty Cess" (17) | NAME elements: "MLab M1 Duty Cess" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de | parent "Duties & Taxes" (14) | ALTERID 231
+   LEDGER "MLab M1 Duty CGST" (17) | NAME elements: "MLab M1 Duty CGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 | parent "Duties & Taxes" (14) | ALTERID 226
+   LEDGER "MLab M1 Duty IGST" (17) | NAME elements: "MLab M1 Duty IGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da | parent "Duties & Taxes" (14) | ALTERID 227
+   LEDGER "MLab M1 Duty SGST UTGST" (23) | NAME elements: "MLab M1 Duty SGST UTGST" (23) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc | parent "Duties & Taxes" (14) | ALTERID 229
+   LEDGER "MLab M1 Duty State Tax" (22) | NAME elements: "MLab M1 Duty State Tax" (22) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db | parent "Duties & Taxes" (14) | ALTERID 228
+   LEDGER "MLab M1 Duty UT Tax" (19) | NAME elements: "MLab M1 Duty UT Tax" (19) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd | parent "Duties & Taxes" (14) | ALTERID 230
+   LEDGER "MLab M1 Party" (13) | NAME elements: "MLab M1 Party" (13) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 | parent "Sundry Debtors" (14) | ALTERID 224
+   LEDGER "MLab M1 Suspense" (16) | NAME elements: "MLab M1 Suspense" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 | parent "Suspense A/c" (12) | ALTERID 225
+   LEDGER "MLab Probe Pvt Ltd" (18) | NAME elements: "MLab Probe Pvt Ltd" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df | parent "Sundry Debtors" (14) | ALTERID 236
+   LEDGER "MLab Slash Target" (17) | NAME elements: "MLab Slash Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3 | parent "Sundry Creditors" (16) | ALTERID 222
+   LEDGER "MLab  Space Target" (18) | NAME elements: "MLab  Space Target" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1 | parent "Sundry Creditors" (16) | ALTERID 220
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e | parent " Primary" (8) | ALTERID 31
+
+== ml1-s4b-stop-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s4-ledgers.xml | 28046 bytes | sha256 9d2fd93775f2890a1bcae771957b138925499fc3c96b7a000f85a006db5620dc
+   rows under COLLECTION: COMPANY 0, LEDGER 19, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "MLab Alias Target" (17) | NAME elements: "MLab Alias Target" (17), "MLab Alias Name" (15), "MLab Alias Two" (14) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf | parent "Sundry Creditors" (16) | ALTERID 233
+   LEDGER "MLAB CASE TARGET" (16) | NAME elements: "MLAB CASE TARGET" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0 | parent "Sundry Creditors" (16) | ALTERID 219
+   LEDGER "MLab Dash Target" (16) | NAME elements: "MLab Dash Target" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2 | parent "Sundry Creditors" (16) | ALTERID 221
+   LEDGER "MLab Exact Target" (17) | NAME elements: "MLab Exact Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce | parent "Sundry Debtors" (14) | ALTERID 232
+   LEDGER "MLab FreshParty" (15) | NAME elements: "MLab FreshParty" (15) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5 | parent "Sundry Debtors" (14) | ALTERID 234
+   LEDGER "MLab Group Target" (17) | NAME elements: "MLab Group Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6 | parent "Sundry Creditors" (16) | ALTERID 223
+   LEDGER "MLab M1 Duty Cess" (17) | NAME elements: "MLab M1 Duty Cess" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de | parent "Duties & Taxes" (14) | ALTERID 231
+   LEDGER "MLab M1 Duty CGST" (17) | NAME elements: "MLab M1 Duty CGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 | parent "Duties & Taxes" (14) | ALTERID 226
+   LEDGER "MLab M1 Duty IGST" (17) | NAME elements: "MLab M1 Duty IGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da | parent "Duties & Taxes" (14) | ALTERID 227
+   LEDGER "MLab M1 Duty SGST UTGST" (23) | NAME elements: "MLab M1 Duty SGST UTGST" (23) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc | parent "Duties & Taxes" (14) | ALTERID 229
+   LEDGER "MLab M1 Duty State Tax" (22) | NAME elements: "MLab M1 Duty State Tax" (22) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db | parent "Duties & Taxes" (14) | ALTERID 228
+   LEDGER "MLab M1 Duty UT Tax" (19) | NAME elements: "MLab M1 Duty UT Tax" (19) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd | parent "Duties & Taxes" (14) | ALTERID 230
+   LEDGER "MLab M1 Party" (13) | NAME elements: "MLab M1 Party" (13) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 | parent "Sundry Debtors" (14) | ALTERID 224
+   LEDGER "MLab M1 Suspense" (16) | NAME elements: "MLab M1 Suspense" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 | parent "Suspense A/c" (12) | ALTERID 225
+   LEDGER "MLab Probe Pvt Ltd" (18) | NAME elements: "MLab Probe Pvt Ltd" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df | parent "Sundry Debtors" (14) | ALTERID 236
+   LEDGER "MLab Slash Target" (17) | NAME elements: "MLab Slash Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3 | parent "Sundry Creditors" (16) | ALTERID 222
+   LEDGER "MLab  Space Target" (18) | NAME elements: "MLab  Space Target" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1 | parent "Sundry Creditors" (16) | ALTERID 220
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e | parent " Primary" (8) | ALTERID 31
+
+== ml1-s4-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s4-stop-ledgers.xml | 28046 bytes | sha256 9d2fd93775f2890a1bcae771957b138925499fc3c96b7a000f85a006db5620dc
+   rows under COLLECTION: COMPANY 0, LEDGER 19, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "MLab Alias Target" (17) | NAME elements: "MLab Alias Target" (17), "MLab Alias Name" (15), "MLab Alias Two" (14) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf | parent "Sundry Creditors" (16) | ALTERID 233
+   LEDGER "MLAB CASE TARGET" (16) | NAME elements: "MLAB CASE TARGET" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0 | parent "Sundry Creditors" (16) | ALTERID 219
+   LEDGER "MLab Dash Target" (16) | NAME elements: "MLab Dash Target" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2 | parent "Sundry Creditors" (16) | ALTERID 221
+   LEDGER "MLab Exact Target" (17) | NAME elements: "MLab Exact Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce | parent "Sundry Debtors" (14) | ALTERID 232
+   LEDGER "MLab FreshParty" (15) | NAME elements: "MLab FreshParty" (15) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5 | parent "Sundry Debtors" (14) | ALTERID 234
+   LEDGER "MLab Group Target" (17) | NAME elements: "MLab Group Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6 | parent "Sundry Creditors" (16) | ALTERID 223
+   LEDGER "MLab M1 Duty Cess" (17) | NAME elements: "MLab M1 Duty Cess" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de | parent "Duties & Taxes" (14) | ALTERID 231
+   LEDGER "MLab M1 Duty CGST" (17) | NAME elements: "MLab M1 Duty CGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 | parent "Duties & Taxes" (14) | ALTERID 226
+   LEDGER "MLab M1 Duty IGST" (17) | NAME elements: "MLab M1 Duty IGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da | parent "Duties & Taxes" (14) | ALTERID 227
+   LEDGER "MLab M1 Duty SGST UTGST" (23) | NAME elements: "MLab M1 Duty SGST UTGST" (23) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc | parent "Duties & Taxes" (14) | ALTERID 229
+   LEDGER "MLab M1 Duty State Tax" (22) | NAME elements: "MLab M1 Duty State Tax" (22) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db | parent "Duties & Taxes" (14) | ALTERID 228
+   LEDGER "MLab M1 Duty UT Tax" (19) | NAME elements: "MLab M1 Duty UT Tax" (19) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd | parent "Duties & Taxes" (14) | ALTERID 230
+   LEDGER "MLab M1 Party" (13) | NAME elements: "MLab M1 Party" (13) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 | parent "Sundry Debtors" (14) | ALTERID 224
+   LEDGER "MLab M1 Suspense" (16) | NAME elements: "MLab M1 Suspense" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 | parent "Suspense A/c" (12) | ALTERID 225
+   LEDGER "MLab Probe Pvt Ltd" (18) | NAME elements: "MLab Probe Pvt Ltd" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df | parent "Sundry Debtors" (14) | ALTERID 236
+   LEDGER "MLab Slash Target" (17) | NAME elements: "MLab Slash Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3 | parent "Sundry Creditors" (16) | ALTERID 222
+   LEDGER "MLab  Space Target" (18) | NAME elements: "MLab  Space Target" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1 | parent "Sundry Creditors" (16) | ALTERID 220
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e | parent " Primary" (8) | ALTERID 31
+
+== ml1-s4-stop-marks.xml | 3308 bytes | sha256 0c318ae330d7bf326ecf310d1f443398d3bb3998b9038bea754ecf75cb63c086
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 236
+
+== ml1-s6-groups.xml | 56068 bytes | sha256 2ee6d8b77ee072c1fa36b8ba45e6683927851015199d96da8456f9be63c9dfb9
+   rows under COLLECTION: COMPANY 0, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+
+== ml1-s6-ledgers.xml | 29348 bytes | sha256 f34fcd240cc6c524d2c97f58f90b5a674c51e2811c39cb9024ef08bbc84b19b7
+   rows under COLLECTION: COMPANY 0, LEDGER 20, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   LEDGER "Cash" (4) | NAME elements: "Cash" (4) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001f | parent "Cash-in-Hand" (12) | ALTERID 32
+   LEDGER "MLab Alias Target" (17) | NAME elements: "MLab Alias Target" (17), "MLab Alias Name" (15), "MLab Alias Two" (14) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000cf | parent "Sundry Creditors" (16) | ALTERID 233
+   LEDGER "MLAB CASE TARGET" (16) | NAME elements: "MLAB CASE TARGET" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d0 | parent "Sundry Creditors" (16) | ALTERID 219
+   LEDGER "MLab Dash Target" (16) | NAME elements: "MLab Dash Target" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d2 | parent "Sundry Creditors" (16) | ALTERID 221
+   LEDGER "MLab Exact Target" (17) | NAME elements: "MLab Exact Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000ce | parent "Sundry Debtors" (14) | ALTERID 232
+   LEDGER "MLab FreshParty" (15) | NAME elements: "MLab FreshParty" (15) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d5 | parent "Sundry Debtors" (14) | ALTERID 234
+   LEDGER "MLab Group Target" (17) | NAME elements: "MLab Group Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d6 | parent "Sundry Creditors" (16) | ALTERID 223
+   LEDGER "MLab Live Suspense" (18) | NAME elements: "MLab Live Suspense" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000e0 | parent "Suspense A/c" (12) | ALTERID 237
+   LEDGER "MLab M1 Duty Cess" (17) | NAME elements: "MLab M1 Duty Cess" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000de | parent "Duties & Taxes" (14) | ALTERID 231
+   LEDGER "MLab M1 Duty CGST" (17) | NAME elements: "MLab M1 Duty CGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d9 | parent "Duties & Taxes" (14) | ALTERID 226
+   LEDGER "MLab M1 Duty IGST" (17) | NAME elements: "MLab M1 Duty IGST" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000da | parent "Duties & Taxes" (14) | ALTERID 227
+   LEDGER "MLab M1 Duty SGST UTGST" (23) | NAME elements: "MLab M1 Duty SGST UTGST" (23) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dc | parent "Duties & Taxes" (14) | ALTERID 229
+   LEDGER "MLab M1 Duty State Tax" (22) | NAME elements: "MLab M1 Duty State Tax" (22) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000db | parent "Duties & Taxes" (14) | ALTERID 228
+   LEDGER "MLab M1 Duty UT Tax" (19) | NAME elements: "MLab M1 Duty UT Tax" (19) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000dd | parent "Duties & Taxes" (14) | ALTERID 230
+   LEDGER "MLab M1 Party" (13) | NAME elements: "MLab M1 Party" (13) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d7 | parent "Sundry Debtors" (14) | ALTERID 224
+   LEDGER "MLab M1 Suspense" (16) | NAME elements: "MLab M1 Suspense" (16) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d8 | parent "Suspense A/c" (12) | ALTERID 225
+   LEDGER "MLab Probe Pvt Ltd" (18) | NAME elements: "MLab Probe Pvt Ltd" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000df | parent "Sundry Debtors" (14) | ALTERID 236
+   LEDGER "MLab Slash Target" (17) | NAME elements: "MLab Slash Target" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d3 | parent "Sundry Creditors" (16) | ALTERID 222
+   LEDGER "MLab  Space Target" (18) | NAME elements: "MLab  Space Target" (18) | f107e523-3d6b-4516-bd24-5b1a14498fa6-000000d1 | parent "Sundry Creditors" (16) | ALTERID 220
+   LEDGER "Profit & Loss A/c" (17) | NAME elements: "Profit & Loss A/c" (17) | f107e523-3d6b-4516-bd24-5b1a14498fa6-0000001e | parent " Primary" (8) | ALTERID 31
+
+== ml1-s6-marks.xml | 3308 bytes | sha256 2b59f6f4931856d5fb2dfe98afcabf199bcecef2ced2d7c3e7e8c3b27b20ab80
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 237
+
+== ml1-s7-marks.xml | 3308 bytes | sha256 2b59f6f4931856d5fb2dfe98afcabf199bcecef2ced2d7c3e7e8c3b27b20ab80
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 237
+
+== ml1-s8-marks.xml | 3308 bytes | sha256 2b59f6f4931856d5fb2dfe98afcabf199bcecef2ced2d7c3e7e8c3b27b20ab80
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 237
+
+== ml1-s9-marks.xml | 3308 bytes | sha256 2b59f6f4931856d5fb2dfe98afcabf199bcecef2ced2d7c3e7e8c3b27b20ab80
+   rows under COLLECTION: COMPANY 1, LEDGER 0, VOUCHER 0, VOUCHERTYPE 0; LINEERROR elements: 0
+   COMPANY "BRIDGE MASTERS LAB" (18) | GUID f107e523-3d6b-4516-bd24-5b1a14498fa6 | ALTVCHID  | ALTMSTID 237
+

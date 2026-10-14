@@ -1,0 +1,3 @@
+# sha256  bytes  file (every file of this folder except this one)
+44046aa6d563bf00cc77c530e41b31399a4ead0a5b68f47ea8c10519e13a0f9f  654  README.md
+714f47ab7bd55910a13e9b8be3f41672e868528639301fafc7d81f69c63f26ef  23949  WINDOWS-724-M7.md

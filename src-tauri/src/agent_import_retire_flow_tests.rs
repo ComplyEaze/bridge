@@ -794,6 +794,17 @@ async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends_after_a_seco
         "the second read was made: {} of {total}",
         simulator.received()
     );
+    // the second read is a verification of the carrier, recorded as any is, and
+    // the carrier stays retired
+    let kinds = records_of(directory.path(), &held.carrier);
+    assert!(kinds.contains(&"verification_status".into()), "{kinds:?}");
+    assert!(
+        retiring
+            .latest_import_snapshot(&held.carrier)
+            .unwrap()
+            .unwrap()
+            .retired
+    );
 }
 
 /// The second read finds a voucher with the retired batch's own tag: nothing

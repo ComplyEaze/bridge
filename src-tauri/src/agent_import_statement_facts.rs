@@ -497,8 +497,7 @@ impl BuildLine {
 impl BuildVoucher {
     /// The vouchers a transfer can be made of: Contras, Journals (Tally
     /// accepted a Journal between two bank ledgers at its default settings,
-    /// measured on one synthetic book; protocol reference §9.13 records the
-    /// Journals imported beside the bank-statement vouchers) and statement rows.
+    /// measured on one synthetic book) and statement rows.
     pub(super) fn of_vouchers(vouchers: &[ImportVoucher]) -> Vec<Self> {
         vouchers
             .iter()

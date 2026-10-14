@@ -276,7 +276,6 @@ impl StatusRecord {
     /// The verification of a read that found a never-sent batch absent, which
     /// retires it. `batch.status` is the verdict that read gave; `proof` names
     /// the pair the read saved.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn retired(batch: &ImportLedgerLine, proof: ProofName) -> Self {
         Self {
             record_type: StatusKind::BatchRetired,
@@ -287,7 +286,6 @@ impl StatusRecord {
 
     /// This verification record also says the read saw a voucher carrying the
     /// batch's own tag.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn with_own_tag_observed(self) -> Self {
         Self {
             own_tag_observed: Some(true),
@@ -979,6 +977,8 @@ fn scan_records(
     let mut responded: BTreeSet<String> = BTreeSet::new();
     let mut marked: BTreeSet<String> = BTreeSet::new();
     let mut with_verdict: BTreeSet<String> = BTreeSet::new();
+    // Batches a retirement record of the journal has already retired.
+    let mut retired: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
     while read_record(&mut reader, &mut line)? {
@@ -1061,10 +1061,18 @@ fn scan_records(
             if matches!(update.record_type, StatusKind::BatchRetired) && update.proof.is_none() {
                 return Err("import_ledger_invalid".into());
             }
-            if update.own_tag_observed.is_some()
-                && !matches!(update.record_type, StatusKind::VerificationStatus)
-            {
-                return Err("import_ledger_invalid".into());
+            // The note says a batch already retired was seen again, so it is
+            // never false, and never on a batch the journal did not retire.
+            if let Some(noted) = update.own_tag_observed {
+                if !noted
+                    || !matches!(update.record_type, StatusKind::VerificationStatus)
+                    || !retired.contains(&update.batch_id)
+                {
+                    return Err("import_ledger_invalid".into());
+                }
+            }
+            if matches!(update.record_type, StatusKind::BatchRetired) {
+                retired.insert(update.batch_id.clone());
             }
             if matches!(update.record_type, StatusKind::PostSpanVerdict) {
                 admit_post_span_verdict(

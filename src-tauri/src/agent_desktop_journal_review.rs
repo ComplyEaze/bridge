@@ -73,7 +73,7 @@ impl DesktopJournalError {
             ),
             "import_saved_file_missing" => (
                 "The saved batch for this file is missing from this computer, so it cannot be posted from here.",
-                "Choose the original file from the ComplyEaze Bridge installation that built it, or build the Journal again.",
+                "Ask the assistant to run verify_import on it with if_absent set to retire; if Tally does not hold it, it is retired and the Journal can be built again.",
             ),
             "import_selected_file_not_exact" | "import_batch_changed" => (
                 "This file no longer matches its original saved ComplyEaze Bridge Journal.",
@@ -221,6 +221,39 @@ pub(crate) async fn reconcile_reviewed(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_retired_journal_and_one_with_no_saved_file_are_told_what_settles_them() {
+        let retired = DesktopJournalError::refused("import_batch_retired");
+        assert_eq!(
+            retired.message,
+            "A read of Tally found this saved Journal absent and it was retired, so ComplyEaze Bridge will not post it."
+        );
+        assert_eq!(
+            retired.remediation,
+            "Build the Journal again if it is still to be posted."
+        );
+        let missing = DesktopJournalError::refused("import_saved_file_missing");
+        assert_eq!(
+            missing.message,
+            "The saved batch for this file is missing from this computer, so it cannot be posted from here."
+        );
+        assert_eq!(
+            missing.remediation,
+            "Ask the assistant to run verify_import on it with if_absent set to retire; if Tally does not hold it, it is retired and the Journal can be built again."
+        );
+        for text in [
+            retired.message.as_str(),
+            retired.remediation,
+            missing.message.as_str(),
+            missing.remediation,
+        ] {
+            assert!(
+                !text.contains("by hand") && !text.contains("Gateway of Tally"),
+                "{text}"
+            );
+        }
+    }
 
     #[test]
     fn an_amendment_is_explained_rather_than_blamed_on_the_file() {

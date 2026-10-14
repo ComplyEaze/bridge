@@ -3373,3 +3373,18 @@ fn a_retired_batch_leaves_the_two_ledger_guards_as_they_were() {
     assert_eq!(posted(&journal), posted(&plain));
     assert_eq!(posted(&journal), None);
 }
+
+/// A comment that cites a section stands on what the section records. The
+/// Journal comment of the fact builder cites none for a measurement the
+/// reference does not hold.
+#[test]
+fn the_journal_comment_cites_no_reference_section() {
+    let source = include_str!("agent_import_statement_facts.rs");
+    let at = source.find("Journals (Tally").expect("the Journal comment");
+    let comment = &source[at..at + 320];
+    assert!(!comment.contains('§'), "{comment}");
+    assert!(
+        comment.contains("measured on one synthetic book"),
+        "{comment}"
+    );
+}

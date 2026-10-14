@@ -819,7 +819,13 @@ fn an_own_tag_observation_is_written_only_on_a_verification_record() {
     let seen = ledger::StatusRecord::verified(&line, name).with_own_tag_observed();
     let value = serde_json::to_value(&seen).unwrap();
     assert_eq!(value["own_tag_observed"], true);
-    let text = format!("{}{}", record(&line), record(&seen));
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    let retired = ledger::StatusRecord::retired(
+        &incomplete,
+        ledger::ProofName::of(b"proof", chrono::Utc::now()),
+    );
+    let text = format!("{}{}{}", record(&line), record(&retired), record(&seen));
     assert!(ledger::parse_snapshots(&text).is_ok());
     // never on a dispatch intent
     let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch(&line)).unwrap();
@@ -857,4 +863,42 @@ fn a_batch_found_once_stays_found_whatever_a_later_status_says() {
     let mut posted = line.clone();
     posted.status = "posted_verified".into();
     assert!(ledger::parse_snapshots(&record(&posted)).unwrap()[0].ever_found);
+}
+
+/// The note that a retired batch's own tag was seen is a fact about a batch
+/// already retired: the reader refuses it as false, and on a batch the journal
+/// never retired.
+#[test]
+fn an_own_tag_note_is_refused_as_false_and_on_a_batch_never_retired() {
+    let line = batch();
+    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    let retired = ledger::StatusRecord::retired(&incomplete, name.clone());
+    let seen = serde_json::to_value(
+        ledger::StatusRecord::verified(&line, name.clone()).with_own_tag_observed(),
+    )
+    .unwrap();
+    let parse = |records: &[&Value]| {
+        let mut text = record(&line);
+        for each in records {
+            text.push_str(&record(each));
+        }
+        ledger::parse_snapshots(&text)
+    };
+    let retired = serde_json::to_value(retired).unwrap();
+    // after a retirement it is read
+    assert!(parse(&[&retired, &seen]).is_ok());
+    // never on a batch the journal did not retire
+    assert_eq!(
+        parse(&[&seen]).err(),
+        Some("import_ledger_invalid".to_string())
+    );
+    // never as false
+    let mut denied = seen.clone();
+    denied["own_tag_observed"] = json!(false);
+    assert_eq!(
+        parse(&[&retired, &denied]).err(),
+        Some("import_ledger_invalid".to_string())
+    );
 }

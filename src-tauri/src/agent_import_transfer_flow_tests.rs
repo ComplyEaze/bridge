@@ -1147,6 +1147,10 @@ async fn two_verified_contras_let_both_withdrawing_builds_through() {
     let second = rig.build(withdrawing(directory.path())).await;
     assert_ne!(second["state"], "refused", "{second}");
     assert_ne!(second["reason"], "withdraw_skip_paired", "{second}");
+    // and the first of them is sendable: the transfer check at send lets it by
+    let error = post_error(&rig.server, first["batch_id"].as_str().unwrap()).await;
+    let code = error["code"].as_str().unwrap_or_default();
+    assert!(!TRANSFER_REASONS.contains(&code), "{error}");
 }
 
 #[tokio::test]

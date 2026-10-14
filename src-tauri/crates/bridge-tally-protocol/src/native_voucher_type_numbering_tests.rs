@@ -240,7 +240,7 @@ fn a_method_outside_the_measured_set_is_kept_raw_and_never_manual() {
             "manual",
             SeriesNumberingMethod::Unrecognised("manual".to_string()),
         ),
-        // Seen on a real book on 28 September 2026, not on this capture.
+        // Measured on a synthetic book on 13 October 2026, not on this capture.
         (
             "Automatic (Manual Override)",
             SeriesNumberingMethod::AutomaticManualOverride,

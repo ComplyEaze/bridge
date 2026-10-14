@@ -31,10 +31,14 @@ These changes are in source and not yet in a published build.
   join or premise refusal. The type-level `numbering_method` stays as it was, with its limitation.
   Measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named
   `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with
-  duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override), seen once on a real
-  book on 28 September 2026 and on no captured response, more than one series, Multi-user Auto, a single series not
-  named `Default`, a type created new and other releases are not measured, and the two requests have not yet been
-  run together as one tool call on a live Tally (part of #724).
+  duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override) through this tool (it is
+  mapped from the series text measured on a synthetic book on 13 October 2026), more than one series, Multi-user
+  Auto, a single series not named `Default`, a type created new and other releases are not measured. The two
+  requests were run live as one tool call on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver,
+  Windows; 24 voucher types each, exactly one series per type, its name not read): the read was not refused, and on
+  the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with
+  duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's
+  defaults and not checked on screen, read Automatic (part of #724).
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then

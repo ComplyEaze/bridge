@@ -428,12 +428,18 @@ as `masters_extent_changed` in place of a join or premise refusal. Measured on o
 book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series
 named `Default`, of which three (Journal Automatic, Payment Manual with
 duplicates prevented, Receipt Manual with duplicates not prevented) were
-checked against Tally's screen. Automatic (Manual Override), seen once on a
-real book on 28 September 2026 and on no captured response, more than one
-series, Multi-user Auto, a single series not named `Default`, a voucher type
-created new and other releases are not measured, an `unrecognised` method is never
-`manual`, and the integrated read, the two captured requests sent as one tool
-call, has not yet been run on a live Tally.
+checked against Tally's screen. Automatic (Manual Override) through this tool
+(it is mapped from the series text measured on a synthetic book on 13 October
+2026), more than one series, Multi-user Auto, a single series not named
+`Default`, a voucher type created new and other releases are not measured, and
+an `unrecognised` method is never `manual`. The integrated read, the two
+requests sent as one tool call, was run live on 14 October 2026 on two
+synthetic books (TallyPrime 7.1 Silver, Windows; 24 voucher types each, each
+with exactly one series, whose name is not read): it was not refused, and on
+the six types whose numbering was set or checked on Tally's screen it returned
+that numbering (Manual with duplicates prevented, Manual with duplicates not
+prevented, Automatic); the other types, left at a new company's defaults and
+not checked on screen, read Automatic.
 
 The read runs inside the same company, mode and identity brackets as
 `trial_balance`, with the book extent read before and after (they must be

@@ -33,8 +33,11 @@ These changes are in source and not yet in a published build.
   transfer facts, so the other account's statement can withdraw the skip it was waiting on. The answer lists the
   Contra rows to skip when the statement is built again. A sent batch is not retired, and the call is refused
   while the writes setting is off. A step that names a batch not verified yet now says whether it was sent. A
-  release that does not know the new journal record refuses the whole import journal once one is written, so a
-  later release must keep reading it (and the `withdrawn` field of a statement's facts).
+  release without this change refuses the whole import journal once a retirement record, or a verification
+  record carrying `own_tag_observed` or `vouchers_found`, is written in it, so a later release must keep reading
+  them. It does read a journal that holds only the `withdrawn` field of a statement's facts, which sits inside the
+  statement's opaque JSON, and it ignores that field: it applies none of the rules that field brings, at build or
+  at send, and it does not refuse the journal for it. Downgrading is not a rollback of those rules.
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then

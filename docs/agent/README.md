@@ -1898,8 +1898,11 @@ refused as `proposals_legacy` (parse the statement again).
   call `verify_import` again. If the error came once the record may already
   have been written, `state` is `not_established`: the batch may be retired,
   and `verify_import` without `if_absent` shows where it stands, unless the import folder is marked as
-  needing recovery, which refuses `verify_import` for the batch until it is cleared. A release that does not know the retirement record refuses
-  the whole import journal.
+  needing recovery, which refuses `verify_import` for the batch until it is cleared. A release without this change
+  refuses the whole import journal once it holds a retirement record, or a verification record carrying
+  `own_tag_observed` or `vouchers_found`; it reads a statement's `withdrawn` field as nothing (the field sits
+  inside the statement's opaque JSON), so it applies none of the withdrawal rules and does not refuse the journal
+  for them.
 - **At send.** A batch built from a bank statement is checked against these
   records when `post_import` sends it as well as when it was built, with the
   same refusals, once before the person is asked and again under the admission

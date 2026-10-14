@@ -213,6 +213,97 @@ These changes are in source and not yet in a published build.
   (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
   `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
 
+- **The install steps are rewritten for a first-time accountant.** The installation guide gives one short action
+  per step, the exact words on each button, what the screen shows next and what to do when yours differs; the
+  download page and the home page give the same steps in short form and point to the guide. They name the three
+  things a new user meets in Claude Desktop (the notice that the extension is not verified by Anthropic, the
+  confirm box, and the permission prompt before a tool runs), give TallyPrime's path (F1, Settings, Connectivity,
+  Client/Server configuration), and say to leave posting off. The guide now lists what the data folder holds,
+  says the list is not complete, and includes the last four digits of a statement's account number kept with
+  its proposals, the ledger names chosen for a statement, the sign-in name a recorded review can include, and the
+  record of accepting the Terms. TallyPrime's Step 1 screens, the browser check and the Alt+K and Alt+Y menus
+  were checked by looking on one Windows computer (TallyPrime 7.1 Silver, 10 October 2026); the guide says which
+  steps were not tried (#1017).
+
+- The texts that say what Response redaction leaves unhidden now also say that the last four digits of a bank
+  statement's account number (`account_last4` in the answer of `parse_bank_statement`) are always sent: the
+  extension's description and its redaction setting, the two tool descriptions that describe redaction, the
+  README, both guides, the security page, the FAQ and one article. Only the wording changed; what is sent is the
+  same (#1616).
+
+- `parse_bank_statement`, `build_import_xml` and the agent guide now tell the assistant to import a bank
+  statement in whole-day batches: cut a batch only between days, at most 50 vouchers. `post_import` refuses a
+  whole batch with `import_preexisting_identity` when a voucher has a same-day, same-amount, same-ledger twin
+  that an earlier batch posted, while twins inside one batch pass together; a statement cut across two batches on
+  one day hit that refusal. A day with more than 50 rows does not fit one batch, and the text says to ask you.
+  Batch posting is off by default, so same-day twins post together only with it on or through a hand import of
+  the built file. Wording only: no new refusal and no change to the check (#1614).
+
+- `verify_import`'s description now says in plain words that after a restore from a backup, a native voucher
+  keyed again with the same content before any check can read verified, that no identifier a read returns tells
+  the two apart, and that after restoring a backup over a company you should check its posted vouchers in Tally.
+  Tally gave the vouchers keyed again the post's MasterIDs, GUIDs and voucher numbers (measured once, on one
+  synthetic company on TallyPrime 7.1 Silver; the run that compared every identifier had Tally's security off);
+  the description had called that reuse unmeasured. Behaviour is unchanged (#1612, #1636).
+
+- The installation guide now says that a batch posted from the command line is approved on a summary of
+  per-ledger totals and, when there are ten or fewer vouchers and the lines fit, a line for each voucher; it said
+  the summary showed no voucher's date or narration. The window has listed each voucher of such a small batch
+  since 0.5.0 (#1632).
+
+- **A native post whose binding was refused now says what the book holds.** When `verify_import` cannot bind a
+  batch to the vouchers its own post created, `post_span_binding.summary` says the batch stays open and, when
+  every voucher reads `matching_content_observed` against a voucher that is neither cancelled nor optional (or
+  only some do), that the book holds, for each voucher sent (or for some), one with the same date, voucher type
+  and ledger entries, and that ComplyEaze Bridge cannot tell whether that voucher is this post's; it never says
+  the post's vouchers are in the book. `local_data_report` counts such batches as `not_settled_binding_refused`,
+  and `not_settled_not_verified` no longer includes them. The `post_import` description now says no review can
+  be recorded for such a batch: `acknowledge_post_review` refuses it, because its vouchers are matched by content
+  only, so the person checks them in Tally and the batch is not rebuilt (#1469).
+
+- **A refusal because Tally did not answer now carries a next step.** `endpoint_unreachable` tells the assistant
+  to ask you to confirm that Tally is running with the XML server enabled on the port named in the error, and not
+  to repeat the request until you have; `endpoint_circuit_cooldown` (a request held back after repeated failed
+  requests to Tally, nothing sent) says it can be repeated after about ten seconds. A code's own step still comes
+  first, and the other unanswered reasons still name none. The `parse_bank_statement` description and the
+  security and privacy notes in the repository also now say that ` | Statement party: <name>` sits at the end of
+  the narration text, and that a file imported by hand adds the `[BRIDGE:...]` tag after it (#1483).
+
+- The Terms of Use setting is now told as "tick" wherever a person is asked to set it: the refusal a tool gives
+  before the Terms are accepted, the installation guide, the connection guide, the download and home pages and
+  the FAQ said "turn on" or "switch on". "Turn on" stays for the HTTP gateway and the posting setting (#1484).
+
+- The `masters` tool no longer calls a voucher type's numbering value its numbering method. Its description and
+  its result's limitation now say the value is the one Tally reports at the type level, that it read `None` for
+  types set to Automatic and to Manual on Tally's screen (one synthetic book, Windows), that it can differ from
+  the number series that decides what a supplied number does, and that it is not to be passed to
+  `voucher_presence`'s `numbering`. That input now says the method is the one you confirm for the series used.
+  What is read is unchanged (#1487).
+
+- The Outstandings screen's ledger-master export now ends its balances at the screen's "As of" date, so a
+  workbook can be exported as of 31 March; it ignored the field and used the date of the computer. With no date
+  chosen nothing changes, and the assistant's `ledger_masters` still uses the computer's date. A date before the
+  company's books begin is refused as `as_of_precedes_books_from` before any master, balance or group is
+  requested. Only the 1st, 2nd and 31st of a month are accepted as a balance-period end, so a typed 30 June ends
+  on 1 July and that day's vouchers are inside the balances; the notice says so (#1531).
+
+- The security and privacy notes in the repository now say the 0.5.1 Terms refusal (every tool answers
+  `terms_not_accepted`, naming the setting) was seen on one Mac with a test package and on one Windows computer
+  with the build our checks made for 0.5.1; they had said it was not yet checked on Windows (#1543).
+
+- The README's table of tools now has a row for each of the 27 tools offered with posting off (25 reading tools
+  and 2 for import files), adding `company_features`, `gst_status` and `voucher_read_cost`, and says that those
+  three and `statement_tie_out` are in source and not in release 0.5.1, which installs 23 (#1672).
+
+- The FAQ answer and the security page about a second computer reaching Tally's gateway now open with the rule: do
+  not assume the gateway is closed to your office network; the firewall of the computer that runs Tally is what
+  keeps other computers out, so confirm it blocks incoming connections to Tally's port. They keep the scope of
+  the one test on TallyPrime 7.1 (a second computer got the status answer; nothing else was checked) and no
+  longer say it was "not recorded in the repository" (#1685).
+
+- The README and two blog pages no longer say that the record of a test run is our dated notes, "kept privately";
+  what was and was not run is stated as before (#1528).
+
 **Safer or fixed**
 
 - When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
@@ -238,6 +329,63 @@ These changes are in source and not yet in a published build.
   a batch whose voucher mark moved across the post, keep the earlier line.
   Measured live once, on a single voucher refused whole; a batch is not
   measured live (#1108).
+
+- `parse_bank_statement` no longer reads a statement PDF's text in render mode 3 (invisible), which is how a
+  scanner app lays a hidden OCR layer under a page image, so that text is not parsed as if the bank had printed
+  it. A scan whose only text is a hidden layer, or whose drawn text yields no statement row while most of the
+  document's characters were hidden, is refused as `statement_no_readable_text` (before: its text was parsed, or
+  the refusal was `statement_no_account_number_line` or `statement_page_sequence_unproven`). A character PDFium
+  cannot classify refuses the file as `statement_unreadable_pdf`. No OCR is attempted. Neither PDFium failure was
+  seen on the real files checked (#1637).
+
+- A Tally read that timed out, or whose response body failed after Tally had begun answering, is now sent once
+  instead of up to three times: a client timeout does not stop the work Tally is doing and its gateway serves one
+  request at a time, so each further send queued behind the first. This covers the connection check, the
+  company-discovery reads, the ledger read and listing, the voucher read and the snapshot's window read. A read
+  whose connection or send failed, or that Tally answered with a server error or a rate limit, is still retried
+  (#1538, #1556).
+
+- The desktop core snapshot sends each of its group, ledger, voucher-type and voucher-window exports once: when
+  the connection closes after the request was sent, it returns the error instead of sending the export up to
+  three times. Its small reads (the pair of book-extent reads around each export, and the company list) keep the
+  three-attempt retry, so one lost extent read does not make you start the run again (#1674).
+
+- The desktop core snapshot no longer sends the ledger period-balance report it used after each window to
+  corroborate balances: one TallyPrime release could not evaluate it (others were not tried), and it was never
+  seen returning a usable answer. A core run therefore cannot reach Verified; every window it reads records
+  `report_tie_out_unavailable`, as one already did when the report was refused (Education mode). A resumed run no
+  longer reopens a completed window, though a run resumed from an earlier build's saved state keeps a tie-out
+  already stored. No published package sent this read, only the unreleased desktop app's Proof of Sync (#1643).
+
+- A desktop core snapshot that stops because the book changed while its groups, ledgers or vouchers were read is
+  now recorded as `source_changed_during_run` ("Run again during a controlled quiet period"); one that stops
+  because the two reads of a book extent differ, or because Tally gave no master-change marker, is recorded as
+  `company_book_extent_drifted` or `company_altmstid_missing`, each with Gap Map guidance, where all showed
+  "Response parse failed". A well-formed extent that names no row for the selected company is now
+  `company_identity_mismatch` where it showed "Application response rejected". The two native-export drift
+  conditions still use the catch-all (#1554).
+
+- The import journal's first record is now made durable in its folder: when the journal is new or empty, the data
+  folder is synced after the write, and if that sync fails the record is taken back and the append refuses with
+  `import_ledger_unavailable` (`import_ledger_rollback_failed` if the take-back also fails). A failed folder sync
+  on the acknowledgement, the proofs, the verified-baseline additions and the doubt record is now reported instead
+  of ignored: the acknowledgement refuses with `import_file_write_failed`, and publishing proofs refuses before
+  the status record is appended. The masters-check verdict still ignores a failed folder sync, and the built
+  import file is not folder-synced, as before. Before, a power loss soon after the first record could leave no
+  journal and so no local record of a post. On Windows the folder sync does nothing, as before (#1548).
+
+- Desktop setup now refuses a selected company GUID that is not in the strict form of a Tally GUID, as
+  `company_selection_invalid` (retry not recommended), and the snapshot identity check refuses a stored one as
+  `company_identity_invalid`; before, the setup accepted any short trimmed ASCII text. Every GUID in the
+  committed captures is in the strict form, so none is expected to be refused; a TallyPrime release that writes
+  another spelling would be refused until it is observed (#1627).
+
+- Locked dependencies moved, with no source change: `rustls` 0.23.45 to 0.23.46, which clears four advisories
+  published on 14 October 2026 (RUSTSEC-2026-0346 to -0349: secrets in `Debug` output of client session values,
+  a Brotli certificate decompression that can allocate up to 1 GiB before authentication, and a ServerHello
+  downgrade of later connections to classical key exchange), and `tokio`, `uuid`, `zeroize`, `libc` and `objc2`
+  by a patch or minor release (tokio 1.53.2 fixes a Windows process-handle wait and a blocking-pool shutdown bug,
+  per its release notes). The Rust licence inventory is regenerated (#1718, #1580).
 
 ## [0.5.1] - 2026-10-09
 

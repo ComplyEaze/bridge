@@ -1713,7 +1713,7 @@ impl Server {
                 &line.vouchers,
                 qualified_voucher_types(),
             ) {
-                let (mut differences, alter_id, guid, evidence) = self
+                let (mut differences, alter_id, guid, lines, evidence) = self
                     .read_back_sales_invoice(&identity, &company, invoice_voucher)
                     .await?;
                 accumulated = combine_evidence(accumulated.clone(), evidence);
@@ -1730,6 +1730,7 @@ impl Server {
                     &mut result,
                     &invoice_voucher.bridge_txn_id,
                     &differences,
+                    &lines,
                 );
             }
             if span.rolled_back {

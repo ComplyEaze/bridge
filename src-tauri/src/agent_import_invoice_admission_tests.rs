@@ -220,7 +220,8 @@ fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
         voucher["invoice"]["observed"] = json!({
             "voucher_type_guid": format!("{LAB_GUID}-00000106"),
             "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-            "party_bill_wise":false, "company_state":"Rajasthan"
+            "party_bill_wise":false, "company_state":"Rajasthan",
+            "sales_ledgers":["Sales - Goods"]
         });
     }
     serde_json::from_value(voucher).unwrap()
@@ -501,13 +502,14 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
     ] {
         let lab = lab("emsmseeNsNse".chars().map(plan).collect());
         let saved = invoice_to("Counter Sales - Unregistered", "Sales Manual", observed);
-        let (differences, alter_id, guid, _) = lab
+        let (differences, alter_id, guid, lines, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
             .await
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, [difference]);
         assert_eq!((alter_id, guid), (None, None));
+        assert!(lines.is_empty());
         assert_eq!(sent(lab.simulator), requests, "{difference}");
     }
 }
@@ -526,7 +528,8 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
             "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan","observed":{
                 "voucher_type_guid": format!("{LAB_GUID}-00000106"),
                 "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-                "party_bill_wise":false, "company_state":"Rajasthan"
+                "party_bill_wise":false, "company_state":"Rajasthan",
+                "sales_ledgers":["Sales - Goods"]
             }},
             "entries":[
                 {"ledger":"TG Buyer Unregistered RJ","amount":"11800.00","side":"Dr"},
@@ -542,12 +545,21 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
         ("TG/25-26/004", vec!["VOUCHERNUMBER", "REFERENCE"]),
     ] {
         let lab = lab("emsmseeRsRse".chars().map(plan).collect());
-        let (differences, alter_id, guid, _) = lab
+        let (differences, alter_id, guid, _, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &posted(number))
             .await
             .expect("a read-back after a post is never an error");
-        assert_eq!(differences, expected, "{number}");
+        // The rehearsal's answer predates the reads of each line's HSN or SAC
+        // and of the GSTR-1 status, so this branch reports those two as not
+        // read; every other field is the answer's own.
+        let mut shown = differences.clone();
+        shown.retain(|d| d != "invoice_line_hsn_unresolved" && d != "gst_status_not_reported");
+        assert_eq!(shown, expected, "{number}");
+        assert!(
+            differences.contains(&"gst_status_not_reported".to_string()),
+            "{number}: {differences:?}"
+        );
         assert_eq!(alter_id.as_deref(), Some("65"), "{number}");
         assert_eq!(
             guid.as_deref(),

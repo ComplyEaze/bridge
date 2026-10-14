@@ -33,6 +33,9 @@ pub(super) struct Row {
     /// Each direct child whose tag ends in `.LIST`, as its own row (its fields
     /// are relative to it): the ledger entries of a voucher.
     pub(super) lists: Vec<(String, Row)>,
+    /// In a list's row, the path of each element that came back with no text
+    /// (`<GSTHSNNAME/>`): present, unlike an element that did not come back.
+    pub(super) empties: Vec<String>,
 }
 
 impl Row {
@@ -51,6 +54,21 @@ impl Row {
             .iter()
             .filter(move |(key, _)| key == path)
             .map(|(_, value)| value.as_str())
+    }
+
+    /// The one element at `path` of a list's row, told apart as absent, empty
+    /// or text (cleaned as `clean` does); an error when repeated.
+    pub(super) fn entry_text(&self, path: &str) -> Result<EntryText, &'static str> {
+        let empty = self.empties.iter().filter(|key| *key == path).count();
+        match (self.one(path)?, empty) {
+            (None, 0) => Ok(EntryText::Absent),
+            (None, 1) => Ok(EntryText::Empty),
+            (Some(text), 0) => Ok(match clean(text) {
+                cleaned if cleaned.is_empty() => EntryText::Empty,
+                cleaned => EntryText::Text(cleaned),
+            }),
+            _ => Err("invoice_read_field_repeated"),
+        }
     }
 }
 
@@ -90,11 +108,14 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
     let mut text = String::new();
     let mut status: Option<String> = None;
     let mut collection = false;
+    // Whether the element being closed has had no child element: a leaf.
+    let mut leaf = false;
     loop {
         match reader.read_event().map_err(|_| "invoice_read_malformed")? {
             Event::Start(start) => {
                 let name = start.name().as_ref().to_string();
                 text.clear();
+                leaf = true;
                 collection |= name == "COLLECTION";
                 // Only a direct child of the COLLECTION is a row: the answer's
                 // CMPINFO block carries counters named like the rows
@@ -157,6 +178,8 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                             let value = text.trim();
                             if !value.is_empty() {
                                 sub.fields.push((inner, value.to_string()));
+                            } else if leaf {
+                                sub.empties.push(inner);
                             }
                         }
                         // A leaf: record its text under the path below the row.
@@ -173,9 +196,21 @@ pub(super) fn rows(xml: &str, row_tag: &str) -> Result<Vec<Row>, &'static str> {
                     }
                 }
                 text.clear();
+                leaf = false;
             }
             Event::Empty(empty) => {
                 collection |= empty.name().as_ref() == "COLLECTION";
+                leaf = false;
+                if let (Some(_), Some(list)) = (row_depth, list_depth) {
+                    sub.empties.push(
+                        path[list + 1..]
+                            .iter()
+                            .cloned()
+                            .chain(std::iter::once(empty.name().as_ref().to_string()))
+                            .collect::<Vec<_>>()
+                            .join("/"),
+                    );
+                }
                 // A row written as an empty element is still a row, with no
                 // fields and no attributes: its reader refuses it or reports
                 // every field as different, and never counts it as "no rows".
@@ -433,7 +468,10 @@ pub(super) fn control_row_found(xml: &str, number: &str, date: &str) -> Result<b
 /// agent's voucher reads use (it returns the legs of an invoice-view voucher
 /// as ALLLEDGERENTRIES.LIST, measured on a committed Sales capture) plus the GST
 /// header fields. Measured together on the two invoices the rehearsal posted
-/// (7 Oct 2026, §9.16): every field below came back.
+/// (7 Oct 2026, §9.16): every field below came back. The four GSTR-1 status
+/// fields at the end were added on 10 Oct 2026, when the lab answered this
+/// request byte for byte (§9.16; the `pilot-lab-invoice-readback-status`
+/// fixtures).
 pub(in crate::agent) fn render_invoice_readback_request(
     company: &str,
     type_guid: &str,
@@ -449,7 +487,7 @@ pub(in crate::agent) fn render_invoice_readback_request(
         return None;
     }
     Some(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Readback</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceReadback\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\" AND $GUID:VoucherType:$VoucherTypeName = \"{type_guid}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Readback\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, REFERENCE, REFERENCEDATE, PARTYLEDGERNAME, PARTYGSTIN, STATENAME, PLACEOFSUPPLY, GSTREGISTRATIONTYPE, ISINVOICE, ISCANCELLED, ISOPTIONAL, GUID, ALTERID, ALLLEDGERENTRIES.*, VCHGSTSTATUSISINCLUDED, VCHGSTSTATUSISUNCERTAIN, VCHGSTSTATUSISEXCLUDED, ISGSTOVERRIDDEN</FETCH><FILTERS>BridgeInvoiceReadback</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     ))
 }
@@ -461,6 +499,56 @@ pub(super) struct ReadLeg {
     pub(super) deemed_positive: Option<String>,
     /// Bill allocations of the leg: name, type, amount.
     pub(super) allocations: Vec<(Option<String>, Option<String>, String)>,
+    pub(super) hsn: LegHsn,
+}
+
+/// One element of a ledger entry as Tally answered it. Tally writes an element
+/// it holds no value for as an empty one (`<GSTHSNNAME/>`), which is not the
+/// element missing from the answer; neither is a value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum EntryText {
+    Absent,
+    Empty,
+    Text(String),
+}
+
+/// The HSN/SAC Tally used for a ledger entry, and where it took it from, as
+/// the read-back returns them inside every `ALLLEDGERENTRIES.LIST` (§9.16).
+/// Tally fills them from the masters when the voucher is saved: Bridge writes
+/// none.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct LegHsn {
+    /// `GSTHSNNAME`: the code.
+    pub(super) code: EntryText,
+    /// `HSNSOURCETYPE`: the kind of master it came from (`Ledger`).
+    pub(super) source_type: EntryText,
+    /// `HSNLEDGERSOURCE`: the ledger it came from.
+    pub(super) ledger_source: EntryText,
+    /// `HSNGROUPSOURCE`: the group it came from.
+    pub(super) group_source: EntryText,
+    /// `GSTHSNINFERAPPLICABILITY`: how Tally was to find it.
+    pub(super) applicability: EntryText,
+}
+
+impl LegHsn {
+    fn read(entry: &Row) -> Result<Self, &'static str> {
+        Ok(Self {
+            code: entry.entry_text("GSTHSNNAME")?,
+            source_type: entry.entry_text("HSNSOURCETYPE")?,
+            ledger_source: entry.entry_text("HSNLEDGERSOURCE")?,
+            group_source: entry.entry_text("HSNGROUPSOURCE")?,
+            applicability: entry.entry_text("GSTHSNINFERAPPLICABILITY")?,
+        })
+    }
+
+    /// Tally names a code and the kind of master it took it from. The code's
+    /// digits are not judged.
+    pub(super) fn resolved(&self) -> bool {
+        matches!(
+            (&self.code, &self.source_type),
+            (EntryText::Text(_), EntryText::Text(_))
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -486,28 +574,7 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
         [voucher] => voucher,
         _ => return Ok(Readback::Several),
     };
-    let mut fields = BTreeMap::new();
-    for key in [
-        "DATE",
-        "VOUCHERNUMBER",
-        "VOUCHERTYPENAME",
-        "REFERENCE",
-        "REFERENCEDATE",
-        "PARTYLEDGERNAME",
-        "PARTYGSTIN",
-        "STATENAME",
-        "PLACEOFSUPPLY",
-        "GSTREGISTRATIONTYPE",
-        "ISINVOICE",
-        "ISCANCELLED",
-        "ISOPTIONAL",
-        "GUID",
-        "ALTERID",
-    ] {
-        if let Some(value) = voucher.one(key)? {
-            fields.insert(key.to_string(), value.to_string());
-        }
-    }
+    let fields = readback_fields(voucher)?;
     let mut legs = Vec::new();
     for (tag, entry) in &voucher.lists {
         if tag != "ALLLEDGERENTRIES.LIST" {
@@ -549,9 +616,42 @@ pub(super) fn parse_invoice_readback(xml: &str) -> Result<Readback, &'static str
                 .to_string(),
             deemed_positive: entry.one("ISDEEMEDPOSITIVE")?.map(str::to_string),
             allocations,
+            hsn: LegHsn::read(entry)?,
         });
     }
     Ok(Readback::One(ReadInvoice { fields, legs }))
+}
+
+/// The voucher-level fields of one read-back voucher, by tag: a field that did
+/// not come back, or came back empty, is absent; a repeated one fails the read.
+pub(super) fn readback_fields(voucher: &Row) -> Result<BTreeMap<String, String>, &'static str> {
+    let mut fields = BTreeMap::new();
+    for key in [
+        "DATE",
+        "VOUCHERNUMBER",
+        "VOUCHERTYPENAME",
+        "REFERENCE",
+        "REFERENCEDATE",
+        "PARTYLEDGERNAME",
+        "PARTYGSTIN",
+        "STATENAME",
+        "PLACEOFSUPPLY",
+        "GSTREGISTRATIONTYPE",
+        "ISINVOICE",
+        "ISCANCELLED",
+        "ISOPTIONAL",
+        "GUID",
+        "ALTERID",
+        "VCHGSTSTATUSISINCLUDED",
+        "VCHGSTSTATUSISUNCERTAIN",
+        "VCHGSTSTATUSISEXCLUDED",
+        "ISGSTOVERRIDDEN",
+    ] {
+        if let Some(value) = voucher.one(key)? {
+            fields.insert(key.to_string(), value.to_string());
+        }
+    }
+    Ok(fields)
 }
 
 /// The number of vouchers an answer holds (the status check included).

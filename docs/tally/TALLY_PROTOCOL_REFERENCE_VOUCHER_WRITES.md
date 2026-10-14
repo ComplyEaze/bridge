@@ -554,7 +554,8 @@ are byte-identical to the first ones.
   as a Payment's was with duplicates allowed on the other book (above); and a Journal sent with
   a number a Journal held came back refused, with nothing that says why, where a Payment sent
   with a held number, duplicates allowed, was created as a second voucher (above). No one
-  voucher type has been measured under both settings.
+  voucher type was measured under both settings in these runs; a Payment refused for a number a
+  Payment held, duplicates prevented, is in the paragraph after next.
 - From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
   the four imports.
 - **Not established:** duplicates prevented under "Automatic (Manual Override)"; a number with a
@@ -621,24 +622,26 @@ read after the restore are byte-identical to the first ones.
   paragraph).
 
 **Under Manual numbering with duplicates prevented, the held-number check did not cross Journal and
-Payment in either direction, a number in small letters was not refused in itself, and a number's
-end space did not come back:
-verified 2026-10-15 on one book and two voucher types (PARTIAL).** On the book of the two runs
-above, holding the same three vouchers, six imports were sent raw, one per step, each of one voucher
-that carried a `VOUCHERNUMBER` element and a new `REMOTEID`: four Journals and two Payments (branch
+Payment in either direction, a number in small letters was not refused in itself, and a number's end
+space did not come back: verified 2026-10-15 on one book and two voucher types (PARTIAL).** On the
+book of the two runs above (licensed TallyPrime 7.1 Silver, Windows), holding the same three
+vouchers, six imports were sent raw, one per step, each of one voucher that carried a
+`VOUCHERNUMBER` element and a new `REMOTEID`: four Journals and two Payments (branch
 `lab/724-m9p-matching-within-a-type-answers`, `3434d39e`, bridge#724; every figure was read from the
 marks, voucher, series and import answers with an XML parser, with each size checked against
-`CONTENT-LENGTH`; each import file on the branch has the SHA-256 the run sheet gives it). The
-series of the Journal type and of the Payment type each read `Manual`, `PREVENTDUPLICATES` `Yes` at
-every read, and no series row differed from the first series answer at any read. That no type screen was saved
-in this run, and that the book was put back at the end by restoring a backup, are from that
-branch's notes; the voucher answer read after the restore is byte-identical to the first one.
+`CONTENT-LENGTH`; each import file on the branch has the SHA-256 the run sheet gives it). The series
+of the Journal type and of the Payment type each read `Manual`, `Auto Retain`, `PREVENTDUPLICATES`
+`Yes` at every read, and no series row differed from the first series answer at any read. That no
+type screen was saved in this run, and that the book was put back at the end by restoring a backup,
+are from that branch's notes; the voucher answer read after the restore is byte-identical to the
+first one.
 
 - **VERIFIED, a Payment against a Payment:** a Payment numbered `M9P-P1`, dated 20 July, which no
   voucher held, was created and read back its number; a second Payment numbered `M9P-P1`, dated
   21 July, was refused whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`, in
-  an answer byte-identical to the refusals of the two runs above (538 bytes, SHA-256 `09a713e2…`).
-  Everything under `COLLECTION` in the voucher answer equalled the answer before it.
+  an answer byte-identical to the refusals of the two runs above (538 bytes, SHA-256 `09a713e2…`),
+  which names no cause. Everything under `COLLECTION` in the voucher answer equalled the answer
+  before it.
 - **VERIFIED, a number held only by a voucher of another type:** a Journal numbered `M9P-P1`,
   dated 22 July, sent while only that Payment held the number, was created and read back
   `M9P-P1`; the Payment was unchanged. With the run above, where a Payment took a number only a

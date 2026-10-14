@@ -191,8 +191,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and
       change number, and the voucher's GSTR-1 status (included, uncertain,
-      excluded, not in the return, cancelled or optional) and whether it was
-      accepted as it stands. It holds no amounts, no party or ledger names and no
+      excluded or not in the return, or that it is cancelled, optional or
+      post-dated and what its status flags read) and whether it was accepted
+      as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in

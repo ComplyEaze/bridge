@@ -1517,8 +1517,8 @@ fn cost_centre_names_in_the_side_list_of_unplaced_ledgers_are_masked_too() {
     )
     .unwrap();
     let mut rows = captured_rows();
-    // As in the test above: a voucher whose only tax-free ledgers are unplaced lands in the
-    // unplaced side list.
+    // As in the test above: a voucher whose only ledgers outside Duties & Taxes are unplaced
+    // lands in the unplaced side list.
     rows[0]["amounts"].as_array_mut().unwrap().retain(|entry| {
         let name = entry["ledger"].as_str().unwrap();
         name != "Input CGST" && name != "Input SGST"

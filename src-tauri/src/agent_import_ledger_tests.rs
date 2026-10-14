@@ -864,19 +864,27 @@ fn a_verification_that_found_a_voucher_marks_the_batch_found_whatever_its_status
         .remove(0);
     assert!(!snapshot.ever_found);
     // it belongs to a verification record alone, and is never false
-    let parse = |each: &Value| {
-        ledger::parse_snapshots(&format!("{}{}", record(&line), record(each)))
-    };
+    let parse =
+        |each: &Value| ledger::parse_snapshots(&format!("{}{}", record(&line), record(each)));
     let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch(&line)).unwrap();
     intent["vouchers_found"] = json!(true);
-    assert_eq!(parse(&intent).err(), Some("import_ledger_invalid".to_string()));
+    assert_eq!(
+        parse(&intent).err(),
+        Some("import_ledger_invalid".to_string())
+    );
     let mut retired =
         serde_json::to_value(ledger::StatusRecord::retired(&incomplete, name)).unwrap();
     retired["vouchers_found"] = json!(true);
-    assert_eq!(parse(&retired).err(), Some("import_ledger_invalid".to_string()));
+    assert_eq!(
+        parse(&retired).err(),
+        Some("import_ledger_invalid".to_string())
+    );
     let mut denied = value;
     denied["vouchers_found"] = json!(false);
-    assert_eq!(parse(&denied).err(), Some("import_ledger_invalid".to_string()));
+    assert_eq!(
+        parse(&denied).err(),
+        Some("import_ledger_invalid".to_string())
+    );
 }
 
 #[test]

@@ -236,7 +236,10 @@ pub(super) fn judge(rows: &[Value]) -> Result<(), Keep> {
     if rows.iter().any(|row| row["marker"] == "narration_tag") {
         return Err(Keep::OwnTag);
     }
-    if rows.iter().all(|row| row["status"].as_str() == Some("not_found")) {
+    if rows
+        .iter()
+        .all(|row| row["status"].as_str() == Some("not_found"))
+    {
         Ok(())
     } else {
         Err(Keep::VoucherInTally)
@@ -536,8 +539,7 @@ mod tests {
             "window_part_boundary_unsupported_in_education",
         ] {
             assert!(refused_by_the_plan(code), "{code}");
-            let outcome =
-                planned_refusal_outcome(json!({}), "bridge-x", code, evidence(), "guid");
+            let outcome = planned_refusal_outcome(json!({}), "bridge-x", code, evidence(), "guid");
             assert!(unfinished(&outcome.payload), "{code}");
             let retire = &outcome.payload["result"]["retire"];
             assert_eq!(retire["state"], "not_retired", "{code}");
@@ -545,7 +547,10 @@ mod tests {
             assert_eq!(retire["file_removed"], false, "{code}");
             assert_eq!(retire["verification_recorded"], false, "{code}");
             let step = retire["next_step"].as_str().unwrap();
-            assert!(step.contains("before anything was changed"), "{code}: {step}");
+            assert!(
+                step.contains("before anything was changed"),
+                "{code}: {step}"
+            );
             assert!(step.contains("still in place"), "{code}: {step}");
             assert_eq!(
                 step.contains("repeat will not help until"),

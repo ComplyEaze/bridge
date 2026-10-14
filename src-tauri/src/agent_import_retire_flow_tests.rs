@@ -293,18 +293,10 @@ async fn a_retirement_that_kept_the_batch_stops_a_second_one_from_retiring_it() 
     let first = retire(&server, &batch_id).await;
     let kept = &first["structuredContent"]["result"]["retire"];
     assert_eq!(kept["state"], "not_retired", "{first}");
-    let (_absent, later) = reading_from(
-        directory.path(),
-        &batch_id,
-        book(true)[32..].to_vec(),
-        None,
-    );
+    let (_absent, later) =
+        reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
     let second = retire(&later, &batch_id).await;
-    assert_eq!(
-        error_code(&second),
-        "import_retire_batch_found",
-        "{second}"
-    );
+    assert_eq!(error_code(&second), "import_retire_batch_found", "{second}");
 }
 
 /// A verification that found no voucher of the batch is not a record that
@@ -313,12 +305,7 @@ async fn a_retirement_that_kept_the_batch_stops_a_second_one_from_retiring_it() 
 async fn a_verification_that_found_nothing_does_not_stop_a_retirement() {
     let directory = tempfile::tempdir().unwrap();
     let (_build, server, batch_id) = built(directory.path(), qualified_import_cycle_plans()).await;
-    let (_a, verifier) = reading_from(
-        directory.path(),
-        &batch_id,
-        book(true)[32..].to_vec(),
-        None,
-    );
+    let (_a, verifier) = reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
     let plain = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
     let verified = verifier
         .call_tool_response("verify_import", plain)
@@ -338,12 +325,7 @@ async fn a_verification_that_found_nothing_does_not_stop_a_retirement() {
         .as_object()
         .unwrap()
         .contains_key("vouchers_found"));
-    let (_b, later) = reading_from(
-        directory.path(),
-        &batch_id,
-        book(true)[32..].to_vec(),
-        None,
-    );
+    let (_b, later) = reading_from(directory.path(), &batch_id, book(true)[32..].to_vec(), None);
     let response = retire(&later, &batch_id).await;
     assert_eq!(
         response["structuredContent"]["result"]["retire"]["state"], "retired",
@@ -776,7 +758,11 @@ async fn a_retired_carrier_leaves_the_view_and_the_other_side_sends_after_a_seco
     let scripted = [read_of(true, None), read_of(true, None)].concat();
     let total = scripted.len();
     let (simulator, retiring, sending) = one_tally(directory.path(), scripted);
-    move_to_the_tally_of(&retiring, directory.path(), &[&held.carrier, &held.withdrawn]);
+    move_to_the_tally_of(
+        &retiring,
+        directory.path(),
+        &[&held.carrier, &held.withdrawn],
+    );
     // a read of a Tally that holds none of it retires the carrier
     let response = retire(&retiring, &held.carrier).await;
     assert_eq!(
@@ -817,7 +803,11 @@ async fn a_send_that_rests_on_a_retired_batch_is_refused_when_its_tag_is_found()
     let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
     let scripted = [read_of(true, None), read_of(false, Some(&held.carrier_tag))].concat();
     let (_simulator, retiring, sending) = one_tally(directory.path(), scripted);
-    move_to_the_tally_of(&retiring, directory.path(), &[&held.carrier, &held.withdrawn]);
+    move_to_the_tally_of(
+        &retiring,
+        directory.path(),
+        &[&held.carrier, &held.withdrawn],
+    );
     let response = retire(&retiring, &held.carrier).await;
     assert_eq!(
         response["structuredContent"]["result"]["retire"]["state"], "retired",
@@ -835,7 +825,12 @@ async fn a_send_that_rests_on_a_retired_batch_is_refused_when_its_tag_is_found()
         step.starts_with("Nothing was sent to Tally and the approval was not used. "),
         "{step}"
     );
-    for by_hand in ["by hand", "enter the voucher", "import the file", "in Tally itself"] {
+    for by_hand in [
+        "by hand",
+        "enter the voucher",
+        "import the file",
+        "in Tally itself",
+    ] {
         assert!(!step.contains(by_hand), "{step}");
     }
     // nothing was sent
@@ -910,12 +905,10 @@ async fn a_send_that_does_not_rest_on_a_retired_batch_makes_no_second_read() {
         simulator.received() >= first_block,
         "the retirement's own read was made"
     );
-    assert!(
-        !last_record(directory.path(), &carrier)
-            .as_object()
-            .unwrap()
-            .contains_key("own_tag_observed")
-    );
+    assert!(!last_record(directory.path(), &carrier)
+        .as_object()
+        .unwrap()
+        .contains_key("own_tag_observed"));
 }
 
 /// A hand import of the saved file, re-dated a few days past the batch's last
@@ -1076,11 +1069,7 @@ async fn retire_beside(sibling: Sibling) -> Value {
 /// answers were scripted.
 async fn retire_beside_counting(
     sibling: Sibling,
-) -> (
-    Value,
-    Vec<tally_protocol_simulator::ObservedRequest>,
-    usize,
-) {
+) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>, usize) {
     use super::transfer_flow_tests::{contra_statement, Rig, BANK_B, BOOKED};
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(directory.path(), two_bank_plans());
@@ -1142,7 +1131,10 @@ async fn a_closing_probe_that_does_not_qualify_is_reported_after_the_removal() {
     assert_ne!(response["isError"], true, "{response}");
     let retire = &response["structuredContent"]["result"]["retire"];
     assert_eq!(retire["state"], "not_retired", "{response}");
-    assert_eq!(retire["reason"], "verification_mode_unqualified", "{response}");
+    assert_eq!(
+        retire["reason"], "verification_mode_unqualified",
+        "{response}"
+    );
     assert_eq!(retire["file_removed"], true, "{response}");
     assert_eq!(retire["verification_recorded"], false, "{response}");
     assert!(
@@ -1297,7 +1289,10 @@ async fn a_window_plan_refusal_leaves_the_saved_file_and_says_nothing_changed() 
     assert_ne!(response["isError"], true, "{response}");
     let retire = &response["structuredContent"]["result"]["retire"];
     assert_eq!(retire["state"], "not_retired", "{response}");
-    assert_eq!(retire["reason"], "voucher_window_book_too_large", "{response}");
+    assert_eq!(
+        retire["reason"], "voucher_window_book_too_large",
+        "{response}"
+    );
     assert_eq!(retire["file_removed"], false, "{response}");
     assert_eq!(retire["verification_recorded"], false, "{response}");
     assert_eq!(

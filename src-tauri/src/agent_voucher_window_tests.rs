@@ -7117,8 +7117,7 @@ async fn an_education_plan_with_an_unaccepted_part_boundary_is_refused_by_the_pl
         &three_vouchers(),
         &[(1, "20260801"), (2, "20260802"), (3, "20260810")],
     );
-    let simulator =
-        SequenceSimulator::spawn(education_paired(&xml_plan(census))).unwrap();
+    let simulator = SequenceSimulator::spawn(education_paired(&xml_plan(census))).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let identity = identity();

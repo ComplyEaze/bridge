@@ -997,7 +997,8 @@ impl Server {
             }
             self.admit_transfers_while_admitted(input).map(Some)
         };
-        let refuses = |admission: Option<Admission>| matches!(admission, Some(Admission::Refused(_)));
+        let refuses =
+            |admission: Option<Admission>| matches!(admission, Some(Admission::Refused(_)));
         match judge(BTreeSet::new())? {
             None => return Ok(SendCheck::clear()),
             Some(Admission::Refused(refusal)) => return Ok(SendCheck::refused(refusal.for_send())),

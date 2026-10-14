@@ -1768,8 +1768,7 @@ where
         return Err(AUDIT_WINDOW_NEEDS_ITS_OWN_MARKS.to_string().into());
     }
     let timed = TimedReader::new(reader, from, to);
-    let planned =
-        plan_window_timed(&timed, identity, company, from, to, source, limits).await;
+    let planned = plan_window_timed(&timed, identity, company, from, to, source, limits).await;
     let timings = timed.into_timings();
     match planned {
         Ok(plan) => Ok(PlannedWindow {

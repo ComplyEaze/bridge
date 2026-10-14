@@ -1,0 +1,8 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/01-m4.png
+a60375f3ce843688ca5a5a0848786e41f30f79145d24fe07a1149c90d173bb4e  60185  screenshots/02-m4.png
+6558aab90d98f00199760e5918a8ec1f65258573254e4bacae4a6b8a09250807  96396  screenshots/03-m4.png
+01075ed589feeaac2d143a4db2f64f5f9ab15caf8124011d2414db0171421629  2721  working-summary.txt
+4591d80ef2b5f0838628ff883b5b6e79b23d486b1432d5591e4bc39259b8c09c  10027  notes-724m4.log
+f0147ae218f63795764ada45233832ddfb0df3e7aef4fea20bcf0198f7a070f1  130  records/egress-counts-last.json

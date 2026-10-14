@@ -1,0 +1,19 @@
+# sha256  bytes  file (every file of this folder except this one)
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+1cb56cddee634ebed85075812f9186e637c37044cd7bf10580e616889b18514a  2866  NOTES.md
+7f62f7c652e90c1bc59a42b2dbdf764a990301cda6d9155b3a296f8d0db5a4ab  734  SHA256-kept-on-lab-pc.txt
+ac17683f17f1cab5fbe119709267ba314ab6e59a175329a44ae6cd670ea276f7  6  answers/status-end.curl.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  0  answers/status-end.curl.txt.err
+655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  answers/status-end.txt
+7d66ebd99ac6299b9147c52084e7aca8789233f6886f217424b18327520bea7e  584  results/n1-m4-list_companies.json
+55bf3041a88fd70a4864a8e6af65765f79a05f68ba36b1ecb92231563c3581a1  11025  results/n1-m4-masters.json
+5f986972e0ff4a0aed3d892f079648bc17cfe1e61a0a68612bfa77134b3b617c  1404  results/n1-m4-rows.txt
+8d31d28aa44669f16724f10da82b307ec314be3bb5dd9c6f2c7aef263bcf6116  697  results/n1-m4-tally_status.json
+05c05d0574bfd444d8211201891b564f5e52b17fdee8b4767c37650e1e4d27d8  583  results/n2-m4-list_companies.json
+2e5b27b6d18a2e2bf939f05167e4136ae4597586a2cf5a89b23db10bb2d94aa3  11053  results/n2-m4-masters.json
+0deaf4aeff4f1bda6836bfec582e1d350d40e3099a09f23dc99ed3738bf7658c  1425  results/n2-m4-rows.txt
+322080884a93e049bde68d2deffc1efa94b2b2aca2931ae1a8b28045eb67d31f  697  results/n2-m4-tally_status.json
+39d743d187f674078709e9f67c03598d3e88ed1e62e8c2bc2d926861aeb1b0d6  10505  step0/netstat-end.txt
+04c48f0a29c9cd25d2956b2073a6a3f28c9159dbcd102bfcd5d4b9c5fed1e5de  11047  step0/netstat-start.txt
+cc2076a406be37b76f7d57fd7c0063356b930c0294c2801757da9145a4dc7961  48  step0/tasklist-end.txt
+0dfc8305a79d947c5f7baba6ee4e8be7e198f48fba3d2a5c5637d3e01dedb149  48  step0/tasklist-start.txt

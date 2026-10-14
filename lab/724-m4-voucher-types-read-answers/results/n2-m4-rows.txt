@@ -1,0 +1,24 @@
+﻿Attendance | default | observed/automatic/not_prevented
+Contra | unrecognised:None | observed/automatic/not_prevented
+Credit Note | default | observed/automatic/not_prevented
+Debit Note | default | observed/automatic/not_prevented
+Delivery Note | default | observed/automatic/not_prevented
+Job Work In Order | default | observed/automatic/not_prevented
+Job Work Out Order | default | observed/automatic/not_prevented
+Journal | default | observed/automatic/not_prevented
+Material In | default | observed/automatic/not_prevented
+Material Out | default | observed/automatic/not_prevented
+Memorandum | default | observed/automatic/not_prevented
+Payment | unrecognised:None | observed/manual/not_prevented
+Payroll | default | observed/automatic/not_prevented
+Physical Stock | default | observed/automatic/not_prevented
+Purchase | default | observed/automatic/not_prevented
+Purchase Order | default | observed/automatic/not_prevented
+Receipt | unrecognised:None | observed/automatic/not_prevented
+Receipt Note | default | observed/automatic/not_prevented
+Rejections In | default | observed/automatic/not_prevented
+Rejections Out | default | observed/automatic/not_prevented
+Reversing Journal | default | observed/automatic/not_prevented
+Sales | default | observed/automatic/not_prevented
+Sales Order | default | observed/automatic/not_prevented
+Stock Journal | default | observed/automatic/not_prevented

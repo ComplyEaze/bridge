@@ -3808,6 +3808,131 @@ fn a_one_voucher_text_ends_with_the_vouchers_own_text() {
     assert!(VOUCHER_TEXT_HEADING.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS);
 }
 
+/// The voucher's own text shown in parts under a `label`, quoted one part a
+/// line as `<label> (k): "…"`, read back into its parts.
+fn parts_below(lines: &[&str], label: &str) -> Vec<String> {
+    lines
+        .iter()
+        .filter_map(|shown| {
+            let (number, quoted) = shown
+                .strip_prefix(&format!("{label} ("))?
+                .split_once("): ")?;
+            number.parse::<usize>().ok()?;
+            Some(serde_json::from_str::<String>(quoted).unwrap())
+        })
+        .collect()
+}
+
+/// #1535: a narration too long for one line is shown in parts below the
+/// heading, each quoted on its own line and split only at a space, so that
+/// joined in order they are the posted text. The line above the heading
+/// counts them, the date line points below the dashes, and the desktop
+/// Journal route shows the same text. A reference is never split.
+#[test]
+fn a_long_narration_is_shown_in_quoted_parts_below_the_dashes() {
+    let (mut line, endpoint) = batch();
+    let narration = "Synthetic statement row: cash deposit at the branch counter 000123 | Synthetic Bank Ledger | 03-08-2026 | cash purpose not confirmed";
+    line.vouchers[0].narration = Some(narration.into());
+    refresh_batch_sha256(&mut line);
+    let text = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let heading = lines
+        .iter()
+        .position(|shown| *shown == VOUCHER_TEXT_HEADING)
+        .unwrap();
+    assert_eq!(
+        lines[heading - 1],
+        "Below the dashes: the reference on one line, then the narration in 2 parts.",
+        "{text}"
+    );
+    assert_eq!(
+        lines[4],
+        format!("Date: 20260901  Voucher number: Tally assigns it  {VOUCHER_TEXT_CUE_PARTS}"),
+        "{text}"
+    );
+    // One dashed line, and everything the voucher wrote is under it.
+    assert_eq!(
+        lines.iter().filter(|shown| shown.contains("----")).count(),
+        1
+    );
+    let below = &lines[heading + 1..];
+    assert_eq!(below[0], "Reference: \"REF-1\"", "{text}");
+    let parts = parts_below(below, "Narration");
+    assert_eq!(parts.len(), 2, "{text}");
+    assert_eq!(below.len(), 1 + parts.len(), "{text}");
+    assert_eq!(parts.concat(), narration, "{text}");
+    assert!(parts[0].ends_with(' '), "{text}");
+    assert!(
+        lines
+            .iter()
+            .all(|shown| shown.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS),
+        "{text}"
+    );
+    assert!(VOUCHER_TEXT_CUE_PARTS.chars().count() <= VOUCHER_TEXT_CUE.chars().count() + 2);
+    // The desktop Journal route shows the same text.
+    assert_eq!(admit_saved_journal(&line, &endpoint).unwrap().1, text);
+    // A reference too long for one line is refused, as before.
+    line.vouchers[0].reference = Some(
+        "Synthetic reference that is long enough to pass one line of this approval dialog, with spaces".into(),
+    );
+    refresh_batch_sha256(&mut line);
+    assert_eq!(
+        review_preview_with(&line, &endpoint, &[]).unwrap_err(),
+        "import_review_too_large"
+    );
+}
+
+/// #1535: a narration in parts that holds the On Account legend's words and a
+/// marked ledger's name neither adds a legend line nor passes for a marked
+/// entry: each part begins with its label, so the seal's checks still hold.
+#[test]
+fn a_narration_in_parts_cannot_pass_for_the_on_account_lines() {
+    let (mut line, endpoint) = batch();
+    line.vouchers[0].entries = serde_json::from_value(json!([
+        {"ledger":"Party A","amount":"10.00","side":"Dr"},
+        {"ledger":"Cash","amount":"10.00","side":"Cr"}]))
+    .unwrap();
+    line.vouchers[0].narration = Some(format!(
+        "{ON_ACCOUNT_LEGEND} and On Account \"Party A\" again in this synthetic narration"
+    ));
+    refresh_batch_sha256(&mut line);
+    approve_on_account(&mut line, &["Party A"]);
+    let text = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    assert_eq!(
+        text.lines()
+            .filter(|shown| *shown == ON_ACCOUNT_LEGEND)
+            .count(),
+        1,
+        "{text}"
+    );
+    assert!(text.contains("\nNarration (2): "), "{text}");
+}
+
+/// #1535: a value that does not fit one line and cannot be shown in parts is
+/// refused whole, never cut: no space to split at, a dashed run or a number
+/// in brackets. On one line the same characters are shown as before.
+#[test]
+fn a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole() {
+    let (mut line, endpoint) = batch();
+    let words = "word ".repeat(20);
+    for (narration, code) in [
+        ("x".repeat(120), "import_review_too_large"),
+        (format!("{words}---- end"), "import_review_layout_text"),
+        (format!("{words}(2) end"), "import_review_layout_text"),
+    ] {
+        line.vouchers[0].narration = Some(narration.clone());
+        assert_eq!(
+            review_preview_with(&line, &endpoint, &[]).unwrap_err(),
+            code,
+            "{narration}"
+        );
+    }
+    line.vouchers[0].narration = Some("Rent (2) ----".into());
+    let text = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(text.ends_with("\nNarration: \"Rent (2) ----\""), "{text}");
+    assert!(text.contains(VOUCHER_TEXT_CUE), "{text}");
+}
+
 // bridge#626: a ledger name that ends in one CR LF, the one spelling with a
 // line break a build binds, is shown in the dialogs with the break written out.
 

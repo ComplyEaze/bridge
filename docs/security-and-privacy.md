@@ -415,7 +415,12 @@ begin (for example when the batch is not found or the journal is busy); a
 refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
-characters it cannot show safely, or do not fit, it refuses. A window for a
+characters it cannot show safely, or do not fit, it refuses. In the next build,
+a narration too long for one line is shown instead in numbered parts, each
+quoted and split only at a space, under a line that counts them; one that
+cannot be split so, and a reference too long for one line, are still refused.
+The review window for a posted voucher shows its narration last, under the
+same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference; from the next
 build a Journal's line names its first debit and first credit ledger and up to

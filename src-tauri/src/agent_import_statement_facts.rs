@@ -1319,9 +1319,9 @@ pub(super) fn build_transfer_facts(
             Some(holding) => {
                 let contradicting = holding.batches.iter().copied().find(|&at| {
                     batches[at].found
-                        && !withdrawn_at
+                        && withdrawn_at
                             .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
-                            .is_some_and(|recorded| *recorded >= mention.built)
+                            .is_none_or(|recorded| *recorded < mention.built)
                 });
                 let any_posted = holding.batches.iter().any(|&at| batches[at].found);
                 match (contradicting, any_posted) {

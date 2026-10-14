@@ -907,7 +907,7 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
         "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
         "This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended",
     ];
-    let negations = [" not ", " no step ", "Do not", " never ", " cannot "];
+    let negations = [" not ", " no step ", "do not", " never ", " cannot "];
     let mut tally_sentences = 0;
     let mut reads = BTreeSet::new();
     for sentence in every_sentence_to_follow() {
@@ -915,7 +915,7 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
             continue;
         }
         tally_sentences += 1;
-        let padded = format!(" {sentence} ");
+        let padded = format!(" {sentence} ").to_lowercase();
         if negations.iter().any(|negation| padded.contains(negation)) {
             continue;
         }

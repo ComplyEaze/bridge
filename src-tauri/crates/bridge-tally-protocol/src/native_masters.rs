@@ -1,9 +1,10 @@
 //! Native `masters` collections: voucher types, godowns, units, stock
-//! groups, cost centres and cost categories, each read as one Collection with the company GUID computed onto
+//! groups, stock items, cost centres and cost categories, each read as one Collection with the company GUID computed onto
 //! every row.
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1 for the first
-//! four kinds, and three synthetic books for cost centres (two for cost categories)
+//! four kinds and for stock items, and three synthetic books for cost centres
+//! (two for cost categories)
 //! (`tests/fixtures/MASTERS_CAPTURE_PROVENANCE.md`; PARTIAL). Every row of
 //! every kind carried the computed `BRIDGECOMPANYGUID`; `NUMBERINGMETHOD`
 //! took `Default`, `Automatic` and `Manual`. How another release or a larger
@@ -11,12 +12,17 @@
 //!
 //! The parser is closed and fails closed with a typed error (AGENTS.md P3):
 //! it is not the tolerant generic collection reader. Groups are not read
-//! here; they stay on the group snapshot.
+//! here; they stay on the group snapshot. A stock item row also carries its
+//! dated `HSNDETAILS.LIST` and `GSTDETAILS.LIST`, read by `stock_tax_details`,
+//! which says which fault refuses the read and which fails only the row's field.
 //!
 //! The element-reading helpers at the end are `pub(crate)`: `native_stock_summary`
 //! reads its collections with them rather than with a second copy.
+use crate::gst_details::GstDetailsObservation;
+use crate::hsn_details::HsnDetailsObservation;
 use crate::native_ledger_guid_has_company_prefix;
 use crate::native_trial_balance::guid_suffix_is_valid;
+use crate::stock_tax_details::StockTaxLists;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_text::escape_text as xml_escape;
 use quick_xml::{
@@ -50,16 +56,19 @@ pub enum NativeMasterKind {
     Godowns,
     Units,
     StockGroups,
+    /// Stock items, each with the dated HSN and GST details of its own list.
+    StockItems,
     CostCentres,
     CostCategories,
 }
 
 impl NativeMasterKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::VoucherTypes,
         Self::Godowns,
         Self::Units,
         Self::StockGroups,
+        Self::StockItems,
         Self::CostCentres,
         Self::CostCategories,
     ];
@@ -71,6 +80,7 @@ impl NativeMasterKind {
             Self::Godowns => b"GODOWN",
             Self::Units => b"UNIT",
             Self::StockGroups => b"STOCKGROUP",
+            Self::StockItems => b"STOCKITEM",
             Self::CostCentres => b"COSTCENTRE",
             Self::CostCategories => b"COSTCATEGORY",
         }
@@ -108,6 +118,12 @@ impl NativeMasterKind {
                 "StockGroup",
                 "NAME, PARENT, GUID, MASTERID, ALTERID",
             ),
+            Self::StockItems => (
+                "Bridge Master Stock Items",
+                "No",
+                "StockItem",
+                "NAME, PARENT, GUID, MASTERID, ALTERID, HSNDETAILS.LIST, GSTDETAILS.LIST",
+            ),
             Self::CostCentres => (
                 "Bridge Master Cost Centres",
                 "No",
@@ -124,14 +140,18 @@ impl NativeMasterKind {
     }
 
     /// The `MSTDEPTYPE` Tally printed on the `COLLECTION` element of every
-    /// captured cost-centre (32) and cost-category (16) answer, including the
-    /// zero-row one. It is required for those two kinds, so that an empty
-    /// collection that was not resolved to the type asked for is not read as
-    /// "none defined". The other kinds carry no such requirement.
+    /// captured cost-centre (32), cost-category (16) and stock-item (512) answer,
+    /// including the zero-row cost-centre one. It is required for those three
+    /// kinds, so that an empty collection that was not resolved to the type
+    /// asked for is not read as "none defined". For stock items the three
+    /// captures are one book's, and no zero-row stock-item answer was captured,
+    /// so the requirement is a choice that fails loudly, not a measured rule.
+    /// The other kinds carry no such requirement.
     const fn collection_type(self) -> Option<&'static str> {
         match self {
             Self::CostCentres => Some("32"),
             Self::CostCategories => Some("16"),
+            Self::StockItems => Some("512"),
             Self::VoucherTypes | Self::Godowns | Self::Units | Self::StockGroups => None,
         }
     }
@@ -145,12 +165,27 @@ impl NativeMasterKind {
     /// characters, so these carry headroom over that one synthetic book
     /// (PARTIAL). Names are counted here and again in
     /// [`masters_worst_row_bytes`], which only adds to the headroom.
+    ///
+    /// A stock item is 10,200: it grows with its dated entries, not with its
+    /// names. Counted the same way (UTF-16 units, line ends kept, names
+    /// included), the largest captured item row is 4,373 units, an item with two
+    /// dated GST entries (1,627 and 1,569 units) and two dated HSN entries (287
+    /// and 267), against 619 to 635 for an item with empty lists. The
+    /// allowance is that measured row plus three more entries of each list at
+    /// the larger measured size, two for further dated entries and one for the
+    /// entry Tally adds on an item's first save: 4,373 + 3 x 1,627 + 3 x 287 =
+    /// 10,115, rounded up. The HSN description is not a name slot: it is
+    /// inside this allowance. An item with more entries than that, or a state
+    /// row beyond `Any` (unmeasured), is refused as `masters_row_exceeds_bound`.
+    /// The admitted master mark follows from it (see
+    /// [`masters_worst_row_bytes`]).
     const fn fixed_chars(self) -> usize {
         match self {
             Self::VoucherTypes => 1_200,
             Self::Godowns => 800,
             Self::Units => 700,
             Self::StockGroups => 750,
+            Self::StockItems => 10_200,
             Self::CostCentres => 800,
             Self::CostCategories => 950,
         }
@@ -165,7 +200,7 @@ impl NativeMasterKind {
     const fn name_slots(self) -> usize {
         match self {
             Self::VoucherTypes => 5,
-            Self::Godowns | Self::Units | Self::StockGroups => 4,
+            Self::Godowns | Self::Units | Self::StockGroups | Self::StockItems => 4,
             Self::CostCentres => 5,
             Self::CostCategories => 3,
         }
@@ -233,6 +268,13 @@ pub enum NativeMasterDetail {
     /// none was chosen), so an absent or blank one is refused, not read as none.
     CostCentre {
         category: String,
+    },
+    /// A stock item's own dated HSN and GST lists, as Tally sent them. An
+    /// empty list is the item's, not a statement about its stock group or the
+    /// company: those are not on the item's lists (measured, PARTIAL).
+    StockItem {
+        hsn: HsnDetailsObservation,
+        gst: GstDetailsObservation,
     },
     CostCategory {
         allocates_revenue: bool,
@@ -527,6 +569,7 @@ fn parse_row(
     let name = name_attribute(element)?;
     let mut fields = HashMap::<&'static str, String>::new();
     let mut language_names = 0_usize;
+    let mut tax_lists = StockTaxLists::default();
     loop {
         match reader
             .read_event()
@@ -542,7 +585,9 @@ fn parse_row(
                     if fields.insert(field, text).is_some() {
                         return Err(NativeMastersError::Malformed("masters_row_field_repeated"));
                     }
-                } else {
+                } else if kind != NativeMasterKind::StockItems
+                    || !tax_lists.read_list(reader, &child_name, false)?
+                {
                     skip_subtree(reader)?;
                 }
             }
@@ -553,6 +598,8 @@ fn parse_row(
                     if fields.insert(field, String::new()).is_some() {
                         return Err(NativeMastersError::Malformed("masters_row_field_repeated"));
                     }
+                } else if kind == NativeMasterKind::StockItems {
+                    tax_lists.read_list(reader, &child_name, true)?;
                 }
             }
             Event::End(end)
@@ -623,6 +670,10 @@ fn parse_row(
                 .ok_or(NativeMastersError::RowFieldInvalid("is_simple_unit"))?,
         },
         NativeMasterKind::Godowns | NativeMasterKind::StockGroups => NativeMasterDetail::Plain,
+        NativeMasterKind::StockItems => {
+            let (hsn, gst) = tax_lists.observations();
+            NativeMasterDetail::StockItem { hsn, gst }
+        }
         NativeMasterKind::CostCentres => NativeMasterDetail::CostCentre {
             category: fields
                 .remove("CATEGORY")
@@ -883,3 +934,7 @@ pub(crate) fn path_is(path: &[Vec<u8>], expected: &[&[u8]]) -> bool {
 #[cfg(test)]
 #[path = "native_masters_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "native_masters_stock_items_tests.rs"]
+mod stock_item_tests;

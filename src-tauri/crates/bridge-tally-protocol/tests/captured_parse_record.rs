@@ -2279,6 +2279,10 @@ const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oc
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
      feeds it through the build, the post and the read-back and pins what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_W18_REPLAY: &str = "an answer of the pilot lab's W18, W18b and W18c sittings (12 and 13 Oct 2026), \
+     with no row here: the app crate's HSN/SAC warning replay (src/agent_import_w18_replay_tests.rs) \
+     feeds it through the build, the post and the verification and pins what each parse returns; \
+     pilot-lab-w18/PROVENANCE.md says what it is";
 const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on the Windows lab \
      (12 Oct 2026), with no row here: the app crate's HSN/SAC check (src/agent_import_invoice_hsn.rs \
      and src/agent_import_invoice_wire.rs) parses it, and its tests \
@@ -2438,6 +2442,51 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
         PILOT_LAB_EVIDENCE,
+    ),
+    // The W18 replay answers (the build's reads on the book with the four-digit ledger).
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-book-extent.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-company-object.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-groups.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-ledgers-paired.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-marks.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-number-0040.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-tax-units.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18-voucher-types.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-w18/w18b-verification-window.utf16le.xml",
+        PILOT_LAB_W18_REPLAY,
     ),
     // The GST status read answers.
     (

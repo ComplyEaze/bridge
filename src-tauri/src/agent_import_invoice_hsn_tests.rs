@@ -603,3 +603,101 @@ fn on_the_labs_answers_each_sales_ledger_resolves_as_tallys_screens_showed() {
         HsnStep::Refused(NOT_MEASURED)
     );
 }
+
+/// The type of supply is read from the lab's rate listing as Tally sent it:
+/// Services on the services ledgers, Goods on the goods ledger, and nothing
+/// on the round-off ledger, which no rule then judges. A repeated element
+/// (an edit of the answer) is not judged either, and fails nothing.
+#[test]
+fn the_type_of_supply_is_read_from_the_labs_listing_and_never_fails_it() {
+    let names = [
+        "BRIDGE Svc 998313 5%",
+        "BRIDGE Goods 18%",
+        "BRIDGE Round Off",
+    ];
+    let rates = super::super::parse_ledger_rates(&utf16(RATES_HSN), LAB_GUID, &names).unwrap();
+    let supply = names.map(|name| rates[name].supply);
+    assert_eq!(
+        supply,
+        [
+            SupplyType::Services,
+            SupplyType::Goods,
+            SupplyType::NotJudged
+        ]
+    );
+    // Edited: the services ledger's element written twice.
+    let answer = utf16(RATES_HSN);
+    let one = "<GSTTYPEOFSUPPLY TYPE=\"String\">Services</GSTTYPEOFSUPPLY>";
+    let at = answer[answer.find("NAME=\"BRIDGE Svc 998313 5%\"").unwrap()..]
+        .find(one)
+        .unwrap()
+        + answer.find("NAME=\"BRIDGE Svc 998313 5%\"").unwrap();
+    let twice = format!("{}{one}{}", &answer[..at], &answer[at..]);
+    let rates =
+        super::super::parse_ledger_rates(&twice, LAB_GUID, &["BRIDGE Svc 998313 5%"]).unwrap();
+    assert_eq!(rates["BRIDGE Svc 998313 5%"].supply, SupplyType::NotJudged);
+}
+
+/// Each rule on the codes the lab's ledgers resolved to (998313 and 847130
+/// clean, the four-digit 9983 not six digits), and on edited codes and types
+/// for the rules no lab ledger trips. A code that is not digits only is
+/// judged on that alone.
+#[test]
+fn the_warnings_follow_the_code_and_the_type_of_supply() {
+    use HsnWarningCode::*;
+    use SupplyType::{Goods, NotJudged, Services};
+    let codes = |code: &str, supply| {
+        hsn_warnings("L", code, &HsnLevel::Ledger, supply)
+            .into_iter()
+            .map(|warning| warning.code)
+            .collect::<Vec<_>>()
+    };
+    let cases: [(&str, SupplyType, &[HsnWarningCode]); 11] = [
+        // The lab's.
+        ("998313", Services, &[]),
+        ("998314", Services, &[]),
+        ("9983", Services, &[NotSixDigits]),
+        ("847130", Goods, &[]),
+        // Edited.
+        ("84713010", Goods, &[NotSixDigits]),
+        ("847130", Services, &[NotASacForServices]),
+        ("998313", Goods, &[SacForGoods]),
+        ("8471", Services, &[NotSixDigits, NotASacForServices]),
+        ("998313", NotJudged, &[TypeOfSupplyNotJudged]),
+        ("9983 13", Services, &[NotDigits]),
+        ("99831A", Goods, &[NotDigits]),
+    ];
+    for (code, supply, expected) in cases {
+        assert_eq!(codes(code, supply), expected, "{code} {supply:?}");
+    }
+    // The ledger, the level and the code's length travel with each warning.
+    assert_eq!(
+        hsn_warnings(
+            "BRIDGE Svc INH2 5%",
+            "9983",
+            &HsnLevel::Group("BRIDGE Sales Sub".to_string()),
+            Services
+        ),
+        [HsnWarning {
+            code: NotSixDigits,
+            ledger: "BRIDGE Svc INH2 5%".to_string(),
+            level: HsnLevel::Group("BRIDGE Sales Sub".to_string()),
+            characters: 4,
+        }]
+    );
+}
+
+/// A warning's code is written in a saved batch as the response names it.
+#[test]
+fn a_warning_code_is_saved_under_the_name_the_response_gives_it() {
+    use HsnWarningCode::*;
+    for code in [
+        NotDigits,
+        NotSixDigits,
+        NotASacForServices,
+        SacForGoods,
+        TypeOfSupplyNotJudged,
+    ] {
+        assert_eq!(serde_json::to_value(code).unwrap(), code.as_str());
+    }
+}

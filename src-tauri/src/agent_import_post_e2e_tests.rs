@@ -4262,6 +4262,8 @@ mod ack_tests;
 mod approval_tests;
 #[path = "agent_import_stop_tests.rs"]
 mod stop_tests;
+#[path = "agent_import_w18_replay_tests.rs"]
+mod w18_replay_tests;
 
 /// A post whose ledger no longer resolves to the master approved names the
 /// ledger only in the masters list, where the configured redaction applies:
@@ -5920,6 +5922,8 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
                 .as_str()
                 .unwrap()
                 .to_string();
+            // Both codes are six digits on services ledgers: nothing to check.
+            assert_eq!(built.payload["result"]["hsn_warnings"], json!([]));
             SCRIPTED_REMOTE_IDS
                 .scope(
                     vec![remote_id],
@@ -5951,6 +5955,7 @@ async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
         pilot_invoice_lines(),
         "{response}"
     );
+    assert!(result.get("hsn_warnings").is_none(), "{response}");
     assert_eq!(
         result["dispatch"]["response"]["request_sha256"],
         PILOT_REQUEST_SHA256

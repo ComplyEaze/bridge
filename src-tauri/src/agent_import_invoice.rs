@@ -20,6 +20,8 @@ use uuid::Uuid;
 #[path = "agent_import_invoice_wire.rs"]
 mod wire;
 
+#[cfg(test)]
+pub(super) use wire::HsnWarning;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
@@ -73,6 +75,12 @@ pub(super) struct InvoiceObserved {
     /// reports as `invoice_not_observed`.
     #[serde(default)]
     pub(super) sales_ledgers: Vec<String>,
+    /// What looks unusual about the HSN/SAC each sales ledger resolved to,
+    /// by ledger name then rule: shown to the person approving and returned
+    /// with the build and the post. Never a refusal. Not written when there
+    /// is none, so a build without this field still reads such a batch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) hsn_warnings: Vec<wire::HsnWarning>,
 }
 
 /// The tax head a ledger carries, as the compliance read reports it.
@@ -1099,6 +1107,7 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
             party_bill_wise,
             company_state,
             sales_ledgers,
+            hsn_warnings,
         }) => {
             field(b"1");
             field(voucher_type_guid.as_bytes());
@@ -1116,6 +1125,26 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
             field(sales_ledgers.len().to_string().as_bytes());
             for ledger in sales_ledgers {
                 field(ledger.as_bytes());
+            }
+            field(hsn_warnings.len().to_string().as_bytes());
+            for wire::HsnWarning {
+                code,
+                ledger,
+                level,
+                characters,
+            } in hsn_warnings
+            {
+                field(code.as_str().as_bytes());
+                field(ledger.as_bytes());
+                match level {
+                    wire::HsnLevel::Ledger => field(b"ledger"),
+                    wire::HsnLevel::Group(group) => {
+                        field(b"group");
+                        field(group.as_bytes());
+                    }
+                    wire::HsnLevel::Company => field(b"company"),
+                }
+                field(characters.to_string().as_bytes());
             }
         }
     }
@@ -1291,6 +1320,38 @@ fn sales_line_evidence(
                 "hsn_ledger_source": name(&leg.hsn.ledger_source),
                 "hsn_group_source": name(&leg.hsn.group_source),
                 "hsn_resolved": leg.hsn.resolved(),
+            })
+        })
+        .collect()
+}
+
+/// The HSN/SAC warnings a saved invoice carries, as a caller reads them: the
+/// rule's code, the sales ledger, where the code came from (the group's name
+/// when a group's), and the code's length. Names are marked as party names,
+/// so the response's redaction applies to them.
+pub(super) fn hsn_warnings_json(voucher: &ImportVoucher) -> Vec<serde_json::Value> {
+    let Some(observed) = voucher
+        .invoice
+        .as_ref()
+        .and_then(|detail| detail.observed.as_ref())
+    else {
+        return Vec::new();
+    };
+    observed
+        .hsn_warnings
+        .iter()
+        .map(|warning| {
+            let (source, group) = match &warning.level {
+                wire::HsnLevel::Ledger => ("ledger", None),
+                wire::HsnLevel::Group(group) => ("group", Some(super::super::party_name(group))),
+                wire::HsnLevel::Company => ("company", None),
+            };
+            serde_json::json!({
+                "code": warning.code.as_str(),
+                "ledger": super::super::party_name(warning.ledger.as_str()),
+                "source": source,
+                "group": group,
+                "characters": warning.characters,
             })
         })
         .collect()
@@ -1901,7 +1962,7 @@ impl super::super::Server {
         // date (#691, section 9.16), asked only of an invoice admitted so
         // far: a code is fixed in Tally and the rest by the caller, and an
         // invoice refused above costs these reads nothing.
-        let (hsn_refusals, evidence) = self
+        let (hsn_refusals, hsn_warnings, evidence) = self
             .sales_hsn_refusals(
                 identity,
                 company_name,
@@ -1920,6 +1981,7 @@ impl super::super::Server {
             bill_wise,
             company_state,
             sales_ledgers,
+            hsn_warnings,
         );
         if let Some(detail) = voucher.invoice.as_mut() {
             detail.observed = Some(observed);
@@ -1930,7 +1992,8 @@ impl super::super::Server {
 
 impl super::super::Server {
     /// One refusal per sales ledger (the classification's sales lines) whose
-    /// HSN/SAC does not resolve on the invoice date. The company object is
+    /// HSN/SAC does not resolve on the invoice date, and the warnings on the
+    /// codes that do, in ledger-name order. The company object is
     /// read for every admitted invoice, because its settings decide whether
     /// the measured order holds at any level; the groups only when a sales
     /// ledger's own row defers.
@@ -1942,7 +2005,14 @@ impl super::super::Server {
         facts: &BTreeMap<String, LedgerFacts>,
         as_of: &str,
         mut evidence: super::super::Evidence,
-    ) -> Result<(Vec<InvoiceRefusal>, super::super::Evidence), InvoiceAdmission> {
+    ) -> Result<
+        (
+            Vec<InvoiceRefusal>,
+            Vec<wire::HsnWarning>,
+            super::super::Evidence,
+        ),
+        InvoiceAdmission,
+    > {
         let mut sales = sales_ledgers
             .iter()
             .map(|name| (name, facts.get(name)))
@@ -1960,7 +2030,8 @@ impl super::super::Server {
                     let chain = fact
                         .map(|fact| fact.group_names.as_slice())
                         .filter(|names| !names.is_empty());
-                    let step = match fact.and_then(|fact| fact.rates.as_ref()) {
+                    let rates = fact.and_then(|fact| fact.rates.as_ref());
+                    let step = match rates {
                         // Not reachable after the classification; this check
                         // never passes a ledger it did not read.
                         None => wire::HsnStep::Refused(wire::HSN_NOT_MEASURED),
@@ -1968,13 +2039,14 @@ impl super::super::Server {
                             wire::resolve_hsn(&row.hsn, chain, groups.as_ref(), &company, as_of)
                         }
                     };
-                    (name.as_str(), step)
+                    let supply = rates.map_or(wire::SupplyType::NotJudged, |row| row.supply);
+                    (name.as_str(), step, supply)
                 })
                 .collect::<Vec<_>>();
             if groups.is_none()
                 && steps
                     .iter()
-                    .any(|(_, step)| *step == wire::HsnStep::NeedsGroups)
+                    .any(|(_, step, _)| *step == wire::HsnStep::NeedsGroups)
             {
                 let (xml, read) = self
                     .post_read(identity, super::super::invoice_group_hsn_read(company_name))
@@ -1984,17 +2056,31 @@ impl super::super::Server {
                     Some(wire::parse_group_hsn(&xml, identity.company_guid()).map_err(failed)?);
                 continue;
             }
-            let refusals = steps
-                .into_iter()
-                .filter_map(|(name, step)| match step {
-                    wire::HsnStep::Resolved { .. } => None,
-                    wire::HsnStep::Refused(code) => Some(refuse_ledger(code, name)),
-                    wire::HsnStep::NeedsGroups => Some(refuse_ledger(wire::HSN_NOT_MEASURED, name)),
-                })
-                .collect();
-            return Ok((refusals, evidence));
+            let (refusals, warnings) = hsn_admission(steps);
+            return Ok((refusals, warnings, evidence));
         }
     }
+}
+
+/// The refusals and the warnings of the sales ledgers' last pass: a ledger
+/// whose code resolved is never refused, only warned about.
+fn hsn_admission(
+    steps: Vec<(&str, wire::HsnStep, wire::SupplyType)>,
+) -> (Vec<InvoiceRefusal>, Vec<wire::HsnWarning>) {
+    let mut refusals = Vec::new();
+    let mut warnings = Vec::new();
+    for (name, step, supply) in steps {
+        match step {
+            wire::HsnStep::Resolved { code, level } => {
+                warnings.extend(wire::hsn_warnings(name, &code, &level, supply));
+            }
+            wire::HsnStep::Refused(code) => refusals.push(refuse_ledger(code, name)),
+            wire::HsnStep::NeedsGroups => {
+                refusals.push(refuse_ledger(wire::HSN_NOT_MEASURED, name));
+            }
+        }
+    }
+    (refusals, warnings)
 }
 
 /// What the build records of an admitted invoice. `classify_sales_invoice` has
@@ -2006,6 +2092,7 @@ fn observe(
     party_bill_wise: bool,
     company_state: String,
     sales_ledgers: Vec<String>,
+    hsn_warnings: Vec<wire::HsnWarning>,
 ) -> InvoiceObserved {
     let party_gstin = match party {
         GstinEvidence::InForce(gstin) => Some(gstin.clone()),
@@ -2026,6 +2113,7 @@ fn observe(
         party_bill_wise,
         company_state,
         sales_ledgers,
+        hsn_warnings,
     }
 }
 

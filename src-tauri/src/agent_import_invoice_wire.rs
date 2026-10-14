@@ -1015,6 +1015,8 @@ pub(in crate::agent::agent_import) struct LedgerRateRow {
     /// it refuses a sales ledger only, never an invoice through its party or
     /// tax ledger.
     pub(super) hsn: Result<HsnRows, &'static str>,
+    /// The ledger's type of supply, for the HSN/SAC warnings only.
+    pub(super) supply: SupplyType,
 }
 
 /// The elements the lab's GST rows carried (10 Oct 2026, fourteen ledgers),
@@ -1122,6 +1124,7 @@ pub(super) fn parse_ledger_rates(
             rounding_method: ledger.text_of("ROUNDINGMETHOD")?,
             rounding_limit: ledger.text_of("ROUNDINGLIMIT")?,
             hsn: hsn::hsn_rows(ledger),
+            supply: SupplyType::of(ledger),
         };
         if out.insert(name, row).is_some() {
             return Err("invoice_ledger_rates_name_repeated");
@@ -1134,9 +1137,12 @@ pub(super) fn parse_ledger_rates(
 
 #[path = "agent_import_invoice_hsn.rs"]
 mod hsn;
+pub(in crate::agent::agent_import) use hsn::HsnWarning;
+#[cfg(test)]
+pub(super) use hsn::HsnWarningCode;
 pub(super) use hsn::{
-    parse_company_hsn, parse_group_hsn, resolve_hsn, HsnRows, HsnStep,
-    NOT_MEASURED as HSN_NOT_MEASURED,
+    hsn_warnings, parse_company_hsn, parse_group_hsn, resolve_hsn, HsnLevel, HsnRows, HsnStep,
+    SupplyType, NOT_MEASURED as HSN_NOT_MEASURED,
 };
 
 /// The group listing the build's compliance read already sends (the

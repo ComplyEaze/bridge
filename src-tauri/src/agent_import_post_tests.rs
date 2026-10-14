@@ -2561,9 +2561,18 @@ fn a_saved_batch_holds_exactly_these_records() {
                         party_bill_wise: _,
                         company_state: _,
                         sales_ledgers: _,
+                        hsn_warnings,
                     }),
             }) = invoice
-            {}
+            {
+                for super::super::invoice::HsnWarning {
+                    code: _,
+                    ledger: _,
+                    level: _,
+                    characters: _,
+                } in hsn_warnings
+                {}
+            }
             for entry in entries {
                 let ImportEntry {
                     ledger: _,
@@ -2603,7 +2612,9 @@ fn a_saved_batch_holds_exactly_these_records() {
         "voucher_type_name":"Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"Round Off",
         "observed":{"voucher_type_guid":"g", "party_gstin":"08ZZZZZ0000Z1ZQ",
             "party_state":"Rajasthan", "party_registration_type":"Regular",
-            "party_bill_wise":true, "company_state":"Rajasthan", "sales_ledgers":["Sales"]}
+            "party_bill_wise":true, "company_state":"Rajasthan", "sales_ledgers":["Sales"],
+            "hsn_warnings":[{"code":"hsn_warning_not_six_digits","ledger":"Sales",
+                "level":{"group":"Sales Sub"},"characters":4}]}
     }))
     .unwrap();
     every_field_is_named(&line);
@@ -2652,6 +2663,12 @@ fn a_saved_batch_holds_exactly_these_records() {
             "vouchers[].invoice",
             "vouchers[].invoice.observed",
             "vouchers[].invoice.observed.company_state",
+            "vouchers[].invoice.observed.hsn_warnings",
+            "vouchers[].invoice.observed.hsn_warnings[].characters",
+            "vouchers[].invoice.observed.hsn_warnings[].code",
+            "vouchers[].invoice.observed.hsn_warnings[].ledger",
+            "vouchers[].invoice.observed.hsn_warnings[].level",
+            "vouchers[].invoice.observed.hsn_warnings[].level.group",
             "vouchers[].invoice.observed.party_bill_wise",
             "vouchers[].invoice.observed.party_gstin",
             "vouchers[].invoice.observed.party_registration_type",
@@ -3955,6 +3972,56 @@ fn an_invoice_of_three_sales_legs_is_shown_whole_inside_the_dialogs_caps() {
         review_preview_for(&line, &endpoint, PostScope::Vouchers).unwrap_err(),
         "import_review_too_large"
     );
+}
+
+/// An invoice whose sales ledgers' HSN/SAC carry a warning says so, with the
+/// number of ledgers warned about, on the line that says what was checked, in
+/// place of it and no longer, so the fullest invoice the window holds still
+/// fits: a warning never refuses a post.
+#[test]
+fn an_hsn_warning_changes_the_checked_line_and_never_the_windows_size() {
+    assert!(
+        super::invoice_checked_hsn_line(9).chars().count()
+            <= super::INVOICE_CHECKED_LINE.chars().count()
+    );
+    let entries = json!([
+        {"ledger":"Walk-in Customers","amount":"1050.00","side":"Dr"},
+        {"ledger":"Sales - Consulting Services (SAC 998311)","amount":"500.00","side":"Cr"},
+        {"ledger":"Sales - Training Services (SAC 999293)","amount":"300.00","side":"Cr"},
+        {"ledger":"Sales - Other Services (SAC 999799)","amount":"200.00","side":"Cr"},
+        {"ledger":"Output CGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"},
+        {"ledger":"Output SGST @ 2.5% (Rajasthan)","amount":"25.00","side":"Cr"}
+    ]);
+    let (line, endpoint) = invoice_batch(entries.clone());
+    let clean = review_preview_for(&line, &endpoint, PostScope::Vouchers).unwrap();
+    let (mut line, endpoint) = invoice_batch(entries);
+    line.vouchers[0]
+        .invoice
+        .as_mut()
+        .unwrap()
+        .observed
+        .as_mut()
+        .unwrap()
+        .hsn_warnings = serde_json::from_value(json!([
+        {"code":"hsn_warning_not_six_digits","ledger":"Sales - Consulting Services (SAC 998311)",
+         "level":"company","characters":4},
+        {"code":"hsn_warning_not_six_digits","ledger":"Sales - Other Services (SAC 999799)",
+         "level":"company","characters":4},
+        {"code":"hsn_warning_type_of_supply_not_judged","ledger":"Sales - Other Services (SAC 999799)",
+         "level":"company","characters":4}
+    ]))
+    .unwrap();
+    let warned = review_preview_for(&line, &endpoint, PostScope::Vouchers)
+        .expect("a warning never makes the window too large");
+    assert_eq!(
+        warned,
+        clean.replace(
+            super::INVOICE_CHECKED_LINE,
+            "Checked: customer, Sales Accounts ledgers, tax per line at ledger rate. HSN/SAC: 2 to check."
+        )
+    );
+    assert_ne!(warned, clean);
+    assert!(warned.lines().count() <= 24 && warned.chars().count() <= 1_600);
 }
 
 /// The approval a person gives to a GST invoice shows what they are agreeing to,

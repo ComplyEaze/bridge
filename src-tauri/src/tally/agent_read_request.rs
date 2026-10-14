@@ -12,6 +12,14 @@ pub(crate) struct AgentReadRequest(String);
 #[error("agent_write_dispatch_forbidden")]
 pub(crate) struct AgentReadRequestError;
 
+/// The verified company's name, validated for a pinned Object template.
+fn verified_company_name(
+    identity: &super::VerifiedCompanyIdentity,
+) -> Result<bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName, AgentReadRequestError> {
+    bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(identity.display_name())
+        .map_err(|_| AgentReadRequestError)
+}
+
 impl AgentReadRequest {
     pub(crate) fn parse(xml: String) -> Result<Self, AgentReadRequestError> {
         let mut reader = quick_xml::Reader::from_str(&xml);
@@ -96,9 +104,10 @@ impl AgentReadRequest {
     /// exactly the verified company, rendered from the pinned
     /// `AuditCompanyObjectV1` template.
     ///
-    /// This is the only way an Object export reaches dispatch. [`Self::parse`]
-    /// stays Collection-only and refuses every `TYPE=Object` envelope, so no
-    /// XML from anywhere else can use this shape: the company name is the only
+    /// This and [`Self::invoice_company_hsn`] are the only ways an Object
+    /// export reaches dispatch. [`Self::parse`] stays Collection-only and
+    /// refuses every `TYPE=Object` envelope, so no XML from anywhere else can
+    /// use this shape: the company name is the only
     /// variable, it comes from a verified identity, and it is validated and
     /// escaped. The response still has to be admitted by GUID, because Tally
     /// resolves the `ID` by name.
@@ -109,12 +118,25 @@ impl AgentReadRequest {
     pub(crate) fn company_object(
         identity: &super::VerifiedCompanyIdentity,
     ) -> Result<Self, AgentReadRequestError> {
-        let company = bridge_tally_protocol::xml_read_profiles::ValidatedCompanyName::new(
-            identity.display_name(),
-        )
-        .map_err(|_| AgentReadRequestError)?;
+        let company = verified_company_name(identity)?;
         Ok(Self(
             bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::AuditCompanyObjectV1 {
+                company: &company,
+            }
+            .render(),
+        ))
+    }
+
+    /// The company object an invoice build reads for the company-level
+    /// HSN/SAC, rendered from the pinned `InvoiceCompanyHsnV1` template under
+    /// the same rules as [`Self::company_object`]: the verified company's name
+    /// is the only variable, and the response is admitted by GUID.
+    pub(crate) fn invoice_company_hsn(
+        identity: &super::VerifiedCompanyIdentity,
+    ) -> Result<Self, AgentReadRequestError> {
+        let company = verified_company_name(identity)?;
+        Ok(Self(
+            bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::InvoiceCompanyHsnV1 {
                 company: &company,
             }
             .render(),

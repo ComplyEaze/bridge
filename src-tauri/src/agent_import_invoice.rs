@@ -22,7 +22,7 @@ mod wire;
 
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
-    render_company_registration_request, render_invoice_number_request,
+    render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
     render_invoice_readback_request, render_ledger_rates_request, render_voucher_types_request,
 };
 
@@ -116,6 +116,9 @@ pub(super) struct LedgerFacts {
     /// Reserved names of the ledger's groups, nearest first, only when the
     /// chain resolved to the root. Empty when it did not.
     pub(super) reserved_groups: Vec<String>,
+    /// The same groups' own names, nearest first, under the same rule: the
+    /// chain the HSN/SAC check walks.
+    pub(super) group_names: Vec<String>,
     pub(super) duty_head: DutyHead,
     pub(super) gstin: GstinEvidence,
     pub(super) registration_type: Option<String>,
@@ -1766,14 +1769,14 @@ impl super::super::Server {
             };
             let parent = record.ledger.parent.returned_text().map(str::to_string);
             let chain = index.ancestry_chain(parent.as_deref());
-            let reserved_groups = if chain.is_complete() {
+            let (reserved_groups, group_names) = if chain.is_complete() {
                 chain
                     .hops
                     .iter()
-                    .map(|hop| hop.reserved_name.clone())
-                    .collect()
+                    .map(|hop| (hop.reserved_name.clone(), hop.name.clone()))
+                    .unzip()
             } else {
-                Vec::new()
+                (Vec::new(), Vec::new())
             };
             let (gstin, registration_type) = gstin_evidence(
                 record.ledger.party_gstin.returned_text(),
@@ -1784,6 +1787,7 @@ impl super::super::Server {
                 entry.ledger.clone(),
                 LedgerFacts {
                     reserved_groups,
+                    group_names,
                     duty_head: duty_head_of(&record.fields.gst_duty_head),
                     gstin,
                     registration_type,
@@ -1888,11 +1892,28 @@ impl super::super::Server {
         let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
             .map_err(InvoiceAdmission::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
-        let sales_ledgers = roles
+        let sales_ledgers: Vec<String> = roles
             .sales
             .iter()
             .map(|&index| voucher.entries[index].ledger.clone())
             .collect();
+        // 5. The HSN/SAC each sales line's ledger resolves to on the invoice
+        // date (#691, section 9.16), asked only of an invoice admitted so
+        // far: a code is fixed in Tally and the rest by the caller, and an
+        // invoice refused above costs these reads nothing.
+        let (hsn_refusals, evidence) = self
+            .sales_hsn_refusals(
+                identity,
+                company_name,
+                &sales_ledgers,
+                &facts,
+                &as_of,
+                evidence,
+            )
+            .await?;
+        if !hsn_refusals.is_empty() {
+            return Err(InvoiceAdmission::Refused(hsn_refusals));
+        }
         let observed = observe(
             &facts[party].gstin,
             resolved.guid,
@@ -1904,6 +1925,75 @@ impl super::super::Server {
             detail.observed = Some(observed);
         }
         Ok(evidence)
+    }
+}
+
+impl super::super::Server {
+    /// One refusal per sales ledger (the classification's sales lines) whose
+    /// HSN/SAC does not resolve on the invoice date. The company object is
+    /// read for every admitted invoice, because its settings decide whether
+    /// the measured order holds at any level; the groups only when a sales
+    /// ledger's own row defers.
+    async fn sales_hsn_refusals(
+        &self,
+        identity: &super::super::VerifiedCompanyIdentity,
+        company_name: &str,
+        sales_ledgers: &[String],
+        facts: &BTreeMap<String, LedgerFacts>,
+        as_of: &str,
+        mut evidence: super::super::Evidence,
+    ) -> Result<(Vec<InvoiceRefusal>, super::super::Evidence), InvoiceAdmission> {
+        let mut sales = sales_ledgers
+            .iter()
+            .map(|name| (name, facts.get(name)))
+            .collect::<Vec<_>>();
+        sales.sort_by(|left, right| left.0.cmp(right.0));
+        sales.dedup_by(|left, right| left.0 == right.0);
+        let (xml, read) = self.post_invoice_company_hsn_read(identity).await?;
+        evidence = super::super::combine_evidence(evidence, read);
+        let company = wire::parse_company_hsn(&xml, identity.company_guid()).map_err(failed)?;
+        let mut groups = None;
+        loop {
+            let steps = sales
+                .iter()
+                .map(|(name, fact)| {
+                    let chain = fact
+                        .map(|fact| fact.group_names.as_slice())
+                        .filter(|names| !names.is_empty());
+                    let step = match fact.and_then(|fact| fact.rates.as_ref()) {
+                        // Not reachable after the classification; this check
+                        // never passes a ledger it did not read.
+                        None => wire::HsnStep::Refused(wire::HSN_NOT_MEASURED),
+                        Some(row) => {
+                            wire::resolve_hsn(&row.hsn, chain, groups.as_ref(), &company, as_of)
+                        }
+                    };
+                    (name.as_str(), step)
+                })
+                .collect::<Vec<_>>();
+            if groups.is_none()
+                && steps
+                    .iter()
+                    .any(|(_, step)| *step == wire::HsnStep::NeedsGroups)
+            {
+                let (xml, read) = self
+                    .post_read(identity, super::super::invoice_group_hsn_read(company_name))
+                    .await?;
+                evidence = super::super::combine_evidence(evidence, read);
+                groups =
+                    Some(wire::parse_group_hsn(&xml, identity.company_guid()).map_err(failed)?);
+                continue;
+            }
+            let refusals = steps
+                .into_iter()
+                .filter_map(|(name, step)| match step {
+                    wire::HsnStep::Resolved { .. } => None,
+                    wire::HsnStep::Refused(code) => Some(refuse_ledger(code, name)),
+                    wire::HsnStep::NeedsGroups => Some(refuse_ledger(wire::HSN_NOT_MEASURED, name)),
+                })
+                .collect();
+            return Ok((refusals, evidence));
+        }
     }
 }
 

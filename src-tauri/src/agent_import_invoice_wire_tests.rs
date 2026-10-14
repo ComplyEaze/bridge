@@ -721,14 +721,24 @@ const LAB_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 
 const RATES_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml");
 
-/// The request the lab answered on 10 Oct 2026 is, character for character,
-/// the one the code renders (the file starts with a byte order mark).
+/// The request the code renders is, character for character, the lab
+/// request set W16's (the file starts with a byte order mark): the request
+/// the lab answered on 10 Oct 2026 with the HSN/SAC check's three fields
+/// added to its field list and nothing else changed (answered on 12 Oct 2026).
 #[test]
-fn the_ledger_rates_request_is_the_one_the_lab_answered() {
-    let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
+fn the_ledger_rates_request_is_the_answered_one_with_the_hsn_fields() {
+    let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.request.utf16le.xml"));
     let rendered =
         render_ledger_rates_request("BRIDGE PILOT LAB", ("20260401", "20260801")).unwrap();
     assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
+    let answered = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.request.utf16le.xml"));
+    assert_eq!(
+        answered.trim_start_matches('\u{feff}').replace(
+            "ROUNDINGLIMIT</FETCH>",
+            "ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH>"
+        ),
+        rendered
+    );
     // A window that is not eight digits renders nothing.
     for bad in ["2026-04-01", "2026040", "2026040a", ""] {
         assert!(render_ledger_rates_request("X", (bad, "20260801")).is_none());
@@ -1076,4 +1086,26 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
         crate::agent::sha256_hex(&sent("BP/26-27/0021")),
         "b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5"
     );
+}
+
+/// The group request is W16's: the group listing the compliance read sends
+/// (answered on 10 Oct 2026) with `HSNDETAILS.LIST` added and nothing else
+/// changed (answered on 12 Oct 2026).
+#[test]
+fn the_group_hsn_request_is_the_answered_listing_with_the_hsn_rows() {
+    let sent = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.request.utf16le.xml"));
+    let rendered = render_group_hsn_request("BRIDGE PILOT LAB");
+    assert_eq!(sent.trim_start_matches('\u{feff}'), rendered);
+    assert_eq!(
+        bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
+            "BRIDGE PILOT LAB"
+        )
+        .replace(
+            "RESERVEDNAME</FETCH>",
+            "RESERVEDNAME, HSNDETAILS.LIST</FETCH>"
+        ),
+        rendered
+    );
+    assert!(render_group_hsn_request("A & B")
+        .contains("<SVCURRENTCOMPANY>A &amp; B</SVCURRENTCOMPANY>"));
 }

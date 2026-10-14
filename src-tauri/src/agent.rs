@@ -1322,7 +1322,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Nothing was changed.",
         ),
         "import_retire_batch_found" => Some(
-            "Tally was already found to hold this batch. Nothing was changed.",
+            "An earlier verification found a voucher of this batch in Tally, so a later read that does not see it cannot retire it. Nothing was changed.",
         ),
         "import_retire_already_retired" => {
             Some("This batch is already retired. Nothing was changed.")

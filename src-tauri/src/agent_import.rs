@@ -2206,6 +2206,9 @@ impl Server {
                 own_tag_observed: true
             }
         );
+        // Whether this read saw any voucher of the batch, for a later retirement
+        // to remember: the status alone forgets it when only some were found.
+        let vouchers_found = !retiring && retire::found_a_voucher(&proof["vouchers"]);
         let imports = self.imports_dir()?;
         // Saved with its party-name marks, so a page served from it masks
         // names as the response's redaction requires.
@@ -2222,12 +2225,19 @@ impl Server {
             update,
             &json,
             markdown.as_bytes(),
-            |batch, name| match (retiring, own_tag_observed) {
-                (true, _) => ledger::StatusRecord::retired(batch, name),
-                (false, true) => {
-                    ledger::StatusRecord::verified(batch, name).with_own_tag_observed()
+            |batch, name| {
+                let record = match (retiring, own_tag_observed) {
+                    (true, _) => return ledger::StatusRecord::retired(batch, name),
+                    (false, true) => {
+                        ledger::StatusRecord::verified(batch, name).with_own_tag_observed()
+                    }
+                    (false, false) => ledger::StatusRecord::verified(batch, name),
+                };
+                if vouchers_found {
+                    record.with_vouchers_found()
+                } else {
+                    record
                 }
-                (false, false) => ledger::StatusRecord::verified(batch, name),
             },
             |record| {
                 let appended_now = self.append_import_record_while_admitted(record);

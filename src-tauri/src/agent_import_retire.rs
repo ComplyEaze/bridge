@@ -198,6 +198,15 @@ pub(super) fn sees_its_own_tag(rows: &[Value]) -> bool {
     rows.iter().any(|row| row["marker"] == "narration_tag")
 }
 
+/// Whether a verification's rows show any voucher of the batch in Tally: any
+/// row that is not "not found". A row that names no status counts as found.
+pub(super) fn found_a_voucher(rows: &Value) -> bool {
+    rows.as_array().is_some_and(|rows| {
+        rows.iter()
+            .any(|row| row["status"].as_str() != Some("not_found"))
+    })
+}
+
 /// The days the retire's read covers: the batch's own dates widened by
 /// [`RETIRE_WIDEN_DAYS`] either side, limited by what a book can hold (not
 /// before it began, not past today) and by the boundaries the licence admits.

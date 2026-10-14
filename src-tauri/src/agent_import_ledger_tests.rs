@@ -836,6 +836,49 @@ fn an_own_tag_observation_is_written_only_on_a_verification_record() {
     );
 }
 
+/// A verification that found some voucher of the batch but left it short of
+/// posted is a record that Tally held it: the note survives the status, and is
+/// read only on a verification record, never as false.
+#[test]
+fn a_verification_that_found_a_voucher_marks_the_batch_found_whatever_its_status() {
+    let line = batch();
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
+    let noted = ledger::StatusRecord::verified(&incomplete, name.clone()).with_vouchers_found();
+    let value = serde_json::to_value(&noted).unwrap();
+    assert_eq!(value["vouchers_found"], true);
+    let snapshot = ledger::parse_snapshots(&format!("{}{}", record(&line), record(&noted)))
+        .unwrap()
+        .remove(0);
+    assert_eq!(snapshot.batch.status, "verification_incomplete");
+    assert!(snapshot.ever_found);
+    // a verification without the note found nothing the status does not say
+    let plain = ledger::StatusRecord::verified(&incomplete, name.clone());
+    assert!(serde_json::to_value(&plain)
+        .unwrap()
+        .get("vouchers_found")
+        .is_none());
+    let snapshot = ledger::parse_snapshots(&format!("{}{}", record(&line), record(&plain)))
+        .unwrap()
+        .remove(0);
+    assert!(!snapshot.ever_found);
+    // it belongs to a verification record alone, and is never false
+    let parse = |each: &Value| {
+        ledger::parse_snapshots(&format!("{}{}", record(&line), record(each)))
+    };
+    let mut intent = serde_json::to_value(ledger::StatusRecord::dispatch(&line)).unwrap();
+    intent["vouchers_found"] = json!(true);
+    assert_eq!(parse(&intent).err(), Some("import_ledger_invalid".to_string()));
+    let mut retired =
+        serde_json::to_value(ledger::StatusRecord::retired(&incomplete, name)).unwrap();
+    retired["vouchers_found"] = json!(true);
+    assert_eq!(parse(&retired).err(), Some("import_ledger_invalid".to_string()));
+    let mut denied = value;
+    denied["vouchers_found"] = json!(false);
+    assert_eq!(parse(&denied).err(), Some("import_ledger_invalid".to_string()));
+}
+
 #[test]
 fn a_batch_found_once_stays_found_whatever_a_later_status_says() {
     let line = batch();

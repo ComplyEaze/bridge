@@ -235,6 +235,119 @@ async fn a_batch_once_found_is_refused_and_keeps_its_file() {
     assert!(saved_file(&server, &batch_id).exists());
 }
 
+/// A verification that found any voucher of the batch, even one that left the
+/// batch short of posted, is a record that Tally held it: a later read that no
+/// longer sees the voucher (it was re-dated out of the window, say) does not
+/// retire the batch.
+#[tokio::test]
+async fn a_batch_a_verification_found_a_voucher_of_is_not_retired_by_a_later_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let verify_from = 32;
+    let (_build, server, batch_id) = built(directory.path(), qualified_import_cycle_plans()).await;
+    let line = server
+        .latest_import_snapshot(&batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let tag = line.attribution_tag(&line.vouchers[0]);
+    // the first voucher is found by its tag, the second only by its content
+    let (_found, finder) = reading_from(
+        directory.path(),
+        &batch_id,
+        qualified_import_cycle_plans()[verify_from..].to_vec(),
+        Some(&tag),
+    );
+    let plain = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let verified = finder
+        .call_tool_response("verify_import", plain.clone())
+        .await
+        .value;
+    assert_ne!(verified["isError"], true, "{verified}");
+    let snapshot = server.latest_import_snapshot(&batch_id).unwrap().unwrap();
+    assert_eq!(snapshot.batch.status, "verification_incomplete");
+    // a later read, of a Tally that no longer shows it, is refused up front
+    let (_absent, later) = reading_from(
+        directory.path(),
+        &batch_id,
+        book(true)[verify_from..].to_vec(),
+        None,
+    );
+    let response = retire(&later, &batch_id).await;
+    assert_eq!(
+        error_code(&response),
+        "import_retire_batch_found",
+        "{response}"
+    );
+    assert!(saved_file(&server, &batch_id).exists());
+}
+
+/// A retirement that read a voucher in Tally and kept the batch is a record
+/// that Tally held one, as a plain verification is.
+#[tokio::test]
+async fn a_retirement_that_kept_the_batch_stops_a_second_one_from_retiring_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server, batch_id) = built(directory.path(), book(false)).await;
+    let first = retire(&server, &batch_id).await;
+    let kept = &first["structuredContent"]["result"]["retire"];
+    assert_eq!(kept["state"], "not_retired", "{first}");
+    let (_absent, later) = reading_from(
+        directory.path(),
+        &batch_id,
+        book(true)[32..].to_vec(),
+        None,
+    );
+    let second = retire(&later, &batch_id).await;
+    assert_eq!(
+        error_code(&second),
+        "import_retire_batch_found",
+        "{second}"
+    );
+}
+
+/// A verification that found no voucher of the batch is not a record that
+/// Tally held it, so it does not stand in the way of a retirement.
+#[tokio::test]
+async fn a_verification_that_found_nothing_does_not_stop_a_retirement() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_build, server, batch_id) = built(directory.path(), qualified_import_cycle_plans()).await;
+    let (_a, verifier) = reading_from(
+        directory.path(),
+        &batch_id,
+        book(true)[32..].to_vec(),
+        None,
+    );
+    let plain = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let verified = verifier
+        .call_tool_response("verify_import", plain)
+        .await
+        .value;
+    assert_ne!(verified["isError"], true, "{verified}");
+    assert_eq!(
+        server
+            .latest_import_snapshot(&batch_id)
+            .unwrap()
+            .unwrap()
+            .batch
+            .status,
+        "verification_incomplete"
+    );
+    assert!(!last_record(directory.path(), &batch_id)
+        .as_object()
+        .unwrap()
+        .contains_key("vouchers_found"));
+    let (_b, later) = reading_from(
+        directory.path(),
+        &batch_id,
+        book(true)[32..].to_vec(),
+        None,
+    );
+    let response = retire(&later, &batch_id).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+}
+
 /// Tally here is not the one the batch was built for, so a read of it proves
 /// nothing about the batch.
 #[tokio::test]

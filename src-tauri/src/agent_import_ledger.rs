@@ -180,6 +180,15 @@ pub(in crate::agent) struct StatusRecord {
     /// (`deny_unknown_fields`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     own_tag_observed: Option<bool>,
+    /// A verification read at least one voucher of the batch in Tally (a row
+    /// that is anything but not found), whatever status that left the batch
+    /// with. Written only then, and only on a verification record, so a journal
+    /// gains it only after a verification that found something. A binary older
+    /// than this field refuses a journal holding one (`deny_unknown_fields`).
+    /// A verification an older build wrote carries none, and is read as having
+    /// found nothing beyond what its status says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    vouchers_found: Option<bool>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -219,6 +228,7 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             own_tag_observed: None,
+            vouchers_found: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -270,6 +280,7 @@ impl StatusRecord {
             binding_refusal,
             proof: None,
             own_tag_observed: None,
+            vouchers_found: None,
         }
     }
 
@@ -291,6 +302,21 @@ impl StatusRecord {
             own_tag_observed: Some(true),
             ..self
         }
+    }
+
+    /// This verification record also says the read found at least one voucher
+    /// of the batch in Tally.
+    pub(super) fn with_vouchers_found(self) -> Self {
+        Self {
+            vouchers_found: Some(true),
+            ..self
+        }
+    }
+
+    /// Whether this record says some voucher of the batch was found in Tally:
+    /// its status is found posted, or the verification noted a found row.
+    fn records_a_found_voucher(&self) -> bool {
+        self.status == POSTED_VERIFIED || self.vouchers_found == Some(true)
     }
 
     /// Whether this record sets the batch's status. A post-span verdict does
@@ -336,6 +362,7 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             own_tag_observed: None,
+            vouchers_found: None,
         }
     }
 }
@@ -365,6 +392,7 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             own_tag_observed: None,
+            vouchers_found: None,
         }
     }
 }
@@ -467,7 +495,7 @@ pub(super) fn read_snapshot(
                 snapshot.current_proof = proof;
             }
             if update.sets_status() {
-                snapshot.ever_found |= update.status == POSTED_VERIFIED;
+                snapshot.ever_found |= update.records_a_found_voucher();
                 snapshot.batch.status = update.status;
             }
             snapshot.generation = generation;
@@ -534,7 +562,7 @@ pub(super) fn read_lineage(
                     snapshot.current_proof = proof;
                 }
                 if update.sets_status() {
-                    snapshot.ever_found |= update.status == POSTED_VERIFIED;
+                    snapshot.ever_found |= update.records_a_found_voucher();
                     snapshot.batch.status = update.status;
                 }
                 snapshot.generation = generation;
@@ -1024,6 +1052,14 @@ fn scan_records(
                     return Err("import_ledger_invalid".into());
                 }
             }
+            // The note says a read found something, so it is never false, and it
+            // belongs to a plain verification record alone: a retirement is the
+            // record of a read that found nothing.
+            if let Some(noted) = update.vouchers_found {
+                if !noted || !matches!(update.record_type, StatusKind::VerificationStatus) {
+                    return Err("import_ledger_invalid".into());
+                }
+            }
             if matches!(update.record_type, StatusKind::BatchRetired) {
                 retired.insert(update.batch_id.clone());
             }
@@ -1268,7 +1304,7 @@ pub(super) fn read_history(reader: impl BufRead) -> Result<Vec<BatchSnapshot>, S
                 snapshot.current_proof = proof;
             }
             if update.sets_status() {
-                snapshot.ever_found |= update.status == POSTED_VERIFIED;
+                snapshot.ever_found |= update.records_a_found_voucher();
                 snapshot.batch.status = update.status;
             }
             snapshot.generation = generation;

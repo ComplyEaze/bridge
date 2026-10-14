@@ -1884,8 +1884,9 @@ refused as `proposals_legacy` (parse the statement again).
   statement is built again without. Otherwise the batch is not retired and
   keeps counting. A later verification that sees a voucher carrying the
   retired batch's own tag counts it again; `post_import` still refuses it.
-  Refused before anything is removed: a batch that was sent, was ever found
-  posted, is already retired, was built for another endpoint or recorded no
+  Refused before anything is removed: a batch that was sent, had any voucher
+  found in Tally by an earlier verification (even one that left it short of
+  posted), is already retired, was built for another endpoint or recorded no
   voucher mark, and any call while the writes setting is off. A read that does
   not finish after the file is removed retires nothing and says so
   (`state: not_retired`), and a repeat can help except after a refusal of the

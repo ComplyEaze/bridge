@@ -475,7 +475,9 @@ import and compared, row by row, with the one read before it. The first three im
 Contras, after the series of the Contra type, which held no voucher, had been changed to
 `Manual`. The last two were Receipts, after the series of the Receipt type, which held seven
 Receipts numbered 1 to 7, had been changed to `Manual`. Both series read `PREVENTDUPLICATES`
-`No`. That each change was a save of Tally's own type screen, and that the book was put back
+`No`; the elements named `NUMBERINGMETHOD` and `PREVENTDUPLICATES` directly on each of the two
+type rows, outside its series list, read `None` and `No` at every read, before and after the
+change. That each change was a save of Tally's own type screen, and that the book was put back
 between the halves and at the end by restoring one backup, are from that branch's notes; the
 answers show the marks, the series and the twelve vouchers reading as at the start both times.
 
@@ -519,11 +521,13 @@ were sent raw, one per step, each of one Journal that carried a `VOUCHERNUMBER` 
 every figure was read from the marks, voucher, series and import answers with an XML parser, with
 each size checked against `CONTENT-LENGTH`). As found, the book held one Receipt, one Payment and
 one Journal, each numbered 1, and the series of its Journal type read `Manual`, `Auto Retain`,
-`PREVENTDUPLICATES` `Yes`, as did the series of its Payment type. A series answer was read after
-every import and compared, row by row, with the one read before it. That no type screen was saved
-in this run, and that the book was put back at the end by restoring a backup, are from that
-branch's notes; `ALTMSTID` read the same at every read, and the marks, series and voucher answers
-read after the restore are byte-identical to the first ones.
+`PREVENTDUPLICATES` `Yes`, as did the series of its Payment type; the elements named
+`NUMBERINGMETHOD` and `PREVENTDUPLICATES` directly on each of the two type rows, outside its
+series list, read `None` and `No`. A series answer was read after every import and compared, row
+by row, with the one read before it. That no type screen was saved in this run, and that the
+book was put back at the end by restoring a backup, are from that branch's notes; `ALTMSTID`
+read the same at every read, and the marks, series and voucher answers read after the restore
+are byte-identical to the first ones.
 
 - **VERIFIED, a number no Journal held:** a Journal numbered `M9N-J1`, dated 20 July, read back
   that number, and a Journal numbered `7`, dated 22 July, read back the one character `7`. Each
@@ -535,7 +539,8 @@ read after the restore are byte-identical to the first ones.
   everything under `COLLECTION` in the voucher answer equalled the answer before it, and
   `ALTVCHID` did not move. Only a Journal held `M9N-J1`. The number 1 was held by the Journal of
   the book as found and also by its Receipt and its Payment, so the second refusal alone does
-  not show which voucher's number it met.
+  not show which voucher's number it met. A later run on this book sent a Payment a number that
+  only a Journal held (next paragraph).
 - **VERIFIED:** the two refusal answers are byte-identical: 538 bytes, SHA-256 `09a713e2…`, the
   size and hash recorded below for the refused second numberless Journal of 12 October and for
   whole refusals of zero-value vouchers. So the answer does not tell a number already held from
@@ -552,11 +557,65 @@ read after the restore are byte-identical to the first ones.
   voucher type has been measured under both settings.
 - From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
   the four imports.
-- **Not established:** duplicates prevented under "Automatic (Manual Override)"; a back-dated
-  voucher with a number under Manual with duplicates prevented; a number with leading zeros or
-  spaces, or one that differs from a held number only in letter case; a number held only by a
-  voucher of another type; Payment, Receipt and Contra; a file of several vouchers, one with a
-  held number; Multi-user Auto; a deletion; Gold; other releases; macOS; the same through
+- **Not established:** duplicates prevented under "Automatic (Manual Override)"; a number with
+  spaces; a Payment, a Receipt or a Contra sent a number that a voucher of its own type holds; a
+  file of several vouchers, one with a held number; Multi-user Auto; a deletion; Gold; other
+  releases; macOS; the same through ComplyEaze Bridge's own post. A back-dated voucher with a
+  number, a number with a leading zero, a held number in small letters, a number held only by a
+  voucher of another type, and a Payment that carries a new number were sent in a later run on
+  this book (next paragraph).
+
+**Under Manual numbering with duplicates prevented, a number held only by a Journal did not block a
+Payment, a held number in small letters was refused, and `01` was created beside a held `1`:
+verified 2026-10-14 on one book and two voucher types (PARTIAL).** On the book of the run above,
+holding the same three vouchers, six imports were sent raw, one per step, each of one voucher that
+carried a `VOUCHERNUMBER` element and a new `REMOTEID`: four Journals and two Payments (branch
+`lab/724-m9o-how-a-held-number-is-matched-answers`, `ec1c39fa`, bridge#724; every figure was read
+from the marks, voucher, series and import answers with an XML parser, with each size checked
+against `CONTENT-LENGTH`). The series of the Journal type and of the Payment type each read
+`Manual`, `Auto Retain`, `PREVENTDUPLICATES` `Yes` at every read. A series answer was read after
+every import and compared, row by row, with the one read before it. That no type screen was saved
+in this run, and that the book was put back at the end by restoring a backup, are from that
+branch's notes; `ALTMSTID` read the same at every read, and the marks, series and voucher answers
+read after the restore are byte-identical to the first ones.
+
+- **VERIFIED, two controls:** a Journal numbered `M9O-A1`, dated 20 July, and a Payment numbered
+  `M9O-P1`, dated 21 July, numbers that no voucher held, each read back its number.
+- **VERIFIED, a number held only by a voucher of another type:** a Payment numbered `M9O-A1`,
+  dated 22 July, sent while the only voucher that held that number was the Journal (in the
+  voucher answer read before it, which returns the vouchers of July 2026: five vouchers with
+  `ALTERID` 1 to 5, where `ALTVCHID` read 5), was created and read back `M9O-A1`. The Journal
+  was unchanged, and both read that number at every later read until the restore. So on this
+  run a number held by a Journal did not stop a Payment from taking it.
+- **VERIFIED, a held number in small letters:** a Journal numbered `m9o-a1`, dated 23 July, was
+  refused whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`, in an answer
+  byte-identical to the refusals of the run above (538 bytes, SHA-256 `09a713e2…`). Everything
+  under `COLLECTION` in the voucher answer equalled the answer before it. No number in small
+  letters that lacked a held twin was sent in this run or in the two before it, so this refusal
+  alone does not show that Tally compares numbers without regard to letter case.
+- **VERIFIED, a leading zero:** a Journal numbered `01`, dated 24 July, was created and read back
+  the two characters `01`. The Receipt, the Payment and the Journal of the book as found still
+  read `1`.
+- **VERIFIED, a back-dated voucher:** a Journal numbered `M9O-B1`, dated 10 July, before the
+  Journal of the book as found (15 July), was created and read back its number. No other voucher
+  changed.
+- **VERIFIED:** each of the five answers to a created voucher read `CREATED` 1, `LASTVCHID` the new
+  voucher's `MASTERID` (4 to 8 in the order sent), and every other counter 0. No voucher already
+  in the book changed at any import. `ALTVCHID` rose by one at each created voucher and did not
+  move at the refusal. `NUMBERINGSTYLE` on the five read `Manual`; `VOUCHERRETAINKEY` read 5, 9
+  and 13 on the three Journals and 5 and 9 on the two Payments, in the order created, where the
+  vouchers as found read 1.
+- **VERIFIED, the series rows:** after each of the six imports, the refused one included, all 24
+  rows equalled the series answer read before that import. `LASTNUMBERLIST.LIST` in the Journal
+  row and in the Payment row stayed an empty element.
+- From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
+  the six imports, and that a line reading "(e) Data exceptions exist" stood on Tally's Gateway
+  screen before the first import, after each import and after the restore; it was not opened.
+- **Not established:** a number in small letters, or one with a leading zero, that has no held
+  twin; a Journal whose number only a Payment holds; a Payment sent a number that another
+  Payment holds (every refusal so far was of a Journal); Receipt and Contra; a number with spaces;
+  duplicates prevented under "Automatic (Manual Override)"; a file of several vouchers, one with
+  a held number; Multi-user Auto; a deletion; Gold; other releases; macOS; the same through
   ComplyEaze Bridge's own post.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one

@@ -766,9 +766,22 @@ impl Server {
             // read, and a batch seen again counts again.
             rechecked_retired = transfers_checked.rests_on_retired;
             if !rechecked_retired.is_empty() {
-                let seen = self
+                let seen = match self
                     .retired_batches_seen_again(&rechecked_retired, guid, &mut accumulated)
-                    .await?;
+                    .await
+                {
+                    Ok(seen) => seen,
+                    // Whatever failed, the send is refused naming the retired
+                    // batch it could not read, never with the retire tool's own
+                    // code and text.
+                    Err(failed) => {
+                        let (code, detail, step) =
+                            transfers::retired_batch_not_read(&failed.batch, &failed.code)
+                                .into_parts();
+                        send_transfer_refusal = Some((detail, step));
+                        return Err(code.to_string().into());
+                    }
+                };
                 if !seen.is_empty() {
                     let (code, detail, step) = transfers::retired_batch_found(&seen).into_parts();
                     send_transfer_refusal = Some((detail, step));

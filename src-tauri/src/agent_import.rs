@@ -91,6 +91,13 @@ tokio::task_local! {
     pub(super) static AFTER_RECORD_APPENDED: std::sync::Arc<dyn Fn() + Send + Sync>;
 }
 
+/// The send's second read of a retired batch failed: the batch it failed for,
+/// and the code it failed with.
+pub(super) struct RetiredReadFailure {
+    pub(super) batch: String,
+    pub(super) code: String,
+}
+
 /// What a verification is recorded as.
 enum PersistKind {
     /// A verification; `own_tag_observed` when the batch is retired and the
@@ -1767,21 +1774,28 @@ impl Server {
                 if let Err(refusal) = opening_mode.qualification {
                     return Err(refusal.verification_code().to_string().into());
                 }
-                let today = TallyDate::parse(super::tally_host_today())
-                    .map_err(|_| "host_setting_invalid".to_string())?;
-                let books_from = company
-                    .books_from
-                    .as_deref()
-                    .and_then(|books_from| TallyDate::parse(books_from).ok());
-                let window = retire::widened_window(
-                    &line.date_from,
-                    &line.date_to,
-                    boundary_profile_for(&opening_mode),
-                    &today,
-                    books_from.as_ref(),
-                )
-                .ok_or_else(|| "import_retire_window_unavailable".to_string())?;
-                Some(window)
+                if rechecking {
+                    // The window the retirement read, not one worked out again
+                    // from today: a window that was admitted then may have no
+                    // admitted end now.
+                    Some(self.recorded_retire_window(&line.batch_id)?)
+                } else {
+                    let today = TallyDate::parse(super::tally_host_today())
+                        .map_err(|_| "host_setting_invalid".to_string())?;
+                    let books_from = company
+                        .books_from
+                        .as_deref()
+                        .and_then(|books_from| TallyDate::parse(books_from).ok());
+                    let window = retire::widened_window(
+                        &line.date_from,
+                        &line.date_to,
+                        boundary_profile_for(&opening_mode),
+                        &today,
+                        books_from.as_ref(),
+                    )
+                    .ok_or_else(|| "import_retire_window_unavailable".to_string())?;
+                    Some(window)
+                }
             } else {
                 None
             };
@@ -2239,20 +2253,51 @@ impl Server {
         Ok(())
     }
 
-    /// Reads Tally for each retired batch of `ids`, over its retirement window,
-    /// and names those that now show a voucher carrying their own tag. Each
-    /// read is recorded as a verification, so a batch seen again counts in the
-    /// transfer view once more.
+    /// The days the retirement of `batch_id` read, as its saved proof records
+    /// them (`retire_read`). The proof is the one the retirement's own record
+    /// names, read whole and checked against its digest.
+    fn recorded_retire_window(
+        &self,
+        batch_id: &str,
+    ) -> Result<(TallyDate, TallyDate), ToolFailure> {
+        let missing = || ToolFailure::from("verification_proof_missing".to_string());
+        let named = {
+            let _admission = self.lock_import_admission_shared()?;
+            match self.import_journal_while_admitted()? {
+                Some(reader) => ledger::retirement_proof(reader, batch_id)?,
+                None => None,
+            }
+        };
+        let name = named.ok_or_else(missing)?;
+        let bytes = self.read_proof_file(batch_id, &ledger::CurrentProof::Saved(name))?;
+        let saved: Value = serde_json::from_slice(&bytes).map_err(|_| missing())?;
+        let day = |key: &str| {
+            saved["retire_read"][key]
+                .as_str()
+                .and_then(|day| TallyDate::parse(day).ok())
+        };
+        match (day("from"), day("to")) {
+            (Some(from), Some(to)) => Ok((from, to)),
+            _ => Err(missing()),
+        }
+    }
+
+    /// Reads Tally for each retired batch of `ids`, over the window its
+    /// retirement recorded, and names those that now show a voucher carrying
+    /// their own tag. Each read is recorded as a verification, so a batch seen
+    /// again counts in the transfer view once more. A read that fails stops
+    /// the rest and names the batch it failed for; a batch already seen again
+    /// is the answer then, since it refuses the send whatever else fails.
     pub(super) async fn retired_batches_seen_again(
         &self,
         ids: &BTreeSet<String>,
         company_guid: &str,
         accumulated: &mut Evidence,
-    ) -> Result<Vec<String>, ToolFailure> {
+    ) -> Result<Vec<String>, RetiredReadFailure> {
         let mut seen = Vec::new();
         for id in ids {
             let args = json!({"company_guid": company_guid, "batch_id": id});
-            let outcome = self
+            let outcome = match self
                 .verify_import_with_dispatch(
                     &args,
                     VerifyIntent::RetiredRecheck,
@@ -2261,7 +2306,22 @@ impl Server {
                     &mut None,
                     None,
                 )
-                .await?;
+                .await
+            {
+                Ok(outcome) => outcome,
+                Err(failure) => {
+                    if let Some(prior) = failure.evidence.clone() {
+                        *accumulated = combine_evidence(accumulated.clone(), *prior);
+                    }
+                    if seen.is_empty() {
+                        return Err(RetiredReadFailure {
+                            batch: id.clone(),
+                            code: failure.code,
+                        });
+                    }
+                    break;
+                }
+            };
             *accumulated = combine_evidence(accumulated.clone(), outcome.evidence);
             let rows = outcome.payload["result"]["vouchers"]
                 .as_array()

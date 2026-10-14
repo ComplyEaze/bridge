@@ -896,6 +896,126 @@ async fn a_send_that_rests_on_a_retired_batch_is_refused_when_its_tag_is_found()
     assert_ne!(again["code"], "retired_batch_found_in_tally", "{again}");
 }
 
+/// Whatever fails in the send's second read of a retired batch, the send is
+/// refused with one typed refusal: it names the retired batch, carries the
+/// failure's own code as the cause, and speaks of the send, never of the
+/// retire tool's own refusal.
+fn assert_not_read_refusal(refused: &Value, carrier: &str, cause: Option<&str>) {
+    assert_eq!(refused["code"], "retired_batch_not_read", "{refused}");
+    assert_eq!(refused["retired_batches"], json!([carrier]), "{refused}");
+    let found = refused["cause"].as_str().unwrap_or_default();
+    assert!(!found.is_empty(), "{refused}");
+    if let Some(cause) = cause {
+        assert_eq!(found, cause, "{refused}");
+    }
+    let step = refused["next_step"].as_str().unwrap();
+    assert!(
+        step.starts_with("Nothing was sent to Tally and the approval was not used. "),
+        "{step}"
+    );
+    for wrong in [
+        "keeps counting",
+        "built for a different",
+        "by hand",
+        "enter the voucher",
+        "import the file",
+    ] {
+        assert!(!step.contains(wrong), "{step}");
+    }
+}
+
+/// Tally cannot be reached for the second read: the send is refused naming the
+/// retired batch, and nothing is sent.
+#[tokio::test]
+async fn a_second_read_that_fails_in_transport_refuses_the_send_naming_the_batch() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
+    // only the retirement's read is scripted
+    let (_simulator, retiring, sending) = one_tally(directory.path(), read_of(true, None));
+    move_to_the_tally_of(
+        &retiring,
+        directory.path(),
+        &[&held.carrier, &held.withdrawn],
+    );
+    let response = retire(&retiring, &held.carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    let refused = post_error(&sending, &held.withdrawn).await;
+    assert_not_read_refusal(&refused, &held.carrier, None);
+    assert!(!records_of(directory.path(), &held.withdrawn).contains(&"dispatch_intent".into()));
+}
+
+/// The window the retirement read is kept in the proof of its record. When
+/// that proof is gone the second read cannot be made, and the send says so.
+#[tokio::test]
+async fn a_second_read_without_the_recorded_window_refuses_the_send_naming_the_batch() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
+    let scripted = [read_of(true, None), read_of(true, None)].concat();
+    let (simulator, retiring, sending) = one_tally(directory.path(), scripted);
+    move_to_the_tally_of(
+        &retiring,
+        directory.path(),
+        &[&held.carrier, &held.withdrawn],
+    );
+    let response = retire(&retiring, &held.carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    fs::remove_file(&retiring.current_proof_paths(&held.carrier)[0]).unwrap();
+    let refused = post_error(&sending, &held.withdrawn).await;
+    assert_not_read_refusal(&refused, &held.carrier, Some("verification_proof_missing"));
+    // no request was made for it
+    assert_eq!(simulator.received(), read_of(true, None).len());
+}
+
+/// The second read covers the days the retirement read, not days worked out
+/// again from the batch's record and today's date: here the batch's last day
+/// has moved since, and every request of the second read is the retirement's.
+#[tokio::test]
+async fn the_second_read_uses_the_window_the_retirement_recorded() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
+    let block = read_of(true, None);
+    let length = block.len();
+    let (simulator, retiring, sending) =
+        one_tally(directory.path(), [block.clone(), block].concat());
+    move_to_the_tally_of(
+        &retiring,
+        directory.path(),
+        &[&held.carrier, &held.withdrawn],
+    );
+    let response = retire(&retiring, &held.carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    let mut line = retiring
+        .latest_import_snapshot(&held.carrier)
+        .unwrap()
+        .unwrap()
+        .batch;
+    line.date_to = TallyDate::parse("20260920").unwrap();
+    retiring.append_import_ledger(&line).unwrap();
+    let sent = post_error(&sending, &held.withdrawn).await;
+    assert_ne!(sent["code"], "retired_batch_not_read", "{sent}");
+    let observed = simulator.finish().expect("requests");
+    assert!(observed.len() >= 2 * length, "{}", observed.len());
+    for at in 0..length {
+        assert_eq!(
+            observed[at].request_body_sha256,
+            observed[length + at].request_body_sha256,
+            "request {at} of the second read is not the retirement's"
+        );
+    }
+}
+
 /// A retired batch whose exclusion changes nothing for this send is not read
 /// for: no request is made to Tally and nothing is written for it.
 #[tokio::test]

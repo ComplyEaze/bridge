@@ -522,6 +522,18 @@ pub(super) fn retired_batch_found(batches: &[String]) -> TransferRefusal {
     }
 }
 
+const RETIRED_BATCH_NOT_READ_STEP: &str = "Nothing was sent to Tally and the approval was not used. This batch can be sent only because a batch of this company was retired after a read of Tally found it absent, and ComplyEaze Bridge could not read Tally again for that retired batch before sending: retired_batches names it and cause says why the read failed. The retired batch is still out of the company's transfer records, and this batch is not sent until it has been read again. Call post_import again; if cause names a refusal that a repeat will not change, report it with the cause named here.";
+
+/// The refusal of a send whose second read of a retired batch failed, whatever
+/// the failure: the batch it could not read, and why.
+pub(super) fn retired_batch_not_read(batch: &str, cause: &str) -> TransferRefusal {
+    TransferRefusal {
+        reason: "retired_batch_not_read",
+        detail: json!({"retired_batches": [batch], "cause": cause}),
+        next_step: RETIRED_BATCH_NOT_READ_STEP.into(),
+    }
+}
+
 pub(super) enum Admission {
     Admitted(TransferSummary),
     Refused(TransferRefusal),

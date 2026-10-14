@@ -2093,6 +2093,7 @@ async fn the_opening_bills_refusal_runs_before_the_first_request() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let args = json!({
         "masters": {"ledgers": [
@@ -2548,6 +2549,7 @@ async fn the_root_group_refusal_runs_before_the_first_request() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let args = json!({
         "masters": {"groups": [

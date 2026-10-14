@@ -142,6 +142,7 @@ async fn call_with(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server
         .call_tool(

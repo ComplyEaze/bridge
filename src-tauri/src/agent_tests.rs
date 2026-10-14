@@ -164,6 +164,7 @@ fn settings(address: std::net::SocketAddr, data_dir: PathBuf) -> Settings {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     }
 }
 
@@ -767,7 +768,11 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // and ids, and no party or ledger name; `statement_tie_out` returns two
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
-    // constant text, and the company's own name.
+    // constant text, and the company's own name; the two master tools return
+    // the batch id, the caller's own proposed ledger name inside the preview
+    // (masked there under `mask_parties`), the company's own name and Bridge's
+    // own states, and no name read from the book (a name that exists is
+    // refused by code).
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
@@ -775,6 +780,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "company_features",
         "gst_status",
         "local_data_report",
+        "post_ledger_creates",
+        "prepare_ledger_creates",
         "statement_tie_out",
         "voucher_read_cost",
     ];
@@ -896,6 +903,7 @@ async fn malformed_tool_name_is_in_band_and_the_same_session_serves_the_next_req
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -950,6 +958,7 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     };
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
@@ -1014,6 +1023,7 @@ async fn tools_call_notifications_are_refused_and_receipted_without_dispatch() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let (mut client, server_io) = tokio::io::duplex(4_096);
     let (server_read, mut server_write) = tokio::io::split(server_io);
@@ -1075,6 +1085,7 @@ async fn pagination_rejects_present_invalid_values_in_helpers_and_row_tools() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server.call_tool("egress_log", json!({"limit": "10"})).await;
     assert_eq!(
@@ -1329,6 +1340,7 @@ async fn stored_evidence_records_have_individual_timestamps_and_durations() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     server.call_tool("voucher_schema", json!({})).await;
     tokio::time::sleep(std::time::Duration::from_millis(1)).await;
@@ -1790,6 +1802,7 @@ async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() 
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server.call_tool("build_import_xml", json!({})).await;
     assert_eq!(
@@ -1817,6 +1830,7 @@ async fn a_batch_mixing_a_journal_with_a_bank_voucher_says_how_to_split_it() {
         import_enabled: true,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let mixed = json!({"company_guid":"00000000-0000-4000-8000-000000000001","vouchers":[
         {"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Journal","entries":[{"ledger":"Expense","amount":"12.50","side":"Dr"},{"ledger":"Income","amount":"12.50","side":"Cr"}]},
@@ -2201,6 +2215,7 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let down_response = down.call_tool("tally_status", json!({})).await;
     assert!(down_response["structuredContent"]["result"]["error"]["code"].is_string());
@@ -2536,6 +2551,7 @@ fn evidence_reads_disclose_requested_limits_and_permanent_retention_eviction() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     assert!(!server.read_evidence(&json!({"limit":1})).unwrap().truncated);
     let record = |index: usize| Evidence {
@@ -2599,6 +2615,7 @@ async fn diagnostic_history_reads_honor_the_configured_global_row_cap() {
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         for index in 0..3 {
             server.record_evidence(Evidence {

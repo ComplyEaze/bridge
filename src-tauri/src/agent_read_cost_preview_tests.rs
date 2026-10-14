@@ -97,6 +97,7 @@ fn server_at(port: u16, directory: &std::path::Path) -> Server {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 

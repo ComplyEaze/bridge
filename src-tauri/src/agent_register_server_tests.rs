@@ -128,6 +128,7 @@ fn server_for(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 

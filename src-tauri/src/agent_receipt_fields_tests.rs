@@ -15,6 +15,7 @@ fn receipt_for(directory: &Path, response: &Value) -> Value {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let wire = format!("{response}\n");
     server

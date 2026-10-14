@@ -54,6 +54,7 @@
 use super::*;
 use bridge_tally_core::master_binding::canonical_master_key;
 use bridge_tally_core::ExactDecimal;
+use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::is_tally_reserved_root;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -655,13 +656,6 @@ fn render_ledger_alter_xml(name: &str, fields: &[(&'static str, String)]) -> Str
 // on every kind except the fields §8.3/§9.4a already qualify for Ledger.
 // ---------------------------------------------------------------------------
 
-fn render_import_envelope(company: &str, report_name: &str, messages: &str) -> String {
-    format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>{report_name}</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>",
-        xml_escape(company)
-    )
-}
-
 // No renderer below declares `xmlns:UDF="TallyUDF"`: none of them emit a
 // `UDF:`-namespaced element (that would require a genuine User Defined
 // Field, which this book model never carries), so the earlier blanket
@@ -824,7 +818,11 @@ fn render_master_batch_xml(
             .map(render_stock_item_xml)
             .collect::<String>(),
     };
-    Ok(render_import_envelope(company, "All Masters", &messages))
+    Ok(render_import_envelope(
+        company,
+        ImportReport::AllMasters,
+        &messages,
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -1444,7 +1442,8 @@ pub(in crate::agent) async fn lab_import_masters(
             .iter()
             .map(|(ledger, fields)| render_ledger_alter_xml(&ledger.name, fields))
             .collect();
-        let xml = render_import_envelope(identity.display_name(), "All Masters", &messages);
+        let xml =
+            render_import_envelope(identity.display_name(), ImportReport::AllMasters, &messages);
         let (response, post_evidence) =
             post_lab_batch(server, &identity, "lab_import_masters.write.reconcile", xml).await?;
         evidence = combine_evidence(evidence.clone(), post_evidence);
@@ -2158,7 +2157,11 @@ fn render_voucher_batch_xml(
         .map(|(voucher, id)| render_voucher_message(voucher, Uuid::new_v4(), *id))
         .collect::<Result<Vec<_>, _>>()?
         .concat();
-    Ok(render_import_envelope(company, "Vouchers", &messages))
+    Ok(render_import_envelope(
+        company,
+        ImportReport::Vouchers,
+        &messages,
+    ))
 }
 
 // ---------------------------------------------------------------------------

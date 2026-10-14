@@ -55,6 +55,7 @@ fn standalone_master_and_status_rows_are_counted_in_final_receipts() {
             import_enabled: false,
             writes_enabled: false,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         let mut structured = json!({"result": {}});
         structured["result"][axis] = json!([{"name":"A"}, {"name":"B"}]);

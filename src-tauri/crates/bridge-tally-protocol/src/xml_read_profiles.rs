@@ -115,6 +115,7 @@ pub enum ReadOnlyProfileId {
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
     StandardLedgerCatalogV2,
+    StandardLedgerCatalogV3,
     LedgersV1,
     AuditCompanyObjectV1,
     AuditLedgersV1,
@@ -131,6 +132,7 @@ impl ReadOnlyProfileId {
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
             Self::StandardLedgerCatalogV2 => "standard_ledger_catalog_v2",
+            Self::StandardLedgerCatalogV3 => "standard_ledger_catalog_v3",
             Self::LedgersV1 => "ledgers_v1",
             Self::AuditCompanyObjectV1 => "audit_company_object_v1",
             Self::AuditLedgersV1 => "audit_ledgers_v1",
@@ -169,6 +171,7 @@ impl ReadOnlyProfileId {
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
+            Self::StandardLedgerCatalogV3 => render_standard_ledger_catalog_v3(TEMPLATE_COMPANY),
             Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
             Self::AuditCompanyObjectV1 => render_audit_company_object(TEMPLATE_COMPANY),
             Self::AuditLedgersV1 => {
@@ -267,6 +270,13 @@ pub enum ReadOnlyProfile<'a> {
     StandardLedgerCatalogV2 {
         company: &'a ValidatedCompanyName,
     },
+    /// V2's request with each ledger's `ALTERID` fetched in the same row, so a
+    /// later read can tell which ledgers changed since the catalogue was taken.
+    /// Request only: no response parser exists for it yet, because no V3
+    /// answer has been captured from a real Tally.
+    StandardLedgerCatalogV3 {
+        company: &'a ValidatedCompanyName,
+    },
     LedgersV1 {
         company: &'a ValidatedCompanyName,
     },
@@ -301,6 +311,7 @@ impl ReadOnlyProfile<'_> {
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
             Self::StandardLedgerCatalogV2 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV2,
+            Self::StandardLedgerCatalogV3 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV3,
             Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
             Self::AuditCompanyObjectV1 { .. } => ReadOnlyProfileId::AuditCompanyObjectV1,
             Self::AuditLedgersV1 { .. } => ReadOnlyProfileId::AuditLedgersV1,
@@ -328,6 +339,9 @@ impl ReadOnlyProfile<'_> {
             }
             Self::StandardLedgerCatalogV2 { company } => {
                 render_standard_ledger_catalog_v2(company.as_str())
+            }
+            Self::StandardLedgerCatalogV3 { company } => {
+                render_standard_ledger_catalog_v3(company.as_str())
             }
             Self::LedgersV1 { company } => render_ledgers(company.as_str()),
             Self::AuditCompanyObjectV1 { company } => render_audit_company_object(company.as_str()),
@@ -488,6 +502,14 @@ fn render_standard_ledger_catalog_v2(company: &str) -> String {
     render_standard_ledger_collection(
         company,
         "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>",
+    )
+}
+
+/// V2's request with `ALTERID` as one more native method.
+fn render_standard_ledger_catalog_v3(company: &str) -> String {
+    render_standard_ledger_collection(
+        company,
+        "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>\n                        <NATIVEMETHOD>AlterID</NATIVEMETHOD>",
     )
 }
 

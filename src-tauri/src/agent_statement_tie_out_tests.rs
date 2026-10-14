@@ -903,6 +903,7 @@ fn server(directory: &std::path::Path, port: Option<std::net::SocketAddr>) -> Se
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 

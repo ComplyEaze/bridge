@@ -182,6 +182,7 @@ async fn forex_outstandings(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server
         .call_tool("outstandings", {
@@ -622,6 +623,7 @@ async fn mcp_outstandings_refuse_a_conflicting_detail_request_before_any_read() 
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let guid = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
     for (extra, code) in [
@@ -779,6 +781,7 @@ async fn ageing_outstandings_with(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let mut arguments =
         json!({"company_guid": "eebb9a9f-1679-4468-9e8f-814c729674cb", "as_of": "20260801"});
@@ -1013,6 +1016,7 @@ async fn replay_recorded_call(
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let response = server
         .call_tool("outstandings", arguments(record["arguments"].clone()))

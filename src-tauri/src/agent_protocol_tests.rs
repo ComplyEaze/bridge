@@ -20,6 +20,7 @@ fn server(path: &Path) -> Server {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 
@@ -472,6 +473,49 @@ fn recovery_egress_error_falls_back_to_the_batch_when_the_compact_response_excee
         200,
     );
     assert_eq!(response["error"]["data"], json!({"batch_id":batch_id}));
+}
+
+#[test]
+fn recovery_egress_error_keeps_the_counters_of_a_ledger_create() {
+    let batch_id = "bridge-00000000-0000-0000-0000-000000000001";
+    let counters = json!({"created":1,"altered":0,"deleted":0,"ignored":0,"errors":0,"cancelled":0,"exceptions":0});
+    let original = |counters: Value| {
+        json!({"result":{"structuredContent":{"result":{
+            "attempt_recorded":true,
+            "counters":counters,
+        }}}})
+    };
+    let kept = recovery_error_with_dispatch(
+        json!(1),
+        Some(batch_id),
+        "egress_record_write_failed",
+        &original(counters.clone()),
+        100_000,
+    );
+    assert_eq!(kept["error"]["data"]["counters"], counters);
+    assert_eq!(kept["error"]["data"]["attempt_recorded"], true);
+    // A counter Tally did not report, or none at all, is not made up.
+    let mut partial = counters.clone();
+    partial["errors"] = Value::Null;
+    for dropped in [partial, Value::Null, json!("1")] {
+        let response = recovery_error_with_dispatch(
+            json!(1),
+            Some(batch_id),
+            "egress_record_write_failed",
+            &original(dropped),
+            100_000,
+        );
+        assert!(response["error"]["data"].get("counters").is_none());
+    }
+    // Over the cap, the batch alone remains.
+    let capped = recovery_error_with_dispatch(
+        json!(1),
+        Some(batch_id),
+        "egress_record_write_failed",
+        &original(counters),
+        200,
+    );
+    assert_eq!(capped["error"]["data"], json!({"batch_id":batch_id}));
 }
 
 #[tokio::test]

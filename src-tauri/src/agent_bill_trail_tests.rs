@@ -1993,6 +1993,7 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
         import_enabled: false,
         writes_enabled: false,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let refusal = || {
         let mut failure = window_too_large(

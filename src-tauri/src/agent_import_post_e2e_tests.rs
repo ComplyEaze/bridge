@@ -247,6 +247,7 @@ fn server_redacting(
         import_enabled: true,
         writes_enabled: true,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     })
 }
 
@@ -661,6 +662,7 @@ fn batch_server_at(address: std::net::SocketAddr, directory: &std::path::Path) -
         import_enabled: true,
         writes_enabled: true,
         batch_post_enabled: true,
+        master_writes_enabled: false,
     })
 }
 
@@ -1192,6 +1194,7 @@ async fn a_dispatch_admission_that_fails_sends_nothing() {
             import_enabled: true,
             writes_enabled: true,
             batch_post_enabled: false,
+            master_writes_enabled: false,
         });
         other.append_import_ledger(&changed).unwrap();
     });
@@ -4530,6 +4533,7 @@ async fn a_tiny_response_budget_keeps_the_code_and_withholds_the_row_list() {
         import_enabled: true,
         writes_enabled: true,
         batch_post_enabled: false,
+        master_writes_enabled: false,
     });
     let (_line, args) = saved_batch(&server);
     let refused = server.call_tool("post_import", args).await;

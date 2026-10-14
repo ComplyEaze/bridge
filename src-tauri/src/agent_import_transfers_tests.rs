@@ -928,3 +928,107 @@ fn a_skip_a_posted_voucher_contradicts_is_listed_open_with_the_batch_that_posts_
         OpenState::PostedAgainstSkip.step()
     );
 }
+
+/// Each failure kind a caller sees as `error` is pinned by its value, so a
+/// rename cannot pass unseen.
+#[test]
+fn every_failure_kind_is_named_by_its_pinned_value() {
+    use crate::agent::transfer_pairing::PairingInputError as Pairing;
+    use statement_facts::FactsError;
+    let skip = skip_key("st-row");
+    let contra_key = ContraKey {
+        batch: BatchId::new("batch"),
+        txn: TxnId::new("txn"),
+    };
+    let all: Vec<(TransferFactsError, &str)> = vec![
+        (
+            TransferFactsError::JournalUnreadable { code: "c".into() },
+            "journal_unreadable",
+        ),
+        (
+            TransferFactsError::SkipFileUnreadable { code: "c".into() },
+            "skip_file_unreadable",
+        ),
+        (
+            TransferFactsError::Facts {
+                source_id: "s".into(),
+                error: FactsError::Unparsable,
+            },
+            "facts",
+        ),
+        (
+            TransferFactsError::MissingEndpoint {
+                source_id: "s".into(),
+            },
+            "missing_endpoint",
+        ),
+        (
+            TransferFactsError::BuiltAtUnparsable {
+                source_id: "s".into(),
+            },
+            "built_at_unparsable",
+        ),
+        (
+            TransferFactsError::BatchRecordChanged {
+                batch_id: "b".into(),
+            },
+            "batch_record_changed",
+        ),
+        (
+            TransferFactsError::DuplicateSkipRecordId {
+                record_id: "r".into(),
+            },
+            "duplicate_skip_record_id",
+        ),
+        (
+            TransferFactsError::SkipIsVoucherInLineage {
+                lineage: "l".into(),
+                txn: "t".into(),
+            },
+            "skip_is_voucher_in_lineage",
+        ),
+        (
+            TransferFactsError::LegLedgerUnbound {
+                batch_id: "b".into(),
+                ledger: "l".into(),
+            },
+            "leg_ledger_unbound",
+        ),
+        (
+            Pairing::DuplicateSkip { key: skip.clone() }.into(),
+            "pairing_duplicate_skip",
+        ),
+        (
+            Pairing::DuplicateContra {
+                key: contra_key.clone(),
+            }
+            .into(),
+            "pairing_duplicate_contra",
+        ),
+        (
+            Pairing::NonPositiveSkipAmount { key: skip.clone() }.into(),
+            "pairing_non_positive_skip",
+        ),
+        (
+            Pairing::NonPositiveContraAmount { key: contra_key }.into(),
+            "pairing_non_positive_contra",
+        ),
+        (
+            Pairing::SkipLedgersEqual { key: skip }.into(),
+            "pairing_skip_ledgers_equal",
+        ),
+        (
+            Pairing::InvertedWindow {
+                bank_ledger: LedgerGuid::new("g"),
+            }
+            .into(),
+            "pairing_inverted_window",
+        ),
+    ];
+    assert_eq!(all.len(), 15);
+    for (error, name) in &all {
+        assert_eq!(error.variant(), *name);
+    }
+    let names: BTreeSet<&str> = all.iter().map(|(_, name)| *name).collect();
+    assert_eq!(names.len(), all.len());
+}

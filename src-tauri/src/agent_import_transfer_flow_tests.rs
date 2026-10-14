@@ -1857,6 +1857,125 @@ async fn the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sen
     }
 }
 
+// ---- long lists, and records that cannot be read ----------------------------------
+
+fn many_rows(count: u32) -> Vec<String> {
+    (0..count)
+        .map(|n| format!("st-20260901-{:016x}", 0x3000 + n))
+        .collect()
+}
+
+fn contras_of(directory: &Path, bank: &str, ids: &[String]) -> Value {
+    statement_v2(
+        directory,
+        bank,
+        window(),
+        ids.iter()
+            .map(|id| contra_voucher(id))
+            .collect::<Vec<_>>()
+            .into(),
+        ids.iter()
+            .map(|id| contra_record(id, None))
+            .collect::<Vec<_>>()
+            .into(),
+    )
+}
+
+/// A refusal lists 50 rows and counts the rest, whichever refusal it is.
+#[tokio::test]
+async fn a_refusal_lists_fifty_rows_and_counts_the_rest() {
+    let ids = many_rows(51);
+    let listed: Vec<&str> = ids.iter().map(String::as_str).take(50).collect();
+    // skip_row_already_posted
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), skip_only_plans()].concat(),
+    );
+    let holder = rig.build(contras_of(directory.path(), BANK_B, &ids)).await["batch_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    mark_sent(directory.path(), &holder);
+    let rows: Vec<(&str, Option<&str>)> = ids.iter().map(|id| (id.as_str(), None)).collect();
+    let refused = rig.build(a_skips(directory.path(), &rows)).await;
+    rig.finish();
+    assert_eq!(refused["reason"], "skip_row_already_posted", "{refused}");
+    assert_eq!(refused["skipped_rows"], json!(listed));
+    assert_eq!(refused["skipped_rows_omitted"], 1);
+    assert_eq!(refused["blocking_batch_id"], holder);
+    // skip_row_paired_elsewhere
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), admission_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &rows)).await;
+    let refused = rig.build(contras_of(directory.path(), BANK_A, &ids)).await;
+    rig.finish();
+    assert_eq!(refused["reason"], "skip_row_paired_elsewhere", "{refused}");
+    assert_eq!(refused["skipped_rows"], json!(listed));
+    assert_eq!(refused["skipped_rows_omitted"], 1);
+    // withdraw_skip_invalid: none of the rows is a skip
+    let directory = tempfile::tempdir().unwrap();
+    let mut args = contras_of(directory.path(), BANK_A, &ids);
+    args["withdraw_skips"] = json!(ids);
+    let refused = run(directory.path(), admission_plans(), args).await;
+    assert_eq!(refused["reason"], "withdraw_skip_invalid", "{refused}");
+    assert_eq!(refused["invalid_rows"], json!(listed));
+    assert_eq!(refused["invalid_rows_omitted"], 1);
+}
+
+/// A skip file that is there and cannot be read stops the view, and is named.
+#[tokio::test]
+async fn a_skip_file_that_cannot_be_read_refuses_a_build_that_needs_the_view() {
+    let directory = tempfile::tempdir().unwrap();
+    // a directory where the file should be
+    fs::create_dir(skip_file(directory.path())).unwrap();
+    let refused = run(
+        directory.path(),
+        admission_plans(),
+        contra_statement(directory.path(), BANK_A, BOOKED, None),
+    )
+    .await;
+    assert_eq!(refused["state"], "refused", "{refused}");
+    assert_eq!(refused["reason"], "transfer_view_not_established");
+    assert_eq!(refused["error"], "skip_file_unreadable", "{refused}");
+    assert!(refused["check"].is_null() && refused["record_id"].is_null());
+    no_journal(directory.path());
+}
+
+/// An unreadable journal stops the view, and a verification's section then
+/// says the check did not run.
+#[test]
+fn an_unreadable_journal_stops_the_view_and_the_verification_section() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        "not a record\n",
+    )
+    .unwrap();
+    let server = journal(directory.path());
+    let error = {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None)
+            .unwrap_err()
+    };
+    assert!(
+        matches!(
+            error,
+            statement_facts::TransferFactsError::JournalUnreadable { .. }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(error.variant(), "journal_unreadable");
+    assert_eq!(
+        server.transfers_for_verification(CAPTURED_GUID, 0),
+        transfers::check_not_run_section(false)
+    );
+}
+
 // ---- an amendment of a statement batch -------------------------------------------
 
 /// The Tally read an amendment compares against: bank B's Contra as the

@@ -3214,3 +3214,55 @@ fn the_withdrawn_rows_are_kept_on_the_record_and_an_older_record_reads_as_none()
     assert_eq!(back.withdrawn_skips, None);
     assert!(BuildLine::of(&back).withdrawn.is_empty());
 }
+
+/// The `check` a caller sees for a failed record is pinned by its value.
+#[test]
+fn every_failed_check_is_named_by_its_pinned_value() {
+    let txn = || "t".to_string();
+    let all = [
+        (FactsError::EmptyLedgerGuid, "empty_ledger_guid"),
+        (FactsError::InvertedCoverage, "inverted_coverage"),
+        (
+            FactsError::DuplicateTxnId { txn: txn() },
+            "duplicate_txn_id",
+        ),
+        (
+            FactsError::SkipIdNotStatementId { txn: txn() },
+            "skip_id_not_statement_id",
+        ),
+        (
+            FactsError::ReferenceInadmissible { txn: txn() },
+            "reference_inadmissible",
+        ),
+        (
+            FactsError::AmountInadmissible { txn: txn() },
+            "amount_inadmissible",
+        ),
+        (
+            FactsError::SkipLedgersEqual { txn: txn() },
+            "skip_ledgers_equal",
+        ),
+        (
+            FactsError::ContraRowNotOneContraVoucher { txn: txn() },
+            "contra_row_not_one_contra_voucher",
+        ),
+        (
+            FactsError::ContraVoucherNotInFacts { txn: txn() },
+            "contra_voucher_not_in_facts",
+        ),
+        (FactsError::SkipIsVoucher { txn: txn() }, "skip_is_voucher"),
+        (FactsError::BankLedgerUnbound, "bank_ledger_unbound"),
+        (FactsError::Unparsable, "unparsable"),
+        (FactsError::BadRecordId, "bad_record_id"),
+        (FactsError::NotSkipOnly, "not_skip_only"),
+        (
+            FactsError::WithdrawnRowNotVoucher { txn: txn() },
+            "withdrawn_row_not_voucher",
+        ),
+    ];
+    for (error, name) in &all {
+        assert_eq!(error.variant(), *name);
+    }
+    let names: BTreeSet<&str> = all.iter().map(|(_, name)| *name).collect();
+    assert_eq!(names.len(), all.len());
+}

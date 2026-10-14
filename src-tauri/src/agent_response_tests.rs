@@ -678,7 +678,10 @@ fn a_section_that_already_fits_or_is_not_computed_is_left_alone() {
     // a note is not cut, so a response too large for its page is the page's
     let mut note = json!({"result": {"items": [], "padding": "x".repeat(2_000),
         "transfers": {"state": "not_established", "next_steps": {}}}});
-    assert!(fit_response(&mut note, "", 500, |value| len_of(value)).is_err());
+    assert_eq!(
+        fit_response(&mut note, "", 500, |value| len_of(value)),
+        Err("agent_response_too_large".to_string())
+    );
     // and a page cut around it leaves it as it was
     let items: Vec<Value> = (0..50).map(|id| json!({"id": id})).collect();
     let mut paged = json!({"result": {"offset": 0, "items": items,
@@ -910,9 +913,15 @@ fn a_result_with_no_computed_section_takes_the_old_path() {
         assert_eq!(response["result"].get("transfers"), transfers.as_ref());
         // a page of one row that does not fit fails
         let mut one = page(1);
-        assert!(fit_response(&mut one, "", 20, |value| len_of(value)).is_err());
+        assert_eq!(
+            fit_response(&mut one, "", 20, |value| len_of(value)),
+            Err("agent_response_too_large".to_string())
+        );
         let mut none = page(0);
-        assert!(fit_response(&mut none, "", 20, |value| len_of(value)).is_err());
+        assert_eq!(
+            fit_response(&mut none, "", 20, |value| len_of(value)),
+            Err("agent_response_too_large".to_string())
+        );
     }
 }
 
@@ -941,5 +950,8 @@ fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_
     // a result too large without its section is still too large
     let mut too_big = bare.clone();
     too_big["result"]["transfers"] = transfers_section(40);
-    assert!(fit_response(&mut too_big, "", 100, |value| len_of(value)).is_err());
+    assert_eq!(
+        fit_response(&mut too_big, "", 100, |value| len_of(value)),
+        Err("agent_response_too_large".to_string())
+    );
 }

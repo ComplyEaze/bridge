@@ -1,0 +1,32 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+224302f5f125091916c4fa16d730348c6f945a423c123b9adfc447ec216ef639  95657  screenshots/01-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/02-m9o.png
+2093aaa146057573f3493ac32b0e76147df8b57b9eeef6e75910b44a6fb060b3  115214  screenshots/03-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/04-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/05-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/06-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/07-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/08-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/09-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/10-m9o.png
+31f4963216dc50f642c086df13cf3572165ff6a8e6a43b7106c92de19159497d  54997  screenshots/11-m9o.png
+5a2d26a5bbb4ec1dd51b1351e7afa79be4f5f065dbc72438fe825e0381fe090d  52386  screenshots/12-m9o.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/13-m9o.png
+ee4c8c753f895bfd0e9b710e0d2361086d77b12e642cafe43ded7e8020736a4f  96303  screenshots/14-m9o.png
+dcc018839bb629d9ea26453ae5e64a869129f91c11696d63877f643c56fe947d  30750  backups/N1-B6/TDBK1800_100058.001
+73257514dab733a59c2b93fb12cb9ccae199be9003d1177ff0e95554da499c4c  3551  working-summary.txt
+bd503547b740bde061dacea277321555f68ba1ff54f7b28d68e6b548c37f4d32  40523  working-log.txt
+5d2a5f6e24ff39b67143cf6c94782df2e0f6ed35402e092837e18ed6c8adc94c  895  step0/m9o-data-folder-100058-after-restore-end.txt
+d15ba7b6e19e523f608f1a2c744fae4551e229c785e82e12d257cb4b84041ce7  894  step0/m9o-data-folder-100058-before-backup.txt
+c6ff45dca5d0e50b9e1e07e2deb3e905bc4a6a5b8a80543455489ea04dca6ac6  932  step0/m9o-data-folder-100058-before-restore-end.txt
+4422334f28054367208c5f2fb79c78ca7b4f0f134347a83283e0c83805364278  13261  step0/m9o-s0-after-o6-netstat.txt
+4aef61542a8f48fd1b8a1d0cb3664a1fed7b7a6785bf2e5d667a822c2b1274ce  48  step0/m9o-s0-after-o6-tasklist.txt
+00e62632f2716c37188ffe990a98518f582cf0347fe9257f8463302d5e7d1167  11255  step0/m9o-s0-after-restore-end-netstat.txt
+39fa497f1ba001694cee26a8a6be7d6248c8637ec30582477c93dd8616291f39  48  step0/m9o-s0-after-restore-end-tasklist.txt
+a9763f7f5850fbd3dc854bcf113e955efd572983dafca96f3e5f3afb48ab982c  11632  step0/m9o-s0-close-netstat.txt
+4d2cd2aff3f7496cd1a1aaccb5f6b663ea47e18cfa0bf5e90b8fb801476342ed  48  step0/m9o-s0-close-tasklist.txt
+e33589970f64a0c8075c6a17cd613a30a9c7e4f5d3aa171474b9c31b7c08782a  12171  step0/m9o-s0-loaded-netstat.txt
+0216bbd4c27ec9aa7c57d3b66d3b85d7db9220d073dfb272fe1d2c191a49659e  48  step0/m9o-s0-loaded-tasklist.txt
+d01bc8ba61b06c5599241838ffad41aed968c17da472e92dafc48dd231400716  11325  step0/m9o-s0-start-netstat.txt
+83b5d447efe5183d28b2e1b2587391dec4fba4a193b03243489693ef72b94e00  48  step0/m9o-s0-start-tasklist.txt

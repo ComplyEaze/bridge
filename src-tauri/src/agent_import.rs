@@ -2458,8 +2458,15 @@ impl Server {
             .and_then(|value| uuid::Uuid::parse_str(value).ok())
             .ok_or_else(|| "import_batch_identifier_invalid".to_string())?;
         let path = self.imports_dir()?.join(format!("bridge-{uuid}.xml"));
-        let mut file = super::local_file::open_local_file(&path, false)
-            .map_err(|_| "import_persisted_file_unavailable".to_string())?;
+        // A file that is not there is told from one that cannot be read: an
+        // unsent batch without its file is settled by retiring it.
+        let mut file = super::local_file::open_local_file(&path, false).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                "import_saved_file_missing".to_string()
+            } else {
+                "import_persisted_file_unavailable".to_string()
+            }
+        })?;
         let length = file
             .metadata()
             .map_err(|_| "import_persisted_file_unavailable".to_string())?

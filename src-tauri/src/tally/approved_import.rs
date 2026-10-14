@@ -489,6 +489,10 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// A read of Tally found the batch absent and it was retired after the
+    /// person was asked: it is never sent.
+    #[error("import_batch_retired")]
+    BatchRetired,
 }
 
 impl UnderLockRefusal {
@@ -501,6 +505,7 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::BatchRetired => "import_batch_retired",
         }
     }
 }

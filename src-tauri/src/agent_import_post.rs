@@ -584,6 +584,11 @@ impl Server {
         // The batch's own transaction ids found already in the book (#901).
         let mut preexisting_txn_ids: Option<Vec<String>> = None;
         let operation: Result<Step, ToolFailure> = async {
+            // Before the saved file or anything else is read: a read of Tally
+            // found this batch absent and it was retired, so it is never sent.
+            if snapshot.retired {
+                return Err("import_batch_retired".to_string().into());
+            }
             let xml = admit_saved_voucher_integrity(
                 &line,
                 &self.settings.endpoint,
@@ -1045,6 +1050,11 @@ impl Server {
                             .ok_or(BeforeDispatchError::Refused(
                                 UnderLockRefusal::BatchNotFound,
                             ))?;
+                        if current.retired {
+                            return Err(BeforeDispatchError::Refused(
+                                UnderLockRefusal::BatchRetired,
+                            ));
+                        }
                         if current.dispatched {
                             return Err(BeforeDispatchError::Refused(
                                 UnderLockRefusal::AlreadyAttempted,

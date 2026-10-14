@@ -903,3 +903,69 @@ async fn the_desktop_post_and_reconcile_refuse_a_ledger_name_ending_in_a_line_br
         );
     }
 }
+
+#[test]
+fn review_refuses_a_retired_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, mut line) = service(directory.path().join("agent"));
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(xml.as_bytes());
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+    assert!(service.review_selected_xml(xml.as_bytes()).is_ok());
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    service
+        .server
+        .append_import_record_while_admitted(&ledger::StatusRecord::retired(
+            &incomplete,
+            ledger::ProofName::of(b"proof", chrono::Utc::now()),
+        ))
+        .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_batch_retired"
+    );
+}
+
+/// A missing saved file is named for an unsent batch, which retiring settles;
+/// a batch that was sent keeps the text it always had, since it is reconciled,
+/// never retired.
+#[test]
+fn review_names_a_missing_saved_file_only_for_an_unsent_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (service, mut line) = service(directory.path().join("agent"));
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(xml.as_bytes());
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_saved_file_missing"
+    );
+    service
+        .server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+            &line,
+            "a".repeat(64),
+            uuid::Uuid::new_v4(),
+        ))
+        .unwrap();
+    assert_eq!(
+        service.review_selected_xml(xml.as_bytes()).unwrap_err(),
+        "import_persisted_file_unavailable"
+    );
+}

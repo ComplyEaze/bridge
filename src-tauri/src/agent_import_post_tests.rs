@@ -1962,7 +1962,7 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
     fs::remove_file(&path).unwrap();
     assert_eq!(
         post_error(&server, &args).await,
-        "import_persisted_file_unavailable"
+        "import_saved_file_missing"
     );
 
     // The exact file passes this check; the post then fails later, at the
@@ -1976,7 +1976,7 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
     assert!(
         !matches!(
             later.as_str(),
-            "import_batch_changed" | "import_persisted_file_unavailable"
+            "import_batch_changed" | "import_saved_file_missing"
         ),
         "{later}"
     );

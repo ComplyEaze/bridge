@@ -5521,3 +5521,89 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
         "{posted}"
     );
 }
+
+/// A batch a read of Tally found absent: the verification that retired it.
+fn retired_record(line: &ImportLedgerLine) -> ledger::StatusRecord {
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    ledger::StatusRecord::retired(
+        &incomplete,
+        ledger::ProofName::of(b"proof", chrono::Utc::now()),
+    )
+}
+
+/// A retired batch is never sent: refused from the journal alone, before any
+/// Tally request and before the person is asked; nothing is appended.
+#[tokio::test]
+async fn a_retired_batch_is_refused_before_any_tally_request_and_before_the_dialog() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    append_record(
+        &directory.path().join("agent-import-ledger.jsonl"),
+        &retired_record(&line),
+    );
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_batch_retired", "{response}");
+    assert!(
+        error["next_step"].as_str().unwrap().contains("retired"),
+        "{response}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}
+
+/// The person approved before the retirement was recorded: the check under the
+/// admission lock refuses, before the intent, and nothing is sent.
+#[tokio::test]
+async fn an_approval_given_before_the_retire_is_refused_under_the_lock() {
+    refused_under_the_admission_lock(
+        |path, line| append_record(path, &retired_record(line)),
+        "import_batch_retired",
+        json!(false),
+        0,
+    )
+    .await;
+}
+
+/// An unsent batch whose saved file is gone cannot be sent, and the refusal
+/// says how it is settled.
+#[tokio::test]
+async fn an_unsent_batch_with_no_saved_file_is_told_to_retire() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch(&server);
+    fs::remove_file(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+    )
+    .unwrap();
+    let before = journal(directory.path());
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_saved_file_missing", "{response}");
+    assert!(
+        error["next_step"].as_str().unwrap().contains("if_absent"),
+        "{response}"
+    );
+    assert_eq!(observed.len(), 0);
+    assert_eq!(journal(directory.path()), before);
+}

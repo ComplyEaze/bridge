@@ -1312,6 +1312,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              `vouchers` and `ledger` over shorter date windows, without the tie-out.",
         ),
         // #697: every Bridge process sends to one Tally one request at a time.
+        "import_batch_retired" => Some(
+            "Nothing was sent. This batch was retired after a read of Tally found it absent; \
+             ComplyEaze Bridge will not send it. Build the statement again if its rows are \
+             still to be posted.",
+        ),
+        "import_saved_file_missing" => Some(
+            "Nothing was sent. The saved file of this batch is missing. Run verify_import on \
+             it with if_absent set to retire; if Tally does not hold it, it is retired and its \
+             statement can be built again.",
+        ),
         "tally_endpoint_busy" => Some(
             "Another ComplyEaze Bridge window or AI client was talking to this Tally for the whole \
              bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \

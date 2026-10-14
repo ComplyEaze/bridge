@@ -1,0 +1,11 @@
+# One line per request to the Tally port, one at a time, none abandoned: UTC time the answer was complete, step, request file, curl exit code, HTTP status, bytes downloaded, seconds (curl time_total), sha256 of the answer.
+2026-10-14T21:37:16.780Z	0b	r01-company-extent.xml	exit=0	http=200	bytes=4000	s=0.014160	sha256=0cb23618073bc5eeddbc3441fd4f0da9e84c55699cd206b66d1410b304f8d147
+2026-10-14T21:37:17.173Z	1	r02-marks.xml	exit=0	http=200	bytes=3394	s=0.012477	sha256=8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+2026-10-14T21:37:31.487Z	2	s03-company-object.xml	exit=0	http=200	bytes=4208	s=0.018769	sha256=5f5b72b7b5bfc42467fbea30b389581c5106ff08ee7b415731fbf372ebfad93d
+2026-10-14T21:37:45.059Z	3	s04-groups.xml	exit=0	http=200	bytes=55954	s=0.038359	sha256=0657b125f00a7f0b4cc31f249d9492337a6408ec3628f124a7da3b824e354e75
+2026-10-14T21:37:45.966Z	4	s05-ledgers.xml	exit=0	http=200	bytes=26106	s=0.048972	sha256=dce6eb363c6f2688d2783e1764992575bfb7e4c72e8dd3ec0ffc273c0dd07fed
+2026-10-14T21:37:46.169Z	5	s06-trial-balance.xml	exit=0	http=200	bytes=24498	s=0.055834	sha256=a96bcfd665124d075fab60f159f93e9ce4fa32af5e8b026c3788f01d2c57eb1f
+2026-10-14T21:37:46.343Z	6	s07-voucher-types.xml	exit=0	http=200	bytes=37956	s=0.020898	sha256=4011411447154d88f27c265bd667f22e6186df9f6ca51e74aef2953cf6324b27
+2026-10-14T21:38:00.787Z	7	s08-vouchers.xml	exit=0	http=200	bytes=2568786	s=0.774014	sha256=4085c787ad2737467891388fe674167af19f2ade786bbac539a425aae6ab6c7e
+2026-10-14T21:38:02.217Z	8	r02-marks.xml	exit=0	http=200	bytes=3394	s=0.012220	sha256=8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+2026-10-14T21:38:02.378Z	9	r01-company-extent.xml	exit=0	http=200	bytes=4000	s=0.012940	sha256=0cb23618073bc5eeddbc3441fd4f0da9e84c55699cd206b66d1410b304f8d147

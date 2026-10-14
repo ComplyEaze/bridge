@@ -1,0 +1,88 @@
+# fixture: tests/fixtures/agent/native-ledger-catalogue.utf16le.xml
+# parser: parse_standard_ledger_catalog_with_identities(WR2)
+# source: captured
+Ok(StandardLedgerCatalog {
+    entries: [
+        StandardLedgerCatalogEntry {
+            name: "Bridge Nested Debtor WR4",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d5",
+            parent: Some(
+                "Bridge Nested Debtors WR4",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Cafe\u{301} NFD2 Probe WR3",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d3",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Café Naïve Traders",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000cf",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Café NFD Probe WR3",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d2",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Cash",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-0000001f",
+            parent: Some(
+                "Cash-in-Hand",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "Profit & Loss A/c",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-0000001e",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "WR2 Sales",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0",
+            parent: Some(
+                "Sales Accounts",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "WR2 XML Café Naïve Ledger 01A01A2F",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d1",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+        StandardLedgerCatalogEntry {
+            name: "नमस\u{94d}त\u{947} ट\u{94d}र\u{947}डर\u{94d}स",
+            stored_name: None,
+            guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ce",
+            parent: Some(
+                "Sundry Debtors",
+            ),
+            parent_unsupported: false,
+        },
+    ],
+})

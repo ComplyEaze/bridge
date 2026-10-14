@@ -278,7 +278,7 @@ pub fn parse_native_cash_flow(
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     match name.as_slice() {
                         b"ENVELOPE" => root_seen = true,
@@ -315,7 +315,7 @@ pub fn parse_native_cash_flow(
                 }
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if !root_seen {
                     // A self-closed root is the same empty answer as an empty pair.
                     return Err(if name.as_slice() == b"ENVELOPE" {
@@ -330,7 +330,7 @@ pub fn parse_native_cash_flow(
                 return Err(invalid("cash_flow_unexpected_empty_element"));
             }
             Event::End(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if name.as_slice() == b"ENVELOPE" && wrapper_depth == 0 && !envelope_closed {
                     envelope_closed = true;
                 } else if is_wrapper(&name) && wrapper_depth > 0 {
@@ -340,7 +340,7 @@ pub fn parse_native_cash_flow(
                 }
             }
             Event::Text(text) => {
-                if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                if !text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("cash_flow_stray_text"));
                 }
             }
@@ -389,14 +389,14 @@ fn read_row(
     reader: &mut Reader<&[u8]>,
     block: &BytesStart<'_>,
 ) -> Result<[NativeStatementAmount; 3], NativeCashFlowError> {
-    let block = block.name().as_ref().to_vec();
+    let block = block.name().as_ref().as_bytes().to_vec();
     let mut debit = None;
     let mut credit = None;
     let mut closing = None;
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if is_failure_signal(&name) {
                     return Err(NativeCashFlowError::TallyReportedFailure);
                 }
@@ -410,15 +410,19 @@ fn read_row(
                 if slot.is_some() {
                     return Err(invalid("cash_flow_duplicate_column"));
                 }
-                *slot = Some(read_column(reader, element.name().as_ref(), inner)?);
+                *slot = Some(read_column(
+                    reader,
+                    element.name().as_ref().as_bytes(),
+                    inner,
+                )?);
             }
-            Event::End(element) if element.name().as_ref() == block.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == block.as_slice() => {
                 return match (debit, credit, closing) {
                     (Some(debit), Some(credit), Some(closing)) => Ok([debit, credit, closing]),
                     _ => Err(invalid("cash_flow_column_missing")),
                 };
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("cash_flow_row_shape")),
         }
     }
@@ -435,19 +439,29 @@ fn read_column(
     loop {
         match reader.read_event().map_err(|_| malformed())? {
             Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(inner) && found.is_none() =>
+                if element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(inner)
+                    && found.is_none() =>
             {
                 found = Some(amount(&read_text(reader, element.name())?)?);
             }
             Event::Empty(element)
-                if element.name().as_ref().eq_ignore_ascii_case(inner) && found.is_none() =>
+                if element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(inner)
+                    && found.is_none() =>
             {
                 found = Some(NativeStatementAmount::Empty);
             }
-            Event::End(element) if element.name().as_ref() == outer.as_slice() => {
+            Event::End(element) if element.name().as_ref().as_bytes() == outer.as_slice() => {
                 return found.ok_or(invalid("cash_flow_amount_missing"));
             }
-            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {}
+            Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             _ => return Err(invalid("cash_flow_column_shape")),
         }
     }

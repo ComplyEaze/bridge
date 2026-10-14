@@ -1,0 +1,31 @@
+# fixture: tests/fixtures/masters_cost_categories_shape_lab_live.utf16le.xml
+# parser: parse_native_masters(CostCategories, SHAPE LAB)
+# source: captured
+Ok(NativeMasters {
+    rows: [
+        NativeMasterRow {
+            name: "Business Line",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-000000d6",
+            master_id: 214,
+            alter_id: 215,
+            parent: None,
+            detail: CostCategory {
+                allocates_revenue: true,
+                allocates_non_revenue: false,
+                affects_stock: false,
+            },
+        },
+        NativeMasterRow {
+            name: "Primary Cost Category",
+            guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000062",
+            master_id: 98,
+            alter_id: 99,
+            parent: None,
+            detail: CostCategory {
+                allocates_revenue: true,
+                allocates_non_revenue: true,
+                affects_stock: false,
+            },
+        },
+    ],
+})

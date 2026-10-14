@@ -1,0 +1,3 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+reviewer: lamemustafa

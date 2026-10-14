@@ -16,12 +16,18 @@
 //! client configuration and never inferred: an unclassified creditor is reported as needing the
 //! certificate and is kept out of every disallowance-candidate total. `check_invariants` is AGE-1,
 //! which re-derives what is owed from the Trial Balance alone.
+//!
+//! A creditor's vouchers are kept by [`VoucherKey`], never by GUID (#1243): its figures and
+//! findings cite each voucher with a line that has an amount on the ledger, by its GUID and label, so
+//! two vouchers sharing a GUID are each cited unless their refs are identical too. A population in
+//! which a GUID holding a NUL makes two keys equal is refused
+//! (`AuditError::VoucherKeysNotUnique`, where the reference raises), with or without a creditor.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
-use crate::book::{Book, Voucher};
+use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
 use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value};
@@ -235,7 +241,7 @@ pub fn apply_post_year_payments(lots: &[Lot], post_year_lines: &[(i64, i64)]) ->
 /// One creditor's population lines and the vouchers carrying them.
 struct Rows<'a> {
     walk: Walk,
-    vouchers: BTreeMap<&'a str, &'a Voucher>,
+    vouchers: BTreeMap<VoucherKey, &'a Voucher>,
     has_tb_row: bool,
     bills_in_year_paise: i64,
 }
@@ -249,11 +255,11 @@ fn compute_ageing<'a>(
     let overflow = || support::overflow(TEST_ID);
     let mut lines: BTreeMap<&str, Vec<(i64, i64)>> =
         creditors.iter().map(|n| (n.as_str(), Vec::new())).collect();
-    let mut vouchers: BTreeMap<&str, BTreeMap<&'a str, &'a Voucher>> = creditors
+    let mut vouchers: BTreeMap<&str, BTreeMap<VoucherKey, &'a Voucher>> = creditors
         .iter()
         .map(|n| (n.as_str(), BTreeMap::new()))
         .collect();
-    for v in pop {
+    for (vk, v) in voucher_keys(pop)? {
         let day = civil_day_number(&v.date);
         for l in &v.lines {
             if l.amount_paise == 0 {
@@ -262,7 +268,7 @@ fn compute_ageing<'a>(
             if let Some(ls) = lines.get_mut(l.ledger.as_str()) {
                 ls.push((day, l.amount_paise));
                 if let Some(vs) = vouchers.get_mut(l.ledger.as_str()) {
-                    vs.insert(v.guid.as_str(), *v);
+                    vs.insert(vk.clone(), v);
                 }
             }
         }
@@ -365,11 +371,7 @@ records.",
         let h = stable_ledger_tag(book, name)?;
         let classification = classify(name, &params.supplier_classification)?;
         let mut creditor_ev = vec![EvidenceRef::new("ledger", name)];
-        creditor_ev.extend(
-            d.vouchers
-                .iter()
-                .map(|(g, v)| EvidenceRef::with_label("voucher", g, &support::voucher_label(v))),
-        );
+        creditor_ev.extend(support::voucher_refs(d.vouchers.values().copied()));
         let creditor_recon = d
             .walk
             .lots

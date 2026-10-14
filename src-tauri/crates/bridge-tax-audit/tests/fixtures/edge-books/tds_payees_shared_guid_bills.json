@@ -1,0 +1,571 @@
+{
+ "comment": "tds_payees, #1243: vouchers that share a GUID (blank, or one GUID repeated) are each their own bill. Transporter A (two blank-GUID bills, Rs 20,000 and Rs 25,000) and Transporter B (one GUID on the same two) are under the single sum and the aggregate: no finding. Transporter C: five blank-GUID bills of Rs 25,000 cross the aggregate on the fifth; the largest single bill is Rs 25,000, each bill is cited and each is its own clause 21(b) row. Carrier G: four blank-GUID bills on one day on a goods-carriage ledger, numbered so that the order of their labels differs from the order of the books, which their keys follow (the eighth to eleventh blank GUIDs: a place zero-padded, so the tenth and eleventh sort after the ninth), two of them with one number (one cited ref). Landlord D: Rs 30,000 of rent in May and in August, each month under the limit. Landlord E: May holds Rs 40,000 (blank GUID) and Rs 20,000 (its own GUID), August Rs 40,000 (blank GUID): the highest month is Rs 60,000. Transporter F: one GUID on three bills of one day, two of them with one number (one cited ref) and a third between them in the books with another; every amount is summed. Carrier K: two bills of one day, each over the single sum, a unique GUID read before a blank one: each is its own clause 21(b) row, numbered in key order (the blank GUID's key first), not in the books' order.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Bank OD A/c": "Loans (Liability)",
+  "Sundry Debtors": "Current Assets",
+  "Loans & Advances (Asset)": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Duties & Taxes": "Current Liabilities",
+  "Loans (Liability)": null,
+  "Unsecured Loans": "Loans (Liability)",
+  "Secured Loans": "Loans (Liability)",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null,
+  "Fixed Assets": null,
+  "Suspense A/c": null
+ },
+ "ledgers": [
+  {
+   "name": "Freight",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-000"
+  },
+  {
+   "name": "Freight GC",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-001"
+  },
+  {
+   "name": "Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-002"
+  },
+  {
+   "name": "Transporter A",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-003"
+  },
+  {
+   "name": "Transporter B",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-004"
+  },
+  {
+   "name": "Transporter C",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-005"
+  },
+  {
+   "name": "Carrier G",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-006"
+  },
+  {
+   "name": "Landlord D",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-007"
+  },
+  {
+   "name": "Landlord E",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-008"
+  },
+  {
+   "name": "Transporter F",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-009"
+  },
+  {
+   "name": "Carrier K",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-tds_payees_shared_guid_bills-010"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Carrier G",
+   "opening": 0,
+   "debit": 0,
+   "credit": 16000000,
+   "closing": -16000000
+  },
+  {
+   "ledger": "Freight",
+   "opening": 0,
+   "debit": 37500000,
+   "credit": 0,
+   "closing": 37500000
+  },
+  {
+   "ledger": "Freight GC",
+   "opening": 0,
+   "debit": 16000000,
+   "credit": 0,
+   "closing": 16000000
+  },
+  {
+   "ledger": "Landlord D",
+   "opening": 0,
+   "debit": 0,
+   "credit": 6000000,
+   "closing": -6000000
+  },
+  {
+   "ledger": "Landlord E",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000000,
+   "closing": -10000000
+  },
+  {
+   "ledger": "Rent",
+   "opening": 0,
+   "debit": 16000000,
+   "credit": 0,
+   "closing": 16000000
+  },
+  {
+   "ledger": "Transporter A",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4500000,
+   "closing": -4500000
+  },
+  {
+   "ledger": "Transporter B",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4500000,
+   "closing": -4500000
+  },
+  {
+   "ledger": "Transporter C",
+   "opening": 0,
+   "debit": 0,
+   "credit": 12500000,
+   "closing": -12500000
+  },
+  {
+   "ledger": "Transporter F",
+   "opening": 0,
+   "debit": 0,
+   "credit": 8500000,
+   "closing": -8500000
+  },
+  {
+   "ledger": "Carrier K",
+   "opening": 0,
+   "debit": 0,
+   "credit": 7500000,
+   "closing": -7500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "",
+   "date": "2025-05-10",
+   "base_type": "Journal",
+   "number": "A1",
+   "lines": [
+    [
+     "Freight",
+     2000000
+    ],
+    [
+     "Transporter A",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-10",
+   "base_type": "Journal",
+   "number": "A2",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter A",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-b",
+   "date": "2025-05-12",
+   "base_type": "Journal",
+   "number": "B1",
+   "lines": [
+    [
+     "Freight",
+     2000000
+    ],
+    [
+     "Transporter B",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-b",
+   "date": "2025-08-12",
+   "base_type": "Journal",
+   "number": "B2",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter B",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-05-15",
+   "base_type": "Journal",
+   "number": "C1",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter C",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-06-15",
+   "base_type": "Journal",
+   "number": "C2",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter C",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "number": "C3",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter C",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-15",
+   "base_type": "Journal",
+   "number": "C4",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter C",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-09-15",
+   "base_type": "Journal",
+   "number": "C5",
+   "lines": [
+    [
+     "Freight",
+     2500000
+    ],
+    [
+     "Transporter C",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "number": "G9",
+   "lines": [
+    [
+     "Freight GC",
+     4000000
+    ],
+    [
+     "Carrier G",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "number": "G10",
+   "lines": [
+    [
+     "Freight GC",
+     4000000
+    ],
+    [
+     "Carrier G",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "number": "G2",
+   "lines": [
+    [
+     "Freight GC",
+     4000000
+    ],
+    [
+     "Carrier G",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-07-01",
+   "base_type": "Journal",
+   "number": "G9",
+   "lines": [
+    [
+     "Freight GC",
+     4000000
+    ],
+    [
+     "Carrier G",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "number": "D1",
+   "lines": [
+    [
+     "Rent",
+     3000000
+    ],
+    [
+     "Landlord D",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-05",
+   "base_type": "Journal",
+   "number": "D2",
+   "lines": [
+    [
+     "Rent",
+     3000000
+    ],
+    [
+     "Landlord D",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-05-06",
+   "base_type": "Journal",
+   "number": "E1",
+   "lines": [
+    [
+     "Rent",
+     4000000
+    ],
+    [
+     "Landlord E",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-08-06",
+   "base_type": "Journal",
+   "number": "E2",
+   "lines": [
+    [
+     "Rent",
+     4000000
+    ],
+    [
+     "Landlord E",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "e-own",
+   "date": "2025-05-20",
+   "base_type": "Journal",
+   "number": "E3",
+   "lines": [
+    [
+     "Rent",
+     2000000
+    ],
+    [
+     "Landlord E",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-f",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "F5",
+   "lines": [
+    [
+     "Freight",
+     4000000
+    ],
+    [
+     "Transporter F",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-f",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "F6",
+   "lines": [
+    [
+     "Freight",
+     1000000
+    ],
+    [
+     "Transporter F",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "dup-f",
+   "date": "2025-06-10",
+   "base_type": "Journal",
+   "number": "F5",
+   "lines": [
+    [
+     "Freight",
+     3500000
+    ],
+    [
+     "Transporter F",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "k-own",
+   "date": "2025-10-20",
+   "base_type": "Journal",
+   "number": "K1",
+   "lines": [
+    [
+     "Freight",
+     4000000
+    ],
+    [
+     "Carrier K",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "date": "2025-10-20",
+   "base_type": "Journal",
+   "number": "K2",
+   "lines": [
+    [
+     "Freight",
+     3500000
+    ],
+    [
+     "Carrier K",
+     -3500000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Freight": "194C",
+  "Freight GC": "194C",
+  "Rent": "194I"
+ },
+ "goods_carriage_ledgers": [
+  "Freight GC"
+ ]
+}

@@ -1,0 +1,427 @@
+{
+ "comment": "book_keeping_quality re-issue narrations and Contra direction on vouchers that share a GUID (#1243): every voucher is its own row. Re-issue: two blank-GUID payments, one GUID on two journals, and two blank-GUID payments with one number and day (counted twice, cited once), six rows. Contra: blank-GUID deposits debiting cash on three days, read out of date order, five of them on one day (two with one number) and read out of number order; each row id takes its place among the blank-GUID rows in date order and then books order, as a suffix _1 to _7, and the places among those sharing the blank GUID run past nine on that day; one GUID on two disagreeing contras of one day (_1, _2); a GUID shared with an agreeing contra, and a unique GUID, each keeping an id with no suffix; a blank-GUID withdrawal debiting cash agrees and has no row.",
+ "groups": {
+  "Current Assets": null,
+  "Cash-in-Hand": "Current Assets",
+  "Bank Accounts": "Current Assets",
+  "Sundry Debtors": "Current Assets",
+  "Stock-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Sundry Creditors": "Current Liabilities",
+  "Sales Accounts": null,
+  "Purchase Accounts": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-0"
+  },
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-1"
+  },
+  {
+   "name": "Sales",
+   "chain": [
+    "Sales Accounts"
+   ],
+   "guid": "edge-bkqg-2"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "edge-bkqg-3"
+  },
+  {
+   "name": "Supplier",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "edge-bkqg-4"
+  },
+  {
+   "name": "Customer",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-5"
+  },
+  {
+   "name": "Expenses",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-bkqg-6"
+  },
+  {
+   "name": "UPI Collections",
+   "chain": [
+    "Sundry Debtors",
+    "Current Assets"
+   ],
+   "guid": "edge-bkqg-7"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 0,
+   "closing": 0
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "",
+   "number": "PR-1",
+   "date": "2025-05-01",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     10000
+    ],
+    [
+     "Cash",
+     -10000
+    ]
+   ],
+   "narration": "re-issued bill"
+  },
+  {
+   "guid": "",
+   "number": "PR-2",
+   "date": "2025-05-02",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     20000
+    ],
+    [
+     "Cash",
+     -20000
+    ]
+   ],
+   "narration": "Re-Issued cheque"
+  },
+  {
+   "guid": "g-re",
+   "number": "PR-3",
+   "date": "2025-05-03",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expenses",
+     30000
+    ],
+    [
+     "Supplier",
+     -30000
+    ]
+   ],
+   "narration": "bill re-issued"
+  },
+  {
+   "guid": "g-re",
+   "number": "PR-4",
+   "date": "2025-05-04",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Expenses",
+     40700
+    ],
+    [
+     "Supplier",
+     -40700
+    ]
+   ],
+   "narration": "RE-ISSUED"
+  },
+  {
+   "guid": "",
+   "number": "PR-5",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     5000
+    ],
+    [
+     "Cash",
+     -5000
+    ]
+   ],
+   "narration": "re-issued"
+  },
+  {
+   "guid": "",
+   "number": "PR-5",
+   "date": "2025-05-05",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Supplier",
+     6000
+    ],
+    [
+     "Cash",
+     -6000
+    ]
+   ],
+   "narration": "re-issued"
+  },
+  {
+   "guid": "",
+   "number": "CB-2",
+   "date": "2025-08-02",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     20000
+    ],
+    [
+     "Bank",
+     -20000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "",
+   "number": "CB-1",
+   "date": "2025-08-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     10000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "",
+   "number": "CW-1",
+   "date": "2025-08-03",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     15000
+    ],
+    [
+     "Bank",
+     -15000
+    ]
+   ],
+   "narration": "cash withdrawal"
+  },
+  {
+   "guid": "",
+   "number": "CX-5",
+   "date": "2025-09-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     5000
+    ],
+    [
+     "Bank",
+     -5000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "",
+   "number": "CX-3",
+   "date": "2025-09-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     3000
+    ],
+    [
+     "Bank",
+     -3000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "",
+   "number": "CX-4",
+   "date": "2025-09-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     4000
+    ],
+    [
+     "Bank",
+     -4000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "",
+   "number": "CX-3",
+   "date": "2025-09-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     7000
+    ],
+    [
+     "Bank",
+     -7000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "",
+   "number": "CX-1",
+   "date": "2025-09-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     1000
+    ],
+    [
+     "Bank",
+     -1000
+    ]
+   ],
+   "narration": "cash deposited"
+  },
+  {
+   "guid": "g-cn",
+   "number": "CN-2",
+   "date": "2025-10-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     2000
+    ],
+    [
+     "Bank",
+     -2000
+    ]
+   ],
+   "narration": "deposit"
+  },
+  {
+   "guid": "g-cn",
+   "number": "CN-1",
+   "date": "2025-10-01",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     8000
+    ],
+    [
+     "Bank",
+     -8000
+    ]
+   ],
+   "narration": "deposit"
+  },
+  {
+   "guid": "g-solo",
+   "number": "CS-1",
+   "date": "2025-10-02",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     9000
+    ],
+    [
+     "Bank",
+     -9000
+    ]
+   ],
+   "narration": "deposit to bank"
+  },
+  {
+   "guid": "g-solo",
+   "number": "CS-2",
+   "date": "2025-10-03",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     -9000
+    ],
+    [
+     "Bank",
+     9000
+    ]
+   ],
+   "narration": "deposit to bank"
+  },
+  {
+   "guid": "c-u",
+   "number": "CU-1",
+   "date": "2025-10-04",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Cash",
+     6000
+    ],
+    [
+     "Bank",
+     -6000
+    ]
+   ],
+   "narration": "cash deposited"
+  }
+ ],
+ "cash": [
+  "Cash"
+ ],
+ "book_keeping_quality": {
+  "payment_channel_debtors": [],
+  "tax_ledgers": {},
+  "gst_payment_ledgers": [],
+  "reissue_narration_terms": [
+   "RE-ISSUED"
+  ],
+  "writeoff_discount_ledgers": []
+ },
+ "tests": [
+  "book_keeping_quality"
+ ]
+}

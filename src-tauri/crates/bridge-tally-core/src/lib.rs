@@ -4,17 +4,18 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) use bridge_tally_primitives::exact_arithmetic;
 pub use bridge_tally_primitives::{
-    DateSpan, ExactDecimal, ReadResponseScope, TallyDate, TallyError, MAX_EXACT_DECIMAL_BYTES,
+    company_guid, text, DateSpan, ExactDecimal, ReadResponseScope, TallyDate, TallyError,
+    MAX_EXACT_DECIMAL_BYTES,
 };
 
 pub mod bills_reconciliation;
 pub mod book_presence;
 pub mod master_binding;
+pub mod master_name_index;
 mod pack_models;
 pub mod reconciliation;
 pub mod report_tie_out;
 pub mod text_search;
-pub mod transport_qualification;
 
 pub use pack_models::*;
 
@@ -231,11 +232,6 @@ pub struct CoreAccountingBatch {
     pub foreign_master_text_diagnostics: Vec<ForeignMasterTextDiagnostic>,
 }
 
-/// Safe operator warning for a committed Core Accounting window that retains
-/// master text which may render badly in a document.
-pub const FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE: &str =
-    "foreign_master_text_rendering_degraded";
-
 impl CoreAccountingBatch {
     /// The diagnostic details intentionally remain in-process so source names
     /// and identifiers cannot enter the durable operator-proof surface.
@@ -402,14 +398,6 @@ pub trait TallyConnector: Send + Sync {
         &self,
         context: &RequestContext,
     ) -> Result<CanonicalPackWindow, TallyError>;
-    async fn read_core_period_balance_report(
-        &self,
-        _context: &RequestContext,
-    ) -> Result<report_tie_out::LedgerPeriodBalanceReport, TallyError> {
-        Err(TallyError::Unsupported {
-            code: "core_period_balance_report_not_supported".to_string(),
-        })
-    }
 }
 
 #[cfg(test)]

@@ -61,8 +61,6 @@ fn receipt_for(surface: &str, product: ProductFamily, mode: TallyMode) -> LiveCo
             ReadProfileId::XmlCompanyEnumerationV1,
             ReadProfileId::XmlSyntheticFixtureMarkerV1,
             ReadProfileId::XmlLedgerReadV1,
-            ReadProfileId::XmlVoucherEmptyRangeV1,
-            ReadProfileId::XmlVoucherPopulatedRangeV1,
         ]
         .into_iter()
         .map(operation)
@@ -315,8 +313,6 @@ fn unsuccessful_attempt_is_receipted_without_live_or_fixture_claims() {
         },
         not_attempted(ReadProfileId::XmlSyntheticFixtureMarkerV1),
         not_attempted(ReadProfileId::XmlLedgerReadV1),
-        not_attempted(ReadProfileId::XmlVoucherEmptyRangeV1),
-        not_attempted(ReadProfileId::XmlVoucherPopulatedRangeV1),
     ];
     let sealed = value.seal().unwrap();
     assert!(!sealed.authority.live_endpoint_response_observed);
@@ -593,17 +589,6 @@ fn unsupported_claims_remain_disabled_without_a_profile_specific_signature() {
     ledger.outcome = OperationOutcome::Failed;
     ledger.application_status = ApplicationStatus::Failure;
     ledger.safe_reason_code = Some("tally_export_rejected".to_string());
-    for profile in [
-        ReadProfileId::XmlVoucherEmptyRangeV1,
-        ReadProfileId::XmlVoucherPopulatedRangeV1,
-    ] {
-        let operation = later_failure
-            .operations
-            .iter_mut()
-            .find(|operation| operation.profile == profile)
-            .unwrap();
-        *operation = not_attempted_operation(profile);
-    }
     let later_failure = later_failure.seal().unwrap();
     let later_attestation = attestation(&later_failure, &surface, &signing);
     let ledger_manifest = unsupported_manifest(ReadProfileId::XmlLedgerReadV1);
@@ -652,17 +637,6 @@ fn unsupported_claims_remain_disabled_without_a_profile_specific_signature() {
             ledger.encoding = TextEncoding::Unknown;
             ledger.response_size = SizeBucket::Zero;
         }
-        for profile in [
-            ReadProfileId::XmlVoucherEmptyRangeV1,
-            ReadProfileId::XmlVoucherPopulatedRangeV1,
-        ] {
-            let operation = non_authoritative
-                .operations
-                .iter_mut()
-                .find(|operation| operation.profile == profile)
-                .unwrap();
-            *operation = not_attempted_operation(profile);
-        }
         let non_authoritative = non_authoritative.seal().unwrap();
         let non_authoritative_attestation = attestation(&non_authoritative, &surface, &signing);
         assert_eq!(
@@ -710,8 +684,6 @@ fn unsupported_claims_remain_disabled_without_a_profile_specific_signature() {
     for profile in [
         ReadProfileId::XmlSyntheticFixtureMarkerV1,
         ReadProfileId::XmlLedgerReadV1,
-        ReadProfileId::XmlVoucherEmptyRangeV1,
-        ReadProfileId::XmlVoucherPopulatedRangeV1,
     ] {
         let operation = missing_fixture
             .operations
@@ -747,18 +719,12 @@ fn unsupported_claims_remain_disabled_without_a_profile_specific_signature() {
     marker.outcome = OperationOutcome::Failed;
     marker.application_status = ApplicationStatus::Failure;
     marker.safe_reason_code = Some("synthetic_fixture_unverified".to_string());
-    for profile in [
-        ReadProfileId::XmlLedgerReadV1,
-        ReadProfileId::XmlVoucherEmptyRangeV1,
-        ReadProfileId::XmlVoucherPopulatedRangeV1,
-    ] {
-        let operation = marker_failure
-            .operations
-            .iter_mut()
-            .find(|operation| operation.profile == profile)
-            .unwrap();
-        *operation = not_attempted_operation(profile);
-    }
+    let operation = marker_failure
+        .operations
+        .iter_mut()
+        .find(|operation| operation.profile == ReadProfileId::XmlLedgerReadV1)
+        .unwrap();
+    *operation = not_attempted_operation(ReadProfileId::XmlLedgerReadV1);
     let marker_failure = marker_failure.seal().unwrap();
     let marker_attestation = attestation(&marker_failure, &surface, &signing);
     let marker_manifest = unsupported_manifest(ReadProfileId::XmlSyntheticFixtureMarkerV1);

@@ -1,0 +1,104 @@
+# fixture: tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml
+# parser: parse_native_negative_stock
+# source: captured
+Ok(NativeNegativeStockListing {
+    items: [
+        NativeListedStockItem {
+            name: "Carton Box Small",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "100",
+                    ),
+                    unit: "Box",
+                },
+            ),
+            rate: Present(
+                ExactDecimal(
+                    "25.00",
+                ),
+            ),
+            value: Present(
+                ExactDecimal(
+                    "2500.00",
+                ),
+            ),
+        },
+        NativeListedStockItem {
+            name: "Cleaning Kit A",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "12",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            rate: Present(
+                ExactDecimal(
+                    "1562.50",
+                ),
+            ),
+            value: Present(
+                ExactDecimal(
+                    "18750.00",
+                ),
+            ),
+        },
+        NativeListedStockItem {
+            name: "HDPE Drum 50L",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "40",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            rate: Present(
+                ExactDecimal(
+                    "300.00",
+                ),
+            ),
+            value: Present(
+                ExactDecimal(
+                    "12000.00",
+                ),
+            ),
+        },
+        NativeListedStockItem {
+            name: "Sulphuric Acid 98pc",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "100.000",
+                    ),
+                    unit: "Kgs",
+                },
+            ),
+            rate: Present(
+                ExactDecimal(
+                    "50.00",
+                ),
+            ),
+            value: Present(
+                ExactDecimal(
+                    "5000.00",
+                ),
+            ),
+        },
+        NativeListedStockItem {
+            name: "Zero Stock Item",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "-50.000",
+                    ),
+                    unit: "Kgs",
+                },
+            ),
+            rate: Empty,
+            value: Empty,
+        },
+    ],
+})

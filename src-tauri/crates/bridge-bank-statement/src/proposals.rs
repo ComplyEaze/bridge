@@ -13,7 +13,9 @@
 //! yields the same labels — which is what an amendment of the earlier batch has
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
-use crate::bank::{Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION};
+use crate::bank::{
+    Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES, PARSER_SENTINELS,
+};
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
 use crate::mapping::{Mapping, Treatment};
@@ -34,6 +36,45 @@ pub const MAX_NARRATION_CHARS: usize = 2000;
 /// The narration tag of a line posted to suspense because no mapping names
 /// its party, or the parser could not identify one.
 pub const UNIDENTIFIED: &str = "UNIDENTIFIED - reallocate from";
+
+/// The label of the segment that names the statement's party on a voucher
+/// posted to a mapped ledger: ` | Statement party: <name>`, after the date. It
+/// says where the name came from, so it is not read as a Tally party ledger.
+pub const STATEMENT_PARTY_LABEL: &str = "Statement party:";
+
+/// The counterparty a statement printed, fit to be written into a narration of
+/// a voucher posted to a mapped ledger. It cannot be built from a parser
+/// sentinel, a cash movement or a parser category such as bank charges (none
+/// is a counterparty the statement printed), nor from a name holding the segment delimiter `|` (it would end the segment early).
+struct StatementPayee<'a>(&'a str);
+
+impl<'a> StatementPayee<'a> {
+    /// `None` when the party is not a counterparty; a refusal when it is one
+    /// that cannot be written.
+    fn new(party: &'a str, row: usize) -> Result<Option<Self>, Refusal> {
+        if party.is_empty()
+            || PARSER_SENTINELS.contains(&party)
+            || PARSER_CATEGORIES.contains(&party)
+            || CashMovement::of_party(party).is_some()
+        {
+            return Ok(None);
+        }
+        if party.contains('|') {
+            return Err(Refusal::at_row(
+                "party_not_admissible",
+                row,
+                format!(
+                    "row {row}'s party contains the character | and cannot be written into the narration"
+                ),
+            ));
+        }
+        Ok(Some(Self(party)))
+    }
+
+    fn segment(&self) -> String {
+        format!(" | {STATEMENT_PARTY_LABEL} {}", self.0)
+    }
+}
 
 /// Every tag a line Bridge posts to suspense carries, one of each kind, so
 /// one read can find them all.
@@ -151,6 +192,130 @@ pub struct StatementRecord {
 pub struct Build {
     pub proposals: Vec<Proposal>,
     pub records: Vec<StatementRecord>,
+    /// The earliest and latest date any row prints, over every row before the
+    /// date window: not the first and last row in printed order, and not the
+    /// window's own edges. `None` only when there are no rows.
+    pub span: Option<(Date, Date)>,
+    /// How many rows the date window left out. Zero means the window is the
+    /// whole statement.
+    pub rows_outside_window: usize,
+    /// The net (credits less debits) of the rows dated before the window's
+    /// `from`, and of those dated after its `to`. Zero when none is left out.
+    pub net_before_window: ExactDecimal,
+    pub net_after_window: ExactDecimal,
+}
+
+/// Why a parse cannot be tied to the book over its window. Not a refusal of
+/// the parse: the proposals stand, and `statement_tie_out` answers
+/// `not_established` with this code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TieOutWindowRefusal {
+    /// A window that leaves rows out must run from the 1st of a month to the
+    /// last day of a month, so a tie-out shows the statement's totals per
+    /// calendar month and never a part of a month, except the part-months at
+    /// the statement's own start and end (a month edge's balance with the
+    /// supplied opening or closing gives their net); a month in which every
+    /// other row's amount is already known still shows that row's amount.
+    NotWholeCalendarMonths,
+    /// The window starts before the statement's first row or ends after its
+    /// last: the statement does not prove its balance on those days.
+    BeyondStatementRows,
+}
+
+impl TieOutWindowRefusal {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::NotWholeCalendarMonths => "window_not_whole_calendar_months",
+            Self::BeyondStatementRows => "window_beyond_statement_rows",
+        }
+    }
+}
+
+/// The statement's balance at the start of `first` and at the end of `last`,
+/// worked out from its own rows by transaction date. Built only by
+/// [`tie_out_window`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TieOutEdges {
+    first: Date,
+    last: Date,
+    opening: ExactDecimal,
+    closing: ExactDecimal,
+}
+
+impl TieOutEdges {
+    pub fn first(&self) -> Date {
+        self.first
+    }
+    pub fn last(&self) -> Date {
+        self.last
+    }
+    pub fn opening(&self) -> &ExactDecimal {
+        &self.opening
+    }
+    pub fn closing(&self) -> &ExactDecimal {
+        &self.closing
+    }
+}
+
+/// Where a parse can be tied to the book, from the build and the balances the
+/// caller supplied (which `reconcile` proved against every row). For the whole
+/// statement that is its first and last row dates and those two balances. For
+/// a window that leaves rows out it is the window's own dates, with the
+/// opening plus the net of the rows before it and the closing less the net of
+/// the rows after it: sums by date, so the order the bank printed the rows in
+/// cannot move them. `None` when the build has no rows.
+pub fn tie_out_window(
+    build: &Build,
+    opening: &ExactDecimal,
+    closing: &ExactDecimal,
+    date_from: Option<Date>,
+    date_to: Option<Date>,
+) -> Option<Result<Result<TieOutEdges, TieOutWindowRefusal>, Refusal>> {
+    let (first_row, last_row) = build.span?;
+    if build.rows_outside_window == 0 {
+        return Some(Ok(Ok(TieOutEdges {
+            first: first_row,
+            last: last_row,
+            opening: opening.clone(),
+            closing: closing.clone(),
+        })));
+    }
+    let first = date_from.unwrap_or(first_row);
+    let last = date_to.unwrap_or(last_row);
+    if !is_whole_calendar_months(first, last) {
+        return Some(Ok(Err(TieOutWindowRefusal::NotWholeCalendarMonths)));
+    }
+    if first < first_row || last > last_row {
+        return Some(Ok(Err(TieOutWindowRefusal::BeyondStatementRows)));
+    }
+    let edges = opening
+        .checked_add(&build.net_before_window)
+        .and_then(|opening| {
+            closing
+                .checked_subtract(&build.net_after_window)
+                .map(|closing| (opening, closing))
+        })
+        .map_err(out_of_range);
+    Some(edges.map(|(opening, closing)| {
+        Ok(TieOutEdges {
+            first,
+            last,
+            opening,
+            closing,
+        })
+    }))
+}
+
+/// From the 1st of a month to the last day of a month (the same or a later one).
+pub fn is_whole_calendar_months(first: Date, last: Date) -> bool {
+    first.day == 1 && first <= last && Date::new(last.year, last.month, last.day + 1).is_none()
+}
+
+fn out_of_range(error: impl std::fmt::Debug) -> Refusal {
+    Refusal::new(
+        "arithmetic_out_of_range",
+        format!("a running total exceeded the exact-decimal bound ({error:?})"),
+    )
 }
 
 /// Everything `build` needs besides the rows and the mapping.
@@ -340,6 +505,10 @@ pub fn build(
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut statement_ids = BTreeSet::new();
     let mut window_ids = BTreeSet::new();
+    let mut span: Option<(Date, Date)> = None;
+    let mut rows_outside_window = 0;
+    let mut net_before_window = ExactDecimal::zero();
+    let mut net_after_window = ExactDecimal::zero();
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
@@ -355,9 +524,28 @@ pub fn build(
         };
         let txn_id = transaction_id(options.account_number, date, row);
         statement_ids.insert(txn_id.clone());
-        if options.date_from.is_some_and(|from| date < from)
-            || options.date_to.is_some_and(|to| date > to)
-        {
+        span = Some(span.map_or((date, date), |(first, last)| {
+            (first.min(date), last.max(date))
+        }));
+        let before = options.date_from.is_some_and(|from| date < from);
+        if before || options.date_to.is_some_and(|to| date > to) {
+            rows_outside_window += 1;
+            let net = match (
+                money(row.get(DEBIT), DEBIT, number)?,
+                money(row.get(CREDIT), CREDIT, number)?,
+            ) {
+                (Some(debit), None) => ExactDecimal::zero().checked_subtract(&debit),
+                (None, Some(credit)) => Ok(credit),
+                // `reconcile` refused a row with both; a row with neither moved nothing.
+                _ => Ok(ExactDecimal::zero()),
+            }
+            .map_err(out_of_range)?;
+            let sum = if before {
+                &mut net_before_window
+            } else {
+                &mut net_after_window
+            };
+            *sum = sum.checked_add(&net).map_err(out_of_range)?;
             continue;
         }
         window_ids.insert(txn_id.clone());
@@ -480,6 +668,12 @@ pub fn build(
         let unidentified = !dont_know && ledger_key(&ledger) == ledger_key(options.suspense_ledger);
         let suspense = dont_know || unidentified;
         let shown = if suspense { &party } else { &ledger };
+        // A suspense line already names its party where the ledger would be.
+        let payee = if suspense {
+            None
+        } else {
+            StatementPayee::new(&party, number)?
+        };
         let mut narration = squash(&format!(
             "{mode} {reference} {} {shown} | {} | {}",
             if outward { "to" } else { "from" },
@@ -499,6 +693,18 @@ pub fn build(
                     "row {number}'s narration carries control characters, the reserved [BRIDGE: marker, or more than {MAX_NARRATION_CHARS} characters"
                 ),
             ));
+        }
+        if let Some(payee) = &payee {
+            narration.push_str(&payee.segment());
+            if !admissible_text(&narration, MAX_NARRATION_CHARS) {
+                return Err(Refusal::at_row(
+                    "party_not_admissible",
+                    number,
+                    format!(
+                        "row {number}'s party makes the narration longer than {MAX_NARRATION_CHARS} characters or adds a character a narration cannot carry"
+                    ),
+                ));
+            }
         }
         require_unique(&mut seen, &txn_id, number)?;
         let (debit_ledger, credit_ledger) = if outward {
@@ -576,7 +782,14 @@ pub fn build(
             "no statement row falls inside the date window; the window does not overlap the statement",
         ));
     }
-    Ok(Build { proposals, records })
+    Ok(Build {
+        proposals,
+        records,
+        span,
+        rows_outside_window,
+        net_before_window,
+        net_after_window,
+    })
 }
 
 /// What [`selfcheck`] counted.
@@ -748,4 +961,28 @@ pub fn group_counterparties(
             }
         })
         .collect())
+}
+
+#[cfg(test)]
+mod statement_payee_tests {
+    use super::*;
+    use crate::bank::{UNNAMED, UNRESOLVED};
+    use crate::cash::{CASH_DEPOSIT, CASH_WITHDRAWAL};
+
+    #[test]
+    fn only_a_printed_counterparty_becomes_a_payee() {
+        for not_a_counterparty in ["", UNRESOLVED, UNNAMED, CASH_WITHDRAWAL, CASH_DEPOSIT]
+            .into_iter()
+            .chain(PARSER_CATEGORIES)
+        {
+            assert!(
+                matches!(StatementPayee::new(not_a_counterparty, 2), Ok(None)),
+                "{not_a_counterparty:?}"
+            );
+        }
+        let payee = StatementPayee::new("RAVI KUMAR", 2).unwrap().unwrap();
+        assert_eq!(payee.segment(), " | Statement party: RAVI KUMAR");
+        let refusal = StatementPayee::new("A|B", 2).err().unwrap();
+        assert_eq!(refusal.category, "party_not_admissible");
+    }
 }

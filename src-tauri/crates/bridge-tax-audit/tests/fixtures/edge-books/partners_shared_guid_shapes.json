@@ -1,0 +1,355 @@
+{
+ "comment": "partners_40b_194t with vouchers that share a GUID, each counted in a limit: partner P has two of each shape, under one GUID per shape (blank for two): interest paid from the bank touching no capital (off-capital), interest reversals and remuneration reversals (not of the plain shape), interest and remuneration not split with the capital also debited, interest with the capital both credited and debited, and remuneration also crediting a payable this test does not read. Every count says 2, and each voucher is named and cited.",
+ "groups": {
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Capital Account": null,
+  "Indirect Expenses": null
+ },
+ "ledgers": [
+  {
+   "name": "Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "edge-partners_shared_guid_shapes-000"
+  },
+  {
+   "name": "Interest P",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_shared_guid_shapes-001"
+  },
+  {
+   "name": "P Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "edge-partners_shared_guid_shapes-002"
+  },
+  {
+   "name": "Remuneration P",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "edge-partners_shared_guid_shapes-003"
+  },
+  {
+   "name": "Sundry Payable",
+   "chain": [
+    "Current Liabilities"
+   ],
+   "guid": "edge-partners_shared_guid_shapes-004"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 1020000,
+   "closing": 38980000
+  },
+  {
+   "ledger": "Interest P",
+   "opening": 0,
+   "debit": 7600000,
+   "credit": 500000,
+   "closing": 7100000
+  },
+  {
+   "ledger": "P Capital",
+   "opening": -40000000,
+   "debit": 1920000,
+   "credit": 9600000,
+   "closing": -47680000
+  },
+  {
+   "ledger": "Remuneration P",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 200000,
+   "closing": 1800000
+  },
+  {
+   "ledger": "Sundry Payable",
+   "opening": 0,
+   "debit": 0,
+   "credit": 200000,
+   "closing": -200000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "p-int",
+   "number": "1",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     4000000
+    ],
+    [
+     "P Capital",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "number": "2",
+   "date": "2025-05-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Interest P",
+     500000
+    ],
+    [
+     "Bank",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "number": "3",
+   "date": "2025-06-15",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Interest P",
+     500000
+    ],
+    [
+     "Bank",
+     -500000
+    ]
+   ]
+  },
+  {
+   "guid": "rev-p",
+   "number": "4",
+   "date": "2025-07-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     -200000
+    ],
+    [
+     "P Capital",
+     200000
+    ]
+   ]
+  },
+  {
+   "guid": "rev-p",
+   "number": "5",
+   "date": "2025-08-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     -300000
+    ],
+    [
+     "P Capital",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "mix-p",
+   "number": "6",
+   "date": "2025-09-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     800000
+    ],
+    [
+     "Remuneration P",
+     400000
+    ],
+    [
+     "P Capital",
+     -1500000
+    ],
+    [
+     "P Capital",
+     310000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "mix-p",
+   "number": "7",
+   "date": "2025-10-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     800000
+    ],
+    [
+     "Remuneration P",
+     400000
+    ],
+    [
+     "P Capital",
+     -1500000
+    ],
+    [
+     "P Capital",
+     310000
+    ],
+    [
+     "Bank",
+     -10000
+    ]
+   ]
+  },
+  {
+   "guid": "set-p",
+   "number": "8",
+   "date": "2025-11-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     500000
+    ],
+    [
+     "P Capital",
+     -800000
+    ],
+    [
+     "P Capital",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "set-p",
+   "number": "9",
+   "date": "2025-12-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest P",
+     500000
+    ],
+    [
+     "P Capital",
+     -800000
+    ],
+    [
+     "P Capital",
+     300000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "number": "10",
+   "date": "2026-01-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration P",
+     600000
+    ],
+    [
+     "P Capital",
+     -500000
+    ],
+    [
+     "Sundry Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "",
+   "number": "11",
+   "date": "2026-02-15",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration P",
+     600000
+    ],
+    [
+     "P Capital",
+     -500000
+    ],
+    [
+     "Sundry Payable",
+     -100000
+    ]
+   ]
+  },
+  {
+   "guid": "rrev-p",
+   "number": "12",
+   "date": "2025-12-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration P",
+     -100000
+    ],
+    [
+     "P Capital",
+     100000
+    ]
+   ]
+  },
+  {
+   "guid": "rrev-p",
+   "number": "13",
+   "date": "2026-01-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Remuneration P",
+     -100000
+    ],
+    [
+     "P Capital",
+     100000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "partners_40b_194t"
+ ],
+ "entity_type": "firm",
+ "partners": {
+  "pp": {
+   "capital_ledgers": [
+    "P Capital"
+   ],
+   "interest_ledger": "Interest P",
+   "remuneration_ledger": "Remuneration P"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ },
+ "tds_payable_ledgers": [
+  "TDS Payable"
+ ]
+}

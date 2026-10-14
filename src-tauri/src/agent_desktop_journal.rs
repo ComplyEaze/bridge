@@ -93,6 +93,8 @@ impl DesktopJournalService {
                 let no_attempt_recorded = failure.code == "import_not_dispatched";
                 let message = if no_attempt_recorded {
                     "No posting attempt is recorded for this original Journal."
+                } else if failure.code == super::post::DESKTOP_LEDGER_LINE_BREAK {
+                    super::post::DESKTOP_LEDGER_LINE_BREAK_ACTION
                 } else {
                     "ComplyEaze Bridge could not confirm this original Journal. Reconcile it again after the underlying condition changes."
                 };
@@ -123,6 +125,7 @@ impl DesktopJournalService {
     ) -> Result<DesktopJournalReview, String> {
         if snapshot.dispatched {
             let _ = admit_saved_journal_integrity(&snapshot.batch, &self.server.settings.endpoint)?;
+            super::post::refuse_a_line_break_name_on_the_desktop(&snapshot.batch)?;
         } else {
             let _ = admit_saved_journal(&snapshot.batch, &self.server.settings.endpoint)?;
         }
@@ -143,7 +146,7 @@ impl DesktopJournalService {
             .ok_or_else(|| "import_post_company_missing".to_string())?;
         let (total_debit, total_credit) = totals(&snapshot.batch.vouchers)?;
         let details = DesktopJournalDetails {
-            date: voucher.date.clone(),
+            date: voucher.date.as_str().to_owned(),
             reference: voucher.reference.clone(),
             narration: super::posted_narration(voucher).map(str::to_owned),
             entries: voucher
@@ -171,7 +174,7 @@ impl DesktopJournalService {
                 name: company.name,
                 guid: company.guid,
                 company_number: company.company_number,
-                books_from: company.books_from,
+                books_from: company.books_from.as_str().to_owned(),
             },
             built_at: snapshot.batch.built_at,
             dispatched: snapshot.dispatched,

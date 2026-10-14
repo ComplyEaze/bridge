@@ -3,6 +3,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use bridge_tally_core::{ExactDecimal, ReadWindow};
 use std::net::SocketAddr;
 use tally_protocol_simulator::{Fixture, ScenarioPlan, SequenceSimulator, WireEncoding};
 use tokio::{
@@ -67,7 +68,7 @@ fn observed_identity(
 ) -> VerifiedCompanyIdentity {
     VerifiedCompanyIdentity::from_observed_companies(
         name.to_owned(),
-        guid.to_owned(),
+        crate::tally::test_company_guid(guid),
         number.to_owned(),
         books_from.to_owned(),
         &[TallyCompany {
@@ -617,20 +618,10 @@ fn failed_or_unobserved_canary_cannot_authorize_snapshot_start() {
     }
 }
 
-#[test]
-fn period_report_company_guid_matching_is_ascii_case_insensitive_only() {
-    assert!(company_guids_equal(
-        "4C42A771-AbCd-4DeF-8AbC-001122AaBbCc",
-        "4c42a771-abcd-4def-8abc-001122aabbcc"
-    ));
-    assert!(!company_guids_equal("company-guid-a", "company-guid-b"));
-    assert!(!company_guids_equal("company-guid", " company-guid "));
-}
-
 #[tokio::test]
 async fn presentation_equivalent_company_snapshot_probe_stops_before_core_exports() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     // `TallyClient::probe` requests the trusted `Company` collection
     // (`CompanyListV2`) first, so the presentation-equivalent same-GUID
     // rows this test exercises are expressed in that shape rather than the legacy
@@ -681,16 +672,15 @@ async fn presentation_equivalent_company_snapshot_probe_stops_before_core_export
 }
 
 #[tokio::test]
-async fn failed_period_read_preserves_its_error_after_a_closing_identity_request() {
+async fn failed_source_read_preserves_its_error_after_a_failed_closing_identity_request() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     let company_collection = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
     let (address, server) = spawn_method_routed_server(vec![
-        company_collection.clone(),
-        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
         company_collection,
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
     ])
     .await;
     let config = TallyConfig {
@@ -708,7 +698,7 @@ async fn failed_period_read_preserves_its_error_after_a_closing_identity_request
         display_name: "Synthetic Company".to_string(),
     };
     let context = RequestContext {
-        run_id: "run-period-source-failure".to_string(),
+        run_id: "run-source-failure".to_string(),
         company: company.clone(),
         pack: CapabilityPackId::CoreAccounting,
         schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
@@ -720,120 +710,27 @@ async fn failed_period_read_preserves_its_error_after_a_closing_identity_request
         filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
     };
     let connector =
-        RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
-            .unwrap();
-
-    let error = connector
-        .read_core_period_balance_report(&context)
+        RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context).unwrap();
+    let opening = connector
+        .verify_snapshot_identity()
         .await
-        .expect_err("the rejected period response must remain the reported failure");
+        .expect("opening identity");
+
+    // The closing identity request is itself rejected; the earlier source
+    // failure must still be the one reported.
+    let error = connector
+        .finish_snapshot_source_read::<()>(
+            Err(protocol_error("synthetic_source_failure")),
+            &opening,
+        )
+        .await
+        .expect_err("the source failure must remain the reported failure");
     assert!(matches!(
         error,
-        TallyError::Protocol { code } if code == "application_response_rejected"
+        TallyError::Protocol { code } if code == "synthetic_source_failure"
     ));
     let methods = server.await.expect("join source-failure server");
-    assert_eq!(methods, ["POST", "POST", "POST"]);
-}
-
-/// The period report is a custom report whose TDL Education answers with a
-/// blocking dialog on the Tally screen (bridge#45). With Education observed,
-/// by the identity read that precedes it or by the run's own probe, it is
-/// refused before it is sent. Licensed, the same read goes out.
-#[tokio::test]
-async fn the_period_report_is_refused_before_sending_when_education_is_observed() {
-    let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
-    let collection = |edumode: &str| {
-        format!(
-            r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM><EDUMODE TYPE="Logical">{edumode}</EDUMODE></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
-        )
-    };
-    let education_profile = bridge_tally_core::CapabilityProfile {
-        profile_version: 4,
-        product: "TallyPrime".to_string(),
-        release: Some("7.1".to_string()),
-        license_tier: None,
-        mode: Some("Education".to_string()),
-        transports: Default::default(),
-        features: Default::default(),
-        packs: Default::default(),
-    };
-    for (case, responses, probed_education) in [
-        (
-            "identity read reports Education",
-            vec![collection("Yes")],
-            false,
-        ),
-        ("probe reported Education", vec![collection("No")], true),
-        (
-            "licensed",
-            vec![
-                collection("No"),
-                "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER></ENVELOPE>".to_string(),
-                collection("No"),
-            ],
-            false,
-        ),
-    ] {
-        let licensed = case == "licensed";
-        let (address, server) = spawn_method_routed_server_refusing_extra_requests(responses).await;
-        let config = TallyConfig {
-            host: address.ip().to_string(),
-            port: address.port(),
-        };
-        let company = CompanyRef {
-            identity: company_source_identity(
-                &format!("tally_xml_http:http://{address}"),
-                company_guid,
-                "100001",
-                "Synthetic Company",
-                "20260401",
-            ),
-            display_name: "Synthetic Company".to_string(),
-        };
-        let context = RequestContext {
-            run_id: "run-period-education".to_string(),
-            company: company.clone(),
-            pack: CapabilityPackId::CoreAccounting,
-            schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
-            window: ReadWindow {
-                from_yyyymmdd: "20260701".to_string(),
-                to_yyyymmdd: "20260701".to_string(),
-            },
-            query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
-            filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
-        };
-        let connector =
-            RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
-                .unwrap();
-        if probed_education {
-            assert_eq!(
-                connector
-                    .observe_snapshot_profile(&education_profile)
-                    .unwrap(),
-                DateBoundaryProfile::EducationRestricted
-            );
-        }
-        let error = connector
-            .read_core_period_balance_report(&context)
-            .await
-            .expect_err(case);
-        let methods = server.await.expect("join period server");
-        if licensed {
-            // The report was sent (and its rejection is the reported failure).
-            assert!(
-                matches!(&error, TallyError::Protocol { code } if code == "application_response_rejected"),
-                "{case}: {error:?}"
-            );
-            assert_eq!(methods, ["POST", "POST", "POST"], "{case}");
-        } else {
-            assert!(
-                matches!(&error, TallyError::Unsupported { code } if code == "education_report_family_unsupported"),
-                "{case}: {error:?}"
-            );
-            assert_eq!(methods, ["POST"], "{case}: only the identity read went out");
-        }
-    }
+    assert_eq!(methods, ["POST", "POST"]);
 }
 
 /// `discover_companies` requests the native `Company` collection
@@ -951,8 +848,508 @@ async fn core_window_bracket_fails_closed_when_altmstid_is_absent() {
         ),
         "unexpected error: {error:?}"
     );
+    wr2_core_window_sequence::assert_persisted_code(&error, "company_altmstid_missing");
     let methods = server.await.expect("join routed Tally server");
     assert_eq!(methods, ["POST", "POST"]);
+}
+
+/// The captured WR2 core window, served in the exact order
+/// `extract_core_window` requests it. Every response is a captured file: the
+/// company-extent collection and the native groups, ledgers, voucher types and
+/// vouchers of one live company (no hand-authored response is used). Only the
+/// extent pairs vary per test, one edited field at a time.
+mod wr2_core_window_sequence {
+    use super::*;
+
+    pub(super) const COMPANY_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    pub(super) const COMPANY: &str = "WR2 Unicode Lab";
+    pub(super) const EXTENTS: &str = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    );
+    const GROUPS: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/group_snapshot_wr2_with_identity.utf16le.xml"
+    );
+    const LEDGERS: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/ledgers_native_wr2_core_window.utf16le.xml"
+    );
+    const VOUCHER_TYPES: &str = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/voucher_types_native_wr2.xml"
+    );
+    const VOUCHERS: &str = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/vouchers_native_wr2.xml"
+    );
+    pub(super) const VOUCHER_WITNESS: &str = "<ALTVCHID TYPE=\"Number\"> 17</ALTVCHID>";
+
+    /// Copy of the captured extent collection with exactly one substring
+    /// replaced; the original must occur exactly once so the edit is one field.
+    pub(super) fn extents_with(original: &str, replacement: &str) -> String {
+        assert_eq!(
+            EXTENTS.matches(original).count(),
+            1,
+            "the edited field must occur exactly once in the capture"
+        );
+        EXTENTS.replace(original, replacement)
+    }
+
+    /// The six GUID-verified extent brackets, each a pair of reads, in request
+    /// order: groups opening/closing, ledgers opening/closing, vouchers
+    /// opening/closing.
+    pub(super) const EXTENT_BRACKETS: usize = 6;
+    /// 12 extent reads + 2 groups + 2 ledgers + 1 voucher types + 1 vouchers.
+    pub(super) const POSTS_IN_A_SUCCESSFUL_WINDOW: usize = 18;
+
+    pub(super) fn posts(brackets: [(&str, &str); EXTENT_BRACKETS]) -> Vec<String> {
+        let groups = decode_bomless_utf16le_capture(GROUPS);
+        let ledgers = decode_bomless_utf16le_capture(LEDGERS);
+        let extent = |index: usize| [brackets[index].0.to_owned(), brackets[index].1.to_owned()];
+        let mut posts = Vec::new();
+        posts.extend(extent(0));
+        posts.extend([groups.clone(), groups]);
+        posts.extend(extent(1));
+        posts.extend(extent(2));
+        posts.extend([ledgers.clone(), ledgers]);
+        posts.extend(extent(3));
+        posts.push(VOUCHER_TYPES.to_owned());
+        posts.extend(extent(4));
+        posts.push(VOUCHERS.to_owned());
+        posts.extend(extent(5));
+        assert_eq!(posts.len(), POSTS_IN_A_SUCCESSFUL_WINDOW);
+        posts
+    }
+
+    /// The code a desktop snapshot records and shows for this refusal, never
+    /// the `response_parse_failed` catch-all. That the stored value is
+    /// persistable is asserted in the snapshot engine's own test.
+    pub(super) fn assert_persisted_code(error: &TallyError, expected: &str) {
+        let persisted = crate::sync::snapshot::tally_error_code(error);
+        assert_eq!(persisted, expected, "persisted code for {error:?}");
+        assert_ne!(persisted, "response_parse_failed");
+    }
+
+    pub(super) async fn run(
+        responses: Vec<String>,
+    ) -> (Result<CanonicalPackWindow, TallyError>, Vec<String>) {
+        let _simulator_guard = simulator_test_lock().lock().await;
+        let (address, server) = spawn_method_routed_server(responses).await;
+        let result = extract_from(address).await;
+        let methods = tokio::time::timeout(std::time::Duration::from_secs(10), server)
+            .await
+            .expect("the routed server saw every response it was given requested")
+            .expect("join routed Tally server");
+        (result, methods)
+    }
+
+    /// One `extract_core_window` of the captured company against `address`.
+    pub(super) async fn extract_from(
+        address: SocketAddr,
+    ) -> Result<CanonicalPackWindow, TallyError> {
+        let identity = observed_identity(COMPANY, COMPANY_GUID, "100004", "20260401");
+        let (connector, context) = connector_at(address);
+        connector
+            .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
+            .await
+    }
+
+    /// A connector for the captured company at `address`, with its context.
+    pub(super) fn connector_at(address: SocketAddr) -> (RuntimeTallyConnector, RequestContext) {
+        let config = TallyConfig {
+            host: address.ip().to_string(),
+            port: address.port(),
+        };
+        let company = CompanyRef {
+            identity: company_source_identity(
+                &format!("tally_xml_http:http://{address}"),
+                COMPANY_GUID,
+                "100004",
+                COMPANY,
+                "20260401",
+            ),
+            display_name: COMPANY.to_string(),
+        };
+        let context = RequestContext {
+            run_id: "run-core-window-bracket-refusal".to_string(),
+            company: company.clone(),
+            pack: CapabilityPackId::CoreAccounting,
+            schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+            window: ReadWindow {
+                from_yyyymmdd: "20260401".to_string(),
+                to_yyyymmdd: "20260930".to_string(),
+            },
+            query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+            filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+        };
+        let connector =
+            RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
+                .unwrap();
+        (connector, context)
+    }
+
+    /// Serves `responses` in order, except that the POST numbered
+    /// `closed_post` (from 0) is read in full and then closed unanswered, as
+    /// a connection lost after Tally received the request. Returns the count
+    /// of POSTs received so far.
+    pub(super) async fn spawn_server_closing_one_post(
+        responses: Vec<String>,
+        closed_post: usize,
+    ) -> (
+        SocketAddr,
+        Arc<std::sync::atomic::AtomicUsize>,
+        JoinHandle<()>,
+    ) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the local double");
+        let address = listener.local_addr().expect("double address");
+        let received = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&received);
+        let server = tokio::spawn(async move {
+            let mut responses = responses.into_iter();
+            loop {
+                let (mut socket, _) = listener.accept().await.expect("accept a send");
+                let request =
+                    crate::tally::connection::tests::read_complete_http_request(&mut socket).await;
+                assert!(
+                    request.starts_with(b"POST "),
+                    "a core-window read is a POST"
+                );
+                if counted.fetch_add(1, Ordering::SeqCst) == closed_post {
+                    continue;
+                }
+                let response = utf16_xml_response(responses.next().expect("a response to serve"));
+                socket.write_all(&response).await.expect("write a response");
+            }
+        });
+        (address, received, server)
+    }
+}
+
+/// Each export of a core window, in turn, has its connection closed after the
+/// whole request was received: both group exports, both ledger exports, the
+/// voucher-type export and the voucher export, by their place among the
+/// eighteen requests. None is sent again, and the window ends with the
+/// transport's typed error. A second copy would have been answered here, and
+/// the window would have built.
+#[tokio::test]
+async fn core_window_sends_each_export_once_when_its_connection_closes_after_the_request() {
+    use wr2_core_window_sequence as seq;
+    const EXPORTS: [usize; 6] = [2, 3, 8, 9, 12, 15];
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let extent = seq::EXTENTS;
+    for export in EXPORTS {
+        let (address, received, server) = seq::spawn_server_closing_one_post(
+            seq::posts([(extent, extent); seq::EXTENT_BRACKETS]),
+            export,
+        )
+        .await;
+        let result = seq::extract_from(address).await;
+        server.abort();
+        let error = result.expect_err("an export that is never answered must fail the window");
+        assert!(
+            matches!(error, TallyError::Unreachable),
+            "request {export}: unexpected error: {error:?}"
+        );
+        assert_eq!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            export + 1,
+            "request {export} was sent again"
+        );
+    }
+}
+
+/// Control for the test above, and the other half of the rule: the first two
+/// requests of a core window are the two small extent reads of a pair. When
+/// either has its connection closed the same way it is sent again, and the
+/// window builds after one request more than the eighteen of an undisturbed
+/// run.
+#[tokio::test]
+async fn core_window_sends_an_extent_read_again_when_its_connection_closes_after_the_request() {
+    use wr2_core_window_sequence as seq;
+    const EXTENT_READS_OF_A_PAIR: [usize; 2] = [0, 1];
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let extent = seq::EXTENTS;
+    for extent_read in EXTENT_READS_OF_A_PAIR {
+        let (address, received, server) = seq::spawn_server_closing_one_post(
+            seq::posts([(extent, extent); seq::EXTENT_BRACKETS]),
+            extent_read,
+        )
+        .await;
+        let result = seq::extract_from(address).await;
+        server.abort();
+        result.expect("the window must build once the extent read is sent again");
+        assert_eq!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            seq::POSTS_IN_A_SUCCESSFUL_WINDOW + 1
+        );
+    }
+}
+
+/// The company list is the connector's other small read. Closed the same way
+/// it is sent again, and discovery returns the captured company. The response
+/// served is the captured extent collection, which holds that company's row.
+#[tokio::test]
+async fn discover_companies_sends_the_company_list_again_when_its_connection_closes_after_the_request(
+) {
+    use wr2_core_window_sequence as seq;
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let (address, received, server) =
+        seq::spawn_server_closing_one_post(vec![seq::EXTENTS.to_owned()], 0).await;
+    let (connector, _context) = seq::connector_at(address);
+    let discovered = connector.discover_companies().await;
+    server.abort();
+    let discovered = discovered.expect("discovery must succeed once the list is sent again");
+    assert!(discovered
+        .iter()
+        .any(|company| company.identity == connector.company.identity));
+    assert_eq!(received.load(std::sync::atomic::Ordering::SeqCst), 2);
+}
+
+/// Control for the three refusals below: the same captured sequence with no
+/// edit succeeds after exactly the 18 requests those tests count, so none of
+/// them can pass by the sequence failing earlier than intended.
+#[tokio::test]
+async fn core_window_unedited_captured_sequence_succeeds_in_eighteen_posts() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let (result, methods) = seq::run(seq::posts([(extent, extent); seq::EXTENT_BRACKETS])).await;
+    let window = result.expect("the unedited captured core window must build");
+    let PackBatch::CoreAccounting(batch) = window.batch else {
+        panic!("wrong pack");
+    };
+    assert_eq!(batch.vouchers.len(), 3);
+    assert_eq!(methods, vec!["POST"; seq::POSTS_IN_A_SUCCESSFUL_WINDOW]);
+}
+
+/// Everything reads cleanly, then the voucher-read bracket's closing extent
+/// reports a higher voucher AlterID high-water than its opening extent: the
+/// book changed while the vouchers were being read. Both closing reads carry
+/// the same edit, so the paired-read drift check passes and only the
+/// opening/closing comparison can refuse.
+#[tokio::test]
+async fn core_window_refuses_a_book_that_changed_during_the_voucher_read() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let changed = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[5] = (&changed, &changed);
+    let (result, methods) = seq::run(seq::posts(brackets)).await;
+    let error = result.expect_err("a book changed during the voucher read must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_changed_during_voucher_read"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
+    assert_eq!(methods, vec!["POST"; seq::POSTS_IN_A_SUCCESSFUL_WINDOW]);
+}
+
+/// The groups bracket's closing extent pair reports a higher voucher AlterID
+/// than its opening pair: the book changed while the groups were being read.
+/// Both closing reads carry the same edit, so the paired-read drift check
+/// passes and only the opening/closing comparison can refuse.
+#[tokio::test]
+async fn core_window_refuses_a_book_that_changed_during_the_group_read() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let changed = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[1] = (&changed, &changed);
+    // Opening pair, two group exports and the closing pair: six requests.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(6);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a book changed during the group read must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_changed_during_group_read"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
+    assert_eq!(methods, vec!["POST"; 6]);
+}
+
+/// The ledgers bracket's closing extent pair reports a higher voucher AlterID
+/// than its opening pair. The groups bracket before it is clean, so the
+/// refusal is the ledger bracket's own comparison.
+#[tokio::test]
+async fn core_window_refuses_a_book_that_changed_during_the_ledger_read() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let changed = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[3] = (&changed, &changed);
+    // The groups bracket (six requests), then the ledgers bracket's opening
+    // pair, two ledger exports and its closing pair: twelve requests.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(12);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a book changed during the ledger read must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_changed_during_ledger_read"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "source_changed_during_run");
+    assert_eq!(methods, vec!["POST"; 12]);
+}
+
+/// The two reads that make up one extent bracket disagree. Both parse for the
+/// selected company; only their values differ (a voucher AlterID), so the
+/// refusal is the pair comparison, before any export is requested.
+#[tokio::test]
+async fn core_window_refuses_two_extent_reads_of_one_bracket_that_differ() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let drifted = seq::extents_with(
+        seq::VOUCHER_WITNESS,
+        "<ALTVCHID TYPE=\"Number\"> 18</ALTVCHID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (extent, &drifted);
+    // The refusal lands after the first two requests; serve only those.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(2);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("two differing extent reads must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_book_extent_drifted"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "company_book_extent_drifted");
+    assert_eq!(methods, ["POST", "POST"]);
+}
+
+/// An extent response whose GUID belongs to no row for the selected company
+/// (the captured WR2 row's GUID is edited to another company's). The response
+/// is well formed, so the transport seam accepts it and the connector's own
+/// parse names the refusal: a wrong company, not a generic protocol rejection.
+#[tokio::test]
+async fn core_window_refuses_an_extent_response_for_a_different_company() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let foreign = seq::extents_with(
+        &format!("<GUID TYPE=\"String\">{}</GUID>", seq::COMPANY_GUID),
+        "<GUID TYPE=\"String\">00000000-0000-4000-8000-000000000001</GUID>",
+    );
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (&foreign, &foreign);
+    // The refusal lands on the first request; serve only that one.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(1);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("an extent for a different company must be refused");
+    assert!(
+        matches!(
+            &error,
+            TallyError::InvalidData { code } if code == "company_identity_mismatch"
+        ),
+        "unexpected error: {error:?}"
+    );
+    seq::assert_persisted_code(&error, "company_identity_mismatch");
+    assert_eq!(methods, ["POST"]);
+}
+
+/// A malformed extent response (the captured bytes without their closing
+/// envelope tag) is still rejected at the transport seam, as a protocol
+/// rejection: only a well-formed response for another company reaches the
+/// connector's identity parse.
+#[tokio::test]
+async fn core_window_rejects_a_malformed_extent_response_at_the_transport_seam() {
+    use wr2_core_window_sequence as seq;
+    let extent = seq::EXTENTS;
+    let truncated = seq::extents_with("</ENVELOPE>", "");
+    let mut brackets = [(extent, extent); seq::EXTENT_BRACKETS];
+    brackets[0] = (&truncated, &truncated);
+    // The rejection lands on the first request; serve only that one.
+    let mut responses = seq::posts(brackets);
+    responses.truncate(1);
+    let (result, methods) = seq::run(responses).await;
+    let error = result.expect_err("a malformed extent response must be rejected");
+    assert!(
+        matches!(
+            &error,
+            TallyError::Protocol { code } if code == "application_response_rejected"
+        ),
+        "unexpected error: {error:?}"
+    );
+    assert_eq!(methods, ["POST"]);
+}
+
+/// The source-identity match lowercases the GUID but accepts any spelling, so
+/// a pin built from an un-hyphenated GUID still matches the company that
+/// reports the same spelling. Only the strict parse that follows refuses it,
+/// with its own typed code rather than "not found".
+#[test]
+fn snapshot_identity_refuses_a_matching_company_whose_guid_is_not_strict_shaped() {
+    let lineage = "tally_xml_http:http://127.0.0.1:9000";
+    let unhyphenated = "4C42A771ABCD4DEF8ABC001122AABBCC";
+    let company = CompanyRef {
+        identity: company_source_identity(
+            lineage,
+            unhyphenated,
+            "100001",
+            "Synthetic Company",
+            "20260401",
+        ),
+        display_name: "Synthetic Company".to_string(),
+    };
+    let context = RequestContext {
+        run_id: "run-non-strict-company-guid".to_string(),
+        company: company.clone(),
+        pack: CapabilityPackId::CoreAccounting,
+        schema_version: CORE_ACCOUNTING_SCHEMA_VERSION,
+        window: ReadWindow {
+            from_yyyymmdd: "20260701".to_string(),
+            to_yyyymmdd: "20260701".to_string(),
+        },
+        query_profile: bridge_tally_core::CanonicalText::parse(CORE_QUERY_PROFILE).unwrap(),
+        filters_sha256: bridge_tally_core::CanonicalText::parse("0".repeat(64)).unwrap(),
+    };
+    let connector = RuntimeTallyConnector::new(
+        TallyRuntime::default(),
+        TallyConfig {
+            host: "127.0.0.1".to_string(),
+            port: 9000,
+        },
+        company,
+        context,
+    )
+    .unwrap();
+    let companies = [TallyCompany {
+        name: "Synthetic Company".to_string(),
+        guid: Some(unhyphenated.to_string()),
+        company_number: Some("100001".to_string()),
+        books_from: Some("20260401".to_string()),
+    }];
+
+    let error = connector
+        .verify_snapshot_identity_from_companies(&companies)
+        .expect_err("a GUID that is not 8-4-4-4-12 must not become a verified identity");
+    assert!(
+        matches!(
+            &error,
+            TallyError::Protocol { code } if code == "company_identity_invalid"
+        ),
+        "unexpected error: {error:?}"
+    );
 }
 
 #[tokio::test]
@@ -1033,7 +1430,7 @@ async fn direct_company_snapshot_probe_rejects_identity_without_company_collecti
 #[tokio::test]
 async fn snapshot_start_uses_its_fresh_education_profile_before_ledger_export() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "education-mid-month-guid";
+    let company_guid = "3f9b6e04-d1a7-4c58-9e20-b84a6c7d1f35";
     let company_collection = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Education Mid-month"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20240115</BOOKSFROM><PRODUCTNAME TYPE="String">TallyPrime</PRODUCTNAME><EDUMODE>Yes</EDUMODE><SILVER>No</SILVER><GOLD>No</GOLD></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
@@ -1121,7 +1518,7 @@ async fn snapshot_start_uses_its_fresh_education_profile_before_ledger_export() 
 #[tokio::test]
 async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_freshly() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     // `TallyClient::probe` requests the trusted `Company` collection
     // (`CompanyListV2`) first; this shape is what every `probe`/`probe_fresh`
     // POST below answers with, so the trusted path resolves the company in
@@ -1225,7 +1622,6 @@ async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_
         .reserve_cached_probe_fresh(&config, &review_id, 300_000)
         .expect("review cache remains readable")
         .expect("snapshot probes preserve interactive review");
-    assert_eq!(preserved.review_id(), review_id);
     assert_eq!(preserved.observed_at_unix_ms(), observed_at_unix_ms);
     assert_eq!(preserved.result().companies.len(), reviewed_company_count);
     assert_eq!(preserved.result().profile.product, reviewed_product);
@@ -1267,7 +1663,7 @@ async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_
 #[tokio::test]
 async fn same_context_snapshot_read_does_not_reuse_pre_run_canary_rows() {
     let _simulator_guard = simulator_test_lock().lock().await;
-    let company_guid = "synthetic-company-guid";
+    let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     let identity = observed_identity("Synthetic Company", company_guid, "100001", "20240101");
     let empty_native_groups = native_groups(company_guid, &[]);
     let second_group = native_groups(company_guid, &[("Post-start Assets", "&#4; Primary")]);

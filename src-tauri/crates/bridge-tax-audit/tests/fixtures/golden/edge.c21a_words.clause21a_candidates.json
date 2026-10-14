@@ -1,0 +1,718 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "clause21a_candidates",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "797c2b1bb11ca213",
+  "population_note_text": "Every debit line on a ledger under Purchase Accounts, Direct Expenses or Indirect Expenses, in the books population; credits on those ledgers that match are shown beside.",
+  "figures": [
+    {
+      "id": "clause21a_candidates.candidate_total_benefit_perquisite",
+      "value": 700000,
+      "unit": "paise",
+      "definition_sha256_16": "4bdc9e22cc874656",
+      "definition_text": "Clause 21(a) (viii) benefit or perquisite in breach of the recipient's rules: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v09",
+          "label": "Payment edge-c21a_words-v09 on 2025-06-01, Advertisement, ₹7,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_capital",
+      "value": 13160700,
+      "unit": "paise",
+      "definition_sha256_16": "4ef775a47629d6ac",
+      "definition_text": "Clause 21(a) (i) capital expenditure: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v01",
+          "label": "Purchase edge-c21a_words-v01 on 2025-06-01, Purchases, ₹1,25,007"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v18",
+          "label": "Payment edge-c21a_words-v18 on 2025-06-01, Purchases, ₹6,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v21",
+          "label": "Payment edge-c21a_words-v21 on 2025-06-01, Freight Inward, ₹300"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v21",
+          "label": "Payment edge-c21a_words-v21 on 2025-06-01, Purchases, ₹300"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_club_fee",
+      "value": 1500000,
+      "unit": "paise",
+      "definition_sha256_16": "21013a72d5c7da0d",
+      "definition_text": "Clause 21(a) (iv) club entrance fees and subscriptions: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v04",
+          "label": "Payment edge-c21a_words-v04 on 2025-06-01, General Expenses, ₹15,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_club_service",
+      "value": 800000,
+      "unit": "paise",
+      "definition_sha256_16": "bc699a2417429df3",
+      "definition_text": "Clause 21(a) (v) club services and facilities: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v05",
+          "label": "Payment edge-c21a_words-v05 on 2025-06-01, General Expenses, ₹8,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_compounding",
+      "value": 5000000,
+      "unit": "paise",
+      "definition_sha256_16": "29e8e0db199a48a7",
+      "definition_text": "Clause 21(a) (vii) compounding an offence: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v08",
+          "label": "Payment edge-c21a_words-v08 on 2025-06-01, Legal Charges, ₹50,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_late_fee",
+      "value": 320000,
+      "unit": "paise",
+      "definition_sha256_16": "ca0b4b15c00cae91",
+      "definition_text": "Clause 21(a) late fees -- not 21(a)(vi)/(via): the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v06",
+          "label": "Payment edge-c21a_words-v06 on 2025-06-01, Penalty and Fines, ₹3,000, multiple matches"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v17",
+          "label": "Payment edge-c21a_words-v17 on 2025-06-01, General Expenses, ₹200"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_penalty_or_fine",
+      "value": 300000,
+      "unit": "paise",
+      "definition_sha256_16": "a3cf7cd94a7e8c7d",
+      "definition_text": "Clause 21(a) (vi)/(via) penalty or fine: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v06",
+          "label": "Payment edge-c21a_words-v06 on 2025-06-01, Penalty and Fines, ₹3,000, multiple matches"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_personal",
+      "value": 5500050,
+      "unit": "paise",
+      "definition_sha256_16": "d653d575e21ea25f",
+      "definition_text": "Clause 21(a) (ii) personal expenditure: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v02",
+          "label": "Payment 1a_words-v02 on 2025-06-01, General Expenses, ₹45,000.50"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v19",
+          "label": "Payment edge-c21a_words-v19 on 2025-06-01, General Expenses, ₹5,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v20",
+          "label": "Payment edge-c21a_words-v20 on 2025-06-01, General Expenses, ₹5,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_political_ad",
+      "value": 2000000,
+      "unit": "paise",
+      "definition_sha256_16": "4b2c9b9e9513bbe5",
+      "definition_text": "Clause 21(a) (iii) political-party advertisement: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v03",
+          "label": "Payment edge-c21a_words-v03 on 2025-06-01, Advertisement, ₹20,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_settlement",
+      "value": 1000000,
+      "unit": "paise",
+      "definition_sha256_16": "306db1c63c3bd474",
+      "definition_text": "Clause 21(a) (ix) settling proceedings under a notified law: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v10",
+          "label": "Payment edge-c21a_words-v10 on 2025-06-01, Legal Charges, ₹10,000"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.candidate_total_statutory_interest",
+      "value": 120000,
+      "unit": "paise",
+      "definition_sha256_16": "625d8c601ca448af",
+      "definition_text": "Clause 21(a) statutory interest -- the CA decides: the P&L debits matched as candidates, summed -- a candidate total, not a reportable amount.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v07",
+          "label": "Payment edge-c21a_words-v07 on 2025-06-01, Interest on TDS, ₹1,200"
+        }
+      ]
+    },
+    {
+      "id": "clause21a_candidates.credits_total_benefit_perquisite",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a54af8f8bad4d6f6",
+      "definition_text": "Credits on the same P&L ledgers matching the (viii) benefit or perquisite in breach of the recipient's rules words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_capital",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a1138831649df0d8",
+      "definition_text": "Credits on the same P&L ledgers matching the (i) capital expenditure words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_club_fee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "82c5af4088c5d13c",
+      "definition_text": "Credits on the same P&L ledgers matching the (iv) club entrance fees and subscriptions words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_club_service",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9edffb70fff50879",
+      "definition_text": "Credits on the same P&L ledgers matching the (v) club services and facilities words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_compounding",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "7b9a591925e552f1",
+      "definition_text": "Credits on the same P&L ledgers matching the (vii) compounding an offence words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_late_fee",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2654937e72fc9ab5",
+      "definition_text": "Credits on the same P&L ledgers matching the late fees -- not 21(a)(vi)/(via) words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_penalty_or_fine",
+      "value": 50000,
+      "unit": "paise",
+      "definition_sha256_16": "2cdc982565aca07e",
+      "definition_text": "Credits on the same P&L ledgers matching the (vi)/(via) penalty or fine words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_personal",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0c6c01ee393d1122",
+      "definition_text": "Credits on the same P&L ledgers matching the (ii) personal expenditure words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_political_ad",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "6cfd712597c6c5e5",
+      "definition_text": "Credits on the same P&L ledgers matching the (iii) political-party advertisement words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_settlement",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "7b5f5b4ed61c8557",
+      "definition_text": "Credits on the same P&L ledgers matching the (ix) settling proceedings under a notified law words: shown beside, never netted.",
+      "evidence": []
+    },
+    {
+      "id": "clause21a_candidates.credits_total_statutory_interest",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ef7f4c7a7973b1e5",
+      "definition_text": "Credits on the same P&L ledgers matching the statutory interest -- the CA decides words: shown beside, never netted.",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "clause21a_candidates/benefit_perquisite",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_benefit_perquisite"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_benefit_perquisite"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v09",
+          "label": "Payment edge-c21a_words-v09 on 2025-06-01, Advertisement, ₹7,000"
+        }
+      ],
+      "title_sha256_16": "6500dff357e88798",
+      "title_text": "Clause 21(a) (viii) benefit or perquisite in breach of the recipient's rules: candidates listed for the CA, not reported",
+      "limits_sha256_16": "5de17ac7d9c1f13c",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 para 33.23 (Explanation 3(ii) to s.37(1); CBDT Circular 5/2012; cross-check s.194R); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "2e30c5daaa30458a",
+      "ask_client_text": [
+        "Any benefit or perquisite whose acceptance breaches the recipient's conduct rules? Cross-check the s.194R list."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/capital",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_capital"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_capital"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v01",
+          "label": "Purchase edge-c21a_words-v01 on 2025-06-01, Purchases, ₹1,25,007"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v18",
+          "label": "Payment edge-c21a_words-v18 on 2025-06-01, Purchases, ₹6,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v21",
+          "label": "Payment edge-c21a_words-v21 on 2025-06-01, Freight Inward, ₹300"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v21",
+          "label": "Payment edge-c21a_words-v21 on 2025-06-01, Purchases, ₹300"
+        }
+      ],
+      "title_sha256_16": "9023ac7f6bb14c77",
+      "title_text": "Clause 21(a) (i) capital expenditure: candidates listed for the CA, not reported",
+      "limits_sha256_16": "9314c2365554e3dc",
+      "limits_text": [
+        "4 P&L debit line(s) match the words for this item (ICAI GN on tax audit (2025) ch.33 paras 33.2-33.6; the clause 21(a) candidate spec (repairs/software/computer ledgers, purchase narrations, preliminary expenses)); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "3ad99277f198a838",
+      "ask_client_text": [
+        "Is any of this capital expenditure debited to P&L (enduring benefit, fixed asset, intangible, preliminary expenses)? Confirm the amount per item, and whether an accounting-standard observation is needed in para 3 of 3CA / para 3(a) of 3CB."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/club_fee",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_club_fee"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_club_fee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v04",
+          "label": "Payment edge-c21a_words-v04 on 2025-06-01, General Expenses, ₹15,000"
+        }
+      ],
+      "title_sha256_16": "ff0df27a69d08545",
+      "title_text": "Clause 21(a) (iv) club entrance fees and subscriptions: candidates listed for the CA, not reported",
+      "limits_sha256_16": "05b7426e955a0c27",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 paras 33.14-33.17 (club entrance fees and subscriptions, reported apart from services: TAQRB, GN 2026 p.170); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "4d8758eea992bdbd",
+      "ask_client_text": [
+        "Club entrance or admission fees and subscriptions: confirm the club, the amount and that it is a business expense. Personal items belong under (ii)."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/club_service",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_club_service"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_club_service"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v05",
+          "label": "Payment edge-c21a_words-v05 on 2025-06-01, General Expenses, ₹8,000"
+        }
+      ],
+      "title_sha256_16": "a1e0c57f13cf2ea2",
+      "title_text": "Clause 21(a) (v) club services and facilities: candidates listed for the CA, not reported",
+      "limits_sha256_16": "4925cce0de6ab160",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 paras 33.14-33.17 (club services and facilities used, a separate row from fees); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "33018442268bf2d4",
+      "ask_client_text": [
+        "Cost of club services and facilities used: confirm the club and the amount, as a row separate from fees and subscriptions."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/compounding",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_compounding"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_compounding"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v08",
+          "label": "Payment edge-c21a_words-v08 on 2025-06-01, Legal Charges, ₹50,000"
+        }
+      ],
+      "title_sha256_16": "f093400971fbbbad",
+      "title_text": "Clause 21(a) (vii) compounding an offence: candidates listed for the CA, not reported",
+      "limits_sha256_16": "dde934c670b86a90",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 para 33.22 (Explanation 3(iii) to s.37(1): compounding an offence); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "1d821fc51937ef20",
+      "ask_client_text": [
+        "Any compounding fee paid in the year? Enter it from the compounding application."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/late_fee",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_late_fee"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_late_fee"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v06",
+          "label": "Payment edge-c21a_words-v06 on 2025-06-01, Penalty and Fines, ₹3,000, multiple matches"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v17",
+          "label": "Payment edge-c21a_words-v17 on 2025-06-01, General Expenses, ₹200"
+        }
+      ],
+      "title_sha256_16": "b4fe2b931200e931",
+      "title_text": "Clause 21(a) late fees -- not 21(a)(vi)/(via): candidates listed for the CA, not reported",
+      "limits_sha256_16": "4401a7d14ecc9ff0",
+      "limits_text": [
+        "2 P&L debit line(s) match the words for this item (TAQRB (GN 2026 p.170): late filing fees under s.234E were wrongly reported as a penalty or fine; the clause 21(a) candidate spec keeps late fees apart); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "ad21ed5ca74ea31f",
+      "ask_client_text": [
+        "These are shown for completeness. Late fees under s.234E are not penalties (TAQRB); decide where, if anywhere, each is reported."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/penalty_or_fine",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_penalty_or_fine"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_penalty_or_fine"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v06",
+          "label": "Payment edge-c21a_words-v06 on 2025-06-01, Penalty and Fines, ₹3,000, multiple matches"
+        }
+      ],
+      "title_sha256_16": "479a76f5819992a4",
+      "title_text": "Clause 21(a) (vi)/(via) penalty or fine: candidates listed for the CA, not reported",
+      "limits_sha256_16": "9d86a070e32962d4",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 para 33.21 (Explanation 1 and 3 to s.37(1); the two penalty heads apart: TAQRB, GN 2026 p.170); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "5914b863aa578f19",
+      "ask_client_text": [
+        "Attach or confirm the assessee's written list of penalties and fines (GN 33.21 A(c)). For each: is it for violation of a law (India or abroad), or for an offence or prohibited purpose, or any other penalty or fine? Enter the penal part only, if composite."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/personal",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_personal"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_personal"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v02",
+          "label": "Payment 1a_words-v02 on 2025-06-01, General Expenses, ₹45,000.50"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v19",
+          "label": "Payment edge-c21a_words-v19 on 2025-06-01, General Expenses, ₹5,000"
+        },
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v20",
+          "label": "Payment edge-c21a_words-v20 on 2025-06-01, General Expenses, ₹5,000"
+        }
+      ],
+      "title_sha256_16": "86152e89f1f21e97",
+      "title_text": "Clause 21(a) (ii) personal expenditure: candidates listed for the CA, not reported",
+      "limits_sha256_16": "05ab4acbe5f21c3b",
+      "limits_text": [
+        "3 P&L debit line(s) match the words for this item (ICAI GN ch.33 paras 33.7-33.8 (personal expenses of the assessee; family travel, driver, household); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "e7bffbf5ab5739e3",
+      "ask_client_text": [
+        "Which of these are personal expenses of the assessee? Add any not listed (family travel, a driver, household). If records to decide are not kept, select observation 07."
+      ]
+    },
+    {
+      "id": "clause21a_candidates/political_ad",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_political_ad"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_political_ad"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v03",
+          "label": "Payment edge-c21a_words-v03 on 2025-06-01, Advertisement, ₹20,000"
+        }
+      ],
+      "title_sha256_16": "d85809df6d72d8c7",
+      "title_text": "Clause 21(a) (iii) political-party advertisement: candidates listed for the CA, not reported",
+      "limits_sha256_16": "7dc152754cd5f49d",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 paras 33.11-33.13 (s.37(2B): advertisement in a political party's souvenir, brochure, tract or pamphlet); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "42fd9828ea875d2c",
+      "ask_client_text": [
+        "Was any of this an advertisement in a souvenir, brochure, tract or pamphlet published by a political party (not a separately registered union)?"
+      ]
+    },
+    {
+      "id": "clause21a_candidates/settlement",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_settlement"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_settlement"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v10",
+          "label": "Payment edge-c21a_words-v10 on 2025-06-01, Legal Charges, ₹10,000"
+        }
+      ],
+      "title_sha256_16": "7e69ff92dbb8de87",
+      "title_text": "Clause 21(a) (ix) settling proceedings under a notified law: candidates listed for the CA, not reported",
+      "limits_sha256_16": "89b838de164f7779",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (ICAI GN ch.33 para 33.24 (Explanation 3(iv) to s.37(1); Notification 38/2025: SEBI Act, SCRA, Depositories Act, Competition Act); the clause 21(a) candidate spec); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "a518b74eee8c9544",
+      "ask_client_text": [
+        "Any amount paid to settle proceedings under the SEBI Act, SCRA, Depositories Act or Competition Act?"
+      ]
+    },
+    {
+      "id": "clause21a_candidates/statutory_interest",
+      "clauses": [
+        "3CD-21(a)"
+      ],
+      "confidence": "judgement_required",
+      "facts": [
+        {
+          "name": "candidate_total",
+          "figure_id": "clause21a_candidates.candidate_total_statutory_interest"
+        },
+        {
+          "name": "credits_total",
+          "figure_id": "clause21a_candidates.credits_total_statutory_interest"
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "edge-c21a_words-v07",
+          "label": "Payment edge-c21a_words-v07 on 2025-06-01, Interest on TDS, ₹1,200"
+        }
+      ],
+      "title_sha256_16": "9c3018dc6a6eb468",
+      "title_text": "Clause 21(a) statutory interest -- the CA decides: candidates listed for the CA, not reported",
+      "limits_sha256_16": "6a1d59fda0d7f0c4",
+      "limits_text": [
+        "1 P&L debit line(s) match the words for this item (the clause 21(a) candidate spec: statutory interest (s.201(1A), GST s.50) is kept apart from penalties and never merged into (vi)/(via)); a match is a candidate, never a conclusion, and nothing is left out for being small. The CA decides what, if anything, is reported; no clause 21(a) row is written.",
+        "Only lines on ledgers under Purchase Accounts, Direct Expenses or Indirect Expenses were searched. Keyword recall is not measured: a narration in Hindi, Hinglish or left blank is missed, and a penalty booked only in the GST cash ledger, netted in a party account, or on a credit-card statement is not in these books."
+      ],
+      "ask_client_sha256_16": "dd08349dd875d3ea",
+      "ask_client_text": [
+        "These are shown for completeness. Decide separately where statutory interest is reported."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [],
+  "module_invariant_violations": []
+}

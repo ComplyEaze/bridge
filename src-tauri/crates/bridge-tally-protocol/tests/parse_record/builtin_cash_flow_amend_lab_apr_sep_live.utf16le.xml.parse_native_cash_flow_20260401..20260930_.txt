@@ -1,0 +1,89 @@
+# fixture: tests/fixtures/builtin_cash_flow_amend_lab_apr_sep_live.utf16le.xml
+# parser: parse_native_cash_flow(20260401..20260930)
+# source: captured
+Ok(NativeCashFlow {
+    rows: [
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 4,
+            },
+            debit: Empty,
+            credit: Present(
+                ExactDecimal(
+                    "21371.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "21371.00",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 5,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 6,
+            },
+            debit: Empty,
+            credit: Present(
+                ExactDecimal(
+                    "2553.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "2553.00",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 7,
+            },
+            debit: Present(
+                ExactDecimal(
+                    "-33501.00",
+                ),
+            ),
+            credit: Present(
+                ExactDecimal(
+                    "15810.00",
+                ),
+            ),
+            closing: Present(
+                ExactDecimal(
+                    "-17691.00",
+                ),
+            ),
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 8,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+        NativeCashFlowRow {
+            month: CashFlowMonth {
+                year: 2026,
+                month: 9,
+            },
+            debit: Empty,
+            credit: Empty,
+            closing: Empty,
+        },
+    ],
+})

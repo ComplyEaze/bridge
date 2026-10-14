@@ -1,0 +1,7 @@
+# fixture: stock-lab-day/stock_lab_taxed_day_company_marks_response.utf16le.xml
+# parser: parse_company_high_water(STOCK_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(241),
+    "altvchid": Number(3),
+})

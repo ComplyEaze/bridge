@@ -174,6 +174,9 @@ base revision.
 <a id="93-voucher-idempotency-depends-on-remoteid--this-sections-title-used-to-say-the-opposite"></a>
 
 [9.3 Voucher idempotency depends on `REMOTEID` — **this section's title used to say the opposite**](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#93-voucher-idempotency-depends-on-remoteid--this-sections-title-used-to-say-the-opposite)
+<a id="93a-after-a-refusal-a-corrected-send-under-the-same-remoteid-answered-altered1-while-creating"></a>
+
+[9.3a After a refusal, a corrected send under the same `REMOTEID` answered `ALTERED=1` while creating](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#93a-after-a-refusal-a-corrected-send-under-the-same-remoteid-answered-altered1-while-creating)
 <a id="94-master-re-create-is-a-silent-alter"></a>
 
 [9.4 Master re-create is a silent Alter](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94-master-re-create-is-a-silent-alter)
@@ -219,6 +222,18 @@ base revision.
 <a id="96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap"></a>
 
 [9.6 `ACTION="Cancel"` by `REMOTEID` creates a new voucher — it does not cancel — **TRAP**](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#96-actioncancel-by-remoteid-creates-a-new-voucher--it-does-not-cancel--trap)
+<a id="917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it"></a>
+
+[9.17 Tally's GSTR-1 flag expects a Sales invoice's tax per sales line, rounded half-up, and flags a figure that differs from it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#917-tallys-gstr-1-flag-expects-a-sales-invoices-tax-per-sales-line-rounded-half-up-and-flags-a-figure-that-differs-from-it)
+<a id="918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions"></a>
+
+[9.18 A zero-value Sales voucher is refused unless its voucher type allows zero-valued transactions](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#918-a-zero-value-sales-voucher-is-refused-unless-its-voucher-type-allows-zero-valued-transactions)
+<a id="919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it"></a>
+
+[9.19 A keyed Purchase invoice, as the voucher export reads it](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#919-a-keyed-purchase-invoice-as-the-voucher-export-reads-it)
+<a id="920-the-gstr-1-status-of-one-voucher-type-in-a-window-read-by-the-types-name-with-a-narrow-field-list"></a>
+
+[9.20 The GSTR-1 status of one voucher type in a window, read by the type's name with a narrow field list](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#920-the-gstr-1-status-of-one-voucher-type-in-a-window-read-by-the-types-name-with-a-narrow-field-list)
 <a id="914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate"></a>
 
 [9.14 A `REMOTEID` upsert re-states the voucher: cancel, optional, delete and recreate](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#914-a-remoteid-upsert-re-states-the-voucher-cancel-optional-delete-and-recreate)
@@ -240,9 +255,12 @@ base revision.
 <a id="911c-extent-reads-must-retain-the-verified-company-tuple--verified-on-one-endpoint"></a>
 
 [9.11c Extent reads must retain the verified company tuple — **VERIFIED on one endpoint**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911c-extent-reads-must-retain-the-verified-company-tuple--verified-on-one-endpoint)
+<a id="911e-the-audit-reads-company-part-is-the-one-admitted-object-export--partial-shape-measured-live-once-failure-cases-unmeasured"></a>
+
+[9.11e The audit read's company part is the one admitted Object export — **PARTIAL: shape measured live once; failure cases unmeasured**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911e-the-audit-reads-company-part-is-the-one-admitted-object-export--partial-shape-measured-live-once-failure-cases-unmeasured)
 <a id="911e-the-audit-reads-company-part-is-the-one-admitted-object-export--code-live-unmeasured"></a>
 
-[9.11e The audit read's company part is the one admitted Object export — **CODE; live unmeasured**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911e-the-audit-reads-company-part-is-the-one-admitted-object-export--code-live-unmeasured)
+[9.11e The audit read's company part is the one admitted Object export — **PARTIAL: shape measured live once; failure cases unmeasured**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#911e-the-audit-reads-company-part-is-the-one-admitted-object-export--partial-shape-measured-live-once-failure-cases-unmeasured)
 <a id="910-company-creation-over-xml--partial-symbol-element-found-formal-name-element-not"></a>
 
 [9.10 Company creation over XML — **PARTIAL: symbol element found, formal-name element not**](./TALLY_PROTOCOL_REFERENCE_COMPANY_IDENTITY_AND_CREATION.md#910-company-creation-over-xml--partial-symbol-element-found-formal-name-element-not)
@@ -402,6 +420,12 @@ base revision.
 <a id="12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71"></a>
 
 [12a.16 Cash Flow and its sibling built-in reports by name on licensed 7.1](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a16-cash-flow-and-its-sibling-built-in-reports-by-name-on-licensed-71)
+<a id="12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no"></a>
+
+[12a.17 Cost centres and categories are returned whatever the company's setting reads; an imported allocation is stored although it reads No](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a17-cost-centres-and-categories-are-returned-whatever-the-companys-setting-reads-an-imported-allocation-is-stored-although-it-reads-no)
+<a id="12a18-the-company-collections-settings-and-currency-symbol"></a>
+
+[12a.18 The Company collection's settings and currency symbol](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a18-the-company-collections-settings-and-currency-symbol)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

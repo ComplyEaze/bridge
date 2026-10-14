@@ -112,7 +112,7 @@ fn parse_envelope(
             .map_err(|_| NativeTrialBalanceError::InvalidResponse("trial_balance_xml_malformed"))?
         {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if envelope_closed || (path.is_empty() && (name != b"ENVELOPE" || root_seen)) {
                     return Err(NativeTrialBalanceError::InvalidResponse(
                         "trial_balance_root_not_envelope",
@@ -204,7 +204,7 @@ fn parse_envelope(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if name == b"LINEERROR" || name == b"ERROR" || name == b"DOCTYPE" {
                     return Err(NativeTrialBalanceError::TallyReportedFailure);
                 }
@@ -237,7 +237,7 @@ fn parse_envelope(
                 let expected = path.pop().ok_or(NativeTrialBalanceError::InvalidResponse(
                     "trial_balance_unexpected_close",
                 ))?;
-                if expected != element.name().as_ref().to_ascii_uppercase() {
+                if expected != element.name().as_ref().as_bytes().to_ascii_uppercase() {
                     return Err(NativeTrialBalanceError::InvalidResponse(
                         "trial_balance_unexpected_close",
                     ));
@@ -322,7 +322,13 @@ fn parse_row(
             .read_event()
             .map_err(|_| NativeTrialBalanceError::InvalidResponse("trial_balance_xml_malformed"))?
         {
-            Event::Start(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Start(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"GUID" => set_once(
                     &mut guid,
                     read_element_text(reader, child.name())?,
@@ -360,7 +366,13 @@ fn parse_row(
                 )?,
                 _ => skip_subtree(reader)?,
             },
-            Event::Empty(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Empty(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"PARENT" => {
                     set_once(&mut parent, String::new(), "trial_balance_duplicate_parent")?
                 }
@@ -391,7 +403,7 @@ fn parse_row(
                 )?,
                 _ => {}
             },
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"LEDGER") => break,
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("LEDGER") => break,
             Event::Eof => {
                 return Err(NativeTrialBalanceError::InvalidResponse(
                     "trial_balance_row_unterminated",

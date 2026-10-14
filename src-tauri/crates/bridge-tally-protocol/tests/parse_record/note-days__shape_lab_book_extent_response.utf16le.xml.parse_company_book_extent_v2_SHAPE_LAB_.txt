@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/note-days/shape_lab_book_extent_response.utf16le.xml
+# parser: parse_company_book_extent_v2(SHAPE LAB)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE SHAPE LAB",
+    company_guid: "3a6bd6e1-b835-4bff-89dd-8a6af138c346",
+    books_from: TallyDate(
+        "20250401",
+    ),
+    last_voucher_date: TallyDate(
+        "20260331",
+    ),
+    voucher_alter_id_high_water: Some(
+        111,
+    ),
+    master_alter_id_high_water: Some(
+        289,
+    ),
+})

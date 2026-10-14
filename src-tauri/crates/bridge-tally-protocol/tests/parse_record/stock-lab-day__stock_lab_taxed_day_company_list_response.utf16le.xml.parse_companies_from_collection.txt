@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/stock-lab-day/stock_lab_taxed_day_company_list_response.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE STOCK LAB",
+        guid: Some(
+            "1edb9b05-8d35-4c0c-9959-dce655730463",
+        ),
+        company_number: Some(
+            "100027",
+        ),
+        books_from: Some(
+            "20250401",
+        ),
+    },
+])

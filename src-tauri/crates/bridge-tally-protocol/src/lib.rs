@@ -33,35 +33,28 @@ pub mod bills_native_outstandings_probe;
 pub mod bills_payments_observation;
 pub mod currency_composite;
 pub mod group_ancestry;
+pub mod gst_details;
 pub mod gst_registration;
 mod import_outcome;
 #[cfg(feature = "india-tax-observation-parser")]
 pub mod india_tax_observation;
-#[cfg(feature = "jsonex-parser")]
-pub mod jsonex;
-#[cfg(feature = "jsonex-request-builder")]
-pub mod jsonex_request;
 pub mod ledger_census;
+/// One ledger `Create` message. Its one caller today is the lab rebuild;
+/// this crate runs its goldens in every build.
+pub mod ledger_create;
 pub mod native_cash_flow;
+pub mod native_company_features;
+pub mod native_funds_flow;
 mod native_ledger_collection;
 pub mod native_masters;
+pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;
 pub mod native_stock_summary;
 pub mod native_trial_balance;
-/// The legacy voucher-scan outstandings path: date/AlterID-partitioned
-/// wildcard voucher fetch, segment/witness completeness proofs, and bill
-/// computation from voucher allocations. Superseded by `native_outstandings`,
-/// which is always compiled. Gated because it cannot execute in a shipped
-/// build: the only non-test constructor for its width calibration is behind
-/// `live-calibration-harness`, which implies this feature.
-#[cfg(feature = "voucher-scan")]
-pub mod outstandings;
+pub mod native_voucher_type_numbering;
 /// The outstandings report contract and the company-identity/book-extent
-/// read shared by `outstandings` and `native_outstandings`. Deliberately
-/// ungated: `native_outstandings` depends on it, so gating it with
-/// `outstandings` would break the always-on native path. See the module docs
-/// for why this is scoped the way it is.
+/// read `native_outstandings` pins against. See the module docs.
 pub mod outstandings_shared;
 pub mod parent_partition;
 mod standard_ledger_catalog;
@@ -103,11 +96,6 @@ pub use text_encoding::{
 pub use tolerant_xml::mark_forbidden_numeric_references;
 
 pub const BRIDGE_LEDGER_EXPORT_SCHEMA: &str = "bridge.tally.ledgers/1";
-pub const BRIDGE_LEDGER_WRITE_READBACK_SCHEMA: &str = "bridge.tally.ledger-write-readback/1";
-pub const BRIDGE_GROUP_EXPORT_SCHEMA: &str = "bridge.tally.groups/1";
-pub const BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA: &str = "bridge.tally.voucher-types/1";
-pub const BRIDGE_VOUCHER_EXPORT_SCHEMA: &str = "bridge.tally.vouchers/2";
-pub const BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA: &str = "bridge.tally.ledger-period-balances/1";
 pub const MAX_INTERACTIVE_DISCOVERY_COMPANIES: usize = 100;
 
 /// The sanitized representation of Tally's U+0004 metadata prefix.
@@ -132,12 +120,6 @@ pub fn is_tally_reserved_root(value: &str) -> bool {
         .trim()
         .strip_prefix(TALLY_SANITIZED_ROOT_MARKER)
         .is_some_and(|rest| rest.trim().eq_ignore_ascii_case("primary"))
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TallyEnvelope<T> {
-    #[serde(rename = "BODY")]
-    pub body: Option<T>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -203,29 +185,6 @@ impl PartyLedgerMasterFieldObservation {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct TallyLedgerPeriodBalance {
-    pub opening_balance: String,
-    pub closing_balance: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct LedgerPeriodBalanceContext {
-    pub company_guid: String,
-    pub from_yyyymmdd: String,
-    pub to_yyyymmdd: String,
-    /// Bridge's requested comparison profile echoed by the custom report.
-    /// This is request binding, not source-observed proof of Tally semantics.
-    pub ordinary_books_requested: bool,
-    pub source_record_count: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub struct ParsedLedgerPeriodBalanceReport {
-    pub context: LedgerPeriodBalanceContext,
-    pub records: Vec<ParsedSourceRecord<TallyLedgerPeriodBalance>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TallyNamedMaster {
     pub name: String,
     pub parent: PartyLedgerMasterFieldObservation,
@@ -274,7 +233,9 @@ pub enum TallyExportStatus {
 pub struct CompanyContextEvidence {
     pub name: Option<String>,
     pub guid: Option<String>,
-    /// Echo of the exact requested identity set for scoped write readbacks.
+    /// An echoed `QUERYIDENTITYSETSHA256`, if a response carries one. No request Bridge
+    /// renders asks for it since the scoped write readback was deleted, and it is `None` in
+    /// every fixture.
     pub query_identity_set_sha256: Option<String>,
     /// Bridge request-binding echoes; they are not independent proof that Tally honored filters.
     pub requested_from_yyyymmdd: Option<String>,
@@ -342,13 +303,6 @@ pub struct ParsedSourceRecord<T> {
     pub alter_id: Option<String>,
     pub raw_source_sha256: String,
 }
-pub fn parse_xml<T>(xml: &str) -> anyhow::Result<T>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    Ok(quick_xml::de::from_str(xml)?)
-}
-
 pub fn parse_companies(xml: &str) -> anyhow::Result<Vec<TallyCompany>> {
     Ok(parse_companies_with_evidence(xml)?.records)
 }
@@ -414,7 +368,7 @@ pub fn parse_company_gateway_capability_observation(
         match reader.read_event()? {
             Event::Start(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
-                    && element.name().as_ref().eq_ignore_ascii_case(b"COMPANY") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("COMPANY") =>
             {
                 let parsed = parse_company_gateway_capability_row(&mut reader, &element)?;
                 if let Some(previous) = &observation {
@@ -432,8 +386,12 @@ pub fn parse_company_gateway_capability_observation(
                     observation = Some(parsed);
                 }
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
+            Event::End(element) => {
+                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -478,7 +436,7 @@ fn parse_company_rows_with_limit(
     loop {
         match reader.read_event()? {
             Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"COMPANYINFO") =>
+                if element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") =>
             {
                 if max_records.is_some_and(|limit| records.len() >= limit) {
                     anyhow::bail!(
@@ -507,7 +465,7 @@ fn parse_company_collection_rows(xml: &str) -> anyhow::Result<Vec<TallyCompany>>
         match reader.read_event()? {
             Event::Start(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
-                    && element.name().as_ref().eq_ignore_ascii_case(b"COMPANY") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("COMPANY") =>
             {
                 if records.len() >= MAX_INTERACTIVE_DISCOVERY_COMPANIES {
                     anyhow::bail!(
@@ -518,25 +476,27 @@ fn parse_company_collection_rows(xml: &str) -> anyhow::Result<Vec<TallyCompany>>
             }
             Event::Empty(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"])
-                    && element.name().as_ref().eq_ignore_ascii_case(b"COMPANY") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("COMPANY") =>
             {
                 anyhow::bail!("company collection omitted the company GUID");
             }
             Event::Start(element) => {
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"])
-                    && element.name().as_ref().eq_ignore_ascii_case(b"COLLECTION")
+                    && element.name().as_ref().eq_ignore_ascii_case("COLLECTION")
                 {
                     collection_seen = true;
                 }
-                path.push(element.name().as_ref().to_ascii_uppercase());
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase());
             }
             Event::Empty(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA"])
-                    && element.name().as_ref().eq_ignore_ascii_case(b"COLLECTION") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("COLLECTION") =>
             {
                 collection_seen = true;
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::End(element) => {
+                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -555,17 +515,17 @@ fn parse_company_collection_row(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<TallyCompany> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let name = attr_value(reader, element, b"NAME")
+    let name = attr_value(element, b"NAME")
         .map(|value| normalized_standard_value(&value, "company name"))
         .transpose()?
         .ok_or_else(|| anyhow::anyhow!("company collection omitted the company name"))?;
-    let row_name = element.name().as_ref().to_ascii_uppercase();
+    let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
     let mut guid = None::<String>;
     let mut company_number = None::<String>;
     let mut books_from = None::<String>;
     loop {
         match reader.read_event()? {
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"GUID") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("GUID") => {
                 validate_only_attributes(&child, &[b"TYPE"])?;
                 if guid
                     .replace(normalized_standard_value(
@@ -577,10 +537,10 @@ fn parse_company_collection_row(
                     anyhow::bail!("company collection repeated the company GUID");
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"GUID") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("GUID") => {
                 anyhow::bail!("company collection contained an empty company GUID");
             }
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"COMPANYNUMBER") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("COMPANYNUMBER") => {
                 validate_only_attributes(&child, &[b"TYPE"])?;
                 if company_number
                     .replace(normalized_standard_value(
@@ -592,10 +552,10 @@ fn parse_company_collection_row(
                     anyhow::bail!("company collection repeated the company number");
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"COMPANYNUMBER") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("COMPANYNUMBER") => {
                 anyhow::bail!("company collection contained an empty company number");
             }
-            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case(b"BOOKSFROM") => {
+            Event::Start(child) if child.name().as_ref().eq_ignore_ascii_case("BOOKSFROM") => {
                 validate_only_attributes(&child, &[b"TYPE"])?;
                 if books_from
                     .replace(normalized_standard_value(
@@ -607,10 +567,18 @@ fn parse_company_collection_row(
                     anyhow::bail!("company collection repeated the books-from date");
                 }
             }
-            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case(b"BOOKSFROM") => {
+            Event::Empty(child) if child.name().as_ref().eq_ignore_ascii_case("BOOKSFROM") => {
                 anyhow::bail!("company collection contained an empty books-from date");
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(&row_name) => break,
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&row_name) =>
+            {
+                break
+            }
             // Tally echoes the company name as a CHILD element as well as the
             // row attribute, and may carry other descriptive fields. Skipping
             // an unrecognised child is safe here because identity comes from
@@ -620,11 +588,11 @@ fn parse_company_collection_row(
             // (Measured 2026-08-07: the live row is
             // `<COMPANY NAME="..." RESERVEDNAME=""><NAME .../><GUID .../></COMPANY>`.)
             Event::Start(child) => {
-                let name = child.name().as_ref().to_vec();
+                let name = child.name().as_ref().to_owned();
                 reader.read_to_end(quick_xml::name::QName(&name).to_owned())?;
             }
             Event::Empty(_) => {}
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("company collection row contained unexpected text")
             }
             Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
@@ -649,7 +617,7 @@ fn parse_company_gateway_capability_row(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<CompanyGatewayCapabilityObservation> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let row_name = element.name().as_ref().to_ascii_uppercase();
+    let row_name = element.name().as_ref().as_bytes().to_ascii_uppercase();
     let mut product = None;
     let mut release = None;
     let mut educational_mode = None;
@@ -659,7 +627,7 @@ fn parse_company_gateway_capability_row(
         match reader.read_event()? {
             Event::Start(child) => {
                 validate_only_attributes(&child, &[b"TYPE"])?;
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 if child_name == b"BRIDGERELEASE" {
                     let value = read_optional_text(reader, child.name())?
                         .map(|value| normalized_standard_value(&value, "release"))
@@ -685,7 +653,7 @@ fn parse_company_gateway_capability_row(
                 }
             }
             Event::Empty(child) => {
-                let child_name = child.name().as_ref().to_ascii_uppercase();
+                let child_name = child.name().as_ref().as_bytes().to_ascii_uppercase();
                 if child_name == b"BRIDGERELEASE" {
                     validate_only_attributes(&child, &[b"TYPE"])?;
                     set_once(&mut release, None)?;
@@ -699,8 +667,16 @@ fn parse_company_gateway_capability_row(
                     );
                 }
             }
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(&row_name) => break,
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::End(end)
+                if end
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&row_name) =>
+            {
+                break
+            }
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("company capability collection row contained unexpected text")
             }
             Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
@@ -749,27 +725,25 @@ pub fn company_list_may_be_in_educational_mode(xml: &str) -> bool {
         let in_data = path.iter().any(|name| name.as_slice() == b"DATA");
         match reader.read_event() {
             Ok(Event::Start(element))
-                if in_data && element.name().as_ref().eq_ignore_ascii_case(b"EDUMODE") =>
+                if in_data && element.name().as_ref().eq_ignore_ascii_case("EDUMODE") =>
             {
                 let licensed = reader
                     .read_text(element.name())
                     .ok()
-                    .and_then(|text| {
-                        text.decode()
-                            .ok()
-                            .map(|text| text.trim().eq_ignore_ascii_case("no"))
-                    })
+                    .map(|text| text.trim().eq_ignore_ascii_case("no"))
                     .unwrap_or(false);
                 if !licensed {
                     return true;
                 }
             }
             Ok(Event::Empty(element))
-                if in_data && element.name().as_ref().eq_ignore_ascii_case(b"EDUMODE") =>
+                if in_data && element.name().as_ref().eq_ignore_ascii_case("EDUMODE") =>
             {
                 return true;
             }
-            Ok(Event::Start(element)) => path.push(element.name().as_ref().to_ascii_uppercase()),
+            Ok(Event::Start(element)) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
             Ok(Event::End(_)) => {
                 path.pop();
             }
@@ -787,105 +761,6 @@ fn parse_gateway_yes_no(value: &str, label: &str) -> anyhow::Result<bool> {
     } else {
         anyhow::bail!("company capability collection returned an invalid {label} flag")
     }
-}
-
-pub fn parse_group_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    parse_named_master_source_records(xml, b"GROUP", BRIDGE_GROUP_EXPORT_SCHEMA, "GROUP")
-}
-
-pub fn parse_voucher_type_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    parse_named_master_source_records(
-        xml,
-        b"VOUCHERTYPE",
-        BRIDGE_VOUCHER_TYPE_EXPORT_SCHEMA,
-        "VOUCHERTYPE",
-    )
-}
-
-fn parse_named_master_source_records(
-    xml: &str,
-    element_name: &[u8],
-    schema: &str,
-    object_type: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyNamedMaster>>> {
-    // Mark forbidden references before anything reads the text, as the native
-    // collection parsers do (§1.1(d)), so `&#4; Primary` reads as the marker
-    // and not as a raw U+0004. Row hashes still attest the original bytes.
-    let sanitized = tolerant_xml::sanitize_invalid_numeric_references_with_provenance(xml);
-    let text = sanitized.as_str();
-    validate_export_response(text)?;
-    let evidence = scan_export_evidence(text)?;
-    let mut reader = configured_reader(text);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case(element_name) =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&reader, &element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&reader, &element, b"ALTERID");
-                let name = attr_value(&reader, &element, b"NAME").unwrap_or_default();
-                let record = parse_named_master(&mut reader, element_name, name)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256_from_sanitized(
-                        &sanitized,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Empty(element)
-                if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case(element_name) =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&reader, &element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                records.push(ParsedSourceRecord {
-                    record: TallyNamedMaster {
-                        name: attr_value(&reader, &element, b"NAME").unwrap_or_default(),
-                        parent: PartyLedgerMasterFieldObservation::NotObserved,
-                        reserved_name: None,
-                    },
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id: attr_value(&reader, &element, b"ALTERID"),
-                    raw_source_sha256: source_fragment_sha256_from_sanitized(
-                        &sanitized,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    validate_scoped_export(&evidence, schema, object_type, records.len())?;
-    Ok(ParsedExport { records, evidence })
 }
 
 pub fn parse_ledgers(xml: &str) -> anyhow::Result<Vec<TallyLedger>> {
@@ -1063,7 +938,7 @@ pub fn parse_native_voucher_source_records_with_evidence(
             .map_err(|_| NativeCollectionError::MalformedResponse)?
         {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeCollectionError::MalformedResponse);
                 }
@@ -1124,7 +999,7 @@ pub fn parse_native_voucher_source_records_with_evidence(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     // A self-closing STATUS is no answer (bridge#717), unless
                     // one was already read: then it is a second STATUS. It is
@@ -1144,7 +1019,7 @@ pub fn parse_native_voucher_source_records_with_evidence(
                     return Err(NativeCollectionError::RowUnusable);
                 }
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
                 .map_err(|_| NativeCollectionError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
@@ -1195,7 +1070,7 @@ fn parse_native_collection_with_identity_evidence<T>(
             .map_err(|_| NativeCollectionError::MalformedResponse)?
         {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path.is_empty() && name != b"ENVELOPE" {
                     return Err(NativeCollectionError::MalformedResponse);
                 }
@@ -1254,7 +1129,7 @@ fn parse_native_collection_with_identity_evidence<T>(
                 path.push(name);
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name == b"STATUS" {
                     // A self-closing STATUS is no answer (bridge#717), unless
                     // one was already read: then it is a second STATUS. It is
@@ -1274,7 +1149,7 @@ fn parse_native_collection_with_identity_evidence<T>(
                     return Err(NativeCollectionError::RowUnusable);
                 }
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())
+            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref().as_bytes())
                 .map_err(|_| NativeCollectionError::MalformedResponse)?,
             Event::Eof => break,
             _ => {}
@@ -1379,7 +1254,7 @@ fn parse_native_voucher_type_collection_row(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<(TallyNamedMaster, ParsedSourceIdentities, Option<String>)> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let name = attr_value(reader, element, b"NAME")
+    let name = attr_value(element, b"NAME")
         .ok_or_else(|| anyhow::anyhow!("native voucher type row omitted NAME"))?;
     let mut record = TallyNamedMaster {
         name,
@@ -1394,7 +1269,13 @@ fn parse_native_voucher_type_collection_row(
     let mut alter_id_seen = false;
     loop {
         match reader.read_event()? {
-            Event::Start(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Start(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"GUID" => {
                     validate_only_attributes(&child, &[b"TYPE"])?;
                     if std::mem::replace(&mut guid_seen, true) {
@@ -1435,18 +1316,24 @@ fn parse_native_voucher_type_collection_row(
                     );
                 }
                 _ => {
-                    let child_name = child.name().as_ref().to_vec();
+                    let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             },
-            Event::Empty(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Empty(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"GUID" | b"MASTERID" | b"ALTERID" | b"PARENT" => {
                     anyhow::bail!("native voucher type row omitted a required field");
                 }
                 _ => {}
             },
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"VOUCHERTYPE") => break,
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("VOUCHERTYPE") => break,
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("native voucher type row contained unexpected text");
             }
             Event::Eof => return Err(RowCutOff.into()),
@@ -1473,7 +1360,7 @@ fn parse_native_group_collection_row(
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<(TallyNamedMaster, ParsedSourceIdentities, Option<String>)> {
     validate_only_attributes(element, &[b"NAME", b"RESERVEDNAME"])?;
-    let name = attr_value(reader, element, b"NAME")
+    let name = attr_value(element, b"NAME")
         .ok_or_else(|| anyhow::anyhow!("native group row omitted NAME"))?;
     let mut record = TallyNamedMaster {
         name,
@@ -1488,7 +1375,13 @@ fn parse_native_group_collection_row(
     let mut alter_id_seen = false;
     loop {
         match reader.read_event()? {
-            Event::Start(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Start(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"GUID" => {
                     validate_only_attributes(&child, &[b"TYPE"])?;
                     if std::mem::replace(&mut guid_seen, true) {
@@ -1529,18 +1422,24 @@ fn parse_native_group_collection_row(
                     );
                 }
                 _ => {
-                    let child_name = child.name().as_ref().to_vec();
+                    let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             },
-            Event::Empty(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Empty(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"GUID" | b"MASTERID" | b"ALTERID" | b"PARENT" => {
                     anyhow::bail!("native group row omitted a required field");
                 }
                 _ => {}
             },
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"GROUP") => break,
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("GROUP") => break,
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("native group row contained unexpected text");
             }
             Event::Eof => return Err(RowCutOff.into()),
@@ -1568,7 +1467,7 @@ fn parse_native_voucher_collection_row(
     sanitized: &tolerant_xml::SanitizedXml<'_>,
 ) -> anyhow::Result<(TallyVoucher, ParsedSourceIdentities, Option<String>)> {
     validate_only_attributes(element, &[b"REMOTEID", b"VCHKEY", b"VCHTYPE", b"OBJVIEW"])?;
-    let remote_id = attr_value(reader, element, b"REMOTEID")
+    let remote_id = attr_value(element, b"REMOTEID")
         .ok_or_else(|| anyhow::anyhow!("native voucher row omitted REMOTEID"))?;
     let mut voucher = TallyVoucher {
         id: None,
@@ -1590,7 +1489,13 @@ fn parse_native_voucher_collection_row(
     loop {
         let entry_start = reader.buffer_position() as usize;
         match reader.read_event()? {
-            Event::Start(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Start(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"DATE" => {
                     validate_only_attributes(&child, &[b"TYPE"])?;
                     mark_unique_field(&mut seen, "DATE", "native voucher")?;
@@ -1663,11 +1568,17 @@ fn parse_native_voucher_collection_row(
                     voucher.ledger_entries.push(entry);
                 }
                 _ => {
-                    let child_name = child.name().as_ref().to_vec();
+                    let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             },
-            Event::Empty(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Empty(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"DATE"
                 | b"GUID"
                 | b"MASTERID"
@@ -1683,8 +1594,8 @@ fn parse_native_voucher_collection_row(
                 }
                 _ => {}
             },
-            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"VOUCHER") => break,
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::End(end) if end.name().as_ref().eq_ignore_ascii_case("VOUCHER") => break,
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("native voucher row contained unexpected text");
             }
             Event::Eof => return Err(RowCutOff.into()),
@@ -1718,7 +1629,13 @@ fn parse_native_voucher_ledger_entry(
     let mut seen = HashSet::new();
     loop {
         match reader.read_event()? {
-            Event::Start(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Start(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"LEDGERNAME" => {
                     validate_only_attributes(&child, &[b"TYPE"])?;
                     mark_unique_field(&mut seen, "LEDGERNAME", "native voucher ledger entry")?;
@@ -1747,11 +1664,17 @@ fn parse_native_voucher_ledger_entry(
                     // This consumes nested allocations as a subtree. In
                     // particular, `BILLALLOCATIONS.LIST/AMOUNT` can never
                     // reach the direct-entry `AMOUNT` branch above.
-                    let child_name = child.name().as_ref().to_vec();
+                    let child_name = child.name().as_ref().to_owned();
                     reader.read_to_end(QName(&child_name).to_owned())?;
                 }
             },
-            Event::Empty(child) => match child.name().as_ref().to_ascii_uppercase().as_slice() {
+            Event::Empty(child) => match child
+                .name()
+                .as_ref()
+                .as_bytes()
+                .to_ascii_uppercase()
+                .as_slice()
+            {
                 b"LEDGERNAME" | b"AMOUNT" | b"ISDEEMEDPOSITIVE" => {
                     anyhow::bail!("native voucher ledger entry omitted a required field");
                 }
@@ -1761,11 +1684,11 @@ fn parse_native_voucher_ledger_entry(
                 if end
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"ALLLEDGERENTRIES.LIST") =>
+                    .eq_ignore_ascii_case("ALLLEDGERENTRIES.LIST") =>
             {
                 break;
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("native voucher ledger entry contained unexpected text");
             }
             Event::Eof => return Err(RowCutOff.into()),
@@ -1847,167 +1770,6 @@ fn record_identities_from_values(
     Ok(())
 }
 
-pub fn parse_ledger_write_readback_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyLedger>>> {
-    let mut reader = configured_reader(xml);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    let mut context = None::<ParsedCompanyContext>;
-    let mut header_seen = false;
-    let mut body_seen = false;
-    let mut status_seen = false;
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
-                if matches!(
-                    name.as_slice(),
-                    b"ENVELOPE" | b"HEADER" | b"BODY" | b"VERSION" | b"STATUS"
-                ) {
-                    validate_only_attributes(&element, &[]).map_err(|_| {
-                        anyhow::anyhow!("Tally export response attributes were invalid")
-                    })?;
-                }
-                if path.is_empty() {
-                    if name.as_slice() != b"ENVELOPE" {
-                        anyhow::bail!("Tally write readback root was not ENVELOPE");
-                    }
-                    path.push(name);
-                } else if path_eq(&path, &[b"ENVELOPE"]) && name.as_slice() == b"HEADER" {
-                    if std::mem::replace(&mut header_seen, true) || body_seen {
-                        anyhow::bail!("Tally write readback repeated or misplaced HEADER");
-                    }
-                    path.push(name);
-                } else if path_eq(&path, &[b"ENVELOPE", b"HEADER"]) && name.as_slice() == b"STATUS"
-                {
-                    if std::mem::replace(&mut status_seen, true) {
-                        anyhow::bail!("Tally write readback repeated STATUS");
-                    }
-                    if read_required_text(&mut reader, element.name())? != "1" {
-                        anyhow::bail!("Tally write readback application STATUS was not successful");
-                    }
-                } else if path_eq(&path, &[b"ENVELOPE"]) && name.as_slice() == b"BODY" {
-                    if !status_seen || std::mem::replace(&mut body_seen, true) {
-                        anyhow::bail!("Tally write readback repeated or misplaced BODY");
-                    }
-                    path.push(name);
-                } else if path_eq(&path, &[b"ENVELOPE", b"BODY"])
-                    && name.as_slice() == b"COMPANYCONTEXT"
-                {
-                    if context.is_some() {
-                        anyhow::bail!("Tally write readback repeated COMPANYCONTEXT");
-                    }
-                    context = Some(parse_company_context(&mut reader, &element, false)?);
-                } else if path_eq(&path, &[b"ENVELOPE", b"BODY"]) && name.as_slice() == b"LEDGER" {
-                    validate_only_attributes(
-                        &element,
-                        &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                    )?;
-                    let name = attr_value(&reader, &element, b"NAME");
-                    let identities = parsed_source_identities(&reader, &element)?;
-                    let (source_id, identity_kind) = preferred_identity(&identities);
-                    let alter_id = attr_value(&reader, &element, b"ALTERID");
-                    let record = parse_ledger_write_readback(&mut reader, name)?;
-                    records.push(ParsedSourceRecord {
-                        record,
-                        identity_kind,
-                        source_id,
-                        identities,
-                        alter_id,
-                        raw_source_sha256: source_fragment_sha256(
-                            xml,
-                            record_start,
-                            reader.buffer_position() as usize,
-                        )?,
-                    });
-                } else {
-                    anyhow::bail!(
-                        "Tally write readback contained an element outside its exact profile"
-                    );
-                }
-            }
-            Event::Empty(element)
-                if path_eq(&path, &[b"ENVELOPE", b"BODY"])
-                    && element
-                        .name()
-                        .as_ref()
-                        .eq_ignore_ascii_case(b"COMPANYCONTEXT") =>
-            {
-                if context.is_some() {
-                    anyhow::bail!("Tally write readback repeated COMPANYCONTEXT");
-                }
-                context = Some(parse_company_context(&mut reader, &element, true)?);
-            }
-            Event::Empty(_) => {
-                anyhow::bail!(
-                    "Tally write readback contained an empty element outside its exact profile"
-                );
-            }
-            Event::End(element) => {
-                let Some(expected) = path.pop() else {
-                    anyhow::bail!("Tally write readback closed an unexpected element");
-                };
-                if !element.name().as_ref().eq_ignore_ascii_case(&expected) {
-                    anyhow::bail!("Tally write readback closed an unexpected element");
-                }
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally write readback contained unexpected text");
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    if !path.is_empty() || !header_seen || !status_seen || !body_seen {
-        anyhow::bail!("Tally write readback ended before its root closed");
-    }
-    let context =
-        context.ok_or_else(|| anyhow::anyhow!("Tally write readback omitted COMPANYCONTEXT"))?;
-    let mut identities = HashMap::<String, u64>::new();
-    let mut identified_record_count = 0_u64;
-    for record in &records {
-        let mut identified = false;
-        for identity in [
-            record.identities.guid.as_ref(),
-            record.identities.remote_id.as_ref(),
-            record.identities.master_id.as_ref(),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            *identities.entry(identity.clone()).or_insert(0) += 1;
-            identified = true;
-        }
-        identified_record_count += u64::from(identified);
-    }
-    let duplicate_identities = identities
-        .into_iter()
-        .filter(|(_, occurrences)| *occurrences > 1)
-        .map(|(identity, occurrences)| DuplicateIdentityEvidence {
-            identity_sha256: sha256_hex(identity.as_bytes()),
-            occurrences,
-        })
-        .collect();
-    let evidence = ExportEvidence {
-        company_context: Some(context.company),
-        schema: context.schema,
-        object_type: context.object_type,
-        source_record_count: context.source_record_count,
-        identified_record_count,
-        duplicate_identities,
-        ..ExportEvidence::default()
-    };
-    validate_scoped_export(
-        &evidence,
-        BRIDGE_LEDGER_WRITE_READBACK_SCHEMA,
-        "LEDGER",
-        records.len(),
-    )?;
-    Ok(ParsedExport { records, evidence })
-}
-
 fn parse_ledger_source_records_for_schema(
     xml: &str,
     expected_schema: &str,
@@ -2022,16 +1784,16 @@ fn parse_ledger_source_records_for_schema(
         match reader.read_event()? {
             Event::Start(element)
                 if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case(b"LEDGER") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("LEDGER") =>
             {
                 validate_only_attributes(
                     &element,
                     &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
                 )?;
-                let name = attr_value(&reader, &element, b"NAME");
-                let identities = parsed_source_identities(&reader, &element)?;
+                let name = attr_value(&element, b"NAME");
+                let identities = parsed_source_identities(&element)?;
                 let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&reader, &element, b"ALTERID");
+                let alter_id = attr_value(&element, b"ALTERID");
                 let record = parse_ledger(&mut reader, name)?;
                 records.push(ParsedSourceRecord {
                     record,
@@ -2048,18 +1810,18 @@ fn parse_ledger_source_records_for_schema(
             }
             Event::Empty(element)
                 if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case(b"LEDGER") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("LEDGER") =>
             {
                 validate_only_attributes(
                     &element,
                     &[b"NAME", b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
                 )?;
-                let identities = parsed_source_identities(&reader, &element)?;
+                let identities = parsed_source_identities(&element)?;
                 let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&reader, &element, b"ALTERID");
+                let alter_id = attr_value(&element, b"ALTERID");
                 records.push(ParsedSourceRecord {
                     record: TallyLedger {
-                        name: attr_value(&reader, &element, b"NAME").unwrap_or_default(),
+                        name: attr_value(&element, b"NAME").unwrap_or_default(),
                         parent: PartyLedgerMasterFieldObservation::NotObserved,
                         party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
                         opening_balance: None,
@@ -2075,289 +1837,17 @@ fn parse_ledger_source_records_for_schema(
                     )?,
                 });
             }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::Start(element) => {
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase())
+            }
+            Event::End(element) => {
+                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
+            }
             Event::Eof => break,
             _ => {}
         }
     }
     validate_scoped_export(&evidence, expected_schema, "LEDGER", records.len())?;
-    Ok(ParsedExport { records, evidence })
-}
-
-pub fn parse_ledger_period_balance_report(
-    xml: &str,
-) -> anyhow::Result<ParsedLedgerPeriodBalanceReport> {
-    validate_export_response(xml)?;
-    let mut reader = configured_reader(xml);
-    let mut context = None;
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYCONTEXT") =>
-            {
-                let parsed = parse_ledger_period_context(&mut reader, &element, false)?;
-                if context.replace(parsed).is_some() {
-                    anyhow::bail!("Tally period report repeated its context");
-                }
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYCONTEXT") =>
-            {
-                let parsed = parse_ledger_period_context(&mut reader, &element, true)?;
-                if context.replace(parsed).is_some() {
-                    anyhow::bail!("Tally period report repeated its context");
-                }
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"LEDGERPERIODBALANCE") =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&reader, &element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&reader, &element, b"ALTERID");
-                let record = parse_ledger_period_balance(&mut reader)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256(
-                        xml,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    let context = context.ok_or_else(|| anyhow::anyhow!("Tally period report omitted context"))?;
-    if context.source_record_count != records.len() as u64 {
-        anyhow::bail!("Tally period report count did not match parsed rows");
-    }
-    let mut identities = HashMap::new();
-    for record in &records {
-        let source_id = record
-            .source_id
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!("Tally period report row omitted stable identity"))?;
-        if identities.insert(source_id, ()).is_some() {
-            anyhow::bail!("Tally period report repeated a stable identity");
-        }
-    }
-    Ok(ParsedLedgerPeriodBalanceReport { context, records })
-}
-
-fn parse_ledger_period_context(
-    reader: &mut Reader<&[u8]>,
-    element: &quick_xml::events::BytesStart<'_>,
-    is_empty: bool,
-) -> anyhow::Result<LedgerPeriodBalanceContext> {
-    let mut fields = HashMap::<&'static str, String>::new();
-    for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|_| anyhow::anyhow!("Tally period context contained malformed attributes"))?;
-        let key = period_context_field(attribute.key.as_ref())
-            .ok_or_else(|| anyhow::anyhow!("Tally period context contained an unexpected field"))?;
-        let value = attribute
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|_| anyhow::anyhow!("Tally period context contained invalid text"))?;
-        insert_period_context_field(&mut fields, key, value.trim())?;
-    }
-    if !is_empty {
-        loop {
-            match reader.read_event()? {
-                Event::Start(child) => {
-                    let key = period_context_field(child.name().as_ref()).ok_or_else(|| {
-                        anyhow::anyhow!("Tally period context contained an unexpected field")
-                    })?;
-                    let value = read_required_text(reader, child.name()).map_err(|_| {
-                        anyhow::anyhow!("Tally period context contained an empty or invalid value")
-                    })?;
-                    insert_period_context_field(&mut fields, key, &value)?;
-                }
-                Event::Empty(_) => {
-                    anyhow::bail!("Tally period context contained an empty field");
-                }
-                Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                    anyhow::bail!("Tally period context contained unexpected text");
-                }
-                Event::End(end) if end.name().as_ref().eq_ignore_ascii_case(b"COMPANYCONTEXT") => {
-                    break;
-                }
-                Event::Eof => anyhow::bail!("Tally period context ended before closing"),
-                _ => {}
-            }
-        }
-    }
-
-    let required = |key: &'static str| {
-        fields
-            .get(key)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Tally period context omitted {key}"))
-    };
-    let schema = required("SCHEMA")?;
-    let object_type = required("OBJECTTYPE")?;
-    if schema != BRIDGE_LEDGER_PERIOD_BALANCE_SCHEMA || object_type != "LEDGERPERIODBALANCE" {
-        anyhow::bail!("Tally period report scope was invalid");
-    }
-    Ok(LedgerPeriodBalanceContext {
-        company_guid: required("GUID")?,
-        from_yyyymmdd: required("FROMDATE")?,
-        to_yyyymmdd: required("TODATE")?,
-        ordinary_books_requested: parse_tally_boolean(&required("ORDINARYBOOKSREQUESTED")?)?,
-        source_record_count: required("RECORDCOUNT")?
-            .parse::<u64>()
-            .map_err(|_| anyhow::anyhow!("Tally period report count was invalid"))?,
-    })
-}
-
-fn period_context_field(name: &[u8]) -> Option<&'static str> {
-    [
-        "SCHEMA",
-        "OBJECTTYPE",
-        "GUID",
-        "FROMDATE",
-        "TODATE",
-        "ORDINARYBOOKSREQUESTED",
-        "RECORDCOUNT",
-    ]
-    .into_iter()
-    .find(|field| name.eq_ignore_ascii_case(field.as_bytes()))
-}
-
-fn insert_period_context_field(
-    fields: &mut HashMap<&'static str, String>,
-    key: &'static str,
-    value: &str,
-) -> anyhow::Result<()> {
-    if value.is_empty() {
-        anyhow::bail!("Tally period context contained an empty field");
-    }
-    if fields.insert(key, value.to_string()).is_some() {
-        anyhow::bail!("Tally period context repeated {key}");
-    }
-    Ok(())
-}
-
-pub fn parse_vouchers(xml: &str) -> anyhow::Result<Vec<TallyVoucher>> {
-    Ok(parse_vouchers_with_evidence(xml)?.records)
-}
-
-pub fn parse_vouchers_with_evidence(xml: &str) -> anyhow::Result<ParsedExport<TallyVoucher>> {
-    let parsed = parse_voucher_source_records_with_evidence(xml)?;
-    Ok(ParsedExport {
-        records: parsed
-            .records
-            .into_iter()
-            .map(|record| record.record)
-            .collect(),
-        evidence: parsed.evidence,
-    })
-}
-
-pub fn parse_voucher_source_records_with_evidence(
-    xml: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyVoucher>>> {
-    parse_voucher_source_records_for_schema(xml, BRIDGE_VOUCHER_EXPORT_SCHEMA)
-}
-
-fn parse_voucher_source_records_for_schema(
-    xml: &str,
-    expected_schema: &str,
-) -> anyhow::Result<ParsedExport<ParsedSourceRecord<TallyVoucher>>> {
-    validate_export_response(xml)?;
-    let evidence = scan_export_evidence(xml)?;
-    let mut reader = configured_reader(xml);
-    let mut path = Vec::<Vec<u8>>::new();
-    let mut records = Vec::new();
-    loop {
-        let record_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case(b"VOUCHER") =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&reader, &element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&reader, &element, b"ALTERID");
-                let record = parse_voucher(&mut reader, source_id.clone(), xml)?;
-                records.push(ParsedSourceRecord {
-                    record,
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256(
-                        xml,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Empty(element)
-                if is_supported_export_parent(&path)
-                    && element.name().as_ref().eq_ignore_ascii_case(b"VOUCHER") =>
-            {
-                validate_only_attributes(
-                    &element,
-                    &[b"GUID", b"REMOTEID", b"MASTERID", b"ALTERID"],
-                )?;
-                let identities = parsed_source_identities(&reader, &element)?;
-                let (source_id, identity_kind) = preferred_identity(&identities);
-                let alter_id = attr_value(&reader, &element, b"ALTERID");
-                records.push(ParsedSourceRecord {
-                    record: TallyVoucher {
-                        id: source_id.clone(),
-                        date: None,
-                        voucher_type: None,
-                        voucher_number: None,
-                        party_ledger_name: None,
-                        cancelled: None,
-                        optional: None,
-                        ledger_entry_count: None,
-                        ledger_entries: Vec::new(),
-                    },
-                    source_id,
-                    identity_kind,
-                    identities,
-                    alter_id,
-                    raw_source_sha256: source_fragment_sha256(
-                        xml,
-                        record_start,
-                        reader.buffer_position() as usize,
-                    )?,
-                });
-            }
-            Event::Start(element) => path.push(element.name().as_ref().to_ascii_uppercase()),
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    validate_scoped_export(&evidence, expected_schema, "VOUCHER", records.len())?;
     Ok(ParsedExport { records, evidence })
 }
 
@@ -2419,7 +1909,7 @@ pub fn export_status(xml: &str) -> anyhow::Result<TallyExportStatus> {
     loop {
         match reader.read_event()? {
             Event::Start(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if in_protocol_region(&path)
                     && matches!(
                         name.as_slice(),
@@ -2431,7 +1921,7 @@ pub fn export_status(xml: &str) -> anyhow::Result<TallyExportStatus> {
                     })?;
                 }
                 if path.is_empty() {
-                    if !element.name().as_ref().eq_ignore_ascii_case(b"ENVELOPE") {
+                    if !element.name().as_ref().eq_ignore_ascii_case("ENVELOPE") {
                         anyhow::bail!("Tally response root must be ENVELOPE");
                     }
                     if saw_envelope || envelope_closed {
@@ -2488,7 +1978,7 @@ pub fn export_status(xml: &str) -> anyhow::Result<TallyExportStatus> {
                 }
             }
             Event::Empty(element) => {
-                let name = element.name().as_ref().to_ascii_uppercase();
+                let name = element.name().as_ref().as_bytes().to_ascii_uppercase();
                 if in_protocol_region(&path)
                     && matches!(
                         name.as_slice(),
@@ -2522,7 +2012,12 @@ pub fn export_status(xml: &str) -> anyhow::Result<TallyExportStatus> {
                 let Some(expected) = path.pop() else {
                     anyhow::bail!("Tally response contained an unexpected closing element");
                 };
-                if !element.name().as_ref().eq_ignore_ascii_case(&expected) {
+                if !element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(&expected)
+                {
                     anyhow::bail!("Tally response closed an unexpected element");
                 }
                 if path.is_empty() {
@@ -2534,7 +2029,7 @@ pub fn export_status(xml: &str) -> anyhow::Result<TallyExportStatus> {
                     || path_eq(&path, &[b"ENVELOPE"])
                     || path_eq(&path, &[b"ENVELOPE", b"HEADER"])
                     || path_eq(&path, &[b"ENVELOPE", b"BODY"]))
-                    && !text.decode()?.trim().is_empty() =>
+                    && !text.trim().is_empty() =>
             {
                 anyhow::bail!("Tally response contained unexpected structural text")
             }
@@ -2543,7 +2038,7 @@ pub fn export_status(xml: &str) -> anyhow::Result<TallyExportStatus> {
                     || path_eq(&path, &[b"ENVELOPE"])
                     || path_eq(&path, &[b"ENVELOPE", b"HEADER"])
                     || path_eq(&path, &[b"ENVELOPE", b"BODY"]))
-                    && !text.decode()?.trim().is_empty() =>
+                    && !text.trim().is_empty() =>
             {
                 anyhow::bail!("Tally response contained unexpected structural CDATA")
             }
@@ -2622,7 +2117,7 @@ fn validate_direct_company_list_response(xml: &str) -> anyhow::Result<()> {
     loop {
         match reader.read_event()? {
             Event::Start(element) if !saw_envelope => {
-                if !element.name().as_ref().eq_ignore_ascii_case(b"ENVELOPE") {
+                if !element.name().as_ref().eq_ignore_ascii_case("ENVELOPE") {
                     anyhow::bail!("Tally direct company response root must be ENVELOPE");
                 }
                 validate_only_attributes(&element, &[])?;
@@ -2631,7 +2126,7 @@ fn validate_direct_company_list_response(xml: &str) -> anyhow::Result<()> {
             Event::Start(element)
                 if saw_envelope
                     && !envelope_closed
-                    && element.name().as_ref().eq_ignore_ascii_case(b"COMPANYINFO") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") =>
             {
                 validate_only_attributes(&element, &[])?;
                 validate_direct_company_info(&mut reader)?;
@@ -2640,7 +2135,7 @@ fn validate_direct_company_list_response(xml: &str) -> anyhow::Result<()> {
             Event::End(element)
                 if saw_envelope
                     && !envelope_closed
-                    && element.name().as_ref().eq_ignore_ascii_case(b"ENVELOPE") =>
+                    && element.name().as_ref().eq_ignore_ascii_case("ENVELOPE") =>
             {
                 envelope_closed = true;
             }
@@ -2650,10 +2145,10 @@ fn validate_direct_company_list_response(xml: &str) -> anyhow::Result<()> {
             Event::End(_) => {
                 anyhow::bail!("Tally direct company response closed an unexpected element")
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally direct company response contained unexpected structural text")
             }
-            Event::CData(text) if !text.decode()?.trim().is_empty() => {
+            Event::CData(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally direct company response contained unexpected structural CDATA")
             }
             Event::Comment(_) | Event::DocType(_) | Event::PI(_) => {
@@ -2678,7 +2173,7 @@ fn validate_direct_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<()
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYNAMEFIELD") =>
+                    .eq_ignore_ascii_case("COMPANYNAMEFIELD") =>
             {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut name_seen, true) {
@@ -2690,7 +2185,7 @@ fn validate_direct_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<()
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYGUIDFIELD") =>
+                    .eq_ignore_ascii_case("COMPANYGUIDFIELD") =>
             {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut guid_seen, true) {
@@ -2698,13 +2193,13 @@ fn validate_direct_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<()
                 }
                 read_direct_company_identity_text(reader, element.name())?;
             }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"COMPANYINFO") => {
+            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") => {
                 break;
             }
             Event::Start(_) | Event::Empty(_) => {
                 anyhow::bail!("Tally direct company record contained an unexpected field")
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally direct company record contained unexpected text")
             }
             Event::Comment(_) | Event::CData(_) | Event::DocType(_) | Event::PI(_) => {
@@ -2730,8 +2225,7 @@ fn read_direct_company_identity_text(
     loop {
         match reader.read_event()? {
             Event::Text(text) => {
-                let decoded = text.decode()?;
-                let unescaped = quick_xml::escape::unescape(&decoded)?;
+                let unescaped = quick_xml::escape::unescape(&text)?;
                 if saw_text || unescaped.trim().is_empty() {
                     anyhow::bail!(
                         "Tally direct company identity field was not one non-empty text value"
@@ -2739,7 +2233,13 @@ fn read_direct_company_identity_text(
                 }
                 saw_text = true;
             }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(name.as_ref()) => {
+            Event::End(element)
+                if element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(name.as_ref().as_bytes()) =>
+            {
                 if !saw_text {
                     anyhow::bail!("Tally direct company identity field was empty")
                 }
@@ -2777,7 +2277,7 @@ fn scan_export_evidence(xml: &str) -> anyhow::Result<ExportEvidence> {
                     && element
                         .name()
                         .as_ref()
-                        .eq_ignore_ascii_case(b"COMPANYCONTEXT")
+                        .eq_ignore_ascii_case("COMPANYCONTEXT")
                 {
                     if company_context.is_some() {
                         anyhow::bail!("Tally response included multiple company contexts");
@@ -2790,19 +2290,19 @@ fn scan_export_evidence(xml: &str) -> anyhow::Result<ExportEvidence> {
                     continue;
                 }
                 if is_supported_export_parent(&path)
-                    && is_primary_export_row(element.name().as_ref())
-                    && record_identities(&reader, &element, &mut identities)?
+                    && is_primary_export_row(element.name().as_ref().as_bytes())
+                    && record_identities(&element, &mut identities)?
                 {
                     identified_record_count = identified_record_count.saturating_add(1);
                 }
-                path.push(element.name().as_ref().to_ascii_uppercase());
+                path.push(element.name().as_ref().as_bytes().to_ascii_uppercase());
             }
             Event::Empty(element)
                 if is_supported_export_parent(&path)
                     && element
                         .name()
                         .as_ref()
-                        .eq_ignore_ascii_case(b"COMPANYCONTEXT") =>
+                        .eq_ignore_ascii_case("COMPANYCONTEXT") =>
             {
                 if company_context.is_some() {
                     anyhow::bail!("Tally response included multiple company contexts");
@@ -2815,13 +2315,15 @@ fn scan_export_evidence(xml: &str) -> anyhow::Result<ExportEvidence> {
             }
             Event::Empty(element) => {
                 if is_supported_export_parent(&path)
-                    && is_primary_export_row(element.name().as_ref())
-                    && record_identities(&reader, &element, &mut identities)?
+                    && is_primary_export_row(element.name().as_ref().as_bytes())
+                    && record_identities(&element, &mut identities)?
                 {
                     identified_record_count = identified_record_count.saturating_add(1);
                 }
             }
-            Event::End(element) => pop_expected_path(&mut path, element.name().as_ref())?,
+            Event::End(element) => {
+                pop_expected_path(&mut path, element.name().as_ref().as_bytes())?
+            }
             Event::Eof => break,
             _ => {}
         }
@@ -2858,7 +2360,6 @@ fn is_primary_export_row(name: &[u8]) -> bool {
         b"VOUCHERTYPE".as_slice(),
         b"LEDGER".as_slice(),
         b"VOUCHER".as_slice(),
-        b"LEDGERPERIODBALANCE".as_slice(),
     ]
     .into_iter()
     .any(|candidate| name.eq_ignore_ascii_case(candidate))
@@ -2875,23 +2376,21 @@ fn pop_expected_path(path: &mut Vec<Vec<u8>>, closing_name: &[u8]) -> anyhow::Re
 }
 
 fn record_identities(
-    reader: &Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
     identities: &mut HashMap<String, u64>,
 ) -> anyhow::Result<bool> {
-    validate_unique_decodable_attributes(reader, element)?;
+    validate_unique_decodable_attributes(element)?;
     let mut observed = false;
     for (identity_kind, key) in [
         ("guid", b"GUID".as_slice()),
         ("remote_id", b"REMOTEID".as_slice()),
         ("master_id", b"MASTERID".as_slice()),
     ] {
-        let Some(identity) = attr_value(reader, element, key).filter(|value| !value.is_empty())
-        else {
+        let Some(identity) = attr_value(element, key).filter(|value| !value.is_empty()) else {
             continue;
         };
         observed = true;
-        let object_type = String::from_utf8_lossy(element.name().as_ref()).to_ascii_uppercase();
+        let object_type = element.name().as_ref().to_ascii_uppercase();
         let identity = if identity_kind == "guid" {
             identity.to_ascii_lowercase()
         } else {
@@ -2935,11 +2434,11 @@ fn parse_company_context(
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
             .map_err(|_| anyhow::anyhow!("Tally company context contained malformed attributes"))?;
-        let Some(field) = context_field(attribute.key.as_ref()) else {
+        let Some(field) = context_field(attribute.key.as_ref().as_bytes()) else {
             anyhow::bail!("Tally company context contained an unexpected attribute");
         };
         let value = attribute
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
             .map_err(|_| {
                 anyhow::anyhow!("Tally company context contained an invalid attribute value")
             })?;
@@ -2951,7 +2450,7 @@ fn parse_company_context(
     loop {
         match reader.read_event()? {
             Event::Start(element) => {
-                let Some(field) = context_field(element.name().as_ref()) else {
+                let Some(field) = context_field(element.name().as_ref().as_bytes()) else {
                     anyhow::bail!("Tally company context contained an unexpected child element");
                 };
                 let value = read_required_text(reader, element.name()).map_err(|_| {
@@ -2959,20 +2458,22 @@ fn parse_company_context(
                 })?;
                 set_context_field(&mut context, field, &value)?;
             }
-            Event::Empty(element) if context_field(element.name().as_ref()).is_some() => {
+            Event::Empty(element)
+                if context_field(element.name().as_ref().as_bytes()).is_some() =>
+            {
                 anyhow::bail!("Tally company context contained an empty metadata value");
             }
             Event::Empty(_) => {
                 anyhow::bail!("Tally company context contained an unexpected child element");
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally company context contained unexpected text");
             }
             Event::End(element)
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYCONTEXT") =>
+                    .eq_ignore_ascii_case("COMPANYCONTEXT") =>
             {
                 break;
             }
@@ -3104,15 +2605,14 @@ fn validate_scoped_export(
 }
 
 fn parsed_source_identities(
-    reader: &Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<ParsedSourceIdentities> {
-    validate_unique_decodable_attributes(reader, element)?;
+    validate_unique_decodable_attributes(element)?;
     Ok(ParsedSourceIdentities {
-        guid: validated_optional_identifier(attr_value(reader, element, b"GUID"))?
+        guid: validated_optional_identifier(attr_value(element, b"GUID"))?
             .map(|guid| guid.to_ascii_lowercase()),
-        remote_id: validated_optional_identifier(attr_value(reader, element, b"REMOTEID"))?,
-        master_id: validated_optional_identifier(attr_value(reader, element, b"MASTERID"))?,
+        remote_id: validated_optional_identifier(attr_value(element, b"REMOTEID"))?,
+        master_id: validated_optional_identifier(attr_value(element, b"MASTERID"))?,
     })
 }
 
@@ -3181,7 +2681,7 @@ fn parse_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyCompany
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYNAMEFIELD") =>
+                    .eq_ignore_ascii_case("COMPANYNAMEFIELD") =>
             {
                 company.name = read_optional_text(reader, element.name())?.unwrap_or_default()
             }
@@ -3189,12 +2689,12 @@ fn parse_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyCompany
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"COMPANYGUIDFIELD")
-                    || element.name().as_ref().eq_ignore_ascii_case(b"GUIDFIELD") =>
+                    .eq_ignore_ascii_case("COMPANYGUIDFIELD")
+                    || element.name().as_ref().eq_ignore_ascii_case("GUIDFIELD") =>
             {
                 company.guid = read_optional_text(reader, element.name())?
             }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"COMPANYINFO") => {
+            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("COMPANYINFO") => {
                 break;
             }
             Event::Eof => anyhow::bail!("Tally company response ended before COMPANYINFO closed"),
@@ -3202,44 +2702,6 @@ fn parse_company_info(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyCompany
         }
     }
     Ok(company)
-}
-
-fn parse_named_master(
-    reader: &mut Reader<&[u8]>,
-    element_name: &[u8],
-    name: String,
-) -> anyhow::Result<TallyNamedMaster> {
-    let mut record = TallyNamedMaster {
-        name,
-        parent: PartyLedgerMasterFieldObservation::NotObserved,
-        reserved_name: None,
-    };
-    let mut parent_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally master row repeated PARENT");
-                }
-                record.parent = PartyLedgerMasterFieldObservation::Returned(
-                    read_identifier_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(element_name) => {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally master row contained an unexpected field");
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally master row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally master response ended before its row closed"),
-            _ => {}
-        }
-    }
-    Ok(record)
 }
 
 fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Result<TallyLedger> {
@@ -3254,7 +2716,7 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
     let mut opening_seen = false;
     loop {
         match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
+            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut parent_seen, true) {
                     anyhow::bail!("Tally ledger row repeated PARENT");
@@ -3263,9 +2725,7 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
                     read_identifier_text(reader, element.name())?.unwrap_or_default(),
                 )
             }
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"PARTYGSTIN") =>
-            {
+            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case("PARTYGSTIN") => {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut gstin_seen, true) {
                     anyhow::bail!("Tally ledger row repeated PARTYGSTIN");
@@ -3278,7 +2738,7 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
                 if element
                     .name()
                     .as_ref()
-                    .eq_ignore_ascii_case(b"OPENINGBALANCE") =>
+                    .eq_ignore_ascii_case("OPENINGBALANCE") =>
             {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut opening_seen, true) {
@@ -3286,27 +2746,25 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
                 }
                 ledger.opening_balance = read_optional_text(reader, element.name())?
             }
-            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
+            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case("PARENT") => {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut parent_seen, true) {
                     anyhow::bail!("Tally ledger row repeated PARENT");
                 }
                 ledger.parent = PartyLedgerMasterFieldObservation::Returned(String::new());
             }
-            Event::Empty(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"PARTYGSTIN") =>
-            {
+            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case("PARTYGSTIN") => {
                 validate_only_attributes(&element, &[])?;
                 if std::mem::replace(&mut gstin_seen, true) {
                     anyhow::bail!("Tally ledger row repeated PARTYGSTIN");
                 }
                 ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(String::new());
             }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"LEDGER") => break,
+            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case("LEDGER") => break,
             Event::Start(_) | Event::Empty(_) => {
                 anyhow::bail!("Tally ledger row contained an unexpected field");
             }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
+            Event::Text(text) if !text.trim().is_empty() => {
                 anyhow::bail!("Tally ledger row contained unexpected text");
             }
             Event::Eof => anyhow::bail!("Tally ledger response ended before LEDGER closed"),
@@ -3314,406 +2772,6 @@ fn parse_ledger(reader: &mut Reader<&[u8]>, name: Option<String>) -> anyhow::Res
         }
     }
     Ok(ledger)
-}
-
-fn parse_ledger_write_readback(
-    reader: &mut Reader<&[u8]>,
-    name: Option<String>,
-) -> anyhow::Result<TallyLedger> {
-    let mut ledger = TallyLedger {
-        name: name.ok_or_else(|| anyhow::anyhow!("Tally write readback omitted ledger NAME"))?,
-        parent: PartyLedgerMasterFieldObservation::NotObserved,
-        party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
-        opening_balance: None,
-    };
-    let mut parent_seen = false;
-    let mut gstin_seen = false;
-    let mut opening_seen = false;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARENT");
-                }
-                ledger.parent = PartyLedgerMasterFieldObservation::Returned(
-                    read_identifier_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"PARTYGSTIN") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut gstin_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARTYGSTIN");
-                }
-                ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(
-                    read_optional_text(reader, element.name())?.unwrap_or_default(),
-                );
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"OPENINGBALANCE") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut opening_seen, true) {
-                    anyhow::bail!("Tally write readback repeated OPENINGBALANCE");
-                }
-                ledger.opening_balance = read_optional_text(reader, element.name())?;
-            }
-            Event::Empty(element) if element.name().as_ref().eq_ignore_ascii_case(b"PARENT") => {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut parent_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARENT");
-                }
-                ledger.parent = PartyLedgerMasterFieldObservation::Returned(String::new());
-            }
-            Event::Empty(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"PARTYGSTIN") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut gstin_seen, true) {
-                    anyhow::bail!("Tally write readback repeated PARTYGSTIN");
-                }
-                ledger.party_gstin = PartyLedgerMasterFieldObservation::Returned(String::new());
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"OPENINGBALANCE") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                if std::mem::replace(&mut opening_seen, true) {
-                    anyhow::bail!("Tally write readback repeated OPENINGBALANCE");
-                }
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally write readback contained an unexpected ledger field");
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally write readback contained unexpected ledger text");
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"LEDGER") => break,
-            Event::End(_) => anyhow::bail!("Tally write readback closed an unexpected element"),
-            Event::Eof => anyhow::bail!("Tally write readback ended before LEDGER closed"),
-            _ => {}
-        }
-    }
-    Ok(ledger)
-}
-
-fn parse_ledger_period_balance(
-    reader: &mut Reader<&[u8]>,
-) -> anyhow::Result<TallyLedgerPeriodBalance> {
-    let mut opening_balance = None;
-    let mut closing_balance = None;
-    loop {
-        match reader.read_event()? {
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"OPENINGBALANCE") =>
-            {
-                if opening_balance.is_some() {
-                    anyhow::bail!("Tally period-balance row repeated opening amount");
-                }
-                opening_balance = Some(read_required_text(reader, element.name())?);
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"CLOSINGBALANCE") =>
-            {
-                if closing_balance.is_some() {
-                    anyhow::bail!("Tally period-balance row repeated closing amount");
-                }
-                closing_balance = Some(read_required_text(reader, element.name())?);
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"OPENINGBALANCE") =>
-            {
-                anyhow::bail!("Tally period-balance row contained an empty opening amount");
-            }
-            Event::Empty(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"CLOSINGBALANCE") =>
-            {
-                anyhow::bail!("Tally period-balance row contained an empty closing amount");
-            }
-            Event::End(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"LEDGERPERIODBALANCE") =>
-            {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally period-balance row contained an unexpected field");
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally period-balance row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally period-balance row ended before closing"),
-            _ => {}
-        }
-    }
-    Ok(TallyLedgerPeriodBalance {
-        opening_balance: opening_balance
-            .ok_or_else(|| anyhow::anyhow!("Tally period-balance row omitted opening amount"))?,
-        closing_balance: closing_balance
-            .ok_or_else(|| anyhow::anyhow!("Tally period-balance row omitted closing amount"))?,
-    })
-}
-
-fn parse_voucher(
-    reader: &mut Reader<&[u8]>,
-    id: Option<String>,
-    xml: &str,
-) -> anyhow::Result<TallyVoucher> {
-    let mut voucher = TallyVoucher {
-        id,
-        date: None,
-        voucher_type: None,
-        voucher_number: None,
-        party_ledger_name: None,
-        cancelled: None,
-        optional: None,
-        ledger_entry_count: None,
-        ledger_entries: Vec::new(),
-    };
-    let mut seen = HashSet::new();
-    loop {
-        match reader.read_event()? {
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"DATE") => {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "DATE", "voucher")?;
-                voucher.date = read_optional_text(reader, element.name())?
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"VOUCHERTYPENAME") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "VOUCHERTYPENAME", "voucher")?;
-                voucher.voucher_type = read_identifier_text(reader, element.name())?
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"VOUCHERNUMBER") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "VOUCHERNUMBER", "voucher")?;
-                voucher.voucher_number = read_optional_text(reader, element.name())?
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"PARTYLEDGERNAME") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "PARTYLEDGERNAME", "voucher")?;
-                voucher.party_ledger_name = read_identifier_text(reader, element.name())?
-            }
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"ISCANCELLED") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "ISCANCELLED", "voucher")?;
-                voucher.cancelled = read_optional_text(reader, element.name())?
-                    .map(|value| parse_tally_boolean(&value))
-                    .transpose()?;
-            }
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"ISOPTIONAL") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "ISOPTIONAL", "voucher")?;
-                voucher.optional = read_optional_text(reader, element.name())?
-                    .map(|value| parse_tally_boolean(&value))
-                    .transpose()?;
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"LEDGERENTRYCOUNT") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "LEDGERENTRYCOUNT", "voucher")?;
-                let value = read_optional_text(reader, element.name())?
-                    .ok_or_else(|| anyhow::anyhow!("Tally voucher omitted ledger entry count"))?;
-                if !value.bytes().all(|byte| byte.is_ascii_digit()) {
-                    anyhow::bail!("Tally voucher ledger entry count was invalid");
-                }
-                voucher.ledger_entry_count = Some(value.parse().map_err(|_| {
-                    anyhow::anyhow!("Tally voucher ledger entry count was invalid")
-                })?);
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"LEDGERENTRIES") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "LEDGERENTRIES", "voucher")?;
-                parse_ledger_entries(reader, xml, &mut voucher.ledger_entries)?;
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"VOUCHER") => {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally voucher row contained an unexpected field");
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally voucher row contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally voucher response ended before VOUCHER closed"),
-            _ => {}
-        }
-    }
-    let reported = voucher
-        .ledger_entry_count
-        .ok_or_else(|| anyhow::anyhow!("Tally voucher omitted ledger entry count"))?;
-    if reported != voucher.ledger_entries.len() as u64 {
-        anyhow::bail!("Tally voucher ledger entry count did not match parsed rows");
-    }
-    for (offset, entry) in voucher.ledger_entries.iter().enumerate() {
-        if entry.entry_index != (offset + 1) as u64 {
-            anyhow::bail!("Tally voucher ledger entry indexes were not contiguous");
-        }
-    }
-    Ok(voucher)
-}
-
-fn parse_ledger_entries(
-    reader: &mut Reader<&[u8]>,
-    xml: &str,
-    entries: &mut Vec<TallyLedgerEntry>,
-) -> anyhow::Result<()> {
-    loop {
-        let element_start = reader.buffer_position() as usize;
-        match reader.read_event()? {
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"LEDGERENTRY") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                let mut entry = parse_ledger_entry(reader)?;
-                entry.raw_source_sha256 =
-                    source_fragment_sha256(xml, element_start, reader.buffer_position() as usize)?;
-                entries.push(entry);
-            }
-            Event::End(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"LEDGERENTRIES") =>
-            {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally ledger-entry collection contained an unexpected field");
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally ledger-entry collection contained unexpected text");
-            }
-            Event::Eof => {
-                anyhow::bail!("Tally voucher ended before LEDGERENTRIES closed");
-            }
-            _ => {}
-        }
-    }
-    Ok(())
-}
-
-fn parse_ledger_entry(reader: &mut Reader<&[u8]>) -> anyhow::Result<TallyLedgerEntry> {
-    let mut entry_index = None;
-    let mut ledger_name = None;
-    let mut amount = None;
-    let mut is_deemed_positive = None;
-    let mut seen = HashSet::new();
-    loop {
-        match reader.read_event()? {
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"ENTRYINDEX") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "ENTRYINDEX", "ledger entry")?;
-                let value = read_optional_text(reader, element.name())?
-                    .ok_or_else(|| anyhow::anyhow!("Tally ledger entry omitted its index"))?;
-                entry_index = Some(
-                    value
-                        .parse::<u64>()
-                        .map_err(|_| anyhow::anyhow!("Tally ledger entry index was invalid"))?,
-                );
-            }
-            Event::Start(element)
-                if element.name().as_ref().eq_ignore_ascii_case(b"LEDGERNAME") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "LEDGERNAME", "ledger entry")?;
-                ledger_name = read_identifier_text(reader, element.name())?;
-            }
-            Event::Start(element) if element.name().as_ref().eq_ignore_ascii_case(b"AMOUNT") => {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "AMOUNT", "ledger entry")?;
-                amount = read_optional_text(reader, element.name())?;
-            }
-            Event::Start(element)
-                if element
-                    .name()
-                    .as_ref()
-                    .eq_ignore_ascii_case(b"ISDEEMEDPOSITIVE") =>
-            {
-                validate_only_attributes(&element, &[])?;
-                mark_unique_field(&mut seen, "ISDEEMEDPOSITIVE", "ledger entry")?;
-                is_deemed_positive = read_optional_text(reader, element.name())?
-                    .map(|value| parse_tally_boolean(&value))
-                    .transpose()?;
-            }
-            Event::End(element) if element.name().as_ref().eq_ignore_ascii_case(b"LEDGERENTRY") => {
-                break;
-            }
-            Event::Start(_) | Event::Empty(_) => {
-                anyhow::bail!("Tally ledger entry contained an unexpected field");
-            }
-            Event::Text(text) if !text.decode()?.trim().is_empty() => {
-                anyhow::bail!("Tally ledger entry contained unexpected text");
-            }
-            Event::Eof => anyhow::bail!("Tally voucher ended before ledger entry closed"),
-            _ => {}
-        }
-    }
-    Ok(TallyLedgerEntry {
-        entry_index: entry_index
-            .filter(|index| *index > 0)
-            .ok_or_else(|| anyhow::anyhow!("Tally ledger entry index was invalid"))?,
-        ledger_name: ledger_name
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| anyhow::anyhow!("Tally ledger entry omitted ledger name"))?,
-        amount: amount
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| anyhow::anyhow!("Tally ledger entry omitted amount"))?,
-        is_deemed_positive: is_deemed_positive
-            .ok_or_else(|| anyhow::anyhow!("Tally ledger entry omitted sign evidence"))?,
-        raw_source_sha256: String::new(),
-    })
 }
 
 fn mark_unique_field(
@@ -3740,17 +2798,13 @@ fn parse_tally_boolean(value: &str) -> anyhow::Result<bool> {
     }
 }
 
-fn attr_value(
-    reader: &Reader<&[u8]>,
-    element: &quick_xml::events::BytesStart<'_>,
-    key: &[u8],
-) -> Option<String> {
+fn attr_value(element: &quick_xml::events::BytesStart<'_>, key: &[u8]) -> Option<String> {
     element
         .attributes()
         .flatten()
-        .find(|attr| attr.key.as_ref().eq_ignore_ascii_case(key))
+        .find(|attr| attr.key.as_ref().as_bytes().eq_ignore_ascii_case(key))
         .and_then(|attr| {
-            attr.decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+            attr.normalized_value(quick_xml::XmlVersion::Implicit1_0)
                 .ok()
         })
         .map(|value| value.into_owned())
@@ -3758,18 +2812,17 @@ fn attr_value(
 }
 
 fn validate_unique_decodable_attributes(
-    reader: &Reader<&[u8]>,
     element: &quick_xml::events::BytesStart<'_>,
 ) -> anyhow::Result<()> {
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute
             .map_err(|_| anyhow::anyhow!("Tally record contained malformed attributes"))?;
-        if !seen.insert(attribute.key.as_ref().to_ascii_lowercase()) {
+        if !seen.insert(attribute.key.as_ref().as_bytes().to_ascii_lowercase()) {
             anyhow::bail!("Tally record repeated an attribute");
         }
         attribute
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
             .map_err(|_| anyhow::anyhow!("Tally record contained an invalid attribute value"))?;
     }
     Ok(())
@@ -3781,15 +2834,15 @@ fn validate_only_attributes(
 ) -> anyhow::Result<()> {
     let mut seen = HashSet::new();
     for attribute in element.attributes().with_checks(true) {
-        let attribute = attribute
-            .map_err(|_| anyhow::anyhow!("Tally period report attributes were malformed"))?;
+        let attribute =
+            attribute.map_err(|_| anyhow::anyhow!("Tally record attributes were malformed"))?;
         if !allowed
             .iter()
-            .any(|key| attribute.key.as_ref().eq_ignore_ascii_case(key))
+            .any(|key| attribute.key.as_ref().as_bytes().eq_ignore_ascii_case(key))
         {
-            anyhow::bail!("Tally period report contained an unexpected attribute");
+            anyhow::bail!("Tally record contained an unexpected attribute");
         }
-        if !seen.insert(attribute.key.as_ref().to_ascii_lowercase()) {
+        if !seen.insert(attribute.key.as_ref().as_bytes().to_ascii_lowercase()) {
             anyhow::bail!("Tally response repeated a case-insensitive attribute");
         }
     }
@@ -3801,8 +2854,7 @@ fn read_optional_text(
     name: QName<'_>,
 ) -> anyhow::Result<Option<String>> {
     let value = reader.read_text(name)?;
-    let decoded = value.decode()?;
-    let unescaped = quick_xml::escape::unescape(&decoded)?;
+    let unescaped = quick_xml::escape::unescape(&value)?;
     let trimmed = unescaped.trim();
     Ok((!trimmed.is_empty()).then(|| trimmed.to_owned()))
 }
@@ -3825,8 +2877,7 @@ fn read_identifier_text(
     name: QName<'_>,
 ) -> anyhow::Result<Option<String>> {
     let value = reader.read_text(name)?;
-    let decoded = value.decode()?;
-    let unescaped = quick_xml::escape::unescape(&decoded)?;
+    let unescaped = quick_xml::escape::unescape(&value)?;
     Ok((!unescaped.trim().is_empty()).then(|| unescaped.into_owned()))
 }
 

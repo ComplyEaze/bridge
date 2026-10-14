@@ -1,0 +1,209 @@
+# fixture: tests/fixtures/native/vouchers_native_wr2.xml
+# parser: parse_native_voucher_source_records_with_evidence(WR2)
+# source: captured
+Ok(ParsedExport {
+    records: [
+        ParsedSourceRecord {
+            record: TallyVoucher {
+                id: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000001",
+                ),
+                date: Some(
+                    "20260801",
+                ),
+                voucher_type: Some(
+                    "Sales",
+                ),
+                voucher_number: Some(
+                    "1",
+                ),
+                party_ledger_name: None,
+                cancelled: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                ledger_entry_count: Some(
+                    2,
+                ),
+                ledger_entries: [
+                    TallyLedgerEntry {
+                        entry_index: 1,
+                        ledger_name: "नमस\u{94d}त\u{947} ट\u{94d}र\u{947}डर\u{94d}स",
+                        amount: "-101.01",
+                        is_deemed_positive: true,
+                        raw_source_sha256: "213c8547b64bce3fd88b0a1f4caec7752fa3d5b3be97b2b3c1a91ff41c6cb3dc",
+                    },
+                    TallyLedgerEntry {
+                        entry_index: 2,
+                        ledger_name: "WR2 Sales",
+                        amount: "101.01",
+                        is_deemed_positive: false,
+                        raw_source_sha256: "c7a4e2334ec09dcf18dbbd17ec8db3633653f9edea75ea60fbabe91ccc4af2d3",
+                    },
+                ],
+            },
+            source_id: Some(
+                "61c6de69-1748-461c-ad3f-162cb949df9f-00000001",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000001",
+                ),
+                remote_id: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000001",
+                ),
+                master_id: Some(
+                    "1",
+                ),
+            },
+            alter_id: Some(
+                "1",
+            ),
+            raw_source_sha256: "bd7f25fb3b52b235de8d7013d2f7b615f365997683360d2dccc1fbd2e337b8c7",
+        },
+        ParsedSourceRecord {
+            record: TallyVoucher {
+                id: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000002",
+                ),
+                date: Some(
+                    "20260801",
+                ),
+                voucher_type: Some(
+                    "Sales",
+                ),
+                voucher_number: Some(
+                    "2",
+                ),
+                party_ledger_name: None,
+                cancelled: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                ledger_entry_count: Some(
+                    2,
+                ),
+                ledger_entries: [
+                    TallyLedgerEntry {
+                        entry_index: 1,
+                        ledger_name: "Café Naïve Traders",
+                        amount: "-102.02",
+                        is_deemed_positive: true,
+                        raw_source_sha256: "8a117ce3d14ad0512a607403505d9009b5acd00f0a19b99b04554c49ac24a9d0",
+                    },
+                    TallyLedgerEntry {
+                        entry_index: 2,
+                        ledger_name: "WR2 Sales",
+                        amount: "102.02",
+                        is_deemed_positive: false,
+                        raw_source_sha256: "18197ea6ccc744e6baae0aa748fe5954b6631e1def3d7662a8a48a56266ebaf1",
+                    },
+                ],
+            },
+            source_id: Some(
+                "61c6de69-1748-461c-ad3f-162cb949df9f-00000002",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000002",
+                ),
+                remote_id: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000002",
+                ),
+                master_id: Some(
+                    "2",
+                ),
+            },
+            alter_id: Some(
+                "2",
+            ),
+            raw_source_sha256: "733eea6115211eadb491c87aa61560649cbcea047f0b6098920837f30c132722",
+        },
+        ParsedSourceRecord {
+            record: TallyVoucher {
+                id: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000003",
+                ),
+                date: Some(
+                    "20260801",
+                ),
+                voucher_type: Some(
+                    "Sales",
+                ),
+                voucher_number: Some(
+                    "3",
+                ),
+                party_ledger_name: None,
+                cancelled: Some(
+                    false,
+                ),
+                optional: Some(
+                    false,
+                ),
+                ledger_entry_count: Some(
+                    2,
+                ),
+                ledger_entries: [
+                    TallyLedgerEntry {
+                        entry_index: 1,
+                        ledger_name: "WR2 XML Café Naïve Ledger 01A01A2F",
+                        amount: "-103.03",
+                        is_deemed_positive: true,
+                        raw_source_sha256: "4fa2b6f70169954978f9e8a5b717818e5257aecde46756341fc75316d7b8baf9",
+                    },
+                    TallyLedgerEntry {
+                        entry_index: 2,
+                        ledger_name: "WR2 Sales",
+                        amount: "103.03",
+                        is_deemed_positive: false,
+                        raw_source_sha256: "5d0aae05c895e4702045473f022f23f44afffc0d35bc6bd349171b33c6ad65ff",
+                    },
+                ],
+            },
+            source_id: Some(
+                "61c6de69-1748-461c-ad3f-162cb949df9f-00000003",
+            ),
+            identity_kind: Some(
+                Guid,
+            ),
+            identities: ParsedSourceIdentities {
+                guid: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000003",
+                ),
+                remote_id: Some(
+                    "61c6de69-1748-461c-ad3f-162cb949df9f-00000003",
+                ),
+                master_id: Some(
+                    "3",
+                ),
+            },
+            alter_id: Some(
+                "3",
+            ),
+            raw_source_sha256: "7f33c317046c3c64f5c426ba431f9a7923d55b7cb38edc3fed3749c9ae1c3de5",
+        },
+    ],
+    evidence: ExportEvidence {
+        company_context: None,
+        schema: None,
+        object_type: None,
+        observed_record_count: Some(
+            3,
+        ),
+        source_record_count: None,
+        identified_record_count: 3,
+        duplicate_identities: [],
+        company_guid_prefix_match_count: 3,
+        company_guid_prefix_mismatch_count: 0,
+    },
+})

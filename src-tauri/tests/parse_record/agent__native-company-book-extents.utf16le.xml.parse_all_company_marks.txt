@@ -1,0 +1,101 @@
+# fixture: agent/native-company-book-extents.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "Aarav Trading Company Demo",
+        guid: "bb8ad19e-6aef-4239-a917-87fec0c6215e",
+        vouchers: 101605,
+        masters: 328,
+    },
+    LoadedCompanyMarks {
+        name: "Bridge Ageing Lab",
+        guid: "eebb9a9f-1679-4468-9e8f-814c729674cb",
+        vouchers: 14,
+        masters: 224,
+    },
+    LoadedCompanyMarks {
+        name: "Bridge Billwise Lab",
+        guid: "75f7566d-7a4f-431a-9642-e93a9d06d57d",
+        vouchers: 252,
+        masters: 219,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS AGEING",
+        guid: "2f65b86f-edf4-471c-99ed-da0de7163836",
+        vouchers: 8,
+        masters: 216,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS DENSE",
+        guid: "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        vouchers: 29900,
+        masters: 328,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS FOREX",
+        guid: "b14e9b2d-8a63-4779-804d-25d59eb787eb",
+        vouchers: 14,
+        masters: 214,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS GST",
+        guid: "46faa869-1208-4119-8961-f28db4df3b8e",
+        vouchers: 240,
+        masters: 219,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS ONACCOUNT",
+        guid: "9b4c70d1-2785-486a-8560-63d3a405c312",
+        vouchers: 920,
+        masters: 269,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS OPENING",
+        guid: "915d42f8-42ae-4b03-8291-55f596e3a2ea",
+        vouchers: 0,
+        masters: 213,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS PAYABLES",
+        guid: "b87c24c8-e5fa-43c5-be1f-486202e88bd3",
+        vouchers: 1680,
+        masters: 249,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE CORPUS SETTLED",
+        guid: "74d7e825-396a-4667-90b2-83f593f06a36",
+        vouchers: 24,
+        masters: 214,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE MASTER FIELDS LAB",
+        guid: "56359347-3976-4d01-b44e-56fa0f6a422c",
+        vouchers: 0,
+        masters: 233,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE PROBE B SANDBOX",
+        guid: "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+        vouchers: 2785,
+        masters: 229,
+    },
+    LoadedCompanyMarks {
+        name: "BRIDGE PROBE B SANDBOX - (from 1-Apr-26)",
+        guid: "ec4454ae-5c4c-4bfa-b3b0-68182a749689",
+        vouchers: 2785,
+        masters: 661,
+    },
+    LoadedCompanyMarks {
+        name: "Bridge Validation Lab",
+        guid: "c6afd306-00e1-4f51-802a-babe44daddd3",
+        vouchers: 7,
+        masters: 219,
+    },
+    LoadedCompanyMarks {
+        name: "WR2 Unicode Lab",
+        guid: "61c6de69-1748-461c-ad3f-162cb949df9f",
+        vouchers: 7,
+        masters: 219,
+    },
+])

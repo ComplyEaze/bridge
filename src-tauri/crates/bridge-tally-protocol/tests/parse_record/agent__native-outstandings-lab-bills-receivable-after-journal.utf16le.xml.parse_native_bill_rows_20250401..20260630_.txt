@@ -1,0 +1,165 @@
+# fixture: tests/fixtures/agent/native-outstandings-lab-bills-receivable-after-journal.utf16le.xml
+# parser: parse_native_bill_rows(20250401..20260630)
+# source: captured
+Ok([
+    NativeBillRow {
+        party: "OL P07 Referenced Opening Debtor",
+        reference: "OL-OPEN-001",
+        bill_date: TallyDate(
+            "20250401",
+        ),
+        due_date: TallyDate(
+            "20250501",
+        ),
+        closing_balance: ExactDecimal(
+            "-33333.00",
+        ),
+        tally_overdue_days: Some(
+            425,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P01 Named Bills Debtor",
+        reference: "OL-INV-001",
+        bill_date: TallyDate(
+            "20250415",
+        ),
+        due_date: TallyDate(
+            "20250515",
+        ),
+        closing_balance: ExactDecimal(
+            "-6000.00",
+        ),
+        tally_overdue_days: Some(
+            411,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P02 On Account Debtor",
+        reference: "OL-INV-101",
+        bill_date: TallyDate(
+            "20250415",
+        ),
+        due_date: TallyDate(
+            "20250515",
+        ),
+        closing_balance: ExactDecimal(
+            "-10000.00",
+        ),
+        tally_overdue_days: Some(
+            411,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P05 Credit Note Debtor",
+        reference: "OL-INV-301",
+        bill_date: TallyDate(
+            "20250418",
+        ),
+        due_date: TallyDate(
+            "20250518",
+        ),
+        closing_balance: ExactDecimal(
+            "-12000.00",
+        ),
+        tally_overdue_days: Some(
+            408,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P01 Named Bills Debtor",
+        reference: "OL-INV-002",
+        bill_date: TallyDate(
+            "20250420",
+        ),
+        due_date: TallyDate(
+            "20250604",
+        ),
+        closing_balance: ExactDecimal(
+            "-4000.00",
+        ),
+        tally_overdue_days: Some(
+            391,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P06 Debit Note Creditor",
+        reference: "OL-DN-001",
+        bill_date: TallyDate(
+            "20250528",
+        ),
+        due_date: TallyDate(
+            "20250528",
+        ),
+        closing_balance: ExactDecimal(
+            "-2000.00",
+        ),
+        tally_overdue_days: Some(
+            398,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P09 Reuse Debtor A",
+        reference: "OL-REUSE-1",
+        bill_date: TallyDate(
+            "20250610",
+        ),
+        due_date: TallyDate(
+            "20250710",
+        ),
+        closing_balance: ExactDecimal(
+            "-4200.00",
+        ),
+        tally_overdue_days: Some(
+            355,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P10 Reuse Debtor B",
+        reference: "OL-REUSE-1",
+        bill_date: TallyDate(
+            "20250612",
+        ),
+        due_date: TallyDate(
+            "20250712",
+        ),
+        closing_balance: ExactDecimal(
+            "-6500.00",
+        ),
+        tally_overdue_days: Some(
+            353,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P11 Journal Debtor",
+        reference: "OL-JV-001",
+        bill_date: TallyDate(
+            "20250701",
+        ),
+        due_date: TallyDate(
+            "20250731",
+        ),
+        closing_balance: ExactDecimal(
+            "-5000.00",
+        ),
+        tally_overdue_days: Some(
+            334,
+        ),
+    },
+    NativeBillRow {
+        party: "OL P11 Journal Debtor",
+        reference: "OL-JV-002",
+        bill_date: TallyDate(
+            "20250715",
+        ),
+        due_date: TallyDate(
+            "20250814",
+        ),
+        closing_balance: ExactDecimal(
+            "-2000.00",
+        ),
+        tally_overdue_days: Some(
+            320,
+        ),
+    },
+])

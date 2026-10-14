@@ -17,9 +17,9 @@ Lane E, 2026-09-22. Every book here is invented; none is a Tally read and none h
   killed by these books, the module's unit tests or the binding tests.
   - `bkq_order`: the MASTERID clock (lag 30 not over, 31 over; -31 not over; a sale dated before
     the clock leaves it), a sale with a negative MASTERID starting the clock before a purchase
-    numbered `-2`, equal MASTERIDs kept in population order, a GUID seen twice keeping its last
-    creation-order lag, MASTERID text as `int()` reads it, and base-type slugs from a non-ASCII and
-    a symbols-only name;
+    numbered `-2`, equal MASTERIDs kept in population order, two vouchers sharing a GUID each
+    keeping their own creation-order lag (since #1243), MASTERID text as `int()` reads it, and
+    base-type slugs from a non-ASCII and a symbols-only name;
   - `bkq_channel`: the greedy receipt match (date before GUID for both invoices and receipts, a
     receipt used once, the 0- and 3-day edges), a Sales voucher crediting the channel ledger taken as
     neither invoice nor receipt, an invoice's channel credit line not reducing its amount, a channel
@@ -66,7 +66,9 @@ of the three reads; on the one with write-offs, the reference's EVID-1 violation
 ## Reference commit and invocations
 
 The goldens were produced at the reference engine commit `9d64c7436deedd8136b71d87d41dd36eb82733e1`,
-from an archive of that commit with no client data, under Python 3.13:
+from an archive of that commit with no client data, under Python 3.13; `edge.bkq_order` was
+regenerated at the later commit `5658c8ce70d57981df63c5e65172308bf166ef94`, where two vouchers sharing
+a GUID are two in the entry-order lag (#1243, see `bkq-shared-guid-1243.md`):
 
     uv run -q --python 3.13 --with openpyxl --with xlrd --with python-docx --with jsonschema \
         --with striprtf --with pdfplumber python parity/python_golden.py ENGINE \
@@ -85,11 +87,11 @@ from an archive of that commit with no client data, under Python 3.13:
 | `bkq_channel_alone.json` | 3,845 | `7f705760290ce9ef8e3ff3d55d85b929d43855a02e49b311ee4be48e83286164` | `edge-books/bkq_channel_alone.json` |
 | `bkq_channel_zero.json` | 2,489 | `118e1112f554d9bc3bb3964288a7d6a4b1edb0453d234fa09e6a2c37a0510c25` | `edge-books/bkq_channel_zero.json` |
 | `bkq_misc.json` | 10,356 | `e7e23ce5751b1479c0c40f5f8b557aac39e1dcac54e9bd678238d53a749348a2` | `edge-books/bkq_misc.json` |
-| `bkq_order.json` | 6,758 | `06c6500c322d5a8b7b49cf4b8cd947d9677bc917d22ed9e72b9128fa8d6a0e0b` | `edge-books/bkq_order.json` |
+| `bkq_order.json` | 6,773 | `4a37ac487d52753afd22ba8a3831269cc69b35e017a5903d639d747a8633a5e0` | `edge-books/bkq_order.json` |
 | `bkq_quiet.json` | 2,141 | `502057ad49326bd5d72350dcafd2ae5c209879a4f9076786031637afc608765f` | `edge-books/bkq_quiet.json` |
 | `edge.bkq_channel.book_keeping_quality.json` | 16,610 | `0fa8e387bf850d4b108b00433b436be01a66de2b972c22d473b307ae6d954bce` | `golden/edge.bkq_channel.book_keeping_quality.json` |
 | `edge.bkq_channel_alone.book_keeping_quality.json` | 12,715 | `af10348dc851a5e419d730402af8ddd3d819bc43c9b7adad175d35ca30c372ad` | `golden/edge.bkq_channel_alone.book_keeping_quality.json` |
 | `edge.bkq_channel_zero.book_keeping_quality.json` | 9,207 | `60ed70f9f6580c5169d18ae3d43fb6ff254702f37164e850771a7b2e0453a5ff` | `golden/edge.bkq_channel_zero.book_keeping_quality.json` |
 | `edge.bkq_misc.book_keeping_quality.json` | 25,864 | `b926a90e9a1384ee04e3ea1d2912d1a050470f1a39acc03c9020ab4d7050f5ea` | `golden/edge.bkq_misc.book_keeping_quality.json` |
-| `edge.bkq_order.book_keeping_quality.json` | 18,878 | `d0a731eb1b5bd7df16f6d0ad15657a51f886b851419b3c7ac9093a85d8a05ea3` | `golden/edge.bkq_order.book_keeping_quality.json` |
+| `edge.bkq_order.book_keeping_quality.json` | 19,118 | `b74c75c3a69570139741d9882a35f3e7e9ecb9c573917ab2dbb6f03e67fb559c` | `golden/edge.bkq_order.book_keeping_quality.json` |
 | `edge.bkq_quiet.book_keeping_quality.json` | 4,843 | `bcb7170ec8d81338e6e5f2656ec910c4259bb83f00d1073a6efa411af791c6df` | `golden/edge.bkq_quiet.book_keeping_quality.json` |

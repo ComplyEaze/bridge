@@ -1,0 +1,11 @@
+# fixture: agent/native-outstandings-detail-high-water.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE OUTSTANDINGS LAB",
+        guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
+        vouchers: 20,
+        masters: 222,
+    },
+])

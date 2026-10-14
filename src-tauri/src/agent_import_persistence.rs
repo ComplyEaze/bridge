@@ -31,6 +31,16 @@ pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Remove a batch's saved file. A file that is already gone counts as
+/// removed, so a retirement that stopped after the removal can be repeated;
+/// any other failure is returned and leaves the file where it was.
+pub(super) fn remove_saved_import(imports: &Path, batch_id: &str) -> std::io::Result<()> {
+    match fs::remove_file(imports.join(format!("{batch_id}.xml"))) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
+        _ => Ok(()),
+    }
+}
+
 pub(super) fn persist_build(
     imports: &Path,
     line: &ImportLedgerLine,
@@ -103,6 +113,7 @@ pub(super) enum PublicationStep {
 /// is indeterminate: it runs inside `.proof-publication`, created here and
 /// removed once the journal is known whole, so a stop or a failed truncate
 /// during it blocks admission as before (`require_settled`).
+#[cfg(test)]
 pub(super) fn publish_proofs(
     imports: &Path,
     update: &ImportLedgerLine,
@@ -123,11 +134,37 @@ pub(super) fn publish_proofs(
 }
 
 /// [`publish_proofs`] with the directory sync given, so a test can fail it.
+#[cfg(test)]
 fn publish_proofs_syncing(
     imports: &Path,
     update: &ImportLedgerLine,
     json: &[u8],
     markdown: &[u8],
+    append_status: impl FnOnce(&ledger::StatusRecord) -> Result<(), String>,
+    before: impl FnMut(PublicationStep) -> Result<(), String>,
+    sync: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<ledger::ProofName, String> {
+    publish_proofs_recording(
+        imports,
+        update,
+        json,
+        markdown,
+        ledger::StatusRecord::verified,
+        append_status,
+        before,
+        sync,
+    )
+}
+
+/// [`publish_proofs_syncing`] with the record that names the pair given: a
+/// plain verification's, or the one that also retires the batch.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn publish_proofs_recording(
+    imports: &Path,
+    update: &ImportLedgerLine,
+    json: &[u8],
+    markdown: &[u8],
+    record_of: impl FnOnce(&ImportLedgerLine, ledger::ProofName) -> ledger::StatusRecord,
     append_status: impl FnOnce(&ledger::StatusRecord) -> Result<(), String>,
     mut before: impl FnMut(PublicationStep) -> Result<(), String>,
     sync: impl FnOnce(&Path) -> std::io::Result<()>,
@@ -143,7 +180,7 @@ fn publish_proofs_syncing(
     // The status record appended next names this pair: it must not be durable
     // before the pair is. A failure refuses, leaving files no record names.
     sync(imports).map_err(|_| "import_file_write_failed".to_string())?;
-    let record = ledger::StatusRecord::verified(update, name.clone());
+    let record = record_of(update, name.clone());
     before(PublicationStep::MarkAppend)?;
     let transaction = imports.join(TRANSACTION);
     create_transaction(&transaction)

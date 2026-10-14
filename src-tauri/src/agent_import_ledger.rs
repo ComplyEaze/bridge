@@ -846,6 +846,53 @@ pub(super) fn rows_held_as_vouchers(
         .map(|(id, (_, mine))| (id, mine)))
 }
 
+/// The statement rows among `rows` that a batch of the company holds as a
+/// voucher, of a lineage other than `own_lineage`, which was sent to Tally or
+/// found posted. A voucher of Tally's matching one of those rows by content
+/// alone is that batch's, not the asker's. Each batch's latest full record
+/// decides what it holds. The whole journal is admitted on the way.
+pub(super) fn other_lineage_holders(
+    reader: impl BufRead,
+    company_guid: &str,
+    own_lineage: &str,
+    rows: &BTreeSet<String>,
+) -> Result<BTreeSet<String>, String> {
+    let mut held: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut sent_or_found = BTreeSet::new();
+    scan_records(reader, |record, _| match record {
+        Record::Batch(batch) => {
+            if batch.company_guid.eq_ignore_ascii_case(company_guid)
+                && batch.identity_batch_id() != own_lineage
+            {
+                held.insert(
+                    batch.batch_id.clone(),
+                    batch
+                        .vouchers
+                        .iter()
+                        .filter(|voucher| rows.contains(&voucher.bridge_txn_id))
+                        .map(|voucher| voucher.bridge_txn_id.clone())
+                        .collect(),
+                );
+            }
+            if batch.status == POSTED_VERIFIED {
+                sent_or_found.insert(batch.batch_id.clone());
+            }
+        }
+        Record::Status(update) => {
+            if matches!(update.record_type, StatusKind::DispatchIntent)
+                || update.status == POSTED_VERIFIED
+            {
+                sent_or_found.insert(update.batch_id.clone());
+            }
+        }
+    })?;
+    Ok(held
+        .into_iter()
+        .filter(|(id, _)| sent_or_found.contains(id))
+        .flat_map(|(_, rows)| rows)
+        .collect())
+}
+
 /// The facts the transfer pairing view takes for one company: the journal
 /// (every record admitted, as for every other read) and the skip-only file,
 /// with a build about to be written, if any, read as the newest record.

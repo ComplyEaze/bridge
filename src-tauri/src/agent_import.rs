@@ -61,6 +61,8 @@ pub(super) mod local_data;
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
+#[path = "agent_import_retire.rs"]
+mod retire;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -74,6 +76,34 @@ pub(super) use transfers::{check_not_run_section, counts_only_section, trim_sect
 mod verification;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
+
+#[cfg(test)]
+tokio::task_local! {
+    /// Run right after a retirement removes the saved file and before it reads
+    /// Tally, so a test can write to the journal in that window.
+    pub(super) static AFTER_RETIRE_DELETE: std::sync::Arc<dyn Fn() + Send + Sync>;
+}
+
+/// What a verification is recorded as.
+enum PersistKind {
+    /// A verification; `own_tag_observed` when the batch is retired and the
+    /// read saw a voucher carrying its own tag.
+    Verification { own_tag_observed: bool },
+    /// A retirement, if the read shows the batch absent.
+    Retire(retire::Request),
+}
+
+/// What a verification is for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum VerifyIntent {
+    /// The tool, a review, or the check before a post.
+    Plain,
+    /// The readback right after this call's own POST.
+    AfterPost,
+    /// The tool with `if_absent` set to `retire`: a read of Tally that retires
+    /// a batch that was never sent if Tally does not hold it.
+    Retire,
+}
 use verification::{
     actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
     company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
@@ -1477,7 +1507,15 @@ impl Server {
     /// (bridge#627).
     pub(super) async fn verify_import(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let offset = arg_usize(args, "offset", 0)?;
+        let retiring = match optional_string(args, "if_absent")?.as_deref() {
+            None => false,
+            Some("retire") => true,
+            Some(_) => return Err("argument_schema_invalid".to_string().into()),
+        };
         if let Some(proof_sha256) = optional_string(args, "proof_sha256")? {
+            if retiring {
+                return Err("argument_schema_invalid".to_string().into());
+            }
             return self.verify_import_page(args, &proof_sha256, offset);
         }
         if offset != 0 {
@@ -1485,9 +1523,19 @@ impl Server {
         }
         let batch_id = required_string(args, "batch_id")?;
         let guid = required_string(args, "company_guid")?;
+        let intent = if retiring {
+            VerifyIntent::Retire
+        } else {
+            VerifyIntent::Plain
+        };
         let mut outcome = self
-            .verify_import_with_dispatch(args, false, &mut None, None, &mut None, None)
+            .verify_import_with_dispatch(args, intent, &mut None, None, &mut None, None)
             .await?;
+        // A retirement whose read did not finish has no verification to page.
+        if retire::unfinished(&outcome.payload) {
+            return Ok(outcome);
+        }
+        let retirement = outcome.payload["result"]["retire"].take();
         let evidence = outcome.evidence.clone();
         let persisted = self
             .read_persisted_proof(batch_id)
@@ -1507,6 +1555,9 @@ impl Server {
             .admit_verification_page(&page)
             .map_err(|failure| failure.with_prior_evidence(evidence))?;
         outcome.payload["result"] = page;
+        if !retirement.is_null() {
+            outcome.payload["result"]["retire"] = retirement;
+        }
         // After the verdict is persisted and the page admitted: nothing here
         // can change the verdict or fail the call.
         outcome.payload["result"]["transfers"] = self.transfers_for_verification(guid, essential);
@@ -1579,7 +1630,7 @@ impl Server {
         args: &Value,
         rows: &mut Option<Vec<ReadVoucher>>,
     ) -> Result<ToolOutcome, ToolFailure> {
-        self.verify_import_with_dispatch(args, false, &mut None, None, rows, None)
+        self.verify_import_with_dispatch(args, VerifyIntent::Plain, &mut None, None, rows, None)
             .await
     }
 
@@ -1593,7 +1644,14 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         let mut served = None;
         let outcome = self
-            .verify_import_with_dispatch(args, false, &mut served, None, &mut None, None)
+            .verify_import_with_dispatch(
+                args,
+                VerifyIntent::Plain,
+                &mut served,
+                None,
+                &mut None,
+                None,
+            )
             .await?;
         post::admit_post_window(served).map_err(|code| {
             ToolFailure::from(code).with_prior_evidence(outcome.evidence.clone())
@@ -1615,7 +1673,7 @@ impl Server {
     ) -> Result<ToolOutcome, ToolFailure> {
         self.verify_import_with_dispatch(
             args,
-            true,
+            VerifyIntent::AfterPost,
             &mut None,
             Some(masters_after_post),
             &mut None,
@@ -1627,12 +1685,14 @@ impl Server {
     async fn verify_import_with_dispatch(
         &self,
         args: &Value,
-        current_dispatch: bool,
+        intent: VerifyIntent,
         served: &mut Option<super::WindowServed>,
         masters_after_post: Option<Value>,
         observed_rows: &mut Option<Vec<ReadVoucher>>,
         after_post_mark: Option<u64>,
     ) -> Result<ToolOutcome, ToolFailure> {
+        let current_dispatch = intent == VerifyIntent::AfterPost;
+        let retiring = intent == VerifyIntent::Retire;
         let guid = required_string(args, "company_guid")?;
         let batch_id = required_string(args, "batch_id")?;
         let ledger::BatchSnapshot {
@@ -1640,6 +1700,8 @@ impl Server {
             mut generation,
             response: dispatch_response,
             dispatched,
+            retired,
+            ever_found,
             pre_post_voucher_mark,
             span_verdict,
             ..
@@ -1649,6 +1711,13 @@ impl Server {
         if !batch_guid_matches(&line.company_guid, guid) {
             return Err("import_batch_company_mismatch".to_string().into());
         }
+        // Everything a retirement can be refused for from the journal alone is
+        // decided here, from the one snapshot this call took, before anything is
+        // removed: the record below is written only if no record of this batch
+        // has been appended since.
+        if retiring {
+            self.refuse_retire_from_the_journal(&line, dispatched, retired, ever_found)?;
+        }
         validate_dispatched_import_endpoint(&line, dispatched, &self.settings.endpoint)?;
         let opening_mode = self.observe_import_profile().await?;
         let (company, identity, identity_evidence) = self
@@ -1657,11 +1726,46 @@ impl Server {
             .map_err(|failure| failure.with_prior_evidence(opening_mode.evidence.clone()))?;
         let mut accumulated =
             combine_evidence(opening_mode.evidence.clone(), identity_evidence.clone());
+        let removed = std::sync::atomic::AtomicBool::new(false);
         let result: Result<ToolOutcome, ToolFailure> = async {
             if line.company.as_ref() != Some(&import_company_tuple(&company)?) {
                 return Err("company_identity_mismatch".to_string().into());
             }
-            let window = (&line.date_from, &line.date_to);
+            // Retiring reads a wider window than the batch's own dates, and only
+            // after the saved file is gone, so a hand import of that file cannot
+            // begin during the read. Everything that can be decided before the
+            // file is removed has been.
+            let widened = if retiring {
+                if let Err(refusal) = opening_mode.qualification {
+                    return Err(refusal.verification_code().to_string().into());
+                }
+                let today = TallyDate::parse(super::tally_host_today())
+                    .map_err(|_| "host_setting_invalid".to_string())?;
+                let books_from = company
+                    .books_from
+                    .as_deref()
+                    .and_then(|books_from| TallyDate::parse(books_from).ok());
+                let window = retire::widened_window(
+                    &line.date_from,
+                    &line.date_to,
+                    boundary_profile_for(&opening_mode),
+                    &today,
+                    books_from.as_ref(),
+                )
+                .ok_or_else(|| "import_retire_window_unavailable".to_string())?;
+                persistence::remove_saved_import(&self.imports_dir()?, &line.batch_id)
+                    .map_err(|_| "import_retire_file_not_removed".to_string())?;
+                removed.store(true, std::sync::atomic::Ordering::SeqCst);
+                #[cfg(test)]
+                let _ = AFTER_RETIRE_DELETE.try_with(|hook| hook());
+                Some(window)
+            } else {
+                None
+            };
+            let window = widened.as_ref().map_or(
+                (&line.date_from, &line.date_to),
+                |(from, to)| (from, to),
+            );
             let observed_read = self
                 .read_verification_window(
                     &identity,
@@ -1710,14 +1814,14 @@ impl Server {
                     if let Some(closing) = corroboration_read.closing_evidence {
                         accumulated = combine_evidence(accumulated.clone(), closing);
                     }
-                    corroborate_verification_window(&observed, &corroboration, line.date_from.as_str(), line.date_to.as_str())?;
+                    corroborate_verification_window(&observed, &corroboration, window.0.as_str(), window.1.as_str())?;
                     json!(corroboration_evidence)
                 }
                 super::SecondRead::Spared(_) => {
                     verification_window_identities(
                         &observed,
-                        line.date_from.as_str(),
-                        line.date_to.as_str(),
+                        window.0.as_str(),
+                        window.1.as_str(),
                     )?;
                     json!({"state": "not_sent", "reason": "counted_and_bracketed_read"})
                 }
@@ -1790,7 +1894,9 @@ impl Server {
                 }
             }
             let mut closing_mode_evidence = None;
-            if result["counts"]["not_found"].as_u64().unwrap_or(0) > 0 {
+            // A retirement asserts absence whatever the read found, so it is
+            // qualified as an absence is.
+            if retiring || result["counts"]["not_found"].as_u64().unwrap_or(0) > 0 {
                 // Positive rows are direct observations. Absence additionally requires
                 // the product, release and licence tier qualified by the live slice.
                 if let Err(refusal) = opening_mode.qualification {
@@ -1806,7 +1912,7 @@ impl Server {
                 }
                 closing_mode_evidence = Some(closing_mode.evidence);
             }
-            let proof = json!({
+            let mut proof = json!({
                 "company": company_json(&company, std::slice::from_ref(&company)),
                 "batch_id": line.batch_id, "batch_sha256": line.sha256,
                 "built_at": line.built_at, "verified_at": now(),
@@ -1823,6 +1929,13 @@ impl Server {
             });
             // This call's own check, or the doubt recorded when this batch was
             // posted: a later readback, which compares by name, never clears it.
+            if retiring {
+                proof["retire_read"] = json!({
+                    "from": window.0.as_str(),
+                    "to": window.1.as_str(),
+                    "widened_days": retire::RETIRE_WIDEN_DAYS,
+                });
+            }
             let masters_after_post = match masters_after_post {
                 Some(masters) => Some(masters),
                 None if dispatched => {
@@ -1866,7 +1979,6 @@ impl Server {
                 }
                 None => None,
             };
-            let mut proof = proof;
             if let Some(masters) = &masters_after_post {
                 proof["masters_after_post"] =
                     served_masters_verdict(masters.clone(), &line.vouchers);
@@ -1911,7 +2023,39 @@ impl Server {
             payload["result"]["verification_status"] = json!(status.as_str());
             // Marked before it is saved, so the proof holds the marks too.
             mark_verification_names(&mut payload["result"]);
-            self.persist_import_verification(&payload["result"], &line, status, generation)?;
+            let rows: Vec<Value> = result["vouchers"].as_array().cloned().unwrap_or_default();
+            let kind = if retiring {
+                PersistKind::Retire(retire::Request {
+                    company_guid: line.company_guid.clone(),
+                    own_lineage: line.identity_batch_id().to_string(),
+                    statement_rows: line
+                        .vouchers
+                        .iter()
+                        .filter(|voucher| {
+                            bridge_bank_statement::proposals::is_statement_txn_id(
+                                &voucher.bridge_txn_id,
+                            )
+                        })
+                        .map(|voucher| voucher.bridge_txn_id.clone())
+                        .collect(),
+                    rows: rows.clone(),
+                })
+            } else {
+                // A retired batch whose own tag is seen again counts in the
+                // transfer view once more; the verification says so.
+                PersistKind::Verification {
+                    own_tag_observed: retired && retire::sees_its_own_tag(&rows),
+                }
+            };
+            let retirement =
+                self.persist_verification_as(&payload["result"], &line, status, generation, kind)?;
+            if let Some(decision) = retirement {
+                payload["result"]["retire"] = match decision {
+                    Ok(()) => json!({"state": "retired", "next_step": retire::RETIRED_STEP}),
+                    Err(keep) => json!({"state": "not_retired", "reason": keep.reason(),
+                        "file_removed": true, "next_step": retire::KEPT_STEP}),
+                };
+            }
             Ok(ToolOutcome {
                 payload,
                 evidence: accumulated.clone(),
@@ -1920,11 +2064,55 @@ impl Server {
             })
         }
         .await;
-        result.map_err(|failure| failure.with_prior_evidence(accumulated))
+        match result {
+            // The saved file is gone and nothing was recorded: say so, as an
+            // answer, since the batch can no longer be sent from its file.
+            Err(failure) if removed.load(std::sync::atomic::Ordering::SeqCst) => Ok(retire::unfinished_outcome(
+                company_json(&company, std::slice::from_ref(&company)),
+                &line.batch_id,
+                &failure.code,
+                accumulated,
+                guid,
+            )),
+            result => result.map_err(|failure| failure.with_prior_evidence(accumulated)),
+        }
+    }
+
+    /// What a retirement is refused for by the journal alone, decided from the
+    /// snapshot the call took and before anything is removed.
+    fn refuse_retire_from_the_journal(
+        &self,
+        line: &ImportLedgerLine,
+        dispatched: bool,
+        retired: bool,
+        ever_found: bool,
+    ) -> Result<(), ToolFailure> {
+        if dispatched {
+            return Err("import_retire_batch_sent".to_string().into());
+        }
+        if retired {
+            return Err("import_retire_already_retired".to_string().into());
+        }
+        if ever_found {
+            return Err("import_retire_batch_found".to_string().into());
+        }
+        // A read of another Tally says nothing of the one the batch was built for.
+        let origin = super::canonical_loopback_origin(&self.settings.endpoint)
+            .map_err(|_| "host_setting_invalid".to_string())?;
+        if line.endpoint_origin.as_deref() != Some(origin.as_str()) {
+            return Err("import_retire_endpoint_mismatch".to_string().into());
+        }
+        // Without the mark its build recorded, a voucher cannot be told from
+        // one that was there before.
+        if line.pre_import_mark.value.is_none() {
+            return Err("import_retire_mark_missing".to_string().into());
+        }
+        Ok(())
     }
 
     /// Publishes the proof files and the ledger line recording `status`, the
     /// verdict, for the batch `line` (bridge#814).
+    #[cfg(test)]
     fn persist_import_verification(
         &self,
         proof: &Value,
@@ -1932,6 +2120,29 @@ impl Server {
         status: VerificationStatus,
         expected_generation: ledger::VerificationGeneration,
     ) -> Result<(), String> {
+        self.persist_verification_as(
+            proof,
+            line,
+            status,
+            expected_generation,
+            PersistKind::Verification {
+                own_tag_observed: false,
+            },
+        )
+        .map(|_| ())
+    }
+
+    /// [`Self::persist_import_verification`], and for a retirement the decision
+    /// it took: made under the lock that records it, from the journal as it is
+    /// then, and recorded in the same hold as the verification.
+    fn persist_verification_as(
+        &self,
+        proof: &Value,
+        line: &ImportLedgerLine,
+        status: VerificationStatus,
+        expected_generation: ledger::VerificationGeneration,
+        kind: PersistKind,
+    ) -> Result<Option<Result<(), retire::Keep>>, String> {
         let mut update = line.clone();
         update.status = status.as_str().into();
         let update = &update;
@@ -1940,6 +2151,28 @@ impl Server {
         if current.map(|snapshot| snapshot.generation) != Some(expected_generation) {
             return Err("import_verification_conflict_retry".into());
         }
+        let decision = match &kind {
+            PersistKind::Retire(request) => {
+                let siblings = match self.import_journal_while_admitted()? {
+                    Some(reader) => ledger::other_lineage_holders(
+                        reader,
+                        &request.company_guid,
+                        &request.own_lineage,
+                        &request.statement_rows,
+                    )?,
+                    None => BTreeSet::new(),
+                };
+                Some(retire::judge(&request.rows, &siblings))
+            }
+            PersistKind::Verification { .. } => None,
+        };
+        let retiring = matches!(decision, Some(Ok(())));
+        let own_tag_observed = matches!(
+            kind,
+            PersistKind::Verification {
+                own_tag_observed: true
+            }
+        );
         let imports = self.imports_dir()?;
         // Saved with its party-name marks, so a page served from it masks
         // names as the response's redaction requires.
@@ -1950,13 +2183,21 @@ impl Server {
         let json = serde_json::to_vec_pretty(&local_proof)
             .map_err(|_| "proof_serialization_failed".to_string())?;
         let markdown = render_proof_markdown(&local_proof);
-        persistence::publish_proofs(
+        persistence::publish_proofs_recording(
             &imports,
             update,
             &json,
             markdown.as_bytes(),
+            |batch, name| match (retiring, own_tag_observed) {
+                (true, _) => ledger::StatusRecord::retired(batch, name),
+                (false, true) => {
+                    ledger::StatusRecord::verified(batch, name).with_own_tag_observed()
+                }
+                (false, false) => ledger::StatusRecord::verified(batch, name),
+            },
             |record| self.append_import_record_while_admitted(record),
             |_| Ok(()),
+            persistence::sync_directory,
         )?;
         // The first verified ALTERID of each voucher, for a later amendment to
         // compare against (#239). Kept beside the proof, not in the journal, so
@@ -1965,7 +2206,7 @@ impl Server {
         // voucher it lacks then refuses: the safe direction, so it does not
         // fail this verification.
         let _ = record_verified_baseline(&imports, &update.batch_id, proof);
-        Ok(())
+        Ok(decision)
     }
 
     /// The V1 ledger catalogue, for the reads outside the import family that

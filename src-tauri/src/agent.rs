@@ -1317,6 +1317,31 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              ComplyEaze Bridge will not send it. Build the statement again if its rows are \
              still to be posted.",
         ),
+        "import_retire_batch_sent" => Some(
+            "This batch was sent to Tally, and ComplyEaze Bridge does not retire a sent batch. \
+             Nothing was changed.",
+        ),
+        "import_retire_batch_found" => Some(
+            "Tally was already found to hold this batch. Nothing was changed.",
+        ),
+        "import_retire_already_retired" => {
+            Some("This batch is already retired. Nothing was changed.")
+        }
+        "import_retire_endpoint_mismatch" => Some(
+            "This batch was built for a different Tally endpoint, so a read here says nothing \
+             about it. Nothing was changed. Connect to that endpoint and call again.",
+        ),
+        "import_retire_mark_missing" => Some(
+            "This batch recorded no voucher mark when it was built, so a read cannot tell \
+             whether a voucher is its own. Nothing was changed; the batch keeps counting.",
+        ),
+        "import_retire_window_unavailable" => Some(
+            "No window this licence admits covers the days to read for this batch, so Tally was \
+             not read. Nothing was changed; the batch keeps counting.",
+        ),
+        "import_retire_file_not_removed" => Some(
+            "The saved file could not be removed, so nothing was retired. Call again.",
+        ),
         "import_saved_file_missing" => Some(
             "Nothing was sent. The saved file of this batch is missing. Run verify_import on \
              it with if_absent set to retire; if Tally does not hold it, it is retired and its \
@@ -2142,7 +2167,10 @@ impl Server {
         if matches!(name, "build_import_xml" | "parse_bank_statement") {
             self.import_enabled()?;
         }
-        if matches!(name, "post_import" | "acknowledge_post_review")
+        // Retiring removes a saved file and records a batch as never to be sent:
+        // it belongs with the tools that send and settle, which this setting stops.
+        if (matches!(name, "post_import" | "acknowledge_post_review")
+            || (name == "verify_import" && args.get("if_absent").is_some()))
             && !self.settings.writes_enabled
         {
             return Err("import_posting_disabled".to_string().into());

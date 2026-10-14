@@ -2127,8 +2127,9 @@ impl Server {
         if line.endpoint_origin.as_deref() != Some(origin.as_str()) {
             return Err("import_retire_endpoint_mismatch".to_string().into());
         }
-        // Without the mark its build recorded, a voucher cannot be told from
-        // one that was there before.
+        // The read takes a voucher for the batch's own, by tag or content, only if
+        // it was created after the mark its build recorded; without one every
+        // voucher reads as not found.
         if line.pre_import_mark.value.is_none() {
             return Err("import_retire_mark_missing".to_string().into());
         }

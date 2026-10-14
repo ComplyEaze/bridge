@@ -1332,8 +1332,11 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              about it. Nothing was changed. Connect to that endpoint and call again.",
         ),
         "import_retire_mark_missing" => Some(
-            "This batch recorded no voucher mark when it was built, so a read cannot tell \
-             whether a voucher is its own. Nothing was changed; the batch keeps counting.",
+            "This batch recorded no voucher mark when it was built. A read of Tally takes a \
+             voucher for this batch's own, by its narration tag or its content, only if the \
+             voucher was created after that mark, so without one every voucher of the batch \
+             would read as not found whatever Tally holds. Nothing was changed; the batch keeps \
+             counting.",
         ),
         "import_retire_window_unavailable" => Some(
             "No window this licence admits covers the days to read for this batch, so Tally was \

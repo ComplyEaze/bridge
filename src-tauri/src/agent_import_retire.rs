@@ -75,12 +75,12 @@ pub(super) fn carried_rows(facts: &TransferFacts, view: &TransferView, batch: &s
     rows.into_iter().collect()
 }
 
-pub(super) const RETIRED_CARRIED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Build this statement again with the rows in carried_rows skipped (treatment skip): the other account's statement books them, and posting them from this side would book each transfer twice.";
-pub(super) const RETIRED_UNKNOWN_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Whether another account's statement carries any of its rows could not be established. Run verify_import on the other account's batches first, then build this statement again with every row they carry skipped.";
-pub(super) const RETIRED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Build this statement again if its rows are still to be posted.";
-pub(super) const KEPT_STEP: &str = "Tally holds a voucher of this batch, so it was not retired and still counts. Its saved file is removed, so ComplyEaze Bridge will not send it.";
-const UNFINISHED_STEP: &str = "The read of Tally did not finish, so nothing was retired and the batch still counts. Its saved file is removed, so the batch can no longer be sent from it. Call verify_import on it again with if_absent set to retire.";
-const UNFINISHED_FINAL_STEP: &str = "The read of Tally was refused for a reason that a repeat will not change, so nothing was retired and the batch still counts. Its saved file is removed, so the batch can no longer be sent from it; a repeat will not help until the read limit or the licence mode that stopped the read changes.";
+pub(super) const RETIRED_CARRIED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found no voucher with its narration tag or its content, removed its saved file and will not send it. Build this statement again with the rows in carried_rows skipped (treatment skip): the other account's statement books them, and posting them from this side would book each transfer twice.";
+pub(super) const RETIRED_UNKNOWN_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found no voucher with its narration tag or its content, removed its saved file and will not send it. Whether another account's statement carries any of its rows could not be established. Run verify_import on the other account's batches first, then build this statement again with every row they carry skipped.";
+pub(super) const RETIRED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found no voucher with its narration tag or its content, removed its saved file and will not send it. Build this statement again if its rows are still to be posted.";
+pub(super) const KEPT_STEP: &str = "The read of Tally did not find this batch absent: a voucher carries its narration tag, matches its content, or could not be read as absent (`reason` says which), so it was not retired and still counts. Its saved file is removed, so a new post_import call for it is refused; a send already waiting for approval is not stopped by the removal.";
+const UNFINISHED_STEP: &str = "The read of Tally did not finish, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused. Call verify_import on it again with if_absent set to retire.";
+const UNFINISHED_FINAL_STEP: &str = "The read of Tally was refused for a reason that a repeat will not change, so nothing was retired and the batch still counts. Its saved file is removed, so a new post_import call for it is refused; a repeat will not help until the read limit or the licence mode that stopped the read changes.";
 const CONFLICT_STEP: &str = "Another record of this batch was written meanwhile, so nothing was retired. Call verify_import on it again.";
 const RECORD_UNCONFIRMED_STEP: &str = "The read of Tally finished, but ComplyEaze Bridge could not confirm that the record of it was written, so it is not established whether the batch is retired. Call verify_import on it without if_absent to see where it stands.";
 
@@ -411,7 +411,10 @@ mod tests {
         assert_eq!(retire["reason"], "window_not_corroborated");
         assert_eq!(retire["file_removed"], true);
         let step = retire["next_step"].as_str().unwrap();
-        assert!(step.contains("can no longer be sent from it"), "{step}");
+        assert!(
+            step.contains("a new post_import call for it is refused"),
+            "{step}"
+        );
         assert!(
             step.contains("Call verify_import on it again with if_absent set to retire"),
             "{step}"

@@ -177,7 +177,10 @@ async fn an_incomplete_read_retires_nothing_and_says_the_file_is_gone() {
     assert_eq!(retire["file_removed"], true, "{response}");
     assert!(retire["reason"].is_string(), "{response}");
     let step = retire["next_step"].as_str().unwrap();
-    assert!(step.contains("can no longer be sent"), "{step}");
+    assert!(
+        step.contains("a new post_import call for it is refused"),
+        "{step}"
+    );
     assert!(step.contains("if_absent"), "{step}");
     assert!(!saved_file(&server, &batch_id).exists());
     assert!(!records_of(directory.path(), &batch_id).contains(&"import_batch_retired".into()));
@@ -455,9 +458,9 @@ async fn a_dispatch_intent_between_the_delete_and_the_record_refuses_the_record(
         retire["reason"], "import_verification_conflict_retry",
         "{response}"
     );
-    // the batch was just sent: the answer does not say it can no longer be sent
+    // the batch was just sent: the answer does not say its file is removed
     let step = retire["next_step"].as_str().unwrap();
-    assert!(!step.contains("no longer be sent"), "{step}");
+    assert!(!step.contains("is refused"), "{step}");
     assert!(step.contains("Call verify_import on it again."), "{step}");
     let kinds = records_of(directory.path(), &batch_id);
     assert!(!kinds.contains(&"import_batch_retired".into()), "{kinds:?}");
@@ -767,6 +770,32 @@ async fn a_voucher_with_the_batchs_tag_dated_past_its_days_blocks_the_retire() {
         proof["retire_read"]["to"].as_str().unwrap() >= past.as_str(),
         "{proof}"
     );
+}
+
+/// What the refusals and steps of a retirement say is what the code does: the
+/// read takes a voucher for the batch by its narration tag or its content and
+/// only after the mark the build recorded; a kept batch's file is removed, which
+/// refuses a new send of it, not one already waiting for approval.
+#[test]
+fn the_retire_texts_say_only_what_the_read_does() {
+    assert_eq!(
+        crate::agent::refusal_remediation("import_retire_mark_missing"),
+        Some("This batch recorded no voucher mark when it was built. A read of Tally takes a voucher for this batch's own, by its narration tag or its content, only if the voucher was created after that mark, so without one every voucher of the batch would read as not found whatever Tally holds. Nothing was changed; the batch keeps counting.")
+    );
+    assert_eq!(
+        retire::KEPT_STEP,
+        "The read of Tally did not find this batch absent: a voucher carries its narration tag, matches its content, or could not be read as absent (`reason` says which), so it was not retired and still counts. Its saved file is removed, so a new post_import call for it is refused; a send already waiting for approval is not stopped by the removal."
+    );
+    for step in [
+        retire::RETIRED_STEP,
+        retire::RETIRED_CARRIED_STEP,
+        retire::RETIRED_UNKNOWN_STEP,
+    ] {
+        assert!(
+            step.starts_with("This batch is retired: ComplyEaze Bridge read Tally, found no voucher with its narration tag or its content, removed its saved file and will not send it."),
+            "{step}"
+        );
+    }
 }
 
 /// The tool text says what the code reads and what it answers: the window as

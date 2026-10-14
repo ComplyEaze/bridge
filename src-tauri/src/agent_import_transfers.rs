@@ -95,8 +95,8 @@ impl OpenState {
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.",
             Self::ReferenceDiffers => "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.",
-            Self::HeldElsewhere => "The batch named posts this row, which a statement skipped, and has not been found posted. Verify that batch. Once it is found posted, the skip is retired if a build named this row in withdraw_skips, and otherwise the row reads posted_against_skip.",
-            Self::PostedAgainstSkip => "A statement skipped this row as carried by the other account's Contra, and the batch named, found posted, posts it as a voucher although no build named it in withdraw_skips. If the other account's Contra also carries this transfer, it is booked twice. ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet: do not build or post anything further for this row, and tell the person.",
+            Self::HeldElsewhere => "The batch named posts this row, which a statement skipped, and has not been found posted. Verify that batch. The skip is retired once every batch found posted that holds the row, or the batch it amends, recorded the withdrawal: a build that names this row in withdraw_skips records it, and counts once that build is sent or found posted. To clear the row while the batch named has not been sent, build the statement that posts it again naming this row in withdraw_skips. A batch found posted without that leaves the row as posted_against_skip.",
+            Self::PostedAgainstSkip => "A statement skipped this row as carried by the other account's Contra, and the batch named, found posted, posts it as a voucher although no build that was sent or found posted named it in withdraw_skips. If the other account's Contra also carries this transfer, it is booked twice. ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally, or clears this row, yet: do not build or post anything further for this row, and tell the person.",
             Self::DoubleBooked => "Two statements each booked this transfer as a Contra. No step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet. If either batch named has not been sent to Tally, do not send it, and do not build or post anything further for this transfer; tell the person.",
             Self::NotEstablished => NOT_ESTABLISHED_STEP,
         }
@@ -433,7 +433,7 @@ fn without_facts(needs_the_view: bool, error: &TransferFactsError) -> Admission 
 
 const SKIP_ROW_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was recorded. This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. Do not skip the rows listed in skipped_rows. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with those rows not skipped (a row that batch holds is then refused as import_txn_already_posted) and build again.";
 const SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP: &str = "No file was written and nothing was recorded. This build posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Do not post these rows. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf.";
-const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing was recorded. Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch sent to Tally or found posted, or in a statement of only skipped rows) and a voucher of this build. Build again with withdraw_skips naming only rows that are both, or without it.";
+const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing was recorded. Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch, whether or not it was sent, or in a statement of only skipped rows) and a voucher of this build. Build again with withdraw_skips naming only rows that are both, or without it.";
 const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing was recorded. A Contra in this build carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Posting both books it twice. Do not build this Contra: run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger) and build again.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and nothing was recorded. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this build books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, build with that release; otherwise report it with the error named here, and do not build this statement again until it is fixed.";
 
@@ -515,6 +515,16 @@ fn rows_listed_json(rows: Vec<Value>) -> (Vec<Value>, usize) {
         rows.into_iter().take(REFUSAL_ROWS_LISTED).collect(),
         omitted,
     )
+}
+
+/// The view over the held skips alone, against the company's Contras. A held
+/// skip is judged without the skips that are in the main view: beside them, a
+/// Contra they compete for could read ambiguous, which a withdrawal may pass.
+pub(super) fn held_carrier_view(
+    facts: &TransferFacts,
+) -> Result<TransferView, crate::agent::transfer_pairing::PairingInputError> {
+    let held: Vec<SkipFact> = facts.held.iter().map(|held| held.fact.clone()).collect();
+    transfer_pairing_view(&held, &facts.contras, &facts.coverage, TRANSFER_K_DAYS)
 }
 
 /// The batch holding the other Contra of a double booking that refuses the
@@ -609,10 +619,17 @@ impl Server {
             .iter()
             .map(|key| key.row.as_str())
             .collect();
+        // A skip is withdrawn whether or not its statement was ever sent: a
+        // statement parsed again with the row posted is a build that posts it.
+        let mentioned: BTreeSet<&str> = before
+            .skip_mentions
+            .iter()
+            .map(|key| key.row.as_str())
+            .collect();
         let invalid: Vec<String> = input
             .withdraw
             .iter()
-            .filter(|row| !live.contains(row.as_str()) || !input.voucher_rows.contains(*row))
+            .filter(|row| !mentioned.contains(row.as_str()) || !input.voucher_rows.contains(*row))
             .cloned()
             .collect();
         if !invalid.is_empty() {
@@ -640,14 +657,11 @@ impl Server {
             .map(|contra| &contra.key)
             .collect();
         // A skip whose row a batch holds is outside the view. Naming it again
-        // is judged as any skip is, against the same Contras, in a view of the
-        // held skips alone: beside other skips a Contra they compete for could
-        // read ambiguous, which a withdrawal may pass.
+        // is judged as any skip is, against the same Contras.
         let held_view = if input.withdraw.is_empty() {
             None
         } else {
-            let held: Vec<SkipFact> = before.held.iter().map(|held| held.fact.clone()).collect();
-            match transfer_pairing_view(&held, &before.contras, &before.coverage, TRANSFER_K_DAYS) {
+            match held_carrier_view(&before) {
                 Ok(view) => Some(view),
                 Err(error) => {
                     return Ok(without_facts(input.needs_the_view(), &error.into()));

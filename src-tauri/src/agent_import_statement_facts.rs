@@ -649,6 +649,9 @@ pub(super) struct TransferFacts {
     /// a skip a person has acted on. A skip only built is superseded by the
     /// next build of its statement and is not live.
     pub(super) live_skips: BTreeSet<SkipKey>,
+    /// Every skip the company still has, live or not, kept or held: the skips a
+    /// build that posts the row may withdraw. A retired skip is not one.
+    pub(super) skip_mentions: BTreeSet<SkipKey>,
 }
 
 /// What is true of the batch that holds a skipped row as a voucher.
@@ -757,7 +760,6 @@ fn fold_batches(
                         // the batch keeps its place, and its content is the latest record's
                         batch.found |= line.status == POSTED_VERIFIED;
                         batch.status = line.status.clone();
-                        line.check_withdrawn()?;
                         batch.facts = admit_facts(&line)?;
                         batch.line = *line;
                     }
@@ -1290,19 +1292,27 @@ pub(super) fn build_transfer_facts(
 
     // A skipped row that a batch posted, or may yet post, is not a skip. One a
     // batch found posted holds is retired only when every such batch's lineage
-    // recorded that a person withdrew the skip; otherwise the posted voucher
-    // contradicts the skip and it stays open.
-    let mut withdrawn_by: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    // recorded the withdrawal, in a build that was sent or found posted and was
+    // built no earlier than the newest mention of the skip; otherwise the posted
+    // voucher contradicts the skip and it stays open.
+    let mut withdrawn_at: BTreeMap<(&str, &str), DateTime<FixedOffset>> = BTreeMap::new();
     for batch in &batches {
-        withdrawn_by
-            .entry(batch.line.lineage.as_str())
-            .or_default()
-            .extend(batch.line.withdrawn.iter().map(String::as_str));
+        if !(batch.sent || batch.found) {
+            continue;
+        }
+        for row in &batch.line.withdrawn {
+            let built = built_instant(&batch.line.batch_id, &batch.line.built_at)?;
+            let newest = withdrawn_at
+                .entry((batch.line.lineage.as_str(), row.as_str()))
+                .or_insert(built);
+            *newest = (*newest).max(built);
+        }
     }
     let mut skips = Vec::new();
     let mut retired_skips = 0;
     let mut held = Vec::new();
     let mut live_skips = BTreeSet::new();
+    let mut skip_mentions = BTreeSet::new();
     for (key, mention) in mentions {
         let live = mention.live;
         match holders.get(mention.row.as_str()) {
@@ -1310,9 +1320,9 @@ pub(super) fn build_transfer_facts(
             Some(holding) => {
                 let contradicting = holding.batches.iter().copied().find(|&at| {
                     batches[at].found
-                        && !withdrawn_by
-                            .get(batches[at].line.lineage.as_str())
-                            .is_some_and(|rows| rows.contains(mention.row.as_str()))
+                        && !withdrawn_at
+                            .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
+                            .is_some_and(|recorded| *recorded >= mention.built)
                 });
                 let any_posted = holding.batches.iter().any(|&at| batches[at].found);
                 match (contradicting, any_posted) {
@@ -1333,6 +1343,7 @@ pub(super) fn build_transfer_facts(
                 }
             }
         }
+        skip_mentions.insert(key.clone());
         if live {
             live_skips.insert(key);
         }
@@ -1393,6 +1404,7 @@ pub(super) fn build_transfer_facts(
         contras_without_facts,
         contras_superseded,
         live_skips,
+        skip_mentions,
     })
 }
 

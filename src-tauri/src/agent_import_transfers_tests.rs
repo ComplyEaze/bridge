@@ -94,6 +94,7 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
         contras_without_facts: 0,
         contras_superseded: 0,
         live_skips: BTreeSet::new(),
+        skip_mentions: BTreeSet::new(),
     }
 }
 
@@ -550,10 +551,15 @@ fn each_next_step_says_what_was_decided() {
     // it never says the row is not a transfer
     assert!(!reversed.contains("not a transfer"), "{reversed}");
     let held = step(OpenState::HeldElsewhere);
-    assert!(held.contains("retired if a build named this row in withdraw_skips"));
+    assert!(held.contains(
+        "retired once every batch found posted that holds the row, or the batch it amends, recorded the withdrawal"
+    ));
+    assert!(
+        held.contains("build the statement that posts it again naming this row in withdraw_skips")
+    );
     assert!(held.contains("posted_against_skip"));
     let posted = step(OpenState::PostedAgainstSkip);
-    assert!(posted.contains("no build named it in withdraw_skips"));
+    assert!(posted.contains("no build that was sent or found posted named it in withdraw_skips"));
     assert!(posted.contains("booked twice"));
     let double = step(OpenState::DoubleBooked);
     assert!(double.contains("If either batch named has not been sent to Tally, do not send it"));
@@ -879,8 +885,9 @@ fn no_step_sends_a_person_to_change_tally_by_hand() {
 fn a_state_with_no_way_out_inside_the_product_says_so() {
     let none = "no step inside complyeaze bridge";
     let lower = |text: &str| text.to_lowercase();
-    // two Contras already booked
+    // two Contras already booked, and a skip a posted voucher contradicts
     assert!(lower(OpenState::DoubleBooked.step()).contains(none));
+    assert!(lower(OpenState::PostedAgainstSkip.step()).contains(none));
     // the other statement's send was rejected: a rebuild is refused
     assert!(lower(OpenState::OtherSideUnverified.step()).contains(none));
     assert!(OpenState::OtherSideUnverified.step().contains("rejected"));
@@ -1031,4 +1038,46 @@ fn every_failure_kind_is_named_by_its_pinned_value() {
     }
     let names: BTreeSet<&str> = all.iter().map(|(_, name)| *name).collect();
     assert_eq!(names.len(), all.len());
+}
+
+/// A held skip is judged beside the Contras alone, not beside the other skips:
+/// two skips of one day and amount compete for one Contra, which would read
+/// ambiguous and could be withdrawn.
+#[test]
+fn a_held_skip_is_judged_without_the_skips_in_the_main_view() {
+    let mut facts = facts_of(
+        vec![skip("st-kept", "20260105", "100.00")],
+        vec![contra("batch-1", "t1", "20260105", "100.00")],
+    );
+    facts.held = vec![HeldSkip {
+        fact: skip("st-held", "20260105", "100.00"),
+        holder: BatchId::new("batch-9"),
+        by: HeldBy::UnverifiedBatch,
+    }];
+    let alone = held_carrier_view(&facts).unwrap();
+    assert!(
+        matches!(
+            alone.skips.get(&skip_key("st-held")),
+            Some(SkipState::Paired { .. })
+        ),
+        "{:?}",
+        alone.skips
+    );
+    // chained into one view, the two skips share the Contra
+    let all: Vec<SkipFact> = facts
+        .skips
+        .iter()
+        .cloned()
+        .chain(facts.held.iter().map(|held| held.fact.clone()))
+        .collect();
+    let combined =
+        transfer_pairing_view(&all, &facts.contras, &facts.coverage, TRANSFER_K_DAYS).unwrap();
+    assert!(
+        !matches!(
+            combined.skips.get(&skip_key("st-held")),
+            Some(SkipState::Paired { .. })
+        ),
+        "{:?}",
+        combined.skips
+    );
 }

@@ -357,11 +357,12 @@ async fn a_skip_in_a_batch_only_built_is_not_a_reason_to_refuse_the_row() {
     let built = rig.build(posting).await;
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
-    // and a withdrawal of a skip that is not live is invalid
+    // and a skip that was never sent may be withdrawn: a statement parsed
+    // again with the row posted is a build that posts it
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
-        [two_bank_plans(), admission_plans()].concat(),
+        [two_bank_plans(), two_bank_plans()].concat(),
     );
     rig.build(statement_v2(
         directory.path(),
@@ -376,14 +377,18 @@ async fn a_skip_in_a_batch_only_built_is_not_a_reason_to_refuse_the_row() {
     .await;
     let mut withdrawing = contra_statement(directory.path(), BANK_A, SKIPPED, None);
     withdrawing["withdraw_skips"] = json!([SKIPPED]);
-    let refused = rig.build(withdrawing).await;
+    let built = rig.build(withdrawing).await;
     rig.finish();
-    assert_eq!(refused["reason"], "withdraw_skip_invalid", "{refused}");
-    assert_eq!(refused["invalid_rows"], json!([SKIPPED]));
+    assert_eq!(built["voucher_count"], 1, "{built}");
+    let holder = built["batch_id"].as_str().unwrap();
+    assert!(
+        open_rows(&built["transfers"]).contains(&open_row(SKIPPED, "held_elsewhere", Some(holder))),
+        "{built}"
+    );
 }
 
 #[tokio::test]
-async fn a_withdrawal_must_name_a_live_skip_and_a_row_of_the_build() {
+async fn a_withdrawal_must_name_a_skip_of_the_company_and_a_row_of_the_build() {
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
@@ -403,7 +408,7 @@ async fn a_withdrawal_must_name_a_live_skip_and_a_row_of_the_build() {
         assert_eq!(refused["invalid_rows"], rows, "{refused}");
         assert_eq!(refused["invalid_rows_omitted"], 0);
     };
-    // a live skip that this build does not post
+    // a skip that this build does not post
     let mut elsewhere = contra_statement(directory.path(), BANK_A, BOOKED, None);
     elsewhere["withdraw_skips"] = json!([SKIPPED]);
     let refused = rig.build(elsewhere).await;
@@ -2077,4 +2082,67 @@ async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
         Some(original.as_str())
     );
     rig.finish();
+}
+
+// ---- a skip that was never sent, and a statement parsed again ---------------------
+
+/// The parse tool's own route for a wrong mapping: the statement is parsed again
+/// with the row posted. The first build was never sent, so the second is
+/// admitted; the section then says what clears the row, and it does.
+#[tokio::test]
+async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_with_the_withdrawal() {
+    let directory = tempfile::tempdir().unwrap();
+    // 1. parsed with the row skipped; built, never sent
+    run(
+        directory.path(),
+        two_bank_plans(),
+        a_booking_and_skipping(directory.path()),
+    )
+    .await;
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), two_bank_plans()].concat(),
+    );
+    // 2. parsed again with the row posted; admitted, since the first was never sent
+    let again = |extra: Option<Value>| {
+        let mut args = statement_v2(
+            directory.path(),
+            BANK_A,
+            window(),
+            json!([contra_voucher(OTHER_BOOKED), contra_voucher(SKIPPED)]),
+            json!([
+                contra_record(OTHER_BOOKED, None),
+                contra_record(SKIPPED, None)
+            ]),
+        );
+        if let Some(withdraw) = extra {
+            args["withdraw_skips"] = withdraw;
+        }
+        args
+    };
+    let second = rig.build(again(None)).await;
+    let second_id = second["batch_id"].as_str().unwrap().to_string();
+    assert_eq!(
+        open_rows(&second["transfers"]),
+        vec![open_row(SKIPPED, "held_elsewhere", Some(&second_id))],
+        "{second}"
+    );
+    let step = second["transfers"]["next_steps"]["held_elsewhere"]
+        .as_str()
+        .unwrap();
+    assert!(
+        step.contains("build the statement that posts it again naming this row in withdraw_skips"),
+        "{step}"
+    );
+    // 3. built again naming the row, before anything is sent: admitted
+    let third = rig.build(again(Some(json!([SKIPPED])))).await;
+    rig.finish();
+    assert_eq!(third["voucher_count"], 2, "{third}");
+    let third_id = third["batch_id"].as_str().unwrap().to_string();
+    // that build is found posted: the skip is retired and nothing is open
+    mark_found(directory.path(), &third_id);
+    let section = journal(directory.path()).transfers_for_verification(CAPTURED_GUID, 0);
+    assert_eq!(section["retired"], 1, "{section}");
+    assert_eq!(section["skips_open"], 0, "{section}");
+    assert_eq!(section["open"], json!([]), "{section}");
 }

@@ -1490,7 +1490,7 @@ fn a_skip_only_record_is_retired_like_a_batch_skip() {
     let record = skip_record(
         4,
         ENDPOINT,
-        "2026-09-02T10:00:00Z",
+        "2026-09-01T09:00:00Z",
         facts(B1).skip(skip_row(&st(15), "500.00", B2, None)),
     );
     let posted = build(141)
@@ -2535,7 +2535,7 @@ fn a_window_over_a_row_an_unverified_build_decides_is_no_cover() {
     let b1 = build(201)
         .amends(200)
         .voucher(contra(&st(50), N2, N1, "510.00"));
-    let september = build(202)
+    let september = build(199)
         .facts(
             facts(B2)
                 .window("20260901", "20260930")
@@ -3154,6 +3154,7 @@ fn an_amendment_is_covered_by_the_withdrawal_its_lineage_recorded() {
     let found = Journal::default()
         .batch(&skipped)
         .batch(&original)
+        .sent(&original)
         .batch(&amendment)
         .read()
         .unwrap();
@@ -3265,4 +3266,92 @@ fn every_failed_check_is_named_by_its_pinned_value() {
     }
     let names: BTreeSet<&str> = all.iter().map(|(_, name)| *name).collect();
     assert_eq!(names.len(), all.len());
+}
+
+#[test]
+fn a_withdrawal_counts_only_from_a_build_sent_or_found_posted() {
+    let skipped = skipping(120, 9);
+    // the build that names the row was never sent: the batch found posted is
+    // another lineage's, and nothing recorded a withdrawal for it
+    let unsent = holder_of_row_nine(121).withdrew(&[st(9)]);
+    let other = holder_of_row_nine(122).status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&unsent)
+        .batch(&other)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (0, 1));
+    // an amendment that names the row and is never sent does not count either
+    let original = holder_of_row_nine(123).status("posted_verified");
+    let amendment = holder_of_row_nine(124).amends(123).withdrew(&[st(9)]);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&original)
+        .batch(&amendment)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (0, 1));
+    // sent, it does
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&original)
+        .batch(&amendment)
+        .sent(&amendment)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+#[test]
+fn a_skip_made_after_the_withdrawal_is_not_retired_by_it() {
+    // the withdrawal was recorded by build 131; the row is skipped again by a
+    // build made after it (132), then the withdrawing batch is found posted
+    let withdrawing = holder_of_row_nine(131)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let skipped_again = skipping(132, 9);
+    let found = Journal::default()
+        .batch(&withdrawing)
+        .batch(&skipped_again)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    // and a skip made before it is retired
+    let skipped_before = skipping(130, 9);
+    let found = Journal::default()
+        .batch(&skipped_before)
+        .batch(&withdrawing)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+#[test]
+fn a_skip_that_was_never_sent_can_be_withdrawn_and_is_known_to_the_facts() {
+    let skipped = skipping(140, 9);
+    let found = Journal::default().batch(&skipped).read().unwrap();
+    assert!(found.live_skips.is_empty());
+    assert_eq!(found.skip_mentions, BTreeSet::from([key(B1, 9)]));
+    // a held skip is known too, a retired one is not
+    let withdrawn = holder_of_row_nine(142)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let held_only = holder_of_row_nine(143);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&held_only)
+        .read()
+        .unwrap();
+    assert_eq!(found.skip_mentions, BTreeSet::from([key(B1, 9)]));
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawn)
+        .read()
+        .unwrap();
+    assert!(found.skip_mentions.is_empty());
 }

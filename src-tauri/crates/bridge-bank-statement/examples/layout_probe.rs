@@ -458,10 +458,11 @@ fn run() -> Result<(), String> {
     }
     let bytes = std::fs::read(&arguments.pdf).map_err(|_| "statement unreadable")?;
     let engine = engine(&arguments.pdfium).map_err(|refusal| refusal.category.to_string())?;
-    let pages =
+    let text =
         extract_pages(engine, &bytes, &password).map_err(|refusal| refusal.category.to_string())?;
+    let pages = text.pages();
     drop(password);
-    write_private(&arguments.out, &report(&pages))
+    write_private(&arguments.out, &report(pages))
         .map_err(|_| "output file not writable, or it exists already")?;
     println!("wrote the layout of {} pages", pages.len());
     Ok(())

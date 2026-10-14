@@ -1,0 +1,30 @@
+# These stay on the lab PC and are not on this branch: sha256  bytes  file
+# A screenshot is listed by its sequence number in time order and the step it belongs to.
+46a46495434f24d8d81f696e98461ee6c78969083057652b611f3b443b6cd586  95752  screenshots/01-p0.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/02-p0.png
+bdbfec291beb2e05bcdf35b500570b9bea6cb8de015b8b2d896ef86a0329f31f  115167  screenshots/03-p0.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/04-p0.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/05-p1.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/06-p2.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/07-p3.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/08-p4.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/09-p5.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/10-p6.png
+c59f4917bce38d49fff0837cf2740cfe04aab36aa789b53e6e5660a7a18540a5  54837  screenshots/11-end.png
+b9dfa729dbe9faa113a00005001a268d39035b63a2aa1f4886285c1c87aec620  54869  screenshots/12-end.png
+c4ee7f8e9832cdd2ce6ea1473c4b64fb5cd8db486db8e0300988080a93d0f7d5  52340  screenshots/13-end.png
+db8581bbccfa9ed1b234ae1286d10782ec64b90098beeb8ffb43ef9e80a68e77  61875  screenshots/14-end.png
+6558aab90d98f00199760e5918a8ec1f65258573254e4bacae4a6b8a09250807  96396  screenshots/15-close.png
+d9a80f35e64a97efd8987c82d223051a2652f49401c28087ad307b44911da476  30750  backups/N1-B7/TDBK1800_100058.001
+7af254854702b8fd63327c72e1149e35e18bca441330009198a37cd759a4f740  895  step0/m9p-data-folder-100058-after-restore-end.txt
+f6997ebc04ed2fcf91255e9399be9989518315d963ebce0341309552553cb29c  894  step0/m9p-data-folder-100058-before-backup.txt
+759d3c0ad8a7e1129c6bfa2bfd798431a0c50b3b2822ee8c2f9fc9a5fb12c8bb  932  step0/m9p-data-folder-100058-before-restore-end.txt
+09f5e9baf47d9dad362eda31d10ade5895b162119caf36129349ed2e096e1f69  10811  step0/m9p-s0-after-restore-netstat.txt
+bd51436ec5a9a0be2ae01c4fdcebdea718e4c8ed3d2533879fef9bcf2ca3a765  48  step0/m9p-s0-after-restore-tasklist.txt
+d70a41529bb9860b98216fa02fcb18ffe983196942958fe0c8be846fd6f9dd4f  10873  step0/m9p-s0-close-netstat.txt
+af9422efb519902b47b78829dc944f227bda817aaea74a51f644ed7e31969ce2  48  step0/m9p-s0-close-tasklist.txt
+9cc0e49671277dffb1b521316292c68ea501c05ccf3a65a861db1337a01ec6ce  11251  step0/m9p-s0-start-netstat.txt
+31007034a45889f796c20552ca3a404838e22d116d8b558868e906e77112d593  48  step0/m9p-s0-start-tasklist.txt
+c6815f6d75ecda53bdd771aba97eb63e868f32f977b679d71441827653c71d55  694  restore-plan.txt
+5167ce27b9ebec1ed27b274841f4a863e263cc9f5ec053b38be79e848997e815  39186  notes-requests.log
+b9cd387859ce7663da8fef0956a1bbf2ade52c83384938c2eb5c53e445c468f3  79947  tools/m9p.ps1

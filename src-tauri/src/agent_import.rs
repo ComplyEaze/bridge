@@ -2972,11 +2972,12 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                 return Err("voucher_text_invalid".to_string());
             }
         }
-        if voucher
-            .voucher_number
-            .as_deref()
-            .is_some_and(|number| number.chars().count() > 32 || number.contains('$'))
-        {
+        if voucher.voucher_number.as_deref().is_some_and(|number| {
+            // Tally read back a number sent with a space at its end
+            // without it (§9.8, 2026-10-15), so it could never verify as
+            // posted; white space at the start is refused too, unmeasured.
+            number.chars().count() > 32 || number.contains('$') || number.trim() != number
+        }) {
             return Err("voucher_number_invalid".to_string());
         }
         for entry in &voucher.entries {

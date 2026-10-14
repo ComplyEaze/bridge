@@ -1774,3 +1774,188 @@ async fn a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_pa
         "{refused}"
     );
 }
+
+// ---- the guards read batches that were sent and not yet verified ------------------
+
+/// A statement batch of bank A that books `OTHER_BOOKED` and skips `SKIPPED`.
+fn a_booking_and_skipping(directory: &Path) -> Value {
+    statement_v2(
+        directory,
+        BANK_A,
+        window(),
+        json!([contra_voucher(OTHER_BOOKED)]),
+        json!([
+            contra_record(OTHER_BOOKED, None),
+            skip_record(BANK_A, SKIPPED, None)
+        ]),
+    )
+}
+
+/// A skip held by a batch sent to Tally and not yet verified is a live skip:
+/// posting its row is refused, and naming the row in `withdraw_skips` admits it.
+#[tokio::test]
+async fn a_skip_in_a_batch_sent_but_not_verified_guards_its_row() {
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [two_bank_plans(), admission_plans(), two_bank_plans()].concat(),
+    );
+    let skipping = rig.build(a_booking_and_skipping(directory.path())).await;
+    let sent = skipping["batch_id"].as_str().unwrap().to_string();
+    mark_sent(directory.path(), &sent);
+    let posting = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+    let refused = rig.build(posting).await;
+    assert_eq!(refused["reason"], "skip_row_paired_elsewhere", "{refused}");
+    assert_eq!(refused["skipped_rows"], json!([SKIPPED]));
+    let mut withdrawing = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+    withdrawing["withdraw_skips"] = json!([SKIPPED]);
+    let built = rig.build(withdrawing).await;
+    rig.finish();
+    assert_eq!(built["voucher_count"], 1, "{built}");
+    let holder = built["batch_id"].as_str().unwrap();
+    assert!(
+        open_rows(&built["transfers"]).contains(&open_row(SKIPPED, "held_elsewhere", Some(holder))),
+        "{built}"
+    );
+}
+
+/// A second Contra for one transfer is refused whether the first was only
+/// built (tested above), sent to Tally, or found posted.
+#[tokio::test]
+async fn the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sent_or_found() {
+    for found in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let rig = Rig::new(
+            directory.path(),
+            [two_bank_plans(), admission_plans()].concat(),
+        );
+        let first = rig
+            .build(contra_statement(
+                directory.path(),
+                BANK_A,
+                BOOKED,
+                Some(REFERENCE),
+            ))
+            .await;
+        let other = first["batch_id"].as_str().unwrap().to_string();
+        if found {
+            mark_found(directory.path(), &other);
+        } else {
+            mark_sent(directory.path(), &other);
+        }
+        let refused = rig
+            .build(contra_statement(
+                directory.path(),
+                BANK_B,
+                OTHER_BOOKED,
+                Some(REFERENCE),
+            ))
+            .await;
+        rig.finish();
+        assert_eq!(refused["reason"], "transfer_double_booked", "{refused}");
+        assert_eq!(refused["other_batch_id"], other, "found {found}");
+    }
+}
+
+// ---- an amendment of a statement batch -------------------------------------------
+
+/// The Tally read an amendment compares against: bank B's Contra as the
+/// original batch wrote it.
+fn book_holding_the_contra(tag: &str) -> String {
+    format!(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
+         <VOUCHER REMOTEID=\"{CAPTURED_GUID}-00000001\"><DATE>20260901</DATE><VOUCHERNUMBER>1</VOUCHERNUMBER>\
+         <VOUCHERTYPENAME>Contra</VOUCHERTYPENAME><GUID>{CAPTURED_GUID}-00000001</GUID><MASTERID>1</MASTERID>\
+         <ALTERID>12</ALTERID><NARRATION>[BRIDGE:{tag}]</NARRATION>\
+         <ISCANCELLED>No</ISCANCELLED><ISOPTIONAL>No</ISOPTIONAL>\
+         <ALLLEDGERENTRIES.LIST><LEDGERNAME>{BANK_B}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-12.50</AMOUNT></ALLLEDGERENTRIES.LIST>\
+         <ALLLEDGERENTRIES.LIST><LEDGERNAME>{BANK_A}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>12.50</AMOUNT></ALLLEDGERENTRIES.LIST>\
+         </VOUCHER></COLLECTION></DATA></BODY></ENVELOPE>"
+    )
+}
+
+/// A build that amends a statement batch is admitted, and it is the same
+/// lineage as the batch it amends: the Contra it decides replaces the
+/// original's in the view instead of booking the transfer a second time.
+#[tokio::test]
+async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
+    let directory = tempfile::tempdir().unwrap();
+    // bank A skipped the row; bank B's statement booked the transfer, and the
+    // batch was imported and verified
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .await;
+    let original = rig
+        .build(contra_statement(
+            directory.path(),
+            BANK_B,
+            BOOKED,
+            Some(REFERENCE),
+        ))
+        .await["batch_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let first_endpoint = format!("http://127.0.0.1:{}", rig.simulator.address().port());
+    rig.finish();
+    mark_found(directory.path(), &original);
+    record_verified_baseline(
+        &journal(directory.path()).imports_dir().unwrap(),
+        &original,
+        &json!({"vouchers": [{"bridge_txn_id": BOOKED, "status": "posted_verified", "alter_id": 12}]}),
+    )
+    .unwrap();
+    // the amendment moves the Contra to the next day, and the book still holds
+    // the voucher as the original wrote it
+    let tag = import_identity(&original, BOOKED).to_string();
+    let mut plans = two_bank_plans();
+    let preflight = plans.len() - mode_tests::licensed_import_probe().len() - 6;
+    for index in [preflight + 1, preflight + 3] {
+        plans[index].fixture = Fixture::SyntheticXml(book_holding_the_contra(&tag));
+        plans[index].encoding = WireEncoding::Utf16Le;
+    }
+    let mut moved = contra_voucher(BOOKED);
+    moved["date"] = json!("2026-09-02");
+    let mut amending = statement_v2(
+        directory.path(),
+        BANK_B,
+        window(),
+        json!([moved]),
+        json!([contra_record(BOOKED, Some(REFERENCE))]),
+    );
+    amending["amends_batch_id"] = json!(original);
+    let rig = Rig::new(directory.path(), plans);
+    // an amendment is admitted only at the endpoint its lineage was built at,
+    // and a simulator's port is new each time: the records are moved to it
+    let endpoint = format!("http://127.0.0.1:{}", rig.simulator.address().port());
+    for name in ["agent-import-ledger.jsonl", statement_facts::SKIPS_FILE] {
+        let path = directory.path().join(name);
+        let text = fs::read_to_string(&path).unwrap();
+        fs::write(&path, text.replace(&first_endpoint, &endpoint)).unwrap();
+    }
+    let amended = rig.build(amending).await;
+    assert_eq!(amended["voucher_count"], 1, "{amended}");
+    assert_eq!(
+        amended["amendment"]["identity_batch_id"], original,
+        "{amended}"
+    );
+    let batch = amended["batch_id"].as_str().unwrap().to_string();
+    assert_ne!(batch, original);
+    // the transfer is booked once: the skip waits on the amendment, which now
+    // decides the Contra, and nothing is double booked
+    let section = &amended["transfers"];
+    assert_eq!(
+        open_rows(section),
+        vec![open_row(SKIPPED, "other_side_unverified", Some(&batch))],
+        "{amended}"
+    );
+    assert_eq!(section["skips_paired"], 0, "{amended}");
+    assert_eq!(
+        latest(directory.path(), &batch).amends_batch_id.as_deref(),
+        Some(original.as_str())
+    );
+    rig.finish();
+}

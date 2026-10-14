@@ -1404,6 +1404,10 @@ impl Server {
             if let Some(located) = post_location.clone() {
                 proof.payload["result"]["post_location"] = located;
             }
+            // The send happened and was read back: say how the batch ended.
+            if let Some(headline) = super::verification::batch_headline(&proof.payload["result"]) {
+                proof.payload["headline"] = json!(headline);
+            }
             Ok(Step::Done(Box::new(proof)))
         }
         .await;

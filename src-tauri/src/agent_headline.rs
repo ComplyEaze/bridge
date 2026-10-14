@@ -228,6 +228,9 @@ pub(super) struct Headline {
     rows: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     page: Option<Page>,
+    /// The counts behind a batch's lead (`post_import`, `verify_import`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    batch: Option<BatchOutcome>,
 }
 
 /// What a trial balance read covers, held beside its snapshot so a page served
@@ -274,6 +277,7 @@ impl TrialBalanceBasis {
             lead,
             rows: Some(page.sentence()),
             page: Some(page),
+            batch: None,
         }
     }
 }
@@ -501,6 +505,7 @@ impl StatementBasis {
             lead,
             rows: None,
             page: None,
+            batch: None,
         }
     }
 }
@@ -584,6 +589,7 @@ impl CashFlowBasis {
             lead,
             rows: None,
             page: None,
+            batch: None,
         }
     }
 }
@@ -647,6 +653,180 @@ impl CompanyFeaturesBasis {
             lead,
             rows: None,
             page: None,
+            batch: None,
+        }
+    }
+}
+
+/// Whether a batch's readback as a whole is a confirmation: the same two
+/// words `verification_status` carries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum BatchVerdict {
+    PostedVerified,
+    VerificationIncomplete,
+}
+
+impl BatchVerdict {
+    /// An absent or unknown status is not a confirmation.
+    pub(super) fn from_status(status: Option<&str>) -> Self {
+        match status {
+            Some("posted_verified") => Self::PostedVerified,
+            _ => Self::VerificationIncomplete,
+        }
+    }
+}
+
+/// How many vouchers of a batch read back as each status other than
+/// `posted_verified`. One field for every status a voucher row can carry
+/// (`unrecognised` for any other), so a status cannot be left out of the sum.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct NotConfirmed {
+    matching_content_observed: usize,
+    sent_not_attributed: usize,
+    tally_reported_not_created: usize,
+    posted_divergent: usize,
+    posted_not_effective: usize,
+    not_found: usize,
+    not_attributable: usize,
+    duplicate_fingerprint: usize,
+    bound_not_in_window: usize,
+    book_rolled_back: usize,
+    unrecognised: usize,
+}
+
+impl NotConfirmed {
+    fn count(&mut self, status: &str) {
+        let slot = match status {
+            "matching_content_observed" => &mut self.matching_content_observed,
+            "sent_not_attributed" => &mut self.sent_not_attributed,
+            "tally_reported_not_created" => &mut self.tally_reported_not_created,
+            "posted_divergent" => &mut self.posted_divergent,
+            "posted_not_effective" => &mut self.posted_not_effective,
+            "not_found" => &mut self.not_found,
+            "not_attributable" => &mut self.not_attributable,
+            "duplicate_fingerprint" => &mut self.duplicate_fingerprint,
+            "bound_not_in_window" => &mut self.bound_not_in_window,
+            "book_rolled_back" => &mut self.book_rolled_back,
+            _ => &mut self.unrecognised,
+        };
+        *slot += 1;
+    }
+
+    fn total(&self) -> usize {
+        let Self {
+            matching_content_observed,
+            sent_not_attributed,
+            tally_reported_not_created,
+            posted_divergent,
+            posted_not_effective,
+            not_found,
+            not_attributable,
+            duplicate_fingerprint,
+            bound_not_in_window,
+            book_rolled_back,
+            unrecognised,
+        } = self;
+        matching_content_observed
+            + sent_not_attributed
+            + tally_reported_not_created
+            + posted_divergent
+            + posted_not_effective
+            + not_found
+            + not_attributable
+            + duplicate_fingerprint
+            + bound_not_in_window
+            + book_rolled_back
+            + unrecognised
+    }
+}
+
+/// How a batch's readback ended, counted voucher by voucher. The vouchers are
+/// the ones counted, so the confirmed and the rest always add up to the
+/// batch, and a batch with a voucher that is not confirmed is never
+/// [`BatchVerdict::PostedVerified`] here, whatever the caller passed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct BatchOutcome {
+    vouchers: usize,
+    confirmed: usize,
+    not_confirmed: NotConfirmed,
+    verdict: BatchVerdict,
+}
+
+impl BatchOutcome {
+    /// The outcome of a batch whose vouchers read back with `statuses`, or
+    /// `None` for a batch with no voucher row, which has no outcome to state.
+    pub(super) fn from_statuses<'a>(
+        statuses: impl IntoIterator<Item = &'a str>,
+        verdict: BatchVerdict,
+    ) -> Option<Self> {
+        let mut confirmed = 0;
+        let mut not_confirmed = NotConfirmed::default();
+        for status in statuses {
+            if status == "posted_verified" {
+                confirmed += 1;
+            } else {
+                not_confirmed.count(status);
+            }
+        }
+        let rest = not_confirmed.total();
+        (confirmed + rest > 0).then(|| Self {
+            vouchers: confirmed + rest,
+            confirmed,
+            verdict: if rest == 0 {
+                verdict
+            } else {
+                BatchVerdict::VerificationIncomplete
+            },
+            not_confirmed,
+        })
+    }
+
+    pub(super) fn headline(&self) -> Headline {
+        let Self {
+            vouchers,
+            confirmed,
+            ..
+        } = *self;
+        let rest = self.not_confirmed.total();
+        let lead = match (rest, self.verdict) {
+            (0, BatchVerdict::PostedVerified) if vouchers == 1 => {
+                "The voucher of this batch is confirmed in Tally.".to_string()
+            }
+            (0, BatchVerdict::PostedVerified) => {
+                format!("All {vouchers} vouchers of this batch are confirmed in Tally.")
+            }
+            // Every voucher reads back, but something else about the batch
+            // (a duplicate, a doubt about the ledgers or the voucher mark, or
+            // an answer from Tally that was not clean or is missing) keeps it
+            // from being confirmed: the result names it.
+            (0, BatchVerdict::VerificationIncomplete) => {
+                let subject = if vouchers == 1 {
+                    "The voucher of this batch reads back in Tally".to_string()
+                } else {
+                    format!("All {vouchers} vouchers of this batch read back in Tally")
+                };
+                format!("{subject}, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again.")
+            }
+            // Nothing is confirmed and the batch has one voucher.
+            _ if vouchers == 1 => {
+                "The voucher of this batch is not confirmed in Tally: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.".to_string()
+            }
+            _ => {
+                let (are, each, row) = if rest == 1 {
+                    ("is", "it", "its row")
+                } else {
+                    ("are", "each", "each row")
+                };
+                let confirmed_are = if confirmed == 1 { "is" } else { "are" };
+                format!("{confirmed} of {vouchers} vouchers of this batch {confirmed_are} confirmed in Tally. {rest} {are} not: check {each} in Tally before doing anything else with it; {row} says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.")
+            }
+        };
+        Headline {
+            lead,
+            rows: None,
+            page: None,
+            batch: Some(self.clone()),
         }
     }
 }

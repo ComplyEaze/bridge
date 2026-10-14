@@ -819,6 +819,36 @@ pub(super) fn verification_response_page(
     page
 }
 
+/// The headline that says how a batch ended, voucher by voucher, from a
+/// verification result's own rows and verdict (never from a tool argument).
+/// `None` when the result lists no voucher row or shows no native dispatch.
+pub(super) fn batch_headline(result: &Value) -> Option<super::super::headline::Headline> {
+    // Only a batch that was dispatched natively has an outcome to state. A
+    // built batch not yet posted, or a file not yet imported by hand, reads
+    // every row as not found, and "will not send this saved batch again" would
+    // be false: it can still be posted. Every dispatch state counts (`posted_verified`,
+    // `reconciliation_required`, `previous_attempt_reconciled`); a refusal
+    // that sent nothing says `not_dispatched`.
+    match result["dispatch"]["state"].as_str() {
+        None | Some("not_dispatched") => return None,
+        Some(_) => {}
+    }
+    let rows = result["vouchers"].as_array()?;
+    let outcome = super::super::headline::BatchOutcome::from_statuses(
+        rows.iter()
+            .map(|row| row["status"].as_str().unwrap_or_default()),
+        super::super::headline::BatchVerdict::from_status(result["verification_status"].as_str()),
+    )?;
+    Some(outcome.headline())
+}
+
+/// Puts the batch headline of `result` beside the result in `payload`.
+pub(super) fn attach_batch_headline(payload: &mut Value, result: &Value) {
+    if let Some(headline) = batch_headline(result) {
+        payload["headline"] = json!(headline);
+    }
+}
+
 /// A verdict of `verify_import`: the only statuses a proof may carry. The
 /// ledger line keeps its status as a string, which also holds non-verdicts
 /// such as `built`; taking this type at the persist boundary keeps those out

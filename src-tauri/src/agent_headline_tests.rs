@@ -661,3 +661,186 @@ fn a_setting_tally_did_not_send_leads_as_not_sent_and_not_as_off() {
     assert!(lead.ends_with("Tally sent no currency symbol."), "{lead}");
     assert!(!lead.contains("cost centres off"), "{lead}");
 }
+
+fn outcome(statuses: &[&str], verdict: BatchVerdict) -> BatchOutcome {
+    BatchOutcome::from_statuses(statuses.iter().copied(), verdict).expect("a batch with rows")
+}
+
+/// A batch of several vouchers that all read back, and read back as a whole,
+/// is confirmed in one sentence; one voucher has its own.
+#[test]
+fn a_batch_that_is_confirmed_whole_says_so_in_one_sentence() {
+    let verified = ["posted_verified"; 3];
+    assert_eq!(
+        outcome(&verified, BatchVerdict::PostedVerified)
+            .headline()
+            .lead,
+        "All 3 vouchers of this batch are confirmed in Tally."
+    );
+    assert_eq!(
+        outcome(&verified[..1], BatchVerdict::PostedVerified)
+            .headline()
+            .lead,
+        "The voucher of this batch is confirmed in Tally."
+    );
+}
+
+/// The count is by status and the sentence names how many are not confirmed;
+/// a single voucher left over is singular.
+#[test]
+fn a_batch_with_vouchers_left_says_how_many_and_counts_each_status() {
+    let partly = outcome(
+        &[
+            "posted_verified",
+            "posted_divergent",
+            "not_found",
+            "mystery",
+        ],
+        BatchVerdict::PostedVerified,
+    );
+    assert_eq!(
+        partly.headline().lead,
+        "1 of 4 vouchers of this batch is confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; each row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
+    );
+    assert_eq!(
+        serde_json::to_value(&partly).unwrap(),
+        json!({
+            "vouchers": 4, "confirmed": 1, "verdict": "verification_incomplete",
+            "not_confirmed": {
+                "matching_content_observed": 0, "sent_not_attributed": 0,
+                "tally_reported_not_created": 0, "posted_divergent": 1,
+                "posted_not_effective": 0, "not_found": 1, "not_attributable": 0,
+                "duplicate_fingerprint": 0, "bound_not_in_window": 0,
+                "book_rolled_back": 0, "unrecognised": 1,
+            },
+        })
+    );
+    let one = outcome(
+        &["posted_verified", "posted_verified", "book_rolled_back"],
+        BatchVerdict::VerificationIncomplete,
+    );
+    assert_eq!(
+        one.headline().lead,
+        "2 of 3 vouchers of this batch are confirmed in Tally. 1 is not: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
+    );
+}
+
+/// Every voucher reads back but the batch is not confirmed as a whole (the
+/// readback found a duplicate, or a doubt about the ledgers or the voucher
+/// mark): the headline never says all are confirmed.
+#[test]
+fn all_vouchers_read_back_beside_an_unconfirmed_batch_is_not_called_confirmed() {
+    let lead = outcome(
+        &["posted_verified"; 2],
+        BatchVerdict::VerificationIncomplete,
+    )
+    .headline()
+    .lead;
+    assert_eq!(
+        lead,
+        "All 2 vouchers of this batch read back in Tally, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again."
+    );
+    assert!(!lead.contains("are confirmed"), "{lead}");
+}
+
+/// One voucher that reads back, in a batch that is not confirmed as a whole,
+/// has its own sentence.
+#[test]
+fn one_voucher_that_reads_back_beside_an_unconfirmed_batch_is_not_called_confirmed() {
+    let lead = outcome(&["posted_verified"], BatchVerdict::VerificationIncomplete)
+        .headline()
+        .lead;
+    assert_eq!(
+        lead,
+        "The voucher of this batch reads back in Tally, but the batch is not confirmed: check it in Tally before doing anything else with it; the result says why. ComplyEaze Bridge will not send this saved batch again."
+    );
+}
+
+/// A batch of one voucher that is not confirmed has its own sentence, whether
+/// or not its row carries a next step, and its typed counts say the same.
+#[test]
+fn one_voucher_that_is_not_confirmed_has_its_own_sentence_and_counts() {
+    // One status that carries a next step and one that does not.
+    for status in ["sent_not_attributed", "posted_divergent"] {
+        let batch = outcome(&[status], BatchVerdict::PostedVerified);
+        assert_eq!(
+            batch.headline().lead,
+            "The voucher of this batch is not confirmed in Tally: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again.",
+            "{status}"
+        );
+        let value = serde_json::to_value(&batch).unwrap();
+        assert_eq!(value["vouchers"], 1, "{status}");
+        assert_eq!(value["confirmed"], 0, "{status}");
+        assert_eq!(value["verdict"], "verification_incomplete", "{status}");
+        assert_eq!(value["not_confirmed"][status], 1, "{status}");
+        let total = value["not_confirmed"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|count| count.as_u64().unwrap())
+            .sum::<u64>();
+        assert_eq!(total, 1, "{status}");
+    }
+}
+
+/// Each status other than `posted_verified` is counted in its own field, and
+/// no field takes another's voucher.
+#[test]
+fn every_status_is_counted_in_its_own_field() {
+    // The fields of the counter itself, so a status added to it is walked
+    // here; one with no arm in `count` lands in `unrecognised` and fails.
+    let fields = serde_json::to_value(NotConfirmed::default()).unwrap();
+    let statuses = fields
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    assert!(statuses.contains(&"unrecognised"));
+    assert!(statuses.len() > 1);
+    for (index, &status) in statuses.iter().enumerate() {
+        // Each status is counted a different number of times, so two fields
+        // swapped by mistake cannot read the same.
+        let times = index + 1;
+        let batch = outcome(&vec![status; times], BatchVerdict::PostedVerified);
+        let value = serde_json::to_value(&batch).unwrap();
+        for &other in &statuses {
+            let wanted = if other == status { times } else { 0 };
+            assert_eq!(value["not_confirmed"][other], wanted, "{status} / {other}");
+        }
+        assert_eq!(value["vouchers"], times, "{status}");
+        assert_eq!(value["confirmed"], 0, "{status}");
+    }
+}
+
+/// A voucher that is not confirmed cannot sit in a batch whose verdict is
+/// confirmed, whatever the caller passed; and a batch with no rows has none.
+#[test]
+fn the_verdict_cannot_be_confirmed_beside_a_voucher_that_is_not() {
+    let batch = outcome(
+        &["posted_verified", "matching_content_observed"],
+        BatchVerdict::PostedVerified,
+    );
+    assert_eq!(batch.verdict, BatchVerdict::VerificationIncomplete);
+    assert!(BatchOutcome::from_statuses([], BatchVerdict::PostedVerified).is_none());
+    assert_eq!(
+        BatchVerdict::from_status(None),
+        BatchVerdict::VerificationIncomplete
+    );
+}
+
+/// A headline with no page (a batch's) comes through `restate_rows` as it
+/// went in, counts included. It does not show that a trim keeps the counts of
+/// a headline that has a page: a batch headline has none.
+#[test]
+fn restating_the_rows_of_a_response_leaves_a_batch_headline_as_it_was() {
+    let headline = outcome(
+        &["posted_verified", "not_found"],
+        BatchVerdict::PostedVerified,
+    )
+    .headline();
+    let before = serde_json::to_value(&headline).unwrap();
+    let mut response = json!({"headline": headline, "result": {"items": [1]}});
+    restate_rows(&mut response, 0);
+    assert_eq!(response["headline"], before);
+}

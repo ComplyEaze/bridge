@@ -2629,7 +2629,25 @@ until it has words) and, for a difference, how many lines did not tie (a Tally l
 amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
 profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
-`profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
+`profit_and_loss` and `balance_sheet` carry one, and `post_import` and `verify_import` carry one of
+another shape (below); the other read tools and the refusals follow.
+
+`post_import` (after a send was read back) and every page of `verify_import` carry a headline that
+says how the batch ended, counted voucher by voucher from the verification's own rows, never from
+tool arguments and never stored in the proof (a later page recomputes the same one from the saved
+proof). The lead says whether the batch is confirmed: for a batch of one voucher it is a sentence about
+that voucher, and for a batch of several vouchers it gives their number and, when some are not
+confirmed, how many are confirmed (`posted_verified`) and how many are not. The counts are always in `batch`, which holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
+and `unrecognised` for any status this build does not know) and `verdict` (`posted_verified` only when
+every voucher is confirmed and the readback as a whole is). When every voucher reads back but the
+batch as a whole is not confirmed (a duplicate, a doubt about the ledgers or the voucher mark, or an
+answer from Tally that was not clean or is missing), the lead says so and does not call the batch
+confirmed. When some vouchers are not confirmed, the lead says that each row says what was found and
+gives a next step where there is one: only four statuses (`bound_not_in_window`, `book_rolled_back`,
+`sent_not_attributed`, `tally_reported_not_created`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
+(`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
+file imported by hand and a refusal before anything was sent carry none, because the batch can still be
+posted.
 
 ## Protocol and migration notes
 

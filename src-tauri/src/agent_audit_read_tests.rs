@@ -19,15 +19,6 @@ use tally_protocol_simulator::{
 const FIXTURE_GUID: &str = "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c";
 const FIXTURE_NAME: &str = "Lakeview Hardware Demo";
 
-macro_rules! fixture_part {
-    ($name:literal) => {
-        include_bytes!(concat!(
-            "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/",
-            $name
-        ))
-    };
-}
-
 /// A fixture part as text: UTF-16LE parts are decoded, UTF-8 ones kept.
 fn text_of(bytes: &[u8]) -> String {
     let bytes = bytes.strip_prefix(&[0xFF, 0xFE]).unwrap_or(bytes);
@@ -101,7 +92,9 @@ fn legs(body: String) -> Vec<ScenarioPlan> {
 
 /// The fixture's first voucher window as the one window of the whole period.
 fn period_vouchers() -> String {
-    text_of(fixture_part!("vouchers_h1.xml"))
+    text_of(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchers_h1.xml"
+    ))
 }
 
 struct Replay {
@@ -112,7 +105,9 @@ struct Replay {
 
 impl Replay {
     fn clean() -> Self {
-        let marks = text_of(fixture_part!("high_water_before.xml"));
+        let marks = text_of(include_bytes!(
+            "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/high_water_before.xml"
+        ));
         Self {
             marks_before: marks.clone(),
             company: company_object(FIXTURE_GUID),
@@ -124,10 +119,18 @@ impl Replay {
         [
             self.marks_before.clone(),
             self.company.clone(),
-            text_of(fixture_part!("groups.xml")),
-            text_of(fixture_part!("ledgers.xml")),
-            text_of(fixture_part!("tb_fy.xml")),
-            text_of(fixture_part!("vouchertypes.xml")),
+            text_of(include_bytes!(
+                "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/groups.xml"
+            )),
+            text_of(include_bytes!(
+                "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/ledgers.xml"
+            )),
+            text_of(include_bytes!(
+                "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/tb_fy.xml"
+            )),
+            text_of(include_bytes!(
+                "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchertypes.xml"
+            )),
             self.marks_in_window.0.clone(),
             period_vouchers(),
             self.marks_in_window.1.clone(),
@@ -363,7 +366,9 @@ fn retained(kind: WindowReadKind, bytes: &str) -> RetainedWindowRead {
 
 #[test]
 fn a_window_divided_by_alterid_cannot_become_a_read() {
-    let marks = text_of(fixture_part!("high_water_before.xml"));
+    let marks = text_of(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/high_water_before.xml"
+    ));
     let day = |span| {
         WindowReadKind::Part(WindowPart {
             from: date("20250401"),
@@ -391,7 +396,9 @@ fn a_window_divided_by_alterid_cannot_become_a_read() {
 
 #[test]
 fn a_window_whose_last_read_is_not_the_marks_is_refused() {
-    let marks = text_of(fixture_part!("high_water_before.xml"));
+    let marks = text_of(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/high_water_before.xml"
+    ));
     let part = WindowReadKind::Part(WindowPart {
         from: date("20250401"),
         to: date("20260331"),
@@ -470,7 +477,13 @@ fn voucher_counts_are_the_ones_the_crate_declares_for_its_own_fixture() {
         .find(|part| part["id"] == "vouchers-2025-04-01")
         .unwrap();
     assert_eq!(
-        count_vouchers(fixture_part!("vouchers_h1.xml"), "vouchers").unwrap(),
+        count_vouchers(
+            include_bytes!(
+                "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchers_h1.xml"
+            ),
+            "vouchers"
+        )
+        .unwrap(),
         (
             declared["rows"].as_u64().unwrap(),
             declared["alter_id_max"].as_u64()

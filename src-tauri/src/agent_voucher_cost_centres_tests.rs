@@ -317,3 +317,72 @@ fn the_sort_order_fields_and_empty_quantities_are_not_read_as_amounts() {
         parse(&captured())[0]["amounts"][0][COSTCENTRE_FIELD]
     );
 }
+
+#[test]
+fn a_category_whose_name_follows_its_centres_is_read_with_its_name() {
+    // The capture prints CATEGORY first; Tally's order is not a rule this read relies on.
+    let xml = captured();
+    let named = "<CATEGORY>Business Line</CATEGORY>";
+    assert_eq!(xml.matches(named).count(), 1);
+    let close = "</CATEGORYALLOCATIONS.LIST>";
+    let moved = xml
+        .replacen(named, "", 1)
+        .replacen(close, &format!("{named}{close}"), 1);
+    let rows = parse(&moved);
+    assert_eq!(
+        rows[0]["amounts"][0][COSTCENTRE_FIELD],
+        parse(&captured())[0]["amounts"][0][COSTCENTRE_FIELD]
+    );
+    assert!(rows[0]["amounts"][0].get(UNREADABLE_FIELD).is_none());
+    // And with the name never printed, the list is withheld with its reason, not sent
+    // with an empty category.
+    let nameless = xml.replacen(named, "", 1);
+    assert_unreadable(&nameless, "cost_category_missing");
+}
+
+#[test]
+fn two_categories_that_name_themselves_after_their_centres_do_not_collide() {
+    let xml = captured();
+    let named = "<CATEGORY>Business Line</CATEGORY>";
+    let first = xml.find("<CATEGORYALLOCATIONS.LIST>").unwrap();
+    let close = "</CATEGORYALLOCATIONS.LIST>";
+    let end = xml.find(close).unwrap() + close.len();
+    let block = xml[first..end].to_string();
+    let after = |name: &str| {
+        block.replacen(named, "", 1).replacen(
+            close,
+            &format!("<CATEGORY>{name}</CATEGORY>{close}"),
+            1,
+        )
+    };
+    let doubled = format!(
+        "{}{}{}{}",
+        &xml[..first],
+        after("Line A"),
+        after("Line B"),
+        &xml[end..]
+    );
+    let rows = parse(&doubled);
+    let entry = &rows[0]["amounts"][0];
+    assert!(entry.get(UNREADABLE_FIELD).is_none(), "{entry}");
+    let categories: Vec<_> = entry[COSTCENTRE_FIELD]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            (
+                row["category"].as_str().unwrap(),
+                row["cost_centre"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        categories,
+        [
+            ("Line A", "Trading"),
+            ("Line A", "Assembly"),
+            ("Line B", "Trading"),
+            ("Line B", "Assembly"),
+        ]
+    );
+}

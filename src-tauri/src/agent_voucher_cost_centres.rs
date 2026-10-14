@@ -56,8 +56,13 @@ pub(in crate::agent) struct CostCentreCollector {
     category: Option<Draft>,
     centre: Option<Draft>,
     category_centres: usize,
+    /// Where this category's rows start in `rows`: the category's own name may follow
+    /// its centres, so its rows get the name when the category ends.
+    category_rows_from: usize,
     rows: Vec<Value>,
-    seen: BTreeSet<(String, String)>,
+    /// The centre names seen in the current category: a name may repeat under another
+    /// category, never within one.
+    seen: BTreeSet<String>,
     problem: Option<CostCentreProblem>,
 }
 
@@ -81,6 +86,8 @@ impl CostCentreCollector {
             ([], CATEGORY_LIST) => {
                 self.category = Some(Draft::default());
                 self.category_centres = 0;
+                self.category_rows_from = self.rows.len();
+                self.seen.clear();
             }
             ([c], CENTRE_LIST) if c == CATEGORY_LIST && self.category.is_some() => {
                 self.centre = Some(Draft::default());
@@ -139,12 +146,6 @@ impl CostCentreCollector {
             return;
         };
         self.category_centres += 1;
-        let category = self
-            .category
-            .as_ref()
-            .and_then(|draft| draft.fields.get("CATEGORY"))
-            .map(|value| value.trim().to_string())
-            .unwrap_or_default();
         let name = centre
             .fields
             .get("NAME")
@@ -166,12 +167,13 @@ impl CostCentreCollector {
             self.note(CostCentreProblem::AmountUnparsable);
             return;
         }
-        if !self.seen.insert((category.clone(), name.clone())) {
+        if !self.seen.insert(name.clone()) {
             self.note(CostCentreProblem::CentreDuplicate);
             return;
         }
+        // The category name is set when the category ends (it can follow its centres).
         self.rows.push(json!({
-            "category": category,
+            "category": "",
             "cost_centre": name,
             "amount": amount,
         }));
@@ -200,6 +202,15 @@ impl CostCentreCollector {
         }
         if !named {
             self.note(CostCentreProblem::CategoryMissing);
+            return;
+        }
+        let name = category
+            .fields
+            .get("CATEGORY")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default();
+        for row in self.rows.iter_mut().skip(self.category_rows_from) {
+            row["category"] = json!(name);
         }
     }
 

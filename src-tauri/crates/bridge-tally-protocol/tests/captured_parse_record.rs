@@ -2269,6 +2269,10 @@ const SALES_REHEARSAL: &str = "answers of the GST Sales rehearsal (7 Oct 2026), 
      this crate reads: the app crate's invoice code parses them (src/agent_import_invoice_wire.rs), \
      and its tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
      pin what each parse returns; sales-rehearsal/PROVENANCE.md says what each file is";
+const PILOT_LAB_ADMISSION: &str = "an answer of the pilot lab (9 Oct 2026), with no row here: \
+     the app crate's invoice admission tests (src/agent_import_invoice_admission_tests.rs, and for \
+     the voucher types and the number in use src/agent_import_invoice_wire_tests.rs) feed it through the admission's \
+     reads and pin what each parse returns; pilot-lab/PROVENANCE.md says what each file is";
 const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
      this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
      tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
@@ -2304,9 +2308,54 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml",
         SALES_REHEARSAL,
     ),
+    // The pilot lab answers the invoice admission is scripted from.
     (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml",
-        SALES_REHEARSAL,
+        "tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-company-state.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml",
+        PILOT_LAB_ADMISSION,
     ),
     // The GST status read answers.
     (

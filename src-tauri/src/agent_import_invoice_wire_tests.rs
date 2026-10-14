@@ -324,24 +324,25 @@ fn rehearsal(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// The voucher types as the lab book answered on 7 Oct 2026: the type keyed
-/// for the rehearsal resolves, the predefined Sales type (an Automatic series)
-/// does not, and two raw control characters in a class name do not stop the
-/// read.
+/// The voucher types as the pilot lab's book answered on 9 Oct 2026 (the
+/// `pilot-lab` set; it is decoded as the rehearsal's answers are): `BRIDGE
+/// Sales`, a Sales-class type with one Manual series, resolves; the predefined Sales type (an Automatic series)
+/// does not; a type the book lacks is not found; and two raw control
+/// characters in `BRIDGE Sales`'s class name do not stop the read.
 #[test]
-fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_one() {
-    let xml = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-voucher-types.utf16le.xml"));
+fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic_one() {
+    let xml = rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"));
     assert_eq!(xml.matches('\u{5}').count(), 2);
     let types = parse_voucher_types(&xml).unwrap();
     assert_eq!(types.len(), 25);
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Manual", "Sales"),
+        resolve_voucher_type(&types, "BRIDGE Sales", "Sales"),
         Ok(ResolvedVoucherType {
-            guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797-00000106".into(),
+            guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce".into(),
             class: "Sales".into(),
         })
     );
-    let manual = types.iter().find(|row| row.name == "Sales Manual").unwrap();
+    let manual = types.iter().find(|row| row.name == "BRIDGE Sales").unwrap();
     assert_eq!(
         (manual.parent.as_str(), manual.reserved_name.as_str()),
         ("Sales", "")
@@ -359,24 +360,32 @@ fn the_captured_voucher_types_resolve_the_manual_type_and_refuse_the_automatic_o
         Err("invoice_voucher_type_numbering_not_manual")
     );
     assert_eq!(
-        resolve_voucher_type(&types, "Sales Manual", "Purchase"),
+        resolve_voucher_type(&types, "BRIDGE Sales", "Purchase"),
         Err("invoice_voucher_type_wrong_class")
+    );
+    assert_eq!(
+        resolve_voucher_type(&types, "Sales Acc", "Sales"),
+        Err("invoice_voucher_type_not_found")
     );
 }
 
-/// The duplicate-number read's three captured answers: a number one invoice
+/// The duplicate-number read's captured answers: a number one invoice
 /// carries, a number nothing carries (a collection with no row, which is an
-/// answer), and a number a Purchase and a Sales voucher share.
+/// answer), and a number a Purchase and a Sales voucher share; and the pilot
+/// lab's answer for a number its first invoice carries, whose header counts
+/// (`<VOUCHER>30</VOUCHER>` among them) are not rows.
 #[test]
 fn the_captured_number_answers_count_only_sales_class_vouchers() {
     for (name, vouchers, sales) in [
         ("number-known", 1, 1),
         ("number-absent", 0, 0),
         ("number-shared", 2, 1),
+        ("pilot-number-in-use", 1, 1),
     ] {
         let xml = match name {
             "number-known" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml")),
             "number-absent" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
+            "pilot-number-in-use" => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml")),
             _ => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml")),
         };
         assert_eq!(count_vouchers(&xml), Ok(vouchers), "{name}");

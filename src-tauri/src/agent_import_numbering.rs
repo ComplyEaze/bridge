@@ -27,13 +27,13 @@
 //! duplicate setting. A voucher that carries its own number (a build's
 //! Journal can) is admitted there too, since there Tally discards a supplied
 //! number and assigns its own (protocol reference §9.8),
-//! which leaves it a voucher without one; and into a type that reads Manual,
-//! where Tally kept the number a voucher carried under either duplicate
-//! setting (a Payment with duplicates allowed, a Journal with them prevented),
-//! and what Tally then does with a number already used depends on that
-//! setting: with duplicates prevented a Journal carrying a number that a
-//! Journal already held was refused whole, and Tally's answer gave no reason
-//! (§9.8). A numbered voucher is refused on a type set to "Renumber Vouchers":
+//! which leaves it a voucher without one; and into a type that reads Manual
+//! with duplicate numbers prevented, where Tally kept the number a Journal
+//! carried and refused whole a Journal carrying a number that a Journal
+//! already held, with no reason in its answer (§9.8). Under Manual with
+//! duplicates allowed a Payment carrying a held number was created as a second
+//! voucher with it (§9.8; not measured for a Journal), which nothing here or in
+//! `verify_import` would notice, so a numbered voucher is refused there. A numbered voucher is refused on a type set to "Renumber Vouchers":
 //! there Tally discarded the number a Receipt carried and gave it the number
 //! of its place in date order, and the later-dated Receipts' numbers went up
 //! by one (§9.8), as for a voucher sent without one.
@@ -81,7 +81,7 @@ macro_rules! written_into {
         concat!(
             "ComplyEaze Bridge writes a voucher into a voucher type ",
             admitted!(),
-            " A voucher that carries its own number is also written into one read as Manual; no voucher is written into any other."
+            " A voucher that carries its own number is also written into one read as Manual with duplicate numbers prevented; no voucher is written into any other."
         )
     };
 }
@@ -265,9 +265,10 @@ struct Reading {
 /// carry its own number: its verdict, what a result says of it and what a
 /// person is told. Every reading is named here once, so a reading added to
 /// the read's types does not compile until it is given all three, and none
-/// admits by default. The number decides under Manual only, where Tally keeps
-/// it: a voucher without one is refused there. The duplicate setting does not
-/// decide.
+/// admits by default. The number decides under Manual only: a voucher without
+/// one is refused there, and one with a number is admitted only where
+/// duplicate numbers are prevented. Under any other method the duplicate
+/// setting does not decide.
 /// A method or sub-method Tally printed outside the measured set is named
 /// only as unrecognised: its raw text is Tally's, and nothing is read from
 /// it. `sub_method` is given under `automatic` only, the one method it is
@@ -284,6 +285,7 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
             "was not among the voucher types Tally returned",
         ),
         Some(VoucherTypeNumbering::Observed { method, duplicates }) => {
+            let prevented = matches!(duplicates, DuplicateSetting::Prevented);
             let duplicates = match duplicates {
                 DuplicateSetting::Prevented => "prevented",
                 DuplicateSetting::NotPrevented => "not_prevented",
@@ -322,13 +324,19 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
                         in_words,
                     }
                 }
-                SeriesNumberingMethod::Manual => match number {
-                    OwnNumber::Carried => Reading {
+                SeriesNumberingMethod::Manual => match (number, prevented) {
+                    (OwnNumber::Carried, true) => Reading {
                         reason: None,
                         observed: observed("manual"),
                         in_words: "is numbered Manual",
                     },
-                    OwnNumber::Absent => not_automatic(observed("manual"), "is numbered Manual"),
+                    (OwnNumber::Carried, false) => not_automatic(
+                        observed("manual"),
+                        "is numbered Manual and does not prevent duplicate voucher numbers",
+                    ),
+                    (OwnNumber::Absent, _) => {
+                        not_automatic(observed("manual"), "is numbered Manual")
+                    }
                 },
                 SeriesNumberingMethod::AutomaticManualOverride => not_automatic(
                     observed("automatic_manual_override"),
@@ -354,7 +362,8 @@ fn reading(numbering: Option<&VoucherTypeNumbering>, number: OwnNumber) -> Readi
 /// Admits `vouchers`, each voucher's voucher type and whether it carries its
 /// own number, in batch order, against `read`: each type must be held by the
 /// read (by ASCII case fold, as the read keys its names) and read Automatic
-/// with `Auto Retain`, or Manual for a voucher that carries a number. Every
+/// with `Auto Retain`, or Manual with duplicate numbers prevented for a voucher
+/// that carries a number. Every
 /// refused type is named once, in the order it first appears.
 pub(in crate::agent) fn admit_numbering<'a>(
     read: VoucherNumberingRead,

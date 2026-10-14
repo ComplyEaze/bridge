@@ -5177,16 +5177,48 @@ async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usi
     )
 }
 
+/// The numbering read with the Journal type numbered Manual and its series'
+/// duplicate setting read as prevented (the capture reads it as not).
+fn manual_journal_preventing_duplicates() -> Vec<ScenarioPlan> {
+    super::numbering_fixtures::with_series_text(
+        build_numbering_plans(&["Journal"]),
+        "Journal",
+        "<PREVENTDUPLICATES>No</PREVENTDUPLICATES>",
+        "<PREVENTDUPLICATES>Yes</PREVENTDUPLICATES>",
+    )
+}
+
 /// A Journal that carries its own number, into a Journal type numbered
-/// Manual: Tally keeps the number there, so it is built, after the numbering
-/// read like every other voucher.
+/// Manual with duplicate numbers prevented: Tally keeps the number there, so
+/// it is built, after the numbering read like every other voucher.
 #[tokio::test]
 async fn a_journal_carrying_its_own_number_is_built_into_a_manual_type_after_the_numbering_read() {
     let (result, requests, files) =
-        numbered_journal_built_against(whole_build(build_numbering_plans(&["Journal"]))).await;
+        numbered_journal_built_against(whole_build(manual_journal_preventing_duplicates())).await;
     assert_eq!(result["voucher_count"], 1, "{result}");
     assert_eq!(requests, QUALIFIED_BUILD_REQUESTS);
     assert_eq!(files, 1);
+}
+
+/// The same Journal into a Manual type that allows duplicate numbers: a held
+/// number would make a second voucher that nothing notices, so it is refused,
+/// saying what was read, and nothing is written.
+#[tokio::test]
+async fn a_journal_carrying_its_own_number_is_refused_by_a_manual_type_that_allows_duplicates() {
+    // The captured Journal series prevents no duplicates.
+    let (result, _, files) =
+        numbered_journal_built_against(through_build_numbering(&["Journal"])).await;
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(
+        result["reason"], "import_voucher_numbering_not_automatic",
+        "{result}"
+    );
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"not_prevented"}}]),
+        "{result}"
+    );
+    assert_eq!(files, 0);
 }
 
 /// The same numbered Journal into an Automatic type. Under Automatic

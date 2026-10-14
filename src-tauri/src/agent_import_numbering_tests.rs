@@ -452,25 +452,64 @@ fn the_captured_book_refuses_payment_and_receipt_and_admits_journal_and_contra()
     );
 }
 
+/// The committed live capture again, for a voucher that carries its own
+/// number: Payment (Manual, duplicates prevented) admits it, and Receipt
+/// (Manual, duplicates allowed) refuses it, saying so.
+#[test]
+fn the_captured_book_admits_a_numbered_voucher_only_where_duplicates_are_prevented() {
+    let rows = captured_types(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_series_live.utf16le.xml"
+    ));
+    let read = || VoucherNumberingRead::for_test(GUID, 7, rows.clone());
+    assert!(admit_vouchers(read(), [("Payment", OwnNumber::Carried)]).is_ok());
+    let refusal = admit_vouchers(read(), [("Receipt", OwnNumber::Carried)]).unwrap_err();
+    assert_eq!(refusal.code(), NUMBERING_NOT_AUTOMATIC);
+    assert_eq!(
+        refusal.refused_types(),
+        json!([{"voucher_type": "Receipt", "observed": {"observation":"observed","method":"manual","duplicates":"not_prevented"}}])
+    );
+    assert!(refusal
+        .message()
+        .contains("Receipt is numbered Manual and does not prevent duplicate voucher numbers"));
+}
+
 /// A voucher that carries its own number: admitted into a type read as Manual
-/// (Tally keeps the number) or as Automatic with `Auto Retain` (Tally discards
-/// it and assigns the next), under either duplicate setting, and refused for
+/// with duplicates prevented (Tally keeps the number), or as Automatic with
+/// `Auto Retain` (Tally discards it and assigns the next) under either
+/// duplicate setting; refused into Manual with duplicates allowed, and for
 /// every other reading exactly as a voucher without one is, row for row.
 #[test]
 fn a_voucher_that_carries_a_number_is_admitted_into_manual_and_auto_retain_only() {
     let automatic = |sub_method| SeriesNumberingMethod::Automatic(sub_method);
+    let read = read_with_journal(observed(
+        SeriesNumberingMethod::Manual,
+        DuplicateSetting::Prevented,
+    ));
+    assert!(admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok());
+    let retain = automatic(NumberingSubMethod::AutoRetain);
     for duplicates in [DuplicateSetting::Prevented, DuplicateSetting::NotPrevented] {
-        for method in [
-            SeriesNumberingMethod::Manual,
-            automatic(NumberingSubMethod::AutoRetain),
-        ] {
-            let read = read_with_journal(observed(method.clone(), duplicates));
-            assert!(
-                admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok(),
-                "{method:?} {duplicates:?}"
-            );
-        }
+        let read = read_with_journal(observed(retain.clone(), duplicates));
+        assert!(
+            admit_vouchers(read, [("Journal", OwnNumber::Carried)]).is_ok(),
+            "{duplicates:?}"
+        );
     }
+    // Manual with duplicates allowed refuses a numbered voucher, and says
+    // why in its own words; a numberless one is refused there as before.
+    let allowing = || {
+        read_with_journal(observed(
+            SeriesNumberingMethod::Manual,
+            DuplicateSetting::NotPrevented,
+        ))
+    };
+    let numbered = admit_vouchers(allowing(), [("Journal", OwnNumber::Carried)]).unwrap_err();
+    assert_eq!(numbered.0[0].reason, RefusalReason::NotAutomatic);
+    assert_eq!(
+        numbered.0[0].in_words,
+        "is numbered Manual and does not prevent duplicate voucher numbers"
+    );
+    let numberless = admit_numbering(allowing(), ["Journal"]).unwrap_err();
+    assert_eq!(numberless.0[0].in_words, "is numbered Manual");
     let refusing = [
         (
             Some(observed(

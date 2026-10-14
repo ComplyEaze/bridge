@@ -146,9 +146,11 @@ These changes are in source and not yet in a published build.
   for that batch first: a voucher found in the book is never entered again, one that is not found is not built as a
   new voucher either, and the vouchers of the refused voucher types are left out until ComplyEaze Bridge numbers vouchers
   itself; no refusal sends anyone to enter a voucher in Tally. A Journal that carries its own voucher number (one built for Tally's Import menu)
-  is checked by `build_import_xml` too: it is written into a voucher type that reads Manual, where Tally keeps the
-  number and the type's duplicate setting decides, or Automatic with `Auto Retain`, where Tally discards the number
-  and assigns the next, and it is refused otherwise under the same two codes. It is refused on a voucher type set
+  is checked by `build_import_xml` too: it is written into a voucher type that reads Manual with duplicate numbers
+  prevented, where Tally keeps the number and refuses one a Journal already holds, or Automatic with `Auto Retain`,
+  where Tally discards the number
+  and assigns the next, and it is refused otherwise under the same two codes, Manual with duplicates allowed included,
+  where a Payment carrying a held number was created as a second voucher. It is refused on a voucher type set
   to "Renumber Vouchers": there Tally was seen to discard the number a Receipt carried and give it the number of its
   place in date order, and the later-dated Receipts' numbers went up by one. So a build that holds only Journals carrying their own numbers,
   which made no numbering read before, now makes that read: it can fail with that read's own codes, or as `pre_import_mark_unobserved` when the

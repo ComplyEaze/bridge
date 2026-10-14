@@ -2040,8 +2040,11 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    and what was read in `refused_types`; a batch that holds both is refused
    as `import_voucher_numbering_not_automatic`. `build_import_xml` checks every
    voucher the same way, and writes a Journal that carries its own voucher
-   number into a voucher type that reads Manual as well: Tally keeps the
-   number there, and the type's duplicate setting decides. Under Automatic
+   number into a voucher type that reads Manual with duplicate numbers
+   prevented as well: Tally keeps the number there and refuses one a Journal
+   already holds. Under Manual with duplicates allowed a Payment carrying a
+   held number was created as a second voucher (protocol reference §9.8), so
+   a numbered Journal is refused there. Under Automatic
    numbering Tally discards a supplied number and assigns its own, so such a
    Journal is held to `Auto Retain` like a voucher without a number; it is
    refused on a voucher type set to "Renumber Vouchers", where Tally was seen

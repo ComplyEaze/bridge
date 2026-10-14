@@ -945,3 +945,37 @@ fn an_own_tag_note_is_refused_as_false_and_on_a_batch_never_retired() {
         Some("import_ledger_invalid".to_string())
     );
 }
+
+/// A retired batch is never sent, and it is retired once: a journal that holds
+/// both a retirement and a dispatch intent for one batch, or two retirements,
+/// is refused as a whole, whichever record came first.
+#[test]
+fn a_journal_that_retires_a_sent_batch_or_retires_a_batch_twice_is_refused() {
+    let line = batch();
+    let mut incomplete = line.clone();
+    incomplete.status = "verification_incomplete".into();
+    let name = ledger::ProofName::of(b"proof", chrono::Utc::now());
+    let retired = ledger::StatusRecord::retired(&incomplete, name);
+    let intent = ledger::StatusRecord::dispatch(&line);
+    let parse = |records: &[&ledger::StatusRecord]| {
+        let mut text = record(&line);
+        for each in records {
+            text.push_str(&record(*each));
+        }
+        ledger::parse_snapshots(&text)
+    };
+    assert!(parse(&[&retired]).is_ok());
+    assert!(parse(&[&intent]).is_ok());
+    assert_eq!(
+        parse(&[&intent, &retired]).err(),
+        Some("import_ledger_retired_batch_sent".to_string())
+    );
+    assert_eq!(
+        parse(&[&retired, &intent]).err(),
+        Some("import_ledger_retired_batch_sent".to_string())
+    );
+    assert_eq!(
+        parse(&[&retired, &retired]).err(),
+        Some("import_ledger_batch_retired_twice".to_string())
+    );
+}

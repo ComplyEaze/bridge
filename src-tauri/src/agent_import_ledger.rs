@@ -1008,6 +1008,22 @@ fn scan_records(
                     return Err("import_ledger_invalid".into());
                 }
             }
+            // A retired batch is never sent, and is retired once: the runtime
+            // keeps both out of the journal under the lock, and a journal that
+            // holds either is refused here.
+            if matches!(update.record_type, StatusKind::DispatchIntent)
+                && retired.contains(&update.batch_id)
+            {
+                return Err("import_ledger_retired_batch_sent".into());
+            }
+            if matches!(update.record_type, StatusKind::BatchRetired) {
+                if retired.contains(&update.batch_id) {
+                    return Err("import_ledger_batch_retired_twice".into());
+                }
+                if dispatched.contains_key(&update.batch_id) {
+                    return Err("import_ledger_retired_batch_sent".into());
+                }
+            }
             if matches!(update.record_type, StatusKind::DispatchIntent)
                 && dispatched
                     .insert(

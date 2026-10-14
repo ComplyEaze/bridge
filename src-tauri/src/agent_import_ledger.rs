@@ -172,9 +172,9 @@ pub(in crate::agent) struct StatusRecord {
     /// (`deny_unknown_fields`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     proof: Option<ProofName>,
-    /// A verification of a batch already retired saw a voucher carrying the
-    /// batch's own narration tag: the batch is in Tally after all and counts
-    /// again in the transfer view. Written only then, and only on a
+    /// A verification of a batch already retired saw a voucher of the batch,
+    /// by its narration tag or by its content: the batch may be in Tally after
+    /// all and counts again in the transfer view. Written only then, and only on a
     /// verification record, so a journal gains it only after a retirement. A
     /// binary older than this field refuses a journal holding one
     /// (`deny_unknown_fields`).
@@ -284,8 +284,8 @@ impl StatusRecord {
         }
     }
 
-    /// This verification record also says the read saw a voucher carrying the
-    /// batch's own tag.
+    /// This verification record also says the read saw a voucher of the batch,
+    /// by its tag or by its content.
     pub(super) fn with_own_tag_observed(self) -> Self {
         Self {
             own_tag_observed: Some(true),

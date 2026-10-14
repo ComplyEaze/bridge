@@ -510,10 +510,10 @@ impl SendCheck {
     }
 }
 
-const RETIRED_BATCH_FOUND_STEP: &str = "Nothing was sent to Tally and the approval was not used. This batch can be sent only because a batch of this company was retired after a read of Tally found it absent, and ComplyEaze Bridge read Tally again for that batch before sending: a voucher there carries the narration tag of a batch named in retired_batches. That batch counts again, so this batch cannot be sent as built. Run verify_import on the batch named in retired_batches, then build the statement again.";
+const RETIRED_BATCH_FOUND_STEP: &str = "Nothing was sent to Tally and the approval was not used. This batch can be sent only because a batch of this company was retired after a read of Tally found it absent, and ComplyEaze Bridge read Tally again for that batch before sending: a voucher there carries the narration tag of a batch named in retired_batches, or matches its content. That batch counts again, so this batch cannot be sent as built. A voucher of another batch with equal content also counts, and keeps the retired batch counted until a later change of ComplyEaze Bridge handles that case. Run verify_import on the batch named in retired_batches, then build the statement again.";
 
-/// The refusal of a send whose second read of Tally found a retired batch's own
-/// tag: the batches it found are named.
+/// The refusal of a send whose second read of Tally found a voucher of a
+/// retired batch, by its tag or by its content: the batches it found are named.
 pub(super) fn retired_batch_found(batches: &[String]) -> TransferRefusal {
     TransferRefusal {
         reason: "retired_batch_found_in_tally",

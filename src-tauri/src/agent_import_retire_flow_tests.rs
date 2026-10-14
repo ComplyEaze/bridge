@@ -541,7 +541,8 @@ fn reading_from(
 }
 
 /// Once retired, a batch counts again in the transfer facts if a verification
-/// sees a voucher carrying its own tag, and not for a content match alone.
+/// sees any voucher of it, by its own tag or by its content alone; a
+/// verification that sees none leaves it retired.
 #[tokio::test]
 async fn a_retired_batch_whose_own_tag_is_seen_again_is_recorded_so() {
     let directory = tempfile::tempdir().unwrap();
@@ -565,15 +566,15 @@ async fn a_retired_batch_whose_own_tag_is_seen_again_is_recorded_so() {
         retired["structuredContent"]["result"]["retire"]["state"], "retired",
         "{retired}"
     );
-    // a verification that finds the content but not the tag records nothing of it
-    let (_b, content_only) = reading_from(
+    // a verification that finds nothing records nothing of it
+    let plain = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
+    let (_n, nothing) = reading_from(
         directory.path(),
         &batch_id,
-        qualified_import_cycle_plans()[verify_from..].to_vec(),
+        book(true)[verify_from..].to_vec(),
         None,
     );
-    let plain = json!({"company_guid": CAPTURED_GUID, "batch_id": batch_id});
-    let seen = content_only
+    let seen = nothing
         .call_tool_response("verify_import", plain.clone())
         .await
         .value;
@@ -581,7 +582,22 @@ async fn a_retired_batch_whose_own_tag_is_seen_again_is_recorded_so() {
     let record = last_record(directory.path(), &batch_id);
     assert_eq!(record["record_type"], "verification_status", "{record}");
     assert!(record.get("own_tag_observed").is_none(), "{record}");
-    // one that finds the tag does
+    // one that finds the content but not the tag records it too
+    let (_b, content_only) = reading_from(
+        directory.path(),
+        &batch_id,
+        qualified_import_cycle_plans()[verify_from..].to_vec(),
+        None,
+    );
+    let seen = content_only
+        .call_tool_response("verify_import", plain.clone())
+        .await
+        .value;
+    assert_ne!(seen["isError"], true, "{seen}");
+    let record = last_record(directory.path(), &batch_id);
+    assert_eq!(record["record_type"], "verification_status", "{record}");
+    assert_eq!(record["own_tag_observed"], true, "{record}");
+    // and so does one that finds the tag
     let (_c, tagged) = reading_from(
         directory.path(),
         &batch_id,
@@ -1019,6 +1035,56 @@ async fn the_second_read_uses_the_window_the_retirement_recorded() {
             "request {at} of the second read is not the retirement's"
         );
     }
+}
+
+/// A copy of the retired batch's file imported by hand with its tag edited out
+/// leaves Tally holding its content and no tag: the second read sees it all the
+/// same, the send is refused naming the batch, and the batch counts again.
+#[tokio::test]
+async fn a_send_that_rests_on_a_retired_batch_is_refused_when_only_its_content_is_found() {
+    use super::transfer_flow_tests::post_error;
+    let directory = tempfile::tempdir().unwrap();
+    let held = a_withdrawn_skip_waits_on_an_unsent_carrier(directory.path()).await;
+    // the Tally of the second read holds the carrier's Contra, with no tag
+    let copy = book_holding(CONTRA_IN_TALLY)[32..].to_vec();
+    let scripted = [read_of(true, None), copy].concat();
+    let (_simulator, retiring, sending) = one_tally(directory.path(), scripted);
+    move_to_the_tally_of(
+        &retiring,
+        directory.path(),
+        &[&held.carrier, &held.withdrawn],
+    );
+    let response = retire(&retiring, &held.carrier).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["retire"]["state"], "retired",
+        "{response}"
+    );
+    let refused = post_error(&sending, &held.withdrawn).await;
+    assert_eq!(refused["code"], "retired_batch_found_in_tally", "{refused}");
+    assert_eq!(
+        refused["retired_batches"],
+        json!([held.carrier.as_str()]),
+        "{refused}"
+    );
+    let step = refused["next_step"].as_str().unwrap();
+    assert!(step.contains("or matches its content"), "{step}");
+    assert!(
+        step.contains("keeps the retired batch counted until a later change"),
+        "{step}"
+    );
+    // the second read is a verification that noted the find, so the batch counts
+    assert_eq!(
+        last_record(directory.path(), &held.carrier)["own_tag_observed"],
+        true
+    );
+    let again = post_error(&sending, &held.withdrawn).await;
+    assert_eq!(again["code"], "withdraw_skip_paired", "{again}");
+    assert_eq!(
+        again["paired_rows"][0]["batch_id"],
+        held.carrier.as_str(),
+        "{again}"
+    );
+    assert!(!records_of(directory.path(), &held.withdrawn).contains(&"dispatch_intent".into()));
 }
 
 /// A retired batch whose exclusion changes nothing for this send is not read

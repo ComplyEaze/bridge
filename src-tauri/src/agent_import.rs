@@ -101,7 +101,7 @@ pub(super) struct RetiredReadFailure {
 /// What a verification is recorded as.
 enum PersistKind {
     /// A verification; `own_tag_observed` when the batch is retired and the
-    /// read saw a voucher carrying its own tag.
+    /// read saw any voucher of it, by its tag or by its content.
     Verification { own_tag_observed: bool },
     /// A retirement, if the read shows the batch absent.
     Retire(retire::Request),
@@ -2114,10 +2114,11 @@ impl Server {
                     rows: rows.clone(),
                 })
             } else {
-                // A retired batch whose own tag is seen again counts in the
-                // transfer view once more; the verification says so.
+                // A retired batch of which any voucher is seen again, by its tag
+                // or by its content, counts in the transfer view once more; the
+                // verification says so.
                 PersistKind::Verification {
-                    own_tag_observed: retired && retire::sees_its_own_tag(&rows),
+                    own_tag_observed: retired && retire::found_a_voucher(&rows),
                 }
             };
             let record_may_exist = std::sync::atomic::AtomicBool::new(false);
@@ -2221,10 +2222,10 @@ impl Server {
             let unreadable = || "import_retire_proof_unreadable".to_string();
             let bytes = self.read_proof_file(batch_id, proof).map_err(|_| unreadable())?;
             let saved: Value = serde_json::from_slice(&bytes).map_err(|_| unreadable())?;
-            if !saved["vouchers"].is_array() {
+            let Some(rows) = saved["vouchers"].as_array() else {
                 return Err(unreadable().into());
-            }
-            if retire::found_a_voucher(&saved["vouchers"]) {
+            };
+            if retire::found_a_voucher(rows) {
                 return Err("import_retire_batch_found".to_string().into());
             }
         }
@@ -2283,9 +2284,9 @@ impl Server {
     }
 
     /// Reads Tally for each retired batch of `ids`, over the window its
-    /// retirement recorded, and names those that now show a voucher carrying
-    /// their own tag. Each read is recorded as a verification, so a batch seen
-    /// again counts in the transfer view once more. A read that fails stops
+    /// retirement recorded, and names those of which any voucher is now seen,
+    /// by its tag or by its content. Each read is recorded as a verification,
+    /// so a batch seen again counts in the transfer view once more. A read that fails stops
     /// the rest and names the batch it failed for; a batch already seen again
     /// is the answer then, since it refuses the send whatever else fails.
     pub(super) async fn retired_batches_seen_again(
@@ -2327,7 +2328,7 @@ impl Server {
                 .as_array()
                 .cloned()
                 .unwrap_or_default();
-            if retire::sees_its_own_tag(&rows) {
+            if retire::found_a_voucher(&rows) {
                 seen.push(id.clone());
             }
         }

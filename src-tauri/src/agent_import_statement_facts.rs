@@ -539,7 +539,7 @@ pub(super) enum JournalEvent {
         batch_id: String,
         status: String,
         sent: bool,
-        /// A verification saw a voucher carrying the batch's own tag.
+        /// A verification saw a voucher of the batch, by its tag or its content.
         own_tag: bool,
     },
     /// A read of Tally found the never-sent batch absent and it was retired.
@@ -676,7 +676,8 @@ struct Batch {
     found: bool,
     /// Retired by a read of Tally that found it absent.
     retired: bool,
-    /// A verification since the retirement saw a voucher carrying its own tag.
+    /// A verification since the retirement saw a voucher of the batch, by its tag
+    /// or its content.
     own_tag: bool,
 }
 

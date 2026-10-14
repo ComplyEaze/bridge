@@ -1886,7 +1886,7 @@ refused as `proposals_legacy` (parse the statement again).
   Contra rows another statement was waiting on (`carried_rows`), which the
   statement is built again without. Otherwise the batch is not retired and
   keeps counting. A later verification that sees a voucher carrying the
-  retired batch's own tag counts it again; `post_import` still refuses it.
+  retired batch's own tag, or matching its content, counts it again; `post_import` still refuses it.
   Refused before anything is removed: a batch that was sent, had any voucher
   found in Tally by an earlier verification (read from the saved proof each of
   its verifications names, even one that left it short of posted; a proof that
@@ -1918,10 +1918,13 @@ refused as `proposals_legacy` (parse the statement again).
   statement row, no statement, no withdrawal) is not checked. When the decision
   to send rests on a retired batch being out of these records (counting it
   would refuse the batch), Tally is read again, before the person is asked, for
-  that retired batch's own narration tag, over the window its retirement read
-  and with the same size limits. A batch whose tag is found counts again, and
-  the send is refused as `retired_batch_found_in_tally` with the batches named in
-  `retired_batches`; a retirement that arrives after that read refuses under the
+  that retired batch, over the window its retirement recorded and with the same
+  size limits. A batch of which any voucher is found, by its narration tag or by
+  its content, counts again, and the send is refused as
+  `retired_batch_found_in_tally` with the batches named in `retired_batches`; a
+  voucher of another batch with equal content keeps the retired batch counted
+  until a later change. A second read that fails for any reason is refused as
+  `retired_batch_not_read`, naming the batch and the failure's code (`cause`); a retirement that arrives after that read refuses under the
   lock as `retired_batch_not_read_again`. The cost of that second read on a live
   Tally is not measured yet.
 - **Records a release cannot read.** The statement records refuse unknown

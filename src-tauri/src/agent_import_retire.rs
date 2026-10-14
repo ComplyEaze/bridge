@@ -246,18 +246,12 @@ pub(super) fn judge(rows: &[Value]) -> Result<(), Keep> {
     }
 }
 
-/// Whether any voucher row of a verification carries the batch's own tag.
-pub(super) fn sees_its_own_tag(rows: &[Value]) -> bool {
-    rows.iter().any(|row| row["marker"] == "narration_tag")
-}
-
 /// Whether a verification's rows show any voucher of the batch in Tally: any
-/// row that is not "not found". A row that names no status counts as found.
-pub(super) fn found_a_voucher(rows: &Value) -> bool {
-    rows.as_array().is_some_and(|rows| {
-        rows.iter()
-            .any(|row| row["status"].as_str() != Some("not_found"))
-    })
+/// row that is not "not found", whether it was found by the batch's tag or by
+/// its content. A row that names no status counts as found.
+pub(super) fn found_a_voucher(rows: &[Value]) -> bool {
+    rows.iter()
+        .any(|row| row["status"].as_str() != Some("not_found"))
 }
 
 /// The days the retire's read covers: the batch's own dates widened by
@@ -354,9 +348,9 @@ mod tests {
                 Err(Keep::OwnTag),
                 "{status}"
             );
-            assert!(sees_its_own_tag(&[tagged]));
+            assert!(found_a_voucher(&[tagged]));
         }
-        assert!(!sees_its_own_tag(&[row(ROW, "not_found", "")]));
+        assert!(!found_a_voucher(&[row(ROW, "not_found", "")]));
         // any other status keeps the batch counting
         for status in [
             "posted_not_effective",
@@ -369,6 +363,30 @@ mod tests {
                 "{status}"
             );
         }
+    }
+
+    /// A batch is seen again by any row that is not "not found": a content match
+    /// with no tag counts as a tagged voucher does.
+    #[test]
+    fn any_row_that_is_not_absent_is_a_find() {
+        assert!(!found_a_voucher(&[]));
+        assert!(!found_a_voucher(&[row(ROW, "not_found", "")]));
+        for status in [
+            "matching_content_observed",
+            "posted_verified",
+            "posted_divergent",
+            "not_attributable",
+            "duplicate_fingerprint",
+            "posted_not_effective",
+            "bound_not_in_window",
+        ] {
+            assert!(
+                found_a_voucher(&[row(ROW, "not_found", ""), row(ROW, status, "")]),
+                "{status}"
+            );
+        }
+        // a row with no status is not read as absent
+        assert!(found_a_voucher(&[json!({"bridge_txn_id": ROW})]));
     }
 
     #[test]

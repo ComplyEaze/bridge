@@ -2595,7 +2595,8 @@ Per tool:
   3. only when a voucher type is declared `manual` (20 requests): the company's master mark (6),
      then the voucher-type numbering (14: the mode probe and identity, the masters pair, the
      numbering pair, identity and mode again); the call is refused here, before any window
-     request, when a declared-manual type is not Manual with exactly one series in the book, the
+     request, when a declared-manual type is not Manual with exactly one series that prevents duplicate
+     numbers in the book, the
      book holds no type of that exact name, or its numbering cannot be read (Education mode keeps
      the read's own code, `masters_education_unqualified`). The check reads the numbering as it
      is now, holds for the moment of the read, and does not know how existing vouchers were

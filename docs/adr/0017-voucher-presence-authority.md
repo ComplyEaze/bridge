@@ -254,8 +254,8 @@ qualified voucher-type read, no longer holds once the voucher-type numbering rea
 tree; this change is stacked on those two and merges after them.
 The declaration is still the caller's, but a type declared Manual is now checked
 against the book's own series before the window is read, and the call is refused
-when the book does not number that type Manual with exactly one series, does not
-hold the type, or cannot be read. Declarations and the book's type names still
+when the book does not number that type Manual with exactly one series that prevents
+duplicate numbers, does not hold the type, or cannot be read. Declarations and the book's type names still
 match exactly. A declaration of automatic or unknown is not checked, because it
 only demotes the number to a resemblance.
 

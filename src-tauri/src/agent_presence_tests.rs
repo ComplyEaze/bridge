@@ -733,9 +733,14 @@ const SERIES_READ_REQUESTS: usize = 6 + 14;
 /// other type reads Automatic, as in the captured series (protocol reference,
 /// voucher-type numbering).
 fn with_book_numbering(base: Vec<ScenarioPlan>, manual: &[&str]) -> Vec<ScenarioPlan> {
+    // A type the book numbers Manual also prevents duplicate numbers here, as the
+    // reference's rule requires; the captured defaults are used as captured below.
     with_book_numbering_answers(
         base,
-        agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, manual),
+        agent_import::numbering_fixtures::manual_answers_preventing_duplicates(
+            CAPTURED_GUID,
+            manual,
+        ),
     )
 }
 
@@ -2262,9 +2267,157 @@ async fn a_type_the_book_holds_as_manual_proceeds_and_the_book_s_reading_is_retu
     assert_eq!(read["types"][0]["voucher_type"], "Journal", "{response}");
     assert_eq!(read["types"][0]["declared"], "manual", "{response}");
     assert_eq!(read["types"][0]["book"]["method"], "manual", "{response}");
+    assert_eq!(
+        read["types"][0]["book"]["duplicates"], "prevented",
+        "{response}"
+    );
     assert_eq!(read["types"][0]["agrees"], true, "{response}");
     let sent = answered(&simulator.finish().expect("requests"));
     assert_eq!(sent, 34 + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn a_type_the_book_holds_manual_with_duplicates_not_prevented_is_refused() {
+    // The captured Receipt series: Manual, `PREVENTDUPLICATES` No (the default a type
+    // switched to Manual reads), edited nowhere. A number is an identity only where
+    // the book also refuses a second voucher with it.
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Receipt","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_numbering_refusal(
+        &response,
+        "presence_numbering_method_differs_from_book",
+        &[("Receipt", "observed")],
+        sent,
+    );
+    let row = &response["structuredContent"]["result"]["error"]["candidates"][0];
+    assert_eq!(row["book"]["method"], "manual", "{response}");
+    assert_eq!(row["book"]["duplicates"], "not_prevented", "{response}");
+    assert_eq!(row["agrees"], false, "{response}");
+}
+
+#[tokio::test]
+async fn a_type_the_book_holds_manual_with_duplicates_prevented_proceeds() {
+    // The captured Payment series: Manual, `PREVENTDUPLICATES` Yes, edited nowhere.
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Payment","numbering_method":"manual"},
+        ]),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert_eq!(read["types"][1]["book"]["method"], "manual", "{response}");
+    assert_eq!(
+        read["types"][1]["book"]["duplicates"], "prevented",
+        "{response}"
+    );
+    assert_eq!(read["types"][1]["agrees"], true, "{response}");
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(sent, 34 + SERIES_READ_REQUESTS);
+}
+
+#[tokio::test]
+async fn the_rows_of_types_declared_automatic_or_unknown_are_returned_and_agree_with_nothing() {
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([
+            {"voucher_type":"Payment","numbering_method":"manual"},
+            {"voucher_type":"Journal","numbering_method":"automatic"},
+            {"voucher_type":"Contra","numbering_method":"unknown"},
+        ]),
+    )
+    .await;
+    simulator.cancel();
+    let _ = simulator.finish();
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert!(read["master_mark"].is_u64(), "{response}");
+    let rows = read["types"].as_array().expect("rows");
+    let row = |name: &str| {
+        rows.iter()
+            .find(|row| row["voucher_type"] == name)
+            .unwrap_or_else(|| panic!("{name} row: {response}"))
+    };
+    assert_eq!(row("Journal")["declared"], "automatic", "{response}");
+    assert_eq!(row("Journal")["agrees"], Value::Null, "{response}");
+    assert_eq!(row("Journal")["book"]["method"], "automatic", "{response}");
+    assert_eq!(
+        row("Journal")["book"]["duplicates"],
+        "not_prevented",
+        "{response}"
+    );
+    assert_eq!(row("Contra")["declared"], "unknown", "{response}");
+    assert_eq!(row("Contra")["agrees"], Value::Null, "{response}");
+    assert_eq!(row("Payment")["agrees"], true, "{response}");
+}
+
+#[test]
+fn the_book_s_reading_of_a_series_the_check_cannot_use_is_shown_as_it_is() {
+    use bridge_tally_protocol::native_voucher_type_numbering::{
+        DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
+    };
+    let observed = |method, duplicates| VoucherTypeNumbering::Observed { method, duplicates };
+    let (book, passes) = book_numbering_json(Some(&VoucherTypeNumbering::FieldInvalid(
+        "series_field_repeated",
+    )));
+    assert_eq!(book["state"], "field_invalid");
+    assert_eq!(book["code"], "series_field_repeated");
+    assert!(!passes);
+    for (sub, printed) in [
+        (NumberingSubMethod::Absent, "absent"),
+        (
+            NumberingSubMethod::Unrecognised("Odd".to_string()),
+            "unrecognised",
+        ),
+    ] {
+        let (book, passes) = book_numbering_json(Some(&observed(
+            SeriesNumberingMethod::Automatic(sub),
+            DuplicateSetting::NotPrevented,
+        )));
+        assert_eq!(book["sub_method"], printed);
+        assert_eq!(book["duplicates"], "not_prevented");
+        assert!(!passes);
+    }
+    // Manual passes only with duplicates prevented, whatever sub-method it prints.
+    for (duplicates, expected) in [
+        (DuplicateSetting::Prevented, true),
+        (DuplicateSetting::NotPrevented, false),
+    ] {
+        let (_, passes) =
+            book_numbering_json(Some(&observed(SeriesNumberingMethod::Manual, duplicates)));
+        assert_eq!(passes, expected);
+    }
 }
 
 #[tokio::test]
@@ -2321,9 +2474,45 @@ async fn a_numbering_read_that_fails_refuses_a_manual_declaration_before_the_win
 }
 
 #[tokio::test]
+async fn a_master_mark_read_that_fails_refuses_a_manual_declaration_with_its_own_code() {
+    let unreadable = "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA>\
+                      <LINEERROR>Could not read</LINEERROR></DATA></BODY></ENVELOPE>"
+        .to_string();
+    let (masters, numbering) =
+        agent_import::numbering_fixtures::manual_answers_preventing_duplicates(
+            CAPTURED_GUID,
+            &["Journal"],
+        );
+    let simulator = SequenceSimulator::spawn(splice_numbering(
+        presence_plans(),
+        (masters, numbering),
+        licensed_companies_xml(),
+        unreadable,
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = presence_under(
+        &server,
+        json!([{"voucher_type":"Journal","numbering_method":"manual"}]),
+    )
+    .await;
+    simulator.cancel();
+    let sent = answered(&simulator.finish().expect("requests"));
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "agent_read_protocol_invalid",
+        "{response}"
+    );
+    assert!(
+        sent <= BEFORE_SERIES_READ + 6,
+        "the window or the numbering was read after a failed mark: {sent}"
+    );
+}
+
+#[tokio::test]
 async fn a_declaration_whose_case_differs_from_the_book_s_type_name_is_not_a_match() {
     // Declarations match exactly (ADR 0017), so a Manual declaration written
-    // `journal` is not the book's `Journal`, however Tally's own screens fold case.
+    // `journal` is not the book's `Journal`.
     let simulator = SequenceSimulator::spawn(with_book_numbering(presence_plans(), &["Journal"]))
         .expect("simulator");
     let directory = tempfile::tempdir().expect("directory");
@@ -2507,7 +2696,7 @@ fn the_numbering_rows_are_bounded_by_their_own_budget() {
     let rows = (0..50)
         .map(|n| row(&format!("{long}{n}"), n % 2 == 0))
         .collect::<Vec<_>>();
-    let bounded = bounded_numbering_rows(rows.clone(), 200_000 / 8);
+    let bounded = bounded_numbering_rows(rows.clone(), 200_000 / NUMBERING_ROWS_SHARE);
     assert_eq!(bounded["types_omitted"], true);
     assert_eq!(bounded["declared"], 50);
     assert_eq!(bounded["agreeing"], 25);
@@ -2515,6 +2704,40 @@ fn the_numbering_rows_are_bounded_by_their_own_budget() {
     assert!(bounded.to_string().len() < 200, "{bounded}");
     // A few ordinary rows are returned whole.
     let few = vec![row("Journal", true), row("Payment", true)];
-    let kept = bounded_numbering_rows(few.clone(), 200_000 / 8);
+    let kept = bounded_numbering_rows(few.clone(), 200_000 / NUMBERING_ROWS_SHARE);
     assert_eq!(kept["types"], json!(few));
+}
+
+#[tokio::test]
+async fn numbering_rows_that_would_not_fit_come_back_as_counts_through_the_tool() {
+    let simulator = SequenceSimulator::spawn(with_book_numbering_answers(
+        presence_plans(),
+        agent_import::numbering_fixtures::series_as_captured(CAPTURED_GUID),
+    ))
+    .expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    // The rows' budget is one part in NUMBERING_ROWS_SHARE of the 200,000-byte response.
+    // The most types a call may declare (50), 48 of them with 1,000-character names the
+    // book does not hold and declared automatic, take about twice that.
+    let mut declared = vec![
+        json!({"voucher_type":"Journal","numbering_method":"automatic"}),
+        json!({"voucher_type":"Payment","numbering_method":"manual"}),
+    ];
+    for n in 0..48 {
+        let name = format!("{}{n:02}", "T".repeat(998));
+        declared.push(json!({"voucher_type": name, "numbering_method": "automatic"}));
+    }
+    assert_eq!(declared.len(), 50);
+    let rows_size: usize = declared.iter().map(|row| row.to_string().len()).sum();
+    assert!(rows_size > 200_000 / NUMBERING_ROWS_SHARE, "{rows_size}");
+    let response = presence_under(&server, Value::Array(declared.clone())).await;
+    simulator.cancel();
+    let _ = simulator.finish();
+    assert_eq!(response["isError"], false, "{response}");
+    let read = &response["structuredContent"]["result"]["numbering_read"];
+    assert_eq!(read["types_omitted"], true, "{response}");
+    assert_eq!(read["declared"], declared.len(), "{response}");
+    assert_eq!(read["agreeing"], 1, "{response}");
+    assert!(read.get("types").is_none(), "{response}");
 }

@@ -16,7 +16,7 @@ use bridge_tally_core::book_presence::{
 use bridge_tally_core::book_presence::{ColumnEvidence, ObservedMarker};
 use bridge_tally_core::master_binding::{MasterCatalog, MasterClass, SourceEntity};
 use bridge_tally_protocol::native_voucher_type_numbering::{
-    NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
+    DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
 
 /// Most vouchers one presence request may propose. The window read is
@@ -261,8 +261,8 @@ impl Server {
     /// Reads the book's own numbering for the declared voucher types, before
     /// the window, when at least one type is declared Manual; a call that
     /// declares none Manual reads nothing and says so. A type declared Manual
-    /// that the book does not hold as Manual with exactly one series refuses
-    /// the whole call, with the types named; so does a book whose numbering
+    /// that the book does not hold as Manual with exactly one series that prevents
+    /// duplicate numbers refuses the whole call, with the types named; so does a book whose numbering
     /// cannot be read (Education mode included, which keeps the read's own
     /// code), because a Manual declaration that cannot be checked is the unsafe
     /// direction. Names match exactly, as the declaration does. The check holds
@@ -344,13 +344,17 @@ impl Server {
             "read_before_window": true,
             "master_mark": read.master_mark(),
         });
-        let bounded = bounded_numbering_rows(rows, self.settings.max_bytes / 8);
+        let bounded = bounded_numbering_rows(rows, self.settings.max_bytes / NUMBERING_ROWS_SHARE);
         if let (Some(target), Some(extra)) = (out.as_object_mut(), bounded.as_object()) {
             target.extend(extra.clone());
         }
         Ok(out)
     }
 }
+
+/// The share of the response budget the rows of `numbering_read` may take: one
+/// part in this many.
+const NUMBERING_ROWS_SHARE: usize = 8;
 
 /// The rows of `numbering_read`, or only their counts when the rows would take
 /// more than `budget` bytes. `fit_response` trims only `items`, so a sibling of
@@ -368,10 +372,17 @@ fn bounded_numbering_rows(rows: Vec<Value>, budget: usize) -> Value {
 }
 
 /// What the book's series says about one voucher type, as data, and whether
-/// it is Manual with exactly one series: the only reading under which a
-/// voucher number is an identity. A sub-method printed on a Manual series is
+/// it is Manual with exactly one series that prevents duplicate numbers: the only
+/// reading under which a voucher number is an identity. A sub-method printed on a Manual series is
 /// ignored (every captured Manual series prints one); a repeated one still
 /// refuses the read, as `field_invalid`.
+fn duplicate_setting(setting: DuplicateSetting) -> &'static str {
+    match setting {
+        DuplicateSetting::Prevented => "prevented",
+        DuplicateSetting::NotPrevented => "not_prevented",
+    }
+}
+
 fn book_numbering_json(found: Option<&VoucherTypeNumbering>) -> (Value, bool) {
     match found {
         None => (json!({"state": "not_in_book"}), false),
@@ -381,10 +392,19 @@ fn book_numbering_json(found: Option<&VoucherTypeNumbering>) -> (Value, bool) {
         Some(VoucherTypeNumbering::FieldInvalid(code)) => {
             (json!({"state": "field_invalid", "code": code}), false)
         }
-        Some(VoucherTypeNumbering::Observed { method, .. }) => match method {
-            SeriesNumberingMethod::Manual => {
-                (json!({"state": "observed", "method": "manual"}), true)
-            }
+        Some(VoucherTypeNumbering::Observed { method, duplicates }) => match method {
+            // A Manual series is an identity only where the book also prevents
+            // duplicate numbers: a type switched to Manual with the screen's default
+            // reads `PREVENTDUPLICATES` No (protocol reference, voucher-writes part,
+            // numbering method), and there one number can belong to two vouchers.
+            SeriesNumberingMethod::Manual => (
+                json!({
+                    "state": "observed",
+                    "method": "manual",
+                    "duplicates": duplicate_setting(*duplicates),
+                }),
+                *duplicates == DuplicateSetting::Prevented,
+            ),
             SeriesNumberingMethod::Automatic(sub) => {
                 let sub = match sub {
                     NumberingSubMethod::AutoRetain => "auto_retain",
@@ -393,16 +413,29 @@ fn book_numbering_json(found: Option<&VoucherTypeNumbering>) -> (Value, bool) {
                     NumberingSubMethod::Unrecognised(_) => "unrecognised",
                 };
                 (
-                    json!({"state": "observed", "method": "automatic", "sub_method": sub}),
+                    json!({
+                        "state": "observed",
+                        "method": "automatic",
+                        "sub_method": sub,
+                        "duplicates": duplicate_setting(*duplicates),
+                    }),
                     false,
                 )
             }
             SeriesNumberingMethod::AutomaticManualOverride => (
-                json!({"state": "observed", "method": "automatic_manual_override"}),
+                json!({
+                    "state": "observed",
+                    "method": "automatic_manual_override",
+                    "duplicates": duplicate_setting(*duplicates),
+                }),
                 false,
             ),
             SeriesNumberingMethod::Unrecognised(_) => (
-                json!({"state": "observed", "method": "unrecognised"}),
+                json!({
+                    "state": "observed",
+                    "method": "unrecognised",
+                    "duplicates": duplicate_setting(*duplicates),
+                }),
                 false,
             ),
         },

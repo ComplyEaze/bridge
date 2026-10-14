@@ -544,10 +544,15 @@ class MergeGateControls(unittest.TestCase):
                 self.assert_indeterminate(scenario, "could not")
 
     def test_a_token_in_the_title_body_added_lines_or_a_strangers_comment_is_refused(self):
-        for scenario in ("token-in-the-title", "token-in-the-body", "token-in-an-added-line", "token-in-a-stranger-comment", "token-in-the-branch-name",
+        for scenario in ("token-in-a-previous-file-name", "token-in-the-title", "token-in-the-body", "token-in-an-added-line", "token-in-a-stranger-comment", "token-in-the-branch-name",
                          "token-in-a-file-name", "token-in-a-hidden-comment-in-the-body", "token-in-a-stranger-commit-comment"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "carries a merge-verdict token")
+
+    def test_commit_comments_that_cannot_be_read_or_are_too_many_are_indeterminate_and_an_owners_voids(self):
+        self.assert_indeterminate("commit-comments-unreadable", "could not read")
+        self.assert_indeterminate("sixty-one-commits", "could not read")
+        self.assert_blocked("owner-commit-comment-with-a-token", self.VERDICT_BLOCK)
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away"):
@@ -1271,6 +1276,15 @@ class MergeVerdictEvaluator(unittest.TestCase):
         self.assertEqual(self.status(dict(self.both(), commit_comments=[stranger])), "block")
         retract = "<!-- MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40 + " -->"
         self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [self.comment(retract, self.T[3])])), "block")
+
+    def test_tokens_hidden_by_comment_forms_the_regexes_miss_or_by_tags_between_the_letters_are_still_tokens(self):
+        for hidden in ("<!-->MERGE-<!-->VERDICT CLEAN", "<!--->MERGE-<!--->VERDICT CLEAN", "<!-- a --!>MERGE-<!-- b --!>VERDICT CLEAN",
+                       "MERGE-<b></b>VERDICT CLEAN", "MERGE<span>-</span>ADVERSARY RECOMMEND", "MERGE-VERDICT<!-- unterminated"):
+            with self.subTest(hidden=hidden):
+                self.assertEqual(self.status(dict(self.both(), texts=dict(self.both()["texts"], body=hidden))), "block")
+                retract = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(hidden, self.T[3])]
+                self.assertEqual(self.status(self.doc(comments=retract)), "block")
+        self.assertEqual(self.status(dict(self.both(), texts=dict(self.both()["texts"], body="a plain sentence about merging a verdict"))), "pass")
 
     def test_an_owner_commit_comment_with_a_token_voids_everything(self):
         owner = {"user": self.user(), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": self.T[0]}

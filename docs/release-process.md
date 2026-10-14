@@ -521,18 +521,21 @@ pull request whose title, body, branch name, changed file names, commit messages
 or commit comments carry either token, or on which anyone but the owner posted a review or
 comment (an inline review comment included) that does, so a stranger's comment that carries a
 token blocks the pull request until it is deleted; an owner's commit comment or inline comment
-that carries one voids every verdict instead. The tokens are read without case, with look-alike
-hyphens, hidden characters and character references folded away, and both with and without HTML
-comments removed (a token hidden inside a comment is still a token), so a pull request that quotes
-one in any of those places (this very section included) cannot pass the gate: its merge is the
-owner's own act. Not scanned: ignored files and the contents of files the gate does not read as
-text. History it cannot read
+that carries one voids every verdict instead (so those two places never refuse, they void). The tokens are read
+without case, with look-alike hyphens, hidden characters and character references folded away, and
+read three more ways: with HTML comments removed, with only the comment delimiters removed (a token
+hidden inside a comment is still a token), and as an HTML parser reads the text, with and without
+its comment text (tags and comment forms between the letters do not hide one). A pull request that
+quotes one in any of those places (this very section included) cannot pass the gate: its merge is the
+owner's own act. The commit comments of at most 60 commits are read; more makes the gate
+`INDETERMINATE`. Other places a person can write in (labels, the milestone, author names, comments on
+commits no longer in the pull request) are not read. History it cannot read
 completely (more than one page of reviews, comments or timeline events included) is
 `INDETERMINATE`, never a pass.
 
 The gate is run only from origin/master's tree, never from the pull request's checkout: it
 fetches the branch `master` of `origin` itself into a ref of its own and refuses to run (exit 2) unless
-the directory the gate runs from is this tree's `scripts/` and everything under `scripts/`
+the directory the script itself lives in is this tree's `scripts/` and everything under `scripts/`
 equals it, untracked files included, and its helpers run with an isolated Python interpreter
 so that a file placed beside them cannot replace a standard-library module. A pull request
 that changes or renames away `scripts/merge-gate*`, `scripts/merge_gate*.py` or anything
@@ -541,7 +544,7 @@ the gate. For a pull request that the owner did not author, the two lines must
 come from separately run reviewers, and each reviewer records in its own log which line it posted;
 the gate cannot check that. The gate trusts the `origin` remote of the clone it runs in, and
 ignored files (caches, logs) are not part of the tree comparison, which is harmless because the
-helpers run isolated. A root `.gitattributes` can change the bytes of the gate's files in a working
+helpers run isolated, and a path typed in a different letter case than the real one is refused. A root `.gitattributes` can change the bytes of the gate's files in a working
 tree; that can only break the gate (it then fails), not make it pass.
 
 Accepted residual risks, stated here so nobody reads the gate as stronger than it is: the lines bind

@@ -7,13 +7,14 @@ most one trailing newline, is exactly one line, lowercase hex:
     MERGE-ADVERSARY RECOMMEND head=<40> base=<40>
 posted by the owner's numeric user id (a real User, not through an app). Both are needed; the NEWEST line of each kind by server
 time is the one that counts, and it must name the current head and base; any edit, deletion or dismissal of ANY owner item, and any later owner line that is not a positive one, voids
-every verdict that is not strictly newer. A pull request that carries either token in its title, body, commit messages, added lines or
-anyone else's review or comment is refused. Unreadable evidence is indeterminate, never a pass.
+every verdict that is not strictly newer. A pull request that carries either token in its title, body, branch name, changed file
+names, commit messages, commit comments, added lines or anyone else's review or comment is refused. Unreadable evidence is indeterminate, never a pass.
 
 Usage: merge_gate_verdict.py < DOC.json   (prints one JSON object; exit 0 pass, 1 block, 2 indeterminate)
 """
 import html
 import json
+from html.parser import HTMLParser
 import re
 import sys
 import unicodedata
@@ -50,12 +51,48 @@ def one_line(body):
 DASHES = dict.fromkeys(list(range(0x2010, 0x2016)) + [0x2212, 0xFE58, 0xFE63, 0xFF0D], "-")
 
 
+class _Readings(HTMLParser):
+    """Text as the HTML parser reads it: `shown` is what a page shows, `all` also holds comment, declaration and processing text."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.shown, self.all = [], []
+
+    def handle_data(self, data):
+        self.shown.append(data)
+        self.all.append(data)
+
+    def handle_comment(self, data):
+        self.all.append(data)
+
+    def handle_decl(self, decl):
+        self.all.append(decl)
+
+    def unknown_decl(self, data):
+        self.all.append(data)
+
+    def handle_pi(self, data):
+        self.all.append(data)
+
+
+def parser_readings(text):
+    """The two parser readings of the text; an unparseable text yields none (the regex readings still apply)."""
+    try:
+        parser = _Readings()
+        parser.feed(text)
+        parser.close()
+    except Exception:
+        return []
+    return ["".join(parser.shown), "".join(parser.all)]
+
+
 def has_token(text):
     """Whether the text carries either token, read without case and with every dash look-alike folded to a hyphen."""
     if not isinstance(text, str):
         return False
-    readings = (re.sub(r"<!--.*?-->", "", text, flags=re.S),      # what a renderer shows
-                text.replace("<!--", "").replace("-->", ""))        # a token hidden inside a comment is still a token
+    readings = [re.sub(r"<!--.*?-->", "", text, flags=re.S),       # comments removed
+                text.replace("<!--", "").replace("-->", ""),        # a token hidden inside a comment is still a token
+                re.sub(r"<!--+>|--!>", "", text)] + parser_readings(text)   # forms the regexes do not know, and tags between the letters
     for reading in readings:
         plain = html.unescape(reading).replace("\\", "")
         plain = "".join(c for c in plain if unicodedata.category(c) != "Cf")

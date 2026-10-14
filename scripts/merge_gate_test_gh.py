@@ -220,6 +220,7 @@ def state():
         "owner_reviews": [],
         "head_ref": "feature-branch",
         "commit_comments": [],
+        "commit_comments_fail": False,
         "inline": [],
         "history": EMPTY_HISTORY,
         "history_fail": False,
@@ -286,6 +287,18 @@ def state():
 
     elif scenario == "token-in-a-file-name":
         set_changes(s, ("added", "docs/MERGE-ADVERSARY-notes.md", "A plain line."))
+
+    elif scenario == "token-in-a-previous-file-name":
+        set_changes(s, ("renamed", "docs/MERGE-VERDICT-old.md", "docs/plain-new.md"))
+
+    elif scenario == "commit-comments-unreadable":
+        s["commit_comments_fail"] = True
+
+    elif scenario == "sixty-one-commits":
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(61)]
+
+    elif scenario == "owner-commit-comment-with-a-token":
+        s["commit_comments"] = [{"id": 12, "user": dict(OWNER_USER), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": T1, "updated_at": T1}]
 
     elif scenario == "token-in-a-hidden-comment-in-the-body":
         s["body"] = DEFAULT_BODY + "<!-- MERGE-VERDICT CLEAN head=x -->\n"
@@ -1086,6 +1099,8 @@ elif args and args[0] == "api":
         merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
         emit([S["comments"] + [dict(i, body=i["body"].replace("base=" + BASE_TIP, "base=" + merge_base)) for i in S["owner_items"]]])
     elif "/commits/" in joined and joined.rstrip().split("?")[0].endswith("/comments"):
+        if S["commit_comments_fail"]:
+            fail("controlled commit comments failure")
         emit([S["commit_comments"]])
     elif "/pulls/321/comments" in joined:
         if "inline" in S["pages_fail"]:

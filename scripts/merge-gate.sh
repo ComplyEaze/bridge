@@ -99,8 +99,13 @@ fi
 # .gitattributes conversion) and be committed.
 gate_tree=$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null) || gate_tree=""
 fetch_status=0
-fetch_err=$(git -C "$gate_tree" fetch -q origin +refs/heads/master:refs/merge-gate/master 2>&1 >/dev/null) || fetch_status=$?
-if [ -z "$gate_tree" ] || [ "$fetch_status" -ne 0 ]; then
+if [ -n "$gate_tree" ]; then
+  fetch_err=$(git -C "$gate_tree" fetch -q origin +refs/heads/master:refs/merge-gate/master 2>&1 >/dev/null) || fetch_status=$?
+else
+  fetch_status=1
+  fetch_err="this gate is not inside a git checkout"
+fi
+if [ "$fetch_status" -ne 0 ]; then
   echo "could not fetch the branch master of origin to compare this gate with it: ${fetch_err:0:300}" >&2
   exit 2
 fi
@@ -805,7 +810,7 @@ fi
 # paths" checks. Two lines count, each the WHOLE body of a pull request review or an issue comment by the owner's numeric user id
 # (scripts/merge_gate_verdict.py decides, with every rule in its header): MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND, both
 # bound to this head and to the merge base this gate computed itself. Any edit, deletion or dismissal of an owner item, a later
-# NOT-CLEAN or RETRACT line, or a token in the title, body, commits, added lines or anyone else's comment, blocks. Unreadable
+# NOT-CLEAN or RETRACT line, or a token in the title, body, branch name, file names, commits, commit comments, added lines or anyone else's comment, blocks. Unreadable
 # history is indeterminate. Binary files stay the owner's own act (--binary-review-sha); a pull request that changes this gate or
 # the workflows needs the owner's own act too, because a verdict about the gate cannot clear a change to the gate.
 : >"$errfile"

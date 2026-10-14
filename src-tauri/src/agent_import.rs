@@ -2051,7 +2051,16 @@ impl Server {
                 self.persist_verification_as(&payload["result"], &line, status, generation, kind)?;
             if let Some(decision) = retirement {
                 payload["result"]["retire"] = match decision {
-                    Ok(()) => json!({"state": "retired", "next_step": retire::RETIRED_STEP}),
+                    Ok(retirement) => match retirement.carried_rows {
+                        Some(rows) if rows.is_empty() => {
+                            json!({"state": "retired", "carried_rows": rows,
+                                "next_step": retire::RETIRED_STEP})
+                        }
+                        Some(rows) => json!({"state": "retired", "carried_rows": rows,
+                            "next_step": retire::RETIRED_CARRIED_STEP}),
+                        None => json!({"state": "retired", "carried_rows_state": "not_established",
+                            "next_step": retire::RETIRED_UNKNOWN_STEP}),
+                    },
                     Err(keep) => json!({"state": "not_retired", "reason": keep.reason(),
                         "file_removed": true, "next_step": retire::KEPT_STEP}),
                 };
@@ -2142,7 +2151,7 @@ impl Server {
         status: VerificationStatus,
         expected_generation: ledger::VerificationGeneration,
         kind: PersistKind,
-    ) -> Result<Option<Result<(), retire::Keep>>, String> {
+    ) -> Result<Option<Result<retire::Retirement, retire::Keep>>, String> {
         let mut update = line.clone();
         update.status = status.as_str().into();
         let update = &update;
@@ -2167,6 +2176,23 @@ impl Server {
             PersistKind::Verification { .. } => None,
         };
         let retiring = matches!(decision, Some(Ok(())));
+        // Read before the retirement is written, while the batch still counts:
+        // the rows of it that another statement's skipped row is waiting on.
+        let decision = match (decision, &kind) {
+            (Some(Ok(())), PersistKind::Retire(request)) => Some(Ok(retire::Retirement {
+                carried_rows: self
+                    .transfer_view_while_admitted(
+                        &canonical_batch_guid(&request.company_guid),
+                        None,
+                        None,
+                        &BTreeSet::new(),
+                    )
+                    .ok()
+                    .map(|(facts, view)| retire::carried_rows(&facts, &view, &update.batch_id)),
+            })),
+            (Some(Err(keep)), _) => Some(Err(keep)),
+            _ => None,
+        };
         let own_tag_observed = matches!(
             kind,
             PersistKind::Verification {

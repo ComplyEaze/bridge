@@ -9,11 +9,11 @@ use super::bank_tests::{
 use super::*;
 
 const BANK_A: &str = "WR2 Sales";
-const BANK_B: &str = "Bridge Nested Debtor WR4";
+pub(super) const BANK_B: &str = "Bridge Nested Debtor WR4";
 /// A row bank A's statement skipped as carried by bank B's Contra.
-const SKIPPED: &str = "st-20260901-00000000000000b1";
+pub(super) const SKIPPED: &str = "st-20260901-00000000000000b1";
 /// The Contra bank B's statement booked for the same transfer.
-const BOOKED: &str = "st-20260901-00000000000000c1";
+pub(super) const BOOKED: &str = "st-20260901-00000000000000c1";
 const OTHER_BOOKED: &str = "st-20260901-00000000000000c2";
 const UNKNOWN: &str = "st-20260901-00000000000000ff";
 const REFERENCE: &str = "600000000001";
@@ -56,7 +56,7 @@ fn contra_voucher(txn: &str) -> Value {
 }
 
 /// Bank A's statement of only skipped rows.
-fn a_skips(directory: &Path, rows: &[(&str, Option<&str>)]) -> Value {
+pub(super) fn a_skips(directory: &Path, rows: &[(&str, Option<&str>)]) -> Value {
     a_skips_flagged(directory, rows, false)
 }
 
@@ -74,7 +74,7 @@ fn a_skips_flagged(directory: &Path, rows: &[(&str, Option<&str>)], flagged: boo
 }
 
 /// A statement of `bank` booking `txn` as a Contra.
-fn contra_statement(directory: &Path, bank: &str, txn: &str, reference: Option<&str>) -> Value {
+pub(super) fn contra_statement(directory: &Path, bank: &str, txn: &str, reference: Option<&str>) -> Value {
     statement_v2(
         directory,
         bank,
@@ -85,14 +85,14 @@ fn contra_statement(directory: &Path, bank: &str, txn: &str, reference: Option<&
 }
 
 /// One simulator and one server over a data directory, for a run of calls.
-struct Rig {
+pub(super) struct Rig {
     simulator: SequenceSimulator,
     server: Server,
     expected: usize,
 }
 
 impl Rig {
-    fn new(directory: &Path, plans: Vec<ScenarioPlan>) -> Self {
+    pub(super) fn new(directory: &Path, plans: Vec<ScenarioPlan>) -> Self {
         let expected = plans.len();
         let simulator = SequenceSimulator::spawn(plans).expect("plans");
         let server = bank_server(directory, simulator.address().port());
@@ -103,7 +103,7 @@ impl Rig {
         }
     }
 
-    async fn build(&self, args: Value) -> Value {
+    pub(super) async fn build(&self, args: Value) -> Value {
         let response = self
             .server
             .call_tool_response("build_import_xml", args)
@@ -650,7 +650,7 @@ async fn the_same_transfer_booked_twice_without_a_reference_is_listed_not_refuse
 // ---- the facts cannot be read ---------------------------------------------------
 
 /// A skip-only record whose id is not one, so reading it fails a check.
-fn spoil_the_skip_file(directory: &Path) {
+pub(super) fn spoil_the_skip_file(directory: &Path) {
     let facts = statement_facts::StatementFacts {
         bank_ledger_guid: "g1".into(),
         coverage: None,

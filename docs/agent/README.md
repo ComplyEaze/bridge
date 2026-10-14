@@ -1865,6 +1865,28 @@ refused as `proposals_legacy` (parse the statement again).
   only for a row that nothing else matches. One dated another day, or with a
   third leg, does not match and does not refuse: verify every batch of the
   other account's statement before naming a row.
+- **A batch that was never sent and will not be (`verify_import` with
+  `if_absent` set to `retire`).** Until Tally has been read for it, such a
+  batch counts as carrying its transfers, so the other account's statement
+  cannot withdraw a skip it may carry. The call reads Tally for that one
+  batch, over its days and seven days either side (moved outward to a day an
+  Education licence admits), after removing the batch's saved file so it
+  cannot be imported by hand during the read. If no voucher carries the
+  batch's own narration tag, and each of its vouchers is either not found or
+  matches by content a row that a batch of another lineage, sent or found
+  posted, holds, one journal record both saves the verification and retires
+  the batch: `post_import` refuses it (`import_batch_retired`) and its Contras
+  and holds leave the transfer facts. The answer's `retire` block names the
+  Contra rows another statement was waiting on (`carried_rows`), which the
+  statement is built again without. Otherwise the batch is not retired and
+  keeps counting. A later verification that sees a voucher carrying the
+  retired batch's own tag counts it again; `post_import` still refuses it.
+  Refused before anything is removed: a batch that was sent, was ever found
+  posted, is already retired, was built for another endpoint or recorded no
+  voucher mark, and any call while the writes setting is off. A read that does
+  not finish after the file is removed retires nothing and says so; the call
+  may be repeated. A release that does not know the retirement record refuses
+  the whole import journal.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
   build that needs the view (`transfer_view_not_established`); builds that do

@@ -9,7 +9,9 @@
 //! named batch and, when the batch is absent, removes its saved file and
 //! records it retired, which takes it out of the transfer facts and out of
 //! `post_import`. The decision is made here, from the verification's rows.
+use super::statement_facts::TransferFacts;
 use super::*;
+use crate::agent::transfer_pairing::{ContraKey, SkipState, TransferView};
 use chrono::{Duration, NaiveDate};
 
 /// What the read of Tally is judged on, and what it is judged against.
@@ -23,6 +25,66 @@ pub(super) struct Request {
     pub(super) rows: Vec<Value>,
 }
 
+/// What a retirement did, besides recording it.
+pub(super) struct Retirement {
+    /// The batch's Contra rows that another statement's skipped row is waiting
+    /// on, or `None` when the transfer facts could not be read.
+    pub(super) carried_rows: Option<Vec<String>>,
+}
+
+/// The Contra rows of `batch` that a skipped row of another statement is
+/// paired with, may be carried by, or waits on. Retiring the batch leaves each
+/// of them to that other statement, so the batch's own statement is built again
+/// with them skipped.
+pub(super) fn carried_rows(
+    facts: &TransferFacts,
+    view: &TransferView,
+    batch: &str,
+) -> Vec<String> {
+    let ours = |key: &ContraKey| key.batch.as_str() == batch;
+    let mut rows = BTreeSet::new();
+    for (key, state) in &view.skips {
+        match state {
+            SkipState::Paired { contra, .. } | SkipState::MatchedUnconfirmed { contra }
+                if ours(contra) =>
+            {
+                rows.insert(contra.txn.as_str().to_string());
+            }
+            SkipState::Ambiguous { candidates }
+            | SkipState::ReversedSameDay { candidates }
+            | SkipState::ReferenceDiffers { candidates } => {
+                rows.extend(
+                    candidates
+                        .iter()
+                        .filter(|candidate| ours(candidate))
+                        .map(|candidate| candidate.txn.as_str().to_string()),
+                );
+            }
+            // the view names the batch and not the Contra: the batch's Contra of
+            // the skipped row's day and amount
+            SkipState::OtherSideUnverified { batch: carrier } if carrier.as_str() == batch => {
+                if let Some(skip) = facts.skips.iter().find(|skip| &skip.key == key) {
+                    rows.extend(
+                        facts
+                            .contras
+                            .iter()
+                            .filter(|contra| {
+                                ours(&contra.key)
+                                    && contra.date == skip.date
+                                    && contra.amount.numeric_eq(&skip.amount)
+                            })
+                            .map(|contra| contra.key.txn.as_str().to_string()),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    rows.into_iter().collect()
+}
+
+pub(super) const RETIRED_CARRIED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Build this statement again with the rows in carried_rows skipped (treatment skip): the other account's statement books them, and posting them from this side would book each transfer twice.";
+pub(super) const RETIRED_UNKNOWN_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Whether another account's statement carries any of its rows could not be established. Run verify_import on the other account's batches first, then build this statement again with every row they carry skipped.";
 pub(super) const RETIRED_STEP: &str = "This batch is retired: ComplyEaze Bridge read Tally, found none of its vouchers, removed its saved file and will not send it. Build this statement again if its rows are still to be posted.";
 pub(super) const KEPT_STEP: &str = "Tally holds a voucher of this batch, so it was not retired and still counts. Its saved file is removed, so ComplyEaze Bridge will not send it.";
 const UNFINISHED_STEP: &str = "The read of Tally did not finish, so nothing was retired and the batch still counts. Its saved file is removed, so the batch can no longer be sent from it. Call verify_import on it again with if_absent set to retire.";

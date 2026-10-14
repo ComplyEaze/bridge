@@ -1,6 +1,7 @@
 //! Retiring a batch that was never sent, by reading Tally for it, through
 //! `verify_import` with `if_absent` set to `retire`. The book is the captured
 //! one the import tests share; every identifier is invented.
+use super::bank_tests::{skip_only_plans, two_bank_plans};
 use super::*;
 use std::sync::Arc;
 
@@ -412,4 +413,102 @@ async fn a_retired_batch_whose_own_tag_is_seen_again_is_recorded_so() {
             .unwrap()
             .retired
     );
+}
+
+/// The row of another account's statement that skipped it is carried by this
+/// batch's Contra: retiring the batch names the Contra, so the person builds
+/// this statement again with it skipped, not booked a second time from here.
+#[tokio::test]
+async fn the_answer_lists_the_rows_the_other_statement_carries() {
+    use super::transfer_flow_tests::{
+        a_skips, contra_statement, Rig, BANK_B, BOOKED, SKIPPED,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let rig = Rig::new(
+        directory.path(),
+        [skip_only_plans(), two_bank_plans()].concat(),
+    );
+    rig.build(a_skips(directory.path(), &[(SKIPPED, Some("600000000001"))]))
+        .await;
+    let carrying = rig
+        .build(contra_statement(directory.path(), BANK_B, BOOKED, Some("600000000001")))
+        .await;
+    let batch_id = carrying["batch_id"].as_str().unwrap().to_string();
+    let (_simulator, server) = reading_from(
+        directory.path(),
+        &batch_id,
+        book(true)[32..].to_vec(),
+        None,
+    );
+    // the other account's skip was recorded for the endpoint the batch was
+    // built for, which is this Tally now
+    let moved = server.latest_import_snapshot(&batch_id).unwrap().unwrap();
+    let now = moved.batch.endpoint_origin.clone().unwrap();
+    let skips = directory.path().join(statement_facts::SKIPS_FILE);
+    let text = fs::read_to_string(&skips).unwrap();
+    let before = text
+        .split("\"endpoint_origin\":\"")
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .unwrap()
+        .to_string();
+    fs::write(&skips, text.replace(&before, &now)).unwrap();
+    let response = retire(&server, &batch_id).await;
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "retired", "{response}");
+    assert_eq!(retire["carried_rows"], json!([BOOKED]), "{response}");
+    let step = retire["next_step"].as_str().unwrap();
+    assert!(step.contains("carried_rows skipped"), "{step}");
+}
+
+/// A batch no other statement carries a row of is retired with none listed.
+#[tokio::test]
+async fn a_batch_no_statement_carries_is_retired_with_no_rows_listed() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    let response = retire(&server, &batch_id).await;
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "retired", "{response}");
+    assert_eq!(retire["carried_rows"], json!([]), "{response}");
+    assert_eq!(retire["next_step"], retire::RETIRED_STEP);
+}
+
+/// When the transfer facts cannot be read the retirement still stands, and the
+/// answer does not claim that no row is carried.
+#[tokio::test]
+async fn an_unreadable_view_retires_all_the_same_and_lists_nothing() {
+    use super::transfer_flow_tests::spoil_the_skip_file;
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server, batch_id) = built(directory.path(), book(true)).await;
+    spoil_the_skip_file(directory.path());
+    let response = retire(&server, &batch_id).await;
+    let retire = &response["structuredContent"]["result"]["retire"];
+    assert_eq!(retire["state"], "retired", "{response}");
+    assert!(retire.get("carried_rows").is_none(), "{response}");
+    assert_eq!(retire["carried_rows_state"], "not_established", "{response}");
+    assert_eq!(retire["next_step"], retire::RETIRED_UNKNOWN_STEP);
+    assert!(server.latest_import_snapshot(&batch_id).unwrap().unwrap().retired);
+}
+
+#[tokio::test]
+async fn if_absent_takes_one_value_and_no_proof_page() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(directory.path(), 9, true);
+    let page = server
+        .call_tool_response(
+            "verify_import",
+            json!({"company_guid": CAPTURED_GUID, "batch_id": "bridge-x",
+                "if_absent": "retire", "proof_sha256": "a".repeat(64)}),
+        )
+        .await
+        .value;
+    assert_eq!(error_code(&page), "argument_schema_invalid", "{page}");
+    let other = server
+        .call_tool_response(
+            "verify_import",
+            json!({"company_guid": CAPTURED_GUID, "batch_id": "bridge-x", "if_absent": "delete"}),
+        )
+        .await
+        .value;
+    assert_eq!(other["isError"], true, "{other}");
 }

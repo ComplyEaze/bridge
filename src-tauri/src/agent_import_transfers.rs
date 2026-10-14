@@ -544,7 +544,7 @@ impl Server {
     /// the newest record when one is given.
     ///
     /// `subject` and `withdrawn` are as for `ledger::transfer_facts_scoped`.
-    fn transfer_view_while_admitted(
+    pub(super) fn transfer_view_while_admitted(
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,

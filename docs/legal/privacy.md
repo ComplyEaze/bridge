@@ -88,7 +88,7 @@ Bridge's job is to give your AI Assistant the Tally Data it asks for. **Anything
 - the contents of any bank-statement PDF you ask Bridge to read; and
 - the location of files Bridge saves on your computer, which usually includes your computer user name.
 
-When Bridge reads a bank statement, it returns the last four digits of the statement's account number. It also writes the account label you give it into the narration of every voucher it prepares from the statement. That label carries at least those four digits, and for some banks the whole account number. These narrations are sent whenever your assistant reads them, unless you choose `drop_narration`.
+When Bridge reads a bank statement, it returns the last four digits of the statement's account number. It also writes the account label you give it into the narration of every voucher it prepares from the statement. That label carries at least those four digits, and can carry more of the account number or all of it, which some banks' statements require. These narrations are sent whenever your assistant reads them, unless you choose `drop_narration`.
 
 **Your AI Provider's own terms and privacy policy decide** how long it keeps this information, whether it uses it to train models, and who at the provider can see it. They also decide where it is processed, which may be outside India. These depend on the provider, and on the plan and settings you choose. Your AI Assistant may also keep its own records of conversations and results on your computer. Read your AI Provider's and AI Assistant's terms before you connect Bridge to real client books.
 
@@ -233,8 +233,8 @@ In the builds this version describes, Bridge does the following to reduce risk:
 
 - It connects to Tally only at an address on your computer, and refuses any other address, proxy or redirect.
 - The desktop app's window is not allowed to load anything from the internet.
-- **Posting is off by default in new installations.** If you upgraded from an earlier version, check the setting: an earlier default may still be saved as on.
-- When posting is on, each posting waits for your approval in a separate window on your computer.
+- **Posting is off by default in new installations.** In the Claude Desktop extension, the posting setting is new in 0.6.0 and starts off, so a choice saved under 0.5.1 or earlier does not carry over: turn it on again only if you want posting, which now includes batches of up to 50 vouchers. If you set `BRIDGE_AGENT_ENABLE_WRITES` yourself outside the extension, it carries over and now also allows batches.
+- When posting is on, each posting waits for your approval in a separate window on your computer; a batch of up to 50 vouchers is approved once, from its summary.
 - Bridge gives your AI Assistant no way to approve a posting. Software that can control your screen could still click the button, so do not let such software run while a posting is waiting.
 - An approval is used once, stays valid for at most 15 minutes after you give it, and is kept only in memory.
 - After posting, Bridge reads the voucher back from Tally to check what arrived.

@@ -143,8 +143,9 @@ These changes are in source and not yet in a published build.
   ComplyEaze Bridge does not recognise, is refused the same way. An amendment's vouchers are checked the same
   way. It is refused before its own check of the book, so its next step says that
   whether the earlier batch's vouchers are in the book was not checked, and has the assistant call `verify_import`
-  for that batch first: a voucher found in the book is corrected in Tally and never entered again, and for one
-  that is not found the user looks in Tally before deciding to enter it. A Journal that carries its own voucher number (one built for Tally's Import menu)
+  for that batch first: a voucher found in the book is never entered again, one that is not found is not built as a
+  new voucher either, and the vouchers of the refused voucher types are left out until ComplyEaze Bridge numbers vouchers
+  itself; no refusal sends anyone to enter a voucher in Tally. A Journal that carries its own voucher number (one built for Tally's Import menu)
   is checked by `build_import_xml` too: it is written into a voucher type that reads Manual, where Tally keeps the
   number and the type's duplicate setting decides, or Automatic with `Auto Retain`, where Tally discards the number
   and assigns the next, and it is refused otherwise under the same two codes. It is refused on a voucher type set

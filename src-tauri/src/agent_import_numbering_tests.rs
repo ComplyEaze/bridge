@@ -606,8 +606,8 @@ fn a_type_holding_numbered_and_numberless_vouchers_is_named_once() {
 /// What a person is shown where only the message is shown: each refused
 /// voucher type by name with what was read of it, every reading in its own
 /// words, and never Tally's own text for a reading that was not recognised;
-/// then what the person does. Where a refused type is set to renumber it also
-/// says what a hand entry was seen to do there, and not otherwise.
+/// then what the person can do inside ComplyEaze Bridge, never a hand entry
+/// in Tally.
 #[test]
 fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
     let automatic = |sub_method| {
@@ -688,10 +688,9 @@ fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
     assert!(!message.contains("<z>"), "{message}");
 
     const DOES_NEXT: [&str; 2] = [
-        "enter these vouchers in Tally's voucher entry screen yourself",
+        "leave them out of this batch and post the others",
         "Do not change a voucher type's voucher numbering only to post them",
     ];
-    const SEEN_BY_HAND: &str = "a voucher entered by hand with an earlier date was seen to change";
     let manual_only = admit_numbering(
         read_with_journal(observed(
             SeriesNumberingMethod::Manual,
@@ -705,32 +704,18 @@ fn the_message_names_each_refused_voucher_type_and_what_was_read_of_it() {
         assert!(message.contains(closing), "{closing}: {message}");
         assert!(manual_only.contains(closing), "{closing}: {manual_only}");
     }
-    assert!(message.contains(SEEN_BY_HAND), "{message}");
-    assert!(!manual_only.contains(SEEN_BY_HAND), "{manual_only}");
-
-    // Where the type's setting for existing numbers was not read, missing or
-    // not recognised, the message says a hand entry may change them; it says
-    // so of no other reading, and what was seen under renumber stays its own
-    // sentence.
-    const NOT_KNOWN: &str = "a hand entry may change existing voucher numbers";
-    assert!(message.contains(NOT_KNOWN), "{message}");
-    assert!(!manual_only.contains(NOT_KNOWN), "{manual_only}");
-    let only = |sub_method| {
-        admit_numbering(read_with_journal(automatic(sub_method)), ["Journal"])
-            .unwrap_err()
-            .message()
-    };
-    for not_read in [
-        NumberingSubMethod::Absent,
-        NumberingSubMethod::Unrecognised("x".to_string()),
-    ] {
-        let said = only(not_read.clone());
-        assert!(said.contains(NOT_KNOWN), "{not_read:?}: {said}");
-        assert!(!said.contains(SEEN_BY_HAND), "{not_read:?}: {said}");
+    // No refusal sends the person to Tally's own entry screen.
+    for said in [&message, &manual_only] {
+        for hand_entry in [
+            "entry screen",
+            "by hand",
+            "enter it",
+            "enter these",
+            "to enter",
+        ] {
+            assert!(!said.contains(hand_entry), "{hand_entry}: {said}");
+        }
     }
-    let renumber = only(NumberingSubMethod::AutoRenumber);
-    assert!(renumber.contains(SEEN_BY_HAND), "{renumber}");
-    assert!(!renumber.contains(NOT_KNOWN), "{renumber}");
 }
 
 /// The three next steps share what they say was read and seen, and differ in
@@ -755,8 +740,29 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
         post,
         crate::agent::refusal_remediation(NUMBERING_NOT_AUTOMATIC)
     );
-    for asks_for_a_hand_entry in [POST_NEXT_STEP, BUILD_NEXT_STEP] {
-        assert!(asks_for_a_hand_entry.contains("Ask the user to enter the vouchers"));
+    for step in [POST_NEXT_STEP, BUILD_NEXT_STEP, BUILD_AMENDMENT_NEXT_STEP] {
+        assert!(
+            step.contains("leave the vouchers of those voucher types out")
+                || step.contains("Leave the vouchers of those voucher types out"),
+            "{step}"
+        );
+        assert!(
+            step.contains("does not yet number vouchers itself"),
+            "{step}"
+        );
+        assert!(step.contains("a masters read of voucher_types"), "{step}");
+        // A step may record what a hand entry was seen to do (a measurement);
+        // none asks for one.
+        for hand_entry in [
+            "entry screen",
+            "enter it",
+            "enter these",
+            "to enter",
+            "Ask the user to enter",
+            "corrected in Tally",
+        ] {
+            assert!(!step.contains(hand_entry), "{hand_entry}: {step}");
+        }
     }
     // An amendment is refused before its book check: its step claims nothing
     // of the book and sends the caller to verify_import.
@@ -766,9 +772,9 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
         assert!(!build.contains("without a voucher number"), "{build}");
         assert!(build.contains("is also written into one read as Manual"));
     }
-    // A written file of a refused post is not to be imported by hand either;
-    // only the post's step can speak of one.
-    const NOT_BY_THE_MENU: &str = "imported through Tally's Import menu either";
+    // A written file of a refused post is not to be imported through the
+    // menu; only the post's step can speak of one.
+    const NOT_BY_THE_MENU: &str = "imported through Tally's Import menu";
     assert!(POST_NEXT_STEP.contains(NOT_BY_THE_MENU));
     assert!(!BUILD_NEXT_STEP.contains(NOT_BY_THE_MENU));
     // An amendment alters vouchers in place: its step says they are written
@@ -776,7 +782,6 @@ fn every_next_step_names_the_admitted_reading_and_the_import_that_renumbered() {
     // numbers them. The build of new vouchers says what was measured.
     assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Tally numbers"));
     assert!(BUILD_NEXT_STEP.contains("Tally numbers a voucher that carries no number"));
-    assert!(!BUILD_AMENDMENT_NEXT_STEP.contains("Ask the user to enter"));
     for stated in [
         "was not checked before this refusal",
         "Call verify_import",

@@ -724,6 +724,8 @@ enum Sibling {
     Absent,
     SentOnly,
     Found,
+    /// Found posted, then a later read did not find it.
+    FoundThenLost,
 }
 
 /// A never-sent batch holding a statement Contra; Tally holds a voucher of
@@ -747,7 +749,7 @@ async fn retire_beside(sibling: Sibling) -> Value {
     if !matches!(sibling, Sibling::Absent) {
         rig.server.append_import_ledger(&other).unwrap();
         let record = match sibling {
-            Sibling::Found => {
+            Sibling::Found | Sibling::FoundThenLost => {
                 other.status = "posted_verified".into();
                 ledger::StatusRecord::from(&other)
             }
@@ -757,6 +759,12 @@ async fn retire_beside(sibling: Sibling) -> Value {
         rig.server
             .append_import_record_while_admitted(&record)
             .unwrap();
+        if matches!(sibling, Sibling::FoundThenLost) {
+            other.status = "verification_incomplete".into();
+            rig.server
+                .append_import_record_while_admitted(&ledger::StatusRecord::from(&other))
+                .unwrap();
+        }
     }
     let (_simulator, server) = reading_from(
         directory.path(),
@@ -778,6 +786,10 @@ async fn a_content_match_is_credited_to_a_sibling_only_when_it_is_found() {
     let sent = retire_beside(Sibling::SentOnly).await;
     assert_eq!(sent["state"], "not_retired", "{sent}");
     assert_eq!(sent["reason"], "voucher_in_tally", "{sent}");
+    // found once and read not found since: not found now, so not credited
+    let lost = retire_beside(Sibling::FoundThenLost).await;
+    assert_eq!(lost["state"], "not_retired", "{lost}");
+    assert_eq!(lost["reason"], "voucher_in_tally", "{lost}");
     let alone = retire_beside(Sibling::Absent).await;
     assert_eq!(alone["state"], "not_retired", "{alone}");
     assert_eq!(alone["reason"], "voucher_in_tally", "{alone}");

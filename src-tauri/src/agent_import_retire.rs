@@ -184,7 +184,7 @@ impl Keep {
 ///
 /// No voucher carries the batch's own tag, and every voucher of the batch is
 /// either not found, or matches by content alone a voucher that a batch of
-/// another lineage, found posted, holds for the same statement row:
+/// another lineage, whose latest status is found posted, holds for the same statement row:
 /// that batch's own post accounts for the match, and it is not this batch's
 /// voucher. Anything else (a content match nothing accounts for, a voucher
 /// found by its tag, a duplicate) keeps the batch counting.

@@ -847,12 +847,13 @@ pub(super) fn rows_held_as_vouchers(
 }
 
 /// The statement rows among `rows` that a batch of the company holds as a
-/// voucher, of a lineage other than `own_lineage`, which was found posted. A
-/// voucher of Tally's matching one of those rows by content alone is that
-/// batch's, not the asker's. A batch that was only sent is not counted: Tally
-/// may have created nothing for it, and the match may be the asker's own. Each
-/// batch's latest full record decides what it holds. The whole journal is
-/// admitted on the way.
+/// voucher, of a lineage other than `own_lineage`, whose latest status is found
+/// posted. A voucher of Tally's matching one of those rows by content alone is
+/// that batch's, not the asker's. A batch that was only sent is not counted:
+/// Tally may have created nothing for it, and the match may be the asker's own.
+/// Nor is one found once and read not found since: its voucher may have been
+/// deleted, so what matches may be the asker's. Each batch's latest full record
+/// decides what it holds. The whole journal is admitted on the way.
 pub(super) fn other_lineage_holders(
     reader: impl BufRead,
     company_guid: &str,
@@ -860,7 +861,8 @@ pub(super) fn other_lineage_holders(
     rows: &BTreeSet<String>,
 ) -> Result<BTreeSet<String>, String> {
     let mut held: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let mut found = BTreeSet::new();
+    // each batch's latest status
+    let mut status: BTreeMap<String, String> = BTreeMap::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(batch) => {
             if batch.company_guid.eq_ignore_ascii_case(company_guid)
@@ -876,19 +878,21 @@ pub(super) fn other_lineage_holders(
                         .collect(),
                 );
             }
-            if batch.status == POSTED_VERIFIED {
-                found.insert(batch.batch_id.clone());
-            }
+            status.insert(batch.batch_id.clone(), batch.status.clone());
         }
         Record::Status(update) => {
-            if update.status == POSTED_VERIFIED {
-                found.insert(update.batch_id.clone());
+            if update.sets_status() {
+                status.insert(update.batch_id.clone(), update.status.clone());
             }
         }
     })?;
     Ok(held
         .into_iter()
-        .filter(|(id, _)| found.contains(id))
+        .filter(|(id, _)| {
+            status
+                .get(id)
+                .is_some_and(|status| status == POSTED_VERIFIED)
+        })
         .flat_map(|(_, rows)| rows)
         .collect())
 }

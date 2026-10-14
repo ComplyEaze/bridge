@@ -3328,7 +3328,13 @@ fn the_siblings_are_the_rows_a_found_batch_of_another_lineage_holds() {
     let other_company = build(145)
         .company(OTHER_COMPANY)
         .voucher(payment(&st(5), "500.00"));
+    // found once, then read not found: it no longer accounts for a match
+    let lost = build(146)
+        .voucher(payment(&st(6), "500.00"))
+        .status("posted_verified");
     let journal = Journal::default()
+        .batch(&lost)
+        .status(&lost, "verification_incomplete")
         .batch(&sent)
         .sent(&sent)
         .batch(&found)
@@ -3336,8 +3342,9 @@ fn the_siblings_are_the_rows_a_found_batch_of_another_lineage_holds() {
         .batch(&own_amendment)
         .batch(&other_company)
         .sent(&other_company);
-    let all = [1, 2, 3, 4, 5];
-    // asked by a batch of a lineage of its own: the rows a found batch holds
+    let all = [1, 2, 3, 4, 5, 6];
+    // asked by a batch of a lineage of its own: the rows a batch holds whose
+    // latest status is found posted
     // (the amendment's lineage is another lineage), not those of one only
     // sent, nor an unsent one, nor another company's
     assert_eq!(

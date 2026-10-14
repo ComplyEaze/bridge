@@ -1134,20 +1134,12 @@ impl Server {
                         // The transfer records again, between the check before the
                         // dialog and the intent: the approval is withdrawn and the
                         // next call gives the whole reason before asking.
-                        let checked = self
-                            .transfers_check_for_send_while_admitted(&current.batch)
-                            .map_err(BeforeDispatchError::Other)?;
-                        if let Some(refusal) = checked.refusal {
+                        if let Some(reason) = self
+                            .transfers_refusal_under_the_lock(&current.batch, &rechecked_retired)
+                            .map_err(BeforeDispatchError::Other)?
+                        {
                             return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
-                                refusal.reason(),
-                            )));
-                        }
-                        // A retired batch this decision now rests on that Tally was
-                        // not read for before the dialog: the retirement came in
-                        // meanwhile, and the next call reads for it.
-                        if checked.rests_on_a_batch_not_in(&rechecked_retired) {
-                            return Err(BeforeDispatchError::Refused(UnderLockRefusal::Transfers(
-                                "retired_batch_not_read_again",
+                                reason,
                             )));
                         }
                         // Before the approval is spent: a refusal here withdraws it,

@@ -1082,6 +1082,26 @@ impl Server {
         })
     }
 
+    /// Why a saved batch about to be dispatched is refused under the admission
+    /// lock, if it is: the transfer check refuses it, or its decision now rests
+    /// on a retired batch that Tally was not read for before the dialog (`read`
+    /// holds those that were), because a retirement came in meanwhile and the
+    /// next call reads for it.
+    pub(super) fn transfers_refusal_under_the_lock(
+        &self,
+        current: &ImportLedgerLine,
+        read: &BTreeSet<String>,
+    ) -> Result<Option<&'static str>, String> {
+        let checked = self.transfers_check_for_send_while_admitted(current)?;
+        if let Some(refusal) = checked.refusal {
+            return Ok(Some(refusal.reason()));
+        }
+        if checked.rests_on_a_batch_not_in(read) {
+            return Ok(Some("retired_batch_not_read_again"));
+        }
+        Ok(None)
+    }
+
     /// The section for the first page of a verification: computed after the
     /// verdict is persisted, under a shared admission lock, and never able to
     /// change the verdict or fail the call. Contention or any failure is

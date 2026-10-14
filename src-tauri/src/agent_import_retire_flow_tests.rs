@@ -1215,6 +1215,33 @@ async fn a_send_that_rests_on_two_retired_batches_reads_both_and_names_the_one_f
     assert!(retired.simulator.received() >= 3 * retired.retire_requests);
 }
 
+/// Under the admission lock the decision is judged again: a retired batch it now
+/// rests on that Tally was not read for before the dialog refuses it, and one
+/// that was read for does not.
+#[tokio::test]
+async fn under_the_lock_a_retired_batch_not_read_for_before_the_dialog_refuses_the_send() {
+    let directory = tempfile::tempdir().unwrap();
+    let retired =
+        withdrawn_skip_waits_on_retired_carriers(directory.path(), 2, |_| Vec::new()).await;
+    let line = retired
+        .sending
+        .latest_import_snapshot(&retired.held.withdrawn)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let _admission = retired.sending.lock_import_admission().unwrap();
+    let under_lock = |read: &[&String]| {
+        let read: BTreeSet<String> = read.iter().map(|id| id.to_string()).collect();
+        retired.sending.transfers_refusal_under_the_lock(&line, &read)
+    };
+    let (first, second) = (&retired.ids[0], &retired.ids[1]);
+    // Tally was read for neither, or for one of the two: refused
+    assert_eq!(under_lock(&[]), Ok(Some("retired_batch_not_read_again")));
+    assert_eq!(under_lock(&[first]), Ok(Some("retired_batch_not_read_again")));
+    // read for both: nothing refuses
+    assert_eq!(under_lock(&[first, second]), Ok(None));
+}
+
 /// Three retired batches are within what a send reads for: all three are read,
 /// none is found, and the send goes on to what comes after.
 #[tokio::test]

@@ -399,8 +399,8 @@ cost collections must carry the `MSTDEPTYPE` Tally printed on every captured ans
 (32 for centres, 16 for categories), or the read is refused as
 `masters_collection_type_unexpected`, so an empty answer that was not resolved to the
 type asked for is not read as "none defined". Under `mask_parties` the names of cost centres and categories, a cost centre's parent
-and a cost centre's category are masked, as godown and stock-group names are. ComplyEaze Bridge does not return how a voucher was allocated to a cost centre: no tool
-reads those allocations yet. A `groups` row carries `name`,
+and a cost centre's category are masked, as godown and stock-group names are. How a voucher's entries were allocated to cost centres is read with the voucher reads
+("Cost-centre allocations in voucher reads" below), not by this tool. A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
 `trial_balance`. Alias names are not returned.
@@ -1034,7 +1034,8 @@ or vouchers.
   is. Reverse-charge journals, imports and input service distribution get no special treatment.
 - **Tax comes only from the GST duty head on the ledger master.** An entry on a
   ledger with a recognised head is listed in `tax_in_books` as
-  `{ledger, head, raw_head, amount}`. An entry on a Duties & Taxes ledger with
+  `{ledger, head, raw_head, amount}` (each entry also carries what the vouchers read carries on it, among it
+  `cost_centre_allocations`, with the cost-centre and category names masked as `vouchers` masks them). An entry on a Duties & Taxes ledger with
   no GST head is listed in `duties_taxes_entries_without_gst_head` and is never
   assigned one. Its `observation` says which case it is: `not_tax_ledger` is a
   ledger whose own tax type is not GST (usually TDS or another payable), and
@@ -1653,11 +1654,22 @@ own amount.
   `cost_centre_allocations_unreadable` with one reason, and no partial list; the rest of the response is unchanged.
   The reasons: `cost_centre_name_missing`, `cost_centre_amount_missing` (an empty amount is never read as zero),
   `cost_centre_amount_unparsable`, `cost_centre_duplicate` (one centre named twice in one category),
-  `cost_category_missing`, `cost_category_without_centres`, `cost_centre_field_duplicated` and
-  `cost_centre_text_undecodable`.
+  `cost_category_missing`, `cost_category_without_centres`, `cost_category_present_but_empty`,
+  `cost_centre_field_duplicated` and `cost_centre_text_undecodable`.
+- Names are carried trimmed; the amount is carried exactly as Tally sent it (an amount with space around it is
+  refused as `cost_centre_amount_unparsable`, as the entry's own amount would be). Under `mask_parties` the category and
+  cost-centre names are masked like a party name (as the masters read masks the same names); the amounts are sent.
+- An empty `CATEGORYALLOCATIONS.LIST` is not read as "no allocations": the entry carries
+  `cost_category_present_but_empty`. No capture of the vouchers read shows an empty container; the empty containers on
+  record are in import-verification reads, whose fetch does not ask for the allocation's fields, and there stood for
+  a real allocation.
+- A repeated child of a category or centre (a list included) reads as `cost_centre_field_duplicated`; no capture
+  shows one.
 - No request changed: the allocations were already in the answers the read asks for, and were dropped.
-- Like the bill allocations above, this reaches every reader that shares the voucher parser and whose fetch asks for the
-  entry wildcard; `ledger_movement`, whose fetch names three entry fields, never carries it.
+- It reaches the readers that return a voucher's entries from this parser: the vouchers read (and its search) and
+  the entries the purchase and sales registers list; each marks the two names the same way, so `mask_parties` masks
+  them in all of them (`changed_since` marks them too, but every call to it is refused before Tally is asked). The presence, bill-trail and summary reads, `verify_import` and
+  `ledger_movement` do not return them (`ledger_movement`'s fetch names three entry fields).
 
 ## Voucher-file preparation and verification
 

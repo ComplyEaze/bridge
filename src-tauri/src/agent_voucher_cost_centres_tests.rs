@@ -170,22 +170,123 @@ fn a_named_category_with_no_centre_is_unreadable_not_dropped() {
 }
 
 #[test]
-fn an_empty_container_is_the_placeholder_and_adds_nothing() {
+fn an_empty_container_is_present_but_not_observed_never_silence() {
+    // No capture shows an entry with an empty container; the one on record (the
+    // import-verification read, whose fetch does not ask for the fields) stood for a
+    // real allocation. So it is not read as "no allocations".
     let xml = captured();
     let first = xml.find("<CATEGORYALLOCATIONS.LIST>").unwrap();
     let close = "</CATEGORYALLOCATIONS.LIST>";
     let last = xml.find(close).unwrap() + close.len();
-    for placeholder in [
+    for empty in [
         "<CATEGORYALLOCATIONS.LIST>      </CATEGORYALLOCATIONS.LIST>",
         "<CATEGORYALLOCATIONS.LIST/>",
     ] {
-        let emptied = format!("{}{}{}", &xml[..first], placeholder, &xml[last..]);
-        let rows = parse(&emptied);
-        let entry = &rows[0]["amounts"][0];
-        assert!(entry.get(COSTCENTRE_FIELD).is_none());
-        assert!(entry.get(UNREADABLE_FIELD).is_none());
-        assert_only_the_allocations_differ(&rows);
+        let emptied = format!("{}{}{}", &xml[..first], empty, &xml[last..]);
+        assert_unreadable(&emptied, "cost_category_present_but_empty");
     }
+}
+
+fn first_category_block(xml: &str) -> (usize, usize) {
+    let first = xml.find("<CATEGORYALLOCATIONS.LIST>").unwrap();
+    let close = "</CATEGORYALLOCATIONS.LIST>";
+    (first, xml.find(close).unwrap() + close.len())
+}
+
+#[test]
+fn two_categories_on_one_entry_and_one_centre_name_under_two_categories_are_read() {
+    let xml = captured();
+    let (first, end) = first_category_block(&xml);
+    let block = &xml[first..end];
+    let second = block.replace("Business Line", "Other Line");
+    let doubled = format!("{}{}{}{}", &xml[..end], &second, "", &xml[end..]);
+    let rows = parse(&doubled);
+    let entry = &rows[0]["amounts"][0];
+    assert!(entry.get(UNREADABLE_FIELD).is_none(), "{entry}");
+    // The same centre names under another category are not duplicates.
+    assert_eq!(
+        entry[COSTCENTRE_FIELD],
+        json!([
+            {"category": "Business Line", "cost_centre": "Trading", "amount": "-600.00"},
+            {"category": "Business Line", "cost_centre": "Assembly", "amount": "-400.00"},
+            {"category": "Other Line", "cost_centre": "Trading", "amount": "-600.00"},
+            {"category": "Other Line", "cost_centre": "Assembly", "amount": "-400.00"},
+        ])
+    );
+}
+
+#[test]
+fn a_second_entry_that_carries_allocations_is_read_on_its_own() {
+    let xml = captured();
+    let (first, end) = first_category_block(&xml);
+    let block = xml[first..end]
+        .replace("Trading", "Retail")
+        .replace("Assembly", "Repair");
+    let close = "</ALLLEDGERENTRIES.LIST>";
+    let second_close = xml.rfind(close).unwrap();
+    let both = format!("{}{}{}", &xml[..second_close], block, &xml[second_close..]);
+    let rows = parse(&both);
+    assert_eq!(
+        rows[0]["amounts"][0][COSTCENTRE_FIELD][0]["cost_centre"],
+        "Trading"
+    );
+    assert_eq!(
+        rows[0]["amounts"][1][COSTCENTRE_FIELD],
+        json!([
+            {"category": "Business Line", "cost_centre": "Retail", "amount": "-600.00"},
+            {"category": "Business Line", "cost_centre": "Repair", "amount": "-400.00"},
+        ])
+    );
+    assert!(rows[0]["amounts"][1].get(UNREADABLE_FIELD).is_none());
+}
+
+#[test]
+fn a_name_that_cannot_be_decoded_is_unreadable_and_a_cdata_name_is_read() {
+    assert_unreadable(
+        &changed("<NAME>Trading</NAME>", "<NAME>Trad&bogus;ing</NAME>"),
+        "cost_centre_text_undecodable",
+    );
+    let rows = parse(&changed(
+        "<NAME>Trading</NAME>",
+        "<NAME><![CDATA[Trading]]></NAME>",
+    ));
+    assert_eq!(
+        rows[0]["amounts"][0][COSTCENTRE_FIELD],
+        parse(&captured())[0]["amounts"][0][COSTCENTRE_FIELD]
+    );
+}
+
+#[test]
+fn names_are_trimmed_and_the_amount_is_exactly_as_sent() {
+    let rows = parse(&changed(
+        "<NAME>Trading</NAME>",
+        "<NAME>  Trading \r\n</NAME>",
+    ));
+    assert_eq!(
+        rows[0]["amounts"][0][COSTCENTRE_FIELD][0]["cost_centre"],
+        "Trading"
+    );
+    // The amount is not trimmed: a padded one is refused as the entry's own amount
+    // would be, so what is carried is exactly what Tally sent.
+    assert_unreadable(
+        &changed("<AMOUNT>-600.00</AMOUNT>", "<AMOUNT> -600.00</AMOUNT>"),
+        "cost_centre_amount_unparsable",
+    );
+}
+
+#[test]
+fn under_mask_parties_no_raw_cost_centre_or_category_name_is_left() {
+    let rows = parse(&captured());
+    let marked: Vec<Value> = rows.into_iter().map(mark_voucher_party_names).collect();
+    let masked = redact_value(Value::Array(marked.clone()), Redaction::MaskParties).to_string();
+    for name in ["Trading", "Assembly", "Business Line"] {
+        assert!(!masked.contains(name), "{name} left in {masked}");
+    }
+    // The amounts are not names and stay.
+    assert!(masked.contains("-600.00") && masked.contains("-400.00"));
+    // Unmasked, the names are there.
+    let plain = redact_value(Value::Array(marked), Redaction::None).to_string();
+    assert!(plain.contains("Trading") && plain.contains("Business Line"));
 }
 
 #[test]

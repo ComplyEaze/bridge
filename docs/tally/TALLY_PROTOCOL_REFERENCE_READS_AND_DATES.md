@@ -695,11 +695,13 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   (`Trading` -600.00 and `Assembly` -400.00, which add up to the entry's -1000.00), `PAYHEADSORTORDER` and
   `EMPLOYEESORTORDER` (0, 0) and empty `ACTUALQTY` and `BILLEDQTY`.
 - **An entry without allocations has no `CATEGORYALLOCATIONS.LIST` element at all** in this read (the other entry of the
-  voucher; it carries bill-allocation elements instead). No empty container was observed.
+  voucher; both entries carry a `BILLALLOCATIONS.LIST`, the first one empty). No empty container was observed in this read. Two captured import-verification reads (whose fetch does not ask for
+  allocation fields) hold an empty container on an entry; the parser reports that as present and not observed.
 - **What the tool returns.** An entry with allocations gains `cost_centre_allocations`, a list of
-  `{category, cost_centre, amount}` as sent; an entry without them has no such key. An allocation list that cannot be read
+  `{category, cost_centre, amount}` as sent (names trimmed, the amount as sent); an entry without them has no such key. An allocation list that cannot be read
   whole (a centre with no name or no amount, an amount that is not a decimal, a centre named twice in one category, a
-  category without a name or a field sent twice) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
+  category without a name, a field sent twice, or an empty container, which is reported as present and not observed, never as
+  no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
   with a reason and the rest of the response is unchanged. An empty amount is never read as zero.
 - **Not shown.** Several categories on one entry; a centre with a parent; quantities; a foreign-currency amount; an
   allocation on a book whose Cost Centres setting is Yes; a read of a different voucher type; another release or book;

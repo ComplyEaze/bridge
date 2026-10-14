@@ -25,6 +25,7 @@ pub(in crate::agent) enum CostCentreProblem {
     CentresMissing,
     FieldDuplicated,
     TextUndecodable,
+    CategoryEmpty,
 }
 
 impl CostCentreProblem {
@@ -38,6 +39,7 @@ impl CostCentreProblem {
             Self::CentresMissing => "cost_category_without_centres",
             Self::FieldDuplicated => "cost_centre_field_duplicated",
             Self::TextUndecodable => "cost_centre_text_undecodable",
+            Self::CategoryEmpty => "cost_category_present_but_empty",
         }
     }
 }
@@ -184,12 +186,16 @@ impl CostCentreCollector {
             .get("CATEGORY")
             .is_some_and(|value| !value.trim().is_empty());
         if self.category_centres == 0 {
-            // A container with nothing in it is the placeholder Tally prints for an
-            // entry without allocations. A named category with no centre is a shape
-            // no capture shows: say so rather than drop it.
-            if named {
-                self.note(CostCentreProblem::CentresMissing);
-            }
+            // Neither shape is in a capture: an entry without allocations has no
+            // container at all there, and the one empty container on record (the
+            // import-verification read, whose fetch does not ask for the fields) stood
+            // for a real allocation. So an empty container is not read as "no
+            // allocations": the entry says the container was present and not observed.
+            self.note(if named {
+                CostCentreProblem::CentresMissing
+            } else {
+                CostCentreProblem::CategoryEmpty
+            });
             return;
         }
         if !named {

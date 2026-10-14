@@ -1094,10 +1094,7 @@ fn a_decision_rests_on_the_retired_batches_that_refuse_it_alone_or_all_together(
         (names(&["a", "b", "c"]), 4)
     );
     // counting them changes nothing
-    assert_eq!(
-        rests_on(&["a", "b"], &|_| false),
-        (names(&[]), 3)
-    );
+    assert_eq!(rests_on(&["a", "b"], &|_| false), (names(&[]), 3));
     // a failure to judge is the caller's
     assert_eq!(
         batches_a_decision_rests_on(&names(&["a"]), |_| Err("import_ledger_invalid".into())),

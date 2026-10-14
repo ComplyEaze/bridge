@@ -1070,9 +1070,8 @@ impl Server {
             }
             None => BTreeSet::new(),
         };
-        let rests_on = batches_a_decision_rests_on(&retired, |counted| {
-            Ok(refuses(judge(counted)?))
-        })?;
+        let rests_on =
+            batches_a_decision_rests_on(&retired, |counted| Ok(refuses(judge(counted)?)))?;
         if rests_on.len() > MAX_RECHECKED_RETIRED {
             return Ok(SendCheck::refused(too_many_retired_batches(&rests_on)));
         }

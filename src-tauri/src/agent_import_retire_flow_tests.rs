@@ -1232,12 +1232,17 @@ async fn under_the_lock_a_retired_batch_not_read_for_before_the_dialog_refuses_t
     let _admission = retired.sending.lock_import_admission().unwrap();
     let under_lock = |read: &[&String]| {
         let read: BTreeSet<String> = read.iter().map(|id| id.to_string()).collect();
-        retired.sending.transfers_refusal_under_the_lock(&line, &read)
+        retired
+            .sending
+            .transfers_refusal_under_the_lock(&line, &read)
     };
     let (first, second) = (&retired.ids[0], &retired.ids[1]);
     // Tally was read for neither, or for one of the two: refused
     assert_eq!(under_lock(&[]), Ok(Some("retired_batch_not_read_again")));
-    assert_eq!(under_lock(&[first]), Ok(Some("retired_batch_not_read_again")));
+    assert_eq!(
+        under_lock(&[first]),
+        Ok(Some("retired_batch_not_read_again"))
+    );
     // read for both: nothing refuses
     assert_eq!(under_lock(&[first, second]), Ok(None));
 }

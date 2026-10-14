@@ -846,7 +846,8 @@ fn the_proofs_of_a_batchs_verifications_are_listed_once_each_in_order() {
     incomplete.status = "verification_incomplete".into();
     let first = ledger::ProofName::of(b"first", chrono::Utc::now());
     let second = ledger::ProofName::of(b"second", chrono::Utc::now());
-    let record_of = |name: &ledger::ProofName| ledger::StatusRecord::verified(&incomplete, name.clone());
+    let record_of =
+        |name: &ledger::ProofName| ledger::StatusRecord::verified(&incomplete, name.clone());
     let text = format!(
         "{}{}{}{}{}",
         record(&line),
@@ -855,8 +856,8 @@ fn the_proofs_of_a_batchs_verifications_are_listed_once_each_in_order() {
         record(record_of(&second)),
         record(record_of(&first)),
     );
-    let proofs = ledger::verification_proofs(std::io::Cursor::new(text.as_bytes()), &line.batch_id)
-        .unwrap();
+    let proofs =
+        ledger::verification_proofs(std::io::Cursor::new(text.as_bytes()), &line.batch_id).unwrap();
     assert_eq!(
         proofs,
         [
@@ -865,11 +866,17 @@ fn the_proofs_of_a_batchs_verifications_are_listed_once_each_in_order() {
         ]
     );
     // another batch's verifications are not listed
-    assert!(ledger::verification_proofs(std::io::Cursor::new(text.as_bytes()), "other")
-        .unwrap()
-        .is_empty());
+    assert!(
+        ledger::verification_proofs(std::io::Cursor::new(text.as_bytes()), "other")
+            .unwrap()
+            .is_empty()
+    );
     // an older build's record names the legacy file
-    let legacy = format!("{}{}", record(&line), record(ledger::StatusRecord::from(&incomplete)));
+    let legacy = format!(
+        "{}{}",
+        record(&line),
+        record(ledger::StatusRecord::from(&incomplete))
+    );
     assert_eq!(
         ledger::verification_proofs(std::io::Cursor::new(legacy.as_bytes()), &line.batch_id)
             .unwrap(),
@@ -896,8 +903,11 @@ fn the_proofs_of_a_batchs_verifications_are_listed_once_each_in_order() {
         Some(second)
     );
     assert_eq!(
-        ledger::retirement_proof(std::io::Cursor::new(record(&line).as_bytes()), &line.batch_id)
-            .unwrap(),
+        ledger::retirement_proof(
+            std::io::Cursor::new(record(&line).as_bytes()),
+            &line.batch_id
+        )
+        .unwrap(),
         None
     );
 }

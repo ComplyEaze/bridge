@@ -2220,7 +2220,9 @@ impl Server {
         };
         for proof in &proofs {
             let unreadable = || "import_retire_proof_unreadable".to_string();
-            let bytes = self.read_proof_file(batch_id, proof).map_err(|_| unreadable())?;
+            let bytes = self
+                .read_proof_file(batch_id, proof)
+                .map_err(|_| unreadable())?;
             let saved: Value = serde_json::from_slice(&bytes).map_err(|_| unreadable())?;
             let Some(rows) = saved["vouchers"].as_array() else {
                 return Err(unreadable().into());

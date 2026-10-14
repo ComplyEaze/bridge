@@ -1242,7 +1242,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "reconcile, name absent",
         judged(&judgement(ReconciliationRequired, false, false, true), r),
         verify::NEXT_ABSENT_NOT_SETTLED,
-        true,
+        false,
         false,
     );
     row(
@@ -1321,7 +1321,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             false,
         ),
         &format!("{} {not_recorded}", verify::NEXT_ABSENT_NOT_SETTLED),
-        true,
+        false,
         false,
     );
     row(
@@ -1567,7 +1567,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             row.path
         );
     }
-    assert_eq!(rows.iter().filter(|row| row.may_key_by_hand).count(), 2);
+    assert_eq!(rows.iter().filter(|row| row.may_key_by_hand).count(), 0);
 }
 
 /// The README and the tool description of `post_ledger_creates` say the same
@@ -1837,12 +1837,12 @@ fn the_hand_key_step_appears_only_for_a_read_that_found_the_name_absent_and_did_
                         let step = judged_next_step(&judgement, moment);
                         let label =
                             format!("{state:?} {moment:?} {absent} {found} {scope_changed}");
-                        let hand = step == verify::NEXT_ABSENT_NOT_SETTLED;
+                        let absent_open = step == verify::NEXT_ABSENT_NOT_SETTLED;
                         let expected = state == MasterVerdictState::ReconciliationRequired
                             && moment == Moment::Reconcile
                             && absent
                             && !scope_changed;
-                        assert_eq!(hand, expected, "{label}");
+                        assert_eq!(absent_open, expected, "{label}");
                         seen.insert(step);
                     }
                 }
@@ -1937,16 +1937,17 @@ fn the_hand_key_step_appears_only_for_a_read_that_found_the_name_absent_and_did_
             settled_next_step(state)
         );
     }
-    // Of every step any of them gives, one tells the person to key it by hand,
-    // and it carries the warning that comes with that.
-    let by_hand = seen
-        .iter()
-        .filter(|step| step.contains("create it in Tally by hand"))
-        .collect::<Vec<_>>();
-    assert_eq!(by_hand, [&verify::NEXT_ABSENT_NOT_SETTLED]);
-    let warned = verify::NEXT_ABSENT_NOT_SETTLED;
-    assert!(warned.contains("idle and answering") && warned.contains("overwrite"));
-    assert!(warned.contains("would overwrite a ledger keyed by hand"));
+    // No step any of them gives tells the person to create or key the ledger
+    // by hand; the open absent state says the name stays held and what a later
+    // call shows.
+    for step in &seen {
+        for hand in ["create it in Tally by hand", "keyed by hand", "Keying it by hand"] {
+            assert!(!step.contains(hand), "{step}");
+        }
+    }
+    let open = verify::NEXT_ABSENT_NOT_SETTLED;
+    assert!(open.contains("cannot settle it now") && open.contains("held"));
+    assert!(open.contains("shows whether a ledger of this name now exists"));
 }
 
 /// Records an intent for `batch` as an earlier call would have.
@@ -4296,7 +4297,7 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
 async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appeared() {
     // The mark of the target moved since the intent: not absent, a doubt.
     for (target, other, held, expect, next_step) in [
-        // Read, the name absent, and not settled: the one hand-key step.
+        // Read, the name absent, and not settled: the name stays held.
         (
             8,
             3,

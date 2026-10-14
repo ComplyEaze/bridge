@@ -2011,11 +2011,12 @@ and judges it. A book whose set of loaded companies changed is read and judged:
 the answer is `reconciliation_required` with `company_scope_changed` among its
 reasons, and it says to load the same companies and call again; a read that shows
 a changed existing master or another company's mark moved keeps the state for
-that. Only a read-back that read the book,
-found the name absent and did not settle says to create the ledger in Tally by
-hand, and then it says to look at what else changed and to make sure Tally is idle
-and answering first, because a create still waiting in Tally would overwrite a
-ledger keyed by hand; keying it may not settle the batch. An unconfirmed answer
+that. A read-back that read the book,
+found the name absent and did not settle says that ComplyEaze Bridge cannot settle
+the batch now, because a create it sent may still be waiting in Tally; the name
+stays held, and a later call sends nothing, reads the book back, shows whether a
+ledger of the name now exists and judges one that has appeared. No answer tells the
+person to create the ledger in Tally by hand. An unconfirmed answer
 and the answer given when the book could not be read back after Tally answered
 say to call again later, which only reads, and to create nothing in Tally by hand
 meanwhile. A failure answer that says the create may have been sent says the same.

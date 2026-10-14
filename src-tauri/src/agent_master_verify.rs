@@ -46,8 +46,9 @@ pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger o
 pub(super) const NEXT_SEND_NOT_KNOWN: &str = "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.";
 pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again later to read it back (it sends nothing), or look at the company's ledgers in Tally. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it. Never post this batch again.";
 /// The read-back found no ledger of this name, and the outcome is still open.
-/// The only step that tells the person to create the ledger by hand.
-pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, but the outcome of this batch is not settled. If the ledger is still needed, first look in Tally for what else changed in this company's masters (see the reasons), and make sure Tally is idle and answering; then create it in Tally by hand. A create ComplyEaze Bridge sent that is still waiting in Tally would overwrite a ledger keyed by hand. Keying it by hand may not settle this batch, and ComplyEaze Bridge will not create this ledger name again, in any company this data folder holds batches for, while it stays open. Never post this batch again.";
+/// A read that found the name absent and did not settle: nothing more can be
+/// settled now, and the name stays held.
+pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, and the outcome of this batch is not settled (see the reasons). ComplyEaze Bridge cannot settle it now: a create it sent may still be waiting in Tally. While the batch stays open, ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for, and will not create it again. Calling post_ledger_creates with this batch_id again sends nothing: it reads the book back, shows whether a ledger of this name now exists, and judges one that has appeared. Never post this batch again.";
 /// A ledger of this name is in the book and the read-back could not verify it.
 pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
 /// The book was not compared: the batch's company is not loaded, was renamed,
@@ -90,9 +91,8 @@ pub(super) fn settled_next_step(state: MasterVerdictState) -> &'static str {
     }
 }
 
-/// What a caller does next, by what the read-back judged. Only a read that
-/// found the name absent and did not settle says the ledger may be created by
-/// hand; a state that was not read, or that holds a ledger, never does.
+/// What a caller does next, by what the read-back judged. No step tells the
+/// person to create the ledger in Tally by hand.
 pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'static str {
     if judgement.state != MasterVerdictState::ReconciliationRequired {
         return settled_next_step(judgement.state);

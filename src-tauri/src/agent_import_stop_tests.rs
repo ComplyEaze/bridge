@@ -540,7 +540,7 @@ fn a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable() {
             (
                 "not_established".to_string(),
                 "invoice_rows_repeated".to_string(),
-                "not established: more than one voucher was read as this invoice".to_string()
+                "not established: the read gave this invoice more than one row".to_string()
             ),
             "{rows}"
         );

@@ -56,8 +56,10 @@ pub(super) struct Why {
 /// cannot be placed, never a sighting.
 const ROWS_MISSING: &str = "import_verification_rows_missing";
 
-/// A completed read holding more than one row for the batch's one invoice:
-/// none can be told to be it.
+/// A completed read holding more than one row for the batch's one invoice.
+/// The verification writes one row per voucher the batch expects (several
+/// vouchers matching one are `duplicate_fingerprint`), so this is a batch or
+/// a result out of shape, and no row can be told to be the invoice's.
 const ROWS_REPEATED: &str = "invoice_rows_repeated";
 
 impl Seen {
@@ -85,7 +87,7 @@ impl Seen {
             [..] => {
                 return Self::NotEstablished(Why {
                     status: ROWS_REPEATED.into(),
-                    words: "not established: more than one voucher was read as this invoice".into(),
+                    words: "not established: the read gave this invoice more than one row".into(),
                 })
             }
         };

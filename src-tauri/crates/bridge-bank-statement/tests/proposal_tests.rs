@@ -12,8 +12,8 @@ use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::parse::Row;
 use bridge_bank_statement::proposals::{
-    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Disposition,
-    Side, StatementRecord, VoucherType,
+    build, group_counterparties, is_statement_txn_id, selfcheck, Build, BuildOptions, Direction,
+    Disposition, Side, StatementRecord, VoucherType,
 };
 use common::*;
 
@@ -527,6 +527,8 @@ fn record(party: &str, amount: &str) -> StatementRecord {
         bridge_txn_id: "st-x".to_string(),
         cash_movement: None,
         cash_answer: None,
+        direction: Direction::Inflow,
+        reversed_same_day: false,
     }
 }
 

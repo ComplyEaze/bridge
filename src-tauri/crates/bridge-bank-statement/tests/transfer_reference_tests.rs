@@ -7,14 +7,9 @@ use bridge_bank_statement::bank::Bank;
 use common::*;
 
 /// `(narration, printed reference column, mode Bank::reference names, expected transfer reference)`.
-type Case = (
-    &'static str,
-    &'static str,
-    &'static str,
-    Option<&'static str>,
-);
+type Case<'a> = (&'a str, &'a str, &'static str, Option<&'a str>);
 
-fn check(bank: Bank, cases: &[Case]) {
+fn check(bank: Bank, cases: &[Case<'_>]) {
     for (narration, printed, mode, expected) in cases {
         let row = row(&[("narr", narration), ("ref", printed), ("chq", printed)]);
         // the case really is the mode it claims, so a change in the parser cannot
@@ -35,58 +30,73 @@ fn sbi_admits_only_network_transfers() {
         &[
             // UPI: twelve digits once spaces are gone, and the VPA tail dropped
             (
-                "UPI/DR/600000000001/ACME/ZZZZ/nw@okzz/Payment",
+                &format!("UPI/DR/{}/ACME/ZZZZ/nw@okzz/Payment", p6(1, 12)),
                 "",
                 "UPI",
-                Some("600000000001"),
+                Some(p6(1, 12).as_str()),
             ),
             (
-                "UPI/CR/6000 0000 0002/ACME/ZZZZ/nw@okzz/Payment",
+                &format!("UPI/CR/{}/ACME/ZZZZ/nw@okzz/Payment", grp(&p6(2, 12))),
                 "",
                 "UPI",
-                Some("600000000002"),
+                Some(p6(2, 12).as_str()),
             ),
-            ("UPI/DR/60000000001/ACME/ZZZZ/nw@okzz/P", "", "UPI", None),
-            ("UPI/DR/6000000000011/ACME/ZZZZ/nw@okzz/P", "", "UPI", None),
-            ("UPI/DR/000000000000/ACME/ZZZZ/nw@okzz/P", "", "UPI", None),
+            (
+                &format!("UPI/DR/{}/ACME/ZZZZ/nw@okzz/P", p6(1, 11)),
+                "",
+                "UPI",
+                None,
+            ),
+            (
+                &format!("UPI/DR/{}/ACME/ZZZZ/nw@okzz/P", p6(11, 13)),
+                "",
+                "UPI",
+                None,
+            ),
+            (
+                &format!("UPI/DR/{}/ACME/ZZZZ/nw@okzz/P", padn(0, 12)),
+                "",
+                "UPI",
+                None,
+            ),
             // IMPS
             (
-                "IMPS/600000000003/ACME/NOTE",
+                &format!("IMPS/{}/ACME/NOTE", p6(3, 12)),
                 "",
                 "IMPS",
-                Some("600000000003"),
+                Some(p6(3, 12).as_str()),
             ),
             (
-                "IMPS/6000 0000 0004/ACME/NOTE",
+                &format!("IMPS/{}/ACME/NOTE", grp(&p6(4, 12))),
                 "",
                 "IMPS",
-                Some("600000000004"),
+                Some(p6(4, 12).as_str()),
             ),
-            ("IMPS/60000000003/ACME/NOTE", "", "IMPS", None),
-            ("IMPS/000000000000/ACME/NOTE", "", "IMPS", None),
+            (&format!("IMPS/{}/ACME/NOTE", p6(3, 11)), "", "IMPS", None),
+            (&format!("IMPS/{}/ACME/NOTE", padn(0, 12)), "", "IMPS", None),
             // NEFT and RTGS, by either printed shape
             (
-                "NEFT*ZZZZ0000001*ZZZZZ00000000001*ACME",
+                &format!("NEFT*ZZZZ0000001*ZZZZZ{}*ACME", padn(1, 11)),
                 "",
                 "NEFT",
-                Some("ZZZZZ00000000001"),
+                Some(format!("ZZZZZ{}", padn(1, 11)).as_str()),
             ),
             (
-                "UTR NO: ZZZZZ00000000002-ACME",
+                &format!("UTR NO: ZZZZZ{}-ACME", padn(2, 11)),
                 "",
                 "NEFT",
-                Some("ZZZZZ00000000002"),
+                Some(format!("ZZZZZ{}", padn(2, 11)).as_str()),
             ),
             (
-                "RTGS UTR NO: ZZZZZ00000000003-ACME",
+                &format!("RTGS UTR NO: ZZZZZ{}-ACME", padn(3, 11)),
                 "",
                 "RTGS",
-                Some("ZZZZZ00000000003"),
+                Some(format!("ZZZZZ{}", padn(3, 11)).as_str()),
             ),
             ("UTR NO: AB-ACME", "", "NEFT", None),
             ("UTR NO: INTERNATIONAL-ACME", "", "NEFT", None),
             // everything else
-            ("ATM CASH 600000000005 ZZ", "", "ATM", None),
+            (&format!("ATM CASH {} ZZ", p6(5, 12)), "", "ATM", None),
             ("TRANSFER FROM X", "CT0ZZZ0001 TRANSFER", "INB", None),
             ("CHEQUE PAID", "TRANSFER/ 000417", "CHQ", None),
             ("INT TRF TO 12345", "", "INT-TRF", None),
@@ -101,37 +111,62 @@ fn hdfc_admits_only_network_transfers() {
         Bank::Hdfc,
         &[
             (
-                "UPI-ACME-9@x-ABCD0001-600000000001-P",
+                &format!("UPI-ACME-9@x-ABCD0001-{}-P", p6(1, 12)),
                 "1",
                 "UPI",
-                Some("600000000001"),
+                Some(p6(1, 12).as_str()),
             ),
-            ("UPI-ACME-9@x-ABCD0001-6000000000011-P", "1", "UPI", None),
-            ("UPI-ACME-9@x-ABCD0001-000000000000-P", "1", "UPI", None),
             (
-                "IMPS-600000000003-ACME-ABCD-NOTE",
+                &format!("UPI-ACME-9@x-ABCD0001-{}-P", p6(11, 13)),
+                "1",
+                "UPI",
+                None,
+            ),
+            (
+                &format!("UPI-ACME-9@x-ABCD0001-{}-P", padn(0, 12)),
+                "1",
+                "UPI",
+                None,
+            ),
+            (
+                &format!("IMPS-{}-ACME-ABCD-NOTE", p6(3, 12)),
                 "1",
                 "IMPS",
-                Some("600000000003"),
+                Some(p6(3, 12).as_str()),
             ),
-            ("IMPS-60000000003-ACME-ABCD-NOTE", "1", "IMPS", None),
-            ("IMPS-000000000000-ACME-ABCD-NOTE", "1", "IMPS", None),
+            (
+                &format!("IMPS-{}-ACME-ABCD-NOTE", p6(3, 11)),
+                "1",
+                "IMPS",
+                None,
+            ),
+            (
+                &format!("IMPS-{}-ACME-ABCD-NOTE", padn(0, 12)),
+                "1",
+                "IMPS",
+                None,
+            ),
             // HDFC's NEFT value is the narration's last field, which can be a
             // remark, or the reference column, which cannot hold a long UTR:
             // neither is admitted until a real statement shows the UTR's place.
             (
-                "NEFT DR-ABCD0001234-ACME INDUSTRIES-ZZZZZ00000000003",
+                &format!("NEFT DR-ABCD0001234-ACME INDUSTRIES-ZZZZZ{}", padn(3, 11)),
                 "1",
                 "NEFT",
                 None,
             ),
-            ("NEFT CR-ACME", "0000ZZZZZ00000000004", "NEFT", None),
+            (
+                "NEFT CR-ACME",
+                &format!("0000ZZZZZ{}", padn(4, 11)),
+                "NEFT",
+                None,
+            ),
             ("NEFT CR-ACME", "123", "NEFT", None),
-            ("NEFT CR-ACME", "0000000000000000", "NEFT", None),
+            ("NEFT CR-ACME", &padn(0, 16), "NEFT", None),
             ("NEFT CR-ACME", "", "NEFT", None),
             (
-                "ACH D- ACME LTD-0000000012345",
-                "0000000012345",
+                &format!("ACH D- ACME LTD-{}", padn(12345, 13)),
+                &padn(12345, 13),
                 "ACH",
                 None,
             ),
@@ -147,22 +182,37 @@ fn ubi_admits_only_network_transfers() {
         Bank::Ubi,
         &[
             (
-                "UPIAB/600000000001/DR/ACME/ZZZZ",
+                &format!("UPIAB/{}/DR/ACME/ZZZZ", p6(1, 12)),
                 "",
                 "UPI",
-                Some("600000000001"),
+                Some(p6(1, 12).as_str()),
             ),
-            ("UPIAB/000000000000/DR/ACME/ZZZZ", "", "UPI", None),
-            ("IMPSAB/600000000003/ACME", "", "IMPS", Some("600000000003")),
-            ("IMPSAR/600000000004/ACME", "", "IMPS", Some("600000000004")),
-            ("IMPSAB/000000000000/ACME", "", "IMPS", None),
             (
-                "NEFT:ACME INDUSTRIES ZZZZZ00000000001",
+                &format!("UPIAB/{}/DR/ACME/ZZZZ", padn(0, 12)),
+                "",
+                "UPI",
+                None,
+            ),
+            (
+                &format!("IMPSAB/{}/ACME", p6(3, 12)),
+                "",
+                "IMPS",
+                Some(p6(3, 12).as_str()),
+            ),
+            (
+                &format!("IMPSAR/{}/ACME", p6(4, 12)),
+                "",
+                "IMPS",
+                Some(p6(4, 12).as_str()),
+            ),
+            (&format!("IMPSAB/{}/ACME", padn(0, 12)), "", "IMPS", None),
+            (
+                &format!("NEFT:ACME INDUSTRIES ZZZZZ{}", padn(1, 11)),
                 "",
                 "NEFT",
-                Some("ZZZZZ00000000001"),
+                Some(format!("ZZZZZ{}", padn(1, 11)).as_str()),
             ),
-            ("MOBFT/ACME/600000000005", "", "MOBFT", None),
+            (&format!("MOBFT/ACME/{}", p6(5, 12)), "", "MOBFT", None),
             ("CLG/ACME", "000417", "CLG", None),
             ("BY CASH", "", "CASH", None),
             ("SOMETHING ELSE", "000417", "TXN", None),
@@ -176,33 +226,48 @@ fn bob_admits_only_network_transfers() {
         Bank::Bob,
         &[
             (
-                "UPI/600000000001/10:15:30/UPI/nw@okzz/ZZZZ BANK",
+                &format!("UPI/{}/10:15:30/UPI/nw@okzz/ZZZZ BANK", p6(1, 12)),
                 "",
                 "UPI",
-                Some("600000000001"),
+                Some(p6(1, 12).as_str()),
             ),
-            ("UPI/000000000000/10:15:30/UPI/nw@okzz/Z", "", "UPI", None),
             (
-                "IMPS/P2A/600000000003/ZZZZ/NOTE",
+                &format!("UPI/{}/10:15:30/UPI/nw@okzz/Z", padn(0, 12)),
+                "",
+                "UPI",
+                None,
+            ),
+            (
+                &format!("IMPS/P2A/{}/ZZZZ/NOTE", p6(3, 12)),
                 "",
                 "IMPS",
-                Some("600000000003"),
+                Some(p6(3, 12).as_str()),
             ),
-            ("IMPS/P2A/000000000000/ZZZZ/NOTE", "", "IMPS", None),
             (
-                "NEFT-ZZZZZ00000000001-ACME INDUSTRIES",
+                &format!("IMPS/P2A/{}/ZZZZ/NOTE", padn(0, 12)),
+                "",
+                "IMPS",
+                None,
+            ),
+            (
+                &format!("NEFT-ZZZZZ{}-ACME INDUSTRIES", padn(1, 11)),
                 "",
                 "NEFT",
-                Some("ZZZZZ00000000001"),
+                Some(format!("ZZZZZ{}", padn(1, 11)).as_str()),
             ),
             (
-                "RTGS-ZZZZZ00000000000000002-GREEN FIELD LTD",
+                &format!("RTGS-ZZZZZ{}-GREEN FIELD LTD", padn(2, 17)),
                 "",
                 "RTGS",
-                Some("ZZZZZ00000000000000002"),
+                Some(format!("ZZZZZ{}", padn(2, 17)).as_str()),
             ),
             ("NEFT-ab-ACME", "", "TXN", None),
-            ("MBK/600000000004/12:00:00/SOME NAME", "", "MBK", None),
+            (
+                &format!("MBK/{}/12:00:00/SOME NAME", p6(4, 12)),
+                "",
+                "MBK",
+                None,
+            ),
             ("BY CASH", "", "CASH", None),
             ("SYNTHETIC SUPPLIES-MICR INWARD CLG", "000417", "TXN", None),
         ],
@@ -211,12 +276,12 @@ fn bob_admits_only_network_transfers() {
 
 #[test]
 fn a_transfer_reference_serialises_as_its_plain_string() {
-    let row = row(&[("narr", "IMPS/600000000003/ACME/NOTE")]);
+    let row = row(&[("narr", &format!("IMPS/{}/ACME/NOTE", p6(3, 12)))]);
     let found = Bank::Sbi.transfer_reference(&row).unwrap();
-    assert_eq!(found.to_string(), "600000000003");
+    assert_eq!(found.to_string(), p6(3, 12));
     assert_eq!(
         serde_json::to_value(&found).unwrap(),
-        serde_json::json!("600000000003")
+        serde_json::json!(p6(3, 12))
     );
 }
 

@@ -160,6 +160,9 @@ jobs:
       - name: Read the Playwright version
         id: playwright-version
         run: echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      # Restored here and saved by the "Save Playwright browsers" step after the install, not by the combined cache action,
+      # so that only a push, manual or scheduled run writes the cache: a pull-request ref's copy is readable by that ref
+      # alone (15 Oct 2026: five such copies, 1.8 GiB of a 10 GiB cap).
       - name: Restore Playwright browsers
         id: playwright-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -208,8 +211,6 @@ jobs:
             done
             exit 1
           fi
-      # Saved here, not by the restore step's combined action, so that only a push, manual or scheduled run writes the
-      # cache: a pull-request ref's copy is readable by that ref alone (15 Oct 2026: five such copies, 1.8 GiB of a 10 GiB cap).
       - name: Save Playwright browsers
         if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

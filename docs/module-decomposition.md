@@ -42,7 +42,8 @@ Before bridge#416 nothing recorded either, and the boundary showed it.
 Contra's cash/bank side) and `agent_import_persistence.rs` were not -- so the
 module that *renders* the qualified write shape was sealed and the modules that
 *decide* it were not. #434 pinned those, together with the other admission and
-egress files found the same way, and recorded in the comment beside `MAX_SURFACE_FILES` both
+egress files found the same way, and recorded in the module documentation of
+`bridge-tally-core/tests/compatibility_surface_stays_whole.rs` both
 the reason for each pin and which kinds of file were left out on purpose. That
 paragraph is the exemption record; add to it rather than leaving a collaborator
 silently unpinned.
@@ -62,7 +63,7 @@ prints a report that catches the common case -- a new module declared directly b
 -- but not a new module under an unpinned parent or deeper descendants, so check
 the new files against the rule above yourself.
 
-**A pin is a decision, and that is deliberate.** `MAX_SURFACE_FILES` is a fixed parse
+**A pin is a decision, and that is deliberate.** `MAX_PINS` (in that test) is a fixed parse
 bound against a runaway list, not a count: adding a pin does not touch it. (It used to
 be kept equal to the exact pin count, so each new pin was also an edit to a pinned
 constant; that was dropped once the acknowledgement check became enforcing, because
@@ -258,8 +259,7 @@ A pure move should be provably pure:
   into two new test files and held **919 tests** on both sides; that count is the
   evidence, not the diff.
 - `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings
-  -A clippy::pedantic`, and the full suite on **both** workspaces (`src-tauri/` and
-  `tools/` — a `--workspace` run in one does not touch the other).
+  -A clippy::pedantic`, and the full suite on the `src-tauri/` workspace.
 - If behaviour changed, it is not a decomposition. Land the behaviour change
   separately, before or after, so review can see it.
 
@@ -268,7 +268,7 @@ A pure move should be provably pure:
 1. Measure: line counts, item clustering, pin status.
 2. If pinned and there is no cap headroom, stop and resolve #416 first.
 3. Extract the largest cohesive group to one new module; leave the parent a façade.
-4. Prove purity (test count, both workspaces, fmt, clippy).
+4. Prove purity (test count, the workspace, fmt, clippy).
 5. Write the acknowledgement from the final diff; pin the new files if the parent was pinned.
 6. Repeat for the next group. One group per PR — a 6,000-line file split four ways
    in one diff is not reviewable, which is the problem you set out to fix.

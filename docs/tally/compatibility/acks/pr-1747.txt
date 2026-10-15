@@ -1,0 +1,47 @@
+.gitattributes
+.github/workflows/ci.yml
+.github/workflows/dependency-security-scheduled.yml
+.github/workflows/dependency-security.yml
+docs/adr/0014-tally-native-outstandings-probe-authority.md
+docs/adr/0015-tally-selected-read-qualification-authority.md
+docs/step-by-step-roadmap.md
+docs/tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_ENVIRONMENT_AND_REQUESTS.md
+docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
+package.json
+scripts/check-ci-workflow-consistency.mjs
+scripts/check-surface-ack.mjs
+scripts/check-tally-request-builder-hazards.mjs
+scripts/merge-gate.sh
+src-tauri/Cargo.lock
+src-tauri/crates/bridge-tally-core/Cargo.toml
+src-tauri/crates/bridge-tally-core/tests/compatibility_surface_stays_whole.rs
+src-tauri/crates/bridge-tally-core/tests/lower_crates_stay_clean.rs
+src-tauri/crates/bridge-tally-primitives/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/Cargo.toml
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/src/agent_presence_tests.rs
+src-tauri/src/tally/tdl_engine.rs
+removed-pin: docs/tally/compatibility/README.md
+removed-pin: docs/tally/compatibility/bills-native-probe-runbook.md
+removed-pin: docs/tally/compatibility/fixtures/education-native-outstandings-v0.json
+removed-pin: docs/tally/compatibility/fixtures/education-small-v1.json
+removed-pin: docs/tally/compatibility/native-outstandings-profile.example.json
+removed-pin: docs/tally/compatibility/native-outstandings-ui-after.example.json
+removed-pin: docs/tally/compatibility/native-outstandings-ui-before.example.json
+removed-pin: docs/tally/support-matrix.md
+removed-pin: scripts/check-tally-live-read-boundary.mjs
+removed-pin: src-tauri/crates/bridge-tally-protocol/src/bills_native_outstandings_probe.rs
+removed-pin: tools/Cargo.lock
+removed-pin: tools/bridge-tally-compatibility/Cargo.toml
+removed-pin: tools/bridge-tally-compatibility/src/bills_native_outstandings_probe_receipt.rs
+removed-pin: tools/bridge-tally-compatibility/src/lib.rs
+removed-pin: tools/bridge-tally-compatibility/src/main.rs
+removed-pin: tools/bridge-tally-live-read/Cargo.toml
+removed-pin: tools/bridge-tally-live-read/src/bin/native_outstandings_probe.rs
+removed-pin: tools/bridge-tally-live-read/src/lib.rs
+removed-pin: tools/bridge-tally-live-read/src/main.rs
+removed-pin: tools/bridge-tally-live-read/src/native_outstandings_qualification.rs
+removed-pin: tools/bridge-tally-read-transport/Cargo.toml
+removed-pin: tools/bridge-tally-read-transport/src/lib.rs
+reviewer: lamemustafa

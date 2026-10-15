@@ -86,7 +86,7 @@ for (const [file, job, head] of PINNED) {
 // build on every run, which no test failure would show.
 const NATIVE_CACHE_CASES = [
   ["a changed CARGO_PROFILE variable", (text) => text.replace("      CARGO_PROFILE_TEST_DEBUG: '0'\n    # A cold Windows native build", "      CARGO_PROFILE_TEST_DEBUG: '1'\n    # A cold Windows native build")],
-  ["narrower cache workspaces", (text) => text.replace("            tools -> target\n          # Separate the Windows", "          # Separate the Windows")],
+  ["narrower cache workspaces", (text) => text.replace("            src-tauri -> target\n          # Separate the Windows", "          # Separate the Windows")],
   ["a different env-var list", (text) => text.replace("'ImageOS ImageVersion OPENSSL LIBCLANG' || ''", "'ImageOS ImageVersion OPENSSL' || ''")],
 ];
 for (const [name, change] of NATIVE_CACHE_CASES) {

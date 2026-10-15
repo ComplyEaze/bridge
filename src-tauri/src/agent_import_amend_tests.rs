@@ -798,8 +798,8 @@ fn the_amendment_admission_module_stays_pinned() {
     // check-surface-ack.mjs reads the branch history and requires a `removed-pin:` line for it
     // (#1006); one that existed at the base is a removed pin, which merge-gate.sh blocks
     // without a `removed-pin:` line.
-    // This module decides what an import file may overwrite; its reason sits
-    // beside MAX_SURFACE_FILES.
+    // This module decides what an import file may overwrite; its reason is recorded in the
+    // module documentation of bridge-tally-core's compatibility_surface_stays_whole test.
     let surface: Value = serde_json::from_str(include_str!(
         "../../docs/tally/compatibility/compatibility-surface.json"
     ))

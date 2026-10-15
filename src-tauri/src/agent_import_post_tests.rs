@@ -2245,7 +2245,24 @@ fn the_batch_post_preview_at_full_width_against_its_caps() {
                 })
             })
             .collect();
-        let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+        // A step whose lengths equal the last step's builds the same preview:
+        // reuse its result, so every step is still checked.
+        let last = std::cell::RefCell::new(None::<(Vec<usize>, Result<String, String>)>);
+        let (fit, refusal) = largest_fit(
+            |pad| {
+                let lengths = grown_lengths(pad, 1, &caps);
+                let mut last = last.borrow_mut();
+                match &*last {
+                    Some((previous, result)) if *previous == lengths => result.clone(),
+                    _ => {
+                        let result = fits(&lengths);
+                        *last = Some((lengths, result.clone()));
+                        result
+                    }
+                }
+            },
+            24 * 100,
+        );
         assert_eq!(refusal, None, "every field at its width still fits");
         assert_eq!(fit.lines().count(), 40, "{fit}");
         assert!(

@@ -63,6 +63,18 @@ DEFAULT_COMMENTS = []
 OWNER_USER = {"login": "lamemustafa", "id": 57982425, "type": "User"}
 T1, T2, T3 = "2026-10-14T09:00:00Z", "2026-10-14T10:00:00Z", "2026-10-14T11:00:00Z"
 VERDICT_CLEAN = "MERGE-VERDICT CLEAN head=" + HEAD + " base=" + BASE_TIP
+OLD_HEAD = "9" * 40
+OLD_BASE = "8" * 40
+CARRY_DIFF = (
+    "diff --git a/docs/x.md b/docs/x.md\n"
+    "index 1111111..2222222 100644\n"
+    "--- a/docs/x.md\n"
+    "+++ b/docs/x.md\n"
+    "@@ -1,2 +1,2 @@\n"
+    " keep\n"
+    "-old\n"
+    "+changed\n"
+)
 VERDICT_RECOMMEND = "MERGE-ADVERSARY RECOMMEND head=" + HEAD + " base=" + BASE_TIP
 
 
@@ -226,6 +238,7 @@ def state():
         "history_fail": False,
         "pages_fail": set(),
         "commits": [dict(DEFAULT_COMMIT)],
+        "carry": None,                   # {"old": diff served for the older pair, "new": diff for the current pair, "fail": bool}
     }
 
     if scenario == "surface-fetch-fail":
@@ -247,6 +260,25 @@ def state():
             set_changes(s, ("added", "mystery/unknown.txt", "x"))
         elif scenario == "tier-rename-from-write-path":
             set_changes(s, ("renamed", "src-tauri/src/agent_lab.rs", "docs/moved.md"))
+
+    elif scenario.startswith("carry-"):
+        # The owner's CLEAN line names an OLDER head and merge base; the gate may carry it when the pull request's own patch
+        # (merge base...head) has the same patch-id at both. The compare answers below are the two diffs.
+        s["owner_items"] = [owner_comment("MERGE-VERDICT CLEAN head=" + OLD_HEAD + " base=" + OLD_BASE, T1)]
+        old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444").replace("@@ -1,2 +1,2 @@", "@@ -11,2 +11,2 @@")
+        new = CARRY_DIFF
+        mode = scenario
+        if scenario == "carry-patch-differs":
+            new = CARRY_DIFF.replace("+changed", "+changed differently")
+        elif scenario == "carry-binary":
+            old = new = CARRY_DIFF + "diff --git a/docs/x.png b/docs/x.png\nBinary files a/docs/x.png and b/docs/x.png differ\n"
+        elif scenario == "carry-empty-diff":
+            old = new = ""
+        elif scenario == "carry-two-patch-ids":
+            old = new = CARRY_DIFF + "From 1111111111111111111111111111111111111111 Mon Sep 17 00:00:00 2001\n" + CARRY_DIFF.replace("changed", "other")
+        s["carry"] = {"old": old, "new": new, "fail": scenario == "carry-compare-fails"}
+        if scenario == "carry-same-patch-write-path":
+            set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
 
     elif scenario == "verdict-for-another-base":
         s["owner_items"] = [owner_comment(VERDICT_CLEAN.replace(BASE_TIP, "c" * 40), T1), owner_comment(VERDICT_RECOMMEND.replace(BASE_TIP, "c" * 40), T2)]
@@ -1115,6 +1147,18 @@ elif args and args[0] == "api":
             emit({"encoding": "base64", "content": b64(S["ack_text"])})
         else:
             fail("unknown contents fixture")
+    elif "/compare/" in joined and "vnd.github.diff" in joined:
+        carry = S["carry"]
+        if carry is None or carry["fail"]:
+            fail("controlled compare diff failure")
+        spec = next(a for a in args if "/compare/" in a).split("/compare/")[1]
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        if spec == OLD_BASE + "..." + OLD_HEAD:
+            emit(carry["old"])
+        elif spec == merge_base + "..." + HEAD:
+            emit(carry["new"])
+        else:
+            fail("unknown compare diff fixture: " + spec)
     elif "/compare/" in joined:
         if S["merge_base_fail"]:
             fail("controlled merge-base failure")

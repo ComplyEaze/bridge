@@ -932,6 +932,32 @@ else
   else
     verdict_exit=0
     verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc.json" 2>/dev/null) || verdict_exit=$?
+    # A MERGE-VERDICT CLEAN line that names an older head and merge base is carried to the current pair when the pull request's own
+    # patch (merge base...head) has the same patch-id at both: a merge of master that leaves the patch alone keeps the reviewer's
+    # CLEAN. The gate proves it from two GitHub compare diffs; a diff that cannot be read, is empty, is cut short, holds a binary
+    # change (its text hides the bytes) or is not exactly one patch is never carried. The line names the pair; the evidence names nothing.
+    candidate_head=$(jq -r '.candidate_clean.head // empty' <<<"$verdict_result" 2>/dev/null)
+    candidate_base=$(jq -r '.candidate_clean.base // empty' <<<"$verdict_result" 2>/dev/null)
+    if [ "$(jq -r '.clean' <<<"$verdict_result" 2>/dev/null)" != "true" ] && [[ "$candidate_head" =~ ^[0-9a-f]{40}$ ]] && [[ "$candidate_base" =~ ^[0-9a-f]{40}$ ]]; then
+      patch_id_of() {
+        local diff_file="$tmpdir/patch-$1-$2.diff" id_out
+        gh api -H "Accept: application/vnd.github.diff" "repos/$REPO/compare/$1...$2" >"$diff_file" 2>>"$errfile" </dev/null || return 1
+        grep -q '[^[:space:]]' "$diff_file" || return 1
+        ! grep -Eq '^(Binary files |GIT binary patch)' "$diff_file" || return 1
+        id_out=$(git -C "$gate_tree" patch-id --stable <"$diff_file" 2>/dev/null) || return 1
+        [ "$(printf '%s\n' "$id_out" | grep -c .)" -eq 1 ] || return 1
+        printf '%s\n' "${id_out%% *}"
+      }
+      old_patch=$(patch_id_of "$candidate_base" "$candidate_head") && new_patch=$(patch_id_of "$merge_base" "$head")
+      if [ -n "${old_patch:-}" ] && [ "${old_patch:-}" = "${new_patch:-}" ]; then
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own patch is unchanged (patch-id ${old_patch:0:12})"
+        jq -c --arg h "$candidate_head" --arg b "$candidate_base" '. + {carried: {head: $h, base: $b}}' "$tmpdir/verdict-doc.json" >"$tmpdir/verdict-doc-carried.json" 2>/dev/null \
+          && verdict_exit=0 \
+          && verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc-carried.json" 2>/dev/null) || verdict_exit=$?
+      else
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is not carried: the pull request's own patch could not be shown unchanged"
+      fi
+    fi
     if ! jq -e 'type == "object" and (.status | type == "string")' <<<"$verdict_result" >/dev/null 2>&1; then
       unknown "could not evaluate the owner's merge verdict"
     else

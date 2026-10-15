@@ -707,6 +707,20 @@ class MergeGateControls(unittest.TestCase):
         self.assertIn("src-tauri/src/agent_lab_new.rs (write-path)", self.run_gate("verdict-missing-recommend-write-path").stdout)
         self.assertIn("mystery/unknown.txt (unclassified)", self.run_gate("tier-unclassified-clean-only").stdout)
 
+    # -- (c) at the gate: the clean line of an older head, carried when the pull request's own patch is unchanged --------------
+    def test_a_clean_line_for_an_older_head_is_carried_when_the_patch_is_unchanged(self):
+        result = self.assert_pass("carry-same-patch", "carried")
+        self.assertIn("patch-id", result.stdout)
+
+    def test_a_clean_line_is_not_carried_when_the_patch_changed_or_cannot_be_compared(self):
+        for scenario in ("carry-patch-differs", "carry-binary", "carry-compare-fails", "carry-empty-diff", "carry-two-patch-ids"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
+                self.assertNotIn("carried", result.stdout.replace("not carried", ""))
+
+    def test_a_carried_clean_line_does_not_replace_the_recommend_line_of_the_full_tier(self):
+        self.assert_blocked("carry-same-patch-write-path", self.VERDICT_BLOCK)
+
     def test_both_lines_still_pass_at_either_tier(self):
         self.assert_pass("pass", self.VERDICT_PASS)
 
@@ -1347,6 +1361,86 @@ class MergeVerdictEvaluator(unittest.TestCase):
                 self.assertEqual(self.status(dict(voided, tier="one")), "block")
         token_by_someone_else = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2], uid=7)])
         self.assertEqual(self.status(dict(token_by_someone_else, tier="one")), "block")
+
+    # -- (a) a verdict line may open a longer comment ------------------------------------------------------------------------
+    PROSE = "Review of head 1111, the whole change. CLEAN, 0 P1 / 0 P2.\n\n- the change does what it says\n"
+
+    def test_a_verdict_line_that_opens_an_owner_review_with_prose_after_it_counts(self):
+        for separator in ("\n", "\r\n"):
+            with self.subTest(separator=repr(separator)):
+                clean = self.CLEAN + separator + separator + self.PROSE
+                self.assertEqual(self.status(dict(self.doc(comments=[self.comment(clean, self.T[1])]), tier="one")), "pass")
+                both = [self.comment(clean, self.T[1]), self.comment(self.RECOMMEND + separator + "Adversary read: nothing at P1 or P2." + separator, self.T[2])]
+                self.assertEqual(self.status(self.doc(comments=both)), "pass")
+        as_review = self.doc(reviews=[self.review(self.CLEAN + "\n\n" + self.PROSE, self.T[1])], comments=[self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(as_review), "pass")
+
+    def test_prose_around_a_verdict_line_that_is_not_just_prose_voids_instead(self):
+        token = "MERGE-VERDICT"
+        cases = {
+            "the line is not first": self.PROSE + self.CLEAN,
+            "a second verdict token in the text": self.CLEAN + "\n\nsee also " + token + " CLEAN head=" + "1" * 40 + " base=" + "2" * 40,
+            "a token inside a hidden comment": self.CLEAN + "\n\n<!-- " + token + " NOT-CLEAN -->\nProse.",
+            "trailing spaces on the line": self.CLEAN + "  \n\n" + self.PROSE,
+            "a leading space on the line": " " + self.CLEAN + "\n\n" + self.PROSE,
+            "a different word after the verdict": "MERGE-VERDICT CLEANISH head=" + "1" * 40 + " base=" + "2" * 40 + "\nProse",
+            "another line of the same kind first": "MERGE-VERDICT NOT-CLEAN head=" + "1" * 40 + " base=" + "2" * 40 + "\n" + self.CLEAN,
+        }
+        for name, body in cases.items():
+            with self.subTest(case=name):
+                both = self.doc(comments=[self.comment(body, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])
+                self.assertEqual(self.status(both), "block")
+
+    def test_a_verdict_line_with_prose_by_anyone_else_is_refused_as_before(self):
+        other = self.doc(comments=[self.comment(self.CLEAN + "\n\n" + self.PROSE, self.T[1], uid=7), self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(other), "block")
+
+    # -- (c) a clean line carried across a change of head and merge base the gate proved leaves the patch unchanged ----------
+    OLD_HEAD = "3" * 40
+    OLD_BASE = "4" * 40
+
+    def old_clean(self):
+        return "MERGE-VERDICT CLEAN head=" + self.OLD_HEAD + " base=" + self.OLD_BASE
+
+    def test_a_clean_line_for_an_older_head_stands_only_when_the_gate_carried_exactly_that_pair(self):
+        doc = self.doc(comments=[self.comment(self.old_clean(), self.T[1])])
+        self.assertEqual(self.status(dict(doc, tier="one")), "block")
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        self.assertEqual(self.status(dict(doc, tier="one", carried=carried)), "pass")
+        for bad in ({"head": "5" * 40, "base": self.OLD_BASE}, {"head": self.OLD_HEAD, "base": "5" * 40}, {"head": self.OLD_HEAD},
+                    {"head": self.OLD_HEAD, "base": self.OLD_BASE, "x": 1},
+                    "carried", None, [], {"head": 1, "base": 2}):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.status(dict(doc, tier="one", carried=bad)), "block")
+
+    def test_a_carried_clean_line_does_not_carry_the_recommend_line(self):
+        both = self.doc(comments=[self.comment(self.old_clean(), self.T[1]),
+                                  self.comment("MERGE-ADVERSARY RECOMMEND head=" + self.OLD_HEAD + " base=" + self.OLD_BASE, self.T[2])])
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        self.assertEqual(self.status(dict(both, tier="full", carried=carried)), "block")
+        self.assertEqual(self.status(dict(both, tier="one", carried=carried)), "pass")
+
+    def test_a_carried_clean_line_is_voided_like_any_other(self):
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        for line in ("MERGE-VERDICT RETRACT head=" + self.OLD_HEAD + " base=" + self.OLD_BASE, "MERGE-ADVERSARY REJECT head=" + "1" * 40 + " base=" + "2" * 40):
+            with self.subTest(line=line[:30]):
+                voided = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(line, self.T[3])])
+                self.assertEqual(self.status(dict(voided, tier="one", carried=carried)), "block")
+
+    def test_a_newer_clean_line_for_the_current_pair_wins_over_an_older_carried_one(self):
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        doc = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.old_clean(), self.T[2])])
+        # the NEWEST clean line is the old pair: it stands because it was carried
+        self.assertEqual(self.status(dict(doc, tier="one", carried=carried)), "pass")
+        doc2 = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(self.CLEAN, self.T[2])])
+        self.assertEqual(self.status(dict(doc2, tier="one")), "pass")
+
+    def test_the_result_names_the_clean_line_that_could_be_carried(self):
+        result = self.mod.evaluate(dict(self.doc(comments=[self.comment(self.old_clean(), self.T[1])]), tier="one"))
+        self.assertEqual(result["candidate_clean"], {"head": self.OLD_HEAD, "base": self.OLD_BASE})
+        self.assertIsNone(self.mod.evaluate(dict(self.doc(comments=[self.comment(self.CLEAN, self.T[1])]), tier="one"))["candidate_clean"])
+        voided = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[3])])
+        self.assertIsNone(self.mod.evaluate(dict(voided, tier="one"))["candidate_clean"])
 
     def test_a_void_at_the_same_second_as_a_verdict_voids_it(self):
         comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]

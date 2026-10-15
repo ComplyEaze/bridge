@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test]
 async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
-    let plans = qualified_import_cycle_plans()[..32].to_vec();
+    let plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
     let simulator = SequenceSimulator::spawn([plans.clone(), plans].concat()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = Server::new(crate::agent::Settings {
@@ -85,7 +85,10 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         fs::read(directory.path().join("agent-import-ledger.jsonl")).unwrap(),
         journal
     );
-    assert_eq!(simulator.finish().unwrap().len(), 64);
+    assert_eq!(
+        simulator.finish().unwrap().len(),
+        2 * QUALIFIED_BUILD_REQUESTS
+    );
 }
 
 fn legacy_record() -> Value {

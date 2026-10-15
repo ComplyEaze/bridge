@@ -23,8 +23,8 @@
 // is the after-the-fact tripwire the stored hashes used to give; merge-gate.sh reads the base when
 // it runs but the merge binds only the head, so a base that moved in between is caught here.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export const SURFACE_PATH = "docs/tally/compatibility/compatibility-surface.json";
 export const ACK_DIR = "docs/tally/compatibility/acks/";
@@ -485,6 +485,6 @@ export function main(argv, env) {
   return blocking ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   process.exitCode = main(process.argv.slice(2), process.env);
 }

@@ -422,7 +422,10 @@ pub(crate) enum ApprovedImportAdmissionError {
     BaseCurrencyUndetermined,
     /// The target's master mark (ALTMSTID) moved between the snapshot taken as
     /// the queue's binding reads began and the aim snapshot read last before
-    /// the POST: a master changed after the catalogue re-read (bridge#239).
+    /// the POST: a master changed after the catalogue re-read (bridge#239). Or
+    /// it moved between the mark the voucher numbering was read under, before
+    /// the approval, and that first snapshot (bridge#724): a master, perhaps a
+    /// voucher type, changed since the numbering was read.
     #[error("post_masters_moved")]
     MastersMoved,
     /// That comparison could not be made: the first snapshot could not be

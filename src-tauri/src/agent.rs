@@ -26,6 +26,10 @@ mod lab;
 mod bank_statement;
 #[path = "agent_catalog.rs"]
 mod catalog;
+// Nothing calls the pairing view until the import journal is wired to it.
+#[allow(dead_code)]
+#[path = "agent_transfer_pairing.rs"]
+mod transfer_pairing;
 #[cfg(test)]
 use catalog::tool_definitions;
 use catalog::validate_tool_arguments;
@@ -1331,6 +1335,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // either end of that (#1268).
         "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
             Some(DATE_REMEDIATION)
+        }
+        // One next step for both numbering refusals (bridge#724): a batch that
+        // holds a voucher type of each is named
+        // `import_voucher_numbering_not_automatic`.
+        "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
+            Some(agent_import::POST_NUMBERING_NEXT_STEP)
         }
         _ => None,
     }

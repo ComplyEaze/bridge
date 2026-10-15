@@ -954,8 +954,30 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
         .await;
+    // The reply carries the call's own duration twice (once structured, once
+    // as the content text), so a second call that takes up to four more
+    // digits (9 ms against 10 s) is that many bytes longer than the first. The
+    // cap must absorb that swing and still sit below what the JSON-RPC
+    // envelope adds, or the tool's own cap fires before any framing and the
+    // reply is an `isError` result with no `error` member.
+    let unframed_text = unframed.to_string();
+    assert_eq!(
+        unframed_text.matches("duration_ms").count(),
+        2,
+        "the duration must appear exactly twice, or the margin below is wrong"
+    );
+    let duration_digit_margin = 2 * 4;
+    let envelope_overhead = json!({"jsonrpc": "2.0", "id": 1, "result": unframed})
+        .to_string()
+        .len()
+        + 1
+        - unframed_text.len();
+    assert!(
+        duration_digit_margin < envelope_overhead,
+        "the margin ({duration_digit_margin}) must stay below the envelope overhead ({envelope_overhead})"
+    );
     let server = Server::new(Settings {
-        max_bytes: unframed.to_string().len(),
+        max_bytes: unframed_text.len() + duration_digit_margin,
         ..base_settings
     });
     let (mut client, server_io) = tokio::io::duplex(16_384);

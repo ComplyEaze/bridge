@@ -83,7 +83,21 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             (fault, "none", fault, true, true),
         ]);
     }
-    for (case, opening_fault, closing_fault, has_rows, missing_expected) in cases {
+    // A case has its own simulator, directory and server and spends its time
+    // waiting on that simulator (24 or 26 requests), so the cases below run
+    // side by side. The bodies and the voucher are owned, one copy a case.
+    async fn verified_case(
+        (case, opening_fault, closing_fault, has_rows, missing_expected): (
+            &str,
+            &str,
+            &str,
+            bool,
+            bool,
+        ),
+        positive: String,
+        empty: String,
+        expected: ImportVoucher,
+    ) {
         let cycle = import_cycle_plans();
         let mut reads = cycle[16..].to_vec();
         // The two paired window reads, after the four company legs and the six
@@ -154,6 +168,8 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
+            statement: None,
+            withdrawn_skips: None,
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -161,8 +177,8 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             company_guid: CAPTURED_GUID.into(),
             company: Some(import_company_tuple(&company).unwrap()),
             txn_ids: vouchers.iter().map(|v| v.bridge_txn_id.clone()).collect(),
-            date_from: stored_date(row.date.as_str()),
-            date_to: stored_date(row.date.as_str()),
+            date_from: expected.date.clone(),
+            date_to: expected.date.clone(),
             sha256: "synthetic-history".into(),
             built_at: now(),
             status: "built".into(),
@@ -225,7 +241,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
                 },
                 "{case}"
             );
-            assert_eq!(content["evidence"]["state"], "partial");
+            assert_eq!(content["evidence"]["state"], "partial", "{case}");
             let after = paths
                 .iter()
                 .map(fs::read)
@@ -286,4 +302,42 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
         assert_eq!(content["evidence"]["response_sha256"], response, "{case}");
         assert_eq!(content["evidence"]["bytes"], bytes, "{case}");
     }
+
+    // A few cases at a time, not all 28: one thread serves every running case,
+    // and a simulator gives up on a request that has not reached it within 30
+    // seconds, so on a starved runner too many cases at once made some of them
+    // time out (queue run 38732818063). Every case is joined, and a panic in any
+    // of them is passed on after the others have finished, with the case named
+    // (several cases share a name, so its place in the list is given too).
+    const CASES_AT_ONCE: usize = 4;
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async {
+            let mut panicked = None;
+            for (group_index, group) in cases.chunks(CASES_AT_ONCE).enumerate() {
+                let running = group
+                    .iter()
+                    .enumerate()
+                    .map(|(offset, &case)| {
+                        let running = tokio::task::spawn_local(verified_case(
+                            case,
+                            positive.clone(),
+                            empty.clone(),
+                            expected.clone(),
+                        ));
+                        (group_index * CASES_AT_ONCE + offset, case.0, running)
+                    })
+                    .collect::<Vec<_>>();
+                for (index, name, case) in running {
+                    if let Err(error) = case.await {
+                        eprintln!("case {name} (number {index} in the list) failed");
+                        panicked.get_or_insert(error);
+                    }
+                }
+            }
+            if let Some(error) = panicked {
+                std::panic::resume_unwind(error.into_panic());
+            }
+        })
+        .await;
 }

@@ -1,0 +1,108 @@
+# Look only: the screen setting `Eligible for Input Tax Credit` beside the wire value `GSTINELIGIBLEITC`, on the ledgers of BRIDGE PILOT LAB
+
+Synthetic company `BRIDGE PILOT LAB` only, loaded alone, nobody else using this PC for Tally or this book from step 0 to step 6. **This sheet WRITES NOTHING: no key is typed into any field, nothing is accepted, saved, created, altered or deleted, no voucher screen is opened, Tally's current date is not changed, and nothing is sent over the gateway except four reads (all Export).** The operator only LOOKS.
+
+**Evidence rule (from the run coordinator).** The only thing handed back for publication is **table B** (step 6): per ledger, the screen setting of `Eligible for Input Tax Credit` beside the wire value (`GSTINELIGIBLEITC` Yes / No / absent). The wire column is today's read (`ans-i03.xml`) with the line "equals the committed capture: yes / no", the committed capture being `committed\ledger_gst_details_live.utf16le.xml` (51,434 B, sha256 `597f2b11728c39d6643ced43682b89143fce29481a803ad5f23433ee896c9847`). The screenshots stay on this PC and are recorded by file name, size and sha256 only (a ledger screen may show an address or a registration number). The wire answers (`ans-i03.xml`, `ans-i03b.xml`) also stay on this PC, recorded by size and sha256. No other file, picture or text is handed back for publication. Each screenshot is taken as small as the tool allows: the screen title, the company name line and the input tax credit lines; an address, a registration number or a phone number is cropped out.
+
+Why. The element `GSTINELIGIBLEITC` of a GST details entry looks like an INELIGIBILITY flag: on a stock item the screen `Eligible for Input Tax Credit` read No where the wire had Yes, and read Yes where the element was absent, yet the shipped ledger read maps Yes to `itc_eligible: true`. The only committed ledger capture (this book, 14 ledgers, 5 with one dated GST entry each, 1-Apr-2026) has no screen reading beside it. This sheet captures the missing half, and proves the wire value is still today's (steps 3 and 5).
+
+## What to expect, and what this can and cannot settle (read before the sitting)
+The five ledgers with an entry, from the committed capture:
+
+| LOOK | ledger | parent | details source | wire |
+|---|---|---|---|---|
+| 1 | BRIDGE CGST 2.5% | Duties & Taxes | As per Company/Group (INHERITED) | Yes |
+| 2 | BRIDGE Goods 18% | Sales Accounts | Specify Details Here | Yes |
+| 3 | BRIDGE Purchase Svc 5% | Purchase Accounts | Specify Details Here | absent |
+| 4 | BRIDGE Svc 998313 5% | Sales Accounts | Specify Details Here | Yes |
+| 5 | BRIDGE Svc 998314 5% | Sales Accounts | Specify Details Here | Yes |
+
+- **The input tax credit line may be hidden.** All four wire-Yes ledgers are Sales or Duties & Taxes ledgers; the only Purchase ledger (where input tax credit means something) is the only one with the element absent. Whether TallyPrime 7.1 shows an `Eligible for Input Tax Credit` line on a Sales or a Duties & Taxes ledger is NOT known (unverified; it may not). **`not shown` is a recorded result, not a failure:** the entry's screen is photographed as it stands (kept on the PC) and the lines it does show are written down. If four rows read `not shown`, the sitting has one screen reading, beside wire absent, and none beside wire Yes on a ledger.
+- **LOOK 1 is inherited.** Its entry reads `As per Company/Group`, so its own screen shows, if anything, the setting inherited from above. For every row marked INHERITED the operator ALSO looks, view-only, at the group named as its parent (step 4e) and records that setting; the table keeps the two apart and the ledger's own setting is not paired with the wire as if it were its own.
+- **A second variable is not isolated.** Wire Yes against absent also follows the ledger kind (Sales/duty against Purchase) and creation order (`BRIDGE Purchase Svc 5%` has the highest master id in the capture, 223, the other four 209 to 212). A pairing seen here is one observation per wire value on this book and release, never a rule.
+- **Not covered at all:** wire `No` (no ledger of this book reads No). Yes on a Purchase ledger. Any ledger whose screen does not show the line.
+- If every screen that shows the line reads the same value, Yes and absent show the same screen value: one screen value has been seen and the other is unseen. The next step would then be a counted WRITE on `BRIDGE SHAPE LAB` (set the line on a Purchase-type ledger, read it back): a separate item with its own sheet, backup and restore. **Never improvise a change here.**
+- **For the coordinator, before the sitting is sent:** whether one Purchase-ledger point justifies this sitting, or the write sheet is the decisive item, is the coordinator's decision. This sheet is the read-only half only. Whether a content check of the loaded book must precede the run is also the coordinator's decision; this sheet does not do it. Step 3 compares the book's GUID and the 14 ledger names with the committed capture (a difference is a STOP: report, do not substitute another book or ledger) and the GST entries leaf by leaf (a difference is a FINDING).
+- Mark every statement verified (read off a file or a screenshot of this sitting), partial or unverified.
+
+Files: `requests/` (3), `committed/` (1), `check.py`, `check-request-ids.py`, `.gitattributes`, `SHA256.txt`. Check every file against `SHA256.txt` first (PowerShell: `Get-FileHash -Algorithm SHA256 FILE`, compare the 64 characters), then run `python -I check-request-ids.py requests` (or `py -3 -I ...`). EXPECT exit 0 and `census: ok 3, skipped 0, FAIL 0`.
+
+**Encodings.** The three requests are UTF-16LE with a byte-order mark and no final line break, sent as they are. Each answer is saved raw by curl (`-o`), as received (UTF-16LE without a mark is expected); never open an answer in an editor that rewrites it. `check.py` reads either and prints ASCII only. Screenshots are PNG files.
+
+**Exit codes of `check.py`** (run it as `python -I check.py ...`; `py -3 -I check.py ...` is the same command): 0 = PASS; 1 = FINDING (an EXPECT did not hold: keep the file, write the printed line down, go on unless the step says STOP); 3 = STOP; 2 = the check could not run (never a pass; tell us). Every command below is written in full; nothing is to be assembled by the operator.
+
+**General STOP rule.** Stop and tell us before going on if: Tally shows any dialog, message or warning that the step does not name; `check.py` exits 3 or 2; an answer is not a complete envelope, carries a `LINEERROR` or has header `STATUS` 0; an answer is above its cap; an answer has not finished after five minutes (do nothing at all: do not cancel it, do not send it again, do not send anything else, do not touch Tally; tell us and wait); `GET /status` after a request is not HTTP 200 `TallyPrime Server is Running`; the process picture (step 0) differs at step 4 or step 5 in any way, in particular a second `tally.exe`; a screen offers a field this list does not name and requires it; a screenshot does not show the company name `BRIDGE PILOT LAB`; any key was typed into a field, or a field shows a value you did not find there (press nothing more, leave the screen open). **If the sitting stops at any step, hand back what exists** (every answer so far with size and sha256, every `check.py` line, the screenshot names, sizes and sha256): a sitting never ends with nothing handed back. The evidence rule still applies to what is published.
+
+**Leaving a screen (the only rule; Ctrl+Q is not used anywhere in this sheet).** Press Escape once, and only on a screen whose own title a screenshot shows; repeat it one level at a time. `Quit ? Yes or No` (seen on 15 Oct): answer Yes only on an EMPTY form; a ledger, group or history screen is not an empty form, so press nothing and STOP. At the Gateway press nothing at all (Ctrl+Q there quits Tally with no prompt, seen on 13 Oct). Any other prompt (`Accept ?`, `Cancel ?`, anything): press no key and STOP. Nothing is accepted and nothing is saved: never Ctrl+A, never Yes to an `Accept ?`. The leave is rehearsed once at step 0b before the first ledger. A STOP with a prompt open ends the sitting there: hand back what exists.
+
+**How to send.** One request at a time: `curl.exe -s -S -X POST -H "Content-Type: text/xml; charset=utf-16" --data-binary "@requests\FILE" -o ans-NAME.xml -w "%{http_code} %{size_download}" http://127.0.0.1:9001`, each answer written with `-o`, never piped, no client time limit (an abandoned request can leave the gateway stuck). Note curl's exit code and printed line for every request, then `curl.exe -s -S -o status-NAME.txt -w "%{http_code}" http://127.0.0.1:9001/status`. **Four sends in all, every one an Export, none a write; four `GET /status` reads.**
+
+**Company.** `BRIDGE PILOT LAB` must already be the only company loaded, or nothing is loaded and it is loaded alone from Tally's Select Company screen (pick it, Enter). Any other company loaded: the sitting does not start; STOP and tell us (the coordinator's preflight shuts it). This sheet shuts no company.
+
+**Sizes.** The ledger GST read answered 51,434 B (14 ledgers) on 9-10 Oct: cap 110,000 B (about twice), a STOP above. Company list cap 8,000 B, book extent cap 6,000 B (the seeding run's answers were 4,000 and 3,838 B).
+
+**Time.** Under 30 minutes: steps 0 to 3 about 10 minutes, step 4 (five ledgers and one group) about 15, step 5 about 3.
+
+## Before anything
+0. The process picture. Run `tasklist /fi "imagename eq tally.exe"` and `netstat -ano | findstr ":9001"`; note both. EXPECT exactly one `tally.exe` line and exactly one LISTENING line on port 9001 whose last column (the PID) equals the PID of that `tally.exe` line. Anything else (a second `tally.exe`, another PID on 9001, a second listener): STOP. This pair of outputs is "the process picture"; steps 4 and 5 repeat it. Any company other than `BRIDGE PILOT LAB` loaded: STOP. Record Tally's current date (look only). Leave Tally at the Gateway.
+0b. Rehearse the leave (look only). At the Gateway open the view-only list of ledgers (expected path, unverified in this release: Chart of Accounts, Ledgers). Screenshot it with its title. Press Escape once. EXPECT the previous menu and no prompt. Any prompt: no key, STOP. Then Escape back to the Gateway only as the rule allows (at the Gateway press nothing).
+
+## The reads
+1. `i01-company-list.xml` -> `ans-i01.xml`, then `GET /status` -> `status-i01.txt`. `python -I check.py a01 ans-i01.xml`. EXPECT PASS (the only company is `BRIDGE PILOT LAB`, Education mode No).
+2. `i02-book-extent.xml` -> `ans-i02.xml`, then `GET /status` -> `status-i02.txt`. `python -I check.py a02 ans-i02.xml`. EXPECT PASS. Write down `ALTVCHID`, `ALTMSTID`, `COMPANYNUMBER`, `LASTVOUCHERDATE` as printed (recorded, not compared). The book's GUID is compared in step 3.
+3. `i03-ledger-gst-details.xml` (byte for byte the committed request, sha256 `2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88`, 1,876 B; a read of the ledger masters with each ledger's `GSTDETAILS.LIST`, window 1-Apr-2026 to 1-Aug-2026) -> `ans-i03.xml`, then `GET /status` -> `status-i03.txt`. Record curl's printed size and the sha256 of `ans-i03.xml` (`Get-FileHash -Algorithm SHA256 ans-i03.xml`). Then:
+   `python -I check.py itc ans-i03.xml --company ans-i02.xml`
+   EXPECT PASS and these lines (the committed capture's own values; the XML is parsed, not searched):
+   `LOOK 1: BRIDGE CGST 2.5% | parent Duties & Taxes | source As per Company/Group (INHERITED) | applicable-from 01-04-2026 | wire GSTINELIGIBLEITC Yes`
+   `LOOK 2: BRIDGE Goods 18% | parent Sales Accounts | source Specify Details Here | applicable-from 01-04-2026 | wire GSTINELIGIBLEITC Yes`
+   `LOOK 3: BRIDGE Purchase Svc 5% | parent Purchase Accounts | source Specify Details Here | applicable-from 01-04-2026 | wire GSTINELIGIBLEITC absent`
+   `LOOK 4: BRIDGE Svc 998313 5% | parent Sales Accounts | source Specify Details Here | applicable-from 01-04-2026 | wire GSTINELIGIBLEITC Yes`
+   `LOOK 5: BRIDGE Svc 998314 5% | parent Sales Accounts | source Specify Details Here | applicable-from 01-04-2026 | wire GSTINELIGIBLEITC Yes`
+   and `14 ledgers; 5 with one GSTDETAILS entry (1 inherited); GSTINELIGIBLEITC Yes 4, No 0, absent 1; ledger names equal to the committed capture's 14; book GUID equals the 9-10 Oct capture's: yes; wire No: not in this book, not covered`. STOP (exit 3) if the answer is not a full envelope, carries `LINEERROR` or `STATUS` 0, the 14 ledger names are not the committed capture's, the book's GUID differs from the committed capture's (another book with the same names), a ledger does not carry this book's GUID, a ledger holds more than one GSTDETAILS entry with content (not covered by this sheet), or an entry reads anything but Yes, No or absent: report, do not substitute. Then
+   `python -I check.py vs-committed ans-i03.xml`
+   EXPECT PASS: `byte-identical` (same sha256 as the committed capture) or equal leaf by leaf on the GSTDETAILS entries of the 14 rows (other content of the rows, such as `ALTERID`, may differ and is recorded). A FINDING (exit 1) means the wire moved since 9-10 Oct: write the printed lines down, go on to step 4 for the `LOOK` lines printed by `itc`, and **table B is then PARTIAL and is not published without the coordinator**.
+
+## The look (no key typed, nothing accepted)
+4. First repeat the process picture (step 0 commands): EXPECT it equal to step 0, else STOP. Then, for EACH `LOOK` line printed in step 3 (five expected), in the order printed:
+   a. Open that ledger on Tally's own **Display** (view-only) screen, not the Alter screen, if Tally offers Display for ledgers. Expected path (unverified in this release; name what you see): Gateway of Tally, Chart of Accounts, Ledgers, the ledger, Enter, which opens a screen titled with `Ledger Display`. Use only the Up and Down arrow keys and Enter to move. **On arrival take a screenshot of the screen's title and the company name**; if the title reads `Ledger Alteration` (Tally's word for Alter), rule b applies.
+   b. If Display cannot show the GST rate details, the ledger's Alteration screen may be used for LOOKING only (its title screenshotted on arrival): move with the Up and Down arrow keys only; press Enter only on the one field that opens the GST details sub-screen (`Set/Alter GST Details` or the label Tally shows); type nothing; change nothing. Say in table A which screen kind was used.
+   c. Find the GST rate details history (entries listed by `Applicable From`) and open the entry dated as printed (`1-Apr-2026`; the screen may show `1-Apr-26`; the check line shows `01-04-2026`). If no entry carries that date, or two do: record it, leave, and go on to the next ledger; it is a FINDING.
+   d. Record, with ONE screenshot kept on the PC (`shot-LOOK1.png` to `shot-LOOK5.png`): the setting shown for `Eligible for Input Tax Credit` (Yes / No / **not shown**), the label text exactly as on the screen (letter by letter), and the other lines of the same entry as the screen words them (for example `Set/Alter GST Rate Details`, `Reverse Charge`, `Taxability`): record, do not change. `not shown` means the entry opened and has no line about input tax credit: photograph the entry as it stands and list the lines it shows.
+   e. **Rows marked INHERITED (LOOK 1):** also look, view-only, at the group named as the row's parent (`Duties & Taxes`): Display of the group (expected path, unverified: Chart of Accounts, Groups, the group, Enter) and its GST details; record the setting and the exact label there, with a screenshot (`shot-LOOK1-group.png`). If the group's own details read as inherited from the company, record that, and look at the company's GST details only if Tally offers them on a view-only screen; never open the company Alteration screen or F11; otherwise write `company not looked at`.
+   f. Leave by the rule above (Escape one level at a time; any prompt: no key, STOP). Fill **table A**, one row per ledger.
+   Do not open any other screen.
+
+   **Table A (kept on this PC)**
+
+   | LOOK | ledger | parent | details source | wire (committed) | wire today (step 3) | screen kind | label on screen, exactly | screen value (Yes / No / not shown) | group value (inherited rows) | other lines seen | screenshot file, bytes, sha256 |
+   |---|---|---|---|---|---|---|---|---|---|---|---|
+   | 1 | BRIDGE CGST 2.5% | Duties & Taxes | inherited | Yes | | | | | | | |
+   | 2 | BRIDGE Goods 18% | Sales Accounts | own | Yes | | | | | | | |
+   | 3 | BRIDGE Purchase Svc 5% | Purchase Accounts | own | absent | | | | | | | |
+   | 4 | BRIDGE Svc 998313 5% | Sales Accounts | own | Yes | | | | | | | |
+   | 5 | BRIDGE Svc 998314 5% | Sales Accounts | own | Yes | | | | | | | |
+
+## The repeat read
+5. Repeat the process picture (EXPECT equal to step 0, else STOP). `i03-ledger-gst-details.xml` again -> `ans-i03b.xml`, then `GET /status` -> `status-i03b.txt`. Record curl's size and the sha256. `python -I check.py itc ans-i03b.xml --company ans-i02.xml` (EXPECT PASS, the same five `LOOK` lines), `python -I check.py vs-committed ans-i03b.xml` (EXPECT PASS as in step 3), then `python -I check.py same ans-i03.xml ans-i03b.xml`. EXPECT PASS: identical, or equal leaf by leaf under COLLECTION (nothing moved while you looked; the header counters may differ and are recorded). A difference under COLLECTION (exit 1) means the book moved during the sitting: the screen reading may not belong to the wire reading: write it down; **table B is then PARTIAL and is not published without the coordinator.** Also record Tally's current date again. EXPECT the step-0 value.
+
+## Hand back
+6. Hand back, to us, for the PC's record (**not for publication**): every `ans-*` and `status-*` file with bytes and sha256 (`dir ans-*.xml` for sizes and `Get-FileHash -Algorithm SHA256 FILE` for each file), every `check.py` line, the curl lines (code, size, exit code), the process pictures, the screenshots by file name, size and sha256 only, and table A. **The answers and the screenshots themselves stay on this PC.** Then give **table B**, the only thing meant for publication, filled from table A (a screen reading `not shown` is written as such; nothing else is added to it: no screenshot, no address, no registration number, no answer file):
+
+   **Table B (for publication)**
+
+   | ledger | parent | details source | screen on the ledger: Eligible for Input Tax Credit | screen on the group it inherits from (inherited rows) | wire GSTINELIGIBLEITC today | equals the committed capture (yes / no) |
+   |---|---|---|---|---|---|---|
+   | BRIDGE CGST 2.5% | Duties & Taxes | inherited | | | | |
+   | BRIDGE Goods 18% | Sales Accounts | own | | | | |
+   | BRIDGE Purchase Svc 5% | Purchase Accounts | own | | | | |
+   | BRIDGE Svc 998313 5% | Sales Accounts | own | | | | |
+   | BRIDGE Svc 998314 5% | Sales Accounts | own | | | | |
+
+   Under table B, these lines, each marked verified, partial or unverified: (a) wire No: not in this book, not covered. (b) Screen values seen beside wire Yes (list the ledgers whose own screen showed the line; the inherited row apart). (c) Screen values seen beside wire absent. (d) Ledgers where the line was `not shown`. (e) `vs-committed` at step 3 and at step 5 (PASS byte-identical, PASS leaf by leaf, or FINDING), and `same`; any FINDING makes table B PARTIAL: not published without the coordinator. (f) The exact label text, and whether it was the same on all screens; the screen kind per ledger. (g) If every screen that showed the line read the same: "one screen value seen; the other unseen; the next step would be a counted write on BRIDGE SHAPE LAB, a separate item". Count: four sends, all Export, no write; four status reads. Post nothing yourself: we publish table B.
+
+## Where each request comes from
+| request | committed source | the one change |
+|---|---|---|
+| i01 | the seeding run's company list request, byte for byte | none |
+| i02 | the seeding run's book extent request | the company name in `SVCURRENTCOMPANY` (`BRIDGE PILOT LAB`) |
+| i03 | the committed ledger GST details request (`ledger_gst_details_request.utf16le.xml`), byte for byte | none |

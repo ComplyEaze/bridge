@@ -2133,7 +2133,7 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
         .as_str()
         .unwrap();
     assert!(
-        step.contains("build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named"),
+        step.contains("If the batch named does not name this row in withdraw_skips and has not been sent, build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named"),
         "{step}"
     );
     // 3. built again naming the row, before anything is sent: admitted
@@ -2141,6 +2141,20 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
     rig.finish();
     assert_eq!(third["voucher_count"], 2, "{third}");
     let third_id = third["batch_id"].as_str().unwrap().to_string();
+    // the build that names the row is the batch its own answer names, and that
+    // answer tells it to be sent and verified, not held back
+    assert_eq!(
+        open_rows(&third["transfers"]),
+        vec![open_row(SKIPPED, "held_elsewhere", Some(&third_id))],
+        "{third}"
+    );
+    let own_step = third["transfers"]["next_steps"]["held_elsewhere"]
+        .as_str()
+        .unwrap();
+    assert!(
+        own_step.contains("If the batch named does name this row, send it and verify it"),
+        "{own_step}"
+    );
     // that build is found posted: the skip is retired and nothing is open
     mark_found(directory.path(), &third_id);
     let section = journal(directory.path()).transfers_for_verification(CAPTURED_GUID, 0);

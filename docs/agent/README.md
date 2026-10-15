@@ -1805,34 +1805,40 @@ refused as `proposals_legacy` (parse the statement again).
   a batch holds as a voucher is not a skip to pair. While no batch holding the
   row is found posted it reads `held_elsewhere`, with the batch to verify. Once
   a batch is found posted, the skip is retired (counted in `retired`) only if
-  every batch found posted that holds the row, or the batch it amends,
+  every batch found posted that holds the row has a build in its lineage that
   recorded the withdrawal: a build keeps the rows the person named in
   `withdraw_skips`, and they count once that build is sent or found posted and
-  it was built after the newest record of the skip (a withdrawal built at the
-  very instant of the skip does not count). Otherwise the
-  posted voucher contradicts the skip, and the row stays open as
+  it was built after the newest record of the skip (a later build of the
+  skipping statement, or a skip-only record of it, records the skip again; a
+  withdrawal built at the very instant of the record does not count).
+  Otherwise the posted voucher contradicts the skip, and the row stays open as
   `posted_against_skip`, with that batch: the other account's Contra may carry
   the transfer too, ComplyEaze Bridge does not compare the two, and no step
   inside ComplyEaze Bridge removes a voucher already in Tally. The row leaves
   the list only when a build in that batch's lineage that names it in
-  `withdraw_skips` is sent or found posted after the skip was made, which the
-  person confirms only when the other account's statement does not carry it; a
-  batch ComplyEaze Bridge posted itself cannot be amended, so for it no step
-  inside ComplyEaze Bridge clears the row. Two builds made before either is sent are both admitted, so this is
-  how a skip and a posting of one row that were built apart are reported once
-  both are sent and one is found posted. A skip may be withdrawn whether or not
-  its statement was ever sent, so a statement parsed again with the row posted
-  is built again naming the row in `withdraw_skips`, and the batch built first is
-  not sent: sending it instead gives `posted_against_skip`.
-  A build that names a row held this way is judged against the other account's
-  Contras like any skip. For a skip that was sent or is in a statement of only
-  skipped rows (a live skip), an amendment of a batch whose row reads
-  `posted_against_skip` is refused as `skip_row_paired_elsewhere` unless it
-  names the row in `withdraw_skips`; a skip that was never sent does not refuse
-  it. One that names the row counts once it is sent or found posted, and an
-  amendment that is never sent counts for nothing. A held skip is judged
-  against the Contras alone, without the other skips: a refusal as `paired`
-  for it means a Contra may carry it, not that it is established that it does.
+  `withdraw_skips` is found posted after the newest record of the skip, which
+  the person confirms only when the other account's statement does not carry
+  it; a batch ComplyEaze Bridge posted itself cannot be amended, so for it no
+  step inside ComplyEaze Bridge clears the row. Two builds made before either
+  is sent are both admitted, so this is how a skip and a posting of one row
+  that were built apart are reported once both are sent and one is found
+  posted. A skip may be withdrawn whether or not its statement was ever sent,
+  so a statement parsed again with the row posted is built again naming the row
+  in `withdraw_skips`, and the batch built first is not sent: sending it
+  instead gives `posted_against_skip`. The answer of the build that names the
+  row lists it as `held_elsewhere` with its own batch, which is the one to send
+  and verify. The batch left unsent blocks the days of its rows for the other
+  account's coverage until it is verified, and no step inside ComplyEaze Bridge
+  clears that. A build that names a row held this way is judged against the
+  other account's Contras like any skip. For a skip that was sent or is in a
+  statement of only skipped rows (a live skip), an amendment of a batch whose
+  row reads `posted_against_skip` is refused as `skip_row_paired_elsewhere`
+  unless it names the row in `withdraw_skips`; a skip that was never sent does
+  not refuse it. An amendment that names the row counts once it is found posted
+  (`post_import` does not send amendments), and one that never reaches
+  found posted counts for nothing. A held skip is judged against the Contras alone, without
+  the other skips: a refusal as `paired` for it means a Contra may carry it,
+  not that it is established that it does.
 - **What `reference_differs` means.** The person sees the row listed once for
   each batch holding a Contra of the same day and amount whose reference
   differs from the row's, verifies that batch if it is not verified yet, and

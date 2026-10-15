@@ -400,10 +400,10 @@ pub(super) struct ImportLedgerLine {
     /// The statement rows this build posts although a skip of the company names
     /// them, as the person's `withdraw_skips` named them. Absent when none was
     /// named, and on all older records. Only the fact builder reads it: a skip
-    /// whose row a batch found posted holds is retired when every such batch,
-    /// or the batch it amends, recorded the withdrawal in a build that was sent
-    /// or found posted and built after the skip, and otherwise stays
-    /// open. A release older than this field does not read it (this struct does
+    /// whose row a batch found posted holds is retired when every such batch
+    /// has a build in its lineage that recorded the withdrawal, sent or found
+    /// posted and built after the newest record of the skip, and otherwise
+    /// stays open. A release older than this field does not read it (this struct does
     /// not deny unknown fields).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     withdrawn_skips: Option<Vec<String>>,

@@ -552,27 +552,38 @@ fn each_next_step_says_what_was_decided() {
     assert!(!reversed.contains("not a transfer"), "{reversed}");
     let held = step(OpenState::HeldElsewhere);
     assert!(held.contains(
-        "retired once every batch found posted that holds the row, or the batch it amends, recorded the withdrawal"
+        "retired once every batch found posted that holds the row has a build in its lineage that recorded the withdrawal"
     ));
-    assert!(
-        held.contains("build the statement that posts it again naming this row in withdraw_skips")
-    );
+    assert!(held.contains(
+        "was built after the newest record of the skip (a later build of the skipping statement records the skip again)"
+    ));
     assert!(held.contains("posted_against_skip"));
-    assert!(held.contains("and do not send the batch named"));
-    assert!(held.contains("was built after the skip was made"));
+    // the route is conditional on the batch named: one that does not name the
+    // row is left unsent, one that does is the build to send and verify
+    assert!(held.contains(
+        "If the batch named does not name this row in withdraw_skips and has not been sent, build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named"
+    ));
+    assert!(held.contains("If the batch named does name this row, send it and verify it"));
+    assert!(!held.contains(". Do not send"), "{held}");
+    // and what the route costs
+    assert!(held.contains(
+        "A batch left unsent blocks the days of its rows for the other account's coverage until it is verified, and no step inside ComplyEaze Bridge clears that"
+    ));
     let posted = step(OpenState::PostedAgainstSkip);
     assert!(posted.contains(
-        "no build that was sent or found posted recorded its withdrawal after the skip was made"
+        "no build in its lineage that was sent or found posted recorded its withdrawal after the newest record of the skip"
     ));
     assert!(posted.contains("booked twice"));
     // what clears it is what the facts do: a build of that batch's lineage that
-    // names the row, sent or found posted, after the skip; and a batch
-    // ComplyEaze Bridge posted itself cannot be amended
+    // names the row and is found posted after the newest record of the skip;
+    // and a batch ComplyEaze Bridge posted itself cannot be amended
     assert!(posted.contains(
-        "leaves this list only when a build in that batch's lineage that names it in withdraw_skips is sent or found posted after the skip was made"
+        "leaves this list only when a build in that batch's lineage that names it in withdraw_skips is found posted after the newest record of the skip"
     ));
     assert!(posted.contains("a batch ComplyEaze Bridge posted itself cannot be amended"));
     assert!(!posted.contains("hand"), "{posted}");
+    // it describes an exit and does not forbid the build that is the exit
+    assert!(!posted.contains("Do not build"), "{posted}");
     let double = step(OpenState::DoubleBooked);
     assert!(double.contains("If either batch named has not been sent to Tally, do not send it"));
     let open = step(OpenState::NotEstablished);
@@ -907,10 +918,11 @@ fn every_sentence_to_follow() -> Vec<String> {
         .collect()
 }
 
-/// A sentence that names Tally is a prohibition or a disclosure (it holds a
-/// negation), or one of the named reads below. Anything else is a new
-/// instruction about Tally and has to be looked at: a step may tell a person to
-/// look in Tally, never to enter, edit, delete or import there.
+/// Every sentence that names Tally is one of the named reads or one of the
+/// named prohibitions and disclosures below, word for word. Anything else is a
+/// new sentence about Tally and has to be looked at: a step may tell a person
+/// to look in Tally, never to enter, edit, delete or import there. A negation
+/// somewhere in a sentence is not enough.
 #[test]
 fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read() {
     const READS: [&str; 4] = [
@@ -919,27 +931,35 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
         "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
         "This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended",
     ];
-    let negations = [" not ", " no step ", "do not", " never ", " cannot "];
-    let mut tally_sentences = 0;
-    let mut reads = BTreeSet::new();
+    const NEGATIONS_AND_DISCLOSURES: [&str; 12] = [
+        "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
+        "A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked",
+        "A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet",
+        "ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally",
+        "Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice",
+        "If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
+        "If Tally rejected that batch's send, no step inside ComplyEaze Bridge clears this row yet",
+        "If either batch named has not been sent to Tally, do not send it, and do not build or post anything further for this transfer",
+        "If that batch was never sent to Tally and will not be, build that statement again, post it and verify it",
+        "No step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet",
+        "if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
+        "if that batch was never sent to Tally and will not be, build that statement again, post it and verify it",
+    ];
+    let mut used = BTreeSet::new();
     for sentence in every_sentence_to_follow() {
         if !sentence.contains("Tally") {
             continue;
         }
-        tally_sentences += 1;
-        let padded = format!(" {sentence} ").to_lowercase();
-        if negations.iter().any(|negation| padded.contains(negation)) {
-            continue;
-        }
-        let read = READS
+        let bare = sentence.trim_end_matches('.');
+        let allowed = READS
             .iter()
-            .find(|read| sentence.trim_end_matches('.') == **read)
+            .chain(NEGATIONS_AND_DISCLOSURES.iter())
+            .find(|allowed| bare == **allowed)
             .unwrap_or_else(|| panic!("a new sentence about Tally: {sentence:?}"));
-        reads.insert(*read);
+        used.insert(*allowed);
     }
-    // the reads are all still used, and the texts still name Tally often
-    assert_eq!(reads.len(), READS.len());
-    assert!(tally_sentences >= 15, "{tally_sentences}");
+    // every allowed sentence is still in a text, so the lists do not drift
+    assert_eq!(used.len(), READS.len() + NEGATIONS_AND_DISCLOSURES.len());
 }
 
 /// The same rule over the tool texts that describe skipped rows: a sentence

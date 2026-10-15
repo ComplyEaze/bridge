@@ -3292,12 +3292,12 @@ fn a_withdrawal_counts_only_from_a_build_sent_or_found_posted() {
         .read()
         .unwrap();
     assert_eq!((found.retired_skips, found.held.len()), (0, 1));
-    // sent, it does
+    // found posted, it does (an amendment is never sent)
     let found = Journal::default()
         .batch(&skipped)
         .batch(&original)
         .batch(&amendment)
-        .sent(&amendment)
+        .status(&amendment, "posted_verified")
         .read()
         .unwrap();
     assert_eq!((found.retired_skips, found.held.len()), (1, 0));
@@ -3386,4 +3386,40 @@ fn a_withdrawal_built_at_the_instant_of_the_skip_does_not_retire_it() {
         .read()
         .unwrap();
     assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+/// The newest record of a skip is what a withdrawal is compared with: a later
+/// build of the skipping statement records the skip again, and a withdrawal
+/// built before it no longer retires the skip.
+#[test]
+fn a_skip_recorded_again_after_the_withdrawal_keeps_the_row_open() {
+    let first = skip_record(
+        10,
+        ENDPOINT,
+        "2026-09-01T10:00:10Z",
+        facts(B1).skip(skip_row(&st(9), "500.00", B2, None)),
+    );
+    let again = skip_record(
+        11,
+        ENDPOINT,
+        "2026-09-01T10:00:30Z",
+        facts(B1).skip(skip_row(&st(9), "500.00", B2, None)),
+    );
+    // build 80 names the row at :20 and is found posted
+    let withdrawing = holder_of_row_nine(80)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let journal = Journal::default().batch(&withdrawing);
+    let found = journal
+        .read_with(&skip_file(std::slice::from_ref(&first)), COMPANY)
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+    let found = journal
+        .read_with(&skip_file(&[first, again]), COMPANY)
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
 }

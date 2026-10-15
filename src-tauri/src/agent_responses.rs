@@ -320,7 +320,10 @@ fn fit_response(
     //   3. then the section widened again into what the trimmed page leaves.
     // A result with no computed section takes only the page step, as it always
     // did. Everything here returns true when anything was cut, the section's
-    // rows included: `truncated` on the whole answer is the conservative reading.
+    // rows included, but the tool path discards that flag. The answer says what
+    // was narrowed in-band (`open_omitted`, a `not_established` note); only the
+    // drop of the whole section from a result with no page sets the envelope's
+    // `truncated`.
     let section = computed_section(response, structured_path);
     if let Some(section) = &section {
         if fit_section(

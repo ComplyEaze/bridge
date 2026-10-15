@@ -371,9 +371,13 @@ fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic
 /// The duplicate-number read's captured answers on the pilot lab's book: a
 /// number its first invoice carries, and a number nothing carries (a
 /// collection with no row, which is an answer). The first answer's header
-/// counts (`<VOUCHER>30</VOUCHER>` among them) are not rows.
+/// counts (`<VOUCHER>30</VOUCHER>` among them) are not rows. Every row in
+/// both answers is of the Sales class, so these bytes cannot tell the
+/// Sales-class count from a count of every row:
+/// `only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate` is the
+/// test that does.
 #[test]
-fn the_captured_number_answers_count_only_sales_class_vouchers() {
+fn the_captured_number_answers_count_their_rows_not_their_header() {
     for (name, xml, vouchers, sales) in [
         (
             "number-in-use",

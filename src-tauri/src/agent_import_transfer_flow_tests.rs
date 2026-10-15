@@ -2222,20 +2222,27 @@ async fn skip_only_answer_at(cap: usize) -> Option<Value> {
 /// A record that is written is answered whenever the answer fits without its
 /// section: at the smallest cap that answers at all, the section is left out
 /// and the answer says it was cut; a larger cap keeps the section.
+///
+/// Each call builds in a directory of its own, and the answer carries the call's
+/// `evidence.duration_ms`, whose number of digits differs from call to call, so
+/// the answer's length varies by a few bytes. The search therefore keeps the
+/// answer it got at the cap it ends on and never calls again at the boundary: a
+/// second call at the same cap is not the same size.
 #[tokio::test]
 async fn a_written_record_is_answered_without_its_section_before_it_is_called_too_large() {
     let answered = |cap| async move { skip_only_answer_at(cap).await };
     let (mut low, mut high) = (0, 200_000);
-    assert!(answered(high).await.is_some());
+    let mut smallest = answered(high).await.expect("answered at the wide cap");
     while high - low > 1 {
         let middle = (low + high) / 2;
-        if answered(middle).await.is_some() {
-            high = middle;
-        } else {
-            low = middle;
+        match answered(middle).await {
+            Some(answer) => {
+                high = middle;
+                smallest = answer;
+            }
+            None => low = middle,
         }
     }
-    let smallest = answered(high).await.unwrap();
     let result = &smallest["structuredContent"]["result"];
     assert_eq!(result["state"], "skips_recorded", "{smallest}");
     assert!(result.get("transfers").is_none(), "{smallest}");

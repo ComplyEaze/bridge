@@ -558,9 +558,21 @@ fn each_next_step_says_what_was_decided() {
         held.contains("build the statement that posts it again naming this row in withdraw_skips")
     );
     assert!(held.contains("posted_against_skip"));
+    assert!(held.contains("and do not send the batch named"));
+    assert!(held.contains("was built after the skip was made"));
     let posted = step(OpenState::PostedAgainstSkip);
-    assert!(posted.contains("no build that was sent or found posted named it in withdraw_skips"));
+    assert!(posted.contains(
+        "no build that was sent or found posted recorded its withdrawal after the skip was made"
+    ));
     assert!(posted.contains("booked twice"));
+    // what clears it is what the facts do: a build of that batch's lineage that
+    // names the row, sent or found posted, after the skip; and a batch
+    // ComplyEaze Bridge posted itself cannot be amended
+    assert!(posted.contains(
+        "leaves this list only when a build in that batch's lineage that names it in withdraw_skips is sent or found posted after the skip was made"
+    ));
+    assert!(posted.contains("a batch ComplyEaze Bridge posted itself cannot be amended"));
+    assert!(!posted.contains("hand"), "{posted}");
     let double = step(OpenState::DoubleBooked);
     assert!(double.contains("If either batch named has not been sent to Tally, do not send it"));
     let open = step(OpenState::NotEstablished);
@@ -814,13 +826,13 @@ fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
     assert!(!waiting.contains("already carries"));
     assert_eq!(
         both,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. Do not post these rows."
     );
     // a mix says what each state among the rows needs, and one state alone is
     // told in its own words
     assert_eq!(
         all,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is. Do not post these rows."
     );
     let texts = [&paired, &waiting, &matched, &both, &all];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());

@@ -3355,3 +3355,35 @@ fn a_skip_that_was_never_sent_can_be_withdrawn_and_is_known_to_the_facts() {
         .unwrap();
     assert!(found.skip_mentions.is_empty());
 }
+
+/// A withdrawal built at the very instant of the skip cannot be told from one
+/// made before it, so the skip stays open.
+#[test]
+fn a_withdrawal_built_at_the_instant_of_the_skip_does_not_retire_it() {
+    // builds 10 and 70 are built in the same second
+    let skipped = skipping(10, 9);
+    let withdrawing = holder_of_row_nine(70)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    assert_eq!(skipped.line().built_at, withdrawing.line().built_at);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawing)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    // one second later it retires
+    let later = holder_of_row_nine(71)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&later)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}

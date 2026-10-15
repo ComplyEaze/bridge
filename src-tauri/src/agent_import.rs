@@ -402,7 +402,7 @@ pub(super) struct ImportLedgerLine {
     /// named, and on all older records. Only the fact builder reads it: a skip
     /// whose row a batch found posted holds is retired when every such batch,
     /// or the batch it amends, recorded the withdrawal in a build that was sent
-    /// or found posted and built no earlier than the skip, and otherwise stays
+    /// or found posted and built after the skip, and otherwise stays
     /// open. A release older than this field does not read it (this struct does
     /// not deny unknown fields).
     #[serde(default, skip_serializing_if = "Option::is_none")]

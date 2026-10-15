@@ -1292,8 +1292,9 @@ pub(super) fn build_transfer_facts(
     // A skipped row that a batch posted, or may yet post, is not a skip. One a
     // batch found posted holds is retired only when every such batch's lineage
     // recorded the withdrawal, in a build that was sent or found posted and was
-    // built no earlier than the newest mention of the skip; otherwise the posted
-    // voucher contradicts the skip and it stays open.
+    // built after the newest mention of the skip (a withdrawal built at the very
+    // instant of the skip cannot be told from one made before it, so it does not
+    // count); otherwise the posted voucher contradicts the skip and it stays open.
     let mut withdrawn_at: BTreeMap<(&str, &str), DateTime<FixedOffset>> = BTreeMap::new();
     for batch in &batches {
         if !(batch.sent || batch.found) {
@@ -1321,7 +1322,7 @@ pub(super) fn build_transfer_facts(
                     batches[at].found
                         && withdrawn_at
                             .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
-                            .is_none_or(|recorded| *recorded < mention.built)
+                            .is_none_or(|recorded| *recorded <= mention.built)
                 });
                 let any_posted = holding.batches.iter().any(|&at| batches[at].found);
                 match (contradicting, any_posted) {

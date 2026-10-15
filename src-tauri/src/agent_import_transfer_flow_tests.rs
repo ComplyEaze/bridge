@@ -996,7 +996,7 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         if found {
             assert_eq!(
                 step,
-                "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.",
+                "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: ComplyEaze Bridge judges that skip alone, and another skipped row could share that Contra). If that Contra is wrong, correct that statement's batch first; do not post this row.",
                 "{case}"
             );
         } else {
@@ -1125,7 +1125,7 @@ async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_th
         (
             window(),
             "paired",
-            "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows. If that Contra is wrong, correct that statement's batch first; do not post this row.",
+            "No file was written and nothing was recorded. The other account's statement already carries this row as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: ComplyEaze Bridge judges that skip alone, and another skipped row could share that Contra). If that Contra is wrong, correct that statement's batch first; do not post this row.",
         ),
         (
             Value::Null,
@@ -2133,7 +2133,7 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
         .as_str()
         .unwrap();
     assert!(
-        step.contains("build the statement that posts it again naming this row in withdraw_skips"),
+        step.contains("build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named"),
         "{step}"
     );
     // 3. built again naming the row, before anything is sent: admitted

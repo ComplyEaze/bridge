@@ -18,8 +18,7 @@
 //
 // Two checks, deliberately different in what they can see:
 //
-// 1. A `cargo tree` boundary (modelled on
-//    scripts/check-tally-live-read-boundary.mjs): asserts which first-party
+// 1. A `cargo tree` boundary: asserts which first-party
 //    crates are allowed to declare a *direct* dependency on an outbound HTTP
 //    client (reqwest) or its transport (hyper) at all. This is a
 //    compile-time property -- cargo will not link a crate against reqwest
@@ -120,8 +119,6 @@
 //    network; no method list can tell such a path from a local one.
 //  - Dropping `-D warnings` from a CI clippy step, or narrowing what it
 //    covers, is not detected here.
-//  - tools/ is outside the lints: its binaries do not ship. The cargo-tree half
-//    and the deny-list still cover it.
 //  - The lints run in CI's clippy steps; this gate cannot see a build that
 //    skips clippy.
 
@@ -256,10 +253,7 @@ if (censusFlag !== -1) {
 
 // The one crate that is allowed to carry reqwest as a *direct* dependency
 // for talking to Tally itself: the loopback-only HTTP transport. It is
-// reached by `bridge` (the app crate) and, through it, by the read-only
-// tools in tools/bridge-tally-live-read -- both expected, both already
-// covered by scripts/check-tally-live-read-boundary.mjs's own first-party
-// boundary list. This gate only asks one narrower question: which crates
+// reached by `bridge` (the app crate). This gate only asks one narrower question: which crates
 // declare reqwest *directly*, not which crates reach it transitively.
 const TALLY_HTTP_TRANSPORT_CRATE = "bridge-tally-transport";
 
@@ -381,12 +375,6 @@ const workspaces = [
     label: "src-tauri",
     manifestPath: "src-tauri/Cargo.toml",
     expected: { reqwest: [APP_CRATE, TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
-    shipped: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
-  },
-  {
-    label: "tools",
-    manifestPath: "tools/Cargo.toml",
-    expected: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
     shipped: { reqwest: [TALLY_HTTP_TRANSPORT_CRATE], hyper: [], ...LOWER_LEVEL_NETWORK },
   },
 ];
@@ -540,7 +528,7 @@ const DENIED_CRATES = [
   "tauri-plugin-http", "tauri-plugin-opener", "tauri-plugin-shell", "tauri-plugin-websocket", "tauri-plugin-upload",
 ];
 const DENIED_JS_PACKAGES = /@tauri-apps\/plugin-(?:http|opener|shell|websocket|upload)\b/;
-for (const lockfile of ["src-tauri/Cargo.lock", "tools/Cargo.lock"]) {
+for (const lockfile of ["src-tauri/Cargo.lock"]) {
   const names = new Set([...readFileSync(`${root}${lockfile}`, "utf8").matchAll(/^name = "([^"]+)"$/gm)].map((match) => match[1]));
   if (names.size === 0) egressViolations.push(`${lockfile} lists no packages; it was not read`);
   for (const name of DENIED_CRATES) {

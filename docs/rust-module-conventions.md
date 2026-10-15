@@ -90,7 +90,7 @@ non-idiomatic Rust. Treat them as questions only.
    can jointly confirm purity, and keep moves free of edits so `git blame -C` and
    `git log --follow` still work.
 8. **Prove purity with test names, not counts, then run the suite.** Diff `cargo test -- --list`
-   output before and after, on both workspaces (`src-tauri/`, `tools/`): a count can match while a
+   output before and after, on the workspace (`src-tauri/`): a count can match while a
    test was dropped and another added. But listing is not running.
    - **Tests that read source as text still compile after a move and then fail.** Before moving, grep
      for `include_str!` and script `readFile` calls naming the file. The first `commands.rs` split

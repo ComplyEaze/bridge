@@ -54,31 +54,7 @@
       "path": "docs/tally/TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md"
     },
     {
-      "path": "docs/tally/compatibility/README.md"
-    },
-    {
-      "path": "docs/tally/compatibility/bills-native-probe-runbook.md"
-    },
-    {
-      "path": "docs/tally/compatibility/fixtures/education-native-outstandings-v0.json"
-    },
-    {
-      "path": "docs/tally/compatibility/fixtures/education-small-v1.json"
-    },
-    {
-      "path": "docs/tally/compatibility/native-outstandings-profile.example.json"
-    },
-    {
-      "path": "docs/tally/compatibility/native-outstandings-ui-after.example.json"
-    },
-    {
-      "path": "docs/tally/compatibility/native-outstandings-ui-before.example.json"
-    },
-    {
       "path": "docs/tally/compatibility/synthetic-write-canary-fixture.md"
-    },
-    {
-      "path": "docs/tally/support-matrix.md"
     },
     {
       "path": "package.json"
@@ -93,9 +69,6 @@
     {
       "path": "scripts/check-surface-ack.mjs",
       "reason": "decides whether a change to a sealed file was acknowledged in review; it replaces the stored-hash tripwire, so weakening it must itself be acknowledged"
-    },
-    {
-      "path": "scripts/check-tally-live-read-boundary.mjs"
     },
     {
       "path": "scripts/check-tally-request-builder-hazards.mjs"
@@ -210,9 +183,6 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/Cargo.toml"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/bills_native_outstandings_probe.rs"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/currency_composite.rs"
@@ -948,42 +918,6 @@
     },
     {
       "path": "src/tally-error-copy.ts"
-    },
-    {
-      "path": "tools/Cargo.lock"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/Cargo.toml"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/src/bills_native_outstandings_probe_receipt.rs"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/src/lib.rs"
-    },
-    {
-      "path": "tools/bridge-tally-compatibility/src/main.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/Cargo.toml"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/bin/native_outstandings_probe.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/lib.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/main.rs"
-    },
-    {
-      "path": "tools/bridge-tally-live-read/src/native_outstandings_qualification.rs"
-    },
-    {
-      "path": "tools/bridge-tally-read-transport/Cargo.toml"
-    },
-    {
-      "path": "tools/bridge-tally-read-transport/src/lib.rs"
     }
   ]
 }

@@ -1055,7 +1055,7 @@ the `FETCH` list and looks at what arrives.
 > - **Reads at scale.** Reads of books of thousands of vouchers are the open failure in bridge#485.
 >
 > Neither run exercised a second Tally user writing during the read. That is the case Gold adds
-> over Silver (bridge#239). This correction promotes no compatibility-matrix claim.
+> over Silver (bridge#239). This correction promotes no claim.
 
 ### 9.9 Bulk import throughput
 

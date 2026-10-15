@@ -2,9 +2,7 @@
 //!
 //! These are pure primitives: an exact decimal, a validated Tally date, the
 //! shared error, and which characters a reader sees ([`text`]). They live below `bridge-tally-core` deliberately.
-//! `bridge-tally-core` once carried delivery/destination capability, and the
-//! sealed read-only `bridge-tally-live-read` controller is still forbidden from
-//! reaching that crate by `scripts/check-tally-live-read-boundary.mjs`. Keeping
+//! `bridge-tally-core` once carried delivery/destination capability. Keeping
 //! the value types here lets `bridge-tally-protocol` use them without dragging
 //! core's write-side surface into the read path.
 

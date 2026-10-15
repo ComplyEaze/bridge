@@ -1,5 +1,7 @@
 # Bridge × Tally — Prompt Playbook
 
+> Some prompts below name the `bridge-tally-compatibility` crate, its matrix and the `tools/` workspace; those were removed (#1745). Read them as history.
+
 Companion to `docs/tally/IMPROVEMENT_PLAN_2026H2.md`. Copy-paste prompts for driving AI codegen agents (Codex/Claude) through each roadmap phase: implementation, review/rectification cycles, change-preservation gates, and the overall orchestrator.
 
 **How to use:** every prompt below assumes the GLOBAL RULES block (§1) is pasted beneath it. Each phase runs the same cycle:

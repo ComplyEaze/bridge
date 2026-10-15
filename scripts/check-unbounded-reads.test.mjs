@@ -484,7 +484,7 @@ test("a tracked .rs file outside the roots, unlisted, fails by type and by name"
 test("a listed file outside the roots passes and is not scanned", () => {
   assert.deepEqual(checkSourceCoverage(["src-tauri/build.rs", "src-tauri/src/a.rs"]), ["src-tauri/src/a.rs"]);
   const exclusions = new Map([["x/other.rs", "a generator, no external input"]]);
-  assert.deepEqual(checkSourceCoverage(["x/other.rs", "tools/b.rs"], { exclusions }), ["tools/b.rs"]);
+  assert.deepEqual(checkSourceCoverage(["x/other.rs", "src-tauri/src/b.rs"], { exclusions }), ["src-tauri/src/b.rs"]);
 });
 
 test("a test file outside the roots is excluded by the path rule, not by a listed name", () => {
@@ -516,7 +516,7 @@ test("an exclusion naming a file git does not track is a stale exclusion", () =>
 });
 
 // The roots are spelled out here, not read from SOURCE_ROOTS, so dropping one drops its case's pass.
-for (const root of ["src-tauri/src", "src-tauri/crates", "tools"]) {
+for (const root of ["src-tauri/src", "src-tauri/crates"]) {
   test(`an unguarded read under ${root} is scanned and reported`, async () => {
     assert.ok(SOURCE_ROOTS.includes(root));
     const output = await gateOnTree({ [`${root}/pkg/example.rs`]: UNCAPPED }, true);

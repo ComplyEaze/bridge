@@ -284,6 +284,20 @@ async fn an_unknown_or_missing_kind_is_refused_before_any_read() {
 }
 
 #[test]
+fn the_ledger_masters_text_names_the_credit_flag_by_its_element_and_does_not_read_it_as_eligibility(
+) {
+    let definitions = tool_definitions(false, false);
+    let tool = definitions
+        .as_array()
+        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "ledger_masters"))
+        .expect("ledger_masters tool definition");
+    let description = tool["description"].as_str().unwrap();
+    assert!(description.contains("`ineligible_itc` (Tally's `GSTINELIGIBLEITC` as sent"));
+    assert!(description.contains("whether a ledger's element reads the same way is not yet established, so do not read true as eligible"));
+    assert!(!description.contains("`itc_eligible`"));
+}
+
+#[test]
 fn the_tool_definition_admits_only_the_eight_kinds_and_states_the_size_limits() {
     let definitions = tool_definitions(false, false);
     let tool = definitions

@@ -426,7 +426,7 @@ date measured, so recognise it by its source) when an item is first saved. `stat
 `Any` and `Not Applicable`. On one item `GSTINELIGIBLEITC` was Yes on the entry whose screen
 row read `Eligible for Input Tax Credit: No` and absent on the entry whose screen row read Yes,
 which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire), so a stock
-item row names it `ineligible_itc`, not `itc_eligible` (`ledger_masters` keeps its own key). What an
+item row names it `ineligible_itc`, and so does `ledger_masters` (#1741: whether a ledger's element reads the same way is not yet established, so do not read `true` as eligible). What an
 absent element means for the tax is not known: null is neither eligible nor ineligible. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld: `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an entry was never compared with the screen (both screen readings are of rows a person edited or keyed, and a row's origin and its flag cannot be told apart on one item); a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. A Tally `ERROR` or `LINEERROR`
 anywhere in a list, markup inside a value, or a list cut off refuses the whole read
 (`masters_tally_reported_failure`, `masters_scalar_not_text_only`,

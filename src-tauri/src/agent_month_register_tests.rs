@@ -108,8 +108,7 @@ async fn call(plans: Vec<ScenarioPlan>, args: Value) -> (Value, usize, usize) {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let response = server.call_tool("month_register", args).await;
     (response, simulator.finish().unwrap().len(), expected)
@@ -344,8 +343,7 @@ async fn the_arguments_are_refused_before_any_request() {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     for (args, code) in [
         (

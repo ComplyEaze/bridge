@@ -95,8 +95,7 @@ fn server_at(port: u16, directory: &std::path::Path) -> Server {
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: false,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 

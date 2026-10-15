@@ -32,8 +32,7 @@ fn the_published_rules_name_every_qualified_type_and_claim_no_other() {
         max_bytes: 200_000,
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let published = server.voucher_schema().unwrap().payload;
     let prose = format!(
@@ -142,8 +141,7 @@ async fn an_unshaped_bank_voucher_is_refused_before_dispatch_or_persistence() {
                 max_bytes: 200_000,
                 redaction: super::super::super::Redaction::None,
                 import_enabled: true,
-                writes_enabled: false,
-                batch_post_enabled: false,
+                posting: crate::agent::Posting::Off,
             });
             let mut input = admitted_payload();
             input.vouchers.truncate(1);
@@ -280,8 +278,7 @@ async fn a_sales_voucher_is_refused_before_any_request_and_nothing_is_written() 
         max_bytes: 200_000,
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: true,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::On,
     });
     let invoice = |number: &str| {
         json!({"company_guid": GUID, "vouchers": [{

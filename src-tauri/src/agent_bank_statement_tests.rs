@@ -34,8 +34,7 @@ fn server(directory: &Path, import_enabled: bool, redaction: Redaction) -> Serve
         max_bytes: 200_000,
         redaction,
         import_enabled,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 

@@ -388,10 +388,11 @@ impl Server {
         }
     }
 
-    /// How many vouchers one post may send: 1, unless batch posting is on and
-    /// this is the MCP path (the desktop posts one Journal).
+    /// How many vouchers one post may send: up to the batch cap on the MCP path
+    /// whenever posting is on, since one setting governs every post (#1090);
+    /// the desktop posts one Journal.
     pub(super) fn post_voucher_limit(&self, scope: PostScope) -> usize {
-        if scope == PostScope::Vouchers && self.settings.batch_post_enabled {
+        if scope == PostScope::Vouchers && self.settings.posting.enabled() {
             ledger::MAX_BATCH_POST_VOUCHERS
         } else {
             1
@@ -2578,8 +2579,8 @@ pub(super) fn admit_saved_journal_integrity(
     admit_saved_voucher_integrity(line, endpoint, PostScope::JournalOnly, 1)
 }
 
-/// `max_vouchers` is 1 unless `BRIDGE_AGENT_ENABLE_BATCH_POST` lets the MCP
-/// path post a batch (`Server::post_voucher_limit`). Every voucher's type must
+/// `max_vouchers` is the batch cap on the MCP path while posting is on, and 1
+/// for the desktop (`Server::post_voucher_limit`). Every voucher's type must
 /// be one the scope admits.
 pub(super) fn admit_saved_voucher_integrity(
     line: &ImportLedgerLine,

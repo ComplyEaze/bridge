@@ -392,11 +392,11 @@ What you pay or provide today:
 - **Your clients' data:** what Claude reads goes to Anthropic, under
   Anthropic's terms for your plan; through ComplyEaze Bridge, ComplyEaze does
   not receive it
-  ([Privacy Policy](https://bridge.complyeaze.com/privacy), sections 4 to 6).
+  ([Privacy Policy](https://bridge.complyeaze.com/privacy.html), sections 4 to 6).
 - **Your checking:** check results in Tally before you rely on them.
 
 Support and updates are not guaranteed
-([Terms of Use](https://bridge.complyeaze.com/terms), section 4.4). Our
+([Terms of Use](https://bridge.complyeaze.com/terms.html), section 4.4). Our
 liability is limited as section 14 sets out, including its fallback and
 exceptions; read it before client work.
 

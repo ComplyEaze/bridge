@@ -431,6 +431,36 @@ fn what_was_seen_is_placed_for_every_status_the_verification_writes() {
     }
 }
 
+/// An invoice its post's content cannot find, as each of the verification's
+/// rewrites writes it: after an answer that was not clean the words drop the
+/// edit example, as the verification's own next step does; otherwise they
+/// keep it.
+#[test]
+fn an_unattributed_invoice_after_an_unclean_answer_drops_the_edit_example() {
+    use super::super::super::verification;
+    let line = batch("Sales", "http://127.0.0.1:9000");
+    let empty = verification::verify_batch(
+        &line,
+        &ImportReadSource::admit(Vec::new()).unwrap(),
+        verification::Attribution::Tag,
+    )
+    .unwrap();
+    for (rewrite, words) in [
+        (
+            verification::mark_sent_not_attributed_after_unclean_answer as fn(&mut Value),
+            "not established: no voucher matching this invoice was found, and one may be in the book",
+        ),
+        (verification::mark_sent_not_attributed, NOT_ATTRIBUTED),
+        (verification::mark_sent_after_reported_not_created, NOT_ATTRIBUTED),
+    ] {
+        let mut result = empty.clone();
+        rewrite(&mut result);
+        let seen = Seen::of(&result, &line);
+        assert_eq!(seen.reported(), ("not_established", "sent_not_attributed"));
+        assert_eq!(seen.words(), words);
+    }
+}
+
 /// A row that reads verified still stops its company when another voucher
 /// duplicates it or the dispatch needs reconciliation: the words say which.
 #[test]

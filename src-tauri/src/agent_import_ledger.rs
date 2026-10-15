@@ -1077,6 +1077,9 @@ fn scan_records(
     let mut responded: BTreeSet<String> = BTreeSet::new();
     let mut marked: BTreeSet<String> = BTreeSet::new();
     let mut with_verdict: BTreeSet<String> = BTreeSet::new();
+    // Batches whose latest status is `posted_verified`: a stop release is
+    // admitted only while its batch is not.
+    let mut verified: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
     while read_record(&mut reader, &mut line)? {
@@ -1145,10 +1148,12 @@ fn scan_records(
             if update.pre_post_voucher_mark.is_some() {
                 marked.insert(update.batch_id.clone());
             }
-            // A stop release follows its batch's dispatch intent, carries
-            // nothing else, and records what the release read saw.
+            // A stop release follows its batch's dispatch intent, is made
+            // only while the batch is not verified, carries nothing else, and
+            // records what the release read saw.
             if matches!(update.record_type, StatusKind::StopRelease) {
                 if !dispatched.contains_key(&update.batch_id)
+                    || verified.contains(&update.batch_id)
                     || update.status != STOP_RELEASE_STATUS
                     || update.release_seen.is_none()
                     || update.response.is_some()
@@ -1198,6 +1203,13 @@ fn scan_records(
             } else if update.response.is_some() {
                 return Err("import_ledger_invalid".into());
             }
+            if update.sets_status() {
+                if update.status == "posted_verified" {
+                    verified.insert(update.batch_id.clone());
+                } else {
+                    verified.remove(&update.batch_id);
+                }
+            }
             Record::Status(Box::new(update))
         } else {
             let batch: ImportLedgerLine =
@@ -1211,6 +1223,11 @@ fn scan_records(
                 batch.batch_id.clone(),
                 (batch.sha256.clone(), batch.vouchers.len()),
             );
+            if batch.status == "posted_verified" {
+                verified.insert(batch.batch_id.clone());
+            } else {
+                verified.remove(&batch.batch_id);
+            }
             txn_ids.insert(
                 batch.batch_id.clone(),
                 batch

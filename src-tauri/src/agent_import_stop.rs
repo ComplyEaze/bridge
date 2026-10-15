@@ -110,6 +110,16 @@ impl Seen {
             ("posted_not_effective", Some("voucher_optional")) => {
                 Self::Found(why("found in Tally, optional"))
             }
+            // After an answer that was not clean the verification drops the
+            // edit example, by the next step it writes; so do these words.
+            ("sent_not_attributed", _)
+                if row["next_step"]
+                    == super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP =>
+            {
+                Self::NotEstablished(why(
+                    "not established: no voucher matching this invoice was found, and one may be in the book",
+                ))
+            }
             ("sent_not_attributed", _) => Self::NotEstablished(why(
                 "not established: no voucher matching this invoice was found, and one may be in the book, changed or entered in Tally",
             )),

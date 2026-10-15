@@ -1104,7 +1104,8 @@ fn a_release_lifts_one_batch_and_a_later_verified_read_voids_it() {
 }
 
 /// The journal admits a release only after the batch's dispatch intent, for a
-/// batch it knows, bound to that batch's sha256, carrying nothing else.
+/// batch it knows and that is not verified, bound to that batch's sha256,
+/// carrying nothing else.
 #[test]
 fn the_journal_admits_a_release_only_for_a_sent_batch_bound_to_its_sha() {
     let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
@@ -1148,6 +1149,33 @@ fn the_journal_admits_a_release_only_for_a_sent_batch_bound_to_its_sha() {
             Err("import_ledger_invalid".to_string()),
             "{refused}"
         );
+    }
+    // A release is admitted only while its batch is not verified, whether the
+    // latest status is a status record's or the batch line's own.
+    let mut verified_line = first.clone();
+    verified_line.status = "posted_verified".to_string();
+    for (journal, admitted) in [
+        (vec![record(&first), sent(&first), found(&first)], false),
+        (
+            vec![record(&first), sent(&first), record(&verified_line)],
+            false,
+        ),
+        (
+            vec![
+                record(&first),
+                sent(&first),
+                found(&first),
+                incomplete(&first),
+            ],
+            true,
+        ),
+    ] {
+        let outcome = read([journal, vec![released(&first, ReleaseSeen::Found)]].concat());
+        if admitted {
+            assert_eq!(outcome, Ok(Vec::<String>::new()));
+        } else {
+            assert_eq!(outcome, Err("import_ledger_invalid".to_string()));
+        }
     }
     // A release sets no status: the batch is still not verified. Each value
     // is recorded by its own name.

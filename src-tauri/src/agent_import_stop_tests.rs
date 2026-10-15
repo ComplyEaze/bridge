@@ -362,6 +362,7 @@ fn what_was_seen_is_placed_for_every_status_the_verification_writes() {
         verification::mark_sent_not_attributed,
         verification::mark_reported_not_created,
         verification::mark_sent_after_reported_not_created,
+        verification::mark_sent_not_attributed_after_unclean_answer,
     ] {
         declared.insert(rewritten(rewrite));
     }
@@ -492,7 +493,9 @@ fn a_verified_row_says_why_it_is_not_confirmed() {
 }
 
 /// The release is decided on the batch's one invoice and its one row: any
-/// other shape is a read that cannot be placed, never a sighting.
+/// other shape is a read that cannot be placed, never a sighting. A completed
+/// read holding several rows for the invoice is not established, by its own
+/// detail, never found.
 #[test]
 fn a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable() {
     let line = batch("Sales", "http://127.0.0.1:9000");
@@ -512,7 +515,6 @@ fn a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable() {
             json!({"vouchers": [{"bridge_txn_id": "t2", "status": "posted_divergent"}]}),
             &line,
         ),
-        (json!({"vouchers": [row.clone(), row.clone()]}), &line),
         (json!({"vouchers": [{"bridge_txn_id": "t1"}]}), &line),
         (json!({"vouchers": [row.clone()]}), &two_invoices),
         (json!({"vouchers": [row.clone()]}), &journal),
@@ -523,6 +525,24 @@ fn a_read_that_does_not_hold_the_invoice_s_one_row_is_unreadable() {
             (kind.to_string(), detail.to_string(), seen.words()),
             missing,
             "{result}"
+        );
+    }
+    let verified = json!({"bridge_txn_id": "t1", "status": "posted_verified"});
+    for rows in [
+        json!([row.clone(), row.clone()]),
+        json!([verified.clone(), row.clone()]),
+        json!([verified.clone(), verified.clone(), verified]),
+    ] {
+        let seen = Seen::of(&json!({"vouchers": rows}), &line);
+        let (kind, detail) = seen.reported();
+        assert_eq!(
+            (kind.to_string(), detail.to_string(), seen.words()),
+            (
+                "not_established".to_string(),
+                "invoice_rows_repeated".to_string(),
+                "not established: more than one voucher was read as this invoice".to_string()
+            ),
+            "{rows}"
         );
     }
 }
@@ -660,6 +680,33 @@ async fn a_stop_that_changes_while_the_dialog_is_open_is_not_released() {
     assert_eq!(release_records(&server), Vec::<Value>::new());
     assert_eq!(stop(&server), None);
     status(&server, &line, "verification_incomplete");
+    assert_eq!(stop(&server), Some(line.batch_id));
+}
+
+/// A stop that lifts and comes back while the dialog is open is another stop
+/// than the one the person was shown: the batch reads verified, which voids
+/// what came before, then diverges and stops the company again. The release
+/// is refused, nothing is written, and the new stop stands.
+#[tokio::test]
+async fn a_stop_that_lifts_and_returns_while_the_dialog_is_open_is_not_released() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server) = server_reading(directory.path(), 1);
+    let server = Arc::new(server);
+    let line = saved(&server, "Sales");
+    posted(&server, &line);
+    let (other, other_line) = (Arc::clone(&server), line.clone());
+    let approval = ScriptedApproval::approving_after(move || {
+        status(&other, &other_line, "posted_verified");
+        status(&other, &other_line, "verification_incomplete");
+    });
+    let response = release(&server, args(&line), approval.clone()).await;
+    assert_eq!(
+        result(&response)["error"]["code"],
+        "ack_stop_changed_while_reviewing",
+        "{response}"
+    );
+    assert_eq!(approval.review_counts(), [1]);
+    assert_eq!(release_records(&server), Vec::<Value>::new());
     assert_eq!(stop(&server), Some(line.batch_id));
 }
 

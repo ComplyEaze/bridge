@@ -44,16 +44,21 @@ pub(super) enum Seen {
     },
 }
 
-/// The invoice row's status and the dialog's words for it.
+/// The invoice row's status (or, for several rows, `ROWS_REPEATED`) and the
+/// dialog's words for it.
 pub(super) struct Why {
     status: String,
     words: String,
 }
 
-/// A batch whose invoice is not exactly one voucher, or whose read holds not
-/// exactly one row for it. The build refuses such a batch, so this is a read
-/// that cannot be placed, never a sighting.
+/// A batch whose invoice is not exactly one voucher (the build refuses one),
+/// or whose read holds no row for it, or one without a status: a read that
+/// cannot be placed, never a sighting.
 const ROWS_MISSING: &str = "import_verification_rows_missing";
+
+/// A completed read holding more than one row for the batch's one invoice:
+/// none can be told to be it.
+const ROWS_REPEATED: &str = "invoice_rows_repeated";
 
 impl Seen {
     pub(super) fn of(result: &Value, line: &ImportLedgerLine) -> Self {
@@ -74,8 +79,15 @@ impl Seen {
                 .filter(|row| row["bridge_txn_id"] == invoice.bridge_txn_id.as_str())
                 .collect()
         });
-        let [row] = rows.as_slice() else {
-            return missing();
+        let row = match rows.as_slice() {
+            [] => return missing(),
+            [row] => row,
+            [..] => {
+                return Self::NotEstablished(Why {
+                    status: ROWS_REPEATED.into(),
+                    words: "not established: more than one voucher was read as this invoice".into(),
+                })
+            }
         };
         let Some(status) = row["status"].as_str() else {
             return missing();
@@ -338,19 +350,22 @@ impl Server {
         let Some(held) = self.stop_held(&line)? else {
             return Ok(self.stop_outcome(&line, "not_held", None, evidence));
         };
-        let preview = release_preview(&held, &seen);
+        let preview = release_preview(&held.batch, &seen);
         let count = VoucherCount::new(1).ok_or_else(|| "ack_stop_batch_not_sent".to_string())?;
         let _acknowledged = ReviewAcknowledged::confirm(count, &preview)
             .await
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
 
         // Recorded under the exclusive lock, and only if the batch still
-        // stops the company as the person was shown.
+        // stops the company as the person was shown: no record of it since
+        // (a stop that lifted and came back while the dialog was open is
+        // another stop than the one shown).
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
-        if current.batch.sha256 != line.sha256
+        if current.generation != held.generation
+            || current.batch.sha256 != line.sha256
             || !self
                 .import_invoice_stops_while_admitted(&line.company_guid)?
                 .contains(&line.batch_id)
@@ -382,8 +397,9 @@ impl Server {
             .ok_or_else(|| "ack_stop_not_held".to_string().into())
     }
 
-    /// The batch as the journal holds it now, when it stops its company.
-    fn stop_held(&self, line: &ImportLedgerLine) -> Result<Option<ImportLedgerLine>, String> {
+    /// The batch as the journal holds it now, with the generation of its
+    /// latest record, when it stops its company.
+    fn stop_held(&self, line: &ImportLedgerLine) -> Result<Option<ledger::BatchSnapshot>, String> {
         let _lock = self.lock_import_admission_shared()?;
         if !self
             .import_invoice_stops_while_admitted(&line.company_guid)?
@@ -391,9 +407,7 @@ impl Server {
         {
             return Ok(None);
         }
-        Ok(self
-            .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .map(|snapshot| snapshot.batch))
+        self.import_snapshot_while_admitted(Some(&line.batch_id))
     }
 
     fn stop_outcome(

@@ -355,6 +355,19 @@ impl fmt::Display for BankReference {
     }
 }
 
+impl BankReference {
+    /// A reference read back from a record: admitted only in a shape
+    /// [`Bank::transfer_reference`] can produce (twelve ASCII digits, or a
+    /// value that [`looks_like_utr`]) and never all zeros. Anything else is not
+    /// a value this build wrote.
+    pub fn from_recorded(text: &str) -> Option<Self> {
+        let admitted = (text.len() == 12 && text.bytes().all(|byte| byte.is_ascii_digit()))
+            || looks_like_utr(text);
+        (admitted && !text.chars().all(|character| character == '0'))
+            .then(|| Self(text.to_string()))
+    }
+}
+
 impl Bank {
     /// The row's network-transfer reference, when it carries one, read from
     /// what [`Bank::reference`] names. Every other mode (cheque, internal

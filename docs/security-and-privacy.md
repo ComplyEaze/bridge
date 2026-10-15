@@ -3,13 +3,14 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Four
+page was not read again at it, except as said below). Five
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
 `ledger_movement` read took, in section 2 (#1366), where a program built
-from this repository loads the PDF library from, in section 5 (#1422), and the
-statement party written into a bank voucher's narration, in section 2 (#1430). It was written from a reading
+from this repository loads the PDF library from, in section 5 (#1422), the
+statement party written into a bank voucher's narration, in section 2 (#1430), and the
+file of skipped bank-statement rows, in section 4 (#1625). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -320,6 +321,21 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
+- **Skipped statement rows** (`agent-import-statement-skips.jsonl`): written
+  when you build a statement in which every row is mapped `skip` (recorded
+  from the other bank account's statement), so that there is no voucher batch
+  to save. Each record holds an identifier of its own, the company's
+  identifier (GUID), the Tally address, the time, the bank ledger's GUID and,
+  when the statement covers any day in full, those dates; and for each skipped
+  row an identifier (the row's date and a short fingerprint of the row), its
+  date, amount, direction, the other ledger's GUID, the UPI, IMPS, NEFT or
+  RTGS reference if the row has one, the cheque or instrument number as the
+  statement prints it, and a mark when an equal amount goes the other way on
+  the same day. It has no field for a narration or a ledger name. A statement
+  that also has rows to post keeps the same facts for its skipped rows, and
+  the reference and instrument of each of its Contra rows, in its record in
+  the import journal: unlike the ledger records described above, these hold
+  the dates and amounts of rows that are not posted.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
   kept in ComplyEaze Bridge's per-user folder and, on Windows, also in
   `.complyeaze-bridge\coordination` under your user profile) that keeps two
@@ -347,7 +363,11 @@ any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them
 `verify_import` cannot find the batch. The journal is also how it remembers
 which batches and which bank-statement rows it has already sent to Tally, so
-that it can refuse to send one twice. Once 0.5.0 has built a batch in this
+that it can refuse to send one twice. Do not delete
+`agent-import-statement-skips.jsonl` either: a missing file reads as no
+skipped rows, so those rows are no longer shown in the `transfers` section,
+and a later build that posts one of them as its own voucher is no longer
+refused for that reason: a transfer may then be booked twice. Once 0.5.0 has built a batch in this
 folder, do not run 0.4.2 or earlier over it: they refuse to post that batch. The
 [Privacy Policy](./legal/privacy.md) (section 7) describes archiving the whole
 folder instead of deleting it, and what ComplyEaze Bridge no longer remembers

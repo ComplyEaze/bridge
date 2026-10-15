@@ -51,6 +51,8 @@ mod gst_status;
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
+#[path = "agent_negative_ledgers.rs"]
+mod negative_ledgers;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -797,6 +799,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
             cause.downcast_ref::<bridge_tally_protocol::native_cash_flow::NativeCashFlowError>()
         {
             return Some(cash_flow.code());
+        }
+        if let Some(negative_ledgers) = cause
+            .downcast_ref::<bridge_tally_protocol::native_negative_ledgers::NativeNegativeLedgersError>()
+        {
+            return Some(negative_ledgers.code());
         }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
@@ -1551,6 +1558,10 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::NegativeLedgersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
@@ -2170,6 +2181,7 @@ impl Server {
             }
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
+            "negative_ledgers" => self.negative_ledgers(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;

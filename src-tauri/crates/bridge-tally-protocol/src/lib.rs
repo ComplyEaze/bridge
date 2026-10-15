@@ -43,6 +43,7 @@ pub mod native_company_features;
 pub mod native_funds_flow;
 mod native_ledger_collection;
 pub mod native_masters;
+pub mod native_negative_ledgers;
 pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;

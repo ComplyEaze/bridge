@@ -1,0 +1,6 @@
+# fixture: tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml
+# parser: parse_native_negative_ledgers
+# source: captured
+Ok(NativeNegativeLedgers {
+    entries: [],
+})

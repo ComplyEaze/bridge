@@ -96,6 +96,7 @@ The ordinary default tools, in name order:
 - `list_companies`
 - `local_data_report`
 - `masters`
+- `negative_ledgers`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -115,7 +116,7 @@ The ordinary default tools, in name order:
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
-source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
+source after release 0.5.0 and `negative_ledgers` after release 0.5.1; none is in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -550,6 +551,49 @@ place of a difference; it is covered by tests only), what Tally's debit and cred
 include (each differed from the totals of the ledgers Tally counts as cash and bank by one common amount in size (the ledgers' columns larger in both) while the net tied; on one book that set includes a Bank OD A/c ledger), a contra, a window
 ending in February, a window crossing a financial year, optional or post-dated vouchers, a book with
 several currencies, and a large book with cash activity.
+
+### Negative Ledgers (`negative_ledgers`)
+
+Use `negative_ledgers` with `company_guid`, `from` and `to` for Tally's own Negative
+Ledgers list: the ledgers on that list, each as `ledger`, `side` (`debit` or `credit`) and `amount` (an exact decimal
+with no sign). The list is Tally's own and is returned as it is, in Tally's order. The
+rule by which Tally lists a ledger is not established and is not derived here: on three
+books each listed ledger's balance sat on the side opposite its group, and on the first
+book measured a creditor with a debit balance and a debtor with a credit balance were
+listed and a ledger under Suspense A/c with a credit balance was not.
+
+It is **not compared with any other report**: `checks` says `list_complete` and
+`amounts_against_trial_balance` are `not_checked`, so a ledger Tally did not list is not
+shown to be absent, and a listed amount is not shown to equal the ledger's closing
+balance in the trial balance (the contributor reported that on the first book both did; on two more books the one ledger listed on each did too, with the trial balances kept on the evidence branch). An empty list is
+returned with `state` `not_established` and `reason`
+`negative_ledgers_empty_answer_is_not_a_finding`: Tally's empty answer cannot be told from
+a report that was not rendered, so it never says that no ledger is negative. A non-empty
+list is `observed`. `mask_parties` masks each `ledger` name.
+
+The report was captured for one whole financial year (1 April to 31 March) on one
+synthetic company, and read for a whole year on two more synthetic books: any other window
+is named in `unmeasured_in_this_answer` as `window_other_than_a_whole_financial_year`.
+What GST, stock, several currencies, or optional or post-dated vouchers do to the list was
+not measured: one of the two further books holds GST ledgers and, as the evidence branch records,
+one optional voucher, and neither book's settings were read. A window starting before the book is
+`negative_ledgers_before_books`, a reversed window `invalid_date_range`, and Education mode
+`negative_ledgers_education_unqualified`. A refused answer fails the call as `negative_ledgers_read_failed`, with the specific code below in `error.cause`; `negative_ledgers_before_books`, `negative_ledgers_education_unqualified` and `negative_ledgers_period_not_honoured` are the error's own code. The answer is refused, never reinterpreted, when
+a listed ledger carries both columns, neither, a zero, or the other sign than the one
+measured (a debit as a negative debit amount, a credit as a positive credit amount:
+`negative_ledgers_balance_unexpected`), when a ledger is named twice
+(`negative_ledgers_ledger_repeated`), when Tally reports a failure
+(`negative_ledgers_tally_reported_failure`) or does not know the report
+(`negative_ledgers_report_unknown`), when an amount is not a plain decimal
+(`negative_ledgers_amount_invalid`), or when the report or the book changed between the paired
+reads (`native_negative_ledgers_changed`), or the book's extent differed before and after the read (`native_ledger_extent_changed`). A window the read could not build a period for is `negative_ledgers_period_not_honoured`. The report has no
+size check and its cost on a large book is not known; the report is one paired read (two requests), never retried. Measured on one
+synthetic TallyPrime 7.1 Silver book (the captures are in the protocol crate's fixtures);
+this tool has not yet been run against Tally. Two further synthetic books were read with the same report request (raw requests to Tally, not through this tool) for one whole financial year each,
+with Tally's trial balance of the same year read beside the report: each listed one ledger (an expense ledger and a bank ledger, each
+with a credit balance), its amount equalled the ledger's closing balance in the trial balance, and no other ledger of either
+trial balance read on the opposite side to its group. No empty answer, no list of many ledgers, no other group and no shorter
+period was seen on those books.
 
 ### Company settings and currency symbol (`company_features`)
 

@@ -1,0 +1,23 @@
+{
+  "company_guid": "<GUID of BRIDGE PILOT LAB from step 0>",
+  "vouchers": [
+    {
+      "bridge_txn_id": "lab-1571-p3-<RUN>",
+      "date": "2026-08-01",
+      "voucher_type": "Journal",
+      "narration": "Synthetic macOS dialog row: a long narration shown in numbered parts on the Mac, declined without any write, so that the part lines, their quotes and the line above the dashes can be compared with the Windows dialog line by line.",
+      "entries": [
+        {
+          "ledger": "<LEDGER_DR from step 0>",
+          "amount": "14.50",
+          "side": "Dr"
+        },
+        {
+          "ledger": "<LEDGER_CR from step 0>",
+          "amount": "14.50",
+          "side": "Cr"
+        }
+      ]
+    }
+  ]
+}

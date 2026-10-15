@@ -1,0 +1,23 @@
+{
+  "company_guid": "<GUID of BRIDGE PILOT LAB from step 0>",
+  "vouchers": [
+    {
+      "bridge_txn_id": "lab-1571-p2-<RUN>",
+      "date": "2026-08-01",
+      "voucher_type": "Journal",
+      "narration": "Synthetic row with \"quoted\" words and a folder path C:\\lab\\statements\\row1 to prove that a quote and a backslash are shown escaped in the dialog and are posted and read back exactly as written, in a narration long enough to need parts.",
+      "entries": [
+        {
+          "ledger": "<LEDGER_DR from step 0>",
+          "amount": "13.50",
+          "side": "Dr"
+        },
+        {
+          "ledger": "<LEDGER_CR from step 0>",
+          "amount": "13.50",
+          "side": "Cr"
+        }
+      ]
+    }
+  ]
+}

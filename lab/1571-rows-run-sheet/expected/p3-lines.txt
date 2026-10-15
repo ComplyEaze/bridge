@@ -1,0 +1,7 @@
+﻿ComplyEaze Bridge — post this voucher?
+Date: 20260801  Voucher number: Tally assigns it  (the voucher's own text: below the dashes)
+Below the dashes: the reference on one line, then the narration in 3 parts.
+Reference: (none)
+Narration (1): "Synthetic macOS dialog row: a long narration shown in numbered parts on the Mac, "
+Narration (2): "declined without any write, so that the part lines, their quotes and the line "
+Narration (3): "above the dashes can be compared with the Windows dialog line by line."

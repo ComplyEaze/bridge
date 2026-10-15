@@ -1,0 +1,8 @@
+﻿ComplyEaze Bridge — post this voucher?
+Date: 20260801  Voucher number: Tally assigns it  (the voucher's own text: below the dashes)
+Below the dashes: the reference on one line, then the narration in 4 parts.
+Reference: (none)
+Narration (1): "Synthetic statement row for the lab: cash deposit at the branch counter, reference "
+Narration (2): "000123, booked to a synthetic suspense ledger while the purpose is confirmed. This "
+Narration (3): "narration is long on purpose, so the approval dialog must show it in numbered "
+Narration (4): "parts and the posted voucher can be read back whole."

@@ -1,0 +1,7 @@
+﻿ComplyEaze Bridge — post this voucher?
+Date: 20260801  Voucher number: Tally assigns it  (the voucher's own text: below the dashes)
+Below the dashes: the reference on one line, then the narration in 3 parts.
+Reference: (none)
+Narration (1): "Synthetic row with \"quoted\" words and a folder path C:\\lab\\statements\\row1 to "
+Narration (2): "prove that a quote and a backslash are shown escaped in the dialog and are posted "
+Narration (3): "and read back exactly as written, in a narration long enough to need parts."

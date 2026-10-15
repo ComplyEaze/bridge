@@ -1005,12 +1005,10 @@ fn replayable_observation(batch_id: &str) -> ObservedRecordInput {
         },
         observed_at_unix_ms: 2_100,
         raw_source_sha256: HASH_A.to_string(),
-        canonical_sha256: Some(HASH_B.to_string()),
-        canonical_payload: Some(json!({"amount": "1180.00", "name": "Synthetic Replay Ledger"})),
+        canonical_sha256: HASH_B.to_string(),
+        canonical_payload: json!({"amount": "1180.00", "name": "Synthetic Replay Ledger"}),
         exact_decimals: BTreeMap::from([("opening_balance".to_string(), "1180.00".to_string())]),
         observed_alter_id: Some("42".to_string()),
-        status: ObservationStatus::Accepted,
-        safe_rejection_code: None,
     }
 }
 
@@ -1095,8 +1093,8 @@ async fn changed_replay_is_a_conflict_and_mutates_neither_record_nor_observation
     changed.display_name = Some("Changed Replay Name".to_string());
     changed.observed_at_unix_ms = 8_888;
     changed.raw_source_sha256 = HASH_B.to_string();
-    changed.canonical_sha256 = Some(HASH_A.to_string());
-    changed.canonical_payload = Some(json!({"amount": "999.00", "name": "Changed"}));
+    changed.canonical_sha256 = HASH_A.to_string();
+    changed.canonical_payload = json!({"amount": "999.00", "name": "Changed"});
     changed.exact_decimals =
         BTreeMap::from([("opening_balance".to_string(), "999.00".to_string())]);
     assert!(matches!(
@@ -2765,6 +2763,132 @@ async fn bomless_utf16_migration_preserves_existing_selected_read_evidence() {
     .is_err());
 }
 
+async fn begin_batch_with_foreign_rejected_observation(
+    repository: &TallyMirrorRepository,
+    snapshot: &CapabilitySnapshotRef,
+    company: &CompanyRef,
+    run_id: &str,
+) -> String {
+    let batch_id = begin_batch(repository, snapshot, company, run_id).await;
+    // No path in this build writes a rejected observation; the schema still
+    // admits one, so a foreign writer is the only way this row can exist.
+    let source_record_id = Uuid::new_v4().to_string();
+    sqlx::query(
+        "INSERT INTO tally_source_records(\
+           id, company_id, object_type, source_guid, identity_confidence, \
+           first_seen_batch_id, last_seen_batch_id\
+         ) VALUES (?1, ?2, 'ledger', ?3, 'observed', ?4, ?4)",
+    )
+    .bind(&source_record_id)
+    .bind(&company.id)
+    .bind(format!("foreign-ledger-guid-{run_id}"))
+    .bind(&batch_id)
+    .execute(&repository.pool)
+    .await
+    .expect("seed foreign source record");
+    sqlx::query(
+        "INSERT INTO tally_record_observations(\
+           id, batch_id, source_record_id, observed_at_unix_ms, raw_source_sha256, \
+           validation_status, safe_rejection_code\
+         ) VALUES (?1, ?2, ?3, 2100, ?4, 'rejected', 'synthetic_foreign_rejection')",
+    )
+    .bind(Uuid::new_v4().to_string())
+    .bind(&batch_id)
+    .bind(&source_record_id)
+    .bind(HASH_A)
+    .execute(&repository.pool)
+    .await
+    .expect("seed foreign rejected observation");
+    batch_id
+}
+
+#[tokio::test]
+async fn commit_refuses_a_batch_holding_a_rejected_observation_in_any_verification_state() {
+    let (repository, snapshot, company) = seeded_repository().await;
+    let unverified_batch = begin_batch_with_foreign_rejected_observation(
+        &repository,
+        &snapshot,
+        &company,
+        "foreign-rejected-unverified",
+    )
+    .await;
+    let verified_batch = begin_batch_with_foreign_rejected_observation(
+        &repository,
+        &snapshot,
+        &company,
+        "foreign-rejected-verified",
+    )
+    .await;
+    let cases = [
+        CommitBatchParts {
+            batch_id: unverified_batch.clone(),
+            proof_contract_version: 3,
+            outcome: RunOutcome::Failed,
+            verification: VerificationState::Unverified,
+            completed_at_unix_ms: 2_500,
+            record_counts_sha256: Some(proof_record_counts_sha256(&BTreeMap::new())),
+            snapshot_sha256: None,
+            expected_checkpoint_before: None,
+            checkpoint_after: None,
+            freshness_target_seconds: 60,
+            gap_codes: vec!["source_outcome_unknown".to_string()],
+            warning_codes: Vec::new(),
+        },
+        CommitBatchParts {
+            batch_id: verified_batch.clone(),
+            proof_contract_version: 1,
+            outcome: RunOutcome::Completed,
+            verification: VerificationState::Verified,
+            completed_at_unix_ms: 3_000,
+            record_counts_sha256: None,
+            snapshot_sha256: Some(HASH_B.to_string()),
+            expected_checkpoint_before: None,
+            checkpoint_after: Some("alter_id:42".to_string()),
+            freshness_target_seconds: 60,
+            gap_codes: Vec::new(),
+            warning_codes: Vec::new(),
+        },
+    ];
+    for parts in cases {
+        let verification = parts.verification;
+        let error = repository
+            .commit_batch(CommitBatchInput::test_only(parts))
+            .await
+            .expect_err("a rejected observation must refuse the commit");
+        assert!(
+            matches!(error, MirrorError::VerificationInvariant),
+            "{verification:?}: {error:?}"
+        );
+    }
+    for batch_id in [&unverified_batch, &verified_batch] {
+        assert_eq!(
+            sqlx::query_scalar::<_, String>(
+                "SELECT state FROM tally_observation_batches WHERE id = ?1",
+            )
+            .bind(batch_id)
+            .fetch_one(&repository.pool)
+            .await
+            .expect("read batch state"),
+            "staging"
+        );
+    }
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM tally_proof_ledger")
+            .fetch_one(&repository.pool)
+            .await
+            .expect("count proof entries"),
+        0
+    );
+    assert_eq!(
+        repository
+            .freshness(&company.id, "core_accounting", 30_000)
+            .await
+            .expect("read freshness")
+            .state,
+        FreshnessState::NeverVerified
+    );
+}
+
 #[tokio::test]
 async fn v3_receipt_binds_canonical_record_counts_and_rejects_pre_start_completion() {
     let (repository, snapshot, company) = seeded_repository().await;
@@ -3307,15 +3431,13 @@ async fn mirror_explorer_is_paged_and_omits_source_content() {
                 },
                 observed_at_unix_ms: 2_100,
                 raw_source_sha256: hash.to_string(),
-                canonical_sha256: Some(hash.to_string()),
-                canonical_payload: Some(json!({"private_amount": "1180.00"})),
+                canonical_sha256: hash.to_string(),
+                canonical_payload: json!({"private_amount": "1180.00"}),
                 exact_decimals: BTreeMap::from([(
                     "private_amount".to_string(),
                     "1180.00".to_string(),
                 )]),
                 observed_alter_id: None,
-                status: ObservationStatus::Accepted,
-                safe_rejection_code: None,
             })
             .await
             .expect("store explorer record");
@@ -3581,15 +3703,13 @@ async fn verified_commit_atomically_advances_checkpoint_and_proof_is_immutable()
             },
             observed_at_unix_ms: 2_100,
             raw_source_sha256: HASH_A.to_string(),
-            canonical_sha256: Some(HASH_B.to_string()),
-            canonical_payload: Some(json!({"amount": "1180.00", "name": "Synthetic Sales"})),
+            canonical_sha256: HASH_B.to_string(),
+            canonical_payload: json!({"amount": "1180.00", "name": "Synthetic Sales"}),
             exact_decimals: BTreeMap::from([(
                 "opening_balance".to_string(),
                 "1180.00".to_string(),
             )]),
             observed_alter_id: Some("42".to_string()),
-            status: ObservationStatus::Accepted,
-            safe_rejection_code: None,
         })
         .await
         .expect("store observed record");
@@ -3696,12 +3816,10 @@ async fn partial_batch_cannot_advance_checkpoint_and_float_payloads_are_rejected
             },
             observed_at_unix_ms: 2_100,
             raw_source_sha256: HASH_A.to_string(),
-            canonical_sha256: Some(HASH_B.to_string()),
-            canonical_payload: Some(json!({"amount": 12.5})),
+            canonical_sha256: HASH_B.to_string(),
+            canonical_payload: json!({"amount": 12.5}),
             exact_decimals: BTreeMap::new(),
             observed_alter_id: None,
-            status: ObservationStatus::Accepted,
-            safe_rejection_code: None,
         })
         .await
         .expect_err("floating accounting representation must not enter the mirror");

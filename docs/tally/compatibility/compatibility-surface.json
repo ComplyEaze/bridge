@@ -182,9 +182,6 @@
       "path": "src-tauri/crates/bridge-tally-core/Cargo.toml"
     },
     {
-      "path": "src-tauri/crates/bridge-tally-core/src/bills_reconciliation.rs"
-    },
-    {
       "path": "src-tauri/crates/bridge-tally-core/src/book_presence.rs"
     },
     {
@@ -216,9 +213,6 @@
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/bills_native_outstandings_probe.rs"
-    },
-    {
-      "path": "src-tauri/crates/bridge-tally-protocol/src/bills_payments_observation.rs"
     },
     {
       "path": "src-tauri/crates/bridge-tally-protocol/src/currency_composite.rs"

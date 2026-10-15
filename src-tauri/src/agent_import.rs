@@ -2563,7 +2563,7 @@ impl Server {
         let _lock = self.lock_import_admission_shared()?;
         match self.import_journal_while_admitted()? {
             Some(reader) => ledger::invoice_number_control(reader, company_guid, year),
-            None => Ok(ledger::NumberControl::NeverSent),
+            None => Ok(ledger::NumberControl::NoneStanding),
         }
     }
 

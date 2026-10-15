@@ -169,12 +169,24 @@ pub(in crate::agent) struct StatusRecord {
     /// (`deny_unknown_fields`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     proof: Option<ProofName>,
-    /// A stop release's record of whether the fresh read at the release found
-    /// the batch's invoice in the book attributed to it. `Some` only on a
-    /// stop release. A binary older than this field refuses a journal holding
-    /// one (`deny_unknown_fields`), as for every field before it.
+    /// A stop release's record of what the fresh read at the release saw of
+    /// the batch's invoice: evidence of what the person was shown, read by
+    /// nothing. `Some` only on a stop release. A binary older than this field
+    /// refuses a journal holding one (`deny_unknown_fields`), as for every
+    /// field before it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    release_invoice_found: Option<bool>,
+    release_seen: Option<ReleaseSeen>,
+}
+
+/// What the read at a stop release saw of the batch's invoice, as journaled
+/// (`stop::Seen` without its words). A value this build does not know is
+/// refused with its record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum ReleaseSeen {
+    Found,
+    NotEstablished,
+    Unreadable,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -213,7 +225,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
-            release_invoice_found: None,
+            release_seen: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -264,7 +276,7 @@ impl StatusRecord {
             bindings,
             binding_refusal,
             proof: None,
-            release_invoice_found: None,
+            release_seen: None,
         }
     }
 
@@ -277,9 +289,9 @@ impl StatusRecord {
         )
     }
 
-    /// A person's release of the stop `batch` holds. `invoice_found` is what
-    /// the fresh read at the release saw of its invoice.
-    pub(super) fn stop_release(batch: &ImportLedgerLine, invoice_found: bool) -> Self {
+    /// A person's release of the stop `batch` holds. `seen` is what the fresh
+    /// read at the release saw of its invoice.
+    pub(super) fn stop_release(batch: &ImportLedgerLine, seen: ReleaseSeen) -> Self {
         Self {
             record_type: StatusKind::StopRelease,
             batch_id: batch.batch_id.clone(),
@@ -293,7 +305,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
-            release_invoice_found: Some(invoice_found),
+            release_seen: Some(seen),
         }
     }
 
@@ -329,7 +341,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
-            release_invoice_found: None,
+            release_seen: None,
         }
     }
 }
@@ -358,7 +370,7 @@ impl StatusRecord {
             bindings: None,
             binding_refusal: None,
             proof: None,
-            release_invoice_found: None,
+            release_seen: None,
         }
     }
 }
@@ -830,17 +842,21 @@ pub(super) enum NumberControl {
     /// The newest invoice of a batch whose LATEST status is `posted_verified`,
     /// preferring one dated inside `year`: its number and its date.
     Known { number: String, date: String },
-    /// No batch of this company holding an invoice was ever sent to Tally.
-    NeverSent,
-    /// One was sent and none is verified posted now (an answer lost, a post
-    /// declined, or a later verification that no longer finds it).
+    /// No invoice of this company stands as sent: none was sent, or every one
+    /// sent was released by a person.
+    NoneStanding,
+    /// One stands as sent and none is verified posted now (an answer lost, a
+    /// post declined, or a later verification that no longer finds it).
     NoneVerified,
 }
 
 /// The control the journal offers for an invoice number read of this
 /// company (`NumberControl`). A batch is verified while its latest status is
 /// `posted_verified`, as `settlement` takes it; a dispatch intent makes it
-/// sent. An invoice whose number or date cannot be read is not a control.
+/// sent. A person's release makes it neither until it next reads verified:
+/// whatever the read at the release saw, it did not show that the number read
+/// works on this Tally. An invoice whose number or date cannot be read is not a
+/// control.
 pub(super) fn invoice_number_control(
     reader: impl BufRead,
     company_guid: &str,
@@ -850,10 +866,8 @@ pub(super) fn invoice_number_control(
     let mut invoices: BTreeMap<String, (usize, Vec<(String, String)>)> = BTreeMap::new();
     let mut sent = BTreeSet::new();
     let mut verified = BTreeSet::new();
-    // Batches a person released, while the release stands, by what the read at
-    // the release found: an invoice it found stays a control, one it did not
-    // find no longer counts as sent.
-    let mut released: BTreeMap<String, bool> = BTreeMap::new();
+    // Batches a person released, while the release stands.
+    let mut released = BTreeSet::new();
     let mut order = 0usize;
     scan_records(reader, |record, _| match record {
         Record::Batch(batch) => {
@@ -887,10 +901,8 @@ pub(super) fn invoice_number_control(
             if matches!(update.record_type, StatusKind::DispatchIntent) {
                 sent.insert(update.batch_id.clone());
             }
-            if let (StatusKind::StopRelease, Some(found)) =
-                (&update.record_type, update.release_invoice_found)
-            {
-                released.insert(update.batch_id.clone(), found);
+            if matches!(update.record_type, StatusKind::StopRelease) {
+                released.insert(update.batch_id.clone());
             }
             if update.sets_status() {
                 if update.status == "posted_verified" {
@@ -904,7 +916,7 @@ pub(super) fn invoice_number_control(
     })?;
     let known = invoices
         .iter()
-        .filter(|(id, _)| verified.contains(*id) || released.get(*id) == Some(&true))
+        .filter(|(id, _)| verified.contains(*id))
         .flat_map(|(_, (order, held))| held.iter().map(move |invoice| (*order, invoice)))
         .max_by_key(|(order, (date, _))| {
             (
@@ -920,11 +932,11 @@ pub(super) fn invoice_number_control(
         },
         None if invoices
             .keys()
-            .any(|id| sent.contains(id) && !released.contains_key(id)) =>
+            .any(|id| sent.contains(id) && !released.contains(id)) =>
         {
             NumberControl::NoneVerified
         }
-        None => NumberControl::NeverSent,
+        None => NumberControl::NoneStanding,
     })
 }
 
@@ -1134,11 +1146,11 @@ fn scan_records(
                 marked.insert(update.batch_id.clone());
             }
             // A stop release follows its batch's dispatch intent, carries
-            // nothing else, and records what the release read found.
+            // nothing else, and records what the release read saw.
             if matches!(update.record_type, StatusKind::StopRelease) {
                 if !dispatched.contains_key(&update.batch_id)
                     || update.status != STOP_RELEASE_STATUS
-                    || update.release_invoice_found.is_none()
+                    || update.release_seen.is_none()
                     || update.response.is_some()
                     || update.native_request_sha256.is_some()
                     || update.native_remote_id.is_some()
@@ -1149,7 +1161,7 @@ fn scan_records(
                 {
                     return Err("import_ledger_invalid".into());
                 }
-            } else if update.release_invoice_found.is_some() {
+            } else if update.release_seen.is_some() {
                 return Err("import_ledger_invalid".into());
             }
             // A saved proof belongs only to a verification status record.

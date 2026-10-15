@@ -815,9 +815,9 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
         .unwrap()
     };
     let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
-    assert_eq!(control(vec![]), NumberControl::NeverSent);
+    assert_eq!(control(vec![]), NumberControl::NoneStanding);
     // Only built.
-    assert_eq!(control(vec![record(&first)]), NumberControl::NeverSent);
+    assert_eq!(control(vec![record(&first)]), NumberControl::NoneStanding);
     // Sent, never verified.
     assert_eq!(
         control(vec![record(&first), sent(&first)]),
@@ -852,7 +852,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
             sent(&elsewhere),
             found(&elsewhere)
         ]),
-        NumberControl::NeverSent
+        NumberControl::NoneStanding
     );
     // In the build's year before a newer one outside it; the newest inside it.
     let dated = |id: &str, sha: char, number: &str, date: &str| {
@@ -993,9 +993,15 @@ fn incomplete(batch: &ImportLedgerLine) -> Vec<u8> {
     )
 }
 
-fn released(batch: &ImportLedgerLine, invoice_found: bool) -> Vec<u8> {
-    record(&StatusRecord::stop_release(batch, invoice_found))
+fn released(batch: &ImportLedgerLine, seen: ReleaseSeen) -> Vec<u8> {
+    record(&StatusRecord::stop_release(batch, seen))
 }
+
+const EVERY_SEEN: [ReleaseSeen; 3] = [
+    ReleaseSeen::Found,
+    ReleaseSeen::NotEstablished,
+    ReleaseSeen::Unreadable,
+];
 
 fn stops(journal: Vec<Vec<u8>>) -> Vec<String> {
     invoice_stops(Cursor::new(journal.concat()), "synthetic-guid").unwrap()
@@ -1074,16 +1080,22 @@ fn a_release_lifts_one_batch_and_a_later_verified_read_voids_it() {
     let with = |extra: Vec<Vec<u8>>| [base.clone(), extra].concat();
     assert_eq!(stops(with(vec![])), ["first", "second"]);
     // Releasing one leaves the other.
-    assert_eq!(stops(with(vec![released(&first, false)])), ["second"]);
+    assert_eq!(
+        stops(with(vec![released(&first, ReleaseSeen::NotEstablished)])),
+        ["second"]
+    );
     // A re-read that stays unverified keeps the release.
     assert_eq!(
-        stops(with(vec![released(&first, false), incomplete(&first)])),
+        stops(with(vec![
+            released(&first, ReleaseSeen::NotEstablished),
+            incomplete(&first)
+        ])),
         ["second"]
     );
     // Verified after the release voids it: the next unverified read stops again.
     assert_eq!(
         stops(with(vec![
-            released(&first, false),
+            released(&first, ReleaseSeen::NotEstablished),
             found(&first),
             incomplete(&first)
         ])),
@@ -1100,44 +1112,72 @@ fn the_journal_admits_a_release_only_for_a_sent_batch_bound_to_its_sha() {
         |journal: Vec<Vec<u8>>| invoice_stops(Cursor::new(journal.concat()), "synthetic-guid");
     // Before the dispatch intent.
     assert_eq!(
-        read(vec![record(&first), released(&first, false)]),
+        read(vec![
+            record(&first),
+            released(&first, ReleaseSeen::NotEstablished)
+        ]),
         Err("import_ledger_invalid".to_string())
     );
     // Another batch's sha.
     let other = invoice_batch("first", 'b', ("INV/1", "Sales Manual"), SALE);
     assert_eq!(
-        read(vec![record(&first), sent(&first), released(&other, false)]),
+        read(vec![
+            record(&first),
+            sent(&first),
+            released(&other, ReleaseSeen::NotEstablished)
+        ]),
         Err("import_ledger_invalid".to_string())
     );
-    // A release with no recorded `release_invoice_found`, and the field on a
-    // record that is not a release.
-    let mut bare = serde_json::to_value(StatusRecord::stop_release(&first, true)).unwrap();
-    bare.as_object_mut()
-        .unwrap()
-        .remove("release_invoice_found");
-    assert_eq!(
-        read(vec![record(&first), sent(&first), record(&bare)]),
-        Err("import_ledger_invalid".to_string())
-    );
-    let mut stray = serde_json::to_value(StatusRecord::stop_release(&first, true)).unwrap();
+    // A release with no recorded `release_seen`, one with a value this build
+    // does not know, and the field on a record that is not a release.
+    let release = serde_json::to_value(StatusRecord::stop_release(
+        &first,
+        ReleaseSeen::NotEstablished,
+    ))
+    .unwrap();
+    let mut bare = release.clone();
+    bare.as_object_mut().unwrap().remove("release_seen");
+    let mut unknown = release.clone();
+    unknown["release_seen"] = json!("possibly_found");
+    let mut stray = release;
     stray["record_type"] = json!("verification_status");
     stray["status"] = json!("verification_incomplete");
+    for refused in [bare, unknown, stray] {
+        assert_eq!(
+            read(vec![record(&first), sent(&first), record(&refused)]),
+            Err("import_ledger_invalid".to_string()),
+            "{refused}"
+        );
+    }
+    // A release sets no status: the batch is still not verified. Each value
+    // is recorded by its own name.
+    for seen in EVERY_SEEN {
+        assert_eq!(
+            read(vec![record(&first), sent(&first), released(&first, seen)]),
+            Ok(vec![])
+        );
+    }
     assert_eq!(
-        read(vec![record(&first), sent(&first), record(&stray)]),
-        Err("import_ledger_invalid".to_string())
-    );
-    // A release sets no status: the batch is still not verified.
-    assert_eq!(
-        read(vec![record(&first), sent(&first), released(&first, true)]),
-        Ok(vec![])
+        [
+            json!(ReleaseSeen::Found),
+            json!(ReleaseSeen::NotEstablished),
+            json!(ReleaseSeen::Unreadable)
+        ],
+        [
+            json!("found"),
+            json!("not_established"),
+            json!("unreadable")
+        ]
     );
 }
 
-/// After a release the number control follows what the read at the release
-/// found: an invoice it found stays the control, one it did not find no longer
-/// counts as sent (so the build is not refused for a control it cannot have).
+/// A released batch is never the number control and no longer counts as sent,
+/// whatever its release read saw: that read cannot show the number read works
+/// on this Tally. So a company whose only sent invoice was released stands
+/// as if none was sent, an earlier verified invoice stays the control across a
+/// release of a later one, and a later verified read voids the release.
 #[test]
-fn a_release_clears_the_number_control_refusal_by_what_it_found() {
+fn a_released_invoice_is_never_the_number_control() {
     let control = |journal: Vec<Vec<u8>>| {
         invoice_number_control(
             Cursor::new(journal.concat()),
@@ -1149,22 +1189,52 @@ fn a_release_clears_the_number_control_refusal_by_what_it_found() {
     let first = invoice_batch("first", 'a', ("INV/1", "Sales Manual"), SALE);
     let sent_only = vec![record(&first), sent(&first), incomplete(&first)];
     assert_eq!(control(sent_only.clone()), NumberControl::NoneVerified);
-    let release =
-        |invoice_found| [sent_only.clone(), vec![released(&first, invoice_found)]].concat();
-    assert_eq!(control(release(false)), NumberControl::NeverSent);
-    assert_eq!(
-        control(release(true)),
-        NumberControl::Known {
-            number: "INV/1".to_string(),
-            date: "20260901".to_string()
-        }
-    );
+    let release = |seen| [sent_only.clone(), vec![released(&first, seen)]].concat();
+    for seen in EVERY_SEEN {
+        assert_eq!(
+            control(release(seen)),
+            NumberControl::NoneStanding,
+            "{seen:?}"
+        );
+    }
     // A later verified read voids the release, and the invoice is verified.
     // An unverified read after that is none verified again.
+    let known_first = NumberControl::Known {
+        number: "INV/1".to_string(),
+        date: "20260901".to_string(),
+    };
     assert_eq!(
-        control([release(false), vec![found(&first), incomplete(&first)]].concat()),
+        control([release(ReleaseSeen::Found), vec![found(&first)]].concat()),
+        known_first
+    );
+    assert_eq!(
+        control(
+            [
+                release(ReleaseSeen::Found),
+                vec![found(&first), incomplete(&first)]
+            ]
+            .concat()
+        ),
         NumberControl::NoneVerified
     );
+    // An earlier verified invoice stays the control across the release of a
+    // later, newer one.
+    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let both = vec![
+        record(&first),
+        sent(&first),
+        found(&first),
+        record(&second),
+        sent(&second),
+        incomplete(&second),
+    ];
+    for seen in EVERY_SEEN {
+        assert_eq!(
+            control([both.clone(), vec![released(&second, seen)]].concat()),
+            known_first,
+            "{seen:?}"
+        );
+    }
 }
 
 /// The batch size the tool descriptions and the README tell a caller (#865) is

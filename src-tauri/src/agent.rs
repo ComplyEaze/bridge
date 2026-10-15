@@ -1366,12 +1366,6 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              batch_id and doubt invoice_stop (available when posting is enabled): a native \
              dialog asks the user, and nothing but their answer releases the stop.",
         ),
-        "ack_stop_tally_unreadable" => Some(
-            "A release is recorded with what ComplyEaze Bridge can see of the invoice in \
-             Tally, and the read could not be completed (Tally not answering, or the company not \
-             open). Nothing was recorded and no dialog was shown. Ask the user to open the \
-             company in Tally and call again. Such a Tally cannot post an invoice either."
-        ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \
              invoice of this company stops this one, so the build is refused. Tell the user and \

@@ -338,7 +338,8 @@ pub(super) fn resolve_voucher_type(
     // series).
     // Its "prevent duplicates" flag is Tally's own refusal of a second
     // voucher of the type with a number already used (§9.8), the guard the
-    // number read's control relies on for a company's first invoice.
+    // number read's control relies on when no invoice of the company stands
+    // as sent (its first, or every one after a person's release).
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {

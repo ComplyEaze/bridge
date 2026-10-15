@@ -279,6 +279,39 @@ const flagLines = workflow.split("\n").filter((line) => line.includes("continue-
 if (flagLines.length !== diagnosticUploads.length || flagLines.some((line) => line.replace(/\r$/, "") !== "        continue-on-error: true")) {
   failures.push("ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload: a failure would report success");
 }
+// The Playwright browsers cache is saved only by push, manual and scheduled runs (other caches, such as the Node
+// package cache, still save from every ref). The combined restore-and-save cache action saves from
+// every ref, and a pull-request or merge-queue ref saves a copy only that ref can read: on 15 Oct 2026 five copies of
+// the 365 MiB Playwright browsers, saved by pull-request and merge-queue refs, sat in a repository cache that was at
+// 9.96 of 10 GiB, and the eviction left the Windows runs cold. So the browsers are restored with the restore action and saved by one pinned step that runs after the install.
+if (/actions\/cache@/.test(workflow)) {
+  failures.push("ci.yml must not use the combined restore-and-save cache action (actions/cache@): a pull-request ref would save a copy of its own");
+}
+const playwrightSave = [
+  "      - name: Save Playwright browsers",
+  "        if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}",
+  "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const playwrightRestore = [
+  "      - name: Restore Playwright browsers",
+  "        id: playwright-cache",
+  "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0",
+  "        with:",
+  "          path: ~/.cache/ms-playwright",
+  "          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}",
+].join("\n");
+const frontendJob = jobBlock(workflow, "frontend");
+if (stepBlock(frontendJob, "      - name: Restore Playwright browsers") !== playwrightRestore) {
+  failures.push("the Playwright browsers restore step changed shape: its key must equal the save step's and it must have no restore-keys; review it and update playwrightRestore");
+}
+const playwrightInstallAt = frontendJob.indexOf("      - name: Install Playwright browsers and system dependencies\n");
+const playwrightSaveAt = frontendJob.indexOf("      - name: Save Playwright browsers\n");
+if (stepBlock(frontendJob, "      - name: Save Playwright browsers") !== playwrightSave || frontendJob.split("actions/cache/save@").length !== 2 || playwrightInstallAt === -1 || playwrightSaveAt < playwrightInstallAt) {
+  failures.push("the Playwright browsers save step changed shape, or does not follow the install step; review it and update playwrightSave");
+}
 for (const [name, source] of [["ci.yml", workflow], ["release-mcpb-preview.yml", releaseWorkflow]]) {
   if (name !== "ci.yml" && source.includes("continue-on-error")) failures.push(`${name} must not use continue-on-error: a failure would report success`);
   // A quoted key can spell a refused key with an escape, which the text rule above cannot read; refuse

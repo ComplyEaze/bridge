@@ -2611,6 +2611,54 @@ A ledger mapper is unnecessary for exact existing names: `validate_masters`
 returns exact matches and bounded near matches. Resolve ambiguity with the
 user rather than silently creating or choosing a ledger.
 
+### A bank line is posted at most once
+
+ComplyEaze Bridge sends each bank-statement line to a company at most once from
+this computer. Once a line has been sent, Bridge will not send it again as a new
+voucher, even if the post failed, the reply was lost, or the voucher was later
+changed or deleted in Tally. If Tally does not hold it, enter it in Tally
+yourself; do not edit the statement to get it past Bridge. After each post
+Bridge reads the books back and marks a voucher verified only when it finds
+exactly the voucher its own post created. A correction built with
+`amends_batch_id` is a file the person imports by hand, meant to alter the
+vouchers in place and add none (measured over Tally's gateway, not yet through
+its Import menu); Bridge refuses to build one for a batch it posted itself.
+
+What carries the rule, by its code: the journal row check refuses a row another
+batch of the company was sent with, by its transaction id (for a row with any
+other id, also its date and amounts), whether or not that batch ended well
+(`import_txn_already_posted`, #876, #898); the read-back before
+the post names a voucher already in the book with the same date, type, ledgers
+and amounts and refuses (`import_preexisting_identity`, #901, #908); a native
+post is verified by binding its vouchers to their own exact AlterID span, with
+their GUID and MasterID recorded in the journal (#864, #1054). A post whose
+binding was refused, or whose reply was lost, is closed only by the person
+checking the vouchers in Tally (a way to close it inside Bridge is #1039). This
+was read from the code, and the cases below were not measured on a live Tally
+unless a number links to the measurement.
+
+What the rule does not cover:
+
+1. The memory of what was sent is on this computer. Posting the same company's
+   statement from a second computer, or after reinstalling Bridge or deleting
+   its data folder, is checked only against what Tally holds, and a voucher
+   changed since is not recognised.
+2. Two downloads of the same statement from different places (for example net
+   banking and a branch printout) may read a narration differently and so not be
+   recognised as the same lines; a posted voucher changed in Tally since is then
+   not recognised.
+3. Entries typed by hand are recognised only if date, voucher type, ledgers and
+   amounts all match.
+4. Never import Bridge's saved file into Tally by hand after posting it from
+   Bridge. The saved file carries a different REMOTEID from the post's, so a
+   second voucher is expected (not measured), and Bridge would only report it at
+   the next `verify_import`.
+5. If a reply is lost, or someone works in Tally while Bridge posts, the batch
+   may never read verified; Bridge shows any voucher it finds with the same
+   content, or reports the line as sent but not found, and the person checks
+   them in Tally.
+6. After restoring a backup, check the posted vouchers in Tally.
+
 ## Review and post from the ComplyEaze Bridge app
 
 1. Build one Journal with `build_import_xml` as above. Keep its original XML

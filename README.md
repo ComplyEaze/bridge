@@ -339,6 +339,16 @@ With writing on:
 - **Posting has limits.** It creates no masters, posts no sales, purchase, tax
   or inventory entries, and never alters or deletes a voucher. A company with
   more than one currency defined is refused.
+- **A bank line is posted at most once.** Bridge sends each bank-statement line
+  to a company at most once from this computer, and will not send it again as a
+  new voucher, even if the post failed, the reply was lost, or the voucher was
+  later changed or deleted in Tally. If Tally does not hold it, enter it in
+  Tally yourself; do not edit the statement to get it past Bridge. It cannot
+  see a post made from another computer or after a reinstall, a hand-typed
+  entry that differs in date, type, ledgers or amount, the same statement
+  downloaded from another place when the posted voucher was since changed, or a
+  hand import of the file Bridge saved. The full rule and its six limits are in
+  [the agent guide](docs/agent/README.md#a-bank-line-is-posted-at-most-once).
 
 **What it does not do**
 

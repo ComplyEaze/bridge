@@ -130,27 +130,43 @@ test("an unexpected job in the release workflow is refused", () => {
   refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => `${text.trimEnd()}\n  extra-job:\n    runs-on: ubuntu-latest\n`), "must have exactly the jobs release-admission, package, attest and publish-preview");
 });
 
-// `continue-on-error` is refused except on four pinned, diagnostics-only artifact uploads. Each case below
-// makes one change a weaker rule would let through; the unmodified tree has exactly four allowed flags.
+// `continue-on-error` is refused except on five pinned, diagnostics-only artifact uploads. Each case below
+// makes one change a weaker rule would let through; the unmodified tree has exactly five allowed flags.
 const CI_FILE = ".github/workflows/ci.yml";
 const FLAG = "        continue-on-error: true";
 const UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
 const TIMINGS = `${FLAG}\n        uses: ${UPLOAD} # v7.0.1\n        with:\n          name: native-compiler-timings`;
+const TEST_TIMINGS_STEP = [
+  "      - name: Retain macOS per-test timings",
+  "        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}",
+  FLAG,
+  `        uses: ${UPLOAD} # v7.0.1`,
+  "        with:",
+  "          name: native-test-timings-macos",
+  "          path: src-tauri/target/nextest/default/junit.xml",
+  "          if-no-files-found: warn",
+  "          retention-days: 7",
+].join("\n");
 const AFTER_NATIVE_PIN = "      - name: Test native workspace doctests\n";
 const ONLY_EXACT = "ci.yml must not use continue-on-error except the one exact line in each pinned diagnostics-only upload";
 const UPLOAD_SHAPE = "changed shape; review it and update diagnosticUploads";
 
-test("the unmodified tree has exactly four allowed flags", () => {
-  assert.equal(readFileSync(join(copy, CI_FILE), "utf8").split("\n").filter((line) => line === FLAG).length, 4);
+test("the unmodified tree has exactly five allowed flags", () => {
+  assert.equal(readFileSync(join(copy, CI_FILE), "utf8").split("\n").filter((line) => line === FLAG).length, 5);
 });
 
 for (const [name, change, messages] of [
-  ["a flag on a step that is not one of the four", (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [ONLY_EXACT]],
+  ["a flag on a step that is not one of the five", (text) => text.replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [ONLY_EXACT]],
   ["a job-level flag", (text) => text.replace("  seam-control:\n", "  seam-control:\n    continue-on-error: true\n"), [ONLY_EXACT]],
   ["a flag moved from an allowed step to another step", (text) => text.replace(TIMINGS, TIMINGS.slice(FLAG.length + 1)).replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [UPLOAD_SHAPE]],
   ["an id on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, `${FLAG}\n        id: timings`)), [UPLOAD_SHAPE]],
   ["an expression instead of true on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, "        continue-on-error: ${{ always() }}")), [ONLY_EXACT, UPLOAD_SHAPE]],
   ["a different upload action on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace("043fb46d", "043fb46e")), [UPLOAD_SHAPE]],
+  // The per-test timings report carries a failing test's panic text, so it is uploaded only after a passing test step.
+  ["the per-test timings upload without its passing-test condition", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace(" && steps.native-tests.outcome == 'success'", "")), [UPLOAD_SHAPE]],
+  ["the per-test timings upload on every operating system", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace(" && runner.os == 'macOS'", "")), [UPLOAD_SHAPE]],
+  ["a wider path on the per-test timings upload", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace("default/junit.xml", "default/*")), [UPLOAD_SHAPE]],
+  ["a longer retention on the per-test timings upload", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace("retention-days: 7", "retention-days: 90")), [UPLOAD_SHAPE]],
 ]) {
   test(`diagnostics uploads: ${name} is refused`, () => {
     const result = withChange(CI_FILE, change);
@@ -158,7 +174,7 @@ for (const [name, change, messages] of [
   });
 }
 
-test("diagnostics uploads: an allowed step moved to another job is refused although the count stays four", () => {
+test("diagnostics uploads: an allowed step moved to another job is refused although the count stays five", () => {
   const step = [
     "      - name: Retain native compiler timings",
     "        if: ${{ always() }}",
@@ -181,6 +197,24 @@ test("diagnostics uploads: an allowed step moved to another job is refused altho
   });
   refused(result, UPLOAD_SHAPE);
 });
+
+// The per-test timings artifact is public for 7 days. What it carries is set in nextest.toml, outside the
+// pinned upload step, so the file is pinned too: exactly one JUnit table, with the output stores off, and no
+// setup scripts (their command, arguments and environment names would join the report).
+const NEXTEST = "src-tauri/.config/nextest.toml";
+const NEXTEST_MESSAGE = "src-tauri/.config/nextest.toml must hold exactly one JUnit report table";
+for (const [name, change] of [
+  ["a passing test's output stored", (text) => text.replace("store-success-output = false", "store-success-output = true")],
+  ["a failing test's output stored", (text) => text.replace("store-failure-output = false", "store-failure-output = true")],
+  ["the report written elsewhere", (text) => text.replace('path = "junit.xml"', 'path = "/tmp/junit.xml"')],
+  ["a second profile with a report", (text) => `${text.trimEnd()}\n\n[profile.ci.junit]\npath = "ci.xml"\n`],
+  ["a setup script section", (text) => `${text.trimEnd()}\n\n[scripts.setup.probe]\ncommand = "echo"\n`],
+  ["a property-adding profile script", (text) => `${text.trimEnd()}\n\n[[profile.default.scripts]]\nfilter = "all()"\nsetup = "probe"\n`],
+]) {
+  test(`nextest report: ${name} is refused`, () => {
+    refused(withChange(NEXTEST, change), NEXTEST_MESSAGE);
+  });
+}
 
 test("diagnostics uploads: the flag in any other workflow is refused", () => {
   refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => text.replace(/(\n {6}- uses: actions\/checkout)/, `\n${FLAG}$1`)), "release-mcpb-preview.yml must not use continue-on-error");

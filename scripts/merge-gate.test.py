@@ -13,6 +13,7 @@ merge operation is used.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -61,6 +62,10 @@ if [ "${GATE_SCENARIO:-}" = "scan-input-write-failure" ] && [ "$1" = "-d" ]; the
   dir=$("$real" -d)
   mkdir "$dir/privacy-scan-input"
   printf '%s\\n' "$dir"
+elif [ "${GATE_SCENARIO:-}" = "manifest-write-failure" ] && [ "$1" = "-d" ]; then
+  dir=$("$real" -d)
+  mkdir "$dir/synthetic-uuid-manifest.json"
+  printf '%s\\n' "$dir"
 else
   exec "$real" "$@"
 fi
@@ -103,6 +108,33 @@ class MergeGateControls(unittest.TestCase):
     def git_in_repo(cls, *args):
         subprocess.run(["git", "-C", str(cls.repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", *args],
                        check=True, capture_output=True)
+
+    @classmethod
+    @contextlib.contextmanager
+    def master_state(cls, tracked=None, symlinks=None, ignored=None):
+        """Put files on the throwaway origin/master (and in the gate's checkout), then put it back.
+
+        tracked: path -> text, committed. symlinks: path -> target, committed as links. ignored: path -> text, written
+        into the checkout only, with a committed .gitignore naming it (git status does not show it).
+        """
+        base = subprocess.run(["git", "-C", str(cls.repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+        try:
+            for path, text in (tracked or {}).items():
+                (cls.repo / path).write_text(text)
+            for path, target in (symlinks or {}).items():
+                os.symlink(target, cls.repo / path)
+            if ignored:
+                (cls.repo / ".gitignore").write_text("".join(path + "\n" for path in ignored))
+            cls.git_in_repo("add", "-A")
+            cls.git_in_repo("commit", "-q", "-m", "state")
+            for path, text in (ignored or {}).items():
+                (cls.repo / path).write_text(text)
+            cls.git_in_repo("push", "-q", "-f", "origin", "master")
+            yield
+        finally:
+            cls.git_in_repo("reset", "-q", "--hard", base)
+            cls.git_in_repo("clean", "-fdxq")
+            cls.git_in_repo("push", "-q", "-f", "origin", "master")
 
     @classmethod
     def tearDownClass(cls):
@@ -488,7 +520,82 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("privacy-credential-blocker", "literal credential, bearer, or API token value")
 
     def test_unknown_uuid_is_indeterminate(self):
-        self.assert_indeterminate("privacy-uuid-indeterminate", "without exact current-head fixture provenance")
+        result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+        self.assertNotIn("synthetic-UUID registry:", result.stdout)
+
+    # -- The synthetic-UUID registry: scripts/merge-gate-synthetic-uuids.json on master -----------------------------------
+    REGISTRY_PATH = "scripts/merge-gate-synthetic-uuids.json"
+    LISTED = "11111111-2222-3333-4444-555555555555"
+
+    def registry(self, *uuids, **override):
+        document = {"schema_version": 1, "entries": [{"uuid": value, "note": "a synthetic test value"} for value in uuids]}
+        document.update(override)
+        return json.dumps(document)
+
+    def test_a_listed_uuid_no_longer_makes_the_gate_indeterminate(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_pass("privacy-uuid-indeterminate", "synthetic-UUID registry: 1 listed value(s) applied")
+
+    def test_an_unlisted_uuid_still_does_in_the_same_pull_request(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("privacy-two-uuids", "privacy scan found 1 non-nil UUID shape(s) not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry: 1 listed value(s) applied", result.stdout)
+
+    def test_a_listed_uuid_in_credential_context_still_blocks(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_blocked("privacy-uuid-credential-context", "in credential, session, token, or bearer context")
+
+    def test_a_listed_uuid_is_not_reported_as_a_hit_when_something_else_trips_the_scan(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_blocked("privacy-uuid-and-digit-run", "unexplained long digit run")
+        self.assertIn("at docs/example.md:2: privacy scan found 0 identifier shape(s) and 1 unexplained long digit run(s)", result.stdout)
+        self.assertNotIn("docs/example.md:1:", result.stdout)
+
+    def test_an_invalid_registry_is_not_applied_and_says_so(self):
+        entries = lambda *items: json.dumps({"schema_version": 1, "entries": list(items)})
+        good = {"uuid": self.LISTED, "note": "a synthetic test value"}
+        for name, text in (
+            ("not json", "{"),
+            ("wrong schema version", self.registry(self.LISTED, schema_version=2)),
+            ("an extra top-level key", self.registry(self.LISTED, extra=1)),
+            ("entries not a list", json.dumps({"schema_version": 1, "entries": {}})),
+            ("a duplicate", entries(good, good)),
+            ("an upper-case value", entries({"uuid": "AAAAAAAA-2222-3333-4444-555555555555", "note": "n"})),
+            ("the nil value", entries({"uuid": "00000000-0000-0000-0000-000000000000", "note": "n"})),
+            ("a trailing newline in the value", entries({"uuid": self.LISTED + "\n", "note": "n"})),
+            ("a missing note", entries({"uuid": self.LISTED})),
+            ("an empty note", entries({"uuid": self.LISTED, "note": " "})),
+            ("an extra entry key", entries({"uuid": self.LISTED, "note": "n", "kind": "x"})),
+            ("more than 500 entries", entries(*[{"uuid": "%08x-2222-3333-4444-555555555555" % number, "note": "n"} for number in range(501)])),
+        ):
+            with self.subTest(case=name), self.master_state(tracked={self.REGISTRY_PATH: text}):
+                result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+                self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_registry_that_is_a_symbolic_link_is_not_applied(self):
+        with self.master_state(tracked={"scripts/real-registry.json": self.registry(self.LISTED)}, symlinks={self.REGISTRY_PATH: "real-registry.json"}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_link_whose_target_text_is_itself_a_valid_registry_is_not_applied(self):
+        # A link's content is its target path. Without the regular-file check that text would be read as the registry.
+        text = self.registry(self.LISTED)
+        with self.master_state(symlinks={self.REGISTRY_PATH: text}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied: it is not a regular file", result.stdout)
+
+    def test_a_registry_file_only_in_the_checkout_is_not_read(self):
+        # An ignored file is invisible to git status, so the gate's own-tree check passes with it present; the registry
+        # is read from master's ref, not from the checkout.
+        with self.master_state(ignored={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+
+    def test_a_manifest_that_cannot_be_written_is_not_passed_to_the_scan(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("manifest-write-failure", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied", result.stdout)
+            # The scan was not handed an unwritten list: it did not try to read one.
+            self.assertNotIn("could not read exact current-head fixture UUID provenance", result.stdout)
 
     def test_binary_addition_without_attestation_blocks_and_names_the_path(self):
         result = self.assert_blocked("binary-missing-attestation", "require the owner's own --binary-review-sha attestation")
@@ -556,7 +663,8 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("owner-commit-comment-with-a-token", self.VERDICT_BLOCK)
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
-        for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away"):
+        for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
+                         "changes-the-registry", "changes-the-registry-in-another-case"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 

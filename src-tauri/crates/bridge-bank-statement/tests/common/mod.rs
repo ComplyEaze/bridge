@@ -24,6 +24,20 @@ pub fn p6(n: u64, width: usize) -> String {
     format!("6{n:0>w$}", w = width - 1)
 }
 
+/// `prefix`, then `n` behind zeros so the whole is `width` characters.
+pub fn pre(prefix: &str, n: u64, width: usize) -> String {
+    format!("{prefix}{n:0>w$}", w = width - prefix.len())
+}
+
+/// The digits of an ASCII digit string written in the Arabic-Indic block
+/// (the zero of that block is the character written below).
+pub fn arabic_indic(ascii: &str) -> String {
+    ascii
+        .chars()
+        .map(|c| char::from_u32('٠' as u32 + c.to_digit(10).expect("digit")).expect("char"))
+        .collect()
+}
+
 pub fn grp(digits: &str) -> String {
     digits
         .as_bytes()

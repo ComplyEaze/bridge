@@ -3,9 +3,22 @@
     clippy::disallowed_methods,
     reason = "test doubles: local sockets, servers and processes"
 )]
+use super::super::statement_facts::{
+    statement_record, ContraRow, RowDirection, SkipRow, StatementFacts, StatementWindow,
+};
 use super::*;
 use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid, wr2_lab_guid};
 use bridge_tally_transport::TallyEndpointConfig;
+
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
 
 fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
     let endpoint = TallyEndpointConfig {
@@ -2440,6 +2453,7 @@ fn a_record_without_ledger_identities_reads_as_built_before_binding() {
     let json = serde_json::to_value(&line).unwrap();
     assert!(json.get("ledger_identities").is_none(), "{json}");
     assert!(json.get("ledger_identities_2").is_none(), "{json}");
+    assert!(json.get("ledger_identities_3").is_none(), "{json}");
     let reread: ImportLedgerLine = serde_json::from_value(json).unwrap();
     assert_eq!(reread.ledger_identities, None);
     // And a current record keeps them across a round trip.
@@ -2474,16 +2488,20 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 }
 
 /// A saved batch holds exactly these records, and its ledger binding is
-/// written as `ledger_identities_2`, never as the `ledger_identities` that
-/// releases 0.3.0 to 0.4.2 read. Those releases refuse a batch with no binding
-/// they can read and know nothing of the cash-in-hand and bill-wise records, so
-/// this name is what keeps them from posting a batch saved here without those
-/// checks (ADR 0004).
+/// written as `ledger_identities_3`, never as the `ledger_identities_2` that
+/// the releases after 0.4.2 read or the `ledger_identities` that releases
+/// 0.3.0 to 0.4.2 read. Those releases refuse a batch with no binding they can
+/// read and know nothing of the cash-in-hand, bill-wise and statement records,
+/// so this name is what keeps them from posting a batch saved here without
+/// those checks (ADR 0004).
+///
+/// `withdrawn_skips` was added in the same unreleased change as `statement`
+/// and the `_3` name, so no release holds `_3` without it.
 ///
 /// If this test stops compiling or its list has to change because a field
 /// was added, removed or renamed, the releases before that change will not
 /// read the new record either: give the binding a new written name again
-/// (`ledger_identities_3`, keeping every earlier name as a `serde` alias) in
+/// (`ledger_identities_4`, keeping every earlier name as a `serde` alias) in
 /// the same change, and update the name here. A release that cannot check a
 /// batch must find no binding in it.
 ///
@@ -2524,6 +2542,8 @@ fn a_saved_batch_holds_exactly_these_records() {
             ledger_identities,
             cash_in_hand_ledgers,
             on_account_approved,
+            statement,
+            withdrawn_skips: _,
         } = line;
         if let Some(ImportCompanyTuple {
             name: _,
@@ -2587,6 +2607,35 @@ fn a_saved_batch_holds_exactly_these_records() {
                 party_digest: _,
             } = approved;
         }
+        // the line holds the statement as the JSON it was written as; the
+        // journal reader does not parse it, the fact builder does
+        if let Some(recorded) = statement {
+            let StatementFacts {
+                bank_ledger_guid: _,
+                coverage,
+                contra_rows,
+                skip_rows,
+            } = serde_json::from_value(recorded.clone()).unwrap();
+            if let Some(StatementWindow { from: _, to: _ }) = coverage {}
+            for ContraRow {
+                bridge_txn_id: _,
+                reference: _,
+                instrument: _,
+                reversed_same_day: _,
+            } in contra_rows
+            {}
+            for SkipRow {
+                bridge_txn_id: _,
+                date: _,
+                amount: _,
+                direction: _,
+                other_ledger_guid: _,
+                reference: _,
+                instrument: _,
+                reversed_same_day: _,
+            } in skip_rows
+            {}
+        }
     }
     let (mut line, _) = batch();
     line.amends_batch_id = Some("bridge-00000000-0000-4000-8000-000000000009".into());
@@ -2606,6 +2655,30 @@ fn a_saved_batch_holds_exactly_these_records() {
             "party_bill_wise":true, "company_state":"Rajasthan"}
     }))
     .unwrap();
+    line.statement = Some(statement_record(&StatementFacts {
+        bank_ledger_guid: "g".into(),
+        coverage: Some(StatementWindow {
+            from: TallyDate::parse("20260901").unwrap(),
+            to: TallyDate::parse("20260930").unwrap(),
+        }),
+        contra_rows: vec![ContraRow {
+            bridge_txn_id: format!("st-20260901-{}", padn(1, 16)),
+            reference: Some(p6(1, 12)),
+            instrument: Some("000417".into()),
+            reversed_same_day: true,
+        }],
+        skip_rows: vec![SkipRow {
+            bridge_txn_id: format!("st-20260901-{}", padn(2, 16)),
+            date: TallyDate::parse("20260901").unwrap(),
+            amount: "500.00".into(),
+            direction: RowDirection::Outflow,
+            other_ledger_guid: "h".into(),
+            reference: Some(p6(2, 12)),
+            instrument: Some("000418".into()),
+            reversed_same_day: true,
+        }],
+    }));
+    line.withdrawn_skips = Some(vec![format!("st-20260901-{}", padn(2, 16))]);
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2629,9 +2702,9 @@ fn a_saved_batch_holds_exactly_these_records() {
             "date_to",
             "endpoint_origin",
             "identity_scheme",
-            "ledger_identities_2",
-            "ledger_identities_2[].guid",
-            "ledger_identities_2[].name",
+            "ledger_identities_3",
+            "ledger_identities_3[].guid",
+            "ledger_identities_3[].name",
             "on_account_approved",
             "on_account_approved[].ledger",
             "on_account_approved[].party_digest",
@@ -2640,6 +2713,25 @@ fn a_saved_batch_holds_exactly_these_records() {
             "pre_import_mark.master_value",
             "pre_import_mark.value",
             "sha256",
+            "statement",
+            "statement.bank_ledger_guid",
+            "statement.contra_rows",
+            "statement.contra_rows[].bridge_txn_id",
+            "statement.contra_rows[].instrument",
+            "statement.contra_rows[].reference",
+            "statement.contra_rows[].reversed_same_day",
+            "statement.coverage",
+            "statement.coverage.from",
+            "statement.coverage.to",
+            "statement.skip_rows",
+            "statement.skip_rows[].amount",
+            "statement.skip_rows[].bridge_txn_id",
+            "statement.skip_rows[].date",
+            "statement.skip_rows[].direction",
+            "statement.skip_rows[].instrument",
+            "statement.skip_rows[].other_ledger_guid",
+            "statement.skip_rows[].reference",
+            "statement.skip_rows[].reversed_same_day",
             "status",
             "txn_ids",
             "vouchers",
@@ -2664,11 +2756,13 @@ fn a_saved_batch_holds_exactly_these_records() {
             "vouchers[].reference",
             "vouchers[].voucher_number",
             "vouchers[].voucher_type",
+            "withdrawn_skips",
         ],
         "{written}"
     );
     let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
     assert_eq!(reread.ledger_identities, line.ledger_identities);
+    assert_eq!(reread.statement, line.statement);
 }
 
 /// A batch an earlier release saved, as that release journaled it (a captured
@@ -2692,8 +2786,12 @@ fn a_batch_an_earlier_release_saved_keeps_its_ledger_binding() {
     assert_eq!(line.on_account_approved, None);
     let rewritten = serde_json::to_value(&line).unwrap();
     assert!(rewritten.get("ledger_identities").is_none(), "{rewritten}");
+    assert!(
+        rewritten.get("ledger_identities_2").is_none(),
+        "{rewritten}"
+    );
     assert_eq!(
-        rewritten["ledger_identities_2"].as_array().map(Vec::len),
+        rewritten["ledger_identities_3"].as_array().map(Vec::len),
         Some(bound)
     );
 }

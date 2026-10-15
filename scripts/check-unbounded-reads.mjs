@@ -59,9 +59,9 @@
 // excuses. The script exports its checks and runs the scan only when run directly, the shape of
 // check-surface-ack.mjs, so the tests can call them.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { relative, resolve } from "node:path";
 
 const scriptRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -393,6 +393,6 @@ function main(argv) {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   main(process.argv.slice(2));
 }

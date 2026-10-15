@@ -930,8 +930,28 @@ mod wr2_core_window_sequence {
         responses: Vec<String>,
     ) -> (Result<CanonicalPackWindow, TallyError>, Vec<String>) {
         let _simulator_guard = simulator_test_lock().lock().await;
-        let identity = observed_identity(COMPANY, COMPANY_GUID, "100004", "20260401");
         let (address, server) = spawn_method_routed_server(responses).await;
+        let result = extract_from(address).await;
+        let methods = tokio::time::timeout(std::time::Duration::from_secs(10), server)
+            .await
+            .expect("the routed server saw every response it was given requested")
+            .expect("join routed Tally server");
+        (result, methods)
+    }
+
+    /// One `extract_core_window` of the captured company against `address`.
+    pub(super) async fn extract_from(
+        address: SocketAddr,
+    ) -> Result<CanonicalPackWindow, TallyError> {
+        let identity = observed_identity(COMPANY, COMPANY_GUID, "100004", "20260401");
+        let (connector, context) = connector_at(address);
+        connector
+            .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
+            .await
+    }
+
+    /// A connector for the captured company at `address`, with its context.
+    pub(super) fn connector_at(address: SocketAddr) -> (RuntimeTallyConnector, RequestContext) {
         let config = TallyConfig {
             host: address.ip().to_string(),
             port: address.port(),
@@ -961,15 +981,127 @@ mod wr2_core_window_sequence {
         let connector =
             RuntimeTallyConnector::new(TallyRuntime::default(), config, company, context.clone())
                 .unwrap();
-        let result = connector
-            .extract_core_window(&context, DateBoundaryProfile::ModeAgnostic, &identity)
-            .await;
-        let methods = tokio::time::timeout(std::time::Duration::from_secs(10), server)
-            .await
-            .expect("the routed server saw every response it was given requested")
-            .expect("join routed Tally server");
-        (result, methods)
+        (connector, context)
     }
+
+    /// Serves `responses` in order, except that the POST numbered
+    /// `closed_post` (from 0) is read in full and then closed unanswered, as
+    /// a connection lost after Tally received the request. Returns the count
+    /// of POSTs received so far.
+    pub(super) async fn spawn_server_closing_one_post(
+        responses: Vec<String>,
+        closed_post: usize,
+    ) -> (
+        SocketAddr,
+        Arc<std::sync::atomic::AtomicUsize>,
+        JoinHandle<()>,
+    ) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind the local double");
+        let address = listener.local_addr().expect("double address");
+        let received = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&received);
+        let server = tokio::spawn(async move {
+            let mut responses = responses.into_iter();
+            loop {
+                let (mut socket, _) = listener.accept().await.expect("accept a send");
+                let request =
+                    crate::tally::connection::tests::read_complete_http_request(&mut socket).await;
+                assert!(
+                    request.starts_with(b"POST "),
+                    "a core-window read is a POST"
+                );
+                if counted.fetch_add(1, Ordering::SeqCst) == closed_post {
+                    continue;
+                }
+                let response = utf16_xml_response(responses.next().expect("a response to serve"));
+                socket.write_all(&response).await.expect("write a response");
+            }
+        });
+        (address, received, server)
+    }
+}
+
+/// Each export of a core window, in turn, has its connection closed after the
+/// whole request was received: both group exports, both ledger exports, the
+/// voucher-type export and the voucher export, by their place among the
+/// eighteen requests. None is sent again, and the window ends with the
+/// transport's typed error. A second copy would have been answered here, and
+/// the window would have built.
+#[tokio::test]
+async fn core_window_sends_each_export_once_when_its_connection_closes_after_the_request() {
+    use wr2_core_window_sequence as seq;
+    const EXPORTS: [usize; 6] = [2, 3, 8, 9, 12, 15];
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let extent = seq::EXTENTS;
+    for export in EXPORTS {
+        let (address, received, server) = seq::spawn_server_closing_one_post(
+            seq::posts([(extent, extent); seq::EXTENT_BRACKETS]),
+            export,
+        )
+        .await;
+        let result = seq::extract_from(address).await;
+        server.abort();
+        let error = result.expect_err("an export that is never answered must fail the window");
+        assert!(
+            matches!(error, TallyError::Unreachable),
+            "request {export}: unexpected error: {error:?}"
+        );
+        assert_eq!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            export + 1,
+            "request {export} was sent again"
+        );
+    }
+}
+
+/// Control for the test above, and the other half of the rule: the first two
+/// requests of a core window are the two small extent reads of a pair. When
+/// either has its connection closed the same way it is sent again, and the
+/// window builds after one request more than the eighteen of an undisturbed
+/// run.
+#[tokio::test]
+async fn core_window_sends_an_extent_read_again_when_its_connection_closes_after_the_request() {
+    use wr2_core_window_sequence as seq;
+    const EXTENT_READS_OF_A_PAIR: [usize; 2] = [0, 1];
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let extent = seq::EXTENTS;
+    for extent_read in EXTENT_READS_OF_A_PAIR {
+        let (address, received, server) = seq::spawn_server_closing_one_post(
+            seq::posts([(extent, extent); seq::EXTENT_BRACKETS]),
+            extent_read,
+        )
+        .await;
+        let result = seq::extract_from(address).await;
+        server.abort();
+        result.expect("the window must build once the extent read is sent again");
+        assert_eq!(
+            received.load(std::sync::atomic::Ordering::SeqCst),
+            seq::POSTS_IN_A_SUCCESSFUL_WINDOW + 1
+        );
+    }
+}
+
+/// The company list is the connector's other small read. Closed the same way
+/// it is sent again, and discovery returns the captured company. The response
+/// served is the captured extent collection, which holds that company's row.
+#[tokio::test]
+async fn discover_companies_sends_the_company_list_again_when_its_connection_closes_after_the_request(
+) {
+    use wr2_core_window_sequence as seq;
+    let _simulator_guard = simulator_test_lock().lock().await;
+    let (address, received, server) =
+        seq::spawn_server_closing_one_post(vec![seq::EXTENTS.to_owned()], 0).await;
+    let (connector, _context) = seq::connector_at(address);
+    let discovered = connector.discover_companies().await;
+    server.abort();
+    let discovered = discovered.expect("discovery must succeed once the list is sent again");
+    assert!(discovered
+        .iter()
+        .any(|company| company.identity == connector.company.identity));
+    assert_eq!(received.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
 /// Control for the three refusals below: the same captured sequence with no

@@ -111,14 +111,11 @@ pending consented synthetic live qualification.
    caller-attested durable rows cannot be promoted. Runtime dispatch remains
    blocked until the durable store persists opaque derived commitments and a
    synthetic Education company proves the exact import/readback profile.
-9. India Tax now has a non-default parser for one exact Bridge-owned raw
-   observation envelope. Its outputs remain explicitly unbound, retain only
-   identity candidates and exact source lexemes, and cannot enter the
-   canonical pack, capability registry, mirror, checkpoint, proof, runtime, or
-   UI. Request construction and extraction remain blocked until exact TDL
-   method evaluation, multi-registration and override behaviour, count scope,
-   Core-compatible identity binding, Education-mode behaviour, and a
-   release-specific report tie-out are observed with synthetic data.
+9. The India Tax observation parser has no implementation in the repository. The non-default
+   parser for one exact Bridge-owned raw observation envelope was deleted on 2026-10-14 in [#1710](https://github.com/ComplyEaze/bridge/pull/1710):
+   it had no request artifact and no caller outside itself, and no shipped build
+   compiled it. Any future India Tax extraction needs a new design under the gates
+   [ADR 0008](./adr/0008-tally-india-tax-observation-authority.md) keeps.
 10. PR13 now has a portable, fixed-cardinality observability contract with
     closed dimensions, coherent fixed-memory histograms, saturation evidence,
     bucketed privacy-reduced previews, and no exporter dependency. PR15 wired
@@ -128,20 +125,28 @@ pending consented synthetic live qualification.
     deleted as well; see the ADR 0009 amendment.) Phase/reconciliation
     metrics, persistence, general support bundles, and measured platform
     budgets remain follow-on work.
-11. PR13B1 now has bounded deterministic voucher generators and a versioned
-    parser-only qualification receipt. Inputs are generated before measurement;
-    each sample uses a fresh worker and must match exact bytes, hashes, record
-    counts, entry counts, and derived output. The receipt structurally disclaims
-    live Tally, support, capability, accounting, runtime-cap, and performance
-    budget authority. Windowed 50k/500k, HTTP fault/cap cases, native DB/resume,
-    UI responsiveness, and reviewed baselines remain follow-on work.
+11. PR13B1 built bounded deterministic voucher generators and a versioned
+    parser-only qualification receipt. The receipt, its tool
+    (`tools/bridge-tally-qualification`) and its CI step were deleted on
+    2026-10-12 in [#1566](https://github.com/ComplyEaze/bridge/pull/1566): the
+    tool checked Bridge's parser against data the repository's own simulator
+    generated, so it proved nothing a live capture does not, and no shipped
+    build depended on it. The simulator's voucher-window generator, whose only
+    user was that tool, was deleted on 2026-10-13 in
+    [#1670](https://github.com/ComplyEaze/bridge/pull/1670) because nothing
+    called it. A new scale or performance claim needs a new design, with its
+    evidence observed live.
 12. PR13B2 binds the app to the portable bounded HTTP transport, preserves
     distinct loopback socket identities, rejects proxy/redirect/non-identity
     content encoding paths, and characterizes Content-Length, chunked,
     close-delimited, truncation, cap, timeout, and UTF-16 behavior against the
     loopback simulator. Export/import envelope ambiguity, cancellation pacing,
-    and half-open probe stampedes are rectified. A bounded 50,000-ledger master
-    generator and 10,000-ledger cross-encoding parser test exist. This is
+    and half-open probe stampedes are rectified. The simulator's bounded
+    50,000-ledger master generator was deleted on 2026-10-13 in
+    [#1690](https://github.com/ComplyEaze/bridge/pull/1690) because nothing
+    called it: the 10,000-ledger cross-encoding parser test builds its rows
+    itself, and it remains
+    (`src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs`). This is
     synthetic evidence only; process-isolated runtime, native database/UI, and
     live Education qualification remain pending.
 13. PR14 now has a closed-schema compatibility receipt and executable release
@@ -166,14 +171,12 @@ pending consented synthetic live qualification.
     remains delegated to the configured CI host. Support-bundle UX,
     fuzz/property tests, live XML evidence, and measured performance budgets
     remain pending.
-15. PR16 adds the portable Party Outstanding Confidence Receipt foundation:
-    Bills & Payments schema v2, an exact unbound observation parser, and a
-    fail-closed exact-arithmetic reconciliation engine. Company/party/date/
-    direction/profile/scope reuse is rejected, On Account remains aggregate,
-    and unknown, incomplete, unobserved, or unauthoritative empty evidence
-    cannot become zero. Request construction,
-    runtime/mirror/UI wiring, and live Education semantics remain pending, so
-    the pack stays unknown and unsupported.
+15. PR16 added the portable Party Outstanding Confidence Receipt foundation: Bills & Payments
+    schema v2, an exact unbound observation parser, and a fail-closed exact-arithmetic
+    reconciliation engine. The parser and the engine were deleted on 2026-10-14 in [#1710](https://github.com/ComplyEaze/bridge/pull/1710):
+    nothing outside them used them, and no shipped build compiled the parser. The schema v2
+    canonical model remains, and the capability profile still reports the Bills & Payments
+    pack as `Unknown`.
 16. PR17 adds a dormant, feature-gated native Ledger Outstandings request probe
     with exact request/scope commitments and a synthetic Education fixture
     protocol. It has no production dispatch, parser authority, mirror, UI, or
@@ -206,13 +209,10 @@ non-exhaustive; the linked plans and ADR remain the authoritative gates.
 foundations, was deleted rather than retained ([#1574](https://github.com/ComplyEaze/bridge/pull/1574)), together with the JSONEX parser
 and request builder it was built beside. Two foundations remain below.
 
-- `bills_reconciliation` retains the item 15 fail-closed, exact-arithmetic
-  Bills & Payments foundation governed by [ADR 0013](./adr/0013-tally-party-outstanding-confidence-authority.md)
-  and the [PR16 boundary](./tally/TALLY_INTEGRATION_RESEARCH_AND_CODEX_PLAN.md#implemented-pr16-boundary--party-outstanding-confidence-receipt-v1).
-  Future activation must provide the full gates there, including a
-  parser-to-canonical adapter, a separately reviewed live-qualified typed
-  authority constructor, and Bills-qualified checkpoint/proof authority; a
-  receipt or display wiring alone cannot promote the pack.
+**2026-10-14 amendment.** `bills_reconciliation`, the first of these foundations, was deleted
+rather than retained ([#1710](https://github.com/ComplyEaze/bridge/pull/1710)), together with the two observation parsers built beside
+it. One foundation, `destination`, remains below.
+
 - `destination` retains a versioned destination-contract boundary for an open
   product decision. It does not commit Bridge to Tally-to-AXAL delivery or imply
   that an endpoint exists. Retention can be revisited if a product decision and

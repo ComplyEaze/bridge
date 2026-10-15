@@ -167,7 +167,7 @@ The earlier draft's open questions now have measured answers:
   layers and shared output types.
 - **The ten "ledger data" functions are at least four responsibilities,** each with its own
   closure: standard ledger source records (`parse_ledger_source_records_with_evidence` and its
-  wrappers), native ledger collection, period balance report, write read-back. The standard ledger
+  wrappers), native ledger collection, period balance report (removed by #1643; see #1642), write read-back. The standard ledger
   catalogue and identity (`parse_standard_ledger_catalog*`, 622 lines) is a separate family beside
   them.
 - **Text encoding is the first safe split.** It is 22 items and 586 lines, with no coupling to the
@@ -248,10 +248,6 @@ A method-aware root set is needed before measuring closures.
 
 ### `crates/bridge-tally-core` (pinned files)
 
-- **`bills_reconciliation.rs::assess_party_outstanding`** is 416 of the file's 688 item lines, 26
-  times the median: the crate's clearest one-huge-function case. Its body reads as six phases, from
-  scope admission to on-account handling. Extracting those steps in place is being done
-  separately.
 - **`master_binding.rs`** is one pipeline under `bind`, not a module of many things. Its one clean
   seam is identifier extraction: 18 items and 442 lines behind `extract_identifiers` and the
   `Identifier` types. That would be a deep module. It is also the most scrutinised code here

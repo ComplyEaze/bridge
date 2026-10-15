@@ -211,6 +211,8 @@ pub(super) enum FactsError {
     BadRecordId,
     #[error("a skip-only record must hold skipped rows and no Contra row")]
     NotSkipOnly,
+    #[error("a withdrawn skip is not a statement row the batch posts")]
+    WithdrawnRowNotVoucher { txn: String },
 }
 
 impl FactsError {
@@ -230,6 +232,7 @@ impl FactsError {
             Self::BankLedgerUnbound => "bank_ledger_unbound",
             Self::BadRecordId => "bad_record_id",
             Self::NotSkipOnly => "not_skip_only",
+            Self::WithdrawnRowNotVoucher { .. } => "withdrawn_row_not_voucher",
             Self::Unparsable => "unparsable",
         }
     }
@@ -448,6 +451,8 @@ pub(super) struct BuildLine {
     pub(super) vouchers: Vec<BuildVoucher>,
     pub(super) ledger_identities: Option<Vec<BoundLedger>>,
     pub(super) statement: Option<Value>,
+    /// The statement rows the batch posts although a skip names them.
+    pub(super) withdrawn: BTreeSet<String>,
 }
 
 impl BuildLine {
@@ -462,14 +467,31 @@ impl BuildLine {
             vouchers: BuildVoucher::of_vouchers(&line.vouchers),
             ledger_identities: line.ledger_identities.clone(),
             statement: line.statement.clone(),
+            withdrawn: line.withdrawn_skips.iter().flatten().cloned().collect(),
+        }
+    }
+
+    /// The same check at write and at read: a withdrawn row is a statement row
+    /// the batch holds as a voucher.
+    fn check_withdrawn(&self) -> Result<(), TransferFactsError> {
+        match self.withdrawn.iter().find(|row| {
+            !is_statement_txn_id(row)
+                || !self.vouchers.iter().any(|voucher| &voucher.txn_id == *row)
+        }) {
+            Some(row) => Err(TransferFactsError::Facts {
+                source_id: self.batch_id.clone(),
+                error: FactsError::WithdrawnRowNotVoucher { txn: row.clone() },
+            }),
+            None => Ok(()),
         }
     }
 }
 
 impl BuildVoucher {
-    /// The vouchers a transfer can be made of: Contras, Journals (Tally
-    /// accepted a Journal between two bank ledgers at its default settings,
-    /// measured on one synthetic book) and statement rows.
+    /// The vouchers a transfer can be made of: Contras, Journals and statement
+    /// rows. Reference §9.13 records one Journal between two bank ledgers
+    /// accepted (PARTIAL, one run), so a Journal that names two statement banks
+    /// is treated as a possible transfer.
     pub(super) fn of_vouchers(vouchers: &[ImportVoucher]) -> Vec<Self> {
         vouchers
             .iter()
@@ -598,11 +620,11 @@ pub(super) struct TransferFacts {
     pub(super) skips: Vec<SkipFact>,
     pub(super) contras: Vec<ContraFact>,
     pub(super) coverage: Coverage,
-    /// Skips dropped because a batch found posted holds the row.
+    /// Skips dropped because a batch found posted holds the row and recorded
+    /// that a person withdrew the skip.
     pub(super) retired_skips: usize,
-    /// Skips whose row a batch not found posted holds: not established, the
-    /// batch that holds it, and the skipped row's date.
-    pub(super) held_elsewhere: Vec<(SkipKey, BatchId, TallyDate)>,
+    /// Skips whose row a batch holds as a voucher, and that are not retired.
+    pub(super) held: Vec<HeldSkip>,
     /// Statement Contras left out because they are not two ledgers with equal
     /// positive amounts, or have no leg on the statement's bank.
     // Counted for the tests; no tool reports it, since the coverage rule already
@@ -626,6 +648,31 @@ pub(super) struct TransferFacts {
     /// a skip a person has acted on. A skip only built is superseded by the
     /// next build of its statement and is not live.
     pub(super) live_skips: BTreeSet<SkipKey>,
+    /// Every skip the company still has, live or not, kept or held: the skips a
+    /// build that posts the row may withdraw. A retired skip is not one.
+    pub(super) skip_mentions: BTreeSet<SkipKey>,
+}
+
+/// What is true of the batch that holds a skipped row as a voucher.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum HeldBy {
+    /// No batch holding the row was found posted: it may yet be, and until then
+    /// the skip is not established.
+    UnverifiedBatch,
+    /// A batch found posted holds the row, and no build recorded that a person
+    /// withdrew the skip: the posted voucher contradicts the skip, and the
+    /// other account's Contra may carry the same transfer.
+    PostedBatch,
+}
+
+/// A skipped row that a batch holds as a voucher.
+#[derive(Debug, Clone)]
+pub(super) struct HeldSkip {
+    pub(super) fact: SkipFact,
+    /// The batch that holds the row: the latest one, or for a posted holder
+    /// the first found posted that did not record the withdrawal.
+    pub(super) holder: BatchId,
+    pub(super) by: HeldBy,
 }
 
 /// A batch as the journal leaves it.
@@ -703,6 +750,7 @@ fn fold_batches(
                         let batch = &mut batches[at];
                         if batch.line.vouchers != line.vouchers
                             || batch.line.statement != line.statement
+                            || batch.line.withdrawn != line.withdrawn
                         {
                             return Err(TransferFactsError::BatchRecordChanged {
                                 batch_id: line.batch_id,
@@ -716,6 +764,7 @@ fn fold_batches(
                     }
                     None => {
                         let line = *line;
+                        line.check_withdrawn()?;
                         let facts = admit_facts(&line)?;
                         index.insert(line.batch_id.clone(), batches.len());
                         batches.push(Batch {
@@ -1240,25 +1289,61 @@ pub(super) fn build_transfer_facts(
         }
     }
 
-    // a skipped row that a batch posted, or may yet post, is not a skip
+    // A skipped row that a batch posted, or may yet post, is not a skip. One a
+    // batch found posted holds is retired only when every such batch's lineage
+    // recorded the withdrawal, in a build that was sent or found posted and was
+    // built after the newest mention of the skip (a withdrawal built at the very
+    // instant of the skip cannot be told from one made before it, so it does not
+    // count); otherwise the posted voucher contradicts the skip and it stays open.
+    let mut withdrawn_at: BTreeMap<(&str, &str), DateTime<FixedOffset>> = BTreeMap::new();
+    for batch in &batches {
+        if !(batch.sent || batch.found) {
+            continue;
+        }
+        for row in &batch.line.withdrawn {
+            let built = built_instant(&batch.line.batch_id, &batch.line.built_at)?;
+            let newest = withdrawn_at
+                .entry((batch.line.lineage.as_str(), row.as_str()))
+                .or_insert(built);
+            *newest = (*newest).max(built);
+        }
+    }
     let mut skips = Vec::new();
     let mut retired_skips = 0;
-    let mut held_elsewhere = Vec::new();
+    let mut held = Vec::new();
     let mut live_skips = BTreeSet::new();
+    let mut skip_mentions = BTreeSet::new();
     for (key, mention) in mentions {
         let live = mention.live;
         match holders.get(mention.row.as_str()) {
             None => skips.push(mention.fact),
-            Some(held) if held.batches.iter().any(|&at| batches[at].found) => {
-                retired_skips += 1;
-                continue;
+            Some(holding) => {
+                let contradicting = holding.batches.iter().copied().find(|&at| {
+                    batches[at].found
+                        && withdrawn_at
+                            .get(&(batches[at].line.lineage.as_str(), mention.row.as_str()))
+                            .is_none_or(|recorded| *recorded <= mention.built)
+                });
+                let any_posted = holding.batches.iter().any(|&at| batches[at].found);
+                match (contradicting, any_posted) {
+                    (None, true) => {
+                        retired_skips += 1;
+                        continue;
+                    }
+                    (Some(at), _) => held.push(HeldSkip {
+                        fact: mention.fact,
+                        holder: BatchId::new(batches[at].line.batch_id.as_str()),
+                        by: HeldBy::PostedBatch,
+                    }),
+                    (None, false) => held.push(HeldSkip {
+                        fact: mention.fact,
+                        holder: BatchId::new(batches[holding.latest].line.batch_id.as_str()),
+                        by: HeldBy::UnverifiedBatch,
+                    }),
+                }
             }
-            Some(held) => held_elsewhere.push((
-                key.clone(),
-                BatchId::new(batches[held.latest].line.batch_id.as_str()),
-                mention.fact.date.clone(),
-            )),
         }
+        skip_mentions.insert(key.clone());
         if live {
             live_skips.insert(key);
         }
@@ -1314,11 +1399,12 @@ pub(super) fn build_transfer_facts(
         contras: kept,
         coverage,
         retired_skips,
-        held_elsewhere,
+        held,
         contras_not_two_leg,
         contras_without_facts,
         contras_superseded,
         live_skips,
+        skip_mentions,
     })
 }
 

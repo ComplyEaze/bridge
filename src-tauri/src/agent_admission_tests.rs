@@ -1157,8 +1157,8 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "parse_bank_statement",
-            "a skipped row is never silent",
-            "a skip is recorded and listed until the other account's Contra is verified",
+            "build_import_xml records a skipped row and lists it in a transfers section",
+            "a skip is recorded and listed with its state and what to do",
         ),
         (
             "build_import_xml",
@@ -1472,6 +1472,44 @@ fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
                 limit.get("default").is_none(),
                 "{name}: its limit defaults to the configured row limit, so the schema names no default"
             );
+        }
+    }
+}
+
+/// The texts about skipped rows say what the code does: a skipped row that a
+/// batch found posted also posts stays open, and nothing says the send-time
+/// check is part of this release.
+#[test]
+fn the_transfer_texts_claim_only_what_the_code_does() {
+    let definitions = registered_tool_definitions(true, true);
+    let tool = |name: &str| -> Value {
+        definitions
+            .as_array()
+            .and_then(|tools| tools.iter().find(|entry| entry["name"] == name))
+            .unwrap_or_else(|| panic!("{name} is not registered"))
+            .clone()
+    };
+    let description = |name: &str| tool(name)["description"].as_str().unwrap().to_owned();
+    let parse = description("parse_bank_statement");
+    assert!(!parse.contains("never silent"), "{parse}");
+    assert!(parse.contains("posted_against_skip"), "{parse}");
+    let build = description("build_import_xml");
+    assert!(
+        !build.contains("each skipped row not yet paired"),
+        "{build}"
+    );
+    assert!(build.contains("posted_against_skip"), "{build}");
+    let argument = tool("build_import_xml")
+        .pointer("/inputSchema/properties/withdraw_skips/description")
+        .and_then(Value::as_str)
+        .unwrap()
+        .to_owned();
+    assert!(!argument.contains("It is not saved"), "{argument}");
+    assert!(!argument.contains("Without this a build"), "{argument}");
+    assert!(argument.contains("posted_against_skip"), "{argument}");
+    for text in [&parse, &build, &argument] {
+        for phrase in ["1703", "merges with"] {
+            assert!(!text.contains(phrase), "{phrase}: {text}");
         }
     }
 }

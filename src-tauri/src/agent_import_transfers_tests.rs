@@ -7,6 +7,17 @@ use crate::agent::transfer_pairing::{
     StatementRowId, TxnId,
 };
 use bridge_bank_statement::bank::BankReference;
+use statement_facts::HeldSkip;
+
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
 
 fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).unwrap()
@@ -88,11 +99,12 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
         contras,
         coverage: coverage(),
         retired_skips: 3,
-        held_elsewhere: Vec::new(),
+        held: Vec::new(),
         contras_not_two_leg: 0,
         contras_without_facts: 0,
         contras_superseded: 0,
         live_skips: BTreeSet::new(),
+        skip_mentions: BTreeSet::new(),
     }
 }
 
@@ -140,7 +152,7 @@ fn every_state() -> TransferFacts {
     ];
     skips[4].reversed_same_day = true;
     let printing = |digits: &str| BankReference::from_recorded(digits);
-    skips[7].reference = printing("600000000001");
+    skips[7].reference = printing(&p6(1, 12));
     assert!(skips[7].reference.is_some());
     let mut unverified = contra("batch-2", "t2", "20260106", "222.22");
     unverified.status = BatchStatus::NotVerified {
@@ -163,21 +175,21 @@ fn every_state() -> TransferFacts {
         // two Contras of a row's day and amount, each of another reference
         {
             let mut other = contra("batch-11", "t11", "20260111", "999.99");
-            other.reference = printing("600000000003");
+            other.reference = printing(&p6(3, 12));
             other
         },
         {
             let mut other = contra("batch-10", "t10", "20260111", "999.99");
-            other.reference = printing("600000000002");
+            other.reference = printing(&p6(2, 12));
             other
         },
     ];
     let mut facts = facts_of(skips, contras);
-    facts.held_elsewhere = vec![(
-        skip_key("st-held"),
-        BatchId::new("batch-9"),
-        date("20260104"),
-    )];
+    facts.held = vec![HeldSkip {
+        fact: skip("st-held", "20260104", "100.00"),
+        holder: BatchId::new("batch-9"),
+        by: HeldBy::UnverifiedBatch,
+    }];
     facts
 }
 
@@ -328,7 +340,7 @@ fn two_contras_of_one_batch_list_the_row_once_for_that_batch() {
     let mut reversed = skip("st-reversed", "20260109", "555.55");
     reversed.reversed_same_day = true;
     let mut differs = skip("st-differs", "20260111", "999.99");
-    differs.reference = printing("600000000001");
+    differs.reference = printing(&p6(1, 12));
     assert!(differs.reference.is_some());
     let of_another_reference = |txn: &str, digits: &str| {
         let mut other = contra("batch-3", txn, "20260111", "999.99");
@@ -342,8 +354,8 @@ fn two_contras_of_one_batch_list_the_row_once_for_that_batch() {
             contra("batch-1", "t2", "20260108", "444.44"),
             contra("batch-2", "t3", "20260109", "555.55"),
             contra("batch-2", "t4", "20260109", "555.55"),
-            of_another_reference("t5", "600000000002"),
-            of_another_reference("t6", "600000000003"),
+            of_another_reference("t5", &p6(2, 12)),
+            of_another_reference("t6", &p6(3, 12)),
         ],
     );
     let summary = summary_of(&facts);
@@ -424,9 +436,9 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
         "777.77",
         "888.88",
         "999.99",
-        "600000000001",
-        "600000000002",
-        "600000000003",
+        &p6(1, 12),
+        &p6(2, 12),
+        &p6(3, 12),
         "b1",
         "b2",
     ] {
@@ -470,7 +482,7 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
     );
 }
 
-const EVERY_OPEN_STATE: [OpenState; 9] = [
+const EVERY_OPEN_STATE: [OpenState; 10] = [
     OpenState::NotFound,
     OpenState::Ambiguous,
     OpenState::OtherSideUnverified,
@@ -480,6 +492,7 @@ const EVERY_OPEN_STATE: [OpenState; 9] = [
     OpenState::ReferenceDiffers,
     OpenState::HeldElsewhere,
     OpenState::DoubleBooked,
+    OpenState::PostedAgainstSkip,
 ];
 
 /// Each state, read from its place in `EVERY_OPEN_STATE`. A state added to
@@ -497,6 +510,7 @@ fn from_the_list(state: OpenState) -> OpenState {
         OpenState::ReferenceDiffers => EVERY_OPEN_STATE[6],
         OpenState::HeldElsewhere => EVERY_OPEN_STATE[7],
         OpenState::DoubleBooked => EVERY_OPEN_STATE[8],
+        OpenState::PostedAgainstSkip => EVERY_OPEN_STATE[9],
     }
 }
 
@@ -546,8 +560,42 @@ fn each_next_step_says_what_was_decided() {
     ));
     // it never says the row is not a transfer
     assert!(!reversed.contains("not a transfer"), "{reversed}");
-    assert!(step(OpenState::HeldElsewhere).contains("once it is found posted the skip is retired"));
-    assert!(step(OpenState::DoubleBooked).contains("keep one"));
+    let held = step(OpenState::HeldElsewhere);
+    assert!(held.contains(
+        "retired once every batch found posted that holds the row has a build in its lineage that recorded the withdrawal"
+    ));
+    assert!(held.contains(
+        "was built after the newest record of the skip (a later build of the skipping statement records the skip again)"
+    ));
+    assert!(held.contains("posted_against_skip"));
+    // the route is conditional on the batch named: one that does not name the
+    // row is left unsent, one that does is the build to send and verify
+    assert!(held.contains(
+        "If the batch named does not name this row in withdraw_skips and has not been sent, build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named"
+    ));
+    assert!(held.contains("If the batch named does name this row, send it and verify it"));
+    assert!(!held.contains(". Do not send"), "{held}");
+    // and what the route costs
+    assert!(held.contains(
+        "A batch left unsent blocks the days of its rows for the other account's coverage until it is verified, and no step inside ComplyEaze Bridge clears that"
+    ));
+    let posted = step(OpenState::PostedAgainstSkip);
+    assert!(posted.contains(
+        "no build in its lineage that was sent or found posted recorded its withdrawal after the newest record of the skip"
+    ));
+    assert!(posted.contains("booked twice"));
+    // what clears it is what the facts do: a build of that batch's lineage that
+    // names the row and is found posted after the newest record of the skip;
+    // and a batch ComplyEaze Bridge posted itself cannot be amended
+    assert!(posted.contains(
+        "leaves this list only when a build in that batch's lineage that names it in withdraw_skips is found posted after the newest record of the skip"
+    ));
+    assert!(posted.contains("a batch ComplyEaze Bridge posted itself cannot be amended"));
+    assert!(!posted.contains("hand"), "{posted}");
+    // it describes an exit and does not forbid the build that is the exit
+    assert!(!posted.contains("Do not build"), "{posted}");
+    let double = step(OpenState::DoubleBooked);
+    assert!(double.contains("If either batch named has not been sent to Tally, do not send it"));
     let open = step(OpenState::NotEstablished);
     assert!(open.contains("Verify any batch of the other account's statement for this date first"));
     assert!(open.contains("build that statement only if no batch of it exists"));
@@ -646,7 +694,7 @@ fn withdraw_skips_are_distinct_statement_row_ids() {
         json!({"withdraw_skips": ["bridge-1"]}),
         json!({"withdraw_skips": ["st-20260901-ABCDEF0123456789"]}),
         json!({"withdraw_skips": [7]}),
-        json!({"withdraw_skips": "st-20260901-0000000000000001"}),
+        json!({"withdraw_skips": &format!("st-20260901-{}", padn(1, 16))}),
         json!({"withdraw_skips": null}),
         json!({"withdraw_skips": (0..=MAX_VOUCHERS as u32).map(row).collect::<Vec<_>>()}),
     ] {
@@ -799,13 +847,13 @@ fn a_withdrawal_of_carried_rows_is_told_what_each_state_needs() {
     assert!(!waiting.contains("already carries"));
     assert_eq!(
         both,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. Do not post these rows."
     );
     // a mix says what each state among the rows needs, and one state alone is
     // told in its own words
     assert_eq!(
         all,
-        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows: if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first, or, if it was never imported and will not be, build that statement again, import it and verify it. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). Until then the row stays as it is. Do not post these rows."
+        "No file was written and nothing was recorded. For a row with state paired, the other account's statement already carries it as a Contra in the batch named in paired_rows (for a skip that a batch holds, it may carry it: that skip is judged alone, and another skipped row could share that Contra): if that Contra is wrong, correct that statement's batch first. For a row with state other_side_unverified, the other account's statement may carry it as a Contra in the batch named, which is not verified yet: run verify_import on that batch first; if that batch was never sent to Tally and will not be, build that statement again, post it and verify it; if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet. For a row with state matched_unconfirmed, a verified Contra of the same day and amount, booked from the other account's statement, is in the batch named, and whether it is the only one is not established: keep the skip. The row can be decided only once statement records of both accounts cover its date: for each account that needs a statement whose rows begin before that date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on that date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is. Do not post these rows."
     );
     let texts = [&paired, &waiting, &matched, &both, &all];
     assert_eq!(texts.iter().collect::<BTreeSet<_>>().len(), texts.len());
@@ -828,5 +876,343 @@ fn a_section_that_did_not_run_names_the_call_that_made_it() {
     assert_eq!(
         recorded["next_steps"]["check_not_run"],
         "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
+}
+
+// ---- a next step names something ComplyEaze Bridge does, or says none does ------
+
+/// Every text a person or an assistant is told to follow about a skipped row.
+fn every_step_text() -> Vec<String> {
+    let mut texts: Vec<String> = EVERY_OPEN_STATE
+        .iter()
+        .map(|state| state.step().to_string())
+        .collect();
+    let kinds = [
+        Carrier::Paired,
+        Carrier::OtherSideUnverified,
+        Carrier::MatchedUnconfirmed,
+    ];
+    for kind in kinds {
+        texts.push(Carrier::refusal_step(&BTreeSet::from([kind])));
+    }
+    texts.push(Carrier::refusal_step(&kinds.into_iter().collect()));
+    texts
+}
+
+/// Every sentence a person or an assistant is told to follow about a skipped
+/// row, with the five refusals' next steps and the notes of the section.
+fn every_sentence_to_follow() -> Vec<String> {
+    let mut texts = every_step_text();
+    texts.extend(
+        [
+            SKIP_ROW_ALREADY_POSTED_NEXT_STEP,
+            SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP,
+            WITHDRAW_SKIP_INVALID_NEXT_STEP,
+            TRANSFER_DOUBLE_BOOKED_NEXT_STEP,
+            TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP,
+            NOT_ESTABLISHED_STEP,
+            CHECK_NOT_RUN_STEP,
+            CHECK_NOT_RUN_RECORDED_STEP,
+            OPEN_OMITTED_STEP,
+        ]
+        .map(str::to_string),
+    );
+    texts
+        .iter()
+        .flat_map(|text| {
+            text.replace("; ", ". ")
+                .split(". ")
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Every sentence that names Tally is one of the named reads or one of the
+/// named prohibitions and disclosures below, word for word. Anything else is a
+/// new sentence about Tally and has to be looked at: a step may tell a person
+/// to look in Tally, never to enter, edit, delete or import there. A negation
+/// somewhere in a sentence is not enough.
+#[test]
+fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read() {
+    const READS: [&str; 4] = [
+        "Check in Tally which rows are transfers",
+        "check in Tally which Contra carries this transfer",
+        "Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not",
+        "This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended",
+    ];
+    const NEGATIONS_AND_DISCLOSURES: [&str; 12] = [
+        "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
+        "A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked",
+        "A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet",
+        "ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally",
+        "Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice",
+        "If Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
+        "If Tally rejected that batch's send, no step inside ComplyEaze Bridge clears this row yet",
+        "If either batch named has not been sent to Tally, do not send it, and do not build or post anything further for this transfer",
+        "If that batch was never sent to Tally and will not be, build that statement again, post it and verify it",
+        "No step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet",
+        "if Tally rejected its send, building that statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet",
+        "if that batch was never sent to Tally and will not be, build that statement again, post it and verify it",
+    ];
+    let mut used = BTreeSet::new();
+    for sentence in every_sentence_to_follow() {
+        if !sentence.contains("Tally") {
+            continue;
+        }
+        let bare = sentence.trim_end_matches('.');
+        let allowed = READS
+            .iter()
+            .chain(NEGATIONS_AND_DISCLOSURES.iter())
+            .find(|allowed| bare == **allowed)
+            .unwrap_or_else(|| panic!("a new sentence about Tally: {sentence:?}"));
+        used.insert(*allowed);
+    }
+    // every allowed sentence is still in a text, so the lists do not drift
+    assert_eq!(used.len(), READS.len() + NEGATIONS_AND_DISCLOSURES.len());
+}
+
+/// The same rule over the tool texts that describe skipped rows: a sentence
+/// that names a skip and gives an instruction to enter, edit, delete or import
+/// is a prohibition.
+#[test]
+fn the_tool_texts_about_skipped_rows_give_no_instruction_to_change_tally() {
+    let definitions = crate::agent::catalog::registered_tool_definitions(true, true);
+    let tools = definitions.as_array().unwrap();
+    let text_of = |name: &str| {
+        tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    let build = text_of("build_import_xml");
+    let texts = [
+        text_of("parse_bank_statement")["description"].clone(),
+        build["description"].clone(),
+        build
+            .pointer("/inputSchema/properties/withdraw_skips/description")
+            .unwrap()
+            .clone(),
+    ];
+    let mut checked = 0;
+    for text in texts {
+        let text = text.as_str().unwrap().replace("; ", ". ");
+        for sentence in text
+            .split(". ")
+            .filter(|sentence| sentence.contains("skip"))
+        {
+            checked += 1;
+            let padded = format!(" {sentence} ");
+            let instructs = [" enter ", " edit ", " delete ", " import it "]
+                .iter()
+                .any(|verb| padded.contains(verb));
+            let prohibits = [" not ", " no step ", " never "]
+                .iter()
+                .any(|negation| padded.contains(negation));
+            assert!(!instructs || prohibits, "{sentence:?}");
+        }
+    }
+    assert!(checked >= 10, "{checked}");
+}
+
+#[test]
+fn a_state_with_no_way_out_inside_the_product_says_so() {
+    let none = "no step inside complyeaze bridge";
+    let lower = |text: &str| text.to_lowercase();
+    // two Contras already booked, and a skip a posted voucher contradicts
+    assert!(lower(OpenState::DoubleBooked.step()).contains(none));
+    assert!(lower(OpenState::PostedAgainstSkip.step()).contains(none));
+    // the other statement's send was rejected: a rebuild is refused
+    assert!(lower(OpenState::OtherSideUnverified.step()).contains(none));
+    assert!(OpenState::OtherSideUnverified.step().contains("rejected"));
+    let waiting = Carrier::refusal_step(&BTreeSet::from([Carrier::OtherSideUnverified]));
+    assert!(lower(&waiting).contains(none), "{waiting}");
+    assert!(waiting.contains("import_txn_already_posted"), "{waiting}");
+    // a statement build abandoned unsent keeps its days uncovered for good
+    let matched = OpenState::MatchedUnconfirmed.step();
+    assert!(lower(matched).contains(none) && matched.contains("abandoned"));
+    let carried = Carrier::refusal_step(&BTreeSet::from([Carrier::MatchedUnconfirmed]));
+    assert!(lower(&carried).contains(none) && carried.contains("abandoned"));
+}
+
+#[test]
+fn a_skip_a_posted_voucher_contradicts_is_listed_open_with_the_batch_that_posts_it() {
+    let mut facts = facts_of(vec![], vec![]);
+    facts.held = vec![HeldSkip {
+        fact: skip("st-posted", "20260105", "100.00"),
+        holder: BatchId::new("batch-4"),
+        by: HeldBy::PostedBatch,
+    }];
+    let summary = summary_of(&facts);
+    let TransferSummary::Computed {
+        paired,
+        skips_open,
+        retired,
+        ..
+    } = &summary
+    else {
+        panic!("computed");
+    };
+    assert_eq!((*paired, *skips_open, *retired), (0, 1, 3));
+    assert_eq!(
+        rows_of(&summary),
+        vec![(
+            "st-posted".to_string(),
+            "20260105".to_string(),
+            "posted_against_skip",
+            Some("batch-4".to_string())
+        )]
+    );
+    let section = summary.render(usize::MAX);
+    assert_eq!(
+        section["next_steps"]["posted_against_skip"],
+        OpenState::PostedAgainstSkip.step()
+    );
+}
+
+/// Each failure kind a caller sees as `error` is pinned by its value, so a
+/// rename cannot pass unseen.
+#[test]
+fn every_failure_kind_is_named_by_its_pinned_value() {
+    use crate::agent::transfer_pairing::PairingInputError as Pairing;
+    use statement_facts::FactsError;
+    let skip = skip_key("st-row");
+    let contra_key = ContraKey {
+        batch: BatchId::new("batch"),
+        txn: TxnId::new("txn"),
+    };
+    let all: Vec<(TransferFactsError, &str)> = vec![
+        (
+            TransferFactsError::JournalUnreadable { code: "c".into() },
+            "journal_unreadable",
+        ),
+        (
+            TransferFactsError::SkipFileUnreadable { code: "c".into() },
+            "skip_file_unreadable",
+        ),
+        (
+            TransferFactsError::Facts {
+                source_id: "s".into(),
+                error: FactsError::Unparsable,
+            },
+            "facts",
+        ),
+        (
+            TransferFactsError::MissingEndpoint {
+                source_id: "s".into(),
+            },
+            "missing_endpoint",
+        ),
+        (
+            TransferFactsError::BuiltAtUnparsable {
+                source_id: "s".into(),
+            },
+            "built_at_unparsable",
+        ),
+        (
+            TransferFactsError::BatchRecordChanged {
+                batch_id: "b".into(),
+            },
+            "batch_record_changed",
+        ),
+        (
+            TransferFactsError::DuplicateSkipRecordId {
+                record_id: "r".into(),
+            },
+            "duplicate_skip_record_id",
+        ),
+        (
+            TransferFactsError::SkipIsVoucherInLineage {
+                lineage: "l".into(),
+                txn: "t".into(),
+            },
+            "skip_is_voucher_in_lineage",
+        ),
+        (
+            TransferFactsError::LegLedgerUnbound {
+                batch_id: "b".into(),
+                ledger: "l".into(),
+            },
+            "leg_ledger_unbound",
+        ),
+        (
+            Pairing::DuplicateSkip { key: skip.clone() }.into(),
+            "pairing_duplicate_skip",
+        ),
+        (
+            Pairing::DuplicateContra {
+                key: contra_key.clone(),
+            }
+            .into(),
+            "pairing_duplicate_contra",
+        ),
+        (
+            Pairing::NonPositiveSkipAmount { key: skip.clone() }.into(),
+            "pairing_non_positive_skip",
+        ),
+        (
+            Pairing::NonPositiveContraAmount { key: contra_key }.into(),
+            "pairing_non_positive_contra",
+        ),
+        (
+            Pairing::SkipLedgersEqual { key: skip }.into(),
+            "pairing_skip_ledgers_equal",
+        ),
+        (
+            Pairing::InvertedWindow {
+                bank_ledger: LedgerGuid::new("g"),
+            }
+            .into(),
+            "pairing_inverted_window",
+        ),
+    ];
+    assert_eq!(all.len(), 15);
+    for (error, name) in &all {
+        assert_eq!(error.variant(), *name);
+    }
+    let names: BTreeSet<&str> = all.iter().map(|(_, name)| *name).collect();
+    assert_eq!(names.len(), all.len());
+}
+
+/// A held skip is judged beside the Contras alone, not beside the other skips:
+/// two skips of one day and amount compete for one Contra, which would read
+/// ambiguous and could be withdrawn.
+#[test]
+fn a_held_skip_is_judged_without_the_skips_in_the_main_view() {
+    let mut facts = facts_of(
+        vec![skip("st-kept", "20260105", "100.00")],
+        vec![contra("batch-1", "t1", "20260105", "100.00")],
+    );
+    facts.held = vec![HeldSkip {
+        fact: skip("st-held", "20260105", "100.00"),
+        holder: BatchId::new("batch-9"),
+        by: HeldBy::UnverifiedBatch,
+    }];
+    let alone = held_carrier_view(&facts).unwrap();
+    assert!(
+        matches!(
+            alone.skips.get(&skip_key("st-held")),
+            Some(SkipState::Paired { .. })
+        ),
+        "{:?}",
+        alone.skips
+    );
+    // chained into one view, the two skips share the Contra
+    let all: Vec<SkipFact> = facts
+        .skips
+        .iter()
+        .cloned()
+        .chain(facts.held.iter().map(|held| held.fact.clone()))
+        .collect();
+    let combined =
+        transfer_pairing_view(&all, &facts.contras, &facts.coverage, TRANSFER_K_DAYS).unwrap();
+    assert!(
+        !matches!(
+            combined.skips.get(&skip_key("st-held")),
+            Some(SkipState::Paired { .. })
+        ),
+        "{:?}",
+        combined.skips
     );
 }

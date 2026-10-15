@@ -320,7 +320,10 @@ fn fit_response(
     //   3. then the section widened again into what the trimmed page leaves.
     // A result with no computed section takes only the page step, as it always
     // did. Everything here returns true when anything was cut, the section's
-    // rows included: `truncated` on the whole answer is the conservative reading.
+    // rows included, but the tool path discards that flag. The answer says what
+    // was narrowed in-band (`open_omitted`, a `not_established` note); only the
+    // drop of the whole section from a result with no page sets the envelope's
+    // `truncated`.
     let section = computed_section(response, structured_path);
     if let Some(section) = &section {
         if fit_section(
@@ -333,10 +336,29 @@ fn fit_response(
             return Ok(true);
         }
     }
-    let (shape, width) = response
-        .pointer(structured_path)
-        .and_then(page_shape)
-        .ok_or_else(|| "agent_response_too_large".to_string())?;
+    let Some((shape, width)) = response.pointer(structured_path).and_then(page_shape) else {
+        // A result with no page (a written build) has nothing to trim. If it
+        // fits without its section, whatever the section says, it is answered
+        // without it and the envelope is marked `truncated`: a build whose file
+        // and journal record are written is never turned into an error by the
+        // section.
+        let dropped = response
+            .pointer_mut(&format!("{structured_path}/result"))
+            .and_then(Value::as_object_mut)
+            .is_some_and(|result| result.remove("transfers").is_some());
+        if dropped {
+            if let Some(envelope) = response
+                .pointer_mut(structured_path)
+                .and_then(Value::as_object_mut)
+            {
+                envelope.insert("truncated".into(), json!(true));
+            }
+            if encoded_len(response) <= max_bytes {
+                return Ok(true);
+            }
+        }
+        return Err("agent_response_too_large".to_string());
+    };
     let mut original = response.clone();
     if let Some(section) = &section {
         // A result with a page is a batch's or a verification's, never a

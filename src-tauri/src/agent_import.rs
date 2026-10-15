@@ -349,7 +349,7 @@ pub(super) struct ImportLedgerLine {
     /// `ledger_identities_2`; each finds none here and refuses the batch as
     /// built before this record (`import_batch_predates_ledger_binding`),
     /// which is their one refusal of a record they cannot check. They do not
-    /// read `statement` or the two records below, so without this they would
+    /// read `statement` or the records below, so without this they would
     /// post a batch this build saved without the checks those records feed.
     /// Both earlier names are still read, for a batch one of them saved. No
     /// writer may write two names: a record carrying two does not parse, and
@@ -397,6 +397,16 @@ pub(super) struct ImportLedgerLine {
     /// from posting the batch (see `ledger_identities`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     statement: Option<Value>,
+    /// The statement rows this build posts although a skip of the company names
+    /// them, as the person's `withdraw_skips` named them. Absent when none was
+    /// named, and on all older records. Only the fact builder reads it: a skip
+    /// whose row a batch found posted holds is retired when every such batch
+    /// has a build in its lineage that recorded the withdrawal, sent or found
+    /// posted and built after the newest record of the skip, and otherwise
+    /// stays open. A release older than this field does not read it (this struct does
+    /// not deny unknown fields).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    withdrawn_skips: Option<Vec<String>>,
 }
 
 /// A ledger a bank cash answer named as cash in hand, and the voucher built
@@ -1018,6 +1028,7 @@ impl Server {
                 }
                 None => None,
             };
+            let withdrawn_skips = (!withdraw.is_empty()).then(|| withdraw.iter().cloned().collect());
             let transfers = match self.admit_transfers_while_admitted(transfers::TransferInput {
                 company_guid: company_guid.clone(),
                 carries_statement: statement_record.is_some(),
@@ -1037,7 +1048,7 @@ impl Server {
                     })
                     .map(|voucher| voucher.bridge_txn_id.clone())
                     .collect(),
-                withdraw,
+                withdraw: withdraw.clone(),
                 own_lineage: amends_batch_id.clone(),
                 candidate: statement_facts::Candidate::Build(Box::new(statement_facts::BuildLine {
                     batch_id: batch_id.clone(),
@@ -1049,6 +1060,7 @@ impl Server {
                     vouchers: slim_vouchers,
                     ledger_identities: Some(build_binding.clone()),
                     statement: statement_record.clone(),
+                    withdrawn: withdraw,
                 })),
             })? {
                 transfers::Admission::Refused(refusal) => {
@@ -1251,6 +1263,7 @@ impl Server {
                 ),
                 on_account_approved: Some(on_account_approved),
                 statement: statement_record,
+                withdrawn_skips,
             };
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
@@ -1344,8 +1357,12 @@ impl Server {
                     "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
                 }});
-            // Computed before the append, with this build in it: nothing after
-            // the append can turn a written build into a refusal.
+            // The summary was computed before the append, with this build in it,
+            // so nothing after the append refuses a written build. It is drawn
+            // here into the room the essential result leaves. The response
+            // cap's fitter can still cut it, down to leaving it out, but only
+            // for a result that fits without it (and then the answer is marked
+            // cut): the section never turns a written build into an error.
             let essential = payload.to_string().len();
             payload["result"]["transfers"] = transfers.render(transfers::transfers_budget(
                 self.settings.max_bytes,
@@ -1758,27 +1775,41 @@ impl Server {
                 // Tally created none of its vouchers and none is found (for a
                 // batch, with the voucher mark measured unmoved), say so
                 // (bridge#1108); otherwise an edit in Tally is as likely. Only
-                // the post's own readback reads that answer: by a later
-                // verification someone may have entered a voucher by hand and
-                // edited it.
-                let counters = current_dispatch
-                    .then(|| {
-                        dispatch_response
-                            .as_ref()
-                            .and_then(|response| response.outcome.as_ref())
-                            .map(|outcome| outcome.counters())
-                    })
-                    .flatten();
-                let voucher_step =
-                    verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark);
-                match verification::unmatched_cause(
-                    counters,
-                    line.vouchers.len(),
-                    verification::unmatched_count(&result),
-                    voucher_step,
-                ) {
+                // the post's own readback reads a voucher as not created: by
+                // a later verification someone may have entered it by hand
+                // and edited it, so a later one keeps `sent_not_attributed`
+                // and only says, in the voucher's next step, what that answer
+                // reported when the voucher was sent.
+                let answer = dispatch_response
+                    .as_ref()
+                    .and_then(|response| response.outcome.as_ref())
+                    .map(|outcome| outcome.counters());
+                let cause = if current_dispatch {
+                    verification::unmatched_cause(
+                        answer,
+                        line.vouchers.len(),
+                        verification::unmatched_count(&result),
+                        verification::measured_voucher_step(pre_post_voucher_mark, after_post_mark),
+                    )
+                } else {
+                    // The post's own verdict on its voucher step, for a batch.
+                    // Read only where it decides, and never a way for this
+                    // check to fail: no record reads as not matched.
+                    let step_matched = answer.is_some()
+                        && line.vouchers.len() > 1
+                        && self
+                            .imports_dir()
+                            .ok()
+                            .and_then(|imports| read_masters_check(&imports, &line.batch_id))
+                            .is_some_and(|check| check["batch_step"]["state"] == "matched");
+                    verification::later_unmatched_cause(answer, line.vouchers.len(), step_matched)
+                };
+                match cause {
                     verification::UnmatchedCause::ReportedNotCreated => {
                         verification::mark_reported_not_created(&mut result)
+                    }
+                    verification::UnmatchedCause::ReportedNotCreatedWhenSent => {
+                        verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
                         verification::mark_sent_not_attributed(&mut result)

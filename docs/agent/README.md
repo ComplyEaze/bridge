@@ -597,21 +597,36 @@ type in the window, and returns for each voucher its `voucher_number`, `date`, `
 same class under another name is not read, and a name that holds a double quote, a backslash, `&`, `<`, `>`, `'` or a control
 character, or a space at either end, is refused before any read (`gst_status_type_name_invalid`).
 
-`gst_status` is `included`, `uncertain`, `excluded` or `not_in_return`. `not_in_return` means Tally's three flags
-all read No. On the lab's Receipts that means Tally does not list the voucher in the return; it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
+`gst_status` is `included`, `uncertain`, `excluded`, `not_in_return`, `cancelled`, `optional` or `post_dated`. `cancelled`,
+`optional` and `post_dated` are Tally's own `ISCANCELLED`, `ISOPTIONAL` and `ISPOSTDATED` flags read Yes, decided before the three status flags and
+never counted as `included`, `uncertain`, `excluded` or `not_in_return`: on the lab's book a cancelled Sales voucher read the included flag Yes,
+an optional one read all three No, and a post-dated one read the included flag Yes (one voucher each). `post_dated` is
+the flag, not a date still ahead: the lab's post-dated voucher was marked so by hand (Ctrl+T) and dated the day Tally's
+current date (the date set with F2, not the calendar's) had been set to.
+Whether Tally lists a cancelled voucher anywhere in the return, or a post-dated one while Tally's current date is before
+the voucher's date or once it has reached it, is not measured, and ComplyEaze Bridge states neither: look at the return
+in Tally. Such a voucher's item also holds `status_flags`, what Tally's three status flags read on it (`included`,
+`uncertain`, `excluded` or `not_in_return`); it is returned so that nothing read is hidden, it is not counted, and it does
+not say that the return lists the voucher. A voucher that reads more than one of cancelled, optional and post-dated Yes is unread. `not_in_return` means Tally's three flags
+all read No. On the lab's Receipts that means Tally does not list the voucher in the return (read with the request before it
+fetched the cancelled, optional and post-dated flags; the request as it is now is measured on Sales vouchers only); it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
 accepted the voucher as it stands (Accept As Is) and `false` otherwise; `included` counts such a voucher too, so it is not
 'clean', and it is included by a person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
 voucher is right or wrong, or that a return is ready. The reason for a status (the one measured is a tax figure that did not match Tally's own)
 is on Tally's screen only; no field carries it, so none is returned. Tally keeps the
-status a voucher was given when it was saved (one voucher, cause unverified). Cancelled, optional and post-dated
-vouchers are not marked, and a total of 0 may mean that the type name matched nothing. Each page is a new read,
+status a voucher was given when it was saved (one voucher, cause unverified). A total of 0 may mean that the type name matched nothing. Each page is a new read,
 so a voucher saved between two pages can shift the offsets. The result holds `counts` (`included`, `uncertain`,
-`excluded`, `not_in_return`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
+`excluded`, `not_in_return`, `cancelled`, `optional`, `post_dated`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
 `items`; page with `limit` and `offset` (`next_offset` when more remain).
 
-A voucher whose flags are absent, repeated, nested in another element or spelled another way keeps its row with
+A voucher whose flags, or whose cancelled, optional or post-dated flag, are absent, repeated, nested in another element or
+spelled another way keeps its row with
 `{"unread": code}` (`gst_status_not_reported` or `gst_status_unreadable`) in place of the value and is never read as
-`included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). An answer in which a voucher
+`included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). So does a voucher whose `ISDELETED` or
+`ISDELETEDVCHRETAINED` flag reads Yes (`gst_status_voucher_deleted`, which its acceptance flag carries too, so it is not counted as accepted): Tally returns
+the two flags without being asked, No on every voucher the lab read, a Yes was never measured, and what
+`ISDELETEDVCHRETAINED` means rests on its name. On the lab's book, where no Edit Log was seen to be on, one deleted
+voucher left the answer altogether. Both flags absent is allowed; one absent beside the other is unread. An answer in which a voucher
 cannot be told apart from another (a missing or repeated `MASTERID`, or a missing number, date, type or
 `ALTERID`) is refused (`gst_status_read_voucher_unidentified`, `gst_status_read_voucher_repeated`), as is a
 voucher dated outside the window (`window_not_honoured`) or of another type name
@@ -1782,12 +1797,15 @@ refused as `proposals_legacy` (parse the statement again).
   returns `state: skips_recorded`. No pairing is stored; the view is computed
   again from these records on every call.
 - **The section.** Every successful build, and the first page of
-  `verify_import`, returns `transfers`: `state` (`computed`, or
+  `verify_import`, returns `transfers`, except that a written build whose
+  result fits the response cap only without it, not even beside the note that
+  the check did not run, is answered without it and its envelope is marked
+  `truncated`: `state` (`computed`, or
   `not_established` when the view could not be computed or the section was cut
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
   `batch_id` where one is involved: `not_found`, `ambiguous`,
-  `other_side_unverified`, `held_elsewhere`, `matched_unconfirmed`,
+  `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
   `reference_differs`, `reversed_same_day`, `not_established`, or
   `double_booked` for a Contra booked from both statements. No amount,
   reference, instrument, party or ledger is returned.
@@ -1798,6 +1816,44 @@ refused as `proposals_legacy` (parse the statement again).
   equal reference, or by an equal date (k = 0 until two real statements of one
   transfer have been measured), so a Contra the other bank printed on another
   day is not matched.
+- **What `held_elsewhere` and `posted_against_skip` mean.** A skipped row that
+  a batch holds as a voucher is not a skip to pair. While no batch holding the
+  row is found posted it reads `held_elsewhere`, with the batch to verify. Once
+  a batch is found posted, the skip is retired (counted in `retired`) only if
+  every batch found posted that holds the row has a build in its lineage that
+  recorded the withdrawal: a build keeps the rows the person named in
+  `withdraw_skips`, and they count once that build is sent or found posted and
+  it was built after the newest record of the skip (a later build of the
+  skipping statement, or a skip-only record of it, records the skip again; a
+  withdrawal built at the very instant of the record does not count).
+  Otherwise the posted voucher contradicts the skip, and the row stays open as
+  `posted_against_skip`, with that batch: the other account's Contra may carry
+  the transfer too, ComplyEaze Bridge does not compare the two, and no step
+  inside ComplyEaze Bridge removes a voucher already in Tally. The row leaves
+  the list only when a build in that batch's lineage that names it in
+  `withdraw_skips` is found posted after the newest record of the skip, which
+  the person confirms only when the other account's statement does not carry
+  it; a batch ComplyEaze Bridge posted itself cannot be amended, so for it no
+  step inside ComplyEaze Bridge clears the row. Two builds made before either
+  is sent are both admitted, so this is how a skip and a posting of one row
+  that were built apart are reported once both are sent and one is found
+  posted. A skip may be withdrawn whether or not its statement was ever sent,
+  so a statement parsed again with the row posted is built again naming the row
+  in `withdraw_skips`, and the batch built first is not sent: sending it
+  instead gives `posted_against_skip`. The answer of the build that names the
+  row lists it as `held_elsewhere` with its own batch, which is the one to send
+  and verify. The batch left unsent blocks the days of its rows for the other
+  account's coverage until it is verified, and no step inside ComplyEaze Bridge
+  clears that. A build that names a row held this way is judged against the
+  other account's Contras like any skip. For a skip that was sent or is in a
+  statement of only skipped rows (a live skip), an amendment of a batch whose
+  row reads `posted_against_skip` is refused as `skip_row_paired_elsewhere`
+  unless it names the row in `withdraw_skips`; a skip that was never sent does
+  not refuse it. An amendment that names the row counts once it is found posted
+  (`post_import` does not send amendments), and one that never reaches
+  found posted counts for nothing. A held skip is judged against the Contras alone, without
+  the other skips: a refusal as `paired` for it means a Contra may carry it,
+  not that it is established that it does.
 - **What `reference_differs` means.** The person sees the row listed once for
   each batch holding a Contra of the same day and amount whose reference
   differs from the row's, verifies that batch if it is not verified yet, and
@@ -1813,7 +1869,11 @@ refused as `proposals_legacy` (parse the statement again).
   two ledgers and the same way, one booked from each statement: where their
   references are equal, whatever their dates (the second build is refused as
   `transfer_double_booked`), and where their dates are equal and at least one
-  of them carries no reference (both are listed). Nothing else is compared.
+  of them carries no reference (both are listed). Nothing else is compared: a
+  Receipt or Payment that posts a skipped row is reported as `held_elsewhere`
+  until its batch is found posted, then as `posted_against_skip` unless the
+  withdrawal was recorded, not here. No step inside ComplyEaze Bridge removes a
+  voucher already in Tally yet; the step says not to send a batch not yet sent.
 - **What `matched_unconfirmed` means.** The person sees the row listed with the
   batch whose verified Contra matches it by day and amount, where the statement
   records of the two accounts do not both cover that day, and keeps the skip.
@@ -1839,7 +1899,11 @@ refused as `proposals_legacy` (parse the statement again).
   endpoint, so such a record can turn every skip across its days
   `not_established`. A blocked day removes the whole window it falls in. A
   statement build blocks the days of its rows until it is verified, so one
-  abandoned unsent keeps them `not_established`.
+  abandoned unsent keeps them `not_established`, and no step inside ComplyEaze
+  Bridge clears it yet. A statement build whose send Tally rejected also stays
+  unverified, and building that statement again is refused as
+  `import_txn_already_posted`: a row waiting on it (`other_side_unverified`)
+  has no step inside ComplyEaze Bridge either.
 - **Refused before anything is written:** `skip_row_already_posted`,
   `skip_row_paired_elsewhere`, `transfer_double_booked`, `withdraw_skip_invalid`,
   `withdraw_skip_paired` and `transfer_view_not_established`, each with a
@@ -2289,9 +2353,16 @@ counted, and none of them is found, they are `tally_reported_not_created`
 instead (bridge#1108). For a batch this also needs the company's voucher mark
 read on both sides of the post and unmoved. The person is told to check that
 each is not in Tally and enter it there by hand, not through Tally's Import
-menu. A later `verify_import` never reads the post's answer, since someone may
-have entered a voucher by hand and edited it since: it reads
-`sent_not_attributed`. A partly created batch is never read as not created: a
+menu. A later check (`verify_import`, a repeated `post_import`, or the check
+before a review is recorded) never reads a voucher as not created, since
+someone may have entered it by hand and edited it since: it reads
+`sent_not_attributed`. When the post's saved answer had that shape (every
+counter reported, none created, one exception for each voucher sent, nothing
+else counted), and for a batch the post itself recorded its voucher step as
+matching, the `next_step` of each voucher the check cannot find says that
+Tally reported the voucher as not created when it was sent, and to look for it
+in Tally before entering it by hand; the status and the batch's state are the
+same. A partly created batch is never read as not created: a
 count does not say which voucher Tally rejected, and two vouchers of one batch
 with the same content defeat matching by content. A binding refusal is final: an
 edit to one voucher of a batch in Tally before the binding is made

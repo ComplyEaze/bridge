@@ -6,8 +6,42 @@ use crate::agent::transfer_pairing::{
 };
 use std::io::Cursor;
 
-const COMPANY: &str = "00000000-0000-4000-8000-0000000000c1";
-const OTHER_COMPANY: &str = "00000000-0000-4000-8000-0000000000c2";
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
+/// `prefix`, then `n` behind zeros, `width` characters in all.
+fn pre(prefix: &str, n: u64, width: usize) -> String {
+    format!("{prefix}{n:0>w$}", w = width - prefix.len())
+}
+
+/// A synthetic company GUID: version 4 shape, zeros, then `n` in hex.
+fn guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
+
+/// The DNS namespace UUID with its version nibble set to 4, in upper case.
+fn upper_case_version_four_dns() -> String {
+    let mut bytes = *uuid::Uuid::NAMESPACE_DNS.as_bytes();
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    uuid::Uuid::from_bytes(bytes).to_string().to_uppercase()
+}
+
+fn company() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| guid(0xc1));
+    &TEXT
+}
+
+fn other_company() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| guid(0xc2));
+    &TEXT
+}
 const ENDPOINT: &str = "http://127.0.0.1:9001";
 const OTHER_ENDPOINT: &str = "http://127.0.0.1:9002";
 const B1: &str = "guid-bank-one";
@@ -16,15 +50,23 @@ const B3: &str = "guid-bank-three";
 const N1: &str = "Bank One";
 const N2: &str = "Bank Two";
 const N3: &str = "Bank Three";
-const REF_A: &str = "600000000001";
-const REF_B: &str = "600000000002";
-
+fn ref_a() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| p6(1, 12));
+    &TEXT
+}
+fn ref_b() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| p6(2, 12));
+    &TEXT
+}
 fn st(n: u32) -> String {
     format!("st-20260901-{n:016x}")
 }
 
 fn batch_id(n: u32) -> String {
-    format!("bridge-00000000-0000-4000-8000-{n:012}")
+    format!(
+        "bridge-{}",
+        guid(u128::from_str_radix(&n.to_string(), 16).expect("digits"))
+    )
 }
 
 fn decimal(text: &str) -> ExactDecimal {
@@ -73,6 +115,7 @@ struct Build {
     vouchers: Vec<Value>,
     identities: Option<Vec<(&'static str, &'static str)>>,
     statement: Option<StatementFacts>,
+    withdrawn: Vec<String>,
     status: &'static str,
 }
 
@@ -80,11 +123,12 @@ fn build(id: u32) -> Build {
     Build {
         id,
         amends: None,
-        company: COMPANY,
+        company: company(),
         endpoint: Some(ENDPOINT),
         vouchers: Vec::new(),
         identities: Some(vec![(N1, B1), (N2, B2), (N3, B3)]),
         statement: None,
+        withdrawn: Vec::new(),
         status: "built",
     }
 }
@@ -118,6 +162,11 @@ impl Build {
         self.status = status;
         self
     }
+    /// The build records that a person named these rows in `withdraw_skips`.
+    fn withdrew(mut self, rows: &[String]) -> Self {
+        self.withdrawn = rows.to_vec();
+        self
+    }
     fn line(&self) -> ImportLedgerLine {
         let txn_ids: Vec<String> = self
             .vouchers
@@ -148,6 +197,7 @@ impl Build {
                 .collect()
         });
         line.statement = self.statement.as_ref().map(statement_record);
+        line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
         line
     }
 }
@@ -221,7 +271,7 @@ impl Journal {
         self.push(&ledger::StatusRecord::dispatch(&build.line()))
     }
     fn read(&self) -> Result<TransferFacts, TransferFactsError> {
-        self.read_with("", COMPANY)
+        self.read_with("", company())
     }
     fn read_with(&self, skips: &str, company: &str) -> Result<TransferFacts, TransferFactsError> {
         self.read_candidate(skips, company, None)
@@ -249,7 +299,7 @@ fn skip_record(
 ) -> SkipOnlyRecord {
     SkipOnlyRecord {
         record_id: format!("skips-{}", Uuid::from_u128(0x4000_8000_0000_0000_0000 + n)),
-        company_guid: COMPANY.into(),
+        company_guid: company().into(),
         endpoint_origin: endpoint.into(),
         built_at: built_at.into(),
         statement,
@@ -263,9 +313,24 @@ fn skip_file(records: &[SkipOnlyRecord]) -> String {
         .collect()
 }
 
+/// The skips a batch holds, as key, holder and date.
+fn held_tuples(found: &TransferFacts) -> Vec<(SkipKey, BatchId, TallyDate)> {
+    found
+        .held
+        .iter()
+        .map(|held| {
+            (
+                held.fact.key.clone(),
+                held.holder.clone(),
+                held.fact.date.clone(),
+            )
+        })
+        .collect()
+}
+
 fn key(bank: &str, row: u32) -> SkipKey {
     SkipKey {
-        company: CompanyGuid::new(COMPANY),
+        company: CompanyGuid::new(company()),
         bank_ledger: LedgerGuid::new(bank),
         endpoint_origin: EndpointOrigin::new(ENDPOINT),
         row: StatementRowId::new(st(row)),
@@ -288,7 +353,7 @@ fn transfer_journal() -> Journal {
             &st(1),
             "500.00",
             B2,
-            Some(REF_A),
+            Some(ref_a()),
         )))
         .status("posted_verified");
     let booked = build(2)
@@ -296,7 +361,7 @@ fn transfer_journal() -> Journal {
         .facts(
             facts(B2)
                 .window("20260901", "20260930")
-                .contra(&st(2), Some(REF_A)),
+                .contra(&st(2), Some(ref_a())),
         )
         .status("posted_verified");
     Journal::default().batch(&outflow).batch(&booked)
@@ -319,10 +384,10 @@ fn facts_from_a_journal_give_a_pair_by_reference_in_the_view() {
     assert_eq!(fact.statement_bank_ledger, LedgerGuid::new(B2));
     assert_eq!(
         fact.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some(REF_A)
+        Some(ref_a())
     );
     assert_eq!(fact.endpoint_origin, EndpointOrigin::new(ENDPOINT));
-    assert_eq!(fact.company, CompanyGuid::new(COMPANY));
+    assert_eq!(fact.company, CompanyGuid::new(company()));
 }
 
 #[test]
@@ -417,7 +482,7 @@ fn the_same_day_reversal_flag_follows_each_row_into_the_facts() {
     only.reversed_same_day = true;
     let record = skip_record(1, ENDPOINT, "2026-09-02T10:00:00Z", facts(B1).skip(only));
     let found = Journal::default()
-        .read_with(&skip_file(std::slice::from_ref(&record)), COMPANY)
+        .read_with(&skip_file(std::slice::from_ref(&record)), company())
         .unwrap();
     assert!(found.skips[0].reversed_same_day);
 
@@ -453,14 +518,14 @@ fn an_amendment_naming_one_row_keeps_the_other_from_the_original() {
         .voucher(contra(&st(12), N2, N1, "200.00"))
         .facts(
             facts(B2)
-                .contra(&st(11), Some(REF_A))
-                .contra(&st(12), Some(REF_B)),
+                .contra(&st(11), Some(ref_a()))
+                .contra(&st(12), Some(ref_b())),
         )
         .status("posted_verified");
     let amendment = build(11)
         .amends(10)
         .voucher(contra(&st(11), N2, N1, "150.00"))
-        .facts(facts(B2).contra(&st(11), Some("600000000003")))
+        .facts(facts(B2).contra(&st(11), Some(p6(3, 12).as_str())))
         .status("posted_verified");
     let found = Journal::default()
         .batch(&original)
@@ -481,12 +546,12 @@ fn an_amendment_naming_one_row_keeps_the_other_from_the_original() {
     assert!(a.amount.numeric_eq(&decimal("150")));
     assert_eq!(
         a.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some("600000000003")
+        Some(p6(3, 12).as_str())
     );
     assert!(b.amount.numeric_eq(&decimal("200")));
     assert_eq!(
         b.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some(REF_B)
+        Some(ref_b())
     );
     // one lineage, whichever build decided the row
     assert_eq!(a.lineage, b.lineage);
@@ -497,7 +562,7 @@ fn an_amendment_naming_one_row_keeps_the_other_from_the_original() {
 fn an_amendment_without_facts_changes_the_amount_and_the_fact_follows_it() {
     let original = build(20)
         .voucher(contra(&st(21), N2, N1, "100.00"))
-        .facts(facts(B2).contra(&st(21), Some(REF_A)))
+        .facts(facts(B2).contra(&st(21), Some(ref_a())))
         .status("posted_verified");
     let amendment = build(21)
         .amends(20)
@@ -516,7 +581,7 @@ fn an_amendment_without_facts_changes_the_amount_and_the_fact_follows_it() {
     // the reference is the newest facts entry for the row
     assert_eq!(
         fact.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some(REF_A)
+        Some(ref_a())
     );
     assert_eq!(fact.statement_bank_ledger, LedgerGuid::new(B2));
 }
@@ -674,7 +739,7 @@ fn a_later_full_record_that_differs_from_the_first_is_an_error() {
         .facts(facts(B2).contra(&st(47), None));
     let other_facts = build(46)
         .voucher(contra(&st(47), N2, N1, "100.00"))
-        .facts(facts(B2).contra(&st(47), Some(REF_A)));
+        .facts(facts(B2).contra(&st(47), Some(ref_a())));
     for changed in [other_voucher, other_facts] {
         let error = Journal::default()
             .batch(&original)
@@ -694,7 +759,7 @@ fn a_later_full_record_that_differs_from_the_first_is_an_error() {
 
 #[test]
 fn two_lineages_skipping_one_row_give_the_newest_by_built_at() {
-    let older = build(50).facts(facts(B1).skip(skip_row(&st(5), "500.00", B2, Some(REF_A))));
+    let older = build(50).facts(facts(B1).skip(skip_row(&st(5), "500.00", B2, Some(ref_a()))));
     let newer = build(51).facts(facts(B1).skip(skip_row(&st(5), "500.00", B2, None)));
     // the newer build comes FIRST in the journal: built_at decides, not position
     let found = Journal::default()
@@ -715,6 +780,7 @@ fn a_skip_found_posted_in_another_batch_is_retired() {
     let skipped = build(60).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
     let posted = build(61)
         .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
         .status("posted_verified");
     let found = Journal::default()
         .batch(&skipped)
@@ -723,13 +789,15 @@ fn a_skip_found_posted_in_another_batch_is_retired() {
         .unwrap();
     assert!(found.skips.is_empty());
     assert_eq!(found.retired_skips, 1);
-    assert!(found.held_elsewhere.is_empty());
+    assert!(found.held.is_empty());
 }
 
 #[test]
 fn a_skip_found_posted_at_some_time_is_retired_whatever_the_status_now() {
     let skipped = build(62).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
-    let posted = build(63).voucher(payment(&st(6), "500.00"));
+    let posted = build(63)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
     let journal = Journal::default()
         .batch(&skipped)
         .batch(&posted)
@@ -750,7 +818,7 @@ fn a_skip_held_by_a_batch_only_built_or_only_sent_is_held_elsewhere() {
         assert!(found.skips.is_empty());
         assert_eq!(found.retired_skips, 0);
         assert_eq!(
-            found.held_elsewhere,
+            held_tuples(&found),
             vec![(key(B1, 6), BatchId::new(batch_id(65)), date("20260901"))]
         );
     }
@@ -760,7 +828,7 @@ fn a_skip_held_by_a_batch_only_built_or_only_sent_is_held_elsewhere() {
 fn a_batch_of_another_company_holds_nothing() {
     let skipped = build(66).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
     let elsewhere = build(67)
-        .company(OTHER_COMPANY)
+        .company(other_company())
         .voucher(payment(&st(6), "500.00"))
         .status("posted_verified");
     let found = Journal::default()
@@ -987,7 +1055,7 @@ fn state_given(rest: Journal, skips_file: &str) -> SkipState {
         Journal::default().batch(&skipped).0,
         rest.0
     ));
-    let found = journal.read_with(skips_file, COMPANY).unwrap();
+    let found = journal.read_with(skips_file, company()).unwrap();
     let view = transfer_pairing_view(&found.skips, &found.contras, &found.coverage, 0).unwrap();
     view.skips[&key(B1, 1)].clone()
 }
@@ -1385,7 +1453,7 @@ fn coverage_is_per_endpoint_and_per_company() {
         state_given(Journal::default().batch(&other_endpoint), ""),
         SkipState::NotEstablished
     );
-    let other_company = bank_two_statement(129, "posted_verified").company(OTHER_COMPANY);
+    let other_company = bank_two_statement(129, "posted_verified").company(other_company());
     assert_eq!(
         state_given(Journal::default().batch(&other_company), ""),
         SkipState::NotEstablished
@@ -1432,12 +1500,12 @@ fn a_statement_with_no_vouchers_covers_its_window_whatever_its_status() {
 
 #[test]
 fn skip_only_records_join_the_merge_by_built_at() {
-    let batch = build(140).facts(facts(B1).skip(skip_row(&st(14), "500.00", B2, Some(REF_A))));
+    let batch = build(140).facts(facts(B1).skip(skip_row(&st(14), "500.00", B2, Some(ref_a()))));
     let newer = skip_record(
         2,
         ENDPOINT,
         "2026-09-02T10:00:00Z",
-        facts(B1).skip(skip_row(&st(14), "500.00", B2, Some(REF_B))),
+        facts(B1).skip(skip_row(&st(14), "500.00", B2, Some(ref_b()))),
     );
     let older = skip_record(
         3,
@@ -1447,14 +1515,14 @@ fn skip_only_records_join_the_merge_by_built_at() {
     );
     let found = Journal::default()
         .batch(&batch)
-        .read_with(&skip_file(&[older, newer.clone()]), COMPANY)
+        .read_with(&skip_file(&[older, newer.clone()]), company())
         .unwrap();
     let [skip] = &found.skips[..] else {
         panic!("one skip");
     };
     assert_eq!(
         skip.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some(REF_B)
+        Some(ref_b())
     );
     assert_eq!(skip.lineage, LineageId::new(newer.record_id));
 }
@@ -1464,15 +1532,16 @@ fn a_skip_only_record_is_retired_like_a_batch_skip() {
     let record = skip_record(
         4,
         ENDPOINT,
-        "2026-09-02T10:00:00Z",
+        "2026-09-01T09:00:00Z",
         facts(B1).skip(skip_row(&st(15), "500.00", B2, None)),
     );
     let posted = build(141)
         .voucher(payment(&st(15), "500.00"))
+        .withdrew(&[st(15)])
         .status("posted_verified");
     let found = Journal::default()
         .batch(&posted)
-        .read_with(&skip_file(&[record]), COMPANY)
+        .read_with(&skip_file(&[record]), company())
         .unwrap();
     assert_eq!((found.skips.len(), found.retired_skips), (0, 1));
 }
@@ -1485,11 +1554,11 @@ fn skip_only_records_of_another_company_are_not_read() {
         "2026-09-02T10:00:00Z",
         facts(B1).skip(skip_row(&st(15), "500.00", B2, None)),
     );
-    record.company_guid = OTHER_COMPANY.into();
+    record.company_guid = other_company().into();
     // not even checked: this one would be refused for its record id
     record.record_id = "not-a-record-id".into();
     let found = Journal::default()
-        .read_with(&skip_file(&[record]), COMPANY)
+        .read_with(&skip_file(&[record]), company())
         .unwrap();
     assert!(found.skips.is_empty());
 }
@@ -1502,12 +1571,12 @@ fn a_skip_only_record_is_read_whatever_the_case_of_its_company_guid() {
         "2026-09-02T10:00:00Z",
         facts(B1).skip(skip_row(&st(15), "500.00", B2, None)),
     );
-    record.company_guid = COMPANY.to_ascii_uppercase();
+    record.company_guid = company().to_ascii_uppercase();
     let found = Journal::default()
-        .read_with(&skip_file(&[record]), &COMPANY.to_ascii_uppercase())
+        .read_with(&skip_file(&[record]), &company().to_ascii_uppercase())
         .unwrap();
     assert_eq!(found.skips.len(), 1);
-    assert_eq!(found.skips[0].key.company, CompanyGuid::new(COMPANY));
+    assert_eq!(found.skips[0].key.company, CompanyGuid::new(company()));
 }
 
 #[test]
@@ -1521,7 +1590,7 @@ fn the_skip_file_round_trips_through_the_journal_framing() {
                 &st(16),
                 "500.00",
                 B2,
-                Some(REF_A),
+                Some(ref_a()),
             )),
         ),
         skip_record(
@@ -1595,7 +1664,7 @@ fn an_unreadable_journal_or_skip_file_is_a_typed_error() {
     );
     assert_eq!(
         Journal::default()
-            .read_with("{broken\n", COMPANY)
+            .read_with("{broken\n", company())
             .unwrap_err(),
         TransferFactsError::SkipFileUnreadable {
             code: "import_ledger_invalid".into()
@@ -1615,7 +1684,7 @@ fn skip_only_records_are_checked_whole() {
     };
     let check = |record: SkipOnlyRecord| {
         Journal::default()
-            .read_with(&skip_file(&[record]), COMPANY)
+            .read_with(&skip_file(&[record]), company())
             .map(drop)
     };
     assert_eq!(check(good()), Ok(()));
@@ -1631,8 +1700,8 @@ fn skip_only_records_are_checked_whole() {
     );
     // a version 1 UUID, or an upper-case one, is not what the writer draws
     for text in [
-        "skips-6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-        "skips-6BA7B810-9DAD-41D1-80B4-00C04FD430C8",
+        &format!("skips-{}", uuid::Uuid::NAMESPACE_DNS),
+        &format!("skips-{}", upper_case_version_four_dns()),
     ] {
         let mut record = good();
         record.record_id = text.into();
@@ -1696,7 +1765,7 @@ fn skip_only_records_are_checked_whole() {
     let twice = skip_file(&[good(), good()]);
     let id = good().record_id;
     assert_eq!(
-        Journal::default().read_with(&twice, COMPANY).map(drop),
+        Journal::default().read_with(&twice, company()).map(drop),
         Err(TransferFactsError::DuplicateSkipRecordId { record_id: id })
     );
 }
@@ -1707,7 +1776,7 @@ fn skip_only_records_are_checked_whole() {
 fn only_the_asked_companys_records_are_read_or_checked() {
     // fails exactly one check: it holds facts and names no endpoint
     let broken = build(150)
-        .company(OTHER_COMPANY)
+        .company(other_company())
         .endpoint(None)
         .facts(facts(B1).skip(skip_row(&st(5), "500.00", B2, None)));
     let found = transfer_journal().batch(&broken).read().unwrap();
@@ -1716,7 +1785,7 @@ fn only_the_asked_companys_records_are_read_or_checked() {
     assert_eq!(
         Journal::default()
             .batch(&broken)
-            .read_with("", OTHER_COMPANY)
+            .read_with("", other_company())
             .unwrap_err(),
         TransferFactsError::MissingEndpoint {
             source_id: batch_id(150)
@@ -1727,10 +1796,10 @@ fn only_the_asked_companys_records_are_read_or_checked() {
 #[test]
 fn the_company_guid_matches_whatever_its_case() {
     let upper = transfer_journal()
-        .read_with("", &COMPANY.to_ascii_uppercase())
+        .read_with("", &company().to_ascii_uppercase())
         .unwrap();
     assert_eq!(upper.skips.len(), 1);
-    assert_eq!(upper.skips[0].key.company, CompanyGuid::new(COMPANY));
+    assert_eq!(upper.skips[0].key.company, CompanyGuid::new(company()));
 }
 
 #[test]
@@ -1854,8 +1923,13 @@ fn bound(pairs: &[(&str, &str)]) -> Vec<BoundLedger> {
 fn valid() -> StatementFacts {
     facts(B1)
         .window("20260901", "20260930")
-        .contra(&st(1), Some(REF_A))
-        .skip(skip_row(&st(2), "500.00", B2, Some("SBIN526000000001")))
+        .contra(&st(1), Some(ref_a()))
+        .skip(skip_row(
+            &st(2),
+            "500.00",
+            B2,
+            Some(format!("ZZZZ{}", pre("526", 1, 12)).as_str()),
+        ))
 }
 
 #[test]
@@ -1921,8 +1995,8 @@ fn every_semantic_check_is_a_typed_error() {
     for bad in [
         "",
         "st-2026",
-        "ST-20260901-0000000000000001",
-        "st-20260901-000000000000000G",
+        &format!("ST-20260901-{}", padn(1, 16)),
+        &format!("st-20260901-{}G", padn(0, 15)),
         "txn-001",
     ] {
         assert_eq!(
@@ -1936,9 +2010,9 @@ fn every_semantic_check_is_a_typed_error() {
         " ",
         "12345",
         "abc",
-        "000000000000",
-        "600000000001 ",
-        "sbin526000000001",
+        &padn(0, 12),
+        &format!("{} ", p6(1, 12)),
+        &format!("zzzz{}", pre("526", 1, 12)),
     ] {
         assert_eq!(
             check(&|f| f.contra_rows[0].reference = Some(bad.into())),
@@ -2133,7 +2207,7 @@ fn facts_survive_the_journal_and_change_nothing_the_other_readers_see() {
     let with = build(1).voucher(contra(&st(1), N2, N1, "100.00")).facts(
         facts(B2)
             .window("20260901", "20260930")
-            .contra(&st(1), Some(REF_A))
+            .contra(&st(1), Some(ref_a()))
             .skip(skip_row(&st(2), "5.00", B1, None)),
     );
     let mut stripped = with.line();
@@ -2171,7 +2245,7 @@ fn facts_survive_the_journal_and_change_nothing_the_other_readers_see() {
     let posted = |text: &str| {
         ledger::vouchers_already_posted(
             Cursor::new(text.as_bytes()),
-            COMPANY,
+            company(),
             Some("another"),
             &rows,
         )
@@ -2191,8 +2265,11 @@ fn a_batch_found_posted_stays_found_when_its_record_is_appended_again() {
     let skipped = build(170).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
     let posted = build(171)
         .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
         .status("posted_verified");
-    let again = build(171).voucher(payment(&st(6), "500.00"));
+    let again = build(171)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
     let found = Journal::default()
         .batch(&skipped)
         .batch(&posted)
@@ -2223,11 +2300,11 @@ fn a_batch_found_posted_stays_found_when_its_record_is_appended_again() {
 
 #[test]
 fn the_newest_mention_of_a_skip_in_a_lineage_gives_its_facts() {
-    let first = build(173).facts(facts(B1).skip(skip_row(&st(8), "500.00", B2, Some(REF_A))));
+    let first = build(173).facts(facts(B1).skip(skip_row(&st(8), "500.00", B2, Some(ref_a()))));
     let second =
         build(174)
             .amends(173)
-            .facts(facts(B1).skip(skip_row(&st(8), "500.00", B2, Some(REF_B))));
+            .facts(facts(B1).skip(skip_row(&st(8), "500.00", B2, Some(ref_b()))));
     let found = Journal::default()
         .batch(&first)
         .batch(&second)
@@ -2238,7 +2315,7 @@ fn the_newest_mention_of_a_skip_in_a_lineage_gives_its_facts() {
     };
     assert_eq!(
         skip.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some(REF_B)
+        Some(ref_b())
     );
     assert_eq!(skip.lineage, LineageId::new(batch_id(173)));
 }
@@ -2250,20 +2327,20 @@ fn skips_built_at_one_instant_are_ordered_by_their_record_id() {
         11,
         ENDPOINT,
         at,
-        facts(B1).skip(skip_row(&st(18), "500.00", B2, Some(REF_A))),
+        facts(B1).skip(skip_row(&st(18), "500.00", B2, Some(ref_a()))),
     );
     let large = skip_record(
         12,
         ENDPOINT,
         at,
-        facts(B1).skip(skip_row(&st(18), "500.00", B2, Some(REF_B))),
+        facts(B1).skip(skip_row(&st(18), "500.00", B2, Some(ref_b()))),
     );
     for order in [
         [small.clone(), large.clone()],
         [large.clone(), small.clone()],
     ] {
         let found = Journal::default()
-            .read_with(&skip_file(&order), COMPANY)
+            .read_with(&skip_file(&order), company())
             .unwrap();
         assert_eq!(
             found.skips[0].lineage,
@@ -2278,7 +2355,10 @@ fn skips_built_at_one_instant_are_ordered_by_their_record_id() {
         facts(B1).skip(skip_row(&st(18), "500.00", B2, None)),
     );
     let found = Journal::default()
-        .read_with(&skip_file(&[same_instant.clone(), small.clone()]), COMPANY)
+        .read_with(
+            &skip_file(&[same_instant.clone(), small.clone()]),
+            company(),
+        )
         .unwrap();
     assert_eq!(
         found.skips[0].lineage,
@@ -2292,7 +2372,7 @@ fn skips_built_at_one_instant_are_ordered_by_their_record_id() {
         facts(B1).skip(skip_row(&st(18), "500.00", B2, None)),
     );
     let found = Journal::default()
-        .read_with(&skip_file(&[earlier, small.clone()]), COMPANY)
+        .read_with(&skip_file(&[earlier, small.clone()]), company())
         .unwrap();
     assert_eq!(found.skips[0].lineage, LineageId::new(small.record_id));
 }
@@ -2310,7 +2390,7 @@ fn a_skip_held_by_two_batches_names_the_latest_in_the_journal() {
         .read()
         .unwrap();
     assert_eq!(
-        found.held_elsewhere,
+        held_tuples(&found),
         vec![(key(B1, 6), BatchId::new(batch_id(176)), date("20260901"))]
     );
 }
@@ -2417,9 +2497,12 @@ fn a_contra_keyed_by_something_other_than_a_statement_id_is_still_a_statement_co
 #[test]
 fn a_batch_first_written_unverified_and_written_again_verified_is_found() {
     let skipped = build(191).facts(facts(B1).skip(skip_row(&st(6), "500.00", B2, None)));
-    let first = build(192).voucher(payment(&st(6), "500.00"));
+    let first = build(192)
+        .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)]);
     let again = build(192)
         .voucher(payment(&st(6), "500.00"))
+        .withdrew(&[st(6)])
         .status("posted_verified");
     let found = Journal::default()
         .batch(&skipped)
@@ -2497,11 +2580,12 @@ fn a_window_over_a_row_an_unverified_build_decides_is_no_cover() {
     let b0 = build(200)
         .voucher(contra(&st(50), N2, N1, "500.00"))
         .facts(facts(B2).contra(&st(50), None))
+        .withdrew(&[st(50)])
         .status("posted_verified");
     let b1 = build(201)
         .amends(200)
         .voucher(contra(&st(50), N2, N1, "510.00"));
-    let september = build(202)
+    let september = build(199)
         .facts(
             facts(B2)
                 .window("20260901", "20260930")
@@ -2558,7 +2642,7 @@ fn a_blocked_date_blocks_only_its_own_endpoint_ledger_company_and_date() {
             .voucher(contra(&st(53), N2, N1, "7.00"))
             .facts(facts(B2).contra(&st(53), None)),
         build(208)
-            .company(OTHER_COMPANY)
+            .company(other_company())
             .voucher(contra(&st(53), N2, N1, "7.00"))
             .facts(facts(B2).contra(&st(53), None)),
         build(209)
@@ -2771,7 +2855,7 @@ fn a_statement_this_release_cannot_parse_does_not_make_the_journal_unreadable() 
         }
     );
     // and only for the company it names
-    line.company_guid = OTHER_COMPANY.into();
+    line.company_guid = other_company().into();
     assert!(Journal::default().push(&line).read().is_ok());
 }
 
@@ -2819,10 +2903,12 @@ fn a_skip_is_live_once_its_batch_is_sent_or_found_and_not_before() {
 #[test]
 fn a_skip_in_an_earlier_sent_build_stays_live_when_a_later_build_was_only_built() {
     let first = skipping(91, 9);
-    let rebuilt =
-        build(91 + 1)
-            .amends(91)
-            .facts(facts(B1).skip(skip_row(&st(9), "500.00", B2, Some(REF_A))));
+    let rebuilt = build(91 + 1).amends(91).facts(facts(B1).skip(skip_row(
+        &st(9),
+        "500.00",
+        B2,
+        Some(ref_a()),
+    )));
     let found = Journal::default()
         .batch(&first)
         .sent(&first)
@@ -2866,7 +2952,7 @@ fn a_skip_only_record_is_live() {
         facts(B1).skip(skip_row(&st(9), "500.00", B2, None)),
     );
     let found = Journal::default()
-        .read_with(&skip_file(&[record]), COMPANY)
+        .read_with(&skip_file(&[record]), company())
         .unwrap();
     assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
 }
@@ -2874,14 +2960,16 @@ fn a_skip_only_record_is_live() {
 #[test]
 fn a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not() {
     let sent = skipping(94, 9);
-    let held = build(95).voucher(payment(&st(9), "500.00"));
+    let held = build(95)
+        .voucher(payment(&st(9), "500.00"))
+        .withdrew(&[st(9)]);
     let found = Journal::default()
         .batch(&sent)
         .sent(&sent)
         .batch(&held)
         .read()
         .unwrap();
-    assert_eq!(found.held_elsewhere.len(), 1);
+    assert_eq!(found.held.len(), 1);
     assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
     // not sent: held elsewhere but not live
     let built = skipping(96, 9);
@@ -2890,7 +2978,7 @@ fn a_held_elsewhere_skip_is_live_by_its_own_source_and_a_retired_skip_is_not() {
         .batch(&held)
         .read()
         .unwrap();
-    assert_eq!(found.held_elsewhere.len(), 1);
+    assert_eq!(found.held.len(), 1);
     assert!(found.live_skips.is_empty());
     // the holder found posted retires the skip, which is then no skip at all
     let found = Journal::default()
@@ -2911,18 +2999,18 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
     let journal = Journal::default().batch(&skipped).sent(&skipped);
     let without = journal.read().unwrap();
     assert_eq!(without.skips.len(), 1);
-    assert!(without.held_elsewhere.is_empty());
+    assert!(without.held.is_empty());
     // with a candidate that posts the row, the skip is held by the candidate
     let with = journal
         .read_candidate(
             "",
-            COMPANY,
+            company(),
             Some(Candidate::Build(Box::new(BuildLine::of(&held.line())))),
         )
         .unwrap();
     assert!(with.skips.is_empty());
     assert_eq!(
-        with.held_elsewhere,
+        held_tuples(&with),
         vec![(key(B1, 9), BatchId::new(batch_id(97)), date("20260901"))]
     );
     // a candidate skip-only record is a skip of its own
@@ -2933,7 +3021,7 @@ fn a_candidate_build_is_read_as_the_newest_record_and_a_candidate_record_as_a_sk
         facts(B1).skip(skip_row(&st(10), "500.00", B2, None)),
     );
     let with = journal
-        .read_candidate("", COMPANY, Some(Candidate::SkipOnly(Box::new(record))))
+        .read_candidate("", company(), Some(Candidate::SkipOnly(Box::new(record))))
         .unwrap();
     assert_eq!(with.skips.len(), 2);
     assert!(with.live_skips.contains(&key(B1, 10)));
@@ -2950,7 +3038,7 @@ fn held(
     let own = own_lineage.map(batch_id);
     ledger::rows_held_as_vouchers(
         Cursor::new(journal.0.as_bytes()),
-        COMPANY,
+        company(),
         own.as_deref(),
         &rows,
     )
@@ -2983,7 +3071,7 @@ fn a_row_is_held_by_a_sent_or_found_batch_of_the_company_and_by_no_other() {
     assert_eq!(held(&found, None, &[2]), None);
     // another company's batch holds nothing of this one's
     let elsewhere = build(101)
-        .company(OTHER_COMPANY)
+        .company(other_company())
         .voucher(payment(&st(1), "500.00"))
         .status("posted_verified");
     assert_eq!(
@@ -3027,4 +3115,363 @@ fn the_first_holding_batch_in_id_order_is_named() {
         held(&journal, None, &[1]),
         Some((batch_id(130), vec![st(1)]))
     );
+}
+
+// ---- a skip a posted voucher contradicts is retired only when it was withdrawn ----
+
+fn holder_of_row_nine(id: u32) -> Build {
+    build(id).voucher(payment(&st(9), "500.00"))
+}
+
+#[test]
+fn a_skip_whose_row_a_batch_found_posted_holds_stays_open_unless_a_build_recorded_the_withdrawal() {
+    let skipped = skipping(100, 9);
+    // nobody named the row in withdraw_skips: the posted voucher contradicts the skip
+    let posted = holder_of_row_nine(101).status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .sent(&skipped)
+        .batch(&posted)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    assert!(found.skips.is_empty());
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    assert_eq!(held.holder, BatchId::new(batch_id(101)));
+    assert_eq!(held.fact.key, key(B1, 9));
+    assert_eq!(found.live_skips, BTreeSet::from([key(B1, 9)]));
+    // the same, a skip that was only built
+    let built = Journal::default()
+        .batch(&skipped)
+        .batch(&posted)
+        .read()
+        .unwrap();
+    assert_eq!(built.held.len(), 1);
+    assert_eq!(built.retired_skips, 0);
+    // a build that recorded the withdrawal retires it
+    let withdrawn = holder_of_row_nine(102)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawn)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+    // while that batch is not found posted the skip is held as before
+    let unverified = holder_of_row_nine(103).withdrew(&[st(9)]);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&unverified)
+        .read()
+        .unwrap();
+    assert_eq!(found.held.len(), 1);
+    assert_eq!(found.held[0].by, HeldBy::UnverifiedBatch);
+}
+
+#[test]
+fn every_batch_found_posted_that_holds_the_row_must_have_recorded_the_withdrawal() {
+    let skipped = skipping(104, 9);
+    let withdrawn = holder_of_row_nine(105)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let other = holder_of_row_nine(106).status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawn)
+        .batch(&other)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    // the batch named is the posted one that did not record the withdrawal
+    assert_eq!(
+        (held.by, &held.holder),
+        (HeldBy::PostedBatch, &BatchId::new(batch_id(106)))
+    );
+}
+
+#[test]
+fn an_amendment_is_covered_by_the_withdrawal_its_lineage_recorded() {
+    let skipped = skipping(107, 9);
+    let original = holder_of_row_nine(108).withdrew(&[st(9)]);
+    let amendment = holder_of_row_nine(109)
+        .amends(108)
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&original)
+        .sent(&original)
+        .batch(&amendment)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+#[test]
+fn a_withdrawn_row_must_be_a_statement_row_the_batch_holds() {
+    let skipped = skipping(110, 9);
+    for (withdrew, why) in [
+        (st(8), "a statement row the batch does not hold"),
+        ("txn-001".to_string(), "not a statement row id"),
+    ] {
+        let batch = holder_of_row_nine(111).withdrew(std::slice::from_ref(&withdrew));
+        let error = Journal::default()
+            .batch(&skipped)
+            .batch(&batch)
+            .read()
+            .unwrap_err();
+        assert_eq!(
+            error,
+            TransferFactsError::Facts {
+                source_id: batch_id(111),
+                error: FactsError::WithdrawnRowNotVoucher { txn: withdrew },
+            },
+            "{why}"
+        );
+        assert_eq!(error.variant(), "facts");
+        assert_eq!(error.check(), Some("withdrawn_row_not_voucher"));
+    }
+    // a record that changes what was withdrawn is a changed record
+    let first = holder_of_row_nine(112).withdrew(&[st(9)]);
+    let changed = holder_of_row_nine(112);
+    let error = Journal::default()
+        .batch(&first)
+        .batch(&changed)
+        .read()
+        .unwrap_err();
+    assert_eq!(
+        error,
+        TransferFactsError::BatchRecordChanged {
+            batch_id: batch_id(112)
+        }
+    );
+}
+
+#[test]
+fn the_withdrawn_rows_are_kept_on_the_record_and_an_older_record_reads_as_none() {
+    let line = holder_of_row_nine(113).withdrew(&[st(9)]).line();
+    let text = serde_json::to_string(&line).unwrap();
+    let back: ImportLedgerLine = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.withdrawn_skips, Some(vec![st(9)]));
+    assert_eq!(BuildLine::of(&back).withdrawn, BTreeSet::from([st(9)]));
+    let plain = holder_of_row_nine(114).line();
+    let text = serde_json::to_string(&plain).unwrap();
+    assert!(!text.contains("withdrawn_skips"), "{text}");
+    let back: ImportLedgerLine = serde_json::from_str(&text).unwrap();
+    assert_eq!(back.withdrawn_skips, None);
+    assert!(BuildLine::of(&back).withdrawn.is_empty());
+}
+
+/// The `check` a caller sees for a failed record is pinned by its value.
+#[test]
+fn every_failed_check_is_named_by_its_pinned_value() {
+    let txn = || "t".to_string();
+    let all = [
+        (FactsError::EmptyLedgerGuid, "empty_ledger_guid"),
+        (FactsError::InvertedCoverage, "inverted_coverage"),
+        (
+            FactsError::DuplicateTxnId { txn: txn() },
+            "duplicate_txn_id",
+        ),
+        (
+            FactsError::SkipIdNotStatementId { txn: txn() },
+            "skip_id_not_statement_id",
+        ),
+        (
+            FactsError::ReferenceInadmissible { txn: txn() },
+            "reference_inadmissible",
+        ),
+        (
+            FactsError::AmountInadmissible { txn: txn() },
+            "amount_inadmissible",
+        ),
+        (
+            FactsError::SkipLedgersEqual { txn: txn() },
+            "skip_ledgers_equal",
+        ),
+        (
+            FactsError::ContraRowNotOneContraVoucher { txn: txn() },
+            "contra_row_not_one_contra_voucher",
+        ),
+        (
+            FactsError::ContraVoucherNotInFacts { txn: txn() },
+            "contra_voucher_not_in_facts",
+        ),
+        (FactsError::SkipIsVoucher { txn: txn() }, "skip_is_voucher"),
+        (FactsError::BankLedgerUnbound, "bank_ledger_unbound"),
+        (FactsError::Unparsable, "unparsable"),
+        (FactsError::BadRecordId, "bad_record_id"),
+        (FactsError::NotSkipOnly, "not_skip_only"),
+        (
+            FactsError::WithdrawnRowNotVoucher { txn: txn() },
+            "withdrawn_row_not_voucher",
+        ),
+    ];
+    for (error, name) in &all {
+        assert_eq!(error.variant(), *name);
+    }
+    let names: BTreeSet<&str> = all.iter().map(|(_, name)| *name).collect();
+    assert_eq!(names.len(), all.len());
+}
+
+#[test]
+fn a_withdrawal_counts_only_from_a_build_sent_or_found_posted() {
+    let skipped = skipping(120, 9);
+    // the build that names the row was never sent: the batch found posted is
+    // another lineage's, and nothing recorded a withdrawal for it
+    let unsent = holder_of_row_nine(121).withdrew(&[st(9)]);
+    let other = holder_of_row_nine(122).status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&unsent)
+        .batch(&other)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (0, 1));
+    // an amendment that names the row and is never sent does not count either
+    let original = holder_of_row_nine(123).status("posted_verified");
+    let amendment = holder_of_row_nine(124).amends(123).withdrew(&[st(9)]);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&original)
+        .batch(&amendment)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (0, 1));
+    // found posted, it does (an amendment is never sent)
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&original)
+        .batch(&amendment)
+        .status(&amendment, "posted_verified")
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+#[test]
+fn a_skip_made_after_the_withdrawal_is_not_retired_by_it() {
+    // the withdrawal was recorded by build 131; the row is skipped again by a
+    // build made after it (132), then the withdrawing batch is found posted
+    let withdrawing = holder_of_row_nine(131)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let skipped_again = skipping(132, 9);
+    let found = Journal::default()
+        .batch(&withdrawing)
+        .batch(&skipped_again)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    // and a skip made before it is retired
+    let skipped_before = skipping(130, 9);
+    let found = Journal::default()
+        .batch(&skipped_before)
+        .batch(&withdrawing)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+#[test]
+fn a_skip_that_was_never_sent_can_be_withdrawn_and_is_known_to_the_facts() {
+    let skipped = skipping(140, 9);
+    let found = Journal::default().batch(&skipped).read().unwrap();
+    assert!(found.live_skips.is_empty());
+    assert_eq!(found.skip_mentions, BTreeSet::from([key(B1, 9)]));
+    // a held skip is known too, a retired one is not
+    let withdrawn = holder_of_row_nine(142)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let held_only = holder_of_row_nine(143);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&held_only)
+        .read()
+        .unwrap();
+    assert_eq!(found.skip_mentions, BTreeSet::from([key(B1, 9)]));
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawn)
+        .read()
+        .unwrap();
+    assert!(found.skip_mentions.is_empty());
+}
+
+/// A withdrawal built at the very instant of the skip cannot be told from one
+/// made before it, so the skip stays open.
+#[test]
+fn a_withdrawal_built_at_the_instant_of_the_skip_does_not_retire_it() {
+    // builds 10 and 70 are built in the same second
+    let skipped = skipping(10, 9);
+    let withdrawing = holder_of_row_nine(70)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    assert_eq!(skipped.line().built_at, withdrawing.line().built_at);
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&withdrawing)
+        .read()
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
+    // one second later it retires
+    let later = holder_of_row_nine(71)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let found = Journal::default()
+        .batch(&skipped)
+        .batch(&later)
+        .read()
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+}
+
+/// The newest record of a skip is what a withdrawal is compared with: a later
+/// build of the skipping statement records the skip again, and a withdrawal
+/// built before it no longer retires the skip.
+#[test]
+fn a_skip_recorded_again_after_the_withdrawal_keeps_the_row_open() {
+    let first = skip_record(
+        10,
+        ENDPOINT,
+        "2026-09-01T10:00:10Z",
+        facts(B1).skip(skip_row(&st(9), "500.00", B2, None)),
+    );
+    let again = skip_record(
+        11,
+        ENDPOINT,
+        "2026-09-01T10:00:30Z",
+        facts(B1).skip(skip_row(&st(9), "500.00", B2, None)),
+    );
+    // build 80 names the row at :20 and is found posted
+    let withdrawing = holder_of_row_nine(80)
+        .withdrew(&[st(9)])
+        .status("posted_verified");
+    let journal = Journal::default().batch(&withdrawing);
+    let found = journal
+        .read_with(&skip_file(std::slice::from_ref(&first)), company())
+        .unwrap();
+    assert_eq!((found.retired_skips, found.held.len()), (1, 0));
+    let found = journal
+        .read_with(&skip_file(&[first, again]), company())
+        .unwrap();
+    assert_eq!(found.retired_skips, 0);
+    let [held] = &found.held[..] else {
+        panic!("one held skip");
+    };
+    assert_eq!(held.by, HeldBy::PostedBatch);
 }

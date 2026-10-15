@@ -571,19 +571,12 @@ fn a_shown_spelling_is_chosen_without_amounts() {
 #[test]
 fn every_record_carries_the_reference_and_instrument_the_statement_printed() {
     let rows = [
-        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
-        upi(
-            "02/08/26",
-            "OWN ACCT",
-            "222222222222",
-            "20.00",
-            "",
-            "970.00",
-        ),
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
         row(&[
             ("date", "03/08/26"),
             ("narr", "CHQ PAID-MICR CLG-BETA"),
-            ("ref", "0000000000000417"),
+            ("ref", &padn(417, 16)),
             ("dr", "30.00"),
             ("cr", ""),
             ("bal", "940.00"),
@@ -607,9 +600,9 @@ fn every_record_carries_the_reference_and_instrument_the_statement_printed() {
     assert_eq!(
         seen,
         [
-            (Some("111111111111".to_string()), Some("1")),
-            (Some("222222222222".to_string()), Some("1")),
-            (None, Some("0000000000000417")),
+            (Some(rep('1', 12)), Some("1")),
+            (Some(rep('2', 12)), Some("1")),
+            (None, Some(padn(417, 16).as_str())),
         ]
     );
     // the skipped row names the other account, so its Contra can be found
@@ -618,7 +611,7 @@ fn every_record_carries_the_reference_and_instrument_the_statement_printed() {
 
     // both facts reach the serialised record
     let json = serde_json::to_value(&built.records[1]).unwrap();
-    assert_eq!(json["reference"], "222222222222");
+    assert_eq!(json["reference"], rep('2', 12));
     assert_eq!(json["instrument"], "1");
     assert_eq!(json["ledger"], "Other Bank");
     let json = serde_json::to_value(&built.records[2]).unwrap();
@@ -644,15 +637,8 @@ fn a_cash_line_waiting_for_an_answer_still_carries_the_printed_instrument() {
 #[test]
 fn a_skip_naming_the_statements_own_bank_ledger_is_refused() {
     let rows = [
-        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
-        upi(
-            "02/08/26",
-            "OWN ACCT",
-            "222222222222",
-            "20.00",
-            "",
-            "970.00",
-        ),
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
     ];
     // the same fold the crate uses for ledger names: case, hyphens and spacing
     for (bank_ledger, skip_ledger) in [
@@ -689,15 +675,8 @@ fn a_skip_naming_the_statements_own_bank_ledger_is_refused() {
 #[test]
 fn a_skip_ledger_meets_the_same_name_rules_as_any_other_ledger() {
     let rows = [
-        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
-        upi(
-            "02/08/26",
-            "OWN ACCT",
-            "222222222222",
-            "20.00",
-            "",
-            "970.00",
-        ),
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
     ];
     let mut named = options("SUSPENSE ACC");
     named.bank_ledger = "HDFC BANK";
@@ -716,15 +695,8 @@ fn a_skip_ledger_meets_the_same_name_rules_as_any_other_ledger() {
 #[test]
 fn a_skip_naming_the_suspense_ledger_is_refused() {
     let rows = [
-        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
-        upi(
-            "02/08/26",
-            "OWN ACCT",
-            "222222222222",
-            "20.00",
-            "",
-            "970.00",
-        ),
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "OWN ACCT", &rep('2', 12), "20.00", "", "970.00"),
     ];
     let mut named = options("SUSPENSE ACC");
     named.bank_ledger = "HDFC BANK";

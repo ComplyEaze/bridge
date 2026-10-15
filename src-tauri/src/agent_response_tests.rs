@@ -678,7 +678,10 @@ fn a_section_that_already_fits_or_is_not_computed_is_left_alone() {
     // a note is not cut, so a response too large for its page is the page's
     let mut note = json!({"result": {"items": [], "padding": "x".repeat(2_000),
         "transfers": {"state": "not_established", "next_steps": {}}}});
-    assert!(fit_response(&mut note, "", 500, |value| len_of(value)).is_err());
+    assert_eq!(
+        fit_response(&mut note, "", 500, |value| len_of(value)),
+        Err("agent_response_too_large".to_string())
+    );
     // and a page cut around it leaves it as it was
     let items: Vec<Value> = (0..50).map(|id| json!({"id": id})).collect();
     let mut paged = json!({"result": {"offset": 0, "items": items,
@@ -910,8 +913,115 @@ fn a_result_with_no_computed_section_takes_the_old_path() {
         assert_eq!(response["result"].get("transfers"), transfers.as_ref());
         // a page of one row that does not fit fails
         let mut one = page(1);
-        assert!(fit_response(&mut one, "", 20, |value| len_of(value)).is_err());
+        assert_eq!(
+            fit_response(&mut one, "", 20, |value| len_of(value)),
+            Err("agent_response_too_large".to_string())
+        );
         let mut none = page(0);
-        assert!(fit_response(&mut none, "", 20, |value| len_of(value)).is_err());
+        assert_eq!(
+            fit_response(&mut none, "", 20, |value| len_of(value)),
+            Err("agent_response_too_large".to_string())
+        );
     }
+}
+
+/// A written build has no page to trim. When it fits without its section but
+/// not beside the note that the check did not run, it is answered without the
+/// section and reported as cut: it is never turned into an error after its
+/// file and journal record are written.
+#[test]
+fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_it() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let mut response = bare.clone();
+    response["result"]["transfers"] = transfers_section(40);
+    let cap = len_of(&bare) + 10;
+    let mut noted = bare.clone();
+    noted["result"]["transfers"] = check_not_run_section(false);
+    assert!(len_of(&noted) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(response["result"].get("transfers").is_none(), "{response}");
+    assert_eq!(response["result"]["batch_id"], "bridge-x");
+    assert_eq!(response["truncated"], true);
+    // through the cap itself: answered, and reported as cut
+    let mut with_section = bare.clone();
+    with_section["result"]["transfers"] = transfers_section(40);
+    let (fitted, truncated, _) = enforce_response_byte_cap(with_section, cap).unwrap();
+    assert!(truncated);
+    assert!(fitted["result"].get("transfers").is_none(), "{fitted}");
+    assert_eq!(fitted["result"]["batch_id"], "bridge-x");
+    // a result too large without its section is still too large
+    let mut too_big = bare.clone();
+    too_big["result"]["transfers"] = transfers_section(40);
+    assert_eq!(
+        fit_response(&mut too_big, "", 100, |value| len_of(value)),
+        Err("agent_response_too_large".to_string())
+    );
+}
+
+/// Whatever the section is, a note that the check did not run included: a
+/// result with no page that fits without it is answered without it.
+#[test]
+fn a_result_with_no_page_drops_a_note_section_too() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let mut noted = bare.clone();
+    noted["result"]["transfers"] = check_not_run_section(false);
+    let cap = len_of(&bare) + 5;
+    assert!(len_of(&noted) > cap);
+    assert!(fit_response(&mut noted, "", cap, |value| len_of(value)).unwrap());
+    assert!(noted["result"].get("transfers").is_none(), "{noted}");
+    assert_eq!(noted["truncated"], true);
+}
+
+/// The same drop through the two other places the cap is applied to a tool
+/// result: the MCP result's `structuredContent`, and the JSON-RPC response.
+#[test]
+fn a_result_with_no_page_drops_its_section_in_the_mcp_and_jsonrpc_envelopes_too() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let with_section = |section: Value| {
+        let mut full = bare.clone();
+        full["result"]["transfers"] = section;
+        full
+    };
+    // MCP: structuredContent beside its text copy
+    let mcp = |structured: Value| {
+        let mut mcp =
+            json!({"content": [{"type": "text", "text": ""}], "structuredContent": structured});
+        set_mcp_content_json(&mut mcp);
+        mcp
+    };
+    let cap = len_of(&mcp(bare.clone())) + 10;
+    for section in [transfers_section(40), check_not_run_section(false)] {
+        assert!(len_of(&mcp(with_section(section.clone()))) > cap);
+        let mut response = mcp(with_section(section));
+        enforce_mcp_result_byte_cap(&mut response, cap, "build_import_xml", 0).unwrap();
+        let structured = &response["structuredContent"];
+        assert!(
+            structured["result"].get("transfers").is_none(),
+            "{response}"
+        );
+        assert_eq!(structured["truncated"], true);
+        assert!(len_of(&response) <= cap);
+    }
+    // JSON-RPC: the same under result.structuredContent
+    let rpc = |structured: Value| {
+        let mut rpc = json!({"jsonrpc": "2.0", "id": 1, "result": {"content": [], "structuredContent": structured}});
+        set_mcp_content_json(&mut rpc["result"]);
+        rpc
+    };
+    let cap = len_of(&rpc(bare.clone())) + 11;
+    let mut response = rpc(with_section(transfers_section(40)));
+    enforce_jsonrpc_response_byte_cap(&mut response, cap).unwrap();
+    assert!(response["result"]["structuredContent"]["result"]
+        .get("transfers")
+        .is_none());
+    assert_eq!(response["result"]["structuredContent"]["truncated"], true);
+    // a result too large without the section still fails in both
+    let mut too_big = mcp(with_section(transfers_section(40)));
+    assert_eq!(
+        enforce_mcp_result_byte_cap(&mut too_big, 100, "build_import_xml", 0),
+        Err("agent_response_too_large".to_string())
+    );
 }

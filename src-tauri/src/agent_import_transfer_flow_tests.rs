@@ -2077,7 +2077,7 @@ fn an_unreadable_journal_stops_the_view_and_the_verification_section() {
     let error = {
         let _lock = server.lock_import_admission().unwrap();
         server
-            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None)
+            .transfer_view_while_admitted(&canonical_batch_guid(CAPTURED_GUID), None, None)
             .unwrap_err()
     };
     assert!(

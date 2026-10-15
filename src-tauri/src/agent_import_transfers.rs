@@ -438,6 +438,11 @@ const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing 
 const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and nothing was recorded. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this build books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, build with that release; otherwise report it with the error named here, and do not build this statement again until it is fixed.";
 
 /// What the batch named beside a withdrawn row holds for it, which is why the
+    /// A batch already in the journal that is being judged again, the one about
+    /// to be sent: its records are left out of the facts and it is the
+    /// `candidate`, so the journal reads as it did when the batch was built, plus
+    /// whatever was written since.
+    pub(super) subject: Option<String>,
 /// withdrawal is refused. The labels a refusal shares with the section are the
 /// section's own, and a row need not carry the same one in both: a row the
 /// section reads `ambiguous`, `reversed_same_day` or `reference_differs` is
@@ -557,7 +562,8 @@ impl Server {
     }
 
     /// The facts of one company and the view over them, with a candidate read as
-    /// the newest record when one is given.
+    /// the newest record when one is given. `subject` is as for
+    /// `ledger::transfer_facts`.
     pub(super) fn transfer_view_while_admitted(
         &self,
         company_guid: &str,
@@ -571,7 +577,7 @@ impl Server {
         let skips = self
             .skip_file_while_admitted()
             .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
-        let facts = ledger::transfer_facts(journal, skips, company_guid, candidate)?;
+        let facts = ledger::transfer_facts(journal, skips, company_guid, candidate, subject)?;
         let view = transfer_pairing_view(
             &facts.skips,
             &facts.contras,
@@ -609,11 +615,15 @@ impl Server {
             }
         }
         // C5a: the skips there are before this build.
-        let (before, before_view) =
-            match self.transfer_view_while_admitted(&input.company_guid, None) {
-                Ok(view) => view,
-                Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
-            };
+        let (before, before_view) = match self.transfer_view_while_admitted(
+            &input.company_guid,
+            None,
+            input.subject.as_deref(),
+        ) {
+            Ok(view) => view,
+            Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
+        };
+        subject: Option<&str>,
         let live: BTreeSet<&str> = before
             .live_skips
             .iter()
@@ -734,11 +744,14 @@ impl Server {
         // C6: the view with this build in it.
         let candidate_batch = input.candidate_build().map(str::to_string);
         let needs_the_view = input.needs_the_view();
-        let (facts, view) =
-            match self.transfer_view_while_admitted(&input.company_guid, Some(input.candidate)) {
-                Ok(view) => view,
-                Err(error) => return Ok(without_facts(needs_the_view, &error)),
-            };
+        let (facts, view) = match self.transfer_view_while_admitted(
+            &input.company_guid,
+            Some(input.candidate),
+            input.subject.as_deref(),
+        ) {
+            Ok(view) => view,
+            Err(error) => return Ok(without_facts(needs_the_view, &error)),
+        };
         let other_batch = candidate_batch
             .as_deref()
             .and_then(|ours| double_booked_with(&view, ours));
@@ -766,7 +779,7 @@ impl Server {
             guard
                 .ok()
                 .and_then(|_lock| {
-                    self.transfer_view_while_admitted(&canonical_batch_guid(company_guid), None)
+                    self.transfer_view_while_admitted(&canonical_batch_guid(company_guid), None, None)
                         .ok()
                 })
                 .map_or(TransferSummary::NotEstablished, |(facts, view)| {

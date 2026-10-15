@@ -1773,11 +1773,12 @@ which a build needs for this; a version 1 file holding a skip or a Contra is
 refused as `proposals_legacy` (parse the statement again).
 
 - **What a statement build records.** Beside its vouchers: the statement's bank
-  ledger GUID, the days it read in full, each Contra row's network reference,
-  and each skipped row's date, amount, direction, other ledger and reference,
-  with a flag on any row that has an equal amount going the other way the same
-  day on its own statement. A statement whose every row is skipped writes no
-  file: it appends one record to `agent-import-statement-skips.jsonl` and
+  ledger GUID, the days it read in full, each Contra row's network reference
+  and instrument (the cheque or number the statement prints), and each skipped
+  row's date, amount, direction, other ledger, reference and instrument, with a
+  flag on any row that has an equal amount going the other way the same day on
+  its own statement. A statement whose every row is skipped saves no
+  batch file: it appends one record to `agent-import-statement-skips.jsonl` and
   returns `state: skips_recorded`. No pairing is stored; the view is computed
   again from these records on every call.
 - **The section.** Every successful build, and the first page of
@@ -1786,21 +1787,53 @@ refused as `proposals_legacy` (parse the statement again).
   to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
   `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
   `batch_id` where one is involved: `not_found`, `ambiguous`,
-  `other_side_unverified`, `held_elsewhere`, `reversed_same_day`,
-  `not_established`, or `double_booked` for a Contra booked from both
-  statements. No amount, reference, instrument, party or ledger is returned.
+  `other_side_unverified`, `held_elsewhere`, `matched_unconfirmed`,
+  `reference_differs`, `reversed_same_day`, `not_established`, or
+  `double_booked` for a Contra booked from both statements. No amount,
+  reference, instrument, party or ledger is returned.
 - **What `not_found` claims.** Only that the other account's statement went
-  through ComplyEaze Bridge, was verified for that day, and holds no Contra for
-  the row dated the same day. A row pairs by an equal reference, or by an equal
-  date (k = 0 until two real statements of one transfer have been measured), so
-  a Contra the other bank printed on another day is not matched.
+  through ComplyEaze Bridge, was verified for that day, and holds no Contra of
+  the row's day, amount, ledgers and direction that is not already paired, or
+  matched by date, with another row, whatever its reference. A row pairs by an
+  equal reference, or by an equal date (k = 0 until two real statements of one
+  transfer have been measured), so a Contra the other bank printed on another
+  day is not matched.
+- **What `reference_differs` means.** The person sees the row listed once for
+  each batch holding a Contra of the same day and amount whose reference
+  differs from the row's, verifies that batch if it is not verified yet, and
+  checks that Contra in Tally, because ComplyEaze Bridge cannot tell whether it
+  is the row's other side: they keep the skip if it is, and may name the row in
+  `withdraw_skips` if it is not.
+- **What `ambiguous` and `reversed_same_day` list.** The row is listed once
+  for each batch holding a Contra that could carry it, and ComplyEaze Bridge
+  does not choose among them: the person checks them in Tally. A
+  `reversed_same_day` row that no Contra matches is listed once, without a
+  `batch_id`.
+- **What `double_booked` compares.** Two Contras of one amount between the same
+  two ledgers and the same way, one booked from each statement: where their
+  references are equal, whatever their dates (the second build is refused as
+  `transfer_double_booked`), and where their dates are equal and at least one
+  of them carries no reference (both are listed). Nothing else is compared.
+- **What `matched_unconfirmed` means.** The person sees the row listed with the
+  batch whose verified Contra matches it by day and amount, where the statement
+  records of the two accounts do not both cover that day, and keeps the skip.
+  The row can be decided only once statement records of both accounts cover
+  that day: for each account that needs a statement whose rows begin before
+  that day and end after it, built and, where it books a voucher, verified (a
+  statement that begins or ends on that day does not cover it, and a day
+  blocked by a batch that holds no statement records is covered by none).
+  Until then the row stays as it is.
 - **What the records cannot see.** A batch that holds no statement records
   (built from inline vouchers, or by a release before them) can still book a
   transfer. Each Contra and statement row it holds makes the days it names (its
   date, and the date in its `st-` id) give no coverage for the ledgers it names,
-  whatever the batch's status, so a skip pairing on such a day is
-  `not_established`, never `not_found`. A Contra with no statement record inside
-  a statement's own builds blocks the same way; another voucher there does not.
+  whatever the batch's status. A skip naming one of those ledgers that a single
+  verified Contra matches by date on such a day is `matched_unconfirmed`, never
+  paired. A skip with no candidate is `not_found` only where the other
+  account's windows still hold its day, and otherwise `not_established`;
+  `reference_differs` and `reversed_same_day` are decided before either. A
+  Contra with no statement record inside a statement's own builds blocks the
+  same way; another voucher there does not.
   A record with no endpoint (from an early release) blocks the ledgers it names
   at every endpoint, and one with no ledger binding blocks every ledger at its
   endpoint, so such a record can turn every skip across its days
@@ -1812,14 +1845,26 @@ refused as `proposals_legacy` (parse the statement again).
   `withdraw_skip_paired` and `transfer_view_not_established`, each with a
   `next_step`.
 - **`withdraw_skips`.** Names skipped rows a build posts anyway, only when the
-  person confirms the other account's statement does not carry them. It is
-  refused (`withdraw_skip_paired`) when the row is paired, or when a Contra it
-  could pair with (an equal reference, or the same date and amount) waits in a
-  batch not yet verified, whatever the row's state: the person can confirm only
-  what Tally holds, so each such batch is named to verify first. A Contra dated
-  another day, or with a third leg, is not one it could pair with and does not
-  refuse: verify every batch of the other account's statement before naming a
-  row.
+  person confirms the other account's statement does not carry them. A
+  withdrawal is refused while exactly one verified Contra matches the row and
+  nothing else claims that Contra. Where more than one verified Contra
+  matches, the match is also claimed by another row or booked twice, the amount
+  reverses the same day and the match is by date, or the only match carries a
+  different reference and is verified, ComplyEaze Bridge cannot tell which
+  entry the row belongs to: the withdrawal is then the person's explicit
+  choice, and the batch of every matching Contra is listed on the row in the
+  `transfers` section. While the only match is not yet verified, the
+  withdrawal is refused and the step says to verify that entry first. So is
+  one with any match in a batch not yet verified, whatever the row's state: the
+  person can confirm only what Tally holds. The refusal is
+  `withdraw_skip_paired`, and its `paired_rows` names each such batch with the
+  row's state there (`paired`, `matched_unconfirmed` or
+  `other_side_unverified`). A Contra matches a row by an equal reference, or
+  by the same date and amount where one of the two carries no reference. One
+  of the same day and amount whose reference differs from the row's is a match
+  only for a row that nothing else matches. One dated another day, or with a
+  third leg, does not match and does not refuse: verify every batch of the
+  other account's statement before naming a row.
 - **Records a release cannot read.** The statement records refuse unknown
   fields, so records written by a later release make this one refuse every
   build that needs the view (`transfer_view_not_established`); builds that do

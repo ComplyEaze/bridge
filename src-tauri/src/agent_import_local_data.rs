@@ -248,6 +248,8 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         root,
         |name| match name {
             "agent-import-ledger.jsonl" => "journal",
+            // The skip-only file sits beside the import journal and is read with it.
+            super::statement_facts::SKIPS_FILE => "journal",
             "agent-egress.jsonl" => "egress_log",
             "agent-import-admission.lock" => "locks",
             _ => "other",

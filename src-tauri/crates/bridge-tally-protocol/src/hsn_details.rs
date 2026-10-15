@@ -31,8 +31,8 @@ pub enum HsnDetailsObservation {
     NotObserved,
     /// The entries as returned: sorted by `applicable_from`, strictly
     /// increasing. Empty when Tally sent only an empty placeholder, which is
-    /// not a statement that the item has no HSN: a stock group's or the
-    /// company's code is not on the item's list.
+    /// not a statement that the item has no HSN: what its stock group or the
+    /// company holds is not read.
     Entries { entries: Vec<HsnDetailsEntry> },
     /// The details were returned but cannot be relied on.
     Unreadable { defect: HsnDetailsDefect },

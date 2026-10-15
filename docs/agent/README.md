@@ -416,9 +416,10 @@ flag other than Yes or No, a repeated state or duty-head row, or content only of
 not modelled, such as text, a reference or CDATA directly in the list; that list of that item only, and the read and the row stand) or
 `not_observed` (the row had no such list). Nothing chooses the code or the rate for
 a date. An empty list, or `not_observed`, is not a statement that the item has no HSN
-code or no GST rate: a code keyed on a stock group was not on the empty lists of the four other items
-measured (one synthetic book, one release), whether an item that defers to a coded group
-inherits its code was not observed, and the group's and the company's setting is not read. Tally adds an entry of its own (source `As per Company/Stock Group`,
+code or no GST rate: after a code was keyed on a stock group, the group's four other items still carried empty
+lists (one synthetic book, one release); a GST rate or an HSN code on the company, and whether an
+item that defers to a coded group inherits its code, were not measured; the group's and the
+company's setting is not read. Tally adds an entry of its own (source `As per Company/Stock Group`,
 no code, no rate, dated the book's first day: 1 April 2025 on the one book measured, no other book's
 date measured, so recognise it by its source) when an item is first saved. `state_name` and
 `valuation_type` carry the reserved-character marker (U+FFFD `#4;`) where Tally sends

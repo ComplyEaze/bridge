@@ -350,6 +350,27 @@ fn the_tool_definition_admits_only_the_eight_kinds_and_states_the_size_limits() 
     assert!(description.contains("a zero-row stock-item answer are not measured"));
     assert!(description.contains("such as text, a reference or CDATA directly in the list"));
     assert!(description.contains("is masked like an item name"));
+    // The inheritance sentence says only what was measured, in the tool text and in the README.
+    let scoped = "the group's four other items still carried empty lists";
+    assert!(description.contains(scoped));
+    assert!(description.contains(
+        "not measured: a GST rate on a group or on the company, an HSN code on the company, and whether an item that defers to a coded group inherits its code"
+    ));
+    assert!(!description.contains("does not carry a code or rate set on its stock group"));
+    let readme = include_str!("../../docs/agent/README.md");
+    // CHANGELOG.md is not read here: a test that includes it would put it in the native CI scope.
+    let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains(scoped), "README");
+    assert!(
+        flat.contains(
+            "whether an item that defers to a coded group inherits its code, were not measured"
+        ),
+        "README"
+    );
+    assert!(
+        !flat.contains("did not appear on the items' lists"),
+        "README"
+    );
     assert!(!description.contains("under every redaction setting"));
     assert!(description.contains("`ineligible_itc_withheld` is `tally_default_entry`"));
     assert!(description.contains("so recognise it by its source"));
@@ -1212,10 +1233,17 @@ async fn an_item_without_entries_says_that_its_group_and_the_company_were_not_re
     assert!(mentions(
         "is not a statement that the item has no HSN code or no GST rate"
     ));
-    assert!(mentions("not on the item's list"));
     assert!(mentions(
-        "whether an item that defers to a coded group inherits its code was not observed"
+        "what its stock group or the company holds is not read here"
     ));
+    assert!(mentions(
+        "the group's four other items still carried empty lists"
+    ));
+    assert!(mentions(
+        "Not measured: a GST rate on a group or on the company, an HSN code on the company, and whether an item that defers to a coded group inherits its code"
+    ));
+    // The earlier general sentences, which covered cases nobody measured, are gone.
+    assert!(!mentions("is not on the item's list"));
     assert!(!mentions("its items' lists did not change"));
     assert!(mentions("inherited_from_group_or_company: not_read"));
     assert!(mentions("U+FFFD `#4;`"));

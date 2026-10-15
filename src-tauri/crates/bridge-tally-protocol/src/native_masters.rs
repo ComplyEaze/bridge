@@ -279,7 +279,7 @@ pub enum NativeMasterDetail {
     },
     /// A stock item's own dated HSN and GST lists, as Tally sent them. An
     /// empty list is the item's, not a statement about its stock group or the
-    /// company: those are not on the item's lists (measured, PARTIAL).
+    /// company: what those hold is not read.
     StockItem {
         hsn: HsnDetailsObservation,
         gst: GstDetailsObservation,

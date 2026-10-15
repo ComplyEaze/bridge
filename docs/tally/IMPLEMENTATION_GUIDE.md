@@ -1116,7 +1116,7 @@ A bank statement's text layer places every word, and the width or position of a 
 been masked can still identify the word. Do not commit a sanitised capture of a new statement
 or layout; measure the layout on the statement where it lives and commit only what describes its
 shape (see `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs`, which prints no
-position of a masked word). The two captures in `scripts/fixtures/` are the last ones, and
+position of a masked word on its line). The two captures in `scripts/fixtures/` are the last ones, and
 `scripts/fixtures/README.md` says so. `tests/committed_captures_tests.rs` in the bank crate is a
 tripwire for non-ASCII text in them, not a gate.
 

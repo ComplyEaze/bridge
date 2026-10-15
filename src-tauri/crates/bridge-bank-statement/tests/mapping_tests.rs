@@ -24,21 +24,21 @@ fn mapping_key_survives_non_ascii_scripts() {
 fn mapping_key_keeps_punctuation_significant() {
     for (left, right) in [
         ("A & B", "AB"),
-        ("S.K. Minerals", "SK Minerals"),
-        ("M/s Mercury", "Ms Mercury"),
-        ("Shree-Ram Traders", "Shree Ram Traders"),
+        ("P.Q. Granite", "PQ Granite"),
+        ("M/s Halcyon", "Ms Halcyon"),
+        ("Blue-Fern Traders", "Blue Fern Traders"),
     ] {
         assert_ne!(mapping_key(left), mapping_key(right), "{left} / {right}");
     }
     assert_eq!(
-        mapping_key("MERCURYM ANUFACTURERS"),
-        mapping_key("MERCURYMANUFACTURERS")
+        mapping_key("HALCYONM ANUFACTURERS"),
+        mapping_key("HALCYONMANUFACTURERS")
     );
     assert_eq!(
         mapping_key("ZEPHYR MANUFACTURING"),
         mapping_key("ZEPHYRMANUFACTURING")
     );
-    assert_eq!(mapping_key("m/s mercury"), mapping_key("M/S MERCURY"));
+    assert_eq!(mapping_key("m/s halcyon"), mapping_key("M/S HALCYON"));
     assert_eq!(mapping_key("A&B"), "A&B");
 }
 
@@ -184,7 +184,7 @@ fn ledger_key_folds_exactly_what_its_docstring_claims() {
     assert!(same("straße", "STRASSE"));
     assert!(same("A\tB", "A B"));
     assert!(same("A\u{a0}B", "A B"));
-    assert!(!same("ZZ Ram AND Sons", "ZZ Ram & Sons"));
+    assert!(!same("ZZ Fern AND Sons", "ZZ Fern & Sons"));
     assert!(!same("AB", "A & B"));
     assert!(!same("A_B", "A B"));
     assert!(!same("A/B", "A B"));

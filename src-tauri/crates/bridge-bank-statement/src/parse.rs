@@ -446,8 +446,9 @@ pub fn account_digits(account_tail: &str) -> String {
 /// The running-balance proof validates the PDF's own arithmetic and nothing
 /// else, so it is equally happy to certify the wrong account's statement. This
 /// is the one check that ties the document to the ledger. What it catches in practice:
-/// last month's file offered for this month, the other bank's file, a bank ledger named
-/// for the wrong account.
+/// the other bank's file, a bank ledger named for the wrong account. It does not catch
+/// another month of the same account: only a date window that misses the statement does
+/// (the empty-selection refusal).
 ///
 /// Residual, stated rather than assumed: the label line can carry a second
 /// number (HDFC prints a product code beside it), so a tail that happens to end

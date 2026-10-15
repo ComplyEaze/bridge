@@ -1,14 +1,16 @@
 //! A tripwire over the committed statement captures, `scripts/fixtures/*-bbox-capture.xml`.
 //!
-//! Every captured text in them was fabricated, from a fixed alphabet, when the capture was
-//! sanitised; the real statements are not in the repository. What this test can say is only that
+//! Every customer value in them was fabricated, from a fixed alphabet, when the capture was
+//! sanitised (the bank's own wording is kept); the real statements are not in the repository. What this test can say is only that
 //! nothing outside ASCII is there, once the XML's own entities are decoded: a name, an address or
 //! a narration in an Indian-language script, or an accented letter, would show up here. It is a
 //! tripwire and not a gate. It passes for the raw text layer of any statement printed in English,
 //! so it does not stop a raw statement being committed: `scripts/fixtures/README.md` states the
 //! rule that no new real capture is committed, and a capture is reviewed by a person.
 //!
-//! The glob is deliberate: a capture added later is covered without editing this file.
+//! The glob is deliberate: a capture added later is checked for ASCII without editing the check.
+//! The list asserted at the end is the set that exists; adding a capture deliberately means editing
+//! it, which is a prompt to read the rule above.
 
 mod common;
 

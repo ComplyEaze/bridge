@@ -46,16 +46,13 @@ source region and the complete generated regions, using the same retained geomet
 incomplete accounting rows, misaligned or party-class-changing evidence; captured geometry remains fixture evidence and does not
 qualify raw customer data.
 
-## Adding a capture for a new bank
+## Byte integrity
 
-1. Sanitise, then **diff the result against the source** and scan for surviving tokens (the script's
-   `--help` prints the one-liner). Everything that survives should be bank vocabulary.
-2. If a customer value survives, do not add it to `TEMPLATE`. Work out why the rule matched it.
-3. Byte integrity is enforced: `scripts/fixtures/**` is `-text` in `.gitattributes` and the
-   directory is registered in `scripts/fixture-roots.mjs`. Line-ending normalisation
-   would rewrite the geometry these fixtures exist to preserve. That is also why the sanitiser
-   itself lives in `scripts/`, not here — this directory holds evidence, and a tool whose bytes are
-   pinned as evidence is a category error.
+`scripts/fixtures/**` is `-text` in `.gitattributes` and the directory is registered in
+`scripts/fixture-roots.mjs`. Line-ending normalisation would rewrite the geometry these fixtures
+exist to preserve. That is also why the sanitiser itself lives in `scripts/`, not here: this
+directory holds evidence, and a tool whose bytes are pinned as evidence is a category error.
+A capture for a new bank is not added (see the next section).
 
 ## No new real captures
 
@@ -64,11 +61,11 @@ word, and the width and position of a word that has been masked can still identi
 sanitised `pdftotext -bbox-layout` capture is not committed for a new bank or a new layout: the
 Union Bank and Bank of Baroda layouts were added from shapes measured on statements that stay
 private, and `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs` prints no position of
-a masked word. A future public fixture from a real statement needs a design that follows that
+a masked word on its line. A future public fixture from a real statement needs a design that follows that
 contract, written when it is needed; until then none is added. A person reviews any capture that
 is. `src-tauri/crates/bridge-bank-statement/tests/committed_captures_tests.rs` is only a tripwire
 over `*-bbox-capture.xml` here: it fails on a character outside ASCII in the text, once the XML's
-entities are decoded and the banner comment is set aside, and it would pass on the raw text layer
+entities are decoded and the XML comments (the banner) are set aside, and it would pass on the raw text layer
 of an English statement.
 
 ## Integrity digests

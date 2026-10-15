@@ -173,7 +173,7 @@ fn a_long_party_is_refused_when_mapped_and_fits_when_sent_to_suspense() {
 
 #[test]
 fn the_transaction_id_follows_the_statements_account_not_the_operators_label() {
-    let party = "RAVI KUMAR";
+    let party = "MAPLE QUILL";
     let mapped = mapping(&[(party, "Wages", None)]);
     let ids: Vec<String> = ["ACC xx1234", "main account", "ACC xx1234 (old)"]
         .into_iter()
@@ -198,7 +198,7 @@ fn a_bank_or_suspense_ledger_that_is_empty_or_only_whitespace_is_refused() {
         let mut bank_blank = options("ACC xx1234");
         bank_blank.bank_ledger = blank;
         let refusal = build(
-            &[debit_to("RAVI KUMAR")],
+            &[debit_to("MAPLE QUILL")],
             Bank::Sbi,
             &mapping(&[]),
             &bank_blank,
@@ -208,7 +208,7 @@ fn a_bank_or_suspense_ledger_that_is_empty_or_only_whitespace_is_refused() {
         let mut suspense_blank = options("ACC xx1234");
         suspense_blank.suspense_ledger = blank;
         let refusal = build(
-            &[debit_to("RAVI KUMAR")],
+            &[debit_to("MAPLE QUILL")],
             Bank::Sbi,
             &mapping(&[]),
             &suspense_blank,

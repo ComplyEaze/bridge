@@ -403,8 +403,8 @@ pub fn is_statement_txn_id(id: &str) -> bool {
 /// characters, no control character (C0, DEL or C1), and not the reserved `[BRIDGE:`
 /// marker in any ASCII case. Passing is necessary and not sufficient: Bridge's builder
 /// checks what it is handed after unescaping it, and also refuses text that would read
-/// back rewritten or draws nothing. The point of checking here is that a refusal can name
-/// the statement row.
+/// back rewritten or draws nothing. The point of checking here is that a refusal for a
+/// narration or a party can name the statement row.
 fn admissible_text(text: &str, limit: usize) -> bool {
     text.chars().count() <= limit
         && !text
@@ -713,7 +713,7 @@ pub fn build(
         } else {
             StatementPayee::new(&party, number)?
         };
-        // The bank's own reference leads the narration. Under automatic numbering Tally
+        // The narration opens with the mode and the bank's own reference. Under automatic numbering Tally
         // silently discards a supplied voucher number (protocol reference section 9.8), so
         // the reference is put where it survives. A row can have none (the statement
         // printed no reference), and the narration then carries the mode alone.
@@ -1032,8 +1032,8 @@ mod statement_payee_tests {
                 "{not_a_counterparty:?}"
             );
         }
-        let payee = StatementPayee::new("RAVI KUMAR", 2).unwrap().unwrap();
-        assert_eq!(payee.segment(), " | Statement party: RAVI KUMAR");
+        let payee = StatementPayee::new("MAPLE QUILL", 2).unwrap().unwrap();
+        assert_eq!(payee.segment(), " | Statement party: MAPLE QUILL");
         let refusal = StatementPayee::new("A|B", 2).err().unwrap();
         assert_eq!(refusal.category, "party_not_admissible");
     }

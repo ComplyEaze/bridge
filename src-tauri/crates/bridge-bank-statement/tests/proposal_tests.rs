@@ -531,17 +531,17 @@ fn record(party: &str, amount: &str) -> StatementRecord {
 #[test]
 fn counterparties_group_by_mapping_key() {
     let groups = group_counterparties(&[
-        record("MERCURY MANUFACTURERS", "60000.00"),
-        record("MERCURY M ANUFACTURERS", "220000.00"),
-        record("AMBIKA INDUSTRIES", "1000.00"),
+        record("HALCYON MANUFACTURERS", "60000.00"),
+        record("HALCYON M ANUFACTURERS", "220000.00"),
+        record("ORCHID INDUSTRIES", "1000.00"),
     ])
     .unwrap();
     assert_eq!(groups.len(), 2);
     // one line for two spellings, labelled with the one the bank printed
-    assert_eq!(groups[0].party, "MERCURY MANUFACTURERS");
+    assert_eq!(groups[0].party, "HALCYON MANUFACTURERS");
     assert_eq!(groups[0].rows, 2);
-    assert_eq!(groups[0].also_printed_as, ["MERCURY M ANUFACTURERS"]);
-    assert_eq!(groups[1].party, "AMBIKA INDUSTRIES");
+    assert_eq!(groups[0].also_printed_as, ["HALCYON M ANUFACTURERS"]);
+    assert_eq!(groups[1].party, "ORCHID INDUSTRIES");
 }
 
 /// Spellings of one payee with the same number of words are chosen and listed

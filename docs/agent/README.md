@@ -97,6 +97,7 @@ The ordinary default tools, in name order:
 - `list_companies`
 - `local_data_report`
 - `masters`
+- `month_register`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -115,7 +116,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register` and `voucher_read_cost` are in the
 source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
@@ -660,6 +661,33 @@ collection shape), `company_features_currency_invalid` (a symbol over 16 charact
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
 TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
+
+### Month-wise Sales and Purchase Registers (`month_register`)
+
+`month_register` takes `company_guid`, `kind` (`sales` or `purchase`) and a window of whole months,
+`from` the 1st of a month and `to` the last day of a month, at most twelve months, not starting before
+the book does. It reads Tally's own Sales Register or Purchase Register by report name, twice, with the
+book extent checked before and after and the company and mode checked around the read, and returns
+`months`: one row per month, `month` as `YYYY-MM`, and Tally's three columns `debit`, `credit` and
+`closing`, each `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed
+it. An empty amount is not zero.
+
+Nothing ties the rows to the vouchers, to the trial balance or to `sales_register` and
+`purchase_register`; `checks` says so. On the one synthetic book read (BRIDGE PILOT LAB, one financial
+year, 13 Oct 2026) the Sales Register's credit was the month's sales invoices, tax included, neither
+cancelled nor optional, and its closing was printed for August and September only, as a running total,
+with the other months empty; the Purchase Register's debit was the month's purchases as a negative amount,
+and its closing was printed for August and, unchanged, for September, a month with no purchase. That
+reading is not applied. Equality with Tally's own register screens has not been measured, and `checks`
+says `against_register_screen: not_checked`. The set of months is not left unchecked: an answer whose
+months are not the window's is refused (`month_register_months_unexpected`). A window that is not whole
+months is refused after the company and mode reads and before the register is asked for
+(`month_register_window_not_month_start`, `_not_month_end`, `_reversed`, `_too_many_months`,
+`_unsupported_boundary`), as is one that starts before the books (`month_register_before_books`) and
+Education mode (`month_register_education_unqualified`); an answer Tally marks as a failure, an
+empty answer and a book that moved during the read fail the call (`month_register_read_failed` with the
+cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
+Payment Registers have not been captured.
 
 ### GSTR-1 status of one voucher type (`gst_status`)
 
@@ -1829,7 +1857,12 @@ posting setting covers both, in the MCPB extension and on the command line (#109
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
-   `agent-import-ledger.jsonl` line. On a `Journal`, `voucher_number` and
+   `agent-import-ledger.jsonl` line. The result's `path` is where a person finds
+   that file, and `path_state` says how it was obtained: `resolved` (Windows
+   reported the file's real location, which on a Microsoft Store install of
+   Claude Desktop can be inside the package's own folder), `as_is` (macOS or
+   Linux, shown as written), or `unresolved` (it could not be resolved; this is
+   the logical path, not confirmed to exist). On a `Journal`, `voucher_number` and
    `reference` are optional: when a number is absent Tally applies the voucher
    type's own numbering configuration, and when supplied it is validated and
    sent so a Manual-type duplicate policy can reject it. On `Payment`,

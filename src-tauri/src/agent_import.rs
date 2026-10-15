@@ -74,6 +74,7 @@ use statement_facts::{SkipOnlyRecord, StatementFacts};
 pub(super) use transfers::{check_not_run_section, counts_only_section, trim_section};
 #[path = "agent_import_verification.rs"]
 mod verification;
+use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 use verification::{
@@ -1379,7 +1380,7 @@ impl Server {
                 None => next_step,
             };
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
-                    "batch_id": batch_id, "path": path, "sha256": sha256,
+                    "batch_id": batch_id, "sha256": sha256,
                     "amendment": amendment,
                     "voucher_count": line.vouchers.len(), "total_debit": debit.as_str(), "total_credit": credit.as_str(),
                     // How many lines a bank import sent to suspense, by tag,
@@ -1410,6 +1411,11 @@ impl Server {
                     "statement_ledger_warnings": statement_warnings,
                     "next_step": next_step
                 }});
+            // Where a person finds the file: the real location, which a Microsoft
+            // Store install of Claude Desktop redirects into its package (#1459).
+            // The file was stored and is read by the logical `path`. Set before the
+            // essential length is measured, so the transfers section's room counts it.
+            user_visible_path(&path).put_into(&mut payload["result"], "path");
             // The summary was computed before the append, with this build in it,
             // so nothing after the append refuses a written build. It is drawn
             // here into the room the essential result leaves. The response

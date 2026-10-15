@@ -32,6 +32,21 @@ async fn independent_builds_reuse_labels_without_replacing_retained_batches() {
         let snapshot = server.latest_import_snapshot(batch_id).unwrap().unwrap();
         let xml = fs::read(result["path"].as_str().unwrap()).unwrap();
         assert_eq!(sha256_hex(&xml), result["sha256"]);
+        // The reported path went through `user_visible_path`: the state says
+        // how it was obtained, and it names the file stored under `imports`.
+        assert_eq!(
+            result["path_state"],
+            if cfg!(windows) { "resolved" } else { "as_is" }
+        );
+        let logical = directory
+            .path()
+            .join("imports")
+            .join(format!("{batch_id}.xml"));
+        assert_eq!(
+            fs::canonicalize(result["path"].as_str().unwrap()).unwrap(),
+            fs::canonicalize(&logical).unwrap()
+        );
+        assert!(!result["path"].as_str().unwrap().starts_with(r"\\?\"));
         assert_eq!(snapshot.batch.txn_ids, ["txn-001", "txn-002"]);
         assert_eq!(
             snapshot.batch.identity_scheme,

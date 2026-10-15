@@ -763,7 +763,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // amounts and counts of ledgers, and no ledger name; `company_features`
     // returns only three settings, a currency symbol and the company's own name;
     // `gst_status` returns only voucher numbers, dates, the voucher type's name
-    // and ids, and no party or ledger name; `statement_tie_out` returns two
+    // and ids, and no party or ledger name; `month_register` returns only
+    // months, amounts and the report's name; `statement_tie_out` returns two
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
     // constant text, and the company's own name.
@@ -774,6 +775,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "company_features",
         "gst_status",
         "local_data_report",
+        "month_register",
         "statement_tie_out",
         "voucher_read_cost",
     ];

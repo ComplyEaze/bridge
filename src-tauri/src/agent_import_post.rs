@@ -1740,7 +1740,7 @@ fn mark_reconciliation_required(payload: &mut Value) {
 
 /// A clean response creates exactly the batch's `voucher_count` vouchers and
 /// nothing else.
-fn import_outcome_is_clean(
+pub(super) fn import_outcome_is_clean(
     outcome: Option<&bridge_tally_protocol::TallyImportOutcome>,
     voucher_count: usize,
 ) -> bool {

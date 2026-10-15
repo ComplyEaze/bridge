@@ -54,12 +54,6 @@ impl ExactDecimalAccumulator {
         value
     }
 
-    pub fn equals(&self, value: &str) -> bool {
-        let mut difference = self.clone();
-        difference.subtract(value);
-        difference.is_zero()
-    }
-
     pub fn combine(&mut self, negative: bool, digits: String, scale: usize) {
         let target_scale = self.scale.max(scale);
         let left = aligned_digits(&self.digits, target_scale - self.scale);
@@ -114,13 +108,6 @@ pub fn magnitude_cmp(left: &str, right: &str) -> Ordering {
         &aligned_digits(&left_digits, target_scale - left_scale),
         &aligned_digits(&right_digits, target_scale - right_scale),
     )
-}
-
-pub fn same_nonzero_sign(left: &str, right: &str) -> bool {
-    if numeric_equal(left, "0") || numeric_equal(right, "0") {
-        return false;
-    }
-    is_negative_nonzero(left) == is_negative_nonzero(right)
 }
 
 fn decimal_parts(value: &str) -> (bool, String, usize) {

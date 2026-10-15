@@ -21,7 +21,7 @@ rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mc
 ```
 
 Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
-(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+(https://bridge.complyeaze.com/terms.html); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
 as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
 is on, Bridge appends a line per terms version (version, time, source) to
 `terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
@@ -1788,7 +1788,8 @@ voucher type, not only `Journal`. A different requested date is refused as
 Optional narration and reference must contain 1–2,000 Unicode characters when
 supplied; omit them when unused. Control characters and the reserved attribution
 marker are refused, including XML entity-encoded marker spellings. Voucher
-numbers contain 1–32 characters and cannot contain controls or `$`. Lengths match
+numbers contain 1–32 characters, cannot contain controls or `$`, and cannot begin
+or end with white space (Tally read a number back without its end space). Lengths match
 JSON Schema's character semantics; the 5 MB request-frame limit remains separate.
 If verification would report any `not_found`, the supported TallyPrime product and
 licence mode must have been observed before and after readback. Otherwise

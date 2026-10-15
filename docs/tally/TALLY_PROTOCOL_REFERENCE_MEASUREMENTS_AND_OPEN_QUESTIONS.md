@@ -1251,9 +1251,6 @@ a partition can increase total wall-clock even as it reduces peak payload.
 Deadline planning must therefore model a book-dependent fixed scan cost separately from
 serialization, and subdivision must be justified by payload, not by time.
 
-> A separate stability hazard observed during this work is recorded privately rather than
-> here, per the project's handling of crash triggers.
-
 ### 12a.9 A ledger GUID survived an observed UI rename — coverage must compare GUID to name
 
 `LedgerOpeningCoverageV1` was captured immediately before and after renaming one ledger

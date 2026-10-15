@@ -21,7 +21,7 @@ rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mc
 ```
 
 Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
-(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+(https://bridge.complyeaze.com/terms.html); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
 as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
 is on, Bridge appends a line per terms version (version, time, source) to
 `terms-acceptance.jsonl` in its data folder when it starts (two servers starting together
@@ -597,27 +597,36 @@ type in the window, and returns for each voucher its `voucher_number`, `date`, `
 same class under another name is not read, and a name that holds a double quote, a backslash, `&`, `<`, `>`, `'` or a control
 character, or a space at either end, is refused before any read (`gst_status_type_name_invalid`).
 
-`gst_status` is `included`, `uncertain`, `excluded`, `not_in_return`, `cancelled` or `optional`. `cancelled` and
-`optional` are Tally's own `ISCANCELLED` and `ISOPTIONAL` flags read Yes, decided before the three status flags and
-never counted as `included` or `not_in_return`: on the lab's book a cancelled Sales voucher read the included flag Yes
-and an optional one read all three No (one voucher each); whether Tally lists a cancelled voucher anywhere in the
-return is not measured, and a voucher that reads both Yes is unread. `not_in_return` means Tally's three flags
+`gst_status` is `included`, `uncertain`, `excluded`, `not_in_return`, `cancelled`, `optional` or `post_dated`. `cancelled`,
+`optional` and `post_dated` are Tally's own `ISCANCELLED`, `ISOPTIONAL` and `ISPOSTDATED` flags read Yes, decided before the three status flags and
+never counted as `included`, `uncertain`, `excluded` or `not_in_return`: on the lab's book a cancelled Sales voucher read the included flag Yes,
+an optional one read all three No, and a post-dated one read the included flag Yes (one voucher each). `post_dated` is
+the flag, not a date still ahead: the lab's post-dated voucher was marked so by hand (Ctrl+T) and dated the day Tally's
+current date (the date set with F2, not the calendar's) had been set to.
+Whether Tally lists a cancelled voucher anywhere in the return, or a post-dated one while Tally's current date is before
+the voucher's date or once it has reached it, is not measured, and ComplyEaze Bridge states neither: look at the return
+in Tally. Such a voucher's item also holds `status_flags`, what Tally's three status flags read on it (`included`,
+`uncertain`, `excluded` or `not_in_return`); it is returned so that nothing read is hidden, it is not counted, and it does
+not say that the return lists the voucher. A voucher that reads more than one of cancelled, optional and post-dated Yes is unread. `not_in_return` means Tally's three flags
 all read No. On the lab's Receipts that means Tally does not list the voucher in the return (read with the request before it
-fetched the cancelled and optional flags; the request as it is now is measured on Sales vouchers only); it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
+fetched the cancelled, optional and post-dated flags; the request as it is now is measured on Sales vouchers only); it is not measured for other types, and the lab's keyed Purchase invoices read `uncertain`. `accepted_as_it_stands` is `true` when a person
 accepted the voucher as it stands (Accept As Is) and `false` otherwise; `included` counts such a voucher too, so it is not
 'clean', and it is included by a person's choice, not by its figures. A status is Tally's own flag and not a judgement of ComplyEaze Bridge: it does not say the
 voucher is right or wrong, or that a return is ready. The reason for a status (the one measured is a tax figure that did not match Tally's own)
 is on Tally's screen only; no field carries it, so none is returned. Tally keeps the
-status a voucher was given when it was saved (one voucher, cause unverified). Post-dated vouchers are not marked,
-and a total of 0 may mean that the type name matched nothing. Each page is a new read,
+status a voucher was given when it was saved (one voucher, cause unverified). A total of 0 may mean that the type name matched nothing. Each page is a new read,
 so a voucher saved between two pages can shift the offsets. The result holds `counts` (`included`, `uncertain`,
-`excluded`, `not_in_return`, `cancelled`, `optional`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
+`excluded`, `not_in_return`, `cancelled`, `optional`, `post_dated`, `unread`, `accepted_as_it_stands`) over the whole window, `total`, and the page of
 `items`; page with `limit` and `offset` (`next_offset` when more remain).
 
-A voucher whose flags, or whose cancelled or optional flag, are absent, repeated, nested in another element or
+A voucher whose flags, or whose cancelled, optional or post-dated flag, are absent, repeated, nested in another element or
 spelled another way keeps its row with
 `{"unread": code}` (`gst_status_not_reported` or `gst_status_unreadable`) in place of the value and is never read as
-`included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). An answer in which a voucher
+`included`; the result's `state` is then `partial` (`gst_status_voucher_unread`). So does a voucher whose `ISDELETED` or
+`ISDELETEDVCHRETAINED` flag reads Yes (`gst_status_voucher_deleted`, which its acceptance flag carries too, so it is not counted as accepted): Tally returns
+the two flags without being asked, No on every voucher the lab read, a Yes was never measured, and what
+`ISDELETEDVCHRETAINED` means rests on its name. On the lab's book, where no Edit Log was seen to be on, one deleted
+voucher left the answer altogether. Both flags absent is allowed; one absent beside the other is unread. An answer in which a voucher
 cannot be told apart from another (a missing or repeated `MASTERID`, or a missing number, date, type or
 `ALTERID`) is refused (`gst_status_read_voucher_unidentified`, `gst_status_read_voucher_repeated`), as is a
 voucher dated outside the window (`window_not_honoured`) or of another type name
@@ -1923,9 +1932,7 @@ was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuil
 no verdict. Its `invoice_stop` value is the one exception to "review": it
 releases the stop a sent Sales invoice that is not verified posted puts on its
 company (`invoice_company_stopped`), after the person has checked Tally, in the
-same dialog the model cannot answer. Called again for a batch it released as
-found, it ends that invoice's use as the number control
-(`invoice_number_control_missing`) when a fresh read shows the invoice gone.
+same dialog the model cannot answer.
 
 All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**

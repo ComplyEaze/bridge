@@ -1729,7 +1729,23 @@ impl Server {
                         verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
-                        verification::mark_sent_not_attributed(&mut result)
+                        // An answer on record that was not clean (one that
+                        // did not parse included, as the post itself reads
+                        // it) makes an edit in Tally no likelier than a
+                        // voucher Tally did not create, so its line drops the
+                        // edit example (bridge#1108). With no answer on
+                        // record, or a clean one, the line is unchanged.
+                        let unclean = dispatch_response.as_ref().is_some_and(|response| {
+                            !post::import_outcome_is_clean(
+                                response.outcome.as_ref(),
+                                line.vouchers.len(),
+                            )
+                        });
+                        if unclean {
+                            verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
+                        } else {
+                            verification::mark_sent_not_attributed(&mut result)
+                        }
                     }
                 }
             }
@@ -2563,7 +2579,7 @@ impl Server {
         let _lock = self.lock_import_admission_shared()?;
         match self.import_journal_while_admitted()? {
             Some(reader) => ledger::invoice_number_control(reader, company_guid, year),
-            None => Ok(ledger::NumberControl::NeverSent),
+            None => Ok(ledger::NumberControl::NoneStanding),
         }
     }
 
@@ -2588,18 +2604,6 @@ impl Server {
         Ok(self
             .import_invoice_stop_while_admitted(&line.company_guid)?
             .is_some())
-    }
-
-    /// Every sent, unverified invoice batch of this company that stops it or
-    /// stands as its number control after a release (`ledger::invoice_holds`).
-    pub(super) fn import_invoice_holds_while_admitted(
-        &self,
-        company_guid: &str,
-    ) -> Result<BTreeMap<String, ledger::InvoiceHold>, String> {
-        match self.import_journal_while_admitted()? {
-            Some(reader) => ledger::invoice_holds(reader, company_guid),
-            None => Ok(BTreeMap::new()),
-        }
     }
 
     /// Every batch that stops this company, in id order.

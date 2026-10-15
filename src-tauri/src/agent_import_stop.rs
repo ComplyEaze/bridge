@@ -9,125 +9,242 @@
 //! bound to the batch and its sha256. A later `posted_verified` of that batch
 //! voids the release, so a divergence found after it stops the company again.
 //!
-//! It needs no voucher row: a declined or deleted invoice reads back nothing,
-//! and that is a release. It tries a fresh readback so the dialog can say what
-//! ComplyEaze Bridge sees, and what it saw is recorded: an invoice it found
-//! stays the control for the next invoice number read, and one it did not find
-//! no longer counts as sent. A read that fails for a cause waiting cures is waited
-//! for; a failure no wait cures is shown and recorded as the invoice possibly
-//! being there, so a stop is never unreleasable by such a failure.
+//! It stands on no read. It tries a fresh readback so the dialog can say what
+//! ComplyEaze Bridge sees of the invoice (`Seen`), and records that beside the
+//! release as evidence nothing reads back: a released batch is never the
+//! control for the next invoice number read, whatever was seen. A read that
+//! fails, for any cause, is shown by its code and the release goes ahead,
+//! because no wait cures many of those causes and nothing later depends on
+//! this read; only a cancelled call is refused, since no one is there to
+//! answer the dialog.
 //!
-//! A batch released as found is still the number control, and the control read
-//! cannot find an invoice that is gone: such a batch can be released once more,
-//! and only when a fresh read now shows its invoice gone (`InvoiceHold`). That
-//! second release is the way out of `invoice_number_control_missing`, and it
-//! never relies on the number read it is meant to check.
+//! The check under the lock before the record compares the batch's sha256 and
+//! the stop, not the verification's generation: a read that changes while the
+//! dialog is open makes only the dialog's words stale. The stop lives in this
+//! data folder's journal; another install posting into the same company is not
+//! stopped by it.
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, VoucherCount};
-use ledger::InvoiceHold;
 
-/// What the read made for the dialog saw of the batch's invoice.
+/// What the read made for the dialog saw of the batch's invoice, decided on
+/// the invoice's own row alone (the one carrying its `bridge_txn_id`), by its
+/// status and, where a status has several, its `reason`. Duplicates only add
+/// a clause to a verified row.
 pub(super) enum Seen {
-    /// At least one voucher of the batch's invoice was found in Tally, however
-    /// it reads (verified, divergent, or cancelled or optional).
-    Found,
-    /// The read ran and found none.
-    NotFound,
-    /// The read could not be made, by a failure that no wait will cure (the
-    /// batch's endpoint or company no longer matches what was recorded, for
-    /// one). Recorded as found, so the number control stays strict: the
-    /// invoice may be in the book.
-    Unreadable(String),
+    /// A voucher of this invoice was found in Tally, and why it is not
+    /// confirmed.
+    Found(Why),
+    /// What was read does not establish whether the invoice is in the book.
+    /// Every status or reason not placed below reads so, never as found.
+    NotEstablished(Why),
+    /// The read did not complete, by its code: it reports nothing.
+    Unreadable {
+        code: String,
+        answer: Option<&'static str>,
+    },
 }
 
+/// The invoice row's status (or, for several rows, `ROWS_REPEATED`) and the
+/// dialog's words for it.
+pub(super) struct Why {
+    status: String,
+    words: String,
+}
+
+/// A batch whose invoice is not exactly one voucher (the build refuses one),
+/// or whose read holds no row for it, or one without a status: a read that
+/// cannot be placed, never a sighting.
+const ROWS_MISSING: &str = "import_verification_rows_missing";
+
+/// A completed read holding more than one row for the batch's one invoice.
+/// The verification writes one row per voucher the batch expects (several
+/// vouchers matching one are `duplicate_fingerprint`), so this is a batch or
+/// a result out of shape, and no row can be told to be the invoice's.
+const ROWS_REPEATED: &str = "invoice_rows_repeated";
+
 impl Seen {
-    /// Absent only when every row of the batch reads a state that says the
-    /// voucher is not in the book for the dates it was posted: `not_found`,
-    /// `tally_reported_not_created` (Tally's own answer said it created none),
-    /// and the two states a verification gives a voucher it knows was posted
-    /// and the window does not hold, `bound_not_in_window` (found by its GUID
-    /// at the post, so deleted or re-dated since) and `book_rolled_back` (the
-    /// books are older than the post). A deleted native post can never read
-    /// `not_found`, so reading those two as found would keep a vanished
-    /// invoice as the number control for good: the control read cannot find
-    /// it, and nothing could release it. A re-dated invoice is still seen by
-    /// the number read over its financial year, which is what the control
-    /// guards. Every other state, and a result with no rows or with
-    /// duplicates, reads as found: `sent_not_attributed` (matched by content
-    /// alone, so an edited voucher looks the same), `matching_content_observed`,
-    /// `not_attributable`, `duplicate_fingerprint` and
-    /// `cancelled_with_effective_copy` all say a voucher may be there.
-    pub(super) fn of(result: &Value) -> Self {
-        let Some(rows) = result["vouchers"]
-            .as_array()
-            .filter(|rows| !rows.is_empty())
-        else {
-            return Self::Found;
+    pub(super) fn of(result: &Value, line: &ImportLedgerLine) -> Self {
+        let missing = || Self::Unreadable {
+            code: ROWS_MISSING.into(),
+            answer: None,
         };
-        let duplicates = result["duplicates"]
-            .as_array()
-            .is_some_and(|duplicates| !duplicates.is_empty());
-        let absent = |row: &Value| {
-            matches!(
-                row["status"].as_str(),
-                Some(
-                    "not_found"
-                        | "tally_reported_not_created"
-                        | "bound_not_in_window"
-                        | "book_rolled_back"
-                )
-            )
+        let invoices = line
+            .vouchers
+            .iter()
+            .filter(|voucher| voucher.voucher_type.is_invoice())
+            .collect::<Vec<_>>();
+        let [invoice] = invoices.as_slice() else {
+            return missing();
         };
-        if duplicates || !rows.iter().all(absent) {
-            Self::Found
-        } else {
-            Self::NotFound
+        let rows = result["vouchers"].as_array().map_or_else(Vec::new, |rows| {
+            rows.iter()
+                .filter(|row| row["bridge_txn_id"] == invoice.bridge_txn_id.as_str())
+                .collect()
+        });
+        let row = match rows.as_slice() {
+            [] => return missing(),
+            [row] => row,
+            [..] => {
+                return Self::NotEstablished(Why {
+                    status: ROWS_REPEATED.into(),
+                    words: "not established: the read gave this invoice more than one row".into(),
+                })
+            }
+        };
+        let Some(status) = row["status"].as_str() else {
+            return missing();
+        };
+        let why = |words: &str| Why {
+            status: status.to_string(),
+            words: words.to_string(),
+        };
+        match (status, row["reason"].as_str()) {
+            ("posted_verified", _) => Self::Found(Why {
+                status: status.to_string(),
+                words: verified_words(result),
+            }),
+            ("posted_divergent", _) => Self::Found(why("found in Tally, not confirmed as built")),
+            ("posted_not_effective", Some("voucher_cancelled")) => {
+                Self::Found(why("found in Tally, cancelled"))
+            }
+            ("posted_not_effective", Some("voucher_optional")) => {
+                Self::Found(why("found in Tally, optional"))
+            }
+            // After an answer that was not clean the verification drops the
+            // edit example, by the next step it writes; so do these words.
+            ("sent_not_attributed", _)
+                if row["next_step"]
+                    == super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP =>
+            {
+                Self::NotEstablished(why(
+                    "not established: no voucher matching this invoice was found, and one may be in the book",
+                ))
+            }
+            ("sent_not_attributed", _) => Self::NotEstablished(why(
+                "not established: no voucher matching this invoice was found, and one may be in the book, changed or entered in Tally",
+            )),
+            ("matching_content_observed", _) => Self::NotEstablished(why(
+                "a voucher with this invoice's content was found, but not shown to be the one sent",
+            )),
+            ("duplicate_fingerprint", _) => Self::NotEstablished(why(
+                "vouchers with this invoice's content were found, none shown to be the one sent",
+            )),
+            (
+                "not_attributable",
+                Some("tag_precedes_pre_import_voucher_mark" | "fingerprint_precedes_pre_import_voucher_mark"),
+            ) => Self::NotEstablished(why(
+                "a matching voucher was found, but it was in the book before this post",
+            )),
+            ("not_attributable", Some("observed_voucher_already_attributed")) => Self::NotEstablished(why(
+                "a matching voucher was found, but it is already matched to another voucher",
+            )),
+            ("not_attributable", Some("bound_master_id_changed")) => Self::NotEstablished(why(
+                "a voucher carrying the identity of the one posted is in the book, but with another internal number; how is not established, for example the company's data were rewritten or copied",
+            )),
+            ("bound_not_in_window", _) => Self::NotEstablished(why(
+                "the voucher posted for this invoice is not in the book for these dates now",
+            )),
+            ("book_rolled_back", _) => {
+                Self::NotEstablished(why("the company's books are older than this post"))
+            }
+            // The release cannot tell absence: these say only what the row
+            // says, never a bare "not found".
+            ("not_found", _) => {
+                Self::NotEstablished(why("not established: no voucher of it was found"))
+            }
+            ("tally_reported_not_created", _) => {
+                Self::NotEstablished(why("Tally reported it not created"))
+            }
+            _ => Self::NotEstablished(why(
+                "not established: the read gave this invoice a state ComplyEaze Bridge does not place",
+            )),
         }
     }
 
-    pub(super) fn found(&self) -> bool {
-        !matches!(self, Self::NotFound)
+    /// A failed read, shown by its code, and by what Tally did not do when
+    /// that is known.
+    pub(super) fn unreadable(failure: &ToolFailure) -> Self {
+        let unanswered = failure.unanswered.map(|unanswered| unanswered.0);
+        let answer = if failure.code == "request_deadline_exceeded"
+            || unanswered == Some("request_deadline_exceeded")
+        {
+            Some("Tally did not answer in time")
+        } else if unanswered == Some("endpoint_unreachable") {
+            Some("Tally did not answer")
+        } else {
+            None
+        };
+        Self::Unreadable {
+            code: failure.code.clone(),
+            answer,
+        }
     }
 
-    fn words(&self) -> String {
+    /// What the journal records.
+    pub(super) fn recorded(&self) -> ledger::ReleaseSeen {
         match self {
-            Self::Found => "found in Tally".into(),
-            Self::NotFound => {
-                "not in Tally's book for the dates it was posted (deleted or re-dated there, \
-                 the books restored from a backup, or never created)"
-                    .into()
-            }
-            Self::Unreadable(code) => format!(
-                "not established: Tally could not be read ({code}), so it is recorded as possibly in the book"
+            Self::Found(_) => ledger::ReleaseSeen::Found,
+            Self::NotEstablished(_) => ledger::ReleaseSeen::NotEstablished,
+            Self::Unreadable { .. } => ledger::ReleaseSeen::Unreadable,
+        }
+    }
+
+    /// The tool result's `seen_at_release` and `seen_detail`: codes only.
+    pub(super) fn reported(&self) -> (&'static str, &str) {
+        match self {
+            Self::Found(why) => ("found", &why.status),
+            Self::NotEstablished(why) => ("not_established", &why.status),
+            Self::Unreadable { code, .. } => ("unreadable", code),
+        }
+    }
+
+    pub(super) fn words(&self) -> String {
+        match self {
+            Self::Found(why) | Self::NotEstablished(why) => why.words.clone(),
+            Self::Unreadable { code, answer } => format!(
+                "ComplyEaze Bridge could not complete its read ({code}{}), so it reports nothing about this invoice",
+                answer.map_or_else(String::new, |answer| format!(": {answer}"))
             ),
         }
     }
 }
 
-/// Whether a failed read is one no wait cures, because it fails before any
-/// Tally read, or independently of what Tally holds: the batch was sent to
-/// another endpoint than the one now set, the company now open is not the one
-/// the batch recorded, the host setting is unusable, the product, release or
-/// licence is not one a vouchers-absent verdict is qualified for, or the
-/// window is too large to report. Refusing the release for these would leave the company stopped for
-/// good. Every other failure (Tally not answering, the company not open, a
-/// cancelled or cut-short read) is cured by waiting or by opening Tally, so the
-/// release is refused and made once the read runs; a code not listed here
-/// defaults to that refusal.
-pub(super) fn failure_waiting_cannot_cure(failure: &ToolFailure) -> bool {
-    matches!(
-        failure.code.as_str(),
-        "import_post_endpoint_mismatch"
-            | "company_identity_mismatch"
-            | "host_setting_invalid"
-            | "verification_mode_unqualified"
-            | "verification_too_large_to_report"
-    )
+/// Why a row that reads verified still stops its company: a duplicate of it
+/// (by kind), or a dispatch needing reconciliation, which is Tally's answer to
+/// the post unless that answer was clean, when it is the masters check (or
+/// the duplicate already named).
+fn verified_words(result: &Value) -> String {
+    let mut clauses = Vec::new();
+    for duplicate in result["duplicates"].as_array().into_iter().flatten() {
+        let clause = match duplicate["kind"].as_str() {
+            Some("accounting_fingerprint") => "another voucher has the same content",
+            Some("remote_id") => "another voucher has the same remote id",
+            _ => "another voucher reads as its duplicate",
+        };
+        if !clauses.contains(&clause) {
+            clauses.push(clause);
+        }
+    }
+    // A duplicate alone makes the dispatch need reconciliation, so with a
+    // clean answer the masters check is the cause only when none was found.
+    let dispatch = &result["dispatch"];
+    if dispatch["state"] == "reconciliation_required" {
+        if dispatch["response_state"] != "response_clean" {
+            clauses.push("Tally's answer to the post needs a check");
+        } else if clauses.is_empty() {
+            clauses.push("its ledgers are not confirmed as the masters approved");
+        }
+    }
+    if clauses.is_empty() {
+        "found in Tally as built".into()
+    } else {
+        format!(
+            "found in Tally as built, but not confirmed: {}",
+            clauses.join("; ")
+        )
+    }
 }
 
-/// The words of the dialog. They say what is being released and what it
-/// allows, before anything about the batch, because the title of the shared
-/// review dialog names only a review.
 /// `text` as the dialog shows it: a character that could reorder or hide what
 /// the person reads (the same ones the review dialog refuses) shows as `?`.
 /// The text comes from the journal and Tally, and a release must not become
@@ -147,13 +264,18 @@ fn shown(text: &str) -> String {
         .collect()
 }
 
-pub(super) fn release_preview(
-    line: &ImportLedgerLine,
-    company_name: &str,
-    seen: &Seen,
-    hold: InvoiceHold,
-) -> String {
-    let (company_name, batch_id) = (shown(company_name), shown(&line.batch_id));
+/// The words of the dialog. They say what is being released and what it
+/// allows, before anything about the batch, because the title of the shared
+/// review dialog names only a review. The company is named by the batch's
+/// recorded name, or by its GUID when it recorded none.
+pub(super) fn release_preview(line: &ImportLedgerLine, seen: &Seen) -> String {
+    let company = line
+        .company
+        .as_ref()
+        .map(|company| company.name.as_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or(&line.company_guid);
+    let (company_name, batch_id) = (shown(company), shown(&line.batch_id));
     let invoices = line
         .vouchers
         .iter()
@@ -167,28 +289,14 @@ pub(super) fn release_preview(
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let (headline, what_it_allows) = match hold {
-        InvoiceHold::Stopping => (
-            "THIS RELEASES THE INVOICE STOP FOR THE COMPANY.",
-            "ComplyEaze Bridge will then build and post invoices for this company again.",
-        ),
-        InvoiceHold::ReleasedAsFound => (
-            "THIS STOPS USING AN INVOICE TO TEST THE INVOICE-NUMBER CHECK.",
-            "ComplyEaze Bridge will no longer use this invoice to test that its check for \
-             used invoice numbers works on this book. A new invoice's number is still checked \
-             against Tally's book; if no other invoice remains as that test, the check stands \
-             alone, as for a company's first invoice, and if it misses a used number the \
-             duplicate would show only after the post.",
-        ),
-    };
     format!(
-        "{headline}\n\n\
+        "THIS RELEASES THE INVOICE STOP FOR THE COMPANY.\n\n\
          Company: {company_name}\n\
          ComplyEaze Bridge sent this invoice to Tally and cannot confirm it as posted:\n{invoices}\n\
          Batch: {}\n\
          What ComplyEaze Bridge saw just now: {}.\n\n\
          Click the button only if you have checked this invoice in Tally yourself. \
-         {what_it_allows} \
+         ComplyEaze Bridge will then build and post invoices for this company again. \
          This changes nothing in Tally.",
         batch_id,
         seen.words()
@@ -223,26 +331,21 @@ impl Server {
         {
             return Err("import_batch_company_mismatch".to_string().into());
         }
-        self.hold_of(&line)?
-            .ok_or_else(|| "ack_stop_not_held".to_string())?;
+        self.require_stop(&line)?;
 
-        // What Tally holds now, to show and to record. A read that fails for a
-        // cause waiting cures (Tally not answering, the company not open) is
-        // waited for: a release made blind could drop a possibly posted invoice
-        // from the number control, and such a Tally posts nothing anyway. A
-        // failure waiting cannot cure does not refuse the release (the stop
-        // would never lift); it is shown and recorded as the invoice possibly
-        // being in the book.
+        // What Tally holds now, to show. A cancelled call is refused: the
+        // caller has gone. On this read only the runtime's typed withdrawal
+        // (`ToolFailure::from_runtime`) gives that code; the post's approval
+        // holds, which also give it, are not on this path.
         let mut rows = None;
         let (seen, evidence) = match self.verify_for_review(args, &mut rows).await {
-            Ok(outcome) => (Seen::of(&outcome.payload["result"]), outcome.evidence),
-            Err(failure) if !failure_waiting_cannot_cure(&failure) => {
-                let mut refused = ToolFailure::from("ack_stop_tally_unreadable".to_string());
-                refused.evidence = failure.evidence;
-                return Err(refused);
-            }
+            Ok(outcome) => (
+                Seen::of(&outcome.payload["result"], &line),
+                outcome.evidence,
+            ),
+            Err(failure) if failure.code == "request_cancelled" => return Err(failure),
             Err(failure) => (
-                Seen::Unreadable(failure.code.clone()),
+                Seen::unreadable(&failure),
                 failure.evidence.map_or_else(
                     || {
                         super::super::evidence_from_runtime_read(
@@ -253,40 +356,31 @@ impl Server {
                 ),
             ),
         };
-        // The read itself may have verified the batch: the stop is then gone,
-        // and nothing is asked.
-        let Some((hold, held)) = self.hold_of(&line)? else {
+        // The stop may have lifted while the read ran (the batch read verified
+        // or was released meanwhile, whether or not this read completed):
+        // nothing is then asked.
+        let Some(held) = self.stop_held(&line)? else {
             return Ok(self.stop_outcome(&line, "not_held", None, evidence));
         };
-        // A release that was made as found is dropped only by a read that now
-        // shows the invoice gone: any other answer leaves it as it stands, and
-        // nothing is asked or written.
-        if hold == InvoiceHold::ReleasedAsFound && seen.found() {
-            return Err(ToolFailure::from("ack_stop_release_stands".to_string())
-                .with_prior_evidence(evidence));
-        }
-        let company_name = held
-            .company
-            .as_ref()
-            .map(|company| company.name.clone())
-            .unwrap_or_default();
-        let preview = release_preview(&held, &company_name, &seen, hold);
+        let preview = release_preview(&held.batch, &seen);
         let count = VoucherCount::new(1).ok_or_else(|| "ack_stop_batch_not_sent".to_string())?;
         let _acknowledged = ReviewAcknowledged::confirm(count, &preview)
             .await
             .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
 
         // Recorded under the exclusive lock, and only if the batch still
-        // stands as the person was shown.
+        // stops the company as the person was shown: no record of it since
+        // (a stop that lifted and came back while the dialog was open is
+        // another stop than the one shown).
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
-        if current.batch.sha256 != line.sha256
-            || self
-                .import_invoice_holds_while_admitted(&line.company_guid)?
-                .get(&line.batch_id)
-                != Some(&hold)
+        if current.generation != held.generation
+            || current.batch.sha256 != line.sha256
+            || !self
+                .import_invoice_stops_while_admitted(&line.company_guid)?
+                .contains(&line.batch_id)
         {
             return Err(
                 ToolFailure::from("ack_stop_changed_while_reviewing".to_string())
@@ -295,65 +389,58 @@ impl Server {
         }
         self.append_import_record_while_admitted(&ledger::StatusRecord::stop_release(
             &line,
-            seen.found(),
+            seen.recorded(),
         ))?;
         if self
-            .import_invoice_holds_while_admitted(&line.company_guid)?
-            .get(&line.batch_id)
-            == Some(&hold)
+            .import_invoice_stops_while_admitted(&line.company_guid)?
+            .contains(&line.batch_id)
         {
             return Err(ToolFailure::from("ack_stop_not_recorded".to_string())
                 .with_prior_evidence(evidence));
         }
-        let state = match hold {
-            InvoiceHold::Stopping => "stop_released",
-            InvoiceHold::ReleasedAsFound => "control_dropped",
-        };
-        Ok(self.stop_outcome(&line, state, Some(seen.found()), evidence))
+        Ok(self.stop_outcome(&line, "stop_released", Some(&seen), evidence))
     }
 
-    /// How the batch stands now, with the batch as the journal holds it: it
-    /// stops its company, or it was released as found and is still the number
-    /// control. None for a batch that reads verified, was released as not
-    /// found, or was never sent.
-    fn hold_of(
-        &self,
-        line: &ImportLedgerLine,
-    ) -> Result<Option<(InvoiceHold, ImportLedgerLine)>, String> {
+    /// Refuses a batch that does not stop its company now: it reads verified,
+    /// or a person already released it.
+    fn require_stop(&self, line: &ImportLedgerLine) -> Result<(), ToolFailure> {
+        self.stop_held(line)?
+            .map(|_| ())
+            .ok_or_else(|| "ack_stop_not_held".to_string().into())
+    }
+
+    /// The batch as the journal holds it now, with the generation of its
+    /// latest record, when it stops its company.
+    fn stop_held(&self, line: &ImportLedgerLine) -> Result<Option<ledger::BatchSnapshot>, String> {
         let _lock = self.lock_import_admission_shared()?;
-        let Some(hold) = self
-            .import_invoice_holds_while_admitted(&line.company_guid)?
-            .get(&line.batch_id)
-            .copied()
-        else {
+        if !self
+            .import_invoice_stops_while_admitted(&line.company_guid)?
+            .contains(&line.batch_id)
+        {
             return Ok(None);
-        };
-        Ok(self
-            .import_snapshot_while_admitted(Some(&line.batch_id))?
-            .map(|snapshot| (hold, snapshot.batch)))
+        }
+        self.import_snapshot_while_admitted(Some(&line.batch_id))
     }
 
     fn stop_outcome(
         &self,
         line: &ImportLedgerLine,
         state: &str,
-        invoice_found: Option<bool>,
+        seen: Option<&Seen>,
         evidence: Evidence,
     ) -> ToolOutcome {
-        let next_step = match state {
-            "stop_released" => {
-                "The stop is released. Invoices for this company can be built and posted again."
-            }
-            "control_dropped" => {
-                "This invoice no longer checks new invoice numbers. Build the invoice again."
-            }
-            _ => "This batch no longer stands: nothing was released.",
+        let next_step = if state == "stop_released" {
+            "The stop is released. Invoices for this company can be built and posted again."
+        } else {
+            "This batch no longer stops the company: nothing was released."
         };
+        let (seen_at_release, seen_detail) = seen.map(Seen::reported).unzip();
         ToolOutcome {
             payload: json!({"result": {
                 "batch_id": line.batch_id,
                 "state": state,
-                "invoice_found_at_release": invoice_found,
+                "seen_at_release": seen_at_release,
+                "seen_detail": seen_detail,
                 "next_step": next_step,
             }}),
             evidence,

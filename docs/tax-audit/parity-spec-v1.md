@@ -240,6 +240,18 @@ placeholder. The day a module-level check is added to either language's port of 
 other, this field's set-equality check turns that asymmetry into an immediate, named parity
 failure — which is the point.
 
+**POP-5 and the reader's C11.** POP-5 reports, over the vouchers in the books population, any
+voucher with no GUID and any GUID two of them share. It is a report in the dump, never a refusal,
+and it stays the only check on a Book built directly (the edge books are). A read is stricter: the
+reader of both engines refuses it outright (`C11-blank-guid`, `C11-repeated-guid`,
+`docs/tax-audit/read-format-v1.md` section 7) when any voucher of any status, in any part, has no
+GUID or shares one, so no dump is produced from such a read and none of the committed `synthetic`
+goldens, whose GUIDs are all unique, is affected. This crate applies C11 in `load_book`
+(`src/book.rs`), over every vouchers part together and before the company part's identity check;
+the reference applies it in the same place of its `load_book` (`check_voucher_identity`). The
+crate's legacy raw-export layout does not exist, so the reference's second call site, for
+overlapping legacy voucher files, has no counterpart.
+
 A polarity observation the reference engine tracks separately from its book invariants is excluded
 from every report here: it is documented as an observation, not a gate, so it carries no pass/fail
 meaning in this contract.
@@ -314,11 +326,11 @@ cannot be diffed meaningfully at all.
 
 ## 9. Real-world validation
 
-Beyond the committed synthetic golden fixture that CI compares on every run, this crate's parity
-with the reference implementation has been checked locally against several real client books, with
-zero differences reported by the comparison in section 7. That run, and the client data it reads,
-are never committed: results are kept privately, consistent with the rule that no client name,
-figure or byte enters this repository or its CI.
+CI compares this crate with the reference implementation on the committed synthetic golden
+fixture only, on every run. A local comparison against several real client books reported zero
+differences in the comparison of section 7; that run, and the client data it reads, are never
+committed (no client name, figure or byte enters this repository or its CI), so the claim of
+parity on real books is UNVERIFIED here and the checked claim is the synthetic one.
 
 ## 10. Extending this spec to a new test
 

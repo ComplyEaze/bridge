@@ -117,6 +117,14 @@ impl AgentReadRequest {
         ))
     }
 
+    /// Whether this is the company Object export ([`Self::company_object`] is the
+    /// only way to build one). Its answer's `HEADER` also carries the product
+    /// release fields, which the collection status check refuses; the company
+    /// part's own admission checks its status instead.
+    pub(crate) fn is_company_object(&self) -> bool {
+        self.0.contains("<TYPE>Object</TYPE>")
+    }
+
     /// Whether every `SVFROMDATE`/`SVTODATE` this request sends is a boundary
     /// `profile` lets Tally honour. Education mode answers a read whose window
     /// starts on another day with a well-formed empty collection rather than an

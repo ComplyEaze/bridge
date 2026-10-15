@@ -647,10 +647,16 @@ async fn fetch_admitted_audit_part(
             raw.encoded_body.len(),
         ),
     };
-    if !matches!(
-        bridge_tally_protocol::export_status(&raw.text),
-        Ok(bridge_tally_protocol::TallyExportStatus::Success)
-    ) {
+    // A collection answer's status is checked here. The company Object export's
+    // header carries more fields than that check admits, so its status is checked
+    // by the company part's own admission (`admit_audit_company_part`), which the
+    // caller must run on the body before using it.
+    if !window.is_company_object()
+        && !matches!(
+            bridge_tally_protocol::export_status(&raw.text),
+            Ok(bridge_tally_protocol::TallyExportStatus::Success)
+        )
+    {
         return Err(with_read_evidence(
             AuditResponseRejected.into(),
             evidence.clone(),

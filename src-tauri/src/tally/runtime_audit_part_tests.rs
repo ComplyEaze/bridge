@@ -573,6 +573,54 @@ async fn an_error_envelope_is_rejected_whole_and_owes_nothing() {
     assert_eq!(simulator.finish().unwrap().len(), 5);
 }
 
+/// The header of a company Object export carries the product release fields
+/// (measured on a live TallyPrime 7.1 Silver, item 697-S0A): the collection
+/// status check refuses it, so the Object request is admitted on the company
+/// part's own check, and a collection answer with the same header stays refused.
+#[tokio::test]
+async fn the_company_object_answer_is_admitted_with_its_release_header_and_a_collection_is_not() {
+    let lab = lab();
+    let answer = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS>\
+        <PRODMAJORVER>1</PRODMAJORVER><PRODMINORVER>1</PRODMINORVER>\
+        <PRODMAJORREL>7</PRODMAJORREL><PRODMINORREL>1</PRODMINORREL>\
+        <PRODTYPE>5</PRODTYPE></HEADER><BODY><DATA/></BODY></ENVELOPE>";
+    let simulator = SequenceSimulator::spawn(vec![
+        utf16(&lab.companies_xml),
+        utf16(answer),
+        utf16(&lab.companies_xml),
+        utf16(&lab.companies_xml),
+        utf16(answer),
+    ])
+    .unwrap();
+    let runtime = TallyRuntime::default();
+    let object =
+        super::super::agent_read_request::AgentReadRequest::company_object(&lab.identity).unwrap();
+    assert!(object.is_company_object());
+    runtime
+        .fetch_audit_part(
+            config(&simulator),
+            &lab.identity,
+            object,
+            AuditPartShape::Single,
+        )
+        .await
+        .expect("the object export is admitted");
+    let collection =
+        super::super::agent_read_request::AgentReadRequest::parse(lab.request.clone()).unwrap();
+    assert!(!collection.is_company_object());
+    let failure = runtime
+        .fetch_audit_part(
+            config(&simulator),
+            &lab.identity,
+            collection,
+            AuditPartShape::Single,
+        )
+        .await
+        .expect_err("a collection answer with that header is refused");
+    assert_eq!(failure.kind, AuditPartFailureKind::ResponseRejected);
+    drop(simulator);
+}
+
 #[tokio::test]
 async fn a_refused_response_head_owes_a_drain() {
     let lab = lab();

@@ -291,7 +291,7 @@ test("the jobs table gives one of four answers per row, links each row to its an
 
 // A page that says it was checked against a release must say the manifest's release: a version bump fails here
 // until the page has been read again, so no stamped page can keep describing a release that is no longer current.
-const stamped = ["faq.html", "capabilities.html"];
+const stamped = ["faq.html", "capabilities.html", "bank-statement-pdf-to-tallyprime-vouchers.html"];
 test("every page that carries a 'Checked against release' stamp carries the manifest's release, and none is left out of this list", () => {
   const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
   for (const name of pages.filter((page) => /Checked(?:\s|&nbsp;)+against(?:\s|&nbsp;)+release/i.test(read(page)))) assert.ok(stamped.includes(name), `${name} carries a check stamp and is not in the list of stamped pages`);

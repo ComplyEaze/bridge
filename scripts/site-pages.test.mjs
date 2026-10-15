@@ -294,7 +294,7 @@ test("the jobs table gives one of four answers per row, links each row to its an
 const stamped = ["faq.html", "capabilities.html"];
 test("every page that carries a 'Checked against release' stamp carries the manifest's release, and none is left out of this list", () => {
   const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
-  for (const name of pages.filter((page) => /Checked against release/.test(read(page)))) assert.ok(stamped.includes(name), `${name} carries a check stamp and is not in the list of stamped pages`);
+  for (const name of pages.filter((page) => /Checked(?:\s|&nbsp;)+against(?:\s|&nbsp;)+release/i.test(read(page)))) assert.ok(stamped.includes(name), `${name} carries a check stamp and is not in the list of stamped pages`);
   for (const name of stamped) {
     const stamp = read(name).match(/Checked against release ([0-9.]+) on <time datetime="([0-9]{4}-[0-9]{2}-[0-9]{2})">/);
     assert.ok(stamp, `${name} has no check stamp`);
@@ -308,7 +308,10 @@ test("every page that carries a 'Checked against release' stamp carries the mani
 const inSourceNotPublished = { "0.5.1": ["company_features", "gst_status", "statement_tie_out", "voucher_read_cost"] };
 test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
   const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
-  const registered = [...region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];").matchAll(/^\s*"([a-z0-9_]+)",$/gm)].map((match) => match[1]);
+  const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");
+  const registered = [...names.matchAll(/^\s*"([a-z0-9_]+)",$/gm)].map((match) => match[1]);
+  // a tool written in another shape (a trailing comment, two to a line) would be skipped above and never asked of the page
+  assert.equal([...names.matchAll(/"[^"]*"/g)].length, registered.length, "REGISTERED_TOOL_NAMES holds a string the test did not read as a tool name: one name to a line, as `\"name\",`");
   assert.ok(registered.includes("verify_import") && registered.includes("post_import"), "the registered tool names were not read");
   const withheld = [...source.matchAll(/\.retain\(\|tool\| tool\["name"\] != "([a-z0-9_]+)"\)/g)].map((match) => match[1]);
   assert.deepEqual(withheld, ["changed_since"], "the catalog withholds other tools than the test expects: say so on the page, then change this test");

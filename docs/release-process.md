@@ -811,8 +811,8 @@ disagree.
   In the same pull request, reread every answer on the Questions page (`site/faq.html`)
   and every tool row on the capabilities page (`site/capabilities.html`) against the new
   release and move each page's check stamp (the release and the day; on the Questions page
-  also in the structured data), and every other mention of the release in the capabilities
-  page and in `site/llms.txt`. The tools the catalog serves that no published build installs
+  also in the structured data), and the release named by "release X offers" or "installs" in the
+  capabilities page and in `site/llms.txt`. The tools the catalog serves that no published build installs
   are listed in `scripts/site-pages.test.mjs` under the release the page is stamped for;
   once that release publishes them they belong on the page. `scripts/site-pages.test.mjs`
   fails until each stamp names the version in `packaging/mcpb/manifest.json` and the page

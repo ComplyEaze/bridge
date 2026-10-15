@@ -49,11 +49,12 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** In name order; release 0.5.1 installs 23 of them, and `company_features`, `gst_status`, `statement_tie_out` and `voucher_read_cost` are in source, not yet in a published build. None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** In name order; release 0.5.1 installs 23 of them, and `audit_test_run`, `company_features`, `gst_status`, `statement_tie_out` and `voucher_read_cost` are in source, not yet in a published build. None of them changes your TallyPrime books, and every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
 | --- | --- | --- |
+| `audit_test_run` | One tax-audit test run on the company's own books for a date range, today only the cash share of receipts and payments against the s.44AB(a) limit: figure and finding ids with their values, confidence and clauses, and the count of any failed book check; no ledger name, no voucher, and refused while a redaction setting is on. You name the cash and bank groups; the period must lie in 2025-26. Books only, not a tax opinion | Nothing |
 | `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is expected to be refused) | Nothing |
 | `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |

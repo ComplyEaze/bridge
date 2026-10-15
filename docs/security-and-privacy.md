@@ -129,6 +129,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
+  - A tax-audit test run (`audit_test_run`, in source and not yet in a published build) sends the AI
+    provider the test's figures and findings: amounts in paise, figure and finding ids, the test's
+    fixed wording, and the code and count of any failed book check. It names no ledger, group,
+    party or voucher, and it is refused while `mask_parties` or `drop_narration` is on, because
+    those settings mask only marked values and would not hide what is returned here. The books it
+    reads for the test are held in memory for the call and are not written to disk.
   - A bank-statement check over whole calendar months (`statement_tie_out`, in
     source and not yet in a published build) can show, with the book's figures,
     the statement's balance at the month ends and its net over those months,

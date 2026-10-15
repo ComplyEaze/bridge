@@ -86,6 +86,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // a new tool must be added to `ToolEffect::of` and to this table to be
     // published.
     const READ_TOOLS: &[&str] = &[
+        "audit_test_run",
         "balance_sheet",
         "cash_flow",
         "changed_since",

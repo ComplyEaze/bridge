@@ -767,10 +767,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // and ids, and no party or ledger name; `statement_tie_out` returns two
     // dates, three signed gaps and fixed sentences, and never a ledger name;
     // `voucher_read_cost` returns only a voucher mark, counts, seconds and
-    // constant text, and the company's own name.
+    // constant text, and the company's own name; `audit_test_run` returns only
+    // figure and finding ids, numbers, the admitted test's fixed wording and the
+    // codes and counts of failed book checks (its own test replays a book and
+    // looks for every group, ledger and company name in the result).
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
+        "audit_test_run",
         "cash_flow",
         "company_features",
         "gst_status",

@@ -111,6 +111,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_audit_read.rs"]
 mod audit_read;
+#[path = "agent_audit_run.rs"]
+mod audit_run;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
 #[path = "agent_read_cost_preview.rs"]
@@ -2145,6 +2147,7 @@ impl Server {
         validate_tool_arguments(name, args)?;
         match name {
             "acknowledge_post_review" => self.acknowledge_post_review(args).await,
+            "audit_test_run" => self.audit_test_run(args).await,
             "balance_sheet" => self.balance_sheet(args).await,
             "build_import_xml" => {
                 self.import_enabled()?;

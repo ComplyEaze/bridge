@@ -383,6 +383,14 @@
       "path": "src-tauri/src/agent.rs"
     },
     {
+      "path": "src-tauri/src/agent_audit_read.rs",
+      "reason": "Assembles one company's books from live reads for the tax-audit engine: which requests are sent, that each is kept byte for byte between two identity checks, the high-water marks that must not move, and the manifest the engine admits; a defect lets the engine judge books that were not one consistent read of the pinned company, or sends a request that holds Tally."
+    },
+    {
+      "path": "src-tauri/src/agent_audit_run.rs",
+      "reason": "The audit_test_run tool: which tests are admitted, the refusal of a redaction setting and of a period outside the rules' year, and the projection that decides what of the engine's result reaches the assistant; a defect returns a ledger, group or party name, or runs a test that has no parity record."
+    },
+    {
       "path": "src-tauri/src/agent_bank_statement.rs"
     },
     {

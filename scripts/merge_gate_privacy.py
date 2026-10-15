@@ -4,8 +4,9 @@
 The program accepts raw, already-complete gate input on stdin and writes only a
 small JSON decision record.  It deliberately reports counts and categories,
 never matched values.  UUIDs are recognized before generic hexadecimal digest
-masking: a nil UUID is an explicit sentinel, while every other UUID needs
-exact, current-head fixture provenance.
+masking: a nil UUID is an explicit sentinel, while every other UUID must be
+listed in the synthetic-UUID registry that scripts/merge-gate.sh reads from
+master.
 """
 from __future__ import print_function
 
@@ -151,9 +152,9 @@ def load_fixture_provenance(path, head, record):
 
     The manifest is deliberately narrow: a list of objects with only an exact
     UUID, the current full head, and ``source: fixture`` qualifies.  The gate
-    currently supplies an empty manifest; this interface exists so a later,
-    server-bound fixture inventory can authorize values without any text or
-    path-name heuristic.
+    builds it from the synthetic-UUID registry on master (no registry, or an
+    invalid one, means no manifest), so values are authorized without any text
+    or path-name heuristic.
     """
     if not path:
         return set()
@@ -207,7 +208,7 @@ def tokenize_uuids(text, allowed, record):
     if credential:
         add(record, "blockers", "privacy scan found %d non-nil UUID shape(s) in credential, session, token, or bearer context" % credential)
     if unknown:
-        add(record, "indeterminate", "privacy scan found %d non-nil UUID shape(s) without exact current-head fixture provenance" % unknown)
+        add(record, "indeterminate", "privacy scan found %d non-nil UUID shape(s) not listed in the synthetic-UUID registry" % unknown)
     return "".join(retained)
 
 

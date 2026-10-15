@@ -14,7 +14,9 @@ use crate::agent::transfer_pairing::{
     transfer_pairing_view, BatchId, BatchStatus, ContraKey, DoubleBookedClass, SkipFact, SkipState,
     TransferView,
 };
-use statement_facts::{Candidate, HeldBy, TransferFacts, TransferFactsError};
+use statement_facts::{
+    BuildLine, Candidate, FactsError, HeldBy, StatementFacts, TransferFacts, TransferFactsError,
+};
 
 /// How many days apart the two statements may print one transfer and still
 /// pair it by date. Zero until a real statement pair has been measured: k comes
@@ -357,7 +359,61 @@ pub(super) struct TransferRefusal {
     next_step: String,
 }
 
+/// The codes a transfer check refuses a send with.
+pub(super) const SEND_REFUSALS: [&str; 6] = [
+    "skip_row_already_posted",
+    "withdraw_skip_invalid",
+    "withdraw_skip_paired",
+    "skip_row_paired_elsewhere",
+    "transfer_double_booked",
+    "transfer_view_not_established",
+];
+
+/// What the desktop is told for a transfer refusal that sent nothing: the
+/// agent's step does not reach its webview, so the message says what it says.
+pub(super) const TRANSFER_REFUSED_MESSAGE: &str = "Nothing was sent. The company's transfer records do not allow this batch to be sent as built: build it again. Asking for approval again refuses the same way.";
+pub(super) const TRANSFER_VIEW_REFUSED_MESSAGE: &str = "Nothing was sent. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this batch books a transfer twice. Building it again meets the same record: report it, or send with the later release that wrote it.";
+
+/// A refusal made when a batch is sent, not when it is built.
+const NOTHING_SENT: &str =
+    "Nothing was sent to Tally, and any approval of this batch is withdrawn.";
+const SEND_ENDING: &str = "This batch cannot be sent as built: build it again.";
+const TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP: &str = "Nothing was sent to Tally, and any approval of this batch is withdrawn. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this batch books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, send with that release; otherwise report it with the error named here. No batch of this company that posts a statement row can be sent until it is fixed, as it already blocks every build that needs the view.";
+/// What a refusal under the admission lock says: the reason is its code alone.
+pub(super) const TRANSFERS_CHANGED_UNDER_LOCK_STEP: &str = "The transfer records changed after this batch was checked and before it was sent; nothing was sent and any approval of this batch is withdrawn. Call post_import again: it gives the whole reason before asking.";
+
 impl TransferRefusal {
+    pub(super) fn reason(&self) -> &'static str {
+        self.reason
+    }
+
+    /// The same refusal for a batch about to be sent: one function maps every
+    /// build step, so the two cannot drift. Every one but
+    /// `transfer_view_not_established` ends by saying the statement must be built
+    /// again; that one has no such ending, because building it again meets the
+    /// same unreadable record.
+    pub(super) fn for_send(self) -> Self {
+        let next_step = if self.reason == "transfer_view_not_established" {
+            TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP.to_string()
+        } else {
+            // A step that speaks of the build it refuses has its own wording for a
+            // batch about to be sent; the others speak of rows, and serve both.
+            let middle = send_wording(self.reason).unwrap_or_else(|| {
+                self.next_step
+                    .strip_prefix(NOTHING_WRITTEN)
+                    .unwrap_or(&self.next_step)
+                    .trim()
+            });
+            format!("{NOTHING_SENT} {middle} {SEND_ENDING}")
+        };
+        Self { next_step, ..self }
+    }
+
+    /// The reason, what the refusal lists, and what to do about it.
+    pub(super) fn into_parts(self) -> (&'static str, Value, String) {
+        (self.reason, self.detail, self.next_step)
+    }
+
     pub(super) fn outcome(
         self,
         company: &bridge_tally_protocol::TallyCompany,
@@ -398,6 +454,11 @@ pub(super) struct TransferInput {
     pub(super) own_lineage: Option<String>,
     /// The build carries a statement's facts.
     pub(super) carries_statement: bool,
+    /// A batch already in the journal that is being judged again, the one about
+    /// to be sent: its records are left out of the facts and it is the
+    /// `candidate`, so the journal reads as it did when the batch was built, plus
+    /// whatever was written since.
+    pub(super) subject: Option<String>,
 }
 
 impl TransferInput {
@@ -437,12 +498,19 @@ const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing w
 const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing was recorded. A Contra in this build carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Posting both books it twice. Do not build this Contra: run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger) and build again.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and nothing was recorded. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this build books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, build with that release; otherwise report it with the error named here, and do not build this statement again until it is fixed.";
 
+/// What a refusal says of a batch about to be sent, for the reasons whose step
+/// speaks of the build it refuses, between "nothing was sent" and the ending.
+fn send_wording(reason: &str) -> Option<&'static str> {
+    match reason {
+        "skip_row_already_posted" => Some("This batch skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with the rows listed in skipped_rows not skipped (a row that batch holds is then refused as import_txn_already_posted)."),
+        "skip_row_paired_elsewhere" => Some("This batch posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf."),
+        "withdraw_skip_invalid" => Some("Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch, whether or not it was sent, or in a statement of only skipped rows) and a voucher of this batch. Name in withdraw_skips only rows that are both, or none."),
+        "transfer_double_booked" => Some("A Contra in this batch carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Sending both books it twice. Run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger)."),
+        _ => None,
+    }
+}
+
 /// What the batch named beside a withdrawn row holds for it, which is why the
-    /// A batch already in the journal that is being judged again, the one about
-    /// to be sent: its records are left out of the facts and it is the
-    /// `candidate`, so the journal reads as it did when the batch was built, plus
-    /// whatever was written since.
-    pub(super) subject: Option<String>,
 /// withdrawal is refused. The labels a refusal shares with the section are the
 /// section's own, and a row need not carry the same one in both: a row the
 /// section reads `ambiguous`, `reversed_same_day` or `reference_differs` is
@@ -568,6 +636,7 @@ impl Server {
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,
+        subject: Option<&str>,
     ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
         let journal: Box<dyn std::io::BufRead> = match self.import_journal_while_admitted() {
             Ok(Some(reader)) => Box::new(reader),
@@ -623,7 +692,6 @@ impl Server {
             Ok(view) => view,
             Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
         };
-        subject: Option<&str>,
         let live: BTreeSet<&str> = before
             .live_skips
             .iter()
@@ -727,10 +795,39 @@ impl Server {
                 next_step,
             }));
         }
+        // A withdrawal excuses a row only while it counts against the skip, by the
+        // rule the facts apply to a posted holder: built strictly after the
+        // newest record of that skip. A build is newer than every record; a saved
+        // batch being sent may not be, when a skip of the row was recorded since.
+        let stale_withdrawals: BTreeSet<&str> = match (&input.candidate, &input.subject) {
+            (Candidate::Build(line), Some(_)) => {
+                let built = match statement_facts::built_instant(&line.batch_id, &line.built_at) {
+                    Ok(built) => built,
+                    Err(error) => return Ok(without_facts(input.needs_the_view(), &error)),
+                };
+                input
+                    .withdraw
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|row| {
+                        before
+                            .live_skips
+                            .iter()
+                            .filter(|key| key.row.as_str() == *row)
+                            .filter_map(|key| before.skip_built.get(key))
+                            .any(|recorded| !statement_facts::withdrawal_counts(&built, recorded))
+                    })
+                    .collect()
+            }
+            _ => BTreeSet::new(),
+        };
         let paired_elsewhere: Vec<String> = input
             .voucher_rows
             .iter()
-            .filter(|row| live.contains(row.as_str()) && !input.withdraw.contains(*row))
+            .filter(|row| {
+                live.contains(row.as_str())
+                    && (!input.withdraw.contains(*row) || stale_withdrawals.contains(row.as_str()))
+            })
             .cloned()
             .collect();
         if !paired_elsewhere.is_empty() {
@@ -765,6 +862,64 @@ impl Server {
         Ok(Admission::Admitted(TransferSummary::of(&facts, &view)))
     }
 
+    /// A saved batch about to be sent, judged as its build was and against the
+    /// journal as it is now. `None` when the batch is admitted, or is not about
+    /// transfers at all (it posts no statement row, carries no statement and
+    /// withdraws nothing), as the build decides it. The rows it withdrew are the
+    /// ones its record holds (`withdrawn_skips`), whether or not it carries a
+    /// statement. Called with the admission lock held, shared or exclusive.
+    pub(super) fn transfers_refusal_for_send_while_admitted(
+        &self,
+        line: &ImportLedgerLine,
+    ) -> Result<Option<TransferRefusal>, String> {
+        let statement = match &line.statement {
+            Some(recorded) => match serde_json::from_value::<StatementFacts>(recorded.clone()) {
+                Ok(facts) => Some(facts),
+                Err(_) => {
+                    let error = TransferFactsError::Facts {
+                        source_id: line.batch_id.clone(),
+                        error: FactsError::Unparsable,
+                    };
+                    return Ok(match without_facts(true, &error) {
+                        Admission::Refused(refusal) => Some(refusal.for_send()),
+                        Admission::Admitted(_) => None,
+                    });
+                }
+            },
+            None => None,
+        };
+        // judged as it was built: the batch's own records are left out of the
+        // journal (`subject`) and it is read again as the newest build
+        let input = TransferInput {
+            company_guid: canonical_batch_guid(&line.company_guid),
+            candidate: Candidate::Build(Box::new(BuildLine::of(line))),
+            skip_rows: statement
+                .iter()
+                .flat_map(|statement| &statement.skip_rows)
+                .map(|skip| skip.bridge_txn_id.clone())
+                .collect(),
+            voucher_rows: line
+                .vouchers
+                .iter()
+                .filter(|voucher| {
+                    bridge_bank_statement::proposals::is_statement_txn_id(&voucher.bridge_txn_id)
+                })
+                .map(|voucher| voucher.bridge_txn_id.clone())
+                .collect(),
+            withdraw: line.withdrawn_skips.iter().flatten().cloned().collect(),
+            own_lineage: line.amends_batch_id.clone(),
+            carries_statement: statement.is_some(),
+            subject: Some(line.batch_id.clone()),
+        };
+        if !input.needs_the_view() {
+            return Ok(None);
+        }
+        Ok(match self.admit_transfers_while_admitted(input)? {
+            Admission::Refused(refusal) => Some(refusal.for_send()),
+            Admission::Admitted(_) => None,
+        })
+    }
+
     /// The section for the first page of a verification: computed after the
     /// verdict is persisted, under a shared admission lock, and never able to
     /// change the verdict or fail the call. Contention or any failure is
@@ -779,8 +934,12 @@ impl Server {
             guard
                 .ok()
                 .and_then(|_lock| {
-                    self.transfer_view_while_admitted(&canonical_batch_guid(company_guid), None, None)
-                        .ok()
+                    self.transfer_view_while_admitted(
+                        &canonical_batch_guid(company_guid),
+                        None,
+                        None,
+                    )
+                    .ok()
                 })
                 .map_or(TransferSummary::NotEstablished, |(facts, view)| {
                     TransferSummary::of(&facts, &view)

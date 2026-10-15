@@ -489,6 +489,11 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// The batch is no longer one the company's transfer records allow to be
+    /// sent: the reason is the code. The records changed after the check made
+    /// before the person was asked.
+    #[error("{0}")]
+    Transfers(&'static str),
 }
 
 impl UnderLockRefusal {
@@ -501,6 +506,7 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::Transfers(reason) => reason,
         }
     }
 }

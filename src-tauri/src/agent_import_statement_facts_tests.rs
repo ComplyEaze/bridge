@@ -3491,13 +3491,11 @@ fn skip_of_row_one() -> String {
 }
 
 fn posts_row_one(id: u32) -> Build {
-    build(id)
-        .voucher(contra(&st(1), N2, N1, "500.00"))
-        .facts(
-            facts(B1)
-                .window("20260901", "20260930")
-                .contra(&st(1), None),
-        )
+    build(id).voucher(contra(&st(1), N2, N1, "500.00")).facts(
+        facts(B1)
+            .window("20260901", "20260930")
+            .contra(&st(1), None),
+    )
 }
 
 fn read_with_subject(
@@ -3540,4 +3538,20 @@ fn another_batch_that_holds_the_row_is_not_the_subject() {
     let judged = read_with_subject(&journal, None, Some(3));
     assert_eq!(judged.held.len(), 1);
     assert_eq!(judged.contras.len(), 1);
+}
+
+/// A withdrawal counts against a skip only if built strictly after the skip's
+/// newest record; one built at the same instant fails closed.
+#[test]
+fn a_withdrawal_counts_only_when_built_strictly_after_the_skip() {
+    let at = |text: &str| DateTime::parse_from_rfc3339(text).unwrap();
+    let skip = at("2026-09-01T09:00:00.000Z");
+    assert!(withdrawal_counts(&at("2026-09-01T09:00:00.001Z"), &skip));
+    assert!(!withdrawal_counts(&at("2026-09-01T09:00:00.000Z"), &skip));
+    assert!(!withdrawal_counts(&at("2026-09-01T08:59:59.999Z"), &skip));
+    // the same instant written in another offset is the same instant
+    assert!(!withdrawal_counts(
+        &at("2026-09-01T14:30:00.000+05:30"),
+        &skip
+    ));
 }

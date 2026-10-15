@@ -9,10 +9,10 @@
 //! request. On Windows a checked-out symbolic link is a plain file, so the symlink case is
 //! exercised on Linux and macOS only.
 //!
-//! The text below is the record of why the early pins exist, moved here unchanged from the
+//! The text below is the record of why the early pins exist, moved here from the
 //! constant it was written beside (`MAX_SURFACE_FILES`, now `MAX_PINS`, a parse bound and not a
-//! count to maintain). Where it speaks of the "surface digest" or of a raise, read "a pin added":
-//! the digest was removed with the crate, and the reason for a pin added now lives in its own
+//! count to maintain); the one test name it cites is corrected to the test that exists.
+//! Where it speaks of the "surface digest" or of a raise, read "a pin added": the digest was removed with the crate, and the reason for a pin added now lives in its own
 //! `reason` and in the acknowledgement file the pull request adds.
 //!
 //! A fixed parse bound on the compatibility surface's pin list: a list longer than this is
@@ -364,7 +364,7 @@
 //! judgment pin because a judgment pin can be dropped during a conflict resolution and
 //! the gate still returns `compatibility_gate_passed` -- measured, by deleting this very
 //! entry and acknowledging the change. A required path cannot be dropped silently, and
-//! `required_files_must_all_be_pinned` iterates this list, so adding it
+//! `removing_a_required_file_pin_is_refused` iterates this list, so adding it
 //! here is what covers its omission.
 //!
 //! The voucher-presence contract's files follow (#840; until then a test in

@@ -84,8 +84,7 @@
 //    read, pulled in with `#[path]` or `include!` from outside src-tauri or as
 //    a non-`.rs` file; features the shipped build turns on that the run does
 //    not (tauri.conf.json's build features, `tauri build --features`); other
-//    features the run does not enable (lab-writes and
-//    bridge-tally-protocol's evidence features); Linux-only code; path dependencies that are not workspace
+//    features the run does not enable (lab-writes); Linux-only code; path dependencies that are not workspace
 //    members (clippy does not lint them; measured); and tests, examples and
 //    benches, which do not ship. Measured on a two-file crate: a listed call
 //    made by a dependency's own `macro_rules!` macro fires and is attributed to
@@ -316,7 +315,7 @@ function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
     ],
     { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024, windowsHide: true },
   );
-  // Both workspaces resolve both packages, so there is no "nothing to check"
+  // The workspace resolves both packages, so there is no "nothing to check"
   // exit here: any failure, including "did not match any packages", means
   // the tree was not read.
   if (result.error) {

@@ -142,7 +142,7 @@ Answer these in the PR body before splitting a file:
 8. Does git change coupling agree with the static seam?
 9. Can the parent stay a pure façade?
 10. Is this one named group, small enough to review as a move?
-11. Do test *names* match before and after on both workspaces, with fmt and clippy clean?
+11. Do test *names* match before and after in the workspace, with fmt and clippy clean?
 12. Did you add the acknowledgement (`acks/pr-<N>.txt`) listing every changed pinned path and every new pin, and leave `git status` clean?
 
 ## The current map

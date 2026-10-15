@@ -268,7 +268,7 @@ A pure move should be provably pure:
 1. Measure: line counts, item clustering, pin status.
 2. If pinned and there is no cap headroom, stop and resolve #416 first.
 3. Extract the largest cohesive group to one new module; leave the parent a façade.
-4. Prove purity (test count, both workspaces, fmt, clippy).
+4. Prove purity (test count, the workspace, fmt, clippy).
 5. Write the acknowledgement from the final diff; pin the new files if the parent was pinned.
 6. Repeat for the next group. One group per PR — a 6,000-line file split four ways
    in one diff is not reviewable, which is the problem you set out to fix.

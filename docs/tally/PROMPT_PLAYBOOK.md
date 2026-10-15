@@ -316,7 +316,8 @@ Implement:
      including NFC/NFD, en dash and underscore distinctions.
    - Other licensed scopes remain exact-codepoint unless a capture
      qualifies their particular rule. Compatibility live-READ receipts
-     do not establish write behaviour (`compatibility/README`).
+     do not establish write behaviour (the removed `compatibility/README`; the rule stands:
+     read evidence is not write evidence).
    The shared binder has no product/release/licence qualification input, so
    these observations cannot authorize its automatic folded-name binding.
    Folded spellings stay candidates: an operator chooses an exact catalogue
@@ -712,8 +713,8 @@ Implement — write core (masters):
    only. For **every other master type** — stock items, groups, voucher types
    — §9.4d measured nothing, so match on **exact codepoints** and let a case
    or separator difference fail loudly.
-   **A compatibility result cannot widen this.** `compatibility/README`
-   defines a cell's evidence as a live-**read** receipt and says it
+   **A compatibility result cannot widen this.** The removed `compatibility/README`
+   (the rule stands) defined a cell's evidence as a live-**read** receipt and says it
    "never establishes ... any write behavior". An earlier revision of
    this gate offered the connected instance's compatibility result as a
    widening route; it is withdrawn. Only a direct write measurement

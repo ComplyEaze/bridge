@@ -173,6 +173,14 @@
       "path": "src-tauri/crates/bridge-tally-core/src/report_tie_out.rs"
     },
     {
+      "path": "src-tauri/crates/bridge-tally-core/tests/compatibility_surface_stays_whole.rs",
+      "reason": "Checks this pin list on disk: every pinned file exists and is a regular file, no symbolic link leads to one, the required directories and eighteen required files are pinned, and each pin obeys the shape rules. Removing or weakening it lets a pin vanish unnoticed."
+    },
+    {
+      "path": "src-tauri/crates/bridge-tally-core/tests/lower_crates_stay_clean.rs",
+      "reason": "Keeps the primitives, protocol and transport crates without dependencies on the application, tauri, a database driver, or the storage and delivery crates (the layering check the removed live-read boundary script made). Removing it drops that check."
+    },
+    {
       "path": "src-tauri/crates/bridge-tally-primitives/Cargo.toml"
     },
     {

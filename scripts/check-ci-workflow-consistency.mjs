@@ -558,7 +558,7 @@ for (const step of parseWorkflowSteps(workflow)) {
 
 // ADR 0004: `lab-writes` compiles the lab-only Tally write tools. The only way in is an explicit
 // `--features lab-writes`, which no workflow, action or Cargo config (an alias could carry it) may
-// name, so no feature (default included) and no dependency declaration in either workspace may turn
+// name, so no feature (default included) and no dependency declaration in the workspace may turn
 // it on for a build that did not ask.
 for (const manifest of ["src-tauri"]) {
   for (const candidate of workspaceMetadata(resolve(repositoryRoot, manifest, "Cargo.toml")).packages) {

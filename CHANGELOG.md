@@ -63,9 +63,10 @@ These changes are in source and not yet in a published build.
 
 - `gst_status` reads Tally's own GSTR-1 status of the vouchers of one voucher type in a window. For
   each voucher it says whether Tally lists it as included, uncertain or excluded, or does not list it in the
-  return (measured for Receipts only), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
+  return (measured for Receipts only), or is cancelled, optional or post-dated (decided first from Tally's own flags, never
+  counted as included, with what its status flags read returned beside it; #1655, #1664), and whether a person accepted it as it stands (Accept As Is). The status is Tally's own flag and not a
   judgement of ComplyEaze Bridge; the reason for a status is on Tally's screen only, so none is returned. A voucher
-  whose flags are absent or odd is returned as unread, never as included. The voucher type is named exactly (a
+  whose flags are absent or odd, or whose deleted flag reads Yes (never seen), is returned as unread, never as included. The voucher type is named exactly (a
   type of the same class under another name is not read), a window is at most 93 days, and a book whose voucher
   mark is above 25,000 is refused. Measured on one synthetic book of TallyPrime 7.1 Silver, for the unregistered
   buyer of its Sales invoices; a registered buyer, other releases and Gold are not measured, and an excluded
@@ -211,6 +212,32 @@ These changes are in source and not yet in a published build.
   and an empty window next to a busy day still cannot reach `complete`. The other reasons
   (`empty_uncorroborated`, `company_has_no_vouchers`, `window_contradicted`) are unchanged, and the `vouchers` and
   `voucher_presence` tool descriptions and the agent guide now list all three outcomes of an empty window.
+
+**Safer or fixed**
+
+- When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
+  not a valid key, the app now says so with its own codes (`tally_mirror_key_missing`,
+  `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
+  credential prompt and retry. Restoring the credential (the macOS login keychain, or that user's Windows
+  Credential Manager) or opening the app as the same computer user is what recovers the mirror. The
+  app deletes nothing, and no reset exists yet (#1563). A key is also no longer created when the mirror file's
+  existence cannot be checked. Not measured on a real
+  credential store: what the macOS keychain or the Windows Credential Manager returns after a keychain reset
+  or a profile move.
+- A later check (`verify_import`, a repeated `post_import`, or the check
+  before a review is recorded) of a post that Tally answered as creating none
+  of its vouchers no longer suggests the voucher was edited in Tally. Its
+  status is unchanged (`sent_not_attributed`, the batch still
+  `reconciliation_required`), but the voucher's next step now says that Tally
+  reported it as not created when it was sent, that it is not found for these
+  dates now, and to look for it in Tally before entering it by hand, since it
+  may have been entered in another form meanwhile. This reads what the post
+  left on record: its saved answer (every counter reported, none created, one
+  exception for each voucher sent, nothing else counted) and, for a batch,
+  its own verdict that the voucher step matched. A partly created batch, and
+  a batch whose voucher mark moved across the post, keep the earlier line.
+  Measured live once, on a single voucher refused whole; a batch is not
+  measured live (#1108).
 
 ## [0.5.1] - 2026-10-09
 

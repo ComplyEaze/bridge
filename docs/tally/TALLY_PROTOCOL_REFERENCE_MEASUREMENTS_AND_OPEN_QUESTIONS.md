@@ -524,8 +524,8 @@ export to the same instance returned `STATUS 1` promptly, with no dialog.
 Only `ledgers_v1` was observed. Two things are **inferred**: that the other builders using the same
 construct raise it too, and that the space in the argument is the cause. Those builders are every
 `function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`: the
-ledger canary and the period-balance report. (`vouchers_v2`, which this list once named, was
-deleted 2026-10-12, Part of #1570.)
+ledger canary. (`vouchers_v2`, which this list once named, was deleted 2026-10-12, Part of #1570.
+The period-balance report it named: this read was removed by #1643; see #1642.)
 
 All of them are refused **before sending** once Bridge knows the endpoint is in Education, with
 `education_report_family_unsupported`. Admission is unchanged: nothing is sent, and nothing is
@@ -534,7 +534,8 @@ promoted.
 - **Sync period-balance tie-out.** Reads the mode from the `CompanyListV2` identity read that
   already precedes it, or from the run's own probe. The run carries on and records
   `report_tie_out_unavailable` and `education_report_family_unsupported`. A later window's
-  successful report clears the second code, as it does the other tie-out codes.
+  successful report clears the second code, as it does the other tie-out codes. (2026-10-12: this
+  read was removed by #1643; see #1642.)
 - **Selected-ledger and selected-voucher qualifiers.** Deleted with the rest of their runtime
   path (bridge#732; ADR 0015's 2026-09-26 amendment): no command or tool reached them.
 - **The live-read tool.** Takes its mode from its configuration; it does not observe it. In
@@ -1249,9 +1250,6 @@ a partition can increase total wall-clock even as it reduces peak payload.
 
 Deadline planning must therefore model a book-dependent fixed scan cost separately from
 serialization, and subdivision must be justified by payload, not by time.
-
-> A separate stability hazard observed during this work is recorded privately rather than
-> here, per the project's handling of crash triggers.
 
 ### 12a.9 A ledger GUID survived an observed UI rename — coverage must compare GUID to name
 

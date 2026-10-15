@@ -4232,27 +4232,22 @@ impl TallyRuntime {
         P: Fn(&str) -> bool + Send + Sync,
     {
         let _lease = self.begin_ordinary_read(&config)?;
-        let request_xml = request.into_xml();
+        let (request_xml, retry) = request.into_parts();
         let validate_application_response = Arc::new(validate_application_response);
-        self.execute_cancellable(
-            config,
-            Some(cancellation),
-            ReadRetryPolicy::transient_default(),
-            move |client| {
-                let request_xml = request_xml.clone();
-                let validate_application_response = Arc::clone(&validate_application_response);
-                async move {
-                    let xml = client.post_xml(request_xml).await?;
-                    if validate_application_response(&xml) {
-                        Ok(xml)
-                    } else {
-                        Err(anyhow::Error::new(
-                            TallyRuntimeReadError::ApplicationResponseRejected,
-                        ))
-                    }
+        self.execute_cancellable(config, Some(cancellation), retry, move |client| {
+            let request_xml = request_xml.clone();
+            let validate_application_response = Arc::clone(&validate_application_response);
+            async move {
+                let xml = client.post_xml(request_xml).await?;
+                if validate_application_response(&xml) {
+                    Ok(xml)
+                } else {
+                    Err(anyhow::Error::new(
+                        TallyRuntimeReadError::ApplicationResponseRejected,
+                    ))
                 }
-            },
-        )
+            }
+        })
         .await
     }
 

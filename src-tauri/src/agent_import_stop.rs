@@ -112,7 +112,7 @@ impl Seen {
                 "a matching voucher was found, but it was in the book before this post",
             )),
             ("not_attributable", Some("observed_voucher_already_attributed")) => Self::NotEstablished(why(
-                "a matching voucher was found, but it is already matched to another voucher of this batch",
+                "a matching voucher was found, but it is already matched to another voucher",
             )),
             ("not_attributable", Some("bound_master_id_changed")) => Self::NotEstablished(why(
                 "a voucher carrying the identity of the one posted is in the book, but with another internal number; how is not established, for example the company's data were rewritten or copied",
@@ -125,7 +125,9 @@ impl Seen {
             }
             // The release cannot tell absence: these say only what the row
             // says, never a bare "not found".
-            ("not_found", _) => Self::NotEstablished(why("no voucher of it was found")),
+            ("not_found", _) => {
+                Self::NotEstablished(why("not established: no voucher of it was found"))
+            }
             ("tally_reported_not_created", _) => {
                 Self::NotEstablished(why("Tally reported it not created"))
             }
@@ -185,7 +187,8 @@ impl Seen {
 
 /// Why a row that reads verified still stops its company: a duplicate of it
 /// (by kind), or a dispatch needing reconciliation, which is Tally's answer to
-/// the post unless that answer was clean, when it is the masters check.
+/// the post unless that answer was clean, when it is the masters check (or
+/// the duplicate already named).
 fn verified_words(result: &Value) -> String {
     let mut clauses = Vec::new();
     for duplicate in result["duplicates"].as_array().into_iter().flatten() {
@@ -198,13 +201,15 @@ fn verified_words(result: &Value) -> String {
             clauses.push(clause);
         }
     }
+    // A duplicate alone makes the dispatch need reconciliation, so with a
+    // clean answer the masters check is the cause only when none was found.
     let dispatch = &result["dispatch"];
     if dispatch["state"] == "reconciliation_required" {
-        clauses.push(if dispatch["response_state"] == "response_clean" {
-            "its ledgers are not confirmed as the masters approved"
-        } else {
-            "Tally's answer to the post needs a check"
-        });
+        if dispatch["response_state"] != "response_clean" {
+            clauses.push("Tally's answer to the post needs a check");
+        } else if clauses.is_empty() {
+            clauses.push("its ledgers are not confirmed as the masters approved");
+        }
     }
     if clauses.is_empty() {
         "found in Tally as built".into()
@@ -216,9 +221,6 @@ fn verified_words(result: &Value) -> String {
     }
 }
 
-/// The words of the dialog. They say what is being released and what it
-/// allows, before anything about the batch, because the title of the shared
-/// review dialog names only a review.
 /// `text` as the dialog shows it: a character that could reorder or hide what
 /// the person reads (the same ones the review dialog refuses) shows as `?`.
 /// The text comes from the journal and Tally, and a release must not become
@@ -238,8 +240,18 @@ fn shown(text: &str) -> String {
         .collect()
 }
 
-pub(super) fn release_preview(line: &ImportLedgerLine, company_name: &str, seen: &Seen) -> String {
-    let (company_name, batch_id) = (shown(company_name), shown(&line.batch_id));
+/// The words of the dialog. They say what is being released and what it
+/// allows, before anything about the batch, because the title of the shared
+/// review dialog names only a review. The company is named by the batch's
+/// recorded name, or by its GUID when it recorded none.
+pub(super) fn release_preview(line: &ImportLedgerLine, seen: &Seen) -> String {
+    let company = line
+        .company
+        .as_ref()
+        .map(|company| company.name.as_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or(&line.company_guid);
+    let (company_name, batch_id) = (shown(company), shown(&line.batch_id));
     let invoices = line
         .vouchers
         .iter()
@@ -320,17 +332,13 @@ impl Server {
                 ),
             ),
         };
-        // The read itself may have verified the batch: the stop is then gone,
-        // and nothing is asked.
+        // The stop may have lifted while the read ran (the batch read verified
+        // or was released meanwhile, whether or not this read completed):
+        // nothing is then asked.
         let Some(held) = self.stop_held(&line)? else {
             return Ok(self.stop_outcome(&line, "not_held", None, evidence));
         };
-        let company_name = held
-            .company
-            .as_ref()
-            .map(|company| company.name.clone())
-            .unwrap_or_default();
-        let preview = release_preview(&held, &company_name, &seen);
+        let preview = release_preview(&held, &seen);
         let count = VoucherCount::new(1).ok_or_else(|| "ack_stop_batch_not_sent".to_string())?;
         let _acknowledged = ReviewAcknowledged::confirm(count, &preview)
             .await

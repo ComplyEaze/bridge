@@ -287,9 +287,11 @@ async fn a_cancelled_release_is_refused_with_no_dialog() {
     assert_eq!(stop(&server), Some(line.batch_id));
 }
 
-/// The stop can lift while the release reads (here a verification records the
-/// batch verified while the read's last answer is held): nothing is asked or
-/// recorded, and the result says so.
+/// The stop can lift while the release reads: here another verification
+/// records the batch verified while the read's last answer is held, so the
+/// release's own read then fails to record (the journal moved under it) and
+/// the stop is found gone. Nothing is asked or recorded, and the result says
+/// so.
 #[tokio::test]
 async fn a_release_whose_read_finds_the_stop_gone_asks_nothing() {
     let directory = tempfile::tempdir().unwrap();
@@ -306,7 +308,12 @@ async fn a_release_whose_read_finds_the_stop_gone_asks_nothing() {
     posted(&server, &line);
     let (watched, other, other_line) = (Arc::clone(&simulator), Arc::clone(&server), line.clone());
     let verifier = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
         while watched.received() < held {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the read's last request never arrived"
+            );
             std::thread::sleep(Duration::from_millis(5));
         }
         status(&other, &other_line, "posted_verified");
@@ -368,11 +375,11 @@ fn what_was_seen_is_placed_for_every_status_the_verification_writes() {
         ("duplicate_fingerprint", None, "not_established", "vouchers with this invoice's content were found, none shown to be the one sent"),
         ("not_attributable", Some("tag_precedes_pre_import_voucher_mark"), "not_established", "a matching voucher was found, but it was in the book before this post"),
         ("not_attributable", Some("fingerprint_precedes_pre_import_voucher_mark"), "not_established", "a matching voucher was found, but it was in the book before this post"),
-        ("not_attributable", Some("observed_voucher_already_attributed"), "not_established", "a matching voucher was found, but it is already matched to another voucher of this batch"),
+        ("not_attributable", Some("observed_voucher_already_attributed"), "not_established", "a matching voucher was found, but it is already matched to another voucher"),
         ("not_attributable", Some("bound_master_id_changed"), "not_established", "a voucher carrying the identity of the one posted is in the book, but with another internal number; how is not established, for example the company's data were rewritten or copied"),
         ("bound_not_in_window", None, "not_established", "the voucher posted for this invoice is not in the book for these dates now"),
         ("book_rolled_back", None, "not_established", "the company's books are older than this post"),
-        ("not_found", None, "not_established", "no voucher of it was found"),
+        ("not_found", None, "not_established", "not established: no voucher of it was found"),
         ("tally_reported_not_created", None, "not_established", "Tally reported it not created"),
     ];
     let unplaced =
@@ -467,6 +474,13 @@ fn a_verified_row_says_why_it_is_not_confirmed() {
             json!({"state": "reconciliation_required", "response_state": "response_clean"}),
             but("its ledgers are not confirmed as the masters approved"),
         ),
+        // A duplicate alone makes the dispatch need reconciliation: with a
+        // clean answer, the duplicate is the whole reason.
+        (
+            json!([{"kind": "accounting_fingerprint"}]),
+            json!({"state": "reconciliation_required", "response_state": "response_clean"}),
+            but("another voucher has the same content"),
+        ),
         (
             json!([{"kind": "remote_id"}, {"kind": "accounting_fingerprint"}]),
             not_clean,
@@ -548,19 +562,32 @@ fn a_failed_read_is_shown_by_its_code() {
 }
 
 /// The dialog shows names from the journal and Tally with anything that could
-/// reorder or hide text, and any line break, as `?`, and still shows them.
+/// reorder or hide text, and any line break, as `?`, and still shows them. A
+/// batch that recorded no company name (or an empty one) names its company by
+/// GUID, never by nothing.
 #[test]
 fn the_release_dialog_does_not_show_text_that_could_mislead() {
     use super::super::super::stop::release_preview;
-    let line = batch("Sales", "http://127.0.0.1:9000");
+    let mut line = batch("Sales", "http://127.0.0.1:9000");
     let seen = Seen::of(
         &json!({"vouchers": [{"bridge_txn_id": "t1", "status": "posted_divergent"}]}),
         &line,
     );
+    let words = dialog(&line, "found in Tally, not confirmed as built");
+    line.company.as_mut().unwrap().name = "Acme\u{202e}Ltd\nPaid".to_string();
     assert_eq!(
-        release_preview(&line, "Acme\u{202e}Ltd\nPaid", &seen),
-        dialog(&line, "found in Tally, not confirmed as built")
-            .replace("WR2 Unicode Lab", "Acme?Ltd?Paid")
+        release_preview(&line, &seen),
+        words.replace("WR2 Unicode Lab", "Acme?Ltd?Paid")
+    );
+    line.company.as_mut().unwrap().name = String::new();
+    assert_eq!(
+        release_preview(&line, &seen),
+        words.replace("WR2 Unicode Lab", GUID)
+    );
+    line.company = None;
+    assert_eq!(
+        release_preview(&line, &seen),
+        words.replace("WR2 Unicode Lab", GUID)
     );
 }
 

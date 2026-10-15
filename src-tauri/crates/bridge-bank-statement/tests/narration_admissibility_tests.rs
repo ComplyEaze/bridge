@@ -148,7 +148,12 @@ fn a_party_holding_the_delimiter_is_not_refused_where_no_segment_is_written() {
     assert!(to_suspense.records[0].suspense);
     assert!(to_suspense.proposals[0].narration.contains("A|B"));
     // Skipped, nothing is written at all.
-    let skipped = built("A|B", &mapping(&[("A|B", "", Some("skip"))]), "ACC xx1234").unwrap();
+    let skipped = built(
+        "A|B",
+        &mapping(&[("A|B", "Other Bank", Some("skip"))]),
+        "ACC xx1234",
+    )
+    .unwrap();
     assert_eq!(skipped.records[0].disposition, Disposition::Skipped);
     assert!(skipped.proposals.is_empty());
 }

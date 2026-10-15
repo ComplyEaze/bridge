@@ -3,22 +3,23 @@
 [![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
 
 <!-- llms:begin -->
-ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime (also written Tally
-Prime) MCP server for Claude Desktop. It connects Claude Desktop to the
-TallyPrime running on your own computer, and it is built for chartered
-accountants, CA firms and accountants. What Claude reads from your books goes to
-your AI provider as part of the chat. You can ask about the trial balance,
-outstanding receivables and payables with ageing, ledger movement and vouchers,
-the purchase and sales registers, the stock summary,
-and the Profit and Loss and Balance Sheet (a book with stock items is expected
-to be refused for these two). It checks ledger names before you post. For bank
-statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
-vouchers from a password-protected SBI, HDFC or Union Bank of India statement
-PDF, and it prepares Journal, Payment, Receipt and Contra vouchers as an import
-file that you review and import into TallyPrime yourself. Posting is off by
-default, so as installed it never posts to TallyPrime: it reads from it and
-prepares files on your computer. If you turn posting on in the extension, it
-posts vouchers one at a time, after you approve each one.
+ComplyEaze Bridge is an open-source (Apache-2.0) MCP server that connects
+Claude Desktop to the TallyPrime (also written Tally Prime) running on your own
+computer. It is built for chartered accountants, CA firms and accountants. It
+reads your books; from a password-protected SBI, HDFC or Union Bank of India
+statement PDF it proposes Payment, Receipt and Contra vouchers, and once every
+ledger name is exact and every question is answered it writes them to a file
+that you import in TallyPrime yourself. What Claude reads from your books goes to your AI provider as part of
+the chat. You can ask about the trial balance, outstanding receivables and
+payables with ageing, ledger movement and vouchers, the purchase and sales
+registers, the stock summary, and the Profit and Loss and Balance Sheet (a book
+with stock items is expected to be refused for these two). It checks ledger
+names before you post, and prepares Journal, Payment, Receipt and Contra
+vouchers as an import file that you review and import into TallyPrime yourself.
+Posting is off by default in a new install, so as installed it never posts to
+TallyPrime: it reads from it and prepares files on your computer. If you turn
+posting on in the extension, it posts vouchers one at a time, after you approve
+each one.
 
 Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop;
 its help pages (last updated 18 September 2026) list tools in six groups:

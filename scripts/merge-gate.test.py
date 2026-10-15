@@ -22,6 +22,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -1319,6 +1320,147 @@ class MergeVerdictEvaluator(unittest.TestCase):
 
     def test_the_owner_id_is_the_numeric_id_of_the_owner_account(self):
         self.assertEqual(self.mod.OWNER_ID, 57982425)
+
+
+class PrivacyScanDecodesUtf16(unittest.TestCase):
+    """A value in text written in UTF-16 is spaced out by NUL bytes, which hides it from
+    every pattern, so a caller that hands the classifier the raw bytes must still
+    get it read as the text it stands for. Digits are synthetic and built from
+    parts: this file is scanned by the gate it tests."""
+
+    RUN = "12345" + "678901"
+    LINE = "Account reference: " + RUN + "\n"
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def utf8_view(self, raw):
+        """What a reader that assumes UTF-8 sees: NUL is a valid UTF-8 character."""
+        return raw.decode("utf-8")
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def run_main(self, raw, locale="C"):
+        # A stream is decoded by the process locale unless the reader decodes the bytes itself.
+        done = subprocess.run(
+            ["python3", "-I", str(PRIVACY_MODULE_PATH), "--head", HEAD],
+            input=raw, capture_output=True, env=dict(os.environ, LC_ALL=locale, LANG=locale),
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout)
+
+    def test_a_long_digit_run_in_utf16le_without_a_bom_is_blocked(self):
+        text = self.utf8_view(self.LINE.encode("utf-16-le"))
+        self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_a_long_digit_run_in_utf16be_without_a_bom_is_blocked(self):
+        text = self.utf8_view(self.LINE.encode("utf-16-be"))
+        self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_a_utf16_segment_among_utf8_lines_is_decoded_and_the_rest_is_untouched(self):
+        raw = b"title line\n+" + self.LINE.encode("utf-16-le") + b"+" + b"plain line\n"
+        record = self.privacy.scan(self.utf8_view(raw), HEAD)
+        self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+        self.assertTrue(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_value_that_is_the_whole_text_loses_no_character_to_the_decoding(self):
+        # The run starts at the first digit and ends at the last: dropping either one leaves ten.
+        for codec in ("utf-16-le", "utf-16-be"):
+            with self.subTest(codec=codec):
+                text = self.utf8_view(self.RUN.encode(codec))
+                self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_digits_outside_ascii_after_a_byte_order_mark_are_decoded_whole(self):
+        # Python reads these as digits too; each code unit has no NUL beside it, so only the mark finds them.
+        digits = "".join(chr(0x0966 + int(c)) for c in "123456789012")
+        for codec, bom in (("utf-16-le", b"\xff\xfe"), ("utf-16-be", b"\xfe\xff")):
+            with self.subTest(codec=codec):
+                record = self.run_main(bom + digits.encode(codec))
+                self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+
+    def test_a_short_run_next_to_plain_digits_is_joined_to_them_on_either_side(self):
+        # Each side of the NUL is needed: dropping one leaves the run undecoded and the digits split.
+        # The digits are chosen so that neither half alone is an identifier shape or a long run.
+        for raw in ("123456789".encode() + "01".encode("utf-16-le"), "01".encode("utf-16-be") + "987654321".encode()):
+            with self.subTest(raw=raw):
+                self.assertTrue(any("long digit run" in b for b in self.blockers(self.utf8_view(raw))))
+
+    def test_latin_1_letters_beside_nul_bytes_are_not_read_as_utf16(self):
+        # Valid UTF-16 text never reaches the scan this way: a code unit above 0x7f is not valid UTF-8 beside a NUL.
+        record = self.privacy.scan("\u00e9\x00\u00e9\x00\u00e9\x00", HEAD)
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_decoding_a_run_never_hides_a_number_the_original_text_shows(self):
+        # The decoded run is "ab", a word that now touches the digits and removes the boundary the
+        # patterns need before a grouped number; the original, with its NULs, still has the boundary.
+        run = "a\x00b\x00"
+        for number in ("1234-5678-9012", "011-2345-6789", "022 23456789"):
+            with self.subTest(number=number):
+                text = run + number
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], text)
+
+    def test_text_that_has_a_nul_run_is_blocked_whenever_the_same_text_without_decoding_is(self):
+        import random
+        random.seed(20261015)
+        parts = ["a\x00b\x00", "\x00x\x00y", " ", "-", "1234-5678-9012", "011-2345-6789", "022 23456789",
+                 "98765" + "43210", "12345" + "678901", "(", ")", "ab", "x" + "@" + "example.com", "C" + ":", "/Us" + "ers/", "z"]
+        original_only = mock.patch.object(self.privacy, "decode_utf16_runs", lambda text: (text, 0))
+        checked = 0
+        for _ in range(3000):
+            text = "".join(random.choice(parts) for _ in range(random.randint(1, 6)))
+            if "\x00" not in text:
+                continue
+            with original_only:
+                before = bool(self.privacy.scan(text, HEAD)["blockers"])
+            if before:
+                checked += 1
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], repr(text))
+        self.assertGreater(checked, 100, "the generator must reach inputs the original reading blocks")
+
+    def test_a_mark_never_hides_what_the_utf8_reading_shows(self):
+        digits = self.RUN + "\n"
+        for name, raw in (
+            ("utf-8 digits after a utf-16 file", b"\xff\xfe" + "hello\n".encode("utf-16-le") + digits.encode()),
+            ("plain digits after a bare mark", b"\xff\xfe" + digits.encode()),
+            ("big-endian mark over little-endian body", b"\xfe\xff" + digits.encode("utf-16-le")),
+            ("two marked files", b"\xff\xfe" + "ab\n".encode("utf-16-le") + b"\xfe\xff" + digits.encode("utf-16-be")),
+        ):
+            with self.subTest(name=name):
+                record = self.run_main(raw)
+                self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+
+    def test_harmless_utf16_text_is_not_blocked_and_is_noted(self):
+        text = self.utf8_view("Release notes for the build.\n".encode("utf-16-le"))
+        record = self.privacy.scan(text, HEAD)
+        self.assertEqual(record["blockers"], [], record)
+        self.assertTrue(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_text_without_nul_bytes_is_scanned_exactly_as_before(self):
+        record = self.privacy.scan("Release notes for the build.\n", HEAD)
+        self.assertEqual(record["blockers"], [])
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_single_stray_nul_is_not_read_as_utf16(self):
+        record = self.privacy.scan("a\x00b and nothing else\n", HEAD)
+        self.assertEqual(record["blockers"], [])
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_located_line_in_utf16_is_reported_by_location_without_its_value(self):
+        document = {"sources": [], "added": [{"path": "docs/example.md", "line": 5,
+                    "text": self.utf8_view(self.LINE.encode("utf-16-le"))}]}
+        result = self.privacy.explain(document, HEAD)
+        self.assertEqual([h["where"] for h in result["hits"]], ["docs/example.md:5"])
+        self.assertNotIn(self.RUN, json.dumps(result))
+
+    def test_bytes_that_are_not_utf8_are_indeterminate_whatever_the_locale(self):
+        unreadable = ["could not read privacy scan input"]
+        for locale in ("C", "en_US.UTF-8"):
+            for raw in (b"\x80\x81 not text", b"\xff\xfe" + b"abc"):
+                with self.subTest(locale=locale, raw=raw):
+                    record = self.run_main(raw, locale)
+                    self.assertEqual(record["indeterminate"], unreadable)
+                    self.assertEqual(record["blockers"], [])
 
 
 if __name__ == "__main__":

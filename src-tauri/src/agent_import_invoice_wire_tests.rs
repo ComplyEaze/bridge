@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 
 /// The shape of the lab's voucher-type collection (measured 6 Oct 2026): a
 /// CMPINFO counter named like the rows, then one VOUCHERTYPE per type with its
@@ -215,7 +216,7 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         "A$B",
         "x OR y; \"",
         "\u{e9}",
-        "12345678901234567",
+        "1".repeat(17).as_str(),
     ] {
         assert!(
             render_invoice_number_request("Co", bad_number, ("20250401", "20260331")).is_none(),
@@ -223,7 +224,7 @@ fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
         );
     }
     assert!(
-        render_invoice_number_request("Co", "1234567890123456", ("20250401", "20260331")).is_some()
+        render_invoice_number_request("Co", &"1".repeat(16), ("20250401", "20260331")).is_some()
     );
     assert!(render_invoice_number_request("Co", "1", ("2025-04-01", "20260331")).is_none());
 }
@@ -262,10 +263,10 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
 
 #[test]
 fn the_readback_read_is_dated_and_by_type_guid_and_number() {
-    let guid = "11111111-2222-4333-8444-555555555555-00000193";
+    let guid = &format!("{}-00000193", sentinel_uuid(0x5));
     let request =
         render_invoice_readback_request("Co", guid, "278", ("20250401", "20260331")).unwrap();
-    assert!(request.contains("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"11111111-2222-4333-8444-555555555555-00000193\"</SYSTEM>"));
+    assert!(request.contains(&format!("$Date &gt;= $$Date:\"20250401\" AND $Date &lt;= $$Date:\"20260331\" AND $VoucherNumber = \"278\" AND $GUID:VoucherType:$VoucherTypeName = \"{guid}\"</SYSTEM>")));
     assert!(request.contains("ALLLEDGERENTRIES.*"));
     assert!(
         render_invoice_readback_request("Co", "g\"", "278", ("20250401", "20260331")).is_none()
@@ -336,7 +337,7 @@ fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic
     assert_eq!(
         resolve_voucher_type(&types, "BRIDGE Sales", "Sales"),
         Ok(ResolvedVoucherType {
-            guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce".into(),
+            guid: format!("{}-000000ce", pilot_lab_guid()),
             class: "Sales".into(),
         })
     );
@@ -454,6 +455,7 @@ fn the_captured_read_back_carries_every_field_of_a_posted_invoice() {
     else {
         panic!("one voucher");
     };
+    let posted_guid = format!("{}-0000000b", pilot_lab_guid());
     for (key, value) in [
         ("DATE", "20260801"),
         ("VOUCHERNUMBER", "BP/26-27/0010"),
@@ -467,7 +469,7 @@ fn the_captured_read_back_carries_every_field_of_a_posted_invoice() {
         ("ISINVOICE", "Yes"),
         ("ISCANCELLED", "No"),
         ("ISOPTIONAL", "No"),
-        ("GUID", "6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b"),
+        ("GUID", posted_guid.as_str()),
         ("ALTERID", "17"),
     ] {
         assert_eq!(field(&posted, key).as_deref(), Some(value), "{key}");

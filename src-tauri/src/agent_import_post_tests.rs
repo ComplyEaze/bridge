@@ -4,6 +4,7 @@
     reason = "test doubles: local sockets, servers and processes"
 )]
 use super::*;
+use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid, wr2_lab_guid};
 use bridge_tally_transport::TallyEndpointConfig;
 
 fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
@@ -3800,7 +3801,7 @@ fn a_text_refusal_says_to_build_again_only_when_no_attempt_was_recorded() {
 /// refused in the queue, after the approval was spent.
 #[test]
 fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_else() {
-    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let company_guid = &wr2_lab_guid();
     let decode = |bytes: &[u8]| {
         String::from_utf16(
             &bytes
@@ -3820,7 +3821,7 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
     let line: ImportLedgerLine = serde_json::from_value(json!({
-        "batch_id":"bridge-00000000-0000-4000-8000-0000000000a1",
+        "batch_id": sentinel_batch_id(0xa1),
         "identity_scheme":"batch_v1", "company_guid":company_guid,
         "txn_ids":["INV_1"],
         "date_from":"20260907", "date_to":"20260907", "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
@@ -3993,10 +3994,12 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
     // entries, on a line of the dialog's own that carries none of the voucher's
     // text; no ledger is recorded as approved On Account, so no line is marked
     // and there is no line under the entries.
+    let company_line = format!("Company GUID: {}", sentinel_uuid(2));
+    let batch_line = format!("Batch: {}", sentinel_batch_id(1));
     let text = |entries: [&str; 5], under_the_entries: &str| {
         [
             "Create ONE Sales invoice in \"Synthetic Accounts\"",
-            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            company_line.as_str(),
             "Company number: 100001  Books from: 20260401",
             "Tally: http://127.0.0.1:9001  (the voucher's own text: last two lines)",
             "Voucher type: \"Sales Acc\"  Date: 20260901  Number: \"278\"",
@@ -4014,7 +4017,7 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
             // trailing zeros.
             "Total debit: 11200.4  Total credit: 11200.4",
             "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
-            "Batch: bridge-00000000-0000-4000-8000-000000000001",
+            batch_line.as_str(),
             "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
             "Do not post a file already imported manually. Pause other edits/imports in this company.",
             "After a timeout, reconcile this batch; do not rebuild or resend it.",
@@ -4968,7 +4971,7 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
 /// that type; no evidence of what Tally stores for an invoice.
 #[test]
 fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_unsettled_batch() {
-    let company_guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let company_guid = &wr2_lab_guid();
     let decode = |bytes: &[u8]| {
         String::from_utf16(
             &bytes
@@ -5002,7 +5005,7 @@ fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_un
     .unwrap();
     let refused_as_in_the_book = |number: &str, identity: InvoiceIdentity| {
         let line: ImportLedgerLine = serde_json::from_value(json!({
-            "batch_id":"bridge-00000000-0000-4000-8000-000000000691",
+            "batch_id": sentinel_batch_id(0x691),
             "identity_scheme":"batch_v1", "company_guid":company_guid,
             "txn_ids":["inv-1"],
             "date_from":"20260907", "date_to":"20260907", "sha256":"",

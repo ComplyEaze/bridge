@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 use crate::agent::agent_import::VoucherType;
 use serde_json::json;
 
@@ -150,7 +151,7 @@ fn structure_admits_the_plain_invoice_and_refuses_each_defect() {
         Ok(())
     );
     // Outside GST rule 46(b): a space, a period, an underscore, over 16 characters.
-    for bad in ["INV 0042", "INV.0042", "INV_0042", "12345678901234567"] {
+    for bad in ["INV 0042", "INV.0042", "INV_0042", &"1".repeat(17)] {
         assert_eq!(
             mutated(&|v| v.voucher_number = Some(bad.into())),
             "invoice_number_invalid",
@@ -445,11 +446,16 @@ fn observed() -> InvoiceObserved {
 fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     let mut v = voucher();
     v.invoice.as_mut().unwrap().observed = Some(observed());
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let xml =
         render_sales_invoice_xml(&v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
-    let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"11111111-1111-1111-1111-111111111111\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11200.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11200.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>600.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>600.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
-    assert_eq!(xml, expected.replace("@GSTIN@", GSTIN_RJ));
+    let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"@ID@\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11200.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11200.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>600.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>600.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
+    assert_eq!(
+        xml,
+        expected
+            .replace("@GSTIN@", GSTIN_RJ)
+            .replace("@ID@", &id.to_string())
+    );
     assert!(
         !xml.contains("ALLLEDGERENTRIES"),
         "an invoice view silently drops ALLLEDGERENTRIES"
@@ -477,7 +483,7 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     let mut v = voucher();
     v.entries[0].ledger = "A & B \"Co\" <x>".to_string();
     v.invoice.as_mut().unwrap().observed = Some(observed());
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
     assert!(!xml.contains("A & B"));
     assert!(xml.contains("A &amp; B"));
@@ -571,7 +577,7 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
     seen.party_registration_type = "Unregistered/Consumer".to_string();
     seen.party_bill_wise = false;
     v.invoice.as_mut().unwrap().observed = Some(seen);
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
     assert!(!xml.contains("PARTYGSTIN"));
     assert!(xml.contains("<GSTREGISTRATIONTYPE>Unregistered/Consumer</GSTREGISTRATIONTYPE>"));
@@ -588,7 +594,7 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// attributes Tally adds, wrapped as a collection response. Built from the
 /// renderer, so what is written and what is compared cannot drift apart.
 fn readback_xml(v: &ImportVoucher) -> String {
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let rendered =
         render_sales_invoice_xml(v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
     let voucher = rendered
@@ -937,9 +943,10 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
 /// and numbers are synthetic.
 #[test]
 fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
+    let remote_id = sentinel_uuid(0x2b);
     let xml = format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
-<VOUCHER REMOTEID=\"22222222-2222-2222-2222-222222222222\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
+<VOUCHER REMOTEID=\"{remote_id}\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
 <DATE TYPE=\"Date\">20260310</DATE><EFFECTIVEDATE TYPE=\"Date\">20260310</EFFECTIVEDATE><REFERENCEDATE TYPE=\"Date\">20260310</REFERENCEDATE>\
 <GUID TYPE=\"String\">g-1</GUID><PARTYGSTIN TYPE=\"String\">{GSTIN_RJ}</PARTYGSTIN><STATENAME TYPE=\"String\">Rajasthan</STATENAME>\
 <PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><VOUCHERTYPENAME TYPE=\"String\">Sales</VOUCHERTYPENAME><PARTYLEDGERNAME TYPE=\"String\">Customer A</PARTYLEDGERNAME>\
@@ -990,7 +997,7 @@ fn pilot_posted(number: &str) -> ImportVoucher {
         "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":number,
         "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan","round_off_ledger":"BRIDGE Round Off",
             "observed":{
-                "voucher_type_guid":"6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce",
+                "voucher_type_guid":format!("{}-000000ce", pilot_lab_guid()),
                 "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
                 "party_bill_wise":false, "company_state":"Rajasthan"
             }},

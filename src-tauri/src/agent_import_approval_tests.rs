@@ -620,13 +620,22 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
 // other call polled. Before it, a call is only driven to its open dialog, which
 // waits on the repeat's own simulator (its own port) and decides nothing; the
 // 16 calls are driven side by side on this task, and the moment a call's dialog
-// opens it is decided, so no call that has opened ever waits un-polled.
+// opens it is decided; no call is polled after its dialog has opened.
 #[tokio::test(flavor = "current_thread")]
 async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
     use std::future::Future;
     use std::pin::Pin;
     use std::task::Poll;
     const REPEATS: usize = 16;
+    /// Names the repeat being driven or decided, if a panic happens meanwhile.
+    struct Polling(usize);
+    impl Drop for Polling {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                eprintln!("repeat {}: panicked while it was driven or decided", self.0);
+            }
+        }
+    }
     struct Repeat {
         simulator: std::cell::RefCell<Option<SequenceSimulator>>,
         directory: tempfile::TempDir,
@@ -691,6 +700,7 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
                     if decided[number] {
                         continue;
                     }
+                    let _polling = Polling(number);
                     // The dialog first: a call whose dialog has opened must not be
                     // polled again, because its wait for the answer is bounded and a
                     // call polled after that bound returns pending, not at its dialog.
@@ -708,8 +718,12 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
             }),
         )
         .await
-        .unwrap_or_else(|_| panic!("the calls did not all open their dialogs: {decided:?}"));
+        .unwrap_or_else(|_| {
+            let stuck: Vec<usize> = (0..REPEATS).filter(|number| !decided[*number]).collect();
+            panic!("the calls of repeats {stuck:?} did not open their dialogs")
+        });
         decided[number] = true;
+        let _polling = Polling(number);
         let repeat = &repeats[number];
         // Answer, and let the dialog's task take it, without polling the
         // call. On this current-thread runtime the task drops its end of

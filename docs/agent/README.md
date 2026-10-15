@@ -3013,12 +3013,15 @@ says how the batch ended, counted voucher by voucher from the verification's own
 tool arguments and never stored in the proof (a later page recomputes the same one from the saved
 proof). The lead says whether the batch is confirmed: for a batch of one voucher it is a sentence about
 that voucher, and for a batch of several vouchers it gives their number and, when some are not
-confirmed, how many are confirmed (`posted_verified`) and how many are not. The counts are always in `batch`, which holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
+confirmed, how many read back (`posted_verified`) and how many are not. The counts are always in `batch`, which holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
 and `unrecognised` for any status this build does not know) and `verdict` (`posted_verified` only when
 every voucher is confirmed and the readback as a whole is). When every voucher reads back but the
 batch as a whole is not confirmed (a duplicate, a doubt about the ledgers or the voucher mark, or an
 answer from Tally that was not clean or is missing), the lead says so and does not call the batch
-confirmed. When some vouchers are not confirmed, the lead says that each row says what was found and
+confirmed. When only some vouchers read back, the counts hold the rows only and cannot tell a doubt
+about the whole batch from a doubt about one row, so the lead says that the vouchers read back and that
+the batch is not confirmed, and never calls those vouchers confirmed. When some vouchers are not
+confirmed, the lead says that each row says what was found and
 gives a next step where there is one: only four statuses (`bound_not_in_window`, `book_rolled_back`,
 `sent_not_attributed`, `tally_reported_not_created`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
 (`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a

@@ -700,7 +700,7 @@ fn a_batch_with_vouchers_left_says_how_many_and_counts_each_status() {
     );
     assert_eq!(
         partly.headline().lead,
-        "1 of 4 vouchers of this batch is confirmed in Tally. 3 are not: check each in Tally before doing anything else with it; each row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
+        "1 of 4 vouchers of this batch reads back in Tally, but the batch is not confirmed; the result says why. Check the batch in Tally before doing anything else with it, starting with each of the other 3; each row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
     );
     assert_eq!(
         serde_json::to_value(&partly).unwrap(),
@@ -721,7 +721,68 @@ fn a_batch_with_vouchers_left_says_how_many_and_counts_each_status() {
     );
     assert_eq!(
         one.headline().lead,
-        "2 of 3 vouchers of this batch are confirmed in Tally. 1 is not: check it in Tally before doing anything else with it; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
+        "2 of 3 vouchers of this batch read back in Tally, but the batch is not confirmed; the result says why. Check the batch in Tally before doing anything else with it, starting with the other one; its row says what was found, and gives a next step where there is one. ComplyEaze Bridge will not send this saved batch again."
+    );
+}
+
+/// Some vouchers read back and the rest do not. The counts hold only the rows,
+/// so a doubt about the whole batch (an answer from Tally that was lost or not
+/// clean, a doubt about the ledgers or the voucher mark, a duplicate) cannot
+/// be told from a doubt about one row: the vouchers that read back are never
+/// called confirmed, and the sentence always says the batch is not, whatever
+/// verdict the caller passed.
+#[test]
+fn a_batch_that_reads_back_in_part_is_never_called_confirmed_and_always_says_the_batch_is_not() {
+    let others = [
+        "matching_content_observed",
+        "sent_not_attributed",
+        "tally_reported_not_created",
+        "posted_divergent",
+        "posted_not_effective",
+        "not_found",
+        "not_attributable",
+        "duplicate_fingerprint",
+        "bound_not_in_window",
+        "book_rolled_back",
+        "mystery",
+    ];
+    for other in others {
+        for read_back in 1..=3 {
+            for rest in 1..=2 {
+                let mut statuses = vec!["posted_verified"; read_back];
+                statuses.extend(std::iter::repeat_n(other, rest));
+                let vouchers = read_back + rest;
+                // The caller's verdict is replaced by the rows; a batch built
+                // with the other verdict directly must read the same.
+                let mut batches = vec![
+                    outcome(&statuses, BatchVerdict::PostedVerified),
+                    outcome(&statuses, BatchVerdict::VerificationIncomplete),
+                ];
+                let mut forced = outcome(&statuses, BatchVerdict::VerificationIncomplete);
+                forced.verdict = BatchVerdict::PostedVerified;
+                batches.push(forced);
+                for batch in batches {
+                    let lead = batch.headline().lead;
+                    let case = format!("{other} {read_back}+{rest}: {lead}");
+                    let reads = if read_back == 1 { "reads" } else { "read" };
+                    assert!(
+                        lead.starts_with(&format!(
+                            "{read_back} of {vouchers} vouchers of this batch {reads} back in Tally, but the batch is not confirmed; the result says why. Check the batch in Tally before doing anything else with it, starting with "
+                        )),
+                        "{case}"
+                    );
+                    assert!(!lead.contains("confirmed in Tally"), "{case}");
+                }
+            }
+        }
+    }
+    // Nothing read back and several vouchers: none is confirmed, and the
+    // sentence says so.
+    assert!(
+        outcome(&["not_found", "not_found"], BatchVerdict::PostedVerified)
+            .headline()
+            .lead
+            .starts_with("0 of 2 vouchers of this batch are confirmed in Tally. 2 are not:")
     );
 }
 

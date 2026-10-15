@@ -117,10 +117,13 @@ impl AgentReadRequest {
         ))
     }
 
-    /// Whether this is the company Object export ([`Self::company_object`] is the
-    /// only way to build one). Its answer's `HEADER` also carries the product
-    /// release fields, which the collection status check refuses; the company
-    /// part's own admission checks its status instead.
+    /// Whether this is the company Object export. [`Self::company_object`] is the only
+    /// way to build one ([`Self::parse`] refuses every `Object` envelope), so a request
+    /// that says so is that template. The text is tested, not a stored flag: a flag made
+    /// `cargo clippy` fail `large_enum_variant` in `agent_import_post.rs` (measured). A
+    /// collection whose embedded TDL merely contained the words would only have the five
+    /// numeric release fields set aside from its answer; every other check of the envelope
+    /// still applies. Its answer's `HEADER` carries those fields (item 697-S0A).
     pub(crate) fn is_company_object(&self) -> bool {
         self.0.contains("<TYPE>Object</TYPE>")
     }

@@ -73,7 +73,10 @@ fn identity() -> VerifiedCompanyIdentity {
 /// books-from the crate's company part reads.
 fn company_object(guid: &str) -> String {
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>\
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS>\
+         <PRODMAJORVER>1</PRODMAJORVER><PRODMINORVER>1</PRODMINORVER>\
+         <PRODMAJORREL>7</PRODMAJORREL><PRODMINORREL>1</PRODMINORREL><PRODTYPE>5</PRODTYPE>\
+         </HEADER><BODY><DATA>\
          <TALLYMESSAGE><COMPANY NAME=\"{FIXTURE_NAME}\" RESERVEDNAME=\"\">\
          <GUID TYPE=\"String\">{guid}</GUID><BOOKSFROM TYPE=\"Date\">20250401</BOOKSFROM>\
          <ISINTEGRATED TYPE=\"Logical\">No</ISINTEGRATED></COMPANY></TALLYMESSAGE>\

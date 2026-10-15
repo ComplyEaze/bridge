@@ -647,16 +647,20 @@ async fn fetch_admitted_audit_part(
             raw.encoded_body.len(),
         ),
     };
-    // A collection answer's status is checked here. The company Object export's
-    // header carries more fields than that check admits, so its status is checked
-    // by the company part's own admission (`admit_audit_company_part`), which the
-    // caller must run on the body before using it.
-    if !window.is_company_object()
-        && !matches!(
-            bridge_tally_protocol::export_status(&raw.text),
-            Ok(bridge_tally_protocol::TallyExportStatus::Success)
-        )
-    {
+    // The same envelope check for every answer. The company Object export's
+    // header also carries five product release fields (item 697-S0A), which are
+    // set aside first; everything else about its envelope is still checked. The
+    // company part's own admission (`admit_audit_company_part`) then checks it
+    // again, as the audit read does on the body.
+    let envelope = if window.is_company_object() {
+        without_release_header(&raw.text)
+    } else {
+        std::borrow::Cow::Borrowed(raw.text.as_str())
+    };
+    if !matches!(
+        bridge_tally_protocol::export_status(&envelope),
+        Ok(bridge_tally_protocol::TallyExportStatus::Success)
+    ) {
         return Err(with_read_evidence(
             AuditResponseRejected.into(),
             evidence.clone(),
@@ -686,6 +690,44 @@ async fn fetch_admitted_audit_part(
         evidence,
         boundary_profile,
     })
+}
+
+/// The company Object export's answer with its five product release fields
+/// (`PRODMAJORVER`, `PRODMINORVER`, `PRODMAJORREL`, `PRODMINORREL`, `PRODTYPE`) taken out of
+/// the `HEADER`, each at most once and only when its value is a number. A repeated field,
+/// a value that is not a number and any other header field stay, so the envelope check
+/// refuses them.
+fn without_release_header(text: &str) -> std::borrow::Cow<'_, str> {
+    const FIELDS: [&str; 5] = [
+        "PRODMAJORVER",
+        "PRODMINORVER",
+        "PRODMAJORREL",
+        "PRODMINORREL",
+        "PRODTYPE",
+    ];
+    let Some(start) = text.find("<HEADER>") else {
+        return std::borrow::Cow::Borrowed(text);
+    };
+    let Some(length) = text[start..].find("</HEADER>") else {
+        return std::borrow::Cow::Borrowed(text);
+    };
+    let end = start + length;
+    let mut header = text[start..end].to_string();
+    for field in FIELDS {
+        let (open, close) = (format!("<{field}>"), format!("</{field}>"));
+        let Some(at) = header.find(&open) else {
+            continue;
+        };
+        let value_start = at + open.len();
+        let Some(value_length) = header[value_start..].find(&close) else {
+            continue;
+        };
+        let value = &header[value_start..value_start + value_length];
+        if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
+            header.replace_range(at..value_start + value_length + close.len(), "");
+        }
+    }
+    std::borrow::Cow::Owned(format!("{}{}{}", &text[..start], header, &text[end..]))
 }
 
 /// An approved import response retains the import wire separately from the

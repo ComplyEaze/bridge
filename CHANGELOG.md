@@ -143,6 +143,15 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- One setting now covers all posting: with posting on, ComplyEaze Bridge posts one voucher per
+  approval, or a saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, after
+  one approval of the batch's summary (#1090). In the extension it is a new setting, **Allow voucher
+  posting, one voucher or a batch of up to 50**, off by default: if you turned posting on in 0.5.1 or
+  earlier, it starts off after you upgrade, and you turn it on again under the new text. On the command
+  line, `BRIDGE_AGENT_ENABLE_WRITES` now admits batches too, and the separate
+  `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set and posting is on, `post_import` refuses
+  as `setting_retired` until you remove it. A batch saved earlier that was refused as more than one
+  voucher now posts after its own approval.
 - `post_import` and `build_import_xml` now refuse a voucher sent without a voucher number into a voucher type whose
   voucher numbering does not read Automatic, as `import_voucher_numbering_not_automatic`, and into one that reads
   Automatic without the sub-method `Auto Retain` (the screen's "Retain Original Voucher No."), as

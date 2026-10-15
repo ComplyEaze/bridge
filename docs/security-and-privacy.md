@@ -51,12 +51,13 @@ Four tools read nothing from Tally. They read ComplyEaze Bridge's own files on
 this computer: its receipt log, the evidence it kept for a read, the voucher
 format it accepts, and a report of what it has stored (section 4).
 
-It writes to Tally only if you turn posting on, and then only one voucher at a
-time (a Journal, Payment, Receipt or Contra it prepared and saved), after you
-approve that voucher in a separate ComplyEaze Bridge window. No ComplyEaze
-Bridge tool can approve it. The server program also has a setting for posting 2
-to 50 vouchers of one saved batch after one approval; the published extension
-neither offers nor sets it, so it applies only if someone sets it by hand.
+It writes to Tally only if you turn posting on, and then only a Journal,
+Payment, Receipt or Contra it prepared and saved: one voucher at a time, or a
+saved batch of 2 to 50, each post after you approve it in a separate ComplyEaze
+Bridge window (for a batch, its summary). No ComplyEaze Bridge tool can approve
+it. From the build after 0.5.1, one setting covers both, and a posting choice
+saved for an earlier version starts off; in 0.5.1 and earlier, posting through
+the extension is one voucher at a time.
 
 Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
 accepted in the extension settings. In 0.5.0 the setting was marked required, and

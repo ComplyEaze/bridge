@@ -96,8 +96,9 @@ a caller. They are recorded so that a later re-add does not repeat them.
    fallback for both the voucher mark and the master mark. With marks 500 and 900, `alter_id=500`
    would have started the master feed at 501: masters 1 to 500 never returned, and the result would
    have looked complete. The reverse, `alter_id=900`, put the voucher cursor past its snapshot and
-   was refused (`change_checkpoint_exceeds_snapshot`). That argument was not reachable even without the refusal: the published schema had no `alter_id`
-   property, so `validate_tool_arguments` refused it as `argument_unknown`. A re-add must not accept a
+   was refused (`change_checkpoint_exceeds_snapshot`). That argument was not reachable even
+   without the refusal: the published schema had no `alter_id` property, so
+   `validate_tool_arguments` refused it as `argument_unknown`. A re-add must not accept a
    legacy single cursor at all, or must refuse it whenever the two marks differ.
 2. **Rows were cut by AlterID alone.** Ledger and group rows were merged, sorted by AlterID and
    cut at the page size, and the last AlterID became the next cursor. Two rows of different kinds

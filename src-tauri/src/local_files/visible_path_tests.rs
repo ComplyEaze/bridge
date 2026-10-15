@@ -9,8 +9,8 @@ fn stripped(text: &str) -> PathBuf {
 fn a_verbatim_drive_path_loses_its_prefix() {
     assert_eq!(stripped(r"\\?\C:\x"), PathBuf::from(r"C:\x"));
     assert_eq!(
-        stripped(r"\\?\D:\Users\a\AppData\Local\Bridge\agent"),
-        PathBuf::from(r"D:\Users\a\AppData\Local\Bridge\agent")
+        stripped(r"\\?\D:\Profiles\a\AppData\Local\Bridge\agent"),
+        PathBuf::from(r"D:\Profiles\a\AppData\Local\Bridge\agent")
     );
     assert_eq!(stripped(r"\\?\C:"), PathBuf::from(r"C:"));
 }

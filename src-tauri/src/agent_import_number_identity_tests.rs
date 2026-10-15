@@ -7,8 +7,6 @@
 //! Contra or Journal batch reports.
 use super::*;
 
-const GUID: &str = "11111111-2222-4333-8444-555555555555";
-
 fn row(
     suffix: u32,
     voucher_type: &str,
@@ -62,7 +60,7 @@ fn window() -> ImportReadSource {
 /// A saved batch of one Payment dated 11-Mar-2026.
 fn payment_batch(debit: &str, amount: &str) -> ImportLedgerLine {
     serde_json::from_value(json!({
-        "batch_id":"bridge-00000000-0000-4000-8000-00000000000a",
+        "batch_id": sentinel_batch_id(0xa),
         "identity_scheme":"batch_v1",
         "company_guid":GUID,
         "company":{"name":"Lab", "guid":GUID, "company_number":"100001", "books_from":"20250401"},
@@ -378,7 +376,7 @@ fn the_identity_is_read_from_the_journal_only_for_an_invoice_batch() {
     });
     let bank = payment_batch("Rent", "500.00");
     let mut earlier = invoice_batch("INV/1");
-    earlier.batch_id = "bridge-00000000-0000-4000-8000-00000000000b".into();
+    earlier.batch_id = sentinel_batch_id(0xb);
     let invoice = invoice_batch("INV/2");
     server.append_import_ledger(&earlier).expect("saved batch");
     // The exclusive lock held by another writer.
@@ -441,7 +439,7 @@ fn a_verification_beside_an_unsettled_batch_matches_the_invoice_by_its_figures()
         batch_post_enabled: false,
     });
     let mut earlier = invoice_batch("INV/26-27/011");
-    earlier.batch_id = "bridge-00000000-0000-4000-8000-00000000000b".into();
+    earlier.batch_id = sentinel_batch_id(0xb);
     let invoice = invoice_batch("INV/26-27/002");
     let keyed = || {
         ImportReadSource::admit(vec![row(

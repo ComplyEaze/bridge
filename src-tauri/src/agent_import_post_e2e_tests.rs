@@ -3,6 +3,7 @@
 //! test-only seam (`approved_import::test_seam`). No real Tally is involved.
 use super::*;
 use super::{SCRIPTED_REMOTE_ID, SCRIPTED_REMOTE_IDS};
+use crate::agent::agent_import::tests::sentinel_batch_id;
 use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 use bridge_tally_transport::TallyEndpointConfig;
 use std::time::Duration;
@@ -332,7 +333,7 @@ async fn verification_refuses_a_voucher_type_that_is_not_qualified_before_any_re
     let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
     let (journal_line, _) = saved_batch(&server);
     let mut line = journal_line.clone();
-    line.batch_id = "bridge-00000000-0000-4000-8000-000000000584".into();
+    line.batch_id = sentinel_batch_id(0x584);
     line.vouchers[0].voucher_type = VoucherType::Sales;
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(rendered.as_bytes());

@@ -110,7 +110,6 @@ fn sent(simulator: SequenceSimulator) -> usize {
 
 // ---- BRIDGE PILOT LAB: the admission ----
 
-const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 const PILOT: &str = "BRIDGE PILOT LAB";
 
 /// What one admission sends, in order: e company list, s status probe, m
@@ -185,7 +184,7 @@ fn pilot_catalogue() -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     bridge_tally_protocol::parse_standard_ledger_catalog_v2_with_identities(
         &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml")),
         PILOT,
-        PILOT_GUID,
+        &pilot_lab_guid(),
     )
     .unwrap()
 }
@@ -198,7 +197,7 @@ fn pilot_lab_over(order: &str) -> Lab {
     server_over(
         order.chars().map(pilot_plan).collect(),
         &pilot_company_list(),
-        PILOT_GUID,
+        &pilot_lab_guid(),
     )
 }
 
@@ -279,7 +278,7 @@ async fn admit_on(
 /// company's state, not bill-wise.
 fn pilot_observed() -> serde_json::Value {
     json!({
-        "voucher_type_guid": format!("{PILOT_GUID}-000000ce"),
+        "voucher_type_guid": format!("{}-000000ce", pilot_lab_guid()),
         "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
         "party_bill_wise":false, "company_state":"Rajasthan"
     })
@@ -386,7 +385,7 @@ async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
 #[tokio::test]
 async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
     let mut other_type = pilot_observed();
-    other_type["voucher_type_guid"] = json!(format!("{PILOT_GUID}-0000002c"));
+    other_type["voucher_type_guid"] = json!(format!("{}-0000002c", pilot_lab_guid()));
     let in_use = ADMISSION_ORDER.replace('N', "U");
     for (filed, number, order, observed, outcome, requests) in [
         (
@@ -514,8 +513,8 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
         assert_eq!(differences, expected, "{number}");
         assert_eq!(alter_id.as_deref(), Some("17"), "{number}");
         assert_eq!(
-            guid.as_deref(),
-            Some("6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b"),
+            guid,
+            Some(format!("{}-0000000b", pilot_lab_guid())),
             "{number}"
         );
         let requests = received(lab.simulator);
@@ -552,7 +551,7 @@ async fn admission_after_a_sent_invoice(
     first.voucher_number = Some("BP/26-27/0001".to_string());
     let line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-00000000-0000-4000-8000-000000000001","identity_scheme":"batch_v1",
-        "company_guid":PILOT_GUID,"endpoint_origin":"http://127.0.0.1:9000",
+        "company_guid":pilot_lab_guid(),"endpoint_origin":"http://127.0.0.1:9000",
         "company":null,"txn_ids":["t0"],"date_from":"20260801","date_to":"20260801",
         "sha256":"a".repeat(64),"built_at":"2026-08-01T00:00:00Z","status":"built",
         "on_account_approved":[],

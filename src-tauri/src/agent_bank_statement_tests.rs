@@ -6,6 +6,21 @@
 //! --lib bank_statement -- --ignored`.
 use super::*;
 
+/// `width` copies of one digit.
+fn rep(digit: char, width: usize) -> String {
+    digit.to_string().repeat(width)
+}
+
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A synthetic company GUID: version 4 shape, zeros, then `n` in hex.
+fn guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
+
 const PASSWORD: &str = "synthetic-user-4321";
 
 fn server(directory: &Path, import_enabled: bool, redaction: Redaction) -> Server {
@@ -700,6 +715,7 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
+            coverage: None,
             build,
         }
     };
@@ -856,6 +872,7 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
         check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
+        coverage: None,
         build,
     };
     let request = OwnedRequest::from_args(&json!({
@@ -918,13 +935,16 @@ fn a_deposit_answer_binds_the_credit_leg_of_its_receipt() {
         let document = json!({
             "schema": PROPOSALS_SCHEMA,
             "proposals_id": proposals_id,
+            "bank_ledger": "Union Bank",
+            "coverage": null,
             "vouchers": [{"bridge_txn_id":"st-1","date":"2026-08-03","voucher_type":"Receipt",
                 "narration":"CASH from Synthetic Customer | UBI SB xx7788 | 03-Aug-2026",
                 "entries":[{"ledger":"Union Bank","amount":"750.50","side":bank_side},
                            {"ledger":"Synthetic Customer","amount":"750.50","side":customer_side}]}],
             "records": [{"row":1,"date":"2026-08-03","disposition":{"voucher":"Receipt"},"amount":"750.50",
                 "party":"CASH DEPOSIT","ledger":"Synthetic Customer","suspense":false,"bridge_txn_id":"st-1",
-                "cash_movement":"deposit","cash_answer":"customer_paid_in"}],
+                "cash_movement":"deposit","cash_answer":"customer_paid_in",
+                "direction":"inflow","reversed_same_day":false}],
         });
         let bytes = serde_json::to_vec_pretty(&document).unwrap();
         let statements = directory.path().join(PROPOSALS_DIRECTORY);
@@ -949,6 +969,264 @@ fn a_deposit_answer_binds_the_credit_leg_of_its_receipt() {
         resolve_import_arguments(directory.path(), &publish("Dr")).err(),
         Some("proposals_file_invalid".to_string())
     );
+}
+
+/// A parsed statement is published as a version 2 file, and read back with the
+/// facts build needs, as typed values: its coverage, each Contra with its
+/// reference and flag, each skipped row with the other bank's ledger.
+#[test]
+fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{
+        build, coverage, group_counterparties, selfcheck, BuildOptions,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let upi = |date: &str, name: &str, reference: &str, dr: &str, cr: &str, balance: &str| {
+        let narration = format!("UPI-{name}-9@x-ABCD0001-{reference}-P");
+        Row::from_pairs([
+            ("date", date),
+            ("narr", narration.as_str()),
+            ("ref", "1"),
+            ("dr", dr),
+            ("cr", cr),
+            ("bal", balance),
+        ])
+    };
+    let rows = [
+        // out to a mapped Contra, and a line of the same amount back that day
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("01/08/26", "BACK", &rep('2', 12), "", "10.00", "1000.00"),
+        // out to the other bank, skipped, and the same amount back that day
+        upi("03/08/26", "OWN", &rep('3', 12), "30.00", "", "970.00"),
+        upi("03/08/26", "BACK", &rep('5', 12), "", "30.00", "1000.00"),
+        upi("05/08/26", "LAST", &rep('4', 12), "", "5.00", "1005.00"),
+    ];
+    let mapping = Mapping::from_rows(
+        [
+            ("ALPHA", "Alpha Bank", "contra"),
+            ("OWN", "Other Bank", "skip"),
+        ]
+        .into_iter()
+        .map(|(party, ledger, treatment)| MappingRow {
+            origin: party.to_string(),
+            party: party.to_string(),
+            ledger: ledger.to_string(),
+            treatment: Some(treatment.to_string()),
+        }),
+    )
+    .unwrap();
+    let build = build(
+        &rows,
+        Bank::Hdfc,
+        &mapping,
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic CA xx4321",
+            account_number: &padn(4321, 14),
+            date_from: None,
+            date_to: None,
+            cash_answers: CashAnswers::none(),
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: padn(4321, 14),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("1005.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        coverage: coverage(&build.dates, None, None),
+        build,
+    };
+    let request = OwnedRequest::from_args(&json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "hdfc",
+        "account_label": "Synthetic CA xx4321",
+        "opening_balance": "1,000.00",
+        "closing_balance": "975.00",
+        "total_debits": "40.00",
+        "total_credits": "15.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    }))
+    .unwrap();
+    let (proposals_id, digest) =
+        persist(directory.path(), &request, &parsed, &"0".repeat(64)).unwrap();
+    let document: Value = serde_json::from_slice(
+        &fs::read(
+            directory
+                .path()
+                .join(PROPOSALS_DIRECTORY)
+                .join(format!("{proposals_id}.json")),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(document["schema"], "bridge.bank_statement.proposals.v2");
+    assert_eq!(
+        document["coverage"],
+        json!({"from": "2026-08-02", "to": "2026-08-04"})
+    );
+    assert_eq!(document["records"][0]["direction"], "outflow");
+    assert_eq!(document["records"][0]["reversed_same_day"], true);
+    assert_eq!(document["records"][4]["reversed_same_day"], false);
+
+    let resolved = resolve_import_arguments(
+        directory.path(),
+        &json!({"company_guid": guid(2),
+                "proposals_id": proposals_id, "proposals_sha256": digest}),
+    )
+    .unwrap();
+    let statement = resolved.statement.expect("a version 2 file's facts");
+    assert_eq!(statement.bank_ledger, "Synthetic Bank Ledger");
+    assert_eq!(
+        statement.coverage,
+        Some((
+            bridge_tally_core::TallyDate::parse("20260802").unwrap(),
+            bridge_tally_core::TallyDate::parse("20260804").unwrap()
+        ))
+    );
+    let [contra] = &statement.contras[..] else {
+        panic!("one Contra");
+    };
+    assert_eq!(
+        contra
+            .reference
+            .as_ref()
+            .map(ToString::to_string)
+            .as_deref(),
+        Some(rep('1', 12).as_str())
+    );
+    assert!(contra.reversed_same_day);
+    let [skip] = &statement.skips[..] else {
+        panic!("one skip");
+    };
+    assert_eq!(
+        skip.date,
+        bridge_tally_core::TallyDate::parse("20260803").unwrap()
+    );
+    assert_eq!(skip.amount, "30.00");
+    assert_eq!(skip.direction, Direction::Outflow);
+    assert_eq!(skip.other_ledger, "Other Bank");
+    assert_eq!(
+        skip.reference.as_ref().map(ToString::to_string).as_deref(),
+        Some(rep('3', 12).as_str())
+    );
+    assert!(skip.reversed_same_day);
+    // the facts name the bank and the skipped row's ledger beyond the vouchers'
+    assert_eq!(
+        statement.ledger_names(),
+        ["Other Bank", "Synthetic Bank Ledger"]
+    );
+    assert!(!statement.is_skip_only());
+}
+
+/// A version 2 file whose facts are missing or not of the shape the parse
+/// writes is invalid, not read with a default; one with nothing but skipped
+/// rows is a skip-only statement; a version 1 file with neither skips nor
+/// Contras builds with no facts.
+#[test]
+fn version_two_facts_are_read_strictly_and_a_skip_only_file_is_told() {
+    let directory = tempfile::tempdir().unwrap();
+    let skipped = json!({"row": 1, "date": "2026-08-03", "disposition": "skipped", "amount": "30.00",
+        "party": "OWN", "ledger": "Other Bank", "bridge_txn_id": "st-20260803-0123456789abcdef",
+        "reference": &rep('3', 12), "direction": "outflow", "reversed_same_day": false});
+    let publish = |schema: &str, edit: &dyn Fn(&mut Value)| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let mut document = json!({
+            "schema": schema, "proposals_id": proposals_id,
+            "bank_ledger": "Synthetic Bank Ledger", "coverage": null,
+            "vouchers": [], "records": [skipped.clone()],
+        });
+        edit(&mut document);
+        let bytes = serde_json::to_vec_pretty(&document).unwrap();
+        let statements = directory.path().join(PROPOSALS_DIRECTORY);
+        fs::create_dir_all(&statements).unwrap();
+        fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        resolve_import_arguments(
+            directory.path(),
+            &json!({"company_guid": guid(2),
+                    "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
+        )
+    };
+    let v2 = "bridge.bank_statement.proposals.v2";
+    let resolved = publish(v2, &|_| {}).unwrap();
+    assert!(resolved.statement.as_ref().unwrap().is_skip_only());
+    // with a voucher, or without a skipped row, it is not
+    let with_voucher = publish(v2, &|document| {
+        document["vouchers"] = json!([{"bridge_txn_id":"st-1","date":"2026-08-03","voucher_type":"Payment",
+            "entries":[{"ledger":"A","amount":"1.00","side":"Dr"},{"ledger":"B","amount":"1.00","side":"Cr"}]}]);
+    })
+    .unwrap();
+    assert!(!with_voucher.statement.unwrap().is_skip_only());
+    let none_skipped = publish(v2, &|document| document["records"] = json!([])).unwrap();
+    assert!(!none_skipped.statement.unwrap().is_skip_only());
+
+    let invalid = |result: Result<ResolvedImport, String>| result.err();
+    let bad = Some("proposals_file_invalid".to_string());
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document.as_object_mut().unwrap().remove("coverage");
+        })),
+        bad
+    );
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document.as_object_mut().unwrap().remove("bank_ledger");
+        })),
+        bad
+    );
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document["records"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("direction");
+        })),
+        bad
+    );
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document["records"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("reversed_same_day");
+        })),
+        bad
+    );
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document["records"][0]
+                .as_object_mut()
+                .unwrap()
+                .remove("ledger");
+        })),
+        bad
+    );
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document["records"][0]["reference"] = json!("123");
+        })),
+        bad
+    );
+    assert_eq!(
+        invalid(publish(v2, &|document| {
+            document["coverage"] = json!({"from": "2026-08-02"});
+        })),
+        bad
+    );
+
+    // version 1: a skipped record is refused as legacy; with none, no facts
+    let v1 = "bridge.bank_statement.proposals.v1";
+    assert_eq!(
+        invalid(publish(v1, &|_| {})),
+        Some("proposals_legacy".to_string())
+    );
+    let plain = publish(v1, &|document| document["records"] = json!([])).unwrap();
+    assert!(plain.statement.is_none());
 }
 
 /// A mapping to hundreds of distinct ledgers keeps ledgers_to_validate
@@ -1003,6 +1281,7 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
         check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
+        coverage: None,
         build,
     };
     let request = OwnedRequest::from_args(&json!({
@@ -1145,6 +1424,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
+            coverage: None,
             build,
         }
     };
@@ -1442,6 +1722,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
             totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
             check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
             counterparties: group_counterparties(&build.records).unwrap(),
+            coverage: None,
             build,
         }
     };
@@ -1751,6 +2032,7 @@ fn parse_of(
         totals: bridge_bank_statement::money::statement_totals(rows).unwrap(),
         check: selfcheck(&build, bank_ledger).unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
+        coverage: bridge_bank_statement::proposals::coverage(&build.dates, date_from, date_to),
         build,
     };
     (request, parsed)
@@ -1965,6 +2247,7 @@ fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
         check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
         counterparties: group_counterparties(&build.records).unwrap(),
+        coverage: None,
         build,
     };
     let (proposals_id, digest) =
@@ -2046,4 +2329,95 @@ async fn a_bob_statement_parses_from_the_callers_balances_with_an_empty_password
         error_code(&server.call_tool("parse_bank_statement", short).await),
         Some("statement_extent_unproven")
     );
+}
+
+/// A skipped row's ledger is the other bank account's, which the later pairing
+/// looks for: it is listed for validate_masters like every other ledger.
+#[test]
+fn a_skipped_rows_ledger_is_listed_to_validate() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    // Synthetic digits built from a visible pattern: n behind zeros to a width.
+    let padn = |n: u64, width: usize| format!("{n:0>width$}");
+    let row = |party: &str, reference: &str, balance: &str| {
+        let narration = format!("BY TRANSFER-UPI/CR/{reference}/{party}/XYZ");
+        Row::from_pairs([
+            ("date", "01Aug2026"),
+            ("narr", narration.as_str()),
+            ("narr_spaced", narration.as_str()),
+            ("ref", ""),
+            ("ref_spaced", ""),
+            ("dr", ""),
+            ("cr", "1.00"),
+            ("bal", balance),
+        ])
+    };
+    let rows = vec![
+        row("SYNTHETIC PAYER", &padn(1, 12), "1.00"),
+        row("OWN ACCOUNT", &padn(2, 12), "2.00"),
+    ];
+    let mapping = Mapping::from_rows([
+        MappingRow {
+            origin: "mapping[0]".into(),
+            party: "SYNTHETIC PAYER".into(),
+            ledger: "Synthetic Payer Ledger".into(),
+            treatment: None,
+        },
+        MappingRow {
+            origin: "mapping[1]".into(),
+            party: "OWN ACCOUNT".into(),
+            ledger: "Synthetic Other Bank".into(),
+            treatment: Some("skip".into()),
+        },
+    ])
+    .unwrap();
+    let build = build(
+        &rows,
+        Bank::Sbi,
+        &mapping,
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic SB xx1234",
+            account_number: &padn(1234, 14),
+            date_from: None,
+            date_to: None,
+            cash_answers: CashAnswers::none(),
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: padn(1234, 14),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("2.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        coverage: None,
+        build,
+    };
+    let request = OwnedRequest::from_args(&json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "0.00",
+        "closing_balance": "2.00",
+        "total_debits": "0.00",
+        "total_credits": "2.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    }))
+    .unwrap();
+    let summary = summary(&request, &parsed, "statement-x", "0", 40_000);
+    // Each name is listed as the summary lists every ledger: a marked party name.
+    let expected: Vec<Value> = [
+        "Synthetic Bank Ledger",
+        "Synthetic Other Bank",
+        "Synthetic Payer Ledger",
+    ]
+    .iter()
+    .map(|name| json!(party_name(name.to_string())))
+    .collect();
+    assert_eq!(summary["ledgers_to_validate"], json!(expected));
 }

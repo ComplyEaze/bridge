@@ -7,6 +7,16 @@
 use super::*;
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, TallyNamedMaster};
 
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
 fn captured_group_collection() -> String {
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
@@ -510,6 +520,15 @@ fn group_read_plans() -> Vec<ScenarioPlan> {
 /// The build request sequence for a payload that carries a cash/bank voucher:
 /// the Journal cycle plus a paired group read after each catalogue read.
 pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
+    bank_build_plans_numbering(build_numbering_plans(&[]))
+}
+
+/// How many requests a bank build sends up to and including its numbering
+/// read.
+const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
+
+/// [`bank_build_plans`], its numbering read answered by `numbering`.
+fn bank_build_plans_numbering(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
     let cycle = import_family_cycle_plans();
     let probe = mode_tests::licensed_import_probe();
     [
@@ -517,6 +536,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
         cycle[..10].to_vec(),
         group_read_plans(),
         cycle[10..16].to_vec(),
+        numbering,
         cycle[4..10].to_vec(),
         group_read_plans(),
         build_preflight_plans(),
@@ -551,6 +571,65 @@ pub(super) fn bank_server(directory: &std::path::Path, port: u16) -> Server {
         import_enabled: true,
         posting: crate::agent::Posting::Off,
     })
+}
+
+/// The committed series answers of 13 October 2026 through the build tool: a
+/// Receipt without a number, built against the answer taken with the Receipt
+/// type set to "Renumber Vouchers", is refused under the sub-method's code and
+/// names Receipt; against the answer taken before the change it is built.
+/// The join is edited (see `captured_numbering_answers`): the four rows carry
+/// the masters capture's GUIDs and AlterIDs of 1 to 4. Their method,
+/// sub-method and duplicate setting are as captured.
+#[tokio::test]
+async fn the_captured_series_answers_decide_a_numberless_receipt_through_the_build() {
+    use super::super::numbering_fixtures::captured_numbering_answers;
+    let numbering = |series: &[u8]| {
+        build_numbering_plans_answering(
+            captured_numbering_answers(CAPTURED_GUID, series),
+            &mode_tests::licensed_import_probe(),
+        )
+    };
+    let receipt = || {
+        let mut payload = captured_bank_payload();
+        payload.vouchers.remove(0);
+        assert_eq!(payload.vouchers[0].voucher_type.as_str(), "Receipt");
+        assert_eq!(payload.vouchers[0].voucher_number, None);
+        serde_json::to_value(payload).unwrap()
+    };
+
+    let mut plans = bank_build_plans_numbering(numbering(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x4_series.utf16le.xml"
+    )));
+    plans.truncate(THROUGH_BANK_NUMBERING);
+    let simulator = SequenceSimulator::spawn(plans).expect("bank build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let refused = server.build_import_xml(&receipt()).await.unwrap();
+    let result = &refused.payload["result"];
+    assert_eq!(result["state"], "refused", "{result}");
+    assert_eq!(result["reason"], "import_voucher_numbering_not_retain");
+    assert_eq!(
+        result["refused_types"],
+        json!([{"voucher_type":"Receipt","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}])
+    );
+    assert_eq!(simulator.finish().unwrap().len(), THROUGH_BANK_NUMBERING);
+    assert_eq!(written_files(directory.path()), 0);
+
+    let plans = bank_build_plans_numbering(numbering(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_type_numbering_m8r_x0_series.utf16le.xml"
+    )));
+    let whole = plans.len();
+    let simulator = SequenceSimulator::spawn(plans).expect("bank build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let built = server.build_import_xml(&receipt()).await.unwrap();
+    assert_eq!(
+        built.payload["result"]["voucher_count"], 1,
+        "{}",
+        built.payload
+    );
+    assert_eq!(simulator.finish().unwrap().len(), whole);
+    assert_eq!(written_files(directory.path()), 1);
 }
 
 #[tokio::test]
@@ -632,7 +711,10 @@ async fn a_payment_and_receipt_batch_builds_against_the_captured_masters() {
         .contains("call verify_import right away"));
     // A cash/bank payload reads the group collection twice, exactly as it reads
     // the catalogue twice, and the whole sequence is consumed.
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 /// bridge#466 through the tool call, not the builder: a three-entry Receipt
@@ -702,7 +784,10 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
     .expect("written import file");
     assert_eq!(xml.matches("<ALLLEDGERENTRIES.LIST>").count(), 3, "{xml}");
     assert!(xml.contains("<PARTYLEDGERNAME>Bridge Nested Debtor WR4</PARTYLEDGERNAME>"));
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 fn demo_batch(voucher_type: &str, dr: &str, cr: &str) -> ImportPayload {
@@ -1306,15 +1391,20 @@ async fn a_contra_leg_outside_cash_and_bank_is_refused_without_writing_a_file() 
 async fn a_journal_only_batch_reads_no_group_collection() {
     // The Journal path keeps the exact request sequence its own qualification
     // was measured on; nothing here widened it.
-    let simulator =
-        SequenceSimulator::spawn(qualified_import_cycle_plans()[..32].to_vec()).expect("simulator");
+    let simulator = SequenceSimulator::spawn(
+        qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec(),
+    )
+    .expect("simulator");
     let directory = tempfile::tempdir().unwrap();
     let server = bank_server(directory.path(), simulator.address().port());
     server
         .build_import_xml(&serde_json::to_value(captured_catalogue_payload()).unwrap())
         .await
         .unwrap();
-    assert_eq!(simulator.finish().expect("requests").len(), 32);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        QUALIFIED_BUILD_REQUESTS
+    );
 }
 
 #[tokio::test]
@@ -1336,6 +1426,8 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             ledger_identities: None,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
+            statement: None,
+            withdrawn_skips: None,
             endpoint_origin: None,
             identity_scheme: None,
             amends_batch_id: None,
@@ -1504,8 +1596,14 @@ async fn a_proposals_file_builds_through_tools_call_exactly_as_its_inline_vouche
         json!({"count": 0, "purpose_not_confirmed": 0, "unidentified": 0})
     );
     // the same request sequence was consumed, so the same admission ran
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
-    assert_eq!(inline_simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
+    assert_eq!(
+        inline_simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     let read = |directory: &std::path::Path, result: &Value| {
         std::fs::read_to_string(
@@ -1679,8 +1777,13 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
 
 /// Publish a proposals file holding `vouchers` and one business-cash record
 /// naming `ledger` for `txn-001`, returning build_import_xml's arguments.
-fn business_cash_proposals(directory: &std::path::Path, vouchers: Value, ledger: &str) -> Value {
-    cash_answer_proposals(directory, vouchers, ledger, "business_cash")
+fn business_cash_proposals(
+    directory: &std::path::Path,
+    vouchers: Value,
+    ledger: &str,
+    bank_ledger: &str,
+) -> Value {
+    cash_answer_proposals(directory, vouchers, ledger, "business_cash", bank_ledger)
 }
 
 /// `business_cash_proposals`, with the record answered `answer`.
@@ -1689,16 +1792,20 @@ fn cash_answer_proposals(
     vouchers: Value,
     ledger: &str,
     answer: &str,
+    bank_ledger: &str,
 ) -> Value {
     let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
     let document = json!({
-        "schema": "bridge.bank_statement.proposals.v1",
+        "schema": "bridge.bank_statement.proposals.v2",
         "proposals_id": proposals_id,
+        "bank_ledger": bank_ledger,
+        "coverage": null,
         "vouchers": vouchers,
         "records": [{
-            "row": 1, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
+            "row": 1, "disposition": {"voucher": vouchers[0]["voucher_type"]}, "party": "ATM CASH WITHDRAWAL",
             "ledger": ledger, "suspense": false, "bridge_txn_id": "txn-001",
-            "cash_movement": "withdrawal", "cash_answer": answer
+            "cash_movement": "withdrawal", "cash_answer": answer,
+            "direction": "outflow", "reversed_same_day": false
         }],
     });
     let bytes = serde_json::to_vec_pretty(&document).unwrap();
@@ -1739,7 +1846,7 @@ async fn a_business_cash_answer_naming_a_bank_ledger_is_refused_at_build() {
     let contra = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
         "entries":[{"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
                    {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
-    let args = business_cash_proposals(directory.path(), contra, "WR2 Sales");
+    let args = business_cash_proposals(directory.path(), contra, "WR2 Sales", "Cash");
     let response = server
         .call_tool_response("build_import_xml", args)
         .await
@@ -1791,7 +1898,7 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
     let contra = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
         "entries":[{"ledger":"Cash","amount":"12.50","side":"Dr"},
                    {"ledger":"WR2 Sales","amount":"12.50","side":"Cr"}]}]);
-    let args = business_cash_proposals(directory.path(), contra, "Cash");
+    let args = business_cash_proposals(directory.path(), contra, "Cash", "WR2 Sales");
     let response = server
         .call_tool_response("build_import_xml", args)
         .await
@@ -1807,6 +1914,18 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
         serde_json::to_value(&saved.cash_in_hand_ledgers).unwrap(),
         json!([{"bridge_txn_id":"txn-001","ledger":"Cash"}])
     );
+    // a cash answer's Contra is a Contra row of the statement's facts too
+    let facts: super::statement_facts::StatementFacts =
+        serde_json::from_value(saved.statement.clone().expect("a version 2 file's facts")).unwrap();
+    assert_eq!(
+        facts
+            .contra_rows
+            .iter()
+            .map(|row| row.bridge_txn_id.as_str())
+            .collect::<Vec<_>>(),
+        ["txn-001"]
+    );
+    assert!(facts.skip_rows.is_empty());
 
     // The captured Payment, answered owner's use: its debtor is a named ledger
     // the build checks, but not one that must reach Cash-in-Hand.
@@ -1819,6 +1938,7 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
         payment,
         "Bridge Nested Debtor WR4",
         "owner_use",
+        "Cash",
     );
     let response = server
         .call_tool_response("build_import_xml", args)
@@ -1843,7 +1963,7 @@ async fn a_business_cash_record_that_does_not_match_its_voucher_is_refused() {
     // port 9: any Tally read would fail differently from the refusal below
     let server = bank_server(directory.path(), 9);
     let payment = serde_json::to_value(captured_bank_payload().vouchers).unwrap();
-    let args = business_cash_proposals(directory.path(), payment, "Cash");
+    let args = business_cash_proposals(directory.path(), payment, "Cash", "Cash");
     let response = server
         .call_tool_response("build_import_xml", args)
         .await
@@ -2182,7 +2302,10 @@ async fn a_parsed_statement_builds_an_import_file_by_proposals_id() {
         xml.contains("UPI 612345678901 from NORTHWIND TRADERS"),
         "{xml}"
     );
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 }
 
 #[test]
@@ -2798,11 +2921,14 @@ async fn the_refused_cash_answer_ledgers_are_listed_in_the_order_the_answers_nam
         let record = |row: usize, bridge_txn_id: &str, ledger: &str| {
             json!({"row": row, "disposition": {"voucher": "Contra"}, "party": "ATM CASH WITHDRAWAL",
                 "ledger": ledger, "suspense": false, "bridge_txn_id": bridge_txn_id,
-                "cash_movement": "withdrawal", "cash_answer": "business_cash"})
+                "cash_movement": "withdrawal", "cash_answer": "business_cash",
+                "direction": "outflow", "reversed_same_day": false})
         };
         let bytes = serde_json::to_vec_pretty(&json!({
-            "schema": "bridge.bank_statement.proposals.v1",
+            "schema": "bridge.bank_statement.proposals.v2",
             "proposals_id": proposals_id,
+            "bank_ledger": "Cash",
+            "coverage": null,
             // The vouchers come in another order than the answers, and it
             // is the answers' order the list takes.
             "vouchers": [
@@ -3102,7 +3228,10 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         .join("imports")
         .join(format!("{}.xml", result["batch_id"].as_str().unwrap()))
         .exists());
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
 
     // The suspense ledger under Suspense A/c: the same build, no such warning.
     let simulator = SequenceSimulator::spawn({
@@ -3135,5 +3264,586 @@ async fn a_statement_whose_suspense_ledger_is_outside_suspense_a_c_builds_with_a
         "{response}"
     );
     assert!(codes_of(&response).is_empty(), "{response}");
-    assert_eq!(simulator.finish().expect("requests").len(), 44);
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
+}
+
+// ---- statement facts written at build (#1392) -------------------------------------
+
+/// A version 2 proposals file for a parse of `bank_ledger`, returning
+/// build_import_xml's arguments.
+pub(super) fn statement_v2(
+    directory: &std::path::Path,
+    bank_ledger: &str,
+    coverage: Value,
+    vouchers: Value,
+    records: Value,
+) -> Value {
+    let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+    let document = json!({
+        "schema": "bridge.bank_statement.proposals.v2",
+        "proposals_id": proposals_id,
+        "bank_ledger": bank_ledger,
+        "coverage": coverage,
+        "vouchers": vouchers,
+        "records": records,
+    });
+    let bytes = serde_json::to_vec_pretty(&document).unwrap();
+    let statements = directory.join("bank-statements");
+    std::fs::create_dir_all(&statements).unwrap();
+    std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+    json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+}
+
+fn contra_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{}a1", padn(0, 14)));
+
+    &TEXT
+}
+fn skip_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260902-{}a2", padn(0, 14)));
+    &TEXT
+}
+fn outflow_skip_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260903-{}a3", padn(0, 14)));
+    &TEXT
+}
+/// The captured plans with both money-bearing demo ledgers moved under Bank
+/// Accounts, for this test only, so a Contra between them is admitted.
+pub(super) fn two_bank_plans() -> Vec<ScenarioPlan> {
+    bank_build_plans()
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                let moved = ["WR2 Sales", "Bridge Nested Debtor WR4"]
+                    .iter()
+                    .fold(body.clone(), |body, ledger| {
+                        under_bank_accounts(&body, ledger)
+                    });
+                plan.fixture = Fixture::SyntheticXml(moved);
+            }
+            plan
+        })
+        .collect()
+}
+
+/// A record the parse writes for a Contra or a skipped row.
+pub(super) fn record(
+    txn: &str,
+    disposition: Value,
+    ledger: &str,
+    direction: &str,
+    reversed: bool,
+) -> Value {
+    json!({"row": 1, "date": "2026-09-01", "disposition": disposition, "amount": "12.50",
+        "party": "SYNTHETIC", "ledger": ledger, "suspense": false, "bridge_txn_id": txn,
+        "reference": &p6(1, 12), "instrument": "000417",
+        "direction": direction, "reversed_same_day": reversed})
+}
+
+fn statement_contra() -> Value {
+    json!({"bridge_txn_id": contra_row(), "date": "2026-09-01", "voucher_type": "Contra",
+        "entries": [{"ledger": "Bridge Nested Debtor WR4", "amount": "12.50", "side": "Dr"},
+                    {"ledger": "WR2 Sales", "amount": "12.50", "side": "Cr"}]})
+}
+
+fn contra_record() -> Value {
+    let mut contra = record(
+        contra_row(),
+        json!({"voucher": "Contra"}),
+        "Bridge Nested Debtor WR4",
+        "outflow",
+        true,
+    );
+    contra["date"] = json!("2026-09-01");
+    contra
+}
+
+fn skip_record_of(ledger: &str) -> Value {
+    let mut skip = record(skip_row(), json!("skipped"), ledger, "inflow", true);
+    skip["date"] = json!("2026-09-02");
+    skip["amount"] = json!("7.50");
+    skip["reference"] = json!(&p6(2, 12));
+    skip["instrument"] = Value::Null;
+    skip
+}
+
+/// A skipped row of the opposite direction, with no reversal.
+fn outflow_skip_record() -> Value {
+    let mut skip = skip_record_of("Cash");
+    skip["bridge_txn_id"] = json!(outflow_skip_row());
+    skip["direction"] = json!("outflow");
+    skip["reversed_same_day"] = json!(false);
+    skip["date"] = json!("2026-09-03");
+    skip["reference"] = Value::Null;
+    skip
+}
+
+fn guid_of(batch: &ImportLedgerLine, name: &str) -> String {
+    batch
+        .ledger_identities
+        .iter()
+        .flatten()
+        .find(|bound| bound.name == name)
+        .unwrap_or_else(|| panic!("{name} is not bound"))
+        .guid
+        .clone()
+}
+
+fn no_skip_file() -> std::io::BufReader<std::io::Empty> {
+    std::io::BufReader::new(std::io::empty())
+}
+
+/// A Contra and a skipped row from a version 2 file are written as the batch's
+/// facts, with the ledgers they name bound by the same catalogue read, and the
+/// view's fact builder reads them back from the journal.
+#[tokio::test]
+async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
+    let simulator = SequenceSimulator::spawn(two_bank_plans()).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        json!({"from": "2026-08-02", "to": "2026-09-29"}),
+        json!([statement_contra()]),
+        json!([
+            contra_record(),
+            skip_record_of("Cash"),
+            outflow_skip_record()
+        ]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    assert_eq!(
+        simulator.finish().expect("requests").len(),
+        44 + BUILD_NUMBERING_PLANS
+    );
+
+    let batch_id = result["batch_id"].as_str().unwrap();
+    let saved = server
+        .latest_import_snapshot(batch_id)
+        .unwrap()
+        .unwrap()
+        .batch;
+    let wr2 = guid_of(&saved, "WR2 Sales");
+    let cash = guid_of(&saved, "Cash");
+    let facts: Value = serde_json::to_value(saved.statement.as_ref().expect("facts")).unwrap();
+    assert_eq!(
+        facts,
+        json!({
+            "bank_ledger_guid": wr2,
+            "coverage": {"from": "20260802", "to": "20260929"},
+            "contra_rows": [{"bridge_txn_id": contra_row(), "reference": &p6(1, 12),
+                "instrument": "000417", "reversed_same_day": true}],
+            "skip_rows": [{"bridge_txn_id": skip_row(), "date": "20260902", "amount": "7.50",
+                "direction": "inflow", "other_ledger_guid": cash, "reference": &p6(2, 12),
+                "reversed_same_day": true},
+                {"bridge_txn_id": outflow_skip_row(), "date": "20260903", "amount": "7.50",
+                "direction": "outflow", "other_ledger_guid": cash}],
+        })
+    );
+
+    // the fact builder reads the same journal: the skip and the Contra, each
+    // with the flag it was written with
+    let journal = server
+        .import_journal_while_admitted()
+        .unwrap()
+        .expect("a journal");
+    let found = ledger::transfer_facts(journal, no_skip_file(), CAPTURED_GUID, None).unwrap();
+    let [skip, outflow] = &found.skips[..] else {
+        panic!("two skips: {found:?}");
+    };
+    assert_eq!(
+        skip.key.row,
+        crate::agent::transfer_pairing::StatementRowId::new(skip_row())
+    );
+    assert!(skip.reversed_same_day);
+    assert_eq!(
+        outflow.direction,
+        crate::agent::transfer_pairing::Direction::Outflow
+    );
+    assert_eq!(
+        skip.direction,
+        crate::agent::transfer_pairing::Direction::Inflow
+    );
+    assert!(!outflow.reversed_same_day);
+    let [contra] = &found.contras[..] else {
+        panic!("one Contra: {found:?}");
+    };
+    assert!(contra.reversed_same_day);
+}
+
+/// The statement's bank ledger and a skipped row's other ledger are held to the
+/// catalogue like a voucher's: one the book does not hold is refused as the
+/// masters are, and nothing is written.
+#[tokio::test]
+async fn a_skips_other_ledger_missing_from_the_book_refuses_the_build() {
+    let plans = bank_build_plans()[..12].to_vec();
+    let simulator = SequenceSimulator::spawn(plans).expect("plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "Cash",
+        Value::Null,
+        serde_json::to_value(captured_bank_payload().vouchers).unwrap(),
+        json!([skip_record_of("Ghost Bank")]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "masters_not_exact", "{response}");
+    let missing: Vec<_> = result["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|master| master["match_state"] != "exact")
+        .collect();
+    assert_eq!(missing.len(), 1, "{response}");
+    assert_eq!(missing[0]["match_state"], "missing");
+    assert!(!directory.path().join("imports").exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 12);
+}
+
+/// Facts that disagree with the batch's own vouchers are never written: here a
+/// Contra voucher the file's records do not name. The check runs under the
+/// admission lock, before the book's mark and the preflight are read.
+#[tokio::test]
+async fn facts_that_disagree_with_their_vouchers_are_refused_and_nothing_is_written() {
+    let simulator = SequenceSimulator::spawn(two_bank_plans()[..18].to_vec()).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([statement_contra()]),
+        json!([skip_record_of("Cash")]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "statement_facts_invalid", "{response}");
+    assert_eq!(result["check"], "contra_voucher_not_in_facts");
+    assert_eq!(simulator.finish().expect("requests").len(), 18);
+    let imports = directory.path().join("imports");
+    assert!(!imports.exists() || std::fs::read_dir(imports).unwrap().next().is_none());
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+/// A file written before facts existed builds as it did, with none; but it
+/// cannot say which Contras it holds or which rows it skipped, so one that
+/// holds either is refused before any read.
+#[tokio::test]
+async fn a_version_one_file_holding_a_skip_or_a_contra_is_refused_as_legacy() {
+    let directory = tempfile::tempdir().unwrap();
+    // port 9: any Tally read would fail differently from the refusal below
+    let server = bank_server(directory.path(), 9);
+    let publish = |vouchers: Value, records: Value| {
+        let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
+        let bytes = serde_json::to_vec_pretty(&json!({
+            "schema": "bridge.bank_statement.proposals.v1",
+            "proposals_id": proposals_id,
+            "vouchers": vouchers,
+            "records": records,
+        }))
+        .unwrap();
+        let statements = directory.path().join("bank-statements");
+        std::fs::create_dir_all(&statements).unwrap();
+        std::fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
+        json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
+    };
+    let payments = serde_json::to_value(captured_bank_payload().vouchers).unwrap();
+    for (vouchers, records) in [
+        (
+            payments.clone(),
+            json!([{"disposition": "skipped", "bridge_txn_id": skip_row()}]),
+        ),
+        (json!([statement_contra()]), json!([])),
+    ] {
+        let response = server
+            .call_tool_response("build_import_xml", publish(vouchers, records))
+            .await
+            .value;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], "proposals_legacy",
+            "{response}"
+        );
+    }
+}
+
+/// A version 1 file of Payments and Receipts, like an inline batch, records no
+/// facts.
+#[tokio::test]
+async fn a_version_one_payment_file_and_an_inline_batch_write_no_facts() {
+    let payload = captured_bank_payload();
+    let simulator = SequenceSimulator::spawn(bank_build_plans()).expect("proposals plan");
+    let directory = tempfile::tempdir().unwrap();
+    let (proposals_id, digest) = published_proposals(directory.path(), &payload);
+    let server = bank_server(directory.path(), simulator.address().port());
+    let response = server
+        .call_tool_response(
+            "build_import_xml",
+            json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": digest}),
+        )
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 2, "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert!(saved.statement.is_none());
+
+    let simulator = SequenceSimulator::spawn(bank_build_plans()).expect("inline plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let response = server
+        .call_tool_response("build_import_xml", serde_json::to_value(&payload).unwrap())
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 2, "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert!(saved.statement.is_none());
+}
+
+/// The requests a skip-only build makes: the company identity, then the
+/// bracketed catalogue read, and no mode probe, group read or preflight.
+pub(super) fn skip_only_plans() -> Vec<ScenarioPlan> {
+    import_family_cycle_plans()[..10].to_vec()
+}
+
+/// A statement of which every row was skipped has no batch: its skipped rows
+/// are recorded in a file of their own, and nothing is built, journaled or sent.
+#[tokio::test]
+async fn a_statement_of_only_skipped_rows_is_recorded_and_builds_nothing() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let port = simulator.address().port();
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), port);
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        json!({"from": "2026-08-02", "to": "2026-09-29"}),
+        json!([]),
+        json!([skip_record_of("Cash")]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "skips_recorded", "{response}");
+    assert_eq!(result["skipped_rows"], 1);
+    let record_id = result["record_id"].as_str().unwrap();
+    assert_eq!(simulator.finish().expect("requests").len(), 10);
+
+    // one record in the skip file, none in the journal, no file for Tally
+    let text = std::fs::read_to_string(directory.path().join("agent-import-statement-skips.jsonl"))
+        .unwrap();
+    let records =
+        statement_facts::read_skip_records(std::io::BufReader::new(text.as_bytes())).unwrap();
+    let [record] = &records[..] else {
+        panic!("one record: {text}");
+    };
+    assert_eq!(record.record_id, record_id);
+    assert!(record_id.starts_with("skips-"));
+    assert_eq!(record.company_guid, CAPTURED_GUID);
+    assert_eq!(record.endpoint_origin, format!("http://127.0.0.1:{port}"));
+    assert!(record.built_at.ends_with('Z'));
+    assert!(record.statement.contra_rows.is_empty());
+    assert_eq!(record.statement.skip_rows.len(), 1);
+    assert_eq!(record.statement.skip_rows[0].bridge_txn_id, skip_row());
+    assert!(!record.statement.skip_rows[0].other_ledger_guid.is_empty());
+    assert_ne!(
+        record.statement.skip_rows[0].other_ledger_guid,
+        record.statement.bank_ledger_guid
+    );
+    assert!(statement_facts::validate_skip_record(record).is_ok());
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+    let imports = directory.path().join("imports");
+    assert!(!imports.exists() || std::fs::read_dir(imports).unwrap().next().is_none());
+
+    // the fact builder reads it back
+    let found = ledger::transfer_facts(
+        no_skip_file(),
+        std::io::BufReader::new(text.as_bytes()),
+        CAPTURED_GUID,
+        None,
+    )
+    .unwrap();
+    assert_eq!(found.skips.len(), 1);
+}
+
+/// The two ledgers of a skip-only statement are held to the book like any
+/// voucher ledger, and a refusal records nothing.
+#[tokio::test]
+async fn a_skip_only_statement_naming_a_ledger_the_book_lacks_records_nothing() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("Ghost Bank")]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "masters_not_exact", "{response}");
+    assert!(!directory
+        .path()
+        .join("agent-import-statement-skips.jsonl")
+        .exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 10);
+}
+
+/// Whatever the caller's spelling of the company's GUID, a skip-only record
+/// holds the canonical form the journal's records hold.
+#[tokio::test]
+async fn a_skip_only_record_holds_the_canonical_company_guid() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let mut args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("Cash")]),
+    );
+    args["company_guid"] = json!(CAPTURED_GUID.to_uppercase());
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["state"], "skips_recorded",
+        "{response}"
+    );
+    let text = std::fs::read_to_string(directory.path().join("agent-import-statement-skips.jsonl"))
+        .unwrap();
+    let records =
+        statement_facts::read_skip_records(std::io::BufReader::new(text.as_bytes())).unwrap();
+    assert_eq!(records[0].company_guid, CAPTURED_GUID);
+    assert_ne!(CAPTURED_GUID, CAPTURED_GUID.to_uppercase());
+}
+
+/// A skip-only record is held to the checks the view makes when it reads it:
+/// a row skipped to the statement's own bank ledger is refused, and nothing is
+/// recorded.
+#[tokio::test]
+async fn a_skip_only_record_failing_a_check_is_refused_and_not_recorded() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("WR2 Sales")]),
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "statement_facts_invalid", "{response}");
+    assert_eq!(result["check"], "skip_ledgers_equal");
+    assert!(!directory
+        .path()
+        .join("agent-import-statement-skips.jsonl")
+        .exists());
+    assert_eq!(simulator.finish().expect("requests").len(), 10);
+}
+
+/// The record is appended under the exclusive admission lock: while another
+/// holder has it, nothing is recorded. A skip-only statement takes neither an
+/// amendment nor an approval, which mean nothing without a batch.
+#[tokio::test]
+async fn a_skip_only_statement_waits_for_the_admission_lock_and_takes_no_amendment() {
+    let simulator = SequenceSimulator::spawn(skip_only_plans()).expect("skip-only plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let args = statement_v2(
+        directory.path(),
+        "WR2 Sales",
+        Value::Null,
+        json!([]),
+        json!([skip_record_of("Cash")]),
+    );
+    let held = server.lock_import_admission().unwrap();
+    let response = server
+        .call_tool_response("build_import_xml", args.clone())
+        .await
+        .value;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_admission_busy",
+        "{response}"
+    );
+    drop(held);
+    assert_eq!(simulator.finish().expect("requests").len(), 10);
+    assert!(!directory
+        .path()
+        .join("agent-import-statement-skips.jsonl")
+        .exists());
+
+    // refused before any read
+    let no_reads = bank_server(directory.path(), 9);
+    for (key, value, code) in [
+        (
+            "amends_batch_id",
+            json!(format!(
+                "bridge-{}",
+                uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | 1)
+            )),
+            "skip_only_statement_cannot_amend",
+        ),
+        (
+            "on_account_approvals",
+            json!([{"party_digest": "a".repeat(64)}]),
+            "skip_only_statement_takes_no_approvals",
+        ),
+    ] {
+        let mut extra = args.clone();
+        extra[key] = value;
+        let response = no_reads
+            .call_tool_response("build_import_xml", extra)
+            .await
+            .value;
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"], code,
+            "{response}"
+        );
+    }
 }

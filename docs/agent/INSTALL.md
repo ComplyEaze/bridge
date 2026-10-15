@@ -158,7 +158,7 @@ A settings window opens with five lines. If none opens, open Settings, then Exte
 
 | Line | What to do | What it is |
 | --- | --- | --- |
-| **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
+| **I accept the ComplyEaze Bridge Terms of Use (version 2026-10.1)** | Read the [Terms of Use](https://bridge.complyeaze.com/terms.html). Then **tick** this box. If you do not own the practice, the owner should read and agree first. | Your agreement. Until you tick it, ComplyEaze Bridge does not read from Tally, and from release 0.5.1 every tool answers that the Terms of Use are not accepted and names this setting (the tools the assistant called gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this release). In 0.5.0, after an update from 0.4.2, Claude Desktop may not start ComplyEaze Bridge: on a Mac with an error that does not mention the Terms, on one Windows computer with no error (bridge#1413). |
 | **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer's own address is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
@@ -208,7 +208,7 @@ Still stuck? See [Help](#help).
 - **Decide who agrees.** What Claude reads, party names and amounts included, goes to Anthropic. How Anthropic keeps
   and uses it is set by your Claude account and Anthropic's own privacy policy. If the books belong to clients, the
   owner of the practice decides. How ComplyEaze Bridge itself handles information is in its
-  [Privacy Policy](https://bridge.complyeaze.com/privacy).
+  [Privacy Policy](https://bridge.complyeaze.com/privacy.html).
 - **Take a backup first** (Alt+Y, Backup & Restore, in TallyPrime).
 - **Leave Tally's port alone.** Do not open it to the internet, and do not try to reach a Tally on another computer.
   ComplyEaze Bridge accepts only this computer's own address.
@@ -247,7 +247,7 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   - a record of your acceptance of the Terms of Use.
 
   Section 7 of the
-  [Privacy Policy](https://bridge.complyeaze.com/privacy) explains how to archive them: keep the import journal in an
+  [Privacy Policy](https://bridge.complyeaze.com/privacy.html) explains how to archive them: keep the import journal in an
   encrypted archive rather than deleting it. Section 4 of [Security and privacy](../security-and-privacy.md) lists
   every file.
 - **Update:** it does not update by itself. Stop ComplyEaze Bridge, and every other program that uses it, before you

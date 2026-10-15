@@ -35,10 +35,10 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
                 voucher.date = "2026-08-01".into();
             }
         }
-        let mut plans = qualified_import_cycle_plans()[..30].to_vec();
+        let mut plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS - 2].to_vec();
         if fault == "http" {
-            plans[25].http_status = 503;
-            plans.truncate(26);
+            plans[25 + BUILD_NUMBERING_PLANS].http_status = 503;
+            plans.truncate(26 + BUILD_NUMBERING_PLANS);
         } else {
             // Refusal-only scalar fault injection into an otherwise unchanged capture.
             let body = if fault == "invalid_amount" {
@@ -61,7 +61,7 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             } else {
                 source.clone()
             };
-            for index in [25, 27] {
+            for index in [25 + BUILD_NUMBERING_PLANS, 27 + BUILD_NUMBERING_PLANS] {
                 plans[index].fixture = Fixture::SyntheticXml(body.clone());
             }
         }
@@ -105,7 +105,10 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
             "{fault}"
         );
         let observed = simulator.finish().unwrap();
-        assert_eq!(observed.len(), if fault == "http" { 26 } else { 30 });
+        assert_eq!(
+            observed.len(),
+            BUILD_NUMBERING_PLANS + if fault == "http" { 26 } else { 30 }
+        );
         let join = |a: &str, b: &str| sha256_hex(format!("{a}:{b}").as_bytes());
         let mut request = join(
             &observed[0].request_body_sha256,
@@ -113,9 +116,20 @@ async fn build_preflight_refuses_unreadable_or_out_of_window_sources_before_file
         );
         let mut response = join(&sha256_hex(&responses[0]), &sha256_hex(&responses[1]));
         let mut bytes = responses[0].len() + responses[1].len();
-        for index in [2, 7, 13, 19]
+        for index in [2, 7, 13] {
+            request = join(&request, &observed[index].request_body_sha256);
+            response = join(&response, &sha256_hex(&responses[index]));
+            bytes += 2 * responses[index].len();
+        }
+        // The numbering read after the mark (bridge#724) folds in as one link.
+        let (numbering_request, numbering_response, numbering_bytes) =
+            numbering_evidence_link(&observed, &responses, 18);
+        request = join(&request, &numbering_request);
+        response = join(&response, &numbering_response);
+        bytes += numbering_bytes;
+        for index in [19 + BUILD_NUMBERING_PLANS]
             .into_iter()
-            .chain((fault != "http").then_some(25))
+            .chain((fault != "http").then_some(25 + BUILD_NUMBERING_PLANS))
         {
             request = join(&request, &observed[index].request_body_sha256);
             response = join(&response, &sha256_hex(&responses[index]));

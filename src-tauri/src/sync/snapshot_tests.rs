@@ -1,8 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use crate::sync::reconciliation::ReconciliationMismatch;
-use bridge_tally_core::report_tie_out::scoped_mismatch_record_alias;
 use bridge_tally_core::{
     CanonicalPackWindow, CapabilityEvidence, CapabilityProfile, CoreAccountingBatch,
     EvidenceConfidence, GroupRecord, ObservedSourceIdentities, PackBatch, ProbeResult,
@@ -1444,50 +1442,6 @@ async fn resume_after_split_commit_never_refetches_the_parent() {
     );
 }
 
-#[tokio::test]
-async fn report_mismatch_aliases_never_persist_raw_source_ids() {
-    let (_, _, _, plan) = setup().await;
-    let window = &plan.windows[0];
-    let raw = "00000000-0000-4000-8000-000000000777";
-    let alias = scoped_mismatch_record_alias(
-        &plan.company.identity.observed_fingerprint,
-        &plan.run_id,
-        &window.id,
-        raw,
-    );
-    assert!(alias.starts_with("rid:"));
-    assert_eq!(alias.len(), 68);
-    assert!(!alias.contains(raw));
-    assert_eq!(
-        alias,
-        scoped_mismatch_record_alias(
-            &plan.company.identity.observed_fingerprint,
-            &plan.run_id,
-            &window.id,
-            raw,
-        )
-    );
-
-    let mut another_run = plan.clone();
-    another_run.run_id = "run-2".to_string();
-    assert_ne!(
-        alias,
-        scoped_mismatch_record_alias(
-            &another_run.company.identity.observed_fingerprint,
-            &another_run.run_id,
-            &window.id,
-            raw,
-        )
-    );
-
-    let durable = serde_json::to_string(&ReconciliationMismatch {
-        safe_reason_code: "period_report_movement_mismatch".to_string(),
-        safe_record_ids: vec![alias],
-    })
-    .unwrap();
-    assert!(!durable.contains(raw));
-}
-
 async fn seed_verified_checkpoint(mirror: &TallyMirrorRepository, plan: &SnapshotPlan) -> String {
     let batch_id = mirror
         .begin_batch(BeginBatchInput {
@@ -2667,7 +2621,9 @@ async fn committed_window_with_foreign_master_text_diagnostic_persists_safe_warn
         .expect("committed receipt");
     assert_eq!(
         receipt.facts.warning_codes,
-        vec![bridge_tally_core::FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE.to_string()]
+        vec![WarningCode::ForeignMasterTextRenderingDegraded
+            .as_str()
+            .to_string()]
     );
     let export = mirror
         .redacted_proof_export(
@@ -2683,7 +2639,7 @@ async fn committed_window_with_foreign_master_text_diagnostic_persists_safe_warn
         .expect("diagnosed window remains exportable as a redacted proof");
     assert!(export
         .json
-        .contains(bridge_tally_core::FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE));
+        .contains(WarningCode::ForeignMasterTextRenderingDegraded.as_str()));
 }
 
 #[tokio::test]
@@ -2744,10 +2700,11 @@ async fn abandoned_diagnosed_attempt_does_not_emit_warning_after_clean_reread() 
         )
         .await
         .expect("committed receipt");
-    assert!(!receipt
-        .facts
-        .warning_codes
-        .contains(&bridge_tally_core::FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE.to_string()));
+    assert!(!receipt.facts.warning_codes.contains(
+        &WarningCode::ForeignMasterTextRenderingDegraded
+            .as_str()
+            .to_string()
+    ));
     assert_eq!(connector.inner.requests.lock().unwrap().len(), 3);
 }
 

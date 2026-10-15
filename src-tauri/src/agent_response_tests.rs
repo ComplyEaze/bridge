@@ -553,3 +553,474 @@ fn a_summary_receipt_counts_its_buckets() {
     let response = json!({"result": {"buckets": [{"group": "a"}, {"group": "b"}, {"group": "c"}]}});
     assert_eq!(response_row_count(&response), Some(3));
 }
+
+// ---- the transfers section never makes a call fail as too large -----------------
+
+fn transfers_section(rows: usize) -> Value {
+    json!({
+        "state": "computed", "skips_paired": 2, "skips_open": rows, "retired": 1,
+        "open": (0..rows)
+            .map(|n| json!({"bridge_txn_id": format!("st-20260105-{n:016x}"),
+                "date": "20260105", "state": "not_found"}))
+            .collect::<Vec<_>>(),
+        "open_omitted": 0,
+        "next_steps": {"not_found": "a step text ".repeat(25)},
+    })
+}
+
+fn len_of(response: &Value) -> usize {
+    response.to_string().len()
+}
+
+#[test]
+fn open_rows_are_cut_before_the_verified_rows_of_a_page() {
+    let items: Vec<Value> = (0..20)
+        .map(|id| json!({"id": id, "padding": "x".repeat(40)}))
+        .collect();
+    let mut response = json!({"result": {"offset": 0, "items": items,
+        "transfers": transfers_section(300)}});
+    let without = {
+        let mut bare = response.clone();
+        bare["result"]["transfers"]["open"] = json!([]);
+        len_of(&bare)
+    };
+    let cap = without + 2_000;
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    // every verified row is still there, and the section counts what it cut
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 20);
+    let section = &response["result"]["transfers"];
+    let kept = section["open"].as_array().unwrap().len();
+    assert!(kept > 0 && kept < 300, "{kept}");
+    assert_eq!(section["open_omitted"], 300 - kept);
+    assert_eq!(section["skips_open"], 300);
+    assert!(section["next_steps"]["open_omitted"]
+        .as_str()
+        .unwrap()
+        .contains("BRIDGE_AGENT_MAX_BYTES"));
+    // the rows kept are the first ones
+    assert_eq!(
+        section["open"][kept - 1]["bridge_txn_id"],
+        format!("st-20260105-{:016x}", kept - 1)
+    );
+}
+
+#[test]
+fn a_result_with_no_rows_of_its_own_still_fits_by_cutting_the_section() {
+    let mut response = json!({"result": {"batch_id": "bridge-x", "note": "y".repeat(500),
+        "transfers": transfers_section(300)}});
+    let cap = 3_000;
+    assert!(len_of(&response) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    assert_eq!(response["result"]["batch_id"], "bridge-x");
+    assert!(
+        response["result"]["transfers"]["open_omitted"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+}
+
+#[test]
+fn the_section_is_fitted_to_the_text_copy_and_its_escaping_too() {
+    let mut mcp = json!({"content": [{"type": "text", "text": ""}],
+        "structuredContent": {"result": {"batch_id": "bridge-x",
+            "transfers": transfers_section(300)}}});
+    let cap = 6_000;
+    enforce_mcp_result_byte_cap(&mut mcp, cap, "build_import_xml", 0).unwrap();
+    set_mcp_content_json(&mut mcp);
+    assert!(len_of(&mcp) <= cap, "{}", len_of(&mcp));
+    let section = &mcp["structuredContent"]["result"]["transfers"];
+    assert!(section["open_omitted"].as_u64().unwrap() > 0);
+    assert_eq!(section["skips_open"], 300);
+}
+
+#[test]
+fn a_section_that_cannot_keep_its_texts_keeps_its_counts_and_then_only_a_note() {
+    let section = transfers_section(300);
+    let with = |section: Value| json!({"result": {"batch_id": "bridge-x", "transfers": section}});
+    // room for the counts and the one step, not for the step texts
+    let cap = len_of(&with(counts_only_section(&section)));
+    assert!(len_of(&with(trim_section(&section, 0))) > cap);
+    let mut counts = with(section.clone());
+    assert!(fit_response(&mut counts, "", cap, |value| len_of(value)).unwrap());
+    let kept = &counts["result"]["transfers"];
+    assert_eq!(kept["state"], "computed");
+    assert_eq!(kept["skips_open"], 300);
+    assert_eq!(kept["open"], json!([]));
+    assert_eq!(kept["open_omitted"], 300);
+    assert_eq!(
+        kept["next_steps"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
+        ["open_omitted"]
+    );
+    // room for nothing but a note that the check is to be run again
+    let cap = len_of(&with(check_not_run_section(false)));
+    let mut note = with(section);
+    assert!(fit_response(&mut note, "", cap, |value| len_of(value)).unwrap());
+    let kept = &note["result"]["transfers"];
+    assert_eq!(kept["state"], "not_established");
+    assert!(kept.get("skips_open").is_none());
+    assert!(kept["next_steps"]["check_not_run"].is_string());
+}
+
+#[test]
+fn a_section_that_already_fits_or_is_not_computed_is_left_alone() {
+    let mut fits = json!({"result": {"transfers": transfers_section(3)}});
+    let before = fits.clone();
+    assert!(!fit_response(&mut fits, "", 100_000, |value| len_of(value)).unwrap());
+    assert_eq!(fits, before);
+    // a note is not cut, so a response too large for its page is the page's
+    let mut note = json!({"result": {"items": [], "padding": "x".repeat(2_000),
+        "transfers": {"state": "not_established", "next_steps": {}}}});
+    assert_eq!(
+        fit_response(&mut note, "", 500, |value| len_of(value)),
+        Err("agent_response_too_large".to_string())
+    );
+    // and a page cut around it leaves it as it was
+    let items: Vec<Value> = (0..50).map(|id| json!({"id": id})).collect();
+    let mut paged = json!({"result": {"offset": 0, "items": items,
+        "transfers": {"state": "not_established", "next_steps": {"check_not_run": "again"}}}});
+    let before = paged["result"]["transfers"].clone();
+    assert!(fit_response(&mut paged, "", 300, |value| len_of(value)).unwrap());
+    assert!(paged["result"]["items"].as_array().unwrap().len() < 50);
+    assert_eq!(paged["result"]["transfers"], before);
+}
+
+// ---- the section is fitted again into what a trimmed page leaves ----------------
+
+fn verify_page(items: usize, section: Value) -> Value {
+    json!({"result": {
+        "verification_status": "posted_verified", "counts": {"posted_verified": items},
+        "offset": 0,
+        "items": (0..items)
+            .map(|id| json!({"id": id, "padding": "x".repeat(1_500)}))
+            .collect::<Vec<_>>(),
+        "transfers": section,
+    }})
+}
+
+/// A page whose own rows exceed the cap: the check did run, so the section
+/// stays computed, widened into what the trimmed page leaves.
+#[test]
+fn a_page_cut_to_the_cap_leaves_its_computed_section_as_wide_as_the_room_allows() {
+    let section = transfers_section(40);
+    // room for five page rows beside the counts, and for some open rows, not for a sixth page row
+    let mut five = verify_page(30, counts_only_section(&section));
+    retain_page_width(&mut five, PageShape::Rows("items"), 5).unwrap();
+    let cap = len_of(&five) + 700;
+    let mut response = verify_page(30, section.clone());
+    assert!(len_of(&response) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    // the page is cut to the rows that fit beside the counts, its verdict is not
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 5);
+    assert_eq!(response["result"]["verification_status"], "posted_verified");
+    assert_eq!(response["result"]["counts"], json!({"posted_verified": 30}));
+    // the check ran: the section is computed, with every open row kept or counted
+    let shown = &response["result"]["transfers"];
+    assert_eq!(shown["state"], "computed");
+    assert_eq!(shown["skips_open"], 40);
+    let rows = shown["open"].as_array().unwrap().len();
+    assert!(rows > 0 && rows < 40, "{rows}");
+    assert_eq!(shown["open_omitted"], 40 - rows);
+    // and it is as wide as the trimmed page leaves room for
+    let mut wider = response.clone();
+    wider["result"]["transfers"] = trim_section(&section, rows + 1);
+    assert!(len_of(&wider) > cap);
+}
+
+#[test]
+fn a_page_cut_to_the_cap_keeps_its_counts_when_no_row_fits_beside_it() {
+    let section = transfers_section(40);
+    let mut response = verify_page(30, section.clone());
+    // one page row and the counts, and no room for an open row
+    let mut one = verify_page(1, counts_only_section(&section));
+    one["result"]["offset"] = json!(0);
+    let cap = len_of(&one) + 40;
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 1);
+    let shown = &response["result"]["transfers"];
+    assert_eq!(shown["state"], "computed");
+    assert_eq!(shown["open"], json!([]));
+    assert_eq!(shown["open_omitted"], 40);
+}
+
+#[test]
+fn a_page_cut_to_the_cap_says_the_check_is_to_be_run_again_only_when_not_even_counts_fit() {
+    let section = transfers_section(40);
+    let mut response = verify_page(30, section.clone());
+    let one = verify_page(1, check_not_run_section(false));
+    let cap = len_of(&one) + 40;
+    assert!(len_of(&verify_page(1, counts_only_section(&section))) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(len_of(&response) <= cap);
+    assert_eq!(response["result"]["transfers"]["state"], "not_established");
+}
+
+/// `truncated` on the whole answer stays true when only the section's rows were
+/// cut: something was left out, and the flag is the conservative reading.
+#[test]
+fn cutting_only_the_section_still_reports_that_something_was_cut() {
+    let mut response = json!({"result": {"batch_id": "bridge-x",
+        "transfers": transfers_section(300)}});
+    let cap = 3_000;
+    let (fitted, truncated, _) = enforce_response_byte_cap(response.clone(), cap).unwrap();
+    assert!(truncated);
+    assert!(
+        fitted["result"]["transfers"]["open_omitted"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    // a section that already fits reports nothing cut
+    response["result"]["transfers"] = transfers_section(2);
+    let (_, truncated, _) = enforce_response_byte_cap(response, 100_000).unwrap();
+    assert!(!truncated);
+}
+
+#[test]
+fn the_note_that_the_check_did_not_run_names_the_call_that_made_it() {
+    let batch = check_not_run_section(false);
+    assert_eq!(
+        batch["next_steps"]["check_not_run"],
+        "Not run, or cut to fit: verify again; if it repeats, raise BRIDGE_AGENT_MAX_BYTES."
+    );
+    let recorded = check_not_run_section(true);
+    assert_eq!(
+        recorded["next_steps"]["check_not_run"],
+        "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
+}
+
+#[test]
+fn a_recorded_statement_that_cannot_keep_its_section_is_told_the_next_call_will_show_it() {
+    let section = transfers_section(40);
+    let with = |section: Value| json!({"result": {"state": "skips_recorded", "record_id": "skips-x", "transfers": section}});
+    let cap = len_of(&with(check_not_run_section(true)));
+    assert!(len_of(&with(counts_only_section(&section))) > cap);
+    let mut response = with(section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(
+        response["result"]["transfers"]["next_steps"]["check_not_run"],
+        "The skipped rows are recorded; the transfer check will show on the next build or verification for this company."
+    );
+}
+
+fn small_page(items: usize, section: Value) -> Value {
+    json!({"result": {"offset": 0, "verification_status": "posted_verified",
+        "items": (0..items).map(|id| json!({"id": id})).collect::<Vec<_>>(),
+        "transfers": section}})
+}
+
+/// A page that fits beside the note at full width is not cut, however many open
+/// rows the section has and however little room the counts would need.
+#[test]
+fn a_page_that_fits_with_the_note_at_full_width_is_not_cut() {
+    let section = transfers_section(40);
+    let cap = len_of(&small_page(30, check_not_run_section(false))) + 5;
+    assert!(len_of(&small_page(30, counts_only_section(&section))) > cap);
+    let mut response = small_page(30, section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 30);
+    assert!(response["result"].get("next_offset").is_none());
+    assert_eq!(response["result"]["transfers"]["state"], "not_established");
+    assert!(len_of(&response) <= cap);
+}
+
+/// A page of one row, or none, has no width to give up: the section is what
+/// gives way, down to the note.
+#[test]
+fn a_page_of_one_row_or_none_keeps_its_rows_and_the_section_gives_way_to_the_note() {
+    let section = transfers_section(40);
+    for rows in [0, 1] {
+        let cap = len_of(&small_page(rows, check_not_run_section(false))) + 5;
+        assert!(len_of(&small_page(rows, counts_only_section(&section))) > cap);
+        let mut response = small_page(rows, section.clone());
+        assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+        assert_eq!(response["result"]["items"].as_array().unwrap().len(), rows);
+        assert_eq!(response["result"]["transfers"]["state"], "not_established");
+        assert!(len_of(&response) <= cap);
+    }
+}
+
+/// A page whose rows alone overflow is trimmed with the note beside it, and the
+/// section is then widened into what is left. Here the trimmed page leaves room
+/// for the note and not the counts.
+#[test]
+fn an_overflowing_page_is_trimmed_beside_the_note_and_the_section_widened_after() {
+    let section = transfers_section(40);
+    let mut fifteen = small_page(60, check_not_run_section(false));
+    retain_page_width(&mut fifteen, PageShape::Rows("items"), 15).unwrap();
+    let cap = len_of(&fifteen) + 8;
+    let mut response = small_page(60, section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 15);
+    assert_eq!(response["result"]["transfers"]["state"], "not_established");
+    assert!(len_of(&response) <= cap);
+}
+
+/// A section with no open rows has counts shorter than the note: the page is
+/// trimmed beside the counts, so it keeps every row the counts leave room for.
+#[test]
+fn an_overflowing_page_is_trimmed_beside_the_counts_when_they_are_shorter_than_the_note() {
+    let section = transfers_section(0);
+    let counts = counts_only_section(&section);
+    assert!(len_of(&counts) < len_of(&check_not_run_section(false)));
+    let mut fifteen = small_page(60, counts.clone());
+    retain_page_width(&mut fifteen, PageShape::Rows("items"), 15).unwrap();
+    let cap = len_of(&fifteen) + 2;
+    let mut with_note = small_page(60, check_not_run_section(false));
+    retain_page_width(&mut with_note, PageShape::Rows("items"), 15).unwrap();
+    assert!(len_of(&with_note) > cap);
+    let mut response = small_page(60, section);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert_eq!(response["result"]["items"].as_array().unwrap().len(), 15);
+    assert_eq!(response["result"]["transfers"], counts);
+    assert!(len_of(&response) <= cap);
+}
+
+/// With no computed section the page is trimmed exactly as it always was, and
+/// a page that cannot fit fails.
+#[test]
+fn a_result_with_no_computed_section_takes_the_old_path() {
+    for transfers in [
+        None,
+        Some(json!({"state": "not_established", "next_steps": {}})),
+    ] {
+        let page = |items: usize| {
+            let mut page = small_page(items, Value::Null);
+            match &transfers {
+                Some(section) => page["result"]["transfers"] = section.clone(),
+                None => {
+                    page["result"].as_object_mut().unwrap().remove("transfers");
+                }
+            }
+            page
+        };
+        let mut five = page(60);
+        retain_page_width(&mut five, PageShape::Rows("items"), 5).unwrap();
+        let cap = len_of(&five) + 3;
+        let mut response = page(60);
+        assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+        assert_eq!(response["result"]["items"].as_array().unwrap().len(), 5);
+        assert_eq!(response["result"].get("transfers"), transfers.as_ref());
+        // a page of one row that does not fit fails
+        let mut one = page(1);
+        assert_eq!(
+            fit_response(&mut one, "", 20, |value| len_of(value)),
+            Err("agent_response_too_large".to_string())
+        );
+        let mut none = page(0);
+        assert_eq!(
+            fit_response(&mut none, "", 20, |value| len_of(value)),
+            Err("agent_response_too_large".to_string())
+        );
+    }
+}
+
+/// A written build has no page to trim. When it fits without its section but
+/// not beside the note that the check did not run, it is answered without the
+/// section and reported as cut: it is never turned into an error after its
+/// file and journal record are written.
+#[test]
+fn a_result_with_no_page_that_fits_only_without_its_section_is_answered_without_it() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let mut response = bare.clone();
+    response["result"]["transfers"] = transfers_section(40);
+    let cap = len_of(&bare) + 10;
+    let mut noted = bare.clone();
+    noted["result"]["transfers"] = check_not_run_section(false);
+    assert!(len_of(&noted) > cap);
+    assert!(fit_response(&mut response, "", cap, |value| len_of(value)).unwrap());
+    assert!(response["result"].get("transfers").is_none(), "{response}");
+    assert_eq!(response["result"]["batch_id"], "bridge-x");
+    assert_eq!(response["truncated"], true);
+    // through the cap itself: answered, and reported as cut
+    let mut with_section = bare.clone();
+    with_section["result"]["transfers"] = transfers_section(40);
+    let (fitted, truncated, _) = enforce_response_byte_cap(with_section, cap).unwrap();
+    assert!(truncated);
+    assert!(fitted["result"].get("transfers").is_none(), "{fitted}");
+    assert_eq!(fitted["result"]["batch_id"], "bridge-x");
+    // a result too large without its section is still too large
+    let mut too_big = bare.clone();
+    too_big["result"]["transfers"] = transfers_section(40);
+    assert_eq!(
+        fit_response(&mut too_big, "", 100, |value| len_of(value)),
+        Err("agent_response_too_large".to_string())
+    );
+}
+
+/// Whatever the section is, a note that the check did not run included: a
+/// result with no page that fits without it is answered without it.
+#[test]
+fn a_result_with_no_page_drops_a_note_section_too() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let mut noted = bare.clone();
+    noted["result"]["transfers"] = check_not_run_section(false);
+    let cap = len_of(&bare) + 5;
+    assert!(len_of(&noted) > cap);
+    assert!(fit_response(&mut noted, "", cap, |value| len_of(value)).unwrap());
+    assert!(noted["result"].get("transfers").is_none(), "{noted}");
+    assert_eq!(noted["truncated"], true);
+}
+
+/// The same drop through the two other places the cap is applied to a tool
+/// result: the MCP result's `structuredContent`, and the JSON-RPC response.
+#[test]
+fn a_result_with_no_page_drops_its_section_in_the_mcp_and_jsonrpc_envelopes_too() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let with_section = |section: Value| {
+        let mut full = bare.clone();
+        full["result"]["transfers"] = section;
+        full
+    };
+    // MCP: structuredContent beside its text copy
+    let mcp = |structured: Value| {
+        let mut mcp =
+            json!({"content": [{"type": "text", "text": ""}], "structuredContent": structured});
+        set_mcp_content_json(&mut mcp);
+        mcp
+    };
+    let cap = len_of(&mcp(bare.clone())) + 10;
+    for section in [transfers_section(40), check_not_run_section(false)] {
+        assert!(len_of(&mcp(with_section(section.clone()))) > cap);
+        let mut response = mcp(with_section(section));
+        enforce_mcp_result_byte_cap(&mut response, cap, "build_import_xml", 0).unwrap();
+        let structured = &response["structuredContent"];
+        assert!(
+            structured["result"].get("transfers").is_none(),
+            "{response}"
+        );
+        assert_eq!(structured["truncated"], true);
+        assert!(len_of(&response) <= cap);
+    }
+    // JSON-RPC: the same under result.structuredContent
+    let rpc = |structured: Value| {
+        let mut rpc = json!({"jsonrpc": "2.0", "id": 1, "result": {"content": [], "structuredContent": structured}});
+        set_mcp_content_json(&mut rpc["result"]);
+        rpc
+    };
+    let cap = len_of(&rpc(bare.clone())) + 11;
+    let mut response = rpc(with_section(transfers_section(40)));
+    enforce_jsonrpc_response_byte_cap(&mut response, cap).unwrap();
+    assert!(response["result"]["structuredContent"]["result"]
+        .get("transfers")
+        .is_none());
+    assert_eq!(response["result"]["structuredContent"]["truncated"], true);
+    // a result too large without the section still fails in both
+    let mut too_big = mcp(with_section(transfers_section(40)));
+    assert_eq!(
+        enforce_mcp_result_byte_cap(&mut too_big, 100, "build_import_xml", 0),
+        Err("agent_response_too_large".to_string())
+    );
+}

@@ -151,6 +151,23 @@ fn before_approval_with_currencies(currencies: String) -> Vec<ScenarioPlan> {
     plans.extend(paired(catalogue()));
     plans.extend(paired(currencies));
     plans.extend(probe());
+    plans.extend(numbering_read(&[]));
+    plans
+}
+
+/// The voucher numbering read before the approval (bridge#724): the company's
+/// marks, then the mode probe and identity, the voucher-type masters pair, the
+/// numbering pair, and identity and mode again. The types in `manual` read
+/// Manual, the rest Automatic.
+fn numbering_read(manual: &[&str]) -> Vec<ScenarioPlan> {
+    let (masters, numbering) =
+        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, manual);
+    let mut plans = paired(marks());
+    plans.extend([status(), xml(companies()), xml(companies())]);
+    for body in [masters, numbering] {
+        plans.extend([xml(body.clone()), status(), xml(body), status()]);
+    }
+    plans.extend([xml(companies()), status(), xml(companies())]);
     plans
 }
 
@@ -1292,6 +1309,7 @@ fn bank_before_approval_with_currencies(
     plans.extend(paired(groups));
     plans.extend(paired(currencies));
     plans.extend(probe());
+    plans.extend(numbering_read(&[]));
     plans
 }
 
@@ -1346,16 +1364,34 @@ fn saved_bank_batch_recording_all(
     cash_in_hand: Value,
     on_account: Value,
 ) -> (ImportLedgerLine, Value) {
+    saved_bank_vouchers_recording(server, vec![voucher], cash_in_hand, on_account)
+}
+
+/// A built, never-dispatched bank batch of `vouchers`, in their order.
+fn saved_bank_vouchers(server: &Server, vouchers: Vec<Value>) -> (ImportLedgerLine, Value) {
+    saved_bank_vouchers_recording(server, vouchers, json!([]), json!([]))
+}
+
+fn saved_bank_vouchers_recording(
+    server: &Server,
+    vouchers: Vec<Value>,
+    cash_in_hand: Value,
+    on_account: Value,
+) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let txn_ids = vouchers
+        .iter()
+        .map(|voucher| voucher["bridge_txn_id"].clone())
+        .collect::<Vec<_>>();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":BANK_BATCH, "identity_scheme":"batch_v1",
         "company_guid":GUID,
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
-        "txn_ids":[voucher["bridge_txn_id"].clone()],"date_from":"20260901","date_to":"20260901",
+        "txn_ids":txn_ids,"date_from":"20260901","date_to":"20260901",
         "sha256":"", "built_at":"2026-09-22T00:00:00Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":10,"master_value":7},
-        "vouchers":[voucher]
+        "vouchers":vouchers
     }))
     .unwrap();
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
@@ -1651,7 +1687,9 @@ fn cash_under_bank_row() -> Value {
 #[tokio::test]
 async fn a_cash_in_hand_ledger_moved_under_bank_since_the_build_is_refused_before_approval() {
     let mut plans = bank_before_approval(catalogue_with_cash_under_bank(), groups());
-    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    plans.truncate(
+        plans.len() - paired(single_currency()).len() - probe().len() - numbering_read(&[]).len(),
+    );
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -1792,7 +1830,9 @@ async fn a_cash_in_hand_ledger_moved_out_of_money_is_refused_by_the_bank_gate_fi
         ">Sundry Debtors</PARENT>",
     );
     let mut plans = bank_before_approval(moved, groups());
-    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    plans.truncate(
+        plans.len() - paired(single_currency()).len() - probe().len() - numbering_read(&[]).len(),
+    );
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -1818,7 +1858,9 @@ async fn a_cash_in_hand_ledger_moved_out_of_money_is_refused_by_the_bank_gate_fi
 #[tokio::test]
 async fn a_journal_recording_a_cash_in_hand_ledger_is_refused_before_approval() {
     let mut plans = before_approval();
-    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    plans.truncate(
+        plans.len() - paired(single_currency()).len() - probe().len() - numbering_read(&[]).len(),
+    );
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -1855,7 +1897,9 @@ async fn a_journal_recording_a_cash_in_hand_ledger_is_refused_before_approval() 
 #[tokio::test]
 async fn the_recheck_before_approval_bounds_its_rows_as_the_queue_does() {
     let mut plans = bank_before_approval(catalogue_with_sales_as_bank(), groups());
-    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    plans.truncate(
+        plans.len() - paired(single_currency()).len() - probe().len() - numbering_read(&[]).len(),
+    );
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
@@ -2074,7 +2118,12 @@ async fn a_classification_changed_since_the_build_is_refused_before_approval() {
         let mut plans = bank_before_approval(catalogue, groups);
         // The Currency masters and the qualified mode probe after the group
         // read are never sent.
-        plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+        plans.truncate(
+            plans.len()
+                - paired(single_currency()).len()
+                - probe().len()
+                - numbering_read(&[]).len(),
+        );
         let expected = plans.len();
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
@@ -2676,7 +2725,7 @@ async fn a_book_with_two_currency_masters_is_refused_before_approval_on_both_sur
     for desktop in [false, true] {
         let mut plans = before_approval_with_currencies(two_currencies());
         // The qualified mode probe after the Currency read is never sent.
-        plans.truncate(plans.len() - probe().len());
+        plans.truncate(plans.len() - probe().len() - numbering_read(&[]).len());
         let expected = plans.len();
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
@@ -2766,7 +2815,7 @@ async fn a_payment_into_a_book_with_two_currency_masters_is_refused_before_and_a
         } else {
             let mut plans =
                 bank_before_approval_with_currencies(catalogue(), groups(), two_currencies());
-            plans.truncate(plans.len() - probe().len());
+            plans.truncate(plans.len() - probe().len() - numbering_read(&[]).len());
             plans
         };
         let expected = plans.len();
@@ -3270,7 +3319,12 @@ async fn refused_by_build_binding_under(
     let mut plans = before_approval();
     let expected = if identities.is_some() {
         // The Currency read and mode probe after the catalogue are never sent.
-        plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+        plans.truncate(
+            plans.len()
+                - paired(single_currency()).len()
+                - probe().len()
+                - numbering_read(&[]).len(),
+        );
         plans.len()
     } else {
         plans.clear();
@@ -3401,7 +3455,9 @@ async fn a_replaced_ledger_is_reported_before_a_flag_that_changed() {
             );
         }
     }
-    plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+    plans.truncate(
+        plans.len() - paired(single_currency()).len() - probe().len() - numbering_read(&[]).len(),
+    );
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -3449,7 +3505,12 @@ async fn a_named_ledger_that_became_bill_wise_since_the_build_is_refused_before_
             }
         }
         // The Currency read and mode probe after the catalogue are never sent.
-        plans.truncate(plans.len() - paired(single_currency()).len() - probe().len());
+        plans.truncate(
+            plans.len()
+                - paired(single_currency()).len()
+                - probe().len()
+                - numbering_read(&[]).len(),
+        );
         let expected = plans.len();
         let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
         let directory = tempfile::tempdir().unwrap();
@@ -5434,6 +5495,13 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         "sent_not_attributed",
         "{posted}"
     );
+    // Tally's own answer reported an exception, so the line does not suggest
+    // an edit in Tally, and names no cause (bridge#1108).
+    assert_eq!(
+        voucher("partial-2")["next_step"],
+        "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.",
+        "{posted}"
+    );
     let verdicts = String::from_utf8(journal(directory.path()))
         .unwrap()
         .lines()
@@ -5480,6 +5548,27 @@ async fn post_batch_rejected(answer: String, after_mark: u64) -> Value {
         .await;
     assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
     posted
+}
+
+/// A post whose answer from Tally does not parse is not clean, as the post
+/// reads it: its vouchers' line drops the edit example too (bridge#1108).
+#[tokio::test]
+async fn a_post_whose_answer_does_not_parse_drops_the_edit_example() {
+    let posted = post_batch_rejected("not an import answer".to_string(), 10).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(
+        result["dispatch"]["response_state"], "response_not_clean",
+        "{posted}"
+    );
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{posted}");
+    let steps = result["vouchers"]
+        .as_array()
+        .expect("the result lists its vouchers")
+        .iter()
+        .map(|voucher| voucher["next_step"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{posted}");
 }
 
 #[tokio::test]
@@ -5639,7 +5728,8 @@ async fn a_batch_rejected_whole_verified_later_says_what_tally_reported_of_each_
 /// The same batch when the voucher mark moved by one across the post (the
 /// later check reads the mark where the post left it): the post claimed
 /// nothing about any voucher, and a later check claims nothing either. Each
-/// voucher keeps the line that says to check in Tally.
+/// voucher keeps the line that says to check in Tally, without the edit
+/// example, because the saved answer was not clean.
 #[tokio::test]
 async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_check() {
     let later =
@@ -5647,8 +5737,9 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_che
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
     let (steps, summary) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain; 3], "{later}");
+    // The saved answer was not clean, so the line drops the edit example.
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{later}");
     assert_eq!(summary, LATER_SUMMARY, "{later}");
 }
 
@@ -5662,13 +5753,15 @@ async fn a_batch_rejected_whole_with_no_step_record_is_not_described_by_a_later_
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
     let (steps, _) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain; 3], "{later}");
+    // The saved answer was not clean, so the line drops the edit example.
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{later}");
 }
 
 /// A batch that landed partly, checked again later: the voucher that is not
-/// found keeps the line that says to check in Tally. A count does not say
-/// which voucher Tally rejected.
+/// found keeps the line that says to check in Tally, without the edit example
+/// (the saved answer was not clean). A count does not say which voucher Tally
+/// rejected.
 #[tokio::test]
 async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
     let later =
@@ -5676,8 +5769,8 @@ async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
     let (steps, _) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain], "{later}");
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean], "{later}");
 }
 
 /// The same answer with the voucher mark moved by one across the post: Tally
@@ -5699,4 +5792,405 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step.",
         "{posted}"
     );
+}
+
+// bridge#724: a voucher goes without a number, so its voucher type must read
+// Automatic with existing numbers retained before the approval, and no master
+// may move from that read to the POST.
+
+/// Every read before the approval, the numbering read answering `numbering`
+/// in place of the default.
+fn before_approval_numbering(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {
+    let mut plans = before_approval();
+    plans.truncate(plans.len() - numbering_read(&[]).len());
+    plans.extend(numbering);
+    plans
+}
+
+#[tokio::test]
+async fn a_journal_into_a_manual_journal_type_is_refused_before_the_approval() {
+    let plans = before_approval_numbering(numbering_read(&["Journal"]));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let before = journal(directory.path());
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_automatic",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"not_prevented"}}]),
+        "{response}"
+    );
+    assert!(
+        result["error"]["next_step"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("Nothing was sent.")),
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+    assert_eq!(
+        appended_kinds(&before, &journal(directory.path())),
+        ["verification_status"]
+    );
+}
+
+/// The Journal type reads Automatic with its series set to renumber: refused
+/// under its own code before the approval, with the same next step as the
+/// not-Automatic refusal, and nothing is asked, recorded as attempted or sent.
+#[tokio::test]
+async fn a_journal_into_a_journal_type_set_to_renumber_is_refused_before_the_approval() {
+    let numbering = crate::agent::agent_import::numbering_fixtures::with_sub_method(
+        numbering_read(&[]),
+        "Journal",
+        SET_TO_RENUMBER,
+    );
+    let plans = before_approval_numbering(numbering);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let before = journal(directory.path());
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_retain",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}]),
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["next_step"],
+        json!(crate::agent::refusal_remediation("import_voucher_numbering_not_automatic").unwrap()),
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+    assert_eq!(
+        appended_kinds(&before, &journal(directory.path())),
+        ["verification_status"]
+    );
+}
+
+const SET_TO_RENUMBER: &str = "<NUMBERINGSUBMETHOD>Auto Renumber</NUMBERINGSUBMETHOD>";
+
+/// What the desktop's Journal screen receives for each numbering refusal. It
+/// shows the message alone, so the message names the voucher type and what was
+/// read of it, and is not the sentence every refusal before an attempt gets.
+#[tokio::test]
+async fn the_desktop_journal_is_told_which_voucher_type_was_refused_and_what_was_read() {
+    use crate::agent::agent_import::numbering_fixtures::with_sub_method;
+    for (numbering, code, read) in [
+        (
+            numbering_read(&["Journal"]),
+            "import_voucher_numbering_not_automatic",
+            "Journal is numbered Manual",
+        ),
+        (
+            with_sub_method(numbering_read(&[]), "Journal", SET_TO_RENUMBER),
+            "import_voucher_numbering_not_retain",
+            "Journal is numbered Automatic with Renumber Vouchers",
+        ),
+    ] {
+        let plans = before_approval_numbering(numbering);
+        let expected = plans.len();
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (line, args) = saved_batch(&server);
+        let scripted = ScriptedApproval::approving();
+        let outcome = SCRIPTED_APPROVAL
+            .scope(
+                scripted.clone(),
+                server.post_import_checked(&args, Some(&line.sha256), PostScope::JournalOnly),
+            )
+            .await
+            .expect("a refusal is reported as the post's outcome");
+        let shown = super::super::desktop_journal::DesktopJournalOperation::from_outcome(outcome)
+            .result["result"]
+            .clone();
+        let observed = sent(simulator);
+        assert_eq!(shown["error"]["code"], code, "{shown}");
+        assert_eq!(shown["attempt_recorded"], json!(false), "{shown}");
+        let message = shown["error"]["message"].as_str().expect("a message");
+        assert!(message.contains(read), "{code}: {message}");
+        let generic = reconciliation_failure_payload(&line.batch_id, Some(false), None, code);
+        assert_ne!(
+            json!(message),
+            generic["result"]["error"]["message"],
+            "{code}"
+        );
+        assert!(scripted.counts().is_empty(), "the dialog is never asked");
+        assert_eq!(observed.len(), expected, "{code}: {shown}");
+    }
+}
+
+/// The Journal type reads Automatic and its series prints no sub-method: a
+/// post is refused before the approval under the sub-method's code, says the
+/// sub-method was absent, and nothing is asked or sent.
+#[tokio::test]
+async fn a_journal_into_a_journal_type_that_prints_no_sub_method_is_refused_before_the_approval() {
+    let numbering = crate::agent::agent_import::numbering_fixtures::with_sub_method(
+        numbering_read(&[]),
+        "Journal",
+        "",
+    );
+    let plans = before_approval_numbering(numbering);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_retain",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"automatic","sub_method":"absent","duplicates":"not_prevented"}}]),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// A batch of two voucher types whose SECOND type is set to renumber: the
+/// rule reads every voucher's type, so the whole batch is refused before the
+/// approval and that type is the one named.
+#[tokio::test]
+async fn a_batch_whose_second_voucher_type_is_set_to_renumber_is_refused_before_the_approval() {
+    let mut plans = bank_before_approval(catalogue(), groups());
+    plans.truncate(plans.len() - numbering_read(&[]).len());
+    plans.extend(
+        crate::agent::agent_import::numbering_fixtures::with_sub_method(
+            numbering_read(&[]),
+            "Receipt",
+            SET_TO_RENUMBER,
+        ),
+    );
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_bank_vouchers(&server, vec![payment(), receipt()]);
+    assert_eq!(
+        line.vouchers
+            .iter()
+            .map(|voucher| voucher.voucher_type.as_str())
+            .collect::<Vec<_>>(),
+        ["Payment", "Receipt"]
+    );
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_retain",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Receipt","observed":{"observation":"observed","method":"automatic","sub_method":"auto_renumber","duplicates":"not_prevented"}}]),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// A batch of the three bank voucher types, every one set to renumber, posted
+/// under a response budget of `max_bytes`: the tool's whole answer.
+async fn every_bank_type_refused_under(max_bytes: usize) -> Value {
+    use crate::agent::agent_import::numbering_fixtures::with_sub_method;
+    let mut numbering = numbering_read(&[]);
+    for name in ["Payment", "Receipt", "Contra"] {
+        numbering = with_sub_method(numbering, name, SET_TO_RENUMBER);
+    }
+    let mut plans = bank_before_approval(catalogue_with_sales_as_bank(), groups());
+    plans.truncate(plans.len() - numbering_read(&[]).len());
+    plans.extend(numbering);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.settings.max_bytes = max_bytes;
+    let (_, args) = saved_bank_vouchers(&server, vec![payment(), receipt(), contra()]);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let _ = sent(simulator);
+    response
+}
+
+/// The byte budget a tool's answer is held to is `max_bytes`: 200,000 unless
+/// set. A numbering refusal carries its next step and its message from
+/// `GUIDANCE_MIN_RESPONSE_BUDGET` up. At exactly that budget a batch of the
+/// three bank voucher types, every one refused, is answered whole through the
+/// tool; and so is the same answer naming four voucher types, the most the
+/// two voucher shapes can name between them, held to the three caps an answer
+/// passes on its way out.
+#[tokio::test]
+async fn a_post_refusing_every_voucher_type_is_answered_whole_at_the_guidance_budget() {
+    const BUDGET: usize = numbering::GUIDANCE_MIN_RESPONSE_BUDGET;
+    let response = every_bank_type_refused_under(BUDGET).await;
+    let whole = |error: &Value, types: usize| {
+        assert_eq!(
+            error["code"], "import_voucher_numbering_not_retain",
+            "{error}"
+        );
+        assert_eq!(
+            error["refused_types"].as_array().map(Vec::len),
+            Some(types),
+            "{error}"
+        );
+        assert_eq!(
+            error["next_step"],
+            json!(numbering::POST_NEXT_STEP),
+            "{error}"
+        );
+        assert!(error["message"]
+            .as_str()
+            .is_some_and(|message| message.matches(" is numbered Automatic").count() == types));
+    };
+    whole(&response["structuredContent"]["result"]["error"], 3);
+    let framed = crate::agent::agent_import::numbering_fixtures::four_types_through_the_caps(
+        response["structuredContent"].clone(),
+        "/result/error",
+        BUDGET,
+    )
+    .expect("an answer naming four voucher types fits the budget");
+    whole(&framed["result"]["structuredContent"]["result"]["error"], 4);
+}
+
+/// Under that budget, down to the general floor of 4,096, the same refusal
+/// is still the numbering refusal: its code, every refused voucher type and
+/// that nothing was attempted, without the next step and with the message
+/// every refusal before an attempt gets. It is not withheld as too large.
+#[tokio::test]
+async fn a_post_refused_for_its_numbering_keeps_its_code_and_types_at_the_general_floor() {
+    const FLOOR: usize = crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET;
+    const { assert!(FLOOR < numbering::GUIDANCE_MIN_RESPONSE_BUDGET) };
+    let response = every_bank_type_refused_under(FLOOR).await;
+    let result = &response["structuredContent"]["result"];
+    let error = &result["error"];
+    assert_eq!(
+        error["code"], "import_voucher_numbering_not_retain",
+        "{response}"
+    );
+    assert_eq!(
+        error["refused_types"].as_array().map(|rows| rows
+            .iter()
+            .map(|row| &row["voucher_type"])
+            .collect::<Vec<_>>()),
+        Some(vec![&json!("Payment"), &json!("Receipt"), &json!("Contra")]),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert!(error.get("next_step").is_none(), "{response}");
+    let general = reconciliation_failure_payload("", Some(false), None, "");
+    assert_eq!(
+        error["message"], general["result"]["error"]["message"],
+        "{response}"
+    );
+    assert!(response.to_string().len() <= FLOOR, "{response}");
+}
+
+#[tokio::test]
+async fn another_voucher_types_manual_numbering_does_not_refuse_a_journal() {
+    let mut plans = before_approval_numbering(numbering_read(&["Payment", "Receipt", "Contra"]));
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let result = &response["structuredContent"]["result"];
+    assert_ne!(
+        result["error"]["code"], "import_voucher_numbering_not_automatic",
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], json!(true), "{response}");
+}
+
+/// The numbering read's masters answer with Contra saved after the mark: its
+/// AlterID is above the master mark of 7 the read is bounded by.
+#[tokio::test]
+async fn a_voucher_type_saved_after_the_mark_refuses_the_post_before_the_approval() {
+    let mut numbering = numbering_read(&[]);
+    let masters_at = paired(marks()).len() + 3;
+    for at in [masters_at, masters_at + 2] {
+        let Fixture::SyntheticXml(body) = &numbering[at].fixture else {
+            panic!("the masters answer")
+        };
+        numbering[at] = xml(replaced_once(
+            body,
+            "<ALTERID TYPE=\"Number\"> 4</ALTERID>",
+            "<ALTERID TYPE=\"Number\"> 9</ALTERID>",
+        ));
+    }
+    let plans = before_approval_numbering(numbering);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let result = &response["structuredContent"]["result"];
+    // A failed read keeps its own code: it is not the numbering refusal.
+    assert_eq!(
+        result["error"]["code"], "masters_bound_premise_violated",
+        "{response}"
+    );
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// A master saved after the numbering read and before the queue's binding
+/// snapshot: the binding and aim snapshots agree with each other, but not with
+/// the mark the numbering was read under, so nothing is sent.
+#[tokio::test]
+async fn a_master_saved_after_the_numbering_read_is_refused_before_the_post() {
+    let (response, observed, through_aim) =
+        post_with_master_marks(marks_with_target_masters(8), marks_with_target_masters(8)).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "post_masters_moved", "{response}");
+    assert_eq!(result["attempt_recorded"], json!(false), "{response}");
+    assert_eq!(observed, through_aim, "the POST is never sent: {response}");
 }

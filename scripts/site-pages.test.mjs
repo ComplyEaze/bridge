@@ -289,6 +289,51 @@ test("the jobs table gives one of four answers per row, links each row to its an
   assert.match(asks, /book with stock items is expected to be refused/);
 });
 
+// A page that says it was checked against a release must say the manifest's release: a version bump fails here
+// until the page has been read again, so no stamped page can keep describing a release that is no longer current.
+const stamped = ["faq.html", "capabilities.html"];
+test("every page that carries a 'Checked against release' stamp carries the manifest's release, and none is left out of this list", () => {
+  const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
+  for (const name of pages.filter((page) => /Checked(?:\s|&nbsp;)+against(?:\s|&nbsp;)+release/i.test(read(page)))) assert.ok(stamped.includes(name), `${name} carries a check stamp and is not in the list of stamped pages`);
+  for (const name of stamped) {
+    const stamp = read(name).match(/Checked against release ([0-9.]+) on <time datetime="([0-9]{4}-[0-9]{2}-[0-9]{2})">/);
+    assert.ok(stamp, `${name} has no check stamp`);
+    assert.equal(stamp[1], version, `site/${name} is stamped for release ${stamp[1]} but the manifest says ${version}: read the page again against the new release, then move its stamp`);
+  }
+});
+
+// The page lists what the stamped release installs. The catalog in the source is ahead of the release while a version is being
+// built: the tools it serves that no published build installs are named here, keyed by the release the page is stamped for. When the
+// stamp moves to the release that publishes them the entry is gone, so the page must list them, and until then the page must not.
+const inSourceNotPublished = { "0.5.1": ["company_features", "gst_status", "statement_tie_out", "voucher_read_cost"] };
+test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
+  const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
+  const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");
+  const registered = [...names.matchAll(/^\s*"([a-z0-9_]+)",$/gm)].map((match) => match[1]);
+  // a tool written in another shape (a trailing comment, two to a line) would be skipped above and never asked of the page
+  assert.equal([...names.matchAll(/"[^"]*"/g)].length, registered.length, "REGISTERED_TOOL_NAMES holds a string the test did not read as a tool name: one name to a line, as `\"name\",`");
+  assert.ok(registered.includes("verify_import") && registered.includes("post_import"), "the registered tool names were not read");
+  const withheld = [...source.matchAll(/\.retain\(\|tool\| tool\["name"\] != "([a-z0-9_]+)"\)/g)].map((match) => match[1]);
+  assert.deepEqual(withheld, ["changed_since"], "the catalog withholds other tools than the test expects: say so on the page, then change this test");
+  const posting = ["acknowledge_post_review", "post_import"];
+  const html = read("capabilities.html");
+  const version = html.match(/Checked against release ([0-9.]+) on/)[1];
+  const unpublished = inSourceNotPublished[version] ?? [];
+  const served = registered.filter((name) => !withheld.includes(name) && !posting.includes(name) && !unpublished.includes(name)).sort();
+  const installed = [...html.matchAll(/<th scope="row"><code>([a-z0-9_]+)<\/code><\/th>/g)].map((match) => match[1]);
+  assert.deepEqual([...installed].sort(), served, `the capabilities page for release ${version} and the catalog name different tools`);
+  const withPosting = region(html, "<h2>Two more, only with posting on</h2>", "</section>");
+  for (const name of posting) assert.ok(withPosting.includes(`<code>${name}</code>`), `${name} is missing from the posting section`);
+  assert.match(html, new RegExp(`The ${installed.length} tools release`), "the page's count of installed tools is not the table's");
+  // every release the page names is the one it is stamped for, so a bump that moves only the stamp fails here
+  const text = visibleText(html);
+  const offered = [...text.matchAll(/(?:release|Bridge) ([0-9]+\.[0-9]+\.[0-9]+) (?:offers|installs)/g)];
+  assert.ok(offered.length >= 2, "the page no longer says which release's tools it lists");
+  for (const [, named] of offered) assert.equal(named, version, `site/capabilities.html names release ${named} but is stamped for ${version}`);
+  const llms = read("llms.txt");
+  for (const [, named] of llms.matchAll(/release ([0-9]+\.[0-9]+\.[0-9]+) installs/g)) assert.equal(named, version, `site/llms.txt names release ${named} but the capabilities page is stamped for ${version}`);
+});
+
 test("the page says which release and day it was checked against, and the structured copy is dated no earlier", () => {
   const html = read("faq.html");
   const stamp = html.match(/Checked against release ([0-9.]+) on <time datetime="([0-9-]+)">/);

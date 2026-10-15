@@ -161,7 +161,7 @@ Ok(NativeMasters {
                             source: Some(
                                 "Specify Details Here",
                             ),
-                            itc_eligible: None,
+                            ineligible_itc: None,
                             states: [
                                 GstStateDetails {
                                     state_name: Some(

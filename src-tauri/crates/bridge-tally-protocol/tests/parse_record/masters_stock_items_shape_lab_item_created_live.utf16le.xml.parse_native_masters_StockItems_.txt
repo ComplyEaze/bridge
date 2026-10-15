@@ -135,7 +135,7 @@ Ok(NativeMasters {
                             source: Some(
                                 "As per Company/Stock Group",
                             ),
-                            itc_eligible: Some(
+                            ineligible_itc: Some(
                                 true,
                             ),
                             states: [
@@ -255,7 +255,7 @@ Ok(NativeMasters {
                             source: Some(
                                 "Specify Details Here",
                             ),
-                            itc_eligible: None,
+                            ineligible_itc: None,
                             states: [
                                 GstStateDetails {
                                     state_name: Some(

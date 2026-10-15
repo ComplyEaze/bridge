@@ -4937,6 +4937,13 @@ mod through_the_tool {
                 for entry in entries {
                     assert_eq!(entry["applicable_from"], "20260401");
                     assert_eq!(entry["other_content_skipped"], false);
+                    // Tally's GSTINELIGIBLEITC goes out under the name of its element (#1741), and
+                    // never under the earlier eligibility key.
+                    assert!(entry.get("itc_eligible").is_none(), "{entry}");
+                    assert!(
+                        entry.as_object().unwrap().contains_key("ineligible_itc"),
+                        "{entry}"
+                    );
                     for state in entry["states"].as_array().unwrap() {
                         assert_eq!(
                             state["state_name"],
@@ -4958,6 +4965,13 @@ mod through_the_tool {
             let mut expected = with_entries;
             expected.sort();
             assert_eq!(with_rows, expected);
+            // The captured values, as sent: Yes on the Goods ledger's entry, no element on the
+            // Purchase ledger's (null, never defaulted).
+            let flag = |name: &str| {
+                row(rows, name)["compliance"]["gst_details"]["entries"][0]["ineligible_itc"].clone()
+            };
+            assert_eq!(flag("BRIDGE Goods 18%"), json!(true));
+            assert_eq!(flag("BRIDGE Purchase Svc 5%"), Value::Null);
 
             let rates_of = |name: &str, head: &str| -> Value {
                 let rates = &row(rows, name)["compliance"]["gst_details"]["entries"][0]["states"]

@@ -154,13 +154,9 @@ const STOCK_ITEM_LIMITATIONS: [&str; 7] = [
 /// item is first saved: the entry defers to the item's group or the company.
 const TALLY_OWN_ENTRY_SOURCE: &str = "As per Company/Stock Group";
 
-/// A stock item's GST observation under the key Tally's element means. The
-/// shared entry type serialises Tally's `GSTINELIGIBLEITC` as `itc_eligible`,
-/// which is the key `ledger_masters` ships; for a stock item Tally's Yes was
-/// seen where the screen's `Eligible for Input Tax Credit` read No, so it goes
-/// out as `ineligible_itc` with the same value, `true`, `false` or `null` and
-/// never a default. The ledger output is not changed: two keys for one Tally
-/// element is deliberate until the ledger key is rectified (tracked in #1741).
+/// A stock item's GST observation. The shared entry type already serialises
+/// Tally's `GSTINELIGIBLEITC` as `ineligible_itc` (`true`, `false` or `null`,
+/// never a default), the one key every consumer sees (#1741).
 ///
 /// On an entry whose source is Tally's own the flag is not sent on: the Yes seen there
 /// was never compared with the screen (both screen readings are of rows a
@@ -173,18 +169,15 @@ fn stock_item_gst_json(gst: &GstDetailsObservation) -> Value {
             if let Some(object) = entry.as_object_mut() {
                 let own =
                     object.get("source").and_then(Value::as_str) == Some(TALLY_OWN_ENTRY_SOURCE);
-                if let Some(flag) = object.remove("itc_eligible") {
-                    let withhold = own && !flag.is_null();
+                let sent = object
+                    .get("ineligible_itc")
+                    .is_some_and(|flag| !flag.is_null());
+                if own && sent {
+                    object.insert("ineligible_itc".to_string(), Value::Null);
                     object.insert(
-                        "ineligible_itc".to_string(),
-                        if withhold { Value::Null } else { flag },
+                        "ineligible_itc_withheld".to_string(),
+                        json!("tally_default_entry"),
                     );
-                    if withhold {
-                        object.insert(
-                            "ineligible_itc_withheld".to_string(),
-                            json!("tally_default_entry"),
-                        );
-                    }
                 }
             }
         }

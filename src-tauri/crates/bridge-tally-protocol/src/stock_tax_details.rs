@@ -190,7 +190,7 @@ fn read_gst_entry(reader: &mut Reader<&[u8]>) -> Result<RawGstDetailsEntry, Nati
             b"APPLICABLEFROM" => &mut entry.applicable_from,
             b"TAXABILITY" => &mut entry.taxability,
             b"SRCOFGSTDETAILS" => &mut entry.source,
-            b"GSTINELIGIBLEITC" => &mut entry.itc_eligible,
+            b"GSTINELIGIBLEITC" => &mut entry.ineligible_itc,
             b"STATEWISEDETAILS.LIST" => {
                 let state = if empty {
                     RawGstStateDetails::default()

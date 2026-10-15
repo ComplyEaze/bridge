@@ -41,8 +41,7 @@ These changes are in source and not yet in a published build.
   ineligibility flag; null is neither eligible nor ineligible, and what an absent element means for the tax is
   not known. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld:
   `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an
-  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` keeps its own key for the same element (tracked in
-  #1741). A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
+  entry was never compared with the screen; a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. `ledger_masters` ships the same element under the same key, `ineligible_itc` (the unreleased build shipped it as `itc_eligible`); whether a ledger's Yes reads the same way is not yet established (PARTIAL), and #1741 holds that. A book is read only up to a master mark of 489 (a limit of 489 refuses, by arithmetic, both client
   books measured; not tried on them). Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
   with two dated entries in each list); a state row other than `Any`, slab rates, another release, a larger book
   and a zero-row stock-item answer are not measured. `stock_summary` is unchanged.

@@ -25,7 +25,7 @@ fn entry(date: Option<&str>, rates: Vec<RawGstRateDetails>) -> RawGstDetailsEntr
         applicable_from: date.map(str::to_string),
         taxability: Some("Taxable".to_string()),
         source: Some("Specify Details Here".to_string()),
-        itc_eligible: Some("Yes".to_string()),
+        ineligible_itc: Some("Yes".to_string()),
         states: vec![state(rates)],
         repeated_field: false,
         skipped: false,
@@ -186,9 +186,9 @@ fn each_defect_has_its_own_reason() {
 fn input_tax_credit_is_yes_or_no_and_nothing_else() {
     let itc = |text: Option<&str>| {
         let mut e = entry(Some("20260401"), vec![]);
-        e.itc_eligible = text.map(str::to_string);
+        e.ineligible_itc = text.map(str::to_string);
         match GstDetailsObservation::from_raw(vec![e]) {
-            GstDetailsObservation::Entries { entries } => Ok(entries[0].itc_eligible),
+            GstDetailsObservation::Entries { entries } => Ok(entries[0].ineligible_itc),
             GstDetailsObservation::Unreadable { defect } => Err(defect),
             GstDetailsObservation::NotObserved => unreachable!(),
         }
@@ -336,12 +336,12 @@ fn not_observed_still_serialises_as_an_observation() {
 }
 
 #[test]
-fn the_ledger_output_keeps_the_itc_key_it_ships() {
-    // `ledger_masters` serialises this type as it is; only the stock-item
-    // presentation of `masters` renames the key (`ineligible_itc`).
+fn the_itc_flag_is_serialised_under_the_name_of_tally_s_element() {
+    // `ledger_masters` and `masters` serialise this type as it is: one key,
+    // named for Tally's GSTINELIGIBLEITC, whose Yes is `true` (#1741).
     let observation = GstDetailsObservation::from_raw(vec![entry(Some("20260401"), vec![])]);
     let json = serde_json::to_value(&observation).unwrap();
     let first = &json["entries"][0];
-    assert_eq!(first["itc_eligible"], true);
-    assert!(first.get("ineligible_itc").is_none());
+    assert_eq!(first["ineligible_itc"], true);
+    assert!(first.get("itc_eligible").is_none());
 }

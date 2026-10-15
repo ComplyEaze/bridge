@@ -5,6 +5,7 @@
 //! to its post; others reach no Tally (port 9), or a book too large to read.
 use super::super::super::stop::Seen;
 use super::*;
+use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
 use std::sync::Arc;
 
 const ACK: &str = "acknowledge_post_review";
@@ -809,7 +810,7 @@ fn the_build_asks_the_stop_under_its_lock_before_it_writes_a_file() {
 #[test]
 fn a_post_refused_for_a_stopped_company_says_what_to_do() {
     let payload = super::super::reconciliation_failure_payload(
-        "bridge-00000000-0000-4000-8000-000000000001",
+        &sentinel_batch_id(1),
         Some(false),
         None,
         "invoice_company_stopped",
@@ -835,7 +836,7 @@ async fn a_release_naming_another_company_is_refused_before_any_read() {
     let line = saved(&server, "Sales");
     posted(&server, &line);
     let mut wrong = args(&line);
-    wrong["company_guid"] = json!("00000000-0000-4000-8000-0000000000ff");
+    wrong["company_guid"] = json!(sentinel_uuid(0xff).to_string());
     let approval = ScriptedApproval::approving();
     let response = release(&server, wrong, approval.clone()).await;
     assert_eq!(

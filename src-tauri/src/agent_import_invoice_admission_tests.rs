@@ -550,7 +550,7 @@ async fn admission_after_a_sent_invoice(
     first.bridge_txn_id = "t0".to_string();
     first.voucher_number = Some("BP/26-27/0001".to_string());
     let line: ImportLedgerLine = serde_json::from_value(json!({
-        "batch_id":"bridge-00000000-0000-4000-8000-000000000001","identity_scheme":"batch_v1",
+        "batch_id":sentinel_batch_id(1),"identity_scheme":"batch_v1",
         "company_guid":pilot_lab_guid(),"endpoint_origin":"http://127.0.0.1:9000",
         "company":null,"txn_ids":["t0"],"date_from":"20260801","date_to":"20260801",
         "sha256":"a".repeat(64),"built_at":"2026-08-01T00:00:00Z","status":"built",
@@ -604,10 +604,7 @@ async fn admission_after_a_sent_invoice(
 /// as before, sends no control read, and the invoice is admitted.
 #[tokio::test]
 async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
-    let stopped = Err(vec![(
-        "invoice_company_stopped",
-        "bridge-00000000-0000-4000-8000-000000000001".to_string(),
-    )]);
+    let stopped = Err(vec![("invoice_company_stopped", sentinel_batch_id(1))]);
     for then in [Then::Nothing, Then::Status("verification_incomplete")] {
         let (outcome, requests) = admission_after_a_sent_invoice(then, ADMISSION_ORDER).await;
         assert_eq!(outcome, stopped, "{then:?}");

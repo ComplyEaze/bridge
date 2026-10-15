@@ -210,11 +210,22 @@ for (const [name, change] of [
   ["a second profile with a report", (text) => `${text.trimEnd()}\n\n[profile.ci.junit]\npath = "ci.xml"\n`],
   ["a setup script section", (text) => `${text.trimEnd()}\n\n[scripts.setup.probe]\ncommand = "echo"\n`],
   ["a property-adding profile script", (text) => `${text.trimEnd()}\n\n[[profile.default.scripts]]\nfilter = "all()"\nsetup = "probe"\n`],
+  // The same tables without a bracketed header: valid TOML that nextest reads as setup scripts.
+  ["a setup script as a top-level dotted key", (text) => `scripts.setup.probe.command = "echo"\n${text}`],
+  ["a setup script as a top-level inline table", (text) => `scripts = { setup = { probe = { command = "echo" } } }\n${text}`],
+  ["a profile script as an inline array", (text) => text.replace("[profile.default]\n", '[profile.default]\nscripts = [{ filter = "all()", setup = "probe" }]\n')],
+  ["a setup script under a key spelled with an escape", (text) => `"scr\\u0069pts".setup.probe.command = "echo"\n${text}`],
 ]) {
   test(`nextest report: ${name} is refused`, () => {
     refused(withChange(NEXTEST, change), NEXTEST_MESSAGE);
   });
 }
+
+// Comments are not pinned: the pin reads every line that is not blank or a full-line comment.
+test("nextest report: a changed comment line is accepted", () => {
+  const result = withChange(NEXTEST, (text) => text.replace("# Hang guard for the native test run", "# Hang guard, reworded, for the native test run"));
+  assert.equal(result.status, 0, result.stderr);
+});
 
 test("diagnostics uploads: the flag in any other workflow is refused", () => {
   refused(withChange(".github/workflows/release-mcpb-preview.yml", (text) => text.replace(/(\n {6}- uses: actions\/checkout)/, `\n${FLAG}$1`)), "release-mcpb-preview.yml must not use continue-on-error");

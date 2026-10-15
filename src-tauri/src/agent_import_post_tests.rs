@@ -3882,6 +3882,33 @@ fn a_long_narration_is_shown_in_quoted_parts_below_the_dashes() {
     );
 }
 
+/// #1535: a part that holds a quote or a backslash is shown escaped, as the
+/// dialog quotes every value, and reads back as the posted text: the quote
+/// cannot close the part early and the backslash cannot hide the next
+/// character.
+#[test]
+fn a_narration_in_parts_holding_a_quote_and_a_backslash_reads_back_whole() {
+    let (mut line, endpoint) = batch();
+    let narration = "Synthetic statement row: the \"cash\" deposit at C:\\branch\\counter 000123 | Synthetic Bank Ledger | 03-08-2026 | cash purpose not confirmed";
+    line.vouchers[0].narration = Some(narration.into());
+    refresh_batch_sha256(&mut line);
+    let text = review_preview_with(&line, &endpoint, &[]).unwrap();
+    let lines: Vec<&str> = text.lines().collect();
+    let heading = lines
+        .iter()
+        .position(|shown| *shown == VOUCHER_TEXT_HEADING)
+        .unwrap();
+    let below = &lines[heading + 1..];
+    let parts = parts_below(below, "Narration");
+    assert!(parts.len() >= 2, "{text}");
+    assert_eq!(parts.concat(), narration, "{text}");
+    // Shown escaped: the line holds the backslash-quote and the doubled
+    // backslash, not the bare characters.
+    let shown = below[1..].join("\n");
+    assert!(shown.contains("\\\"cash\\\""), "{text}");
+    assert!(shown.contains("C:\\\\branch\\\\counter"), "{text}");
+}
+
 /// #1535: a narration in parts that holds the On Account legend's words and a
 /// marked ledger's name neither adds a legend line nor passes for a marked
 /// entry: each part begins with its label, so the seal's checks still hold.

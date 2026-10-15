@@ -173,6 +173,20 @@ mod tests {
     }
 
     #[test]
+    fn a_split_keeps_every_character_of_multibyte_and_combining_text() {
+        // A combining acute accent right after a space opens a part: no
+        // character is lost or cut in two, whatever the rendering does.
+        let text = "caf\u{e9} cr\u{e8}me \u{301}x br\u{fb}l\u{e9}e \u{4e2d}\u{6587} done";
+        let parts = split(text, 14).unwrap();
+        assert!(parts.len() > 1, "{parts:?}");
+        assert_eq!(parts.concat(), text);
+        assert!(
+            parts.iter().any(|part| part.starts_with('\u{301}')),
+            "{parts:?}"
+        );
+    }
+
+    #[test]
     fn a_value_over_the_dialog_cap_is_refused_before_splitting() {
         let text = "word ".repeat(MOST_CHARS / 5 + 1);
         assert_eq!(split(&text, 50), Err(VoucherTextRefusal::DoesNotFit));

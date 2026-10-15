@@ -578,7 +578,7 @@ proved. With it off, a batch of more than one voucher refuses exactly as before
   dispatch intent before the POST;
 - the ledger bindings, currency and bank-leg checks for every leg.
 
-**Approval.** The native dialog (#665's nonce-bound approval) shows a summary, not a listing:
+**Approval.** The native dialog (#665's nonce-bound approval) shows a summary, and for a batch of at most ten vouchers one line for each (below):
 - the company;
 - the count by type and the date range;
 - one line per ledger with its debit and credit totals and entry count;
@@ -589,7 +589,13 @@ proved. With it off, a batch of more than one voucher refuses exactly as before
   cash/bank ledgers;
 - the standing cautions.
 
-It says, in a line of its own, that each voucher's date, narration and reference are not shown. Its budget is its own: 40 lines, 3,200 characters, 100
+Order, as amended on 13 October 2026 (#746): the count and company, the company number, the
+count by type, the date range, the grand totals and the money lines lead; then the company
+GUID and the Tally origin, the voucher lines or the sentence in their place, the per-ledger
+lines, the batch id, and the cautions. This order has not yet been shown in a running dialog
+on Windows or macOS (UNVERIFIED).
+
+A batch of at most ten vouchers lists one line for each voucher (#1278), and when those lines cannot be shown one sentence says why. Its budget is its own: 40 lines, 3,200 characters, 100
 a line, and 7,000 UTF-8 bytes (under the dialog's 8,000). A summary over it is refused
 (`import_review_too_large`), never cut, and the caller posts the batch in parts. A 40-line native
 dialog has not yet been shown on Windows or macOS (UNVERIFIED).

@@ -3112,12 +3112,13 @@ fn a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move() {
         .starts_with("Create ONE Journal"));
 }
 
-/// The lines of `preview` from the one after its `Dates:` line, up to its first
-/// blank line: where a batch lists its vouchers, or says why it does not.
+/// The lines of `preview` from the one after its `Tally:` line (the last line
+/// of the head, #746), up to its first blank line: where a batch lists its
+/// vouchers, or says why it does not.
 fn voucher_block(preview: &str) -> Vec<&str> {
     preview
         .lines()
-        .skip_while(|line| !line.starts_with("Dates: "))
+        .skip_while(|line| !line.starts_with("Tally: "))
         .skip(1)
         .take_while(|line| !line.is_empty())
         .collect()
@@ -3164,6 +3165,103 @@ fn a_small_batch_lists_each_voucher_on_one_line() {
         ],
         "{preview}"
     );
+}
+
+/// #746: a batch's approval text puts what a person checks first at the top,
+/// in a fixed order, on both paths (voucher lines, and the reason sentence in
+/// their place): the count and company, the company number, the types, the
+/// dates, the totals and the money lines; then the company GUID and the Tally
+/// origin, the voucher lines or the sentence, the per-ledger rows and the line
+/// under them, the batch id, a blank line and the cautions. The totals stand
+/// above every voucher line and every per-ledger row, and the batch id below.
+#[test]
+fn a_batch_shows_what_to_check_first_then_its_details() {
+    let (small, endpoint) = batch_of_every_type();
+    let mut eleven = small.clone();
+    for index in 0..7 {
+        let mut extra = eleven.vouchers[0].clone();
+        extra.bridge_txn_id = format!("journal-more-{index}");
+        eleven.vouchers.push(extra);
+    }
+    assert_eq!(eleven.vouchers.len(), 11);
+    for (batch, count, body, body_len) in [
+        // The heading, the line under it, then one line per voucher.
+        (&small, 4, VOUCHER_LINES_HEADING, 6),
+        // One sentence in place of the voucher lines.
+        (&eleven, 11, VOUCHER_LINES_OVER_LIMIT, 1),
+    ] {
+        let preview = review_preview_with(batch, &endpoint, &[]).unwrap();
+        let lines: Vec<&str> = preview.lines().collect();
+        let starts = |index: usize, start: &str| {
+            assert!(
+                lines[index].starts_with(start),
+                "line {index} should start with {start:?} in:\n{preview}"
+            );
+        };
+        starts(0, &format!("Create {count} vouchers in "));
+        starts(1, "Company number: ");
+        starts(2, "Types: ");
+        starts(3, "Dates: ");
+        starts(4, "Total debit: ");
+        starts(5, "Money in by Receipt vouchers: ");
+        starts(6, "Money out by Payment vouchers: ");
+        starts(7, "Contra: ");
+        starts(8, "Journals may also move cash/bank ledgers");
+        starts(9, "Company GUID: ");
+        starts(10, "Tally: ");
+        starts(11, body);
+        // The voucher lines (or the sentence) are lines 11 up to a blank line,
+        // then the five per-ledger rows, then the line under them.
+        let blank = 11 + body_len;
+        assert_eq!(lines[blank], "", "{preview}");
+        let rows = blank + 1..blank + 6;
+        for index in rows.clone() {
+            starts(index, "Dr ");
+        }
+        // The line under the rows is blank when nothing is marked; the batch
+        // id follows it, then a blank line and the first caution.
+        let last_row = rows.end - 1;
+        assert_eq!(lines[last_row + 1], "", "{preview}");
+        assert_eq!(
+            lines[last_row + 2],
+            format!("Batch: {}", batch.batch_id),
+            "{preview}"
+        );
+        assert_eq!(lines[last_row + 3], "", "{preview}");
+        starts(
+            last_row + 4,
+            "Ledgers checked by identity against the build",
+        );
+        // The totals stand above every voucher line and every per-ledger row,
+        // and the text has no other totals line or per-ledger row below them.
+        let totals = lines
+            .iter()
+            .position(|shown| shown.starts_with("Total debit: "))
+            .unwrap();
+        assert_eq!(totals, 4, "{preview}");
+        for index in 11..blank {
+            assert!(totals < index, "line {index} in:\n{preview}");
+        }
+        for index in rows {
+            assert!(totals < index, "line {index} in:\n{preview}");
+        }
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|shown| shown.starts_with("Total debit: "))
+                .count(),
+            1,
+            "{preview}"
+        );
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|shown| shown.starts_with("Dr "))
+                .count(),
+            5,
+            "{preview}"
+        );
+    }
 }
 
 /// A voucher's line shows its narration as the post sends it, quoted: a
@@ -4158,14 +4256,21 @@ fn approve_on_account(line: &mut ImportLedgerLine, ledgers: &[&str]) {
     );
 }
 
-/// The lines of `preview` from its first `Dr`/`Cr` line to its `Total debit`
-/// line: the entries of one voucher or a batch's per-ledger totals, and the
-/// line under them.
+/// The lines of `preview` from its first `Dr`/`Cr` line to the line that
+/// follows the block: for one voucher its `Total debit` line, and for a batch,
+/// whose `Total debit` line stands in its head (#746), its `Batch:` line. The
+/// entries of one voucher or a batch's per-ledger totals, and the line under
+/// them.
 fn ledger_block(preview: &str) -> Vec<&str> {
+    let end = if preview.starts_with("Create ONE ") {
+        "Total debit: "
+    } else {
+        "Batch: "
+    };
     preview
         .lines()
         .skip_while(|line| !line.starts_with("Dr ") && !line.starts_with("Cr "))
-        .take_while(|line| !line.starts_with("Total debit: "))
+        .take_while(|line| !line.starts_with(end))
         .collect()
 }
 
@@ -4593,11 +4698,16 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
         review_preview_with(&line, &endpoint, &[]).unwrap(),
         [
             "Create 4 vouchers in \"Synthetic Accounts\"",
-            "Company GUID: 00000000-0000-4000-8000-000000000002",
             "Company number: 100001  Books from: 20260401",
-            "Tally: http://127.0.0.1:9001",
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
             "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
+            "Total debit: 72.5  Total credit: 72.5",
+            "Money in by Receipt vouchers: 40",
+            "Money out by Payment vouchers: 15",
+            "Contra: moves between cash/bank ledgers, net zero",
+            "Journals may also move cash/bank ledgers; see the per-ledger totals",
+            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            "Tally: http://127.0.0.1:9001",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
             "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
             "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
@@ -4611,11 +4721,6 @@ fn a_batch_that_marks_nothing_is_shown_whole() {
             "Dr 0  Cr 40  1 entry  \"Party A\"",
             "Dr 15  Cr 0  1 entry  \"Party B\"",
             "",
-            "Total debit: 72.5  Total credit: 72.5",
-            "Money in by Receipt vouchers: 40",
-            "Money out by Payment vouchers: 15",
-            "Contra: moves between cash/bank ledgers, net zero",
-            "Journals may also move cash/bank ledgers; see the per-ledger totals",
             "Batch: bridge-00000000-0000-4000-8000-000000000001",
             "",
             "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
@@ -4908,11 +5013,16 @@ fn a_batch_text_with_a_line_break_name_is_shown_whole() {
         review_preview_with(&line, &endpoint, &[]).unwrap(),
         [
             "Create 4 vouchers in \"Synthetic Accounts\"",
-            "Company GUID: 00000000-0000-4000-8000-000000000002",
             "Company number: 100001  Books from: 20260401",
-            "Tally: http://127.0.0.1:9001",
             "Types: 1 Contra, 1 Journal, 1 Payment, 1 Receipt",
             "Dates: 20260901 to 20260902  Voucher numbers: Tally assigns them",
+            "Total debit: 72.5  Total credit: 72.5",
+            "Money in by Receipt vouchers: 40",
+            "Money out by Payment vouchers: 15",
+            "Contra: moves between cash/bank ledgers, net zero",
+            "Journals may also move cash/bank ledgers; see the per-ledger totals",
+            "Company GUID: 00000000-0000-4000-8000-000000000002",
+            "Tally: http://127.0.0.1:9001",
             "Each voucher: type, date, amount, ledger, narration (references not shown):",
             "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
             "Journal 20260901  12.5  Dr \"Expense\"  Cr \"Cash\"  \"Synthetic test only\"",
@@ -4926,11 +5036,6 @@ fn a_batch_text_with_a_line_break_name_is_shown_whole() {
             r#"Dr 0  Cr 40  1 entry  Line break  "Party A\r\n""#,
             "Dr 15  Cr 0  1 entry  \"Party B\"",
             r"Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.",
-            "Total debit: 72.5  Total credit: 72.5",
-            "Money in by Receipt vouchers: 40",
-            "Money out by Payment vouchers: 15",
-            "Contra: moves between cash/bank ledgers, net zero",
-            "Journals may also move cash/bank ledgers; see the per-ledger totals",
             "Batch: bridge-00000000-0000-4000-8000-000000000001",
             "",
             "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",

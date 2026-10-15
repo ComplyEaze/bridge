@@ -3049,6 +3049,13 @@ fn voucher_review_lines(
 /// lines cannot be shown, the summary says why in their place, and a batch is
 /// never refused for them. References are not shown; the amounts and ledgers
 /// are what the approval binds.
+///
+/// Order (#746): what a person checks first comes first, in lines this
+/// program writes, which hold no narration and no ledger name: the count and
+/// company, the company number, the types, the dates, the totals and the
+/// money lines. Then the company GUID and the Tally origin, the voucher lines
+/// or the sentence in their place, the per-ledger rows, the batch id, and the
+/// cautions.
 fn batch_review_text(
     line: &ImportLedgerLine,
     company: &ImportCompanyTuple,
@@ -3107,19 +3114,17 @@ fn batch_review_text(
     let (first, last) = (first.as_str(), last.as_str());
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let marks = OnAccountMarks::of(line);
-    let head = vec![
+    let mut head = vec![
         format!(
             "Create {} vouchers in {}",
             line.vouchers.len(),
             quoted(&company.name)
         ),
-        format!("Company GUID: {}", company.guid),
         format!(
             "Company number: {}  Books from: {}",
             company.company_number,
             company.books_from.as_str()
         ),
-        format!("Tally: {origin}"),
         format!(
             "Types: {}",
             by_type
@@ -3129,7 +3134,32 @@ fn batch_review_text(
                 .join(", ")
         ),
         format!("Dates: {first} to {last}  Voucher numbers: Tally assigns them"),
+        format!(
+            "Total debit: {}  Total credit: {}",
+            debit.as_str(),
+            credit.as_str()
+        ),
     ];
+    if by_type.contains_key(VoucherType::Receipt.as_str()) {
+        head.push(format!(
+            "Money in by Receipt vouchers: {}",
+            money_in.as_str()
+        ));
+    }
+    if by_type.contains_key(VoucherType::Payment.as_str()) {
+        head.push(format!(
+            "Money out by Payment vouchers: {}",
+            money_out.as_str()
+        ));
+    }
+    if by_type.contains_key(VoucherType::Contra.as_str()) {
+        head.push("Contra: moves between cash/bank ledgers, net zero".into());
+    }
+    if by_type.contains_key(VoucherType::Journal.as_str()) {
+        head.push("Journals may also move cash/bank ledgers; see the per-ledger totals".into());
+    }
+    head.push(format!("Company GUID: {}", company.guid));
+    head.push(format!("Tally: {origin}"));
     let mut text = vec![String::new()];
     for (ledger, (dr, cr, count)) in &ledgers {
         text.push(format!(
@@ -3146,29 +3176,6 @@ fn batch_review_text(
             .split('\n')
             .map(str::to_string),
     );
-    text.push(format!(
-        "Total debit: {}  Total credit: {}",
-        debit.as_str(),
-        credit.as_str()
-    ));
-    if by_type.contains_key(VoucherType::Receipt.as_str()) {
-        text.push(format!(
-            "Money in by Receipt vouchers: {}",
-            money_in.as_str()
-        ));
-    }
-    if by_type.contains_key(VoucherType::Payment.as_str()) {
-        text.push(format!(
-            "Money out by Payment vouchers: {}",
-            money_out.as_str()
-        ));
-    }
-    if by_type.contains_key(VoucherType::Contra.as_str()) {
-        text.push("Contra: moves between cash/bank ledgers, net zero".into());
-    }
-    if by_type.contains_key(VoucherType::Journal.as_str()) {
-        text.push("Journals may also move cash/bank ledgers; see the per-ledger totals".into());
-    }
     text.push(format!("Batch: {}", line.batch_id));
     text.push(String::new());
     text.push(

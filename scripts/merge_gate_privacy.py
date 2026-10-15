@@ -101,6 +101,43 @@ GROUPED_NUMBER_RE = re.compile(r"(^|[^\w])\d{4}[ ._-]\d{4}[ ._-]\d{4}(?:[ ._-]\d
 DATE_RANGE_RE = re.compile(r"^(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-20\d{2}\s+(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])-20\d{2}$")
 
 
+# Text in a UTF-16 encoding puts a NUL beside every ASCII character, which hides its
+# digits and letters from every pattern in this file. Two or more ASCII characters
+# each paired with a NUL on the same side are read as the text they stand for; one
+# stray NUL is not. This reads ASCII only: a value next to characters outside ASCII
+# in a UTF-16 text with no byte order mark is not reached.
+UTF16_RUN_RE = re.compile(r"(?:[\x01-\x7f]\x00){2,}|(?:\x00[\x01-\x7f]){2,}")
+UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
+
+
+def decode_utf16_runs(text):
+    """Return ``text`` with the NULs of each NUL-spaced run of ASCII removed, and how many runs there were."""
+    runs = 0
+
+    def decode(match):
+        nonlocal runs
+        runs += 1
+        return match.group(0).replace("\x00", "")
+
+    return UTF16_RUN_RE.sub(decode, text), runs
+
+
+def read_scan_input():
+    """Read the scan input as text.
+
+    Input that starts with a UTF-16 byte order mark is scanned twice over, as UTF-16
+    and as UTF-8, one after the other: the mark does not prove the rest is one
+    encoding, so reading it as UTF-16 must never hide what the UTF-8 reading shows.
+    Anything else must be UTF-8, and so must the rest of a marked input that is not
+    whole UTF-16 code units: bytes that are not raise ``UnicodeError``, which ``main``
+    reports as indeterminate, whatever the locale of the process.
+    """
+    raw = sys.stdin.buffer.read()
+    if raw[:2] in UTF16_BOMS:
+        return raw.decode("utf-16") + "\n" + raw.decode("utf-8", "surrogateescape")
+    return raw.decode("utf-8")
+
+
 def result_record():
     return {"blockers": [], "indeterminate": [], "notes": []}
 
@@ -388,6 +425,12 @@ def redact_shapes(text):
 
 def scan(text, head, fixture_provenance=None):
     record = result_record()
+    decoded, utf16_runs = decode_utf16_runs(text)
+    if utf16_runs:
+        add(record, "notes", "%d UTF-16 text segment(s) were decoded before the scan" % utf16_runs)
+        # Both readings are scanned: decoding can join a run to the characters beside it and remove
+        # the boundary a pattern needs, so the original text must be read as well as the decoded one.
+        text = decoded + "\n" + text
     allowed = load_fixture_provenance(fixture_provenance, head, record)
 
     home_count = len(HOME_RE.findall(text))
@@ -523,7 +566,7 @@ def main(argv=None):
             parser.error(str(error))
         return 0
     try:
-        text = sys.stdin.read()
+        text = read_scan_input()
     except UnicodeError:
         print(json.dumps({"blockers": [], "indeterminate": ["could not read privacy scan input"], "notes": []}))
         return 0

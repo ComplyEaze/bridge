@@ -41,7 +41,7 @@ import os, re, sys
 from xml.etree import ElementTree as ET
 
 BOOK = "BRIDGE SHAPE LAB"
-CAPS = {"a01": 8000, "a02": 6000, "base": 100000, "led": 110000}
+CAPS = {"a01": 8000, "a02": 6000, "base": 120000, "led": 130000}
 
 class Stop(Exception): pass
 class Err(Exception): pass

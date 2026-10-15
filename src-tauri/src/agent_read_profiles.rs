@@ -228,9 +228,9 @@ pub(super) fn gst_status_type_name_literal_safe(name: &str) -> bool {
 /// 2026): the narrow field list and the by-name voucher-type filter the lab
 /// answered on a synthetic TallyPrime 7.1 Silver book, over two days holding
 /// Sales vouchers, Receipts and a second Sales-class type. Since 12 Oct 2026 it
-/// fetches `ISCANCELLED` and `ISOPTIONAL` as well (#1655), and the request is,
-/// character for character, the lab's file
-/// `w20-status-window-aug-cancel-optional.xml` (the identifiers are the ones it
+/// fetches `ISCANCELLED` and `ISOPTIONAL` (#1655) and `ISPOSTDATED` (#1664) as
+/// well, and the request is, character for character, the lab's file
+/// `w21-status-window-aug-postdated.xml` (the identifiers are the ones it
 /// carried). The type is named, never classed: a type of the same class under
 /// another name is not selected.
 pub(super) fn render_gst_status_window(
@@ -247,7 +247,7 @@ pub(super) fn render_gst_status_window(
     // A quoted `$$Date:"…"` literal takes only a date (#861).
     let (from, to) = (from.as_str(), to.as_str());
     Ok(format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN,ISCANCELLED,ISOPTIONAL</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Import Verification</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeImportWindow\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherTypeName = \"{}\"</SYSTEM><COLLECTION NAME=\"Bridge Agent Import Verification\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,MASTERID,ALTERID,VCHGSTSTATUSISINCLUDED,VCHGSTSTATUSISUNCERTAIN,VCHGSTSTATUSISEXCLUDED,ISGSTOVERRIDDEN,ISCANCELLED,ISOPTIONAL,ISPOSTDATED</FETCH><FILTERS>BridgeImportWindow</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         xml_escape(company.as_str()),
         xml_escape(type_name)
     ))

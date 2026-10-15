@@ -949,6 +949,26 @@ pub(super) fn invoice_readback_due<'a>(
 /// (`UnmatchedCause::ReportedNotCreatedWhenSent`).
 pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered by hand with a different date, voucher type, ledger or amount: look for it in Tally first, and enter it in Tally's voucher entry screen only if it is not there; do not import its file through Tally's Import menu. ComplyEaze Bridge will not send this saved voucher again.";
 
+/// The next step of an unbound post's voucher that its content cannot find when
+/// the post's own answer from Tally is on record and was not clean (it did not
+/// parse, created fewer or more than were sent, or reported an exception or an
+/// error): the
+/// shared line without its edit example, because that answer makes an edit no
+/// likelier than a voucher Tally did not create (bridge#1108). Which voucher a
+/// partly created post left out is not claimed: a count does not say.
+pub(super) const SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP: &str = "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.";
+
+/// Rewrites a verification of an unbound post whose answer was not clean: a
+/// voucher not found by its content is `sent_not_attributed`, with
+/// [`SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP`].
+pub(super) fn mark_sent_not_attributed_after_unclean_answer(result: &mut Value) {
+    mark_not_found_with(
+        result,
+        "sent_not_attributed",
+        Some(SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP),
+    );
+}
+
 /// Rewrites a later verification of a post whose saved answer reported its
 /// vouchers as not created: a voucher not found by its content stays
 /// `sent_not_attributed`, never `not_found`, with the next step that says

@@ -2,6 +2,7 @@
 # Validate a pull request's pinned-path acknowledgement (compatibility surface),
 # run the privacy/PII scan, and confirm that the owner's two machine lines (MERGE-VERDICT CLEAN and
 # MERGE-ADVERSARY RECOMMEND, bound to the head and the merge base) stand on the pull request.
+# A change of the one review tier (scripts/review-tier.mjs: docs, plain tests and read-side production code only) needs the CLEAN line alone.
 #
 # Usage: scripts/merge-gate.sh <pr-number> [--repo OWNER/NAME]
 #        [--binary-review-sha FULL_SHA] (the owner's own act: binary bytes, ownership, license, and NOTICE reviewed)
@@ -891,14 +892,29 @@ else
   printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)" >"$tmpdir/v-filenames.txt"
   printf '%s' "$verdict_history" >"$tmpdir/v-history.json"
   printf '%s' "${sanitized_message_json:-[]}" >"$tmpdir/v-commits.json"
+  # The review tier (scripts/review-tier.mjs, from the changed paths and rename sources just written, with the list in this tree,
+  # which the gate proved equal to master): only the one tier lets the MERGE-ADVERSARY RECOMMEND line be absent. Anything wrong
+  # with the tool or its answer is the full tier.
+  review_tier="full"
+  review_tier_detail="the review tier could not be computed, so both owner lines are needed"
+  tier_json=$(node "$script_dir/review-tier.mjs" --paths-file "$tmpdir/v-filenames.txt" 2>/dev/null) || tier_json=""
+  if [ -n "$tier_json" ] && jq -e 'type == "object" and (.tier | . == "one" or . == "full") and (has("error") | not) and (.files | type == "array")' <<<"$tier_json" >/dev/null 2>&1; then
+    review_tier=$(jq -r '.tier' <<<"$tier_json")
+    if [ "$review_tier" = "one" ]; then
+      review_tier_detail="$(jq -r '.files | length' <<<"$tier_json") file(s), none on the write path, in credentials, in fixtures or unclassified"
+    else
+      review_tier_detail="decided by: $(jq -r '[.files[] | select(.tier == "full")] | .[0:3] | map(.path + " (" + (.class // "unclassified") + ")") | join(", ")' <<<"$tier_json")"
+    fi
+  fi
+  say "note" "review tier: $review_tier ($review_tier_detail)"
   verdict_doc_status=0
   jq -n -c --slurpfile reviews "$tmpdir/v-reviews.json" --slurpfile comments "$tmpdir/v-comments.json" --slurpfile inline "$tmpdir/v-inline.json" \
     --slurpfile history "$tmpdir/v-history.json" --slurpfile commits "$tmpdir/v-commits.json" --rawfile added "$added_payload" \
     --slurpfile commitcomments "$tmpdir/v-commit-comments.json" --rawfile filenames "$tmpdir/v-filenames.txt" --arg headref "$head_ref" \
-    --arg title "$title" --arg body "$raw_prbody" --arg head "$head" --arg base "$merge_base" '
+    --arg title "$title" --arg body "$raw_prbody" --arg head "$head" --arg base "$merge_base" --arg tier "$review_tier" '
     ($history[0].data.repository.pullRequest // null) as $pr |
     def edits: [(.nodes // [])[] | {authorId: (.author.databaseId // null), lastEditedAt: .lastEditedAt, editCount: (.userContentEdits.totalCount // 0)}];
-    {head: $head, base: $base,
+    {head: $head, base: $base, tier: $tier,
      reviews: $reviews[0], comments: $comments[0], inline_comments: $inline[0],
      commit_comments: $commitcomments[0],
      texts: {title: $title, body: $body, head_ref: $headref, filenames: ($filenames | split("\n") | map(select(length > 0))),
@@ -923,7 +939,11 @@ else
       while IFS= read -r line; do bad "$line"; done < <(jq -r '.refusals[]?' <<<"$verdict_result")
       while IFS= read -r line; do say "note" "$line"; done < <(jq -r '.reasons[]?' <<<"$verdict_result")
       if [ "$(jq -r '.status' <<<"$verdict_result")" = "pass" ]; then
-        say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+        if [ "$review_tier" = "one" ] && [ "$(jq -r '.recommend' <<<"$verdict_result")" != "true" ]; then
+          say "ok" "the owner's MERGE-VERDICT CLEAN stands at head $short and merge base ${merge_base:0:7} (review tier one: no MERGE-ADVERSARY RECOMMEND needed)"
+        else
+          say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+        fi
       elif [ "$(jq -r '.status' <<<"$verdict_result")" = "block" ]; then
         bad "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND do not both stand at head $short and merge base ${merge_base:0:7}"
       else
@@ -933,7 +953,7 @@ else
   fi
 fi
 gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
-if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
   bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo

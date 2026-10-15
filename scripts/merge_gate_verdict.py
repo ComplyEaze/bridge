@@ -10,6 +10,11 @@ time is the one that counts, and it must name the current head and base; any edi
 every verdict that is not strictly newer. A pull request that carries either token in its title, body, branch name, changed file
 names, commit messages, commit comments, added lines or anyone else's review or comment is refused. Unreadable evidence is indeterminate, never a pass.
 
+The document may carry `tier`. Only the exact string "one" (the review tier scripts/review-tier.mjs computes from the changed
+paths) lets the MERGE-ADVERSARY RECOMMEND line be absent: a pull request of the one tier stands on MERGE-VERDICT CLEAN alone. Any
+other value, or none, is the full tier and needs both lines. Every refusal and every void still applies at the one tier, and a
+MERGE-ADVERSARY line that voids (a rejection or retraction) still voids the CLEAN line.
+
 Usage: merge_gate_verdict.py < DOC.json   (prints one JSON object; exit 0 pass, 1 block, 2 indeterminate)
 """
 import html
@@ -195,11 +200,16 @@ def evaluate(doc):
             unreadable.append("the edit, deletion and dismissal history was malformed (%s)" % type(error).__name__)
 
     newest_void = max(voids) if voids else None
+    recommend_required = doc.get("tier") != "one"
     stands = {}
     for name, found in positives.items():
         newest = max(found, key=lambda entry: entry[0]) if found else None
         ambiguous = bool(found) and len({entry[1] for entry in found if entry[0] == newest[0]}) > 1
-        if newest is None or ambiguous or newest[1] != (head, base):
+        if name == "recommend" and not recommend_required:
+            stands[name] = bool(newest is not None and not ambiguous and newest[1] == (head, base)
+                                and (newest_void is None or newest[0] > newest_void))
+            reasons.append("review tier one: MERGE-ADVERSARY RECOMMEND is not required")
+        elif newest is None or ambiguous or newest[1] != (head, base):
             stands[name] = False
             reasons.append("the newest owner %s line is missing or names another head or merge base" % ("MERGE-VERDICT CLEAN" if name == "clean" else "MERGE-ADVERSARY RECOMMEND"))
         elif newest_void is not None and not newest[0] > newest_void:
@@ -210,11 +220,11 @@ def evaluate(doc):
             stands[name] = True
     if unreadable:
         status = "indeterminate"
-    elif refusals or not (stands["clean"] and stands["recommend"]):
+    elif refusals or not (stands["clean"] and (stands["recommend"] or not recommend_required)):
         status = "block"
     else:
         status = "pass"
-    return {"status": status, "clean": stands["clean"], "recommend": stands["recommend"],
+    return {"status": status, "clean": stands["clean"], "recommend": stands["recommend"], "recommend_required": recommend_required,
             "reasons": reasons, "refusals": sorted(set(refusals)), "unreadable": unreadable}
 
 

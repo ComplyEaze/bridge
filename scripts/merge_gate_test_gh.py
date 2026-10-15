@@ -237,6 +237,17 @@ def state():
     elif scenario == "verdict-missing-recommend":
         s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
 
+    elif scenario in {"verdict-missing-recommend-write-path", "tier-unclassified-clean-only", "tier-rename-from-write-path", "tier-tool-fails", "tier-tool-error-object", "tier-tool-bad-tier"}:
+        # Only the CLEAN line, on a change that is NOT of the one tier (a write-path file, a path no rule classifies, a rename away
+        # from a write-path file) or whose tier tool fails: the full tier, which needs both lines.
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
+        if scenario == "verdict-missing-recommend-write-path":
+            set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
+        elif scenario == "tier-unclassified-clean-only":
+            set_changes(s, ("added", "mystery/unknown.txt", "x"))
+        elif scenario == "tier-rename-from-write-path":
+            set_changes(s, ("renamed", "src-tauri/src/agent_lab.rs", "docs/moved.md"))
+
     elif scenario == "verdict-for-another-base":
         s["owner_items"] = [owner_comment(VERDICT_CLEAN.replace(BASE_TIP, "c" * 40), T1), owner_comment(VERDICT_RECOMMEND.replace(BASE_TIP, "c" * 40), T2)]
 
@@ -317,6 +328,9 @@ def state():
 
     elif scenario == "changes-the-registry-in-another-case":
         set_changes(s, ("added", "Scripts/Merge-Gate-Synthetic-Uuids.json", "{}"))
+
+    elif scenario == "changes-the-review-tier":
+        set_changes(s, ("modified", "scripts/review-tier-paths.json"))
 
     elif scenario == "changes-a-workflow":
         set_changes(s, ("modified", ".github/workflows/ci.yml"))

@@ -80,7 +80,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -103,6 +103,20 @@ class MergeGateControls(unittest.TestCase):
         mktemp.chmod(mktemp.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         if not shutil.which("jq"):
             raise RuntimeError("jq is required for merge-gate controls")
+        real_node = shutil.which("node")
+        if not real_node:
+            raise RuntimeError("node is required for merge-gate controls (the review tier tool)")
+        node = cls.bin / "node"
+        node.write_text(
+            "#!/usr/bin/env bash\n"
+            'case "${GATE_SCENARIO:-}" in\n'
+            "  tier-tool-fails) exit 2 ;;\n"
+            '  tier-tool-error-object) echo \'{"tier":"one","error":"boom","files":[],"unclassified":[]}\'; exit 0 ;;\n'
+            '  tier-tool-bad-tier) echo \'{"tier":"maybe","files":[]}\'; exit 0 ;;\n'
+            "esac\n"
+            "exec " + shlex.quote(real_node) + ' "$@"\n'
+        )
+        node.chmod(node.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     @classmethod
     def git_in_repo(cls, *args):
@@ -659,7 +673,7 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("verdict-by-review", self.VERDICT_PASS)
 
     def test_either_line_missing_or_for_another_merge_base_blocks(self):
-        for scenario in ("verdict-missing-clean", "verdict-missing-recommend", "verdict-for-another-base"):
+        for scenario in ("verdict-missing-clean", "verdict-missing-recommend-write-path", "verdict-for-another-base"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, self.VERDICT_BLOCK)
 
@@ -679,6 +693,23 @@ class MergeGateControls(unittest.TestCase):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "carries a merge-verdict token")
 
+    def test_a_change_of_the_one_review_tier_needs_only_the_clean_line(self):
+        result = self.assert_pass("verdict-missing-recommend", "the owner's MERGE-VERDICT CLEAN stands at head")
+        self.assertIn("review tier: one", result.stdout)
+        self.assertIn("MERGE-ADVERSARY RECOMMEND is not required", result.stdout)
+
+    def test_a_change_that_is_not_of_the_one_tier_or_whose_tier_cannot_be_computed_still_needs_both_lines(self):
+        for scenario in ("verdict-missing-recommend-write-path", "tier-unclassified-clean-only", "tier-rename-from-write-path", "tier-tool-fails",
+                         "tier-tool-error-object", "tier-tool-bad-tier"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
+                self.assertIn("review tier: full", result.stdout)
+        self.assertIn("src-tauri/src/agent_lab_new.rs (write-path)", self.run_gate("verdict-missing-recommend-write-path").stdout)
+        self.assertIn("mystery/unknown.txt (unclassified)", self.run_gate("tier-unclassified-clean-only").stdout)
+
+    def test_both_lines_still_pass_at_either_tier(self):
+        self.assert_pass("pass", self.VERDICT_PASS)
+
     def test_commit_comments_that_cannot_be_read_or_are_too_many_are_indeterminate_and_an_owners_voids(self):
         self.assert_indeterminate("commit-comments-unreadable", "could not read")
         self.assert_indeterminate("sixty-one-commits", "could not read")
@@ -686,7 +717,7 @@ class MergeGateControls(unittest.TestCase):
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
-                         "changes-the-registry", "changes-the-registry-in-another-case"):
+                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 
@@ -1293,6 +1324,29 @@ class MergeVerdictEvaluator(unittest.TestCase):
                 self.assertEqual(self.status(self.doc(comments=renewed)), "pass")
                 only_one_renewed = comments + [self.comment(self.CLEAN, self.T[4])]
                 self.assertEqual(self.status(self.doc(comments=only_one_renewed)), "block")
+
+    def test_the_review_tier_one_needs_the_clean_line_alone_and_anything_else_needs_both(self):
+        clean_only = self.doc(comments=[self.comment(self.CLEAN, self.T[1])])
+        both = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(dict(clean_only, tier="one")), "pass")
+        self.assertEqual(self.status(dict(both, tier="one")), "pass")
+        for tier in (None, "full", "ONE", "one ", "", 1, True, ["one"]):
+            with self.subTest(tier=tier):
+                self.assertEqual(self.status(dict(clean_only, tier=tier)), "block")
+                self.assertEqual(self.status(dict(both, tier=tier)), "pass")
+        self.assertEqual(self.status(clean_only), "block")
+
+    def test_the_review_tier_one_still_needs_a_standing_clean_line_and_still_obeys_every_void(self):
+        recommend_only = self.doc(comments=[self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(dict(recommend_only, tier="one")), "block")
+        other_head = self.CLEAN.replace("1" * 40, "3" * 40)
+        self.assertEqual(self.status(dict(self.doc(comments=[self.comment(other_head, self.T[1])]), tier="one")), "block")
+        for line in ("MERGE-ADVERSARY REJECT head=" + "1" * 40 + " base=" + "2" * 40, "MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40):
+            with self.subTest(line=line[:30]):
+                voided = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(line, self.T[3])])
+                self.assertEqual(self.status(dict(voided, tier="one")), "block")
+        token_by_someone_else = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2], uid=7)])
+        self.assertEqual(self.status(dict(token_by_someone_else, tier="one")), "block")
 
     def test_a_void_at_the_same_second_as_a_verdict_voids_it(self):
         comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]

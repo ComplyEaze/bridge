@@ -1038,7 +1038,7 @@ async fn post_over_stdio(
 #[tokio::test]
 async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
-    for held_at in (0..lease_reads).map(Some).chain([None]) {
+    async fn one_case(held_at: Option<usize>) {
         let mut plans = before_approval();
         let lease_start = plans.len();
         let mut lease = after_approval(xml(created_one()));
@@ -1087,6 +1087,37 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
             assert_eq!(intents(directory.path()), 1, "the control posts");
             assert!(observed.len() > post_at);
         }
+    }
+
+    // A case has its own simulator (on its own port), directory, server and
+    // approvals, and spends its time waiting on that simulator, so the cases
+    // run side by side on this thread, a group at a time. A group is no wider
+    // than this, so that the cancellation of a case is never held back by the
+    // others for more than a small part of the 300 milliseconds a held read
+    // lasts. Every case is joined, and a panic in any of them is passed on
+    // after the others have finished, with the case named.
+    const AT_ONCE: usize = 11;
+    let cases = (0..lease_reads).map(Some).chain([None]).collect::<Vec<_>>();
+    for group in cases.chunks(AT_ONCE) {
+        let local = tokio::task::LocalSet::new();
+        local
+            .run_until(async {
+                let running = group
+                    .iter()
+                    .map(|&held_at| (held_at, tokio::task::spawn_local(one_case(held_at))))
+                    .collect::<Vec<_>>();
+                let mut panicked = None;
+                for (held_at, case) in running {
+                    if let Err(error) = case.await {
+                        eprintln!("case {held_at:?} failed");
+                        panicked.get_or_insert(error);
+                    }
+                }
+                if let Some(error) = panicked {
+                    std::panic::resume_unwind(error.into_panic());
+                }
+            })
+            .await;
     }
 }
 

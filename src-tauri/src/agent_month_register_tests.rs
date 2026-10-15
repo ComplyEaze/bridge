@@ -176,7 +176,7 @@ async fn the_sales_register_returns_twelve_months_as_tally_printed_them() {
     );
     assert_eq!(
         result["checks"],
-        json!({"months": "not_checked", "against_vouchers": "not_checked", "against_trial_balance": "not_checked"})
+        json!({"against_register_screen": "not_checked", "against_vouchers": "not_checked", "against_trial_balance": "not_checked"})
     );
     let limitations = result["limitations"].as_array().expect("limitations");
     for needle in [
@@ -248,17 +248,41 @@ async fn a_window_that_is_not_whole_months_is_refused_before_the_register_is_ask
     }
 }
 
+/// The start decides: a window wholly before the books, and one that starts
+/// before them and ends inside them, are both refused.
 #[tokio::test]
 async fn a_window_starting_before_the_books_is_refused_before_the_register_is_asked_for() {
     // The test company's books start on 2026-04-01.
-    let mut plans = plans_to_the_mode_probe();
-    plans.push(xml(companies()));
-    pair(&mut plans, xml(extents()));
-    let (response, sent, expected) = call(plans, args("sales", "20260301", "20260331")).await;
+    for (from, to) in [("20260301", "20260331"), ("20260301", "20260430")] {
+        let mut plans = plans_to_the_mode_probe();
+        plans.push(xml(companies()));
+        pair(&mut plans, xml(extents()));
+        let (response, sent, expected) = call(plans, args("sales", from, to)).await;
+        assert_eq!(sent, expected, "{from} {to}");
+        assert_eq!(
+            error(&response)["code"],
+            "month_register_before_books",
+            "{from} {to} {response}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn education_mode_is_refused_with_its_own_code_before_the_register_is_asked_for() {
+    let education = companies().replace(
+        "<EDUMODE TYPE=\"Logical\">No</EDUMODE>",
+        "<EDUMODE TYPE=\"Logical\">Yes</EDUMODE>",
+    );
+    assert_ne!(education, companies());
+    // The identity read, then the status and mode probe, which sees Education.
+    let mut plans = Vec::new();
+    pair(&mut plans, xml(companies()));
+    plans.extend([status(), xml(education)]);
+    let (response, sent, expected) = call(plans, args("sales", "20260401", "20270331")).await;
     assert_eq!(sent, expected, "every planned request was served");
     assert_eq!(
         error(&response)["code"],
-        "month_register_before_books",
+        "month_register_education_unqualified",
         "{response}"
     );
 }

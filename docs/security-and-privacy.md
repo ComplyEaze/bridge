@@ -188,8 +188,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       symbol. It holds no amounts and no narrations, and `mask_parties` has
       nothing to shorten in it.
     - The month-wise register read (`month_register`) sends the company name,
-      its identifier, company number and books-from date, the report's name and,
-      for each month, Tally's debit, credit and closing amounts. It holds no
+      its identifier, company number and books-from date, the register you
+      chose (`kind`) and the report's name, the window's dates, and for each
+      month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
     - The GSTR-1 status read (`gst_status`) sends the company name and its
       identifier, the voucher type name you gave and the dates, and for each

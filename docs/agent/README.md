@@ -639,12 +639,16 @@ it. An empty amount is not zero.
 Nothing ties the rows to the vouchers, to the trial balance or to `sales_register` and
 `purchase_register`; `checks` says so. On the one synthetic book read (BRIDGE PILOT LAB, one financial
 year, 13 Oct 2026) the Sales Register's credit was the month's sales invoices, tax included, neither
-cancelled nor optional, and its closing a running total within the year; the Purchase Register's debit
-was the month's purchases as a negative amount and its closing the running total, carried into a month
-with no purchase. That reading is not applied. Equality with Tally's own register screens has not been
-measured. A window that is not whole months is refused before any request
-(`month_register_window_not_month_start`, `_not_month_end`, `_reversed`, `_too_many_months`), and one
-that starts before the books as `month_register_before_books`; an answer Tally marks as a failure, an
+cancelled nor optional, and its closing was printed for August and September only, as a running total,
+with the other months empty; the Purchase Register's debit was the month's purchases as a negative amount,
+and its closing was printed for August and, unchanged, for September, a month with no purchase. That
+reading is not applied. Equality with Tally's own register screens has not been measured, and `checks`
+says `against_register_screen: not_checked`. The set of months is not left unchecked: an answer whose
+months are not the window's is refused (`month_register_months_unexpected`). A window that is not whole
+months is refused after the company and mode reads and before the register is asked for
+(`month_register_window_not_month_start`, `_not_month_end`, `_reversed`, `_too_many_months`,
+`_unsupported_boundary`), as is one that starts before the books (`month_register_before_books`) and
+Education mode (`month_register_education_unqualified`); an answer Tally marks as a failure, an
 empty answer and a book that moved during the read fail the call (`month_register_read_failed` with the
 cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
 Payment Registers have not been captured.

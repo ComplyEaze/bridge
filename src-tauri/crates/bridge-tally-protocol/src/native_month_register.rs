@@ -12,9 +12,10 @@
 //! Captured once each, on one synthetic book's financial year (BRIDGE PILOT
 //! LAB, 13 Oct 2026). On that book the Sales Register's `Cr` was the month's
 //! sales invoices, tax included, neither cancelled nor optional, and `CL` a
-//! running total within the year; the Purchase Register's `Dr` was the month's
-//! purchases as a negative amount, and its `CL` the running total, carried
-//! into a month with no purchase. Nothing here applies that reading or ties
+//! running total printed for August and September only, the other months
+//! empty; the Purchase Register's `Dr` was the month's purchases as a negative
+//! amount, and its `CL` printed for August and, unchanged, for September, a
+//! month with no purchase. Nothing here applies that reading or ties
 //! the figures to the vouchers: the rows are returned as Tally printed them.
 //! The Journal Register answers another shape (a count of vouchers in the
 //! debit column, no closing column) and is not read here.

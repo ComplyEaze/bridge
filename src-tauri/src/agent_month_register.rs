@@ -60,14 +60,14 @@ impl Server {
                 "from": from, "to": to,
                 "months": months,
                 "checks": {
-                    "months": "not_checked",
+                    "against_register_screen": "not_checked",
                     "against_vouchers": "not_checked",
                     "against_trial_balance": "not_checked",
                 },
                 "verification": VERIFICATION,
                 "limitations": [
                     "These are Tally's own month-wise register rows exactly as Tally printed them: nothing here ties them to the vouchers, to the trial balance or to the sales_register or purchase_register tools",
-                    "Each month carries Tally's three columns as printed: debit, credit and closing. On the one synthetic book read (BRIDGE PILOT LAB, one financial year), the Sales Register's credit was the month's sales invoices, tax included, neither cancelled nor optional, and its closing a running total within the year; the Purchase Register's debit was the month's purchases as a negative amount, and its closing the running total, carried into a month with no purchase. That reading was made by the lab against that book's vouchers and is not applied here",
+                    "Each month carries Tally's three columns as printed: debit, credit and closing. On the one synthetic book read (BRIDGE PILOT LAB, one financial year), the Sales Register's credit was the month's sales invoices, tax included, neither cancelled nor optional, and its closing was printed for August and September only, as a running total, with the other months empty; the Purchase Register's debit was the month's purchases as a negative amount, and its closing was printed for August and, unchanged, for September, a month with no purchase. That reading was made by the lab against that book's vouchers and is not applied here",
                     "An empty amount is not zero, and a month printed with empty amounts does not say the month had no vouchers",
                     "The period must be whole months, at most twelve, so that each row can be placed in its year, and must not start before the book does",
                     "Not measured: equality with Tally's own register screens, credit and debit notes, a book with stock items, a window shorter than a year or crossing years, a several-currency book, a large book, other releases than TallyPrime 7.1 Silver",

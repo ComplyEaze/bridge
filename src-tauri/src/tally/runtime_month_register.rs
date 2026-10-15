@@ -51,8 +51,9 @@ impl MonthRegisterReadError {
 
 impl TallyRuntime {
     /// Tally's own `kind` register for the whole months `from` to `to`. A window
-    /// that is not whole months is refused before any request; a window that
-    /// starts before the books is refused before the register is asked for; a
+    /// that is not whole months is refused after the mode probe (the window
+    /// needs its profile) and before the register is asked for, as is a window
+    /// that starts before the books; a
     /// refusal of how the answer parsed returns at once; a book that moved
     /// between the extents is refused after the answer was read, so the closing
     /// extent decides.

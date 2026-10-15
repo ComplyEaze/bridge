@@ -1213,6 +1213,10 @@ async fn an_item_without_entries_says_that_its_group_and_the_company_were_not_re
         "is not a statement that the item has no HSN code or no GST rate"
     ));
     assert!(mentions("not on the item's list"));
+    assert!(mentions(
+        "whether an item that defers to a coded group inherits its code was not observed"
+    ));
+    assert!(!mentions("its items' lists did not change"));
     assert!(mentions("inherited_from_group_or_company: not_read"));
     assert!(mentions("U+FFFD `#4;`"));
     assert!(mentions(

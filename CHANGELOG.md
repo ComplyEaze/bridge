@@ -31,8 +31,8 @@ These changes are in source and not yet in a published build.
 
 - `masters` can list a company's stock items (`kind` `stock_items`): each row carries the item's own dated HSN
   entries (`hsn`) and GST rate entries (`gst`) as Tally sent them, nothing choosing the code or the rate for a date
-  (part of #1233). An empty or missing list is not "no HSN or GST": a code keyed on a stock group did not appear on
-  its items' lists, the group's and the company's setting is not read, and every row says so
+  (part of #1233). An empty or missing list is not "no HSN or GST": a code keyed on a stock group was not on the empty lists of the four other
+  items measured (one book), whether an item that defers to a coded group inherits its code was not observed, the group's and the company's setting is not read, and every row says so
   (`inherited_from_group_or_company: not_read`). A defect in one item's list marks that list `unreadable` with its
   defect and the read stands; a Tally `ERROR`, markup inside a value or a cut-off list refuses the read. Item names
   and parents are masked under `mask_parties`, and so are HSN descriptions (a person can edit them); HSN codes and rates are returned as sent. Tally's

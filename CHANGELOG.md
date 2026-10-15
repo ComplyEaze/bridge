@@ -49,8 +49,10 @@ These changes are in source and not yet in a published build.
   after one made by hand. It covers a whole statement, or whole calendar months of it, names no cause and writes
   nothing. It returns the two dates and the gaps, not the balances, though a gap plus the statement's balance at
   that date (for a whole statement, the balance you supplied) gives the book's. The parse's proposals file now also
-  records the statement's first and last dates (part of #1211). It is not yet proved against a live book: one run
-  on two synthetic companies by an outside contributor is only partly recorded (see the pull request).
+  records the statement's first and last dates (part of #1211). It was run once in the lab on 14 October
+  2026 (TallyPrime 7.1 Silver, one synthetic company): whole months before and after their post, a whole
+  statement whose last month was not posted, and reads after the ledger's last voucher all gave the gaps
+  expected; a read at a date in the middle of a month is not measured (see the pull request).
 - `statement_tie_out` can check whole calendar months of a longer statement: a file parsed with `from` and `to` (or
   one of them) from the 1st of a month to the last day of a month, within the statement's rows, is compared with the
   book at those dates, against the statement's balance there as worked out from its own rows. Any other narrowed
@@ -331,6 +333,14 @@ These changes are in source and not yet in a published build.
   a batch whose voucher mark moved across the post, keep the earlier line.
   Measured live once, on a single voucher refused whole; a batch is not
   measured live (#1108).
+- A voucher of an unbound native post that ComplyEaze Bridge cannot find in the book no longer has its next
+  step suggest that it was edited in Tally when Tally's own answer to that post was not clean (for example a
+  batch Tally created only partly, or an answer that did not parse): the line now says only that it cannot be
+  matched, and to check in Tally before posting it again (#1108).
+- `build_import_xml` refuses a voucher whose own `voucher_number` begins or ends with white space, or is only
+  white space, as `voucher_number_invalid`, before any file is written: on a raw import Tally read a number
+  sent with a space at its end back without it, so such a voucher could never verify as posted (#1730). A
+  space inside a number is still admitted.
 
 - `parse_bank_statement` no longer reads a statement PDF's text in render mode 3 (invisible), which is how a
   scanner app lays a hidden OCR layer under a page image, so that text is not parsed as if the bank had printed

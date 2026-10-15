@@ -18,7 +18,7 @@ use bridge_tally_protocol::native_masters::{
 };
 use bridge_tally_protocol::native_voucher_type_numbering::{
     parse_voucher_type_numbering, render_voucher_type_numbering_request, DuplicateSetting,
-    NumberingJoinError, SeriesNumberingMethod, VoucherTypeNumbering,
+    NumberingJoinError, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
 use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
 
@@ -912,7 +912,7 @@ async fn each_type_gets_the_numbering_of_its_own_series() {
     assert_eq!(
         of("Journal"),
         &observed(
-            SeriesNumberingMethod::Automatic,
+            SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain),
             DuplicateSetting::NotPrevented
         )
     );
@@ -933,7 +933,7 @@ async fn each_type_gets_the_numbering_of_its_own_series() {
             .filter(|result| matches!(
                 result,
                 VoucherTypeNumbering::Observed {
-                    method: SeriesNumberingMethod::Automatic,
+                    method: SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain),
                     duplicates: DuplicateSetting::NotPrevented
                 }
             ))
@@ -1363,4 +1363,204 @@ async fn a_numbering_answer_over_the_admitted_bytes_is_a_premise_refusal() {
     let (result, dispatched) = read_with_numbering(numbering, 50_000_000, 50_000_001).await;
     assert_reported_as_moved(&result.err().expect("refused"));
     assert_eq!(dispatched, 3 + 4 + 4 + 4 + 4);
+}
+
+// The numbering read a voucher sent without a number is admitted on
+// (bridge#724): bounded by a master mark read before it, with no book extent.
+
+/// The whole sequence: the mode probe and identity (3), the masters pair (4),
+/// the numbering pair (4), identity and mode again (3).
+const NUMBERING_READ_SEQUENCE: usize = 3 + 4 + 4 + 3;
+
+/// A whole numbering read of `masters` and `numbering`.
+fn numbering_read_plans(masters: String, numbering: String) -> Vec<ScenarioPlan> {
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies.clone()];
+    pair(&mut plans, xml(masters));
+    pair(&mut plans, xml(numbering));
+    plans.extend([companies.clone(), status(), companies]);
+    plans
+}
+
+async fn run_numbering(
+    plans: Vec<ScenarioPlan>,
+    master_mark: u64,
+) -> (anyhow::Result<VoucherNumberingRead>, Vec<ObservedRequest>) {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let result = TallyRuntime::default()
+        .fetch_voucher_type_numbering(config(&simulator), &identity(), master_mark)
+        .await;
+    (result, simulator.finish().unwrap())
+}
+
+/// The largest AlterID among the voucher types of the real numbering capture.
+fn captured_highest_alter_id() -> u64 {
+    parse_native_masters(
+        NativeMasterKind::VoucherTypes,
+        &masters_for_numbering_capture(),
+        GUID,
+    )
+    .unwrap()
+    .rows
+    .iter()
+    .map(|row| row.alter_id)
+    .max()
+    .unwrap()
+}
+
+#[tokio::test]
+async fn the_numbering_read_sends_the_masters_pair_then_the_numbering_pair_and_no_extent() {
+    let mark = captured_highest_alter_id();
+    let (result, observed) = run_numbering(
+        numbering_read_plans(masters_for_numbering_capture(), numbering_capture()),
+        mark,
+    )
+    .await;
+    let read = result.unwrap();
+    assert_eq!(observed.len(), NUMBERING_READ_SEQUENCE);
+    let name = identity().display_name().to_string();
+    let masters = request_hash(&render_native_masters_request(
+        NativeMasterKind::VoucherTypes,
+        &name,
+    ));
+    let numbering = request_hash(&render_voucher_type_numbering_request(&name));
+    let posts = observed
+        .iter()
+        .filter(|request| request.method == "POST")
+        .map(|request| request.request_body_sha256.as_str())
+        .collect::<Vec<_>>();
+    // Six company-list POSTs of the brackets, and the two pairs in order.
+    assert_eq!(
+        &posts[2..6],
+        [
+            masters.as_str(),
+            masters.as_str(),
+            numbering.as_str(),
+            numbering.as_str()
+        ]
+    );
+    assert_eq!(posts.len(), 2 + 4 + 2);
+    assert_eq!(read.master_mark(), mark);
+    assert_eq!(read.company_guid(), GUID);
+    assert_eq!(read.types().len(), 24);
+    let of = |name: &str| {
+        read.types()
+            .iter()
+            .find(|(type_name, _)| type_name == name)
+            .map(|(_, numbering)| numbering.clone())
+            .unwrap()
+    };
+    assert_eq!(
+        of("Payment"),
+        VoucherTypeNumbering::Observed {
+            method: SeriesNumberingMethod::Manual,
+            duplicates: DuplicateSetting::Prevented
+        }
+    );
+    assert_eq!(
+        of("Journal"),
+        VoucherTypeNumbering::Observed {
+            method: SeriesNumberingMethod::Automatic(NumberingSubMethod::AutoRetain),
+            duplicates: DuplicateSetting::NotPrevented
+        }
+    );
+    // Both pairs are in the read's evidence.
+    let collections = ((masters_for_numbering_capture().encode_utf16().count()
+        + numbering_capture().encode_utf16().count())
+        * 2
+        * 2) as u64;
+    assert!(u64::try_from(read.evidence().bytes).unwrap() >= collections);
+}
+
+/// The mark is read before this call, so a voucher type saved after it carries
+/// an AlterID above the mark: the read refuses rather than admit an observation
+/// newer than the mark the post is compared by later.
+#[tokio::test]
+async fn a_voucher_type_saved_after_the_mark_refuses_the_read() {
+    let mark = captured_highest_alter_id() - 1;
+    let mut plans = numbering_read_plans(masters_for_numbering_capture(), numbering_capture());
+    plans.truncate(3 + 4);
+    let (result, observed) = run_numbering(plans, mark).await;
+    let error = result.expect_err("refused");
+    assert!(matches!(
+        cause::<MastersReadError>(&error),
+        Some(MastersReadError::PremiseViolated(
+            "masters_alter_id_above_master_mark"
+        ))
+    ));
+    // Refused on the masters answer: the numbering was never requested.
+    assert_eq!(observed.len(), 3 + 4);
+}
+
+#[tokio::test]
+async fn the_numbering_read_refuses_education_before_any_collection() {
+    let (result, observed) =
+        run_numbering(vec![status(), xml(education(&companies()))], 50_000_000).await;
+    let error = result.expect_err("refused");
+    assert!(matches!(
+        cause::<MastersReadError>(&error),
+        Some(MastersReadError::EducationUnqualified)
+    ));
+    assert_eq!(observed.len(), 2);
+}
+
+#[tokio::test]
+async fn a_numbering_pair_that_changed_refuses_the_numbering_read_by_its_own_code() {
+    let masters = masters_for_numbering_capture();
+    let numbering = numbering_capture();
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies];
+    pair(&mut plans, xml(masters));
+    plans.extend([
+        xml(numbering.clone()),
+        status(),
+        xml(format!("{numbering}\n")),
+        status(),
+    ]);
+    let (result, observed) = run_numbering(plans, 50_000_000).await;
+    let error = result.expect_err("refused");
+    assert!(matches!(
+        cause::<PairedReadValidationError>(&error),
+        Some(PairedReadValidationError::MastersNumberingCollection)
+    ));
+    assert_eq!(observed.len(), 3 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_numbering_answer_that_does_not_join_keeps_the_joins_code() {
+    // The numbering answer drops the masters answer's Journal.
+    let masters = masters_for_numbering_capture();
+    let numbering = numbering_capture();
+    let journal = type_blocks(&numbering)
+        .into_iter()
+        .find(|block| name_of(block) == "Journal")
+        .unwrap()
+        .to_string();
+    let mut plans = numbering_read_plans(masters, numbering.replacen(&journal, "", 1));
+    plans.truncate(3 + 4 + 4);
+    let (result, observed) = run_numbering(plans, 50_000_000).await;
+    let error = result.expect_err("refused");
+    assert!(matches!(
+        cause::<MastersReadError>(&error),
+        Some(MastersReadError::NumberingJoin(_))
+    ));
+    assert_eq!(observed.len(), 3 + 4 + 4);
+}
+
+#[tokio::test]
+async fn a_transport_failure_during_the_numbering_read_stays_a_transport_failure() {
+    let masters = masters_for_numbering_capture();
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies];
+    pair(&mut plans, xml(masters));
+    plans.push(xml(numbering_capture()).with_http_status(500));
+    let (result, observed) = run_numbering(plans, 50_000_000).await;
+    let error = result.expect_err("refused");
+    assert!(matches!(
+        cause::<bridge_tally_transport::TallyTransportError>(&error),
+        Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 500 })
+    ));
+    assert!(cause::<MastersReadError>(&error).is_none());
+    assert!(cause::<PairedReadValidationError>(&error).is_none());
+    assert_eq!(observed.len(), 3 + 4 + 1);
 }

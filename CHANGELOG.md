@@ -23,7 +23,10 @@ These changes are in source and not yet in a published build.
   `manual`) and whether duplicate numbers are prevented, read at the number-series level from a second paired
   read of the voucher-type export and joined to the row by GUID with the name as a second equality; a type with no
   series or several returns `series_count` and nothing is read from it, and a series missing or repeating a field
-  returns `field_invalid`. A type found in one read only (`masters_numbering_names_differ`), or a GUID and name that disagree between the
+  returns `field_invalid`. Under `automatic`, and under no other method, a row also carries `sub_method`, the
+  series' own setting for the numbers of vouchers already entered: `auto_retain` ("Retain Original Voucher No."),
+  `auto_renumber` ("Renumber Vouchers"), `absent` where the series printed none, or the raw text under
+  `unrecognised`. A type found in one read only (`masters_numbering_names_differ`), or a GUID and name that disagree between the
   two reads (`masters_numbering_identity_differs`), refuses the whole read; so does the numbering read changing
   between its two reads (`masters_numbering_collection_changed`) and a numbering answer whose row count or size
   breaks the mark's premise (`masters_bound_premise_violated`), and one that does not parse (a missing or repeated
@@ -38,7 +41,9 @@ These changes are in source and not yet in a published build.
   Windows; 24 voucher types each, exactly one series per type, its name not read): the read was not refused, and on
   the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with
   duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's
-  defaults and not checked on screen, read Automatic (part of #724).
+  defaults and not checked on screen, read Automatic (part of #724). `sub_method` was measured on a second
+  synthetic book of the same release and edition, on one voucher type (Receipt, set to "Renumber Vouchers" and
+  back); any other wording, a series that prints none, Gold and other releases are not measured.
 
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
@@ -137,6 +142,52 @@ These changes are in source and not yet in a published build.
   read back from a real Tally. The same tag test now also counts, in a build's `suspense_lines`, a voucher whose tag names its ledger in another case, spacing or hyphenation.
 
 **Changed**
+
+- `post_import` and `build_import_xml` now refuse a voucher sent without a voucher number into a voucher type whose
+  voucher numbering does not read Automatic, as `import_voucher_numbering_not_automatic`, and into one that reads
+  Automatic without the sub-method `Auto Retain` (the screen's "Retain Original Voucher No."), as
+  `import_voucher_numbering_not_retain`. Either names each such voucher type and what was read in `refused_types`,
+  and a batch that holds both is refused as `import_voucher_numbering_not_automatic` (part of #724). Under Manual
+  voucher numbering, a second voucher sent without a number was seen to take a number already used, or to be refused
+  whole. With a voucher type set to "Renumber Vouchers" (the series reads `Auto Renumber`), Tally was seen to change
+  the numbers of vouchers already in the book: at the switch, when a voucher with an earlier date was entered by
+  hand, and when a voucher with an earlier date was sent by import without a number, without moving any voucher's
+  AlterID and with the import's answer reading CREATED 1, ALTERED 0; a voucher dated after every other changed
+  nothing (one synthetic book, one voucher type, TallyPrime 7.1 Silver). A series that prints no sub-method, or one
+  ComplyEaze Bridge does not recognise, is refused the same way. An amendment's vouchers are checked the same
+  way. It is refused before its own check of the book, so its next step says that
+  whether the earlier batch's vouchers are in the book was not checked, and has the assistant call `verify_import`
+  for that batch first: a voucher found in the book is never entered again, one that is not found is not built as a
+  new voucher either, and the vouchers of the refused voucher types are left out until ComplyEaze Bridge numbers vouchers
+  itself; no refusal sends anyone to enter a voucher in Tally. A Journal that carries its own voucher number (one built for Tally's Import menu)
+  is checked by `build_import_xml` too: it is written into a voucher type that reads Manual with duplicate numbers
+  prevented, where Tally keeps the number and refuses one a Journal already holds, or Automatic with `Auto Retain`,
+  where Tally discards the number
+  and assigns the next, and it is refused otherwise under the same two codes, Manual with duplicates allowed included,
+  where a Payment carrying a held number was created as a second voucher. It is refused on a voucher type set
+  to "Renumber Vouchers": there Tally was seen to discard the number a Receipt carried and give it the number of its
+  place in date order, and the later-dated Receipts' numbers went up by one. So a build that holds only Journals carrying their own numbers,
+  which made no numbering read before, now makes that read: it can fail with that read's own codes, or as `pre_import_mark_unobserved` when the
+  company's master mark cannot be read, and it is
+  refused on a book in Education mode, as a build of vouchers without numbers is. On the desktop's Journal
+  screen the refusal names the voucher type and what was read of it. The next step, and a post's message naming
+  the voucher types, are sent only where `BRIDGE_AGENT_MAX_BYTES` is at least 8,192; from 4,096 up to that a refused build
+  still returns its `reason` and `refused_types`, and a refused post its code and `refused_types`. On a type set to "Renumber Vouchers",
+  a file of more than two vouchers, a mixed file, a Journal that carries a number or is dated after every other,
+  Payment and Contra are not measured; nor are Gold, other releases, a series not named Default and the
+  same through ComplyEaze Bridge's own post: on a
+  release, an edition or a book whose series prints no sub-method, or words it differently, every Automatic voucher
+  type is refused.
+- Before approval a post now reads the company's master mark and then the voucher numbering, and compares the mark
+  again just before the post is sent: any master saved in that span, while the person decides included (a ledger
+  created, a voucher type changed), refuses the post as `post_masters_moved` and withdraws the approval; post again.
+  Each of thirteen saves of a voucher type's screen in Tally moved the mark by 2 (nine of a type holding no vouchers,
+  and two in each of two runs on a type holding vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A voucher type
+  saved during the read itself refuses as `masters_bound_premise_violated` (cause
+  `masters_alter_id_above_master_mark`). A book in Education mode is now refused, as
+  `masters_education_unqualified`, for a post and for a build. Each pass of a post
+  sends 20 more requests to Tally before the approval (12 of them POSTs), so a held approval redeemed in a later call
+  sends them again; a build sends 14 more (8 POSTs), under its admission lock.
 
 - **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,

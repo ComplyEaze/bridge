@@ -1317,10 +1317,16 @@ async fn a_refused_redemption_withdraws_its_approval() {
     // the currency pair's closing company list (a POST), and the closing mode
     // probe its checks would otherwise end with (a GET /status, then the
     // company list) is never sent.
-    assert_eq!(observed.len(), 2 * before_approval().len() - probe().len());
+    assert_eq!(
+        observed.len(),
+        2 * before_approval().len() - probe().len() - numbering_read(&[]).len()
+    );
     let last = observed.last().unwrap();
     assert_eq!(last.method, "POST", "the currency pair's closing read");
     let (first_call, redeeming) = observed.split_at(before_approval().len());
+    // The first call's numbering read (bridge#724) comes after the mode probe
+    // and is not reached by the redeeming call either.
+    let first_call = &first_call[..first_call.len() - numbering_read(&[]).len()];
     let gets = |requests: &[tally_protocol_simulator::ObservedRequest]| {
         requests
             .iter()

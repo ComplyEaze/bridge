@@ -1336,6 +1336,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
             Some(DATE_REMEDIATION)
         }
+        // One next step for both numbering refusals (bridge#724): a batch that
+        // holds a voucher type of each is named
+        // `import_voucher_numbering_not_automatic`.
+        "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
+            Some(agent_import::POST_NUMBERING_NEXT_STEP)
+        }
         _ => None,
     }
 }

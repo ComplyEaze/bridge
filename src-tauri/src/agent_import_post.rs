@@ -583,6 +583,8 @@ impl Server {
         let mut cash_in_hand_refused: Option<(Vec<Value>, usize)> = None;
         // The batch's own transaction ids found already in the book (#901).
         let mut preexisting_txn_ids: Option<Vec<String>> = None;
+        // The voucher types refused for their voucher numbering (bridge#724).
+        let mut numbering_refused: Option<(Value, String)> = None;
         let operation: Result<Step, ToolFailure> = async {
             let xml = admit_saved_voucher_integrity(
                 &line,
@@ -895,6 +897,19 @@ impl Server {
             .map_err(|error| error.to_string())?;
             let mode = self.qualified_import_profile().await?;
             validate_post_profile_with_evidence(&payload, &mode, &mut accumulated)?;
+            // Every voucher goes without a number, so each voucher type must be
+            // numbered Automatic with existing numbers retained (bridge#724).
+            // Read on every pass, a redeem included, after the master mark it
+            // is bounded by; the queue compares that mark again before the POST.
+            let numbering_admission = self
+                .admit_numbering_for_post(&company, &identity, &payload, &mut accumulated)
+                .await
+                .map_err(|refusal| {
+                    if let numbering::NumberingFailure::Refused(refused) = &refusal {
+                        numbering_refused = Some((refused.refused_types(), refused.message()));
+                    }
+                    ToolFailure::from(refusal)
+                })?;
             // Kept for the check across the post (#239).
             let approved_binding = ledger_binding.clone();
             let company_marks_request = crate::tally::agent_read_request::AgentReadRequest::parse(
@@ -1018,6 +1033,7 @@ impl Server {
                             queued.company_marks,
                             identity.company_guid(),
                             &company.name,
+                            &numbering_admission,
                         )?;
                         let mark = location::parse_all_company_marks(queued.company_marks)
                             .ok()
@@ -1458,8 +1474,16 @@ impl Server {
                 }
                 // The code's next step, under the same rule, and only when the
                 // journal shows nothing was sent (#1573).
+                // A numbering refusal's step, and its message, need more
+                // room than the general floor gives.
+                let guidance_floor = if numbering_refused.is_some() {
+                    numbering::GUIDANCE_MIN_RESPONSE_BUDGET
+                } else {
+                    crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET
+                };
+                let guidance_fits = self.settings.max_bytes >= guidance_floor;
                 if let Some(nothing_sent) = NothingSent::observed(attempted) {
-                    if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
+                    if guidance_fits {
                         attach_next_step(&mut outcome.payload, cause, nothing_sent);
                     }
                 }
@@ -1488,6 +1512,10 @@ impl Server {
                 }
                 if let Some((refused, omitted)) = cash_in_hand_refused {
                     name_refused_cash_ledgers(&mut outcome.payload, refused, omitted);
+                }
+                if let Some((refused, message)) = numbering_refused {
+                    let message = guidance_fits.then_some(message);
+                    name_refused_voucher_types(&mut outcome.payload, refused, message);
                 }
                 // Withheld under the remediation budget, as `cause` is. That is
                 // not a guarantee against the oversize answer just above it.
@@ -1962,12 +1990,15 @@ fn name_preexisting_rows(payload: &mut Value, txn_ids: &[String]) {
 
 /// The aim check on the snapshot the queue read last before the POST (#574).
 /// The aim check (#574), then the master mark (#239): the target's ALTMSTID in
-/// the aim snapshot must equal the one read as the queue's binding reads began.
+/// the aim snapshot must equal the one read as the queue's binding reads began,
+/// and that one must equal the mark the voucher numbering was read under before
+/// the approval (bridge#724), so no master moved from that read to the POST.
 fn admit_queued_aim(
     marks_at_binding: &str,
     marks: &str,
     company_guid: &str,
     company_name: &str,
+    numbering: &numbering::NumberingAdmission,
 ) -> anyhow::Result<()> {
     let rows = location::parse_all_company_marks(marks)
         .map_err(|_| ApprovedImportAdmissionError::CompanyScopeUnconfirmed)?;
@@ -1976,10 +2007,13 @@ fn admit_queued_aim(
     let at_binding = location::parse_all_company_marks(marks_at_binding)
         .map_err(|_| ApprovedImportAdmissionError::MastersUnconfirmed)?;
     match location::target_masters_unchanged(&at_binding, &rows, company_guid, company_name) {
-        Some(true) => Ok(()),
-        Some(false) => Err(ApprovedImportAdmissionError::MastersMoved.into()),
-        None => Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
+        Some(true) => {}
+        Some(false) => return Err(ApprovedImportAdmissionError::MastersMoved.into()),
+        None => return Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
     }
+    numbering
+        .admit_at_binding(&at_binding, company_guid, company_name)
+        .map_err(Into::into)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2274,6 +2308,19 @@ fn explain_unbound_batch(payload: &mut Value) {
 
 /// How many Currency masters a refusal names; the rest are counted.
 const REFUSAL_CURRENCIES_NAMED: usize = 8;
+
+/// Names the voucher types a numbering refusal refused (bridge#724), and,
+/// while the journal shows nothing was sent, says so in the message: the
+/// desktop's Journal screen shows the message alone. `message` is `None`
+/// under a budget that does not hold it, and the refusal keeps its own.
+fn name_refused_voucher_types(payload: &mut Value, refused: Value, message: Option<String>) {
+    payload["result"]["error"]["refused_types"] = refused;
+    if payload["result"]["attempt_recorded"] == json!(false) {
+        if let Some(message) = message {
+            payload["result"]["error"]["message"] = json!(message);
+        }
+    }
+}
 
 /// Say plainly why a multi-currency book was refused, naming the masters seen.
 /// The message is replaced only where no attempt is recorded: any other state
@@ -3346,6 +3393,13 @@ pub(super) fn has_unreviewable_format_character(value: &str) -> bool {
 
 #[path = "agent_import_post_location.rs"]
 mod location;
+
+#[path = "agent_import_numbering.rs"]
+pub(super) mod numbering;
+
+#[cfg(test)]
+#[path = "agent_import_numbering_tests.rs"]
+mod numbering_tests;
 
 /// The aim snapshot's target voucher mark, for the journal tests: the post
 /// records it with its intent, and refuses (`post_mark_unrecorded`) without one.

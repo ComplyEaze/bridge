@@ -287,7 +287,16 @@ Like `remediation`, `expected`, `cause`, `counts`, `size`, `endpoint`, `ledger`,
 `candidates_reason`, `candidates_total`, `candidates_total_is_lower_bound`, `candidates_truncated`,
 `candidates`, `requested` and `window` are omitted when
 `BRIDGE_AGENT_MAX_BYTES` is below 4,096, so that the code always fits. A refusal's list of
-candidate ledgers needs at least 16,384, so it can be absent above 4,096 too. Before a tool response is written, Bridge appends a
+candidate ledgers needs at least 16,384, so it can be absent above 4,096 too. The two
+voucher-numbering refusals (`import_voucher_numbering_not_automatic` and
+`import_voucher_numbering_not_retain`) need at least 8,192 for their `next_step` and, on
+`post_import`, for the message that names the refused voucher types: from 4,096 up to 8,192 a
+refused `build_import_xml` still returns `state`, `reason` and `refused_types`, and a refused
+`post_import` its `error.code` and `error.refused_types` with the general message; under about
+2,500 bytes even those do not fit, and the answer is cut down as any tool's is. The tests hold a
+refused post naming three voucher types and a refused build naming one within 8,192 bytes with
+the next step and within 4,096 without it, and an answer naming four voucher types within the
+server's caps at 8,192; the sizes themselves are not printed here, since the texts change. Before a tool response is written, ComplyEaze Bridge appends a
 `response_prepared` record to `agent-egress.jsonl`, including a unique `receipt_id`. It holds
 hashes, counts and field paths, and one set of values: for a response that carries an error, its
 `error` keeps the code, the cause when it is a code, and a voucher window's timings (requested
@@ -416,6 +425,13 @@ name as a second equality. It is `{"observation":"observed","method":...,"duplic
 `{"unrecognised": "<raw text>"}`; `duplicates` is `prevented` or `not_prevented`),
 `{"observation":"series_count","count":n}` where a type has no series or
 several (nothing is read from it), or `{"observation":"field_invalid","code":...}`.
+Under `"method":"automatic"`, and under no other method, it also carries
+`sub_method`, the series' own `NUMBERINGSUBMETHOD`: `auto_retain` (the screen's
+"Retain Original Voucher No."), `auto_renumber` ("Renumber Vouchers"), `absent`
+where the series printed none, or `{"unrecognised": "<raw text>"}` for any other
+text, a blank one included. A Manual series printed `Auto Retain` as well on
+both books read, which is not the numbering in force there, so it is not
+returned for one.
 A type found in one answer only (`masters_numbering_names_differ`), or a GUID
 and name that disagree between the two answers
 (`masters_numbering_identity_differs`), refuses the whole read; so does the
@@ -439,7 +455,25 @@ with exactly one series, whose name is not read): it was not refused, and on
 the six types whose numbering was set or checked on Tally's screen it returned
 that numbering (Manual with duplicates prevented, Manual with duplicates not
 prevented, Automatic); the other types, left at a new company's defaults and
-not checked on screen, read Automatic.
+not checked on screen, read Automatic. `sub_method` was measured on a
+second synthetic book (TallyPrime 7.1 Silver, Windows, 13 October 2026) and one
+voucher type, Receipt: it read `Auto Retain`, then `Auto Renumber` after the
+type's screen was set to "Renumber Vouchers", then `Auto Retain` after it was
+set back. With the type on "Renumber Vouchers", numbers already in the book
+changed: at the switch, when a voucher with an earlier date was entered by
+hand, and when a voucher with an earlier date was sent by import without a
+number, where the import's answer read CREATED 1, ALTERED 0 and no voucher's
+AlterID moved; a voucher dated after every other changed nothing. Later runs
+on that book (protocol reference §9.8) found that a file of two Receipts
+without numbers was numbered by date and changed four numbers, that a
+Receipt carrying a number read back the number of its place in date order,
+and that a Journal imported without a number and dated between two others
+was numbered by its date and moved the later one. A file of more than two
+vouchers, a mixed file, a Journal that carries a number or is dated after
+every other, Payment and Contra, Gold, other releases and the same through
+ComplyEaze Bridge's own post are not measured. Neither is any other
+wording, or a series that prints no sub-method: on such a book every Automatic
+type would read `absent` or `unrecognised`.
 
 The read runs inside the same company, mode and identity brackets as
 `trial_balance`, with the book extent read before and after (they must be
@@ -2036,14 +2070,54 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    `import_multi_currency_unsupported` if the company defines more than one
    currency: Bridge does not post into multi-currency books yet. This is checked
    before approval and again inside the queue. A Currency read that names no
-   usable master refuses with `import_base_currency_undetermined`. Inside the
-   queue, a change to the company's masters from just before the catalogue
-   re-read to the last read before the post refuses with `post_masters_moved`
+   usable master refuses with `import_base_currency_undetermined`. A native
+   post sends no voucher number, so before approval ComplyEaze Bridge reads the
+   company's master mark and then each voucher type's voucher numbering
+   (bridge#724): a voucher type that does not read Automatic refuses with
+   `import_voucher_numbering_not_automatic`, and one that reads Automatic
+   without the sub-method `Auto Retain` (it reads `Auto Renumber`, prints no
+   sub-method, or prints one ComplyEaze Bridge does not recognise) refuses with
+   `import_voucher_numbering_not_retain`. Either names each such voucher type
+   and what was read in `refused_types`; a batch that holds both is refused
+   as `import_voucher_numbering_not_automatic`. `build_import_xml` checks every
+   voucher the same way, and writes a Journal that carries its own voucher
+   number into a voucher type that reads Manual with duplicate numbers
+   prevented as well: Tally keeps the number there and refuses one a Journal
+   already holds. Under Manual with duplicates allowed a Payment carrying a
+   held number was created as a second voucher (protocol reference §9.8), so
+   a numbered Journal is refused there. Under Automatic
+   numbering Tally discards a supplied number and assigns its own, so such a
+   Journal is held to `Auto Retain` like a voucher without a number; it is
+   refused on a voucher type set to "Renumber Vouchers", where Tally was seen
+   to discard the number a Receipt carried and give it the number of its
+   place in date order (protocol reference §9.8). With a
+   type set to "Renumber Vouchers", numbers already in the book were seen to
+   change when a voucher with an earlier date was entered by hand, and again
+   when a voucher with an earlier date was sent by import without a number:
+   the import's answer read CREATED 1, ALTERED 0 and no voucher's AlterID
+   moved; a voucher dated after every other changed nothing (one book,
+   TallyPrime 7.1 Silver, Receipts; a file of two Receipts, a Receipt that
+   carried a number and a Journal imported without a number were measured
+   there too, §9.8). A file of more than two vouchers, a mixed file, a
+   Journal that carries a number or is dated after every other, Payment and
+   Contra, Gold, other releases and the same through ComplyEaze Bridge's own
+   post are not measured. On a release, an edition or a book whose series
+   prints no sub-method, or words it differently, every Automatic voucher type
+   refuses this way; a `masters` read of `voucher_types` shows what a book
+   prints. A voucher
+   type saved during that read refuses it with `masters_bound_premise_violated`
+   (cause `masters_alter_id_above_master_mark`): run the call again. A book in
+   Education mode is refused with `masters_education_unqualified`. Inside the
+   queue, a change to the company's masters from that numbering read to the
+   last read before the post refuses with `post_masters_moved`
    (`post_masters_unconfirmed` if it cannot be checked); re-run the post. This
    sees only changes that move the company's master AlterID (`ALTMSTID`):
-   measured for ledger renames and creates made through the gateway. A regroup,
-   an edit made in Tally's own screens, and whether posting a voucher moves it
-   are not yet measured. A queue catalogue re-read that does not parse as this
+   measured for ledger renames and creates made through the gateway, and each
+   of thirteen saves of a voucher type's screen in Tally moved it by 2 (nine of
+   a type holding no vouchers, and two in each of two runs on a type holding
+   vouchers, all on one synthetic book, TallyPrime 7.1 Silver). A regroup, any
+   other edit made in Tally's own screens, and whether posting a voucher moves
+   it are not yet measured. A queue catalogue re-read that does not parse as this
    company's catalogue refuses with `post_catalogue_unreadable`, whose `cause`
    names why, and nothing is sent; a repeated or unusable ledger name refuses
    again until it is corrected in Tally. A queue re-read of the group collection

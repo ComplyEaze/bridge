@@ -1593,5 +1593,163 @@ class PrivacyScanDecodesUtf16(unittest.TestCase):
                     self.assertEqual(record["blockers"], [])
 
 
+class MergeWrapperControls(unittest.TestCase):
+    """scripts/merge-gate-merge.sh: runs the gate, then ready and a head-pinned squash merge, refusing anything that does not match.
+
+    The wrapper is copied beside a stub gate (it always runs the gate in its own directory) and called with a stub `gh` that logs
+    every call, so each case can say which commands were and were not run.
+    """
+
+    GATED = "a" * 40
+    GATE_PASS = (
+        "PR #321 (ComplyEaze/bridge)  head=aaaaaaa  base=master\n"
+        "  ok            something\n\n"
+        "MAY MERGE \u2014 checks passed for aaaaaaa.\n"
+        "Branch protection on master enforces the remaining required status checks separately.\n"
+        '  [ "$(gh pr view 321 --repo ComplyEaze/bridge --json baseRefName -q .baseRefName)" = "master" ] \\\n'
+        "    && gh pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + "a" * 40 + "\n"
+    )
+    VIEW = {"state": "OPEN", "isDraft": False, "headRefOid": "a" * 40, "baseRefName": "master"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory(prefix="merge-wrapper-")
+        cls.root = Path(cls.tmp.name)
+        (cls.root / "scripts").mkdir()
+        shutil.copyfile(ROOT / "scripts" / "merge-gate-merge.sh", cls.root / "scripts" / "merge-gate-merge.sh")
+        os.chmod(cls.root / "scripts" / "merge-gate-merge.sh", 0o755)
+        gate = cls.root / "scripts" / "merge-gate.sh"
+        gate.write_text('#!/usr/bin/env bash\ncat "$STUB_GATE_OUT"\nexit "${STUB_GATE_EXIT:-0}"\n')
+        gate.chmod(0o755)
+        gh = cls.root / "gh"
+        gh.write_text(
+            "#!/usr/bin/env bash\n"
+            'echo "$*" >>"$GH_LOG"\n'
+            'case "$1 $2" in\n'
+            '  "pr view") [ -z "${GH_VIEW_FAIL:-}" ] || exit 1; cat "$GH_VIEW" ;;\n'
+            '  "pr ready") exit "${GH_READY_EXIT:-0}" ;;\n'
+            '  "pr merge") exit "${GH_MERGE_EXIT:-0}" ;;\n'
+            "  *) exit 99 ;;\n"
+            "esac\n"
+        )
+        gh.chmod(0o755)
+        if not shutil.which("jq"):
+            raise RuntimeError("jq is required for the merge wrapper controls")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def run_wrapper(self, args=("321", "--repo", "ComplyEaze/bridge"), gate_out=None, gate_exit=0, view=None, view_fail=False,
+                    merge_exit=0, ready_exit=0):
+        work = Path(tempfile.mkdtemp(dir=self.root))
+        (work / "gate-out").write_text(self.GATE_PASS if gate_out is None else gate_out)
+        (work / "view").write_text(json.dumps(self.VIEW if view is None else view))
+        log = work / "gh.log"
+        log.write_text("")
+        env = os.environ.copy()
+        env.update(PATH=f"{self.root}:{env['PATH']}", STUB_GATE_OUT=str(work / "gate-out"), STUB_GATE_EXIT=str(gate_exit),
+                   GH_LOG=str(log), GH_VIEW=str(work / "view"), GH_MERGE_EXIT=str(merge_exit), GH_READY_EXIT=str(ready_exit))
+        if view_fail:
+            env["GH_VIEW_FAIL"] = "1"
+        result = subprocess.run([str(self.root / "scripts" / "merge-gate-merge.sh"), *args], env=env, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        calls = [line for line in log.read_text().splitlines() if line]
+        return result, calls
+
+    def assert_refused(self, result, calls, phrase):
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(phrase, result.stdout + result.stderr)
+        self.assertFalse([c for c in calls if c.startswith(("pr ready", "pr merge"))], calls)
+
+    def test_a_passing_gate_and_a_matching_head_is_merged_pinned_to_the_gated_head(self):
+        result, calls = self.run_wrapper()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([c for c in calls if c.startswith(("pr ready", "pr merge"))],
+                         ["pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + self.GATED])
+
+    def test_a_draft_is_made_ready_first_and_only_then_merged(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        acts = [c for c in calls if c.startswith(("pr ready", "pr merge"))]
+        self.assertEqual(acts, ["pr ready 321 --repo ComplyEaze/bridge",
+                                "pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + self.GATED])
+
+    def test_a_ready_that_fails_stops_before_the_merge(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), ready_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_gate_that_blocks_or_cannot_decide_is_never_merged(self):
+        for code in (1, 2, 3):
+            with self.subTest(code=code):
+                result, calls = self.run_wrapper(gate_exit=code, gate_out="MUST NOT MERGE\n")
+                self.assert_refused(result, calls, "the gate did not pass")
+
+    def test_a_zero_exit_without_the_may_merge_line_is_refused(self):
+        result, calls = self.run_wrapper(gate_out=self.GATE_PASS.replace("MAY MERGE", "may merge"))
+        self.assert_refused(result, calls, "MAY MERGE")
+
+    def test_a_merge_command_that_is_missing_repeated_or_for_another_pull_request_is_refused(self):
+        command = "    && gh pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + self.GATED + "\n"
+        cases = {
+            "missing": self.GATE_PASS.replace(command, ""),
+            "repeated": self.GATE_PASS + command,
+            "another pull request": self.GATE_PASS.replace("merge 321", "merge 322"),
+            "another repository": self.GATE_PASS.replace("--repo ComplyEaze/bridge --squash", "--repo someone/bridge --squash"),
+            "a short sha": self.GATE_PASS.replace(self.GATED, "a" * 39),
+            "an upper-case sha": self.GATE_PASS.replace(self.GATED, "A" * 40),
+            "a non-hex sha": self.GATE_PASS.replace(self.GATED, "g" * 40),
+            "an extra flag": self.GATE_PASS.replace("--squash", "--squash --admin"),
+        }
+        for name, out in cases.items():
+            with self.subTest(case=name):
+                result, calls = self.run_wrapper(gate_out=out)
+                self.assert_refused(result, calls, "merge command")
+
+    def test_a_missing_or_repeated_base_check_line_is_refused(self):
+        base_line = '  [ "$(gh pr view 321 --repo ComplyEaze/bridge --json baseRefName -q .baseRefName)" = "master" ] \\\n'
+        for name, out in {"missing": self.GATE_PASS.replace(base_line, ""), "repeated": self.GATE_PASS + base_line}.items():
+            with self.subTest(case=name):
+                result, calls = self.run_wrapper(gate_out=out)
+                self.assert_refused(result, calls, "base")
+
+    def test_a_head_that_moved_since_the_gate_is_refused_and_nothing_is_run(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, headRefOid="b" * 40))
+        self.assert_refused(result, calls, "head moved")
+
+    def test_another_base_or_a_closed_pull_request_is_refused(self):
+        for name, view in {"base": dict(self.VIEW, baseRefName="other"), "closed": dict(self.VIEW, state="CLOSED"),
+                           "merged": dict(self.VIEW, state="MERGED")}.items():
+            with self.subTest(case=name):
+                result, calls = self.run_wrapper(view=view)
+                self.assert_refused(result, calls, "pull request")
+
+    def test_a_view_that_cannot_be_read_is_refused(self):
+        result, calls = self.run_wrapper(view_fail=True)
+        self.assert_refused(result, calls, "could not read")
+        result, calls = self.run_wrapper(view={"state": "OPEN"})
+        self.assert_refused(result, calls, "could not read")
+
+    def test_a_merge_that_gh_refuses_is_a_failure_not_a_success(self):
+        result, calls = self.run_wrapper(merge_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("merged", result.stdout.lower().replace("not merged", ""))
+
+    def test_a_dry_run_runs_the_gate_and_the_checks_but_neither_ready_nor_merge(self):
+        result, calls = self.run_wrapper(args=("321", "--repo", "ComplyEaze/bridge", "--dry-run"), view=dict(self.VIEW, isDraft=True))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("dry run", result.stdout)
+        self.assertFalse([c for c in calls if c.startswith(("pr ready", "pr merge"))], calls)
+
+    def test_bad_arguments_are_a_usage_error_and_run_nothing(self):
+        for args in ((), ("abc",), ("321", "--repo", "nonsense"), ("321", "--repo", "a/b", "--unknown"), ("321", "extra"),
+                     ("321", "--repo")):
+            with self.subTest(args=args):
+                result, calls = self.run_wrapper(args=args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertEqual(calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()

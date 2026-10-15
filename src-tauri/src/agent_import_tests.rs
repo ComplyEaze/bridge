@@ -5381,25 +5381,30 @@ async fn a_build_in_education_mode_is_refused_by_the_numbering_read() {
     assert_eq!(written_files(directory.path()), 0);
 }
 
+/// A voucher number that is empty, or has white space at either end, is
+/// refused before the numbering is read (an empty one as invalid text, one
+/// with white space as an invalid number): nothing reaches the numbering
+/// check and no file is written.
 #[tokio::test]
-async fn a_blank_voucher_number_counts_as_none_for_the_numbering_check() {
-    let plans = through_build_numbering(&["Journal"]);
-    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
-    let directory = tempfile::tempdir().unwrap();
-    let server = numbering_server(directory.path(), simulator.address().port());
-    let mut input = captured_catalogue_payload();
-    input.vouchers.truncate(1);
-    input.vouchers[0].voucher_number = Some("  ".into());
-    let Ok(built) = server
-        .build_import_xml(&serde_json::to_value(input).unwrap())
-        .await
-    else {
-        panic!("the build reaches the numbering read")
-    };
-    assert_eq!(
-        built.payload["result"]["reason"], "import_voucher_numbering_not_automatic",
-        "{}",
-        built.payload
-    );
-    assert_eq!(written_files(directory.path()), 0);
+async fn a_blank_voucher_number_is_refused_before_the_numbering_read() {
+    for (blank, code) in [
+        ("", "voucher_text_invalid"),
+        ("  ", "voucher_number_invalid"),
+    ] {
+        let plans = through_build_numbering(&["Journal"]);
+        let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = numbering_server(directory.path(), simulator.address().port());
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(1);
+        input.vouchers[0].voucher_number = Some(blank.into());
+        let Err(failure) = server
+            .build_import_xml(&serde_json::to_value(input).unwrap())
+            .await
+        else {
+            panic!("a blank number is refused: {blank:?}")
+        };
+        assert_eq!(failure.code, code, "{blank:?}");
+        assert_eq!(written_files(directory.path()), 0, "{blank:?}");
+    }
 }

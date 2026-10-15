@@ -922,3 +922,96 @@ fn an_admission_of_another_company_cannot_be_compared() {
         Err(ApprovedImportAdmissionError::MastersUnconfirmed)
     );
 }
+
+/// One synthetic invoice filed under the voucher type `filed`, with its own
+/// number, and one Journal that carries a number, as a caller sends them.
+fn invoice_and_journal(filed: &str) -> super::super::ImportPayload {
+    serde_json::from_value(json!({
+        "company_guid": GUID,
+        "vouchers": [
+            {
+                "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":"INV/1",
+                "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan","round_off_ledger":"Round Off"},
+                "entries":[
+                    {"ledger":"Party","amount":"105.00","side":"Dr"},
+                    {"ledger":"Sales 5%","amount":"100.00","side":"Cr"},
+                    {"ledger":"CGST 2.5%","amount":"2.50","side":"Cr"},
+                    {"ledger":"SGST 2.5%","amount":"2.50","side":"Cr"}
+                ]
+            },
+            {
+                "bridge_txn_id":"t2", "date":"20260801", "voucher_type":"Journal", "voucher_number":"J/1",
+                "entries":[
+                    {"ledger":"Rent","amount":"10.00","side":"Dr"},
+                    {"ledger":"Cash","amount":"10.00","side":"Cr"}
+                ]
+            }
+        ]
+    }))
+    .unwrap()
+}
+
+/// An invoice is filed under its caller-named type with its own number, so
+/// both admissions read that type's numbering as for a voucher that carries a
+/// number (Manual with duplicates prevented, the rule the invoice build's own
+/// type check holds), never the class "Sales". Every other voucher keeps its
+/// class, and a post sends it without a number.
+#[test]
+fn an_invoice_is_admitted_under_the_type_it_is_filed_in_with_its_number() {
+    let payload = invoice_and_journal("Tax Invoice");
+    let at_build: Vec<_> = payload
+        .vouchers
+        .iter()
+        .map(|v| v.numbering_at_build())
+        .collect();
+    let at_post: Vec<_> = payload
+        .vouchers
+        .iter()
+        .map(|v| v.numbering_at_post())
+        .collect();
+    assert_eq!(
+        at_build,
+        [
+            ("Tax Invoice", OwnNumber::Carried),
+            ("Journal", OwnNumber::Carried)
+        ]
+    );
+    assert_eq!(
+        at_post,
+        [
+            ("Tax Invoice", OwnNumber::Carried),
+            ("Journal", OwnNumber::Absent)
+        ]
+    );
+    let manual = |duplicates| observed(SeriesNumberingMethod::Manual, duplicates);
+    let read = |sales, filed| {
+        VoucherNumberingRead::for_test(
+            GUID,
+            7,
+            vec![
+                ("Sales".to_string(), sales),
+                ("Tax Invoice".to_string(), filed),
+                ("Journal".to_string(), manual(DuplicateSetting::Prevented)),
+            ],
+        )
+    };
+    for subjects in [&at_build, &at_post] {
+        // The class reads Manual allowing duplicates, the filed type Manual
+        // preventing them: admitted, as the filed type decides.
+        let admitted = read(
+            manual(DuplicateSetting::NotPrevented),
+            manual(DuplicateSetting::Prevented),
+        );
+        assert!(admit_vouchers(admitted, subjects[..1].iter().copied()).is_ok());
+        // The class reads Automatic retained, the filed type Manual allowing
+        // duplicates: refused, naming the filed type.
+        let refused_read = read(automatic(), manual(DuplicateSetting::NotPrevented));
+        assert_eq!(
+            refused(admit_vouchers(refused_read, subjects[..1].iter().copied()))
+                .into_iter()
+                .map(|(voucher_type, _)| voucher_type)
+                .collect::<Vec<_>>(),
+            ["Tax Invoice"]
+        );
+    }
+}

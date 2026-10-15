@@ -185,6 +185,28 @@ impl<D> ImportVoucher<D> {
         }
     }
 
+    /// The voucher type whose numbering admits this voucher at the build, and
+    /// whether it carries its own number (bridge#724): the type it is filed
+    /// under, so an invoice is read under its caller-named type with its own
+    /// number, never under the class "Sales".
+    fn numbering_at_build(&self) -> (&str, post::numbering::OwnNumber) {
+        (
+            self.filed_type_name(),
+            post::numbering::OwnNumber::of(self.voucher_number.as_deref()),
+        )
+    }
+
+    /// As `numbering_at_build`, for a native post. A post sends a voucher with
+    /// no number (one that carries a number is refused under the post's own
+    /// code), except an invoice, which is posted with its own number into a
+    /// type the build held to Manual with duplicates prevented.
+    fn numbering_at_post(&self) -> (&str, post::numbering::OwnNumber) {
+        match self.numbering_at_build() {
+            invoice if self.voucher_type.is_invoice() => invoice,
+            (filed, _) => (filed, post::numbering::OwnNumber::Absent),
+        }
+    }
+
     /// This voucher, holding `date` as its date.
     fn dated(self, date: TallyDate) -> ImportVoucher {
         let ImportVoucher {
@@ -1120,12 +1142,7 @@ impl Server {
             // reference §9.8), so there it is held to the same
             // reading as a voucher without one. A blank number counts as
             // none, and an amendment's vouchers are checked like any other.
-            let vouchers = payload.vouchers.iter().map(|voucher| {
-                (
-                    voucher.voucher_type.as_str(),
-                    post::numbering::OwnNumber::of(voucher.voucher_number.as_deref()),
-                )
-            });
+            let vouchers = payload.vouchers.iter().map(ImportVoucher::numbering_at_build);
             let master_mark = mark
                 .master_value
                 .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;

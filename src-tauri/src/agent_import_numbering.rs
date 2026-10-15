@@ -477,9 +477,9 @@ impl Server {
     }
 
     /// Before the approval: the company's master mark first, then the voucher
-    /// numbering under it, for every voucher of a native post. A post sends
-    /// no voucher number (one that carries a number is refused under the
-    /// post's own code), so every voucher is admitted as one without.
+    /// numbering under it, for every voucher of a native post, each under the
+    /// type it is filed in: without a number, except an invoice, which is
+    /// posted with its own (`ImportVoucher::numbering_at_post`).
     pub(super) async fn admit_numbering_for_post(
         &self,
         company: &bridge_tally_protocol::TallyCompany,
@@ -501,7 +501,7 @@ impl Server {
             payload
                 .vouchers
                 .iter()
-                .map(|voucher| (voucher.voucher_type.as_str(), OwnNumber::Absent)),
+                .map(|voucher| voucher.numbering_at_post()),
             accumulated,
         )
         .await

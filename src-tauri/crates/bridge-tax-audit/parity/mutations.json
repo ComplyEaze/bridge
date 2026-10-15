@@ -14102,5 +14102,181 @@
   "file": "src/high_value_register.rs",
   "from": "            row.names.note(v, [mode_set, other_money]);\n",
   "to": ""
+ },
+ {
+  "id": "H8-01",
+  "by": "author",
+  "what": "the shared tag is seven hex digits",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..7].to_string()\n"
+ },
+ {
+  "id": "H8-02",
+  "by": "author",
+  "what": "the shared tag is upper-case hex",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_uppercase()\n"
+ },
+ {
+  "id": "H8-03",
+  "by": "author",
+  "what": "the shared tag hashes the text lower-cased",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.to_lowercase().as_bytes()))[..8].to_string()\n"
+ },
+ {
+  "id": "H8-04",
+  "by": "author",
+  "what": "the shared tag hashes the text with a suffix",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest([text, \"x\"].concat().as_bytes()))[..8].to_string()\n"
+ },
+ {
+  "id": "C11-01",
+  "by": "author",
+  "what": "C11: a GUID of only whitespace is not blank",
+  "file": "src/book.rs",
+  "from": "        .filter(|(_, v)| crate::support::py_strip(&v.guid).is_empty())\n",
+  "to": "        .filter(|(_, v)| v.guid.is_empty())\n"
+ },
+ {
+  "id": "C11-02",
+  "by": "author",
+  "what": "C11: a voucher with no GUID is never refused",
+  "file": "src/book.rs",
+  "from": "    if let Some((name, first)) = blank.first() {\n",
+  "to": "    if let Some((name, first)) = blank.first().filter(|_| false) {\n"
+ },
+ {
+  "id": "C11-03",
+  "by": "author",
+  "what": "C11: the blank-GUID refusal counts only the first voucher",
+  "file": "src/book.rs",
+  "from": "                blank.len(),\n",
+  "to": "                1,\n"
+ },
+ {
+  "id": "C11-04",
+  "by": "author",
+  "what": "C11: the blank-GUID refusal names the last voucher, not the first",
+  "file": "src/book.rs",
+  "from": "    if let Some((name, first)) = blank.first() {\n",
+  "to": "    if let Some((name, first)) = blank.last() {\n"
+ },
+ {
+  "id": "C11-05",
+  "by": "author",
+  "what": "C11: a voucher with no GUID is refused only while it is in the books population",
+  "file": "src/book.rs",
+  "from": "        .filter(|(_, v)| crate::support::py_strip(&v.guid).is_empty())\n",
+  "to": "        .filter(|(_, v)| v.status == VoucherStatus::Regular && crate::support::py_strip(&v.guid).is_empty())\n"
+ },
+ {
+  "id": "C11-06",
+  "by": "author",
+  "what": "C11: the blank-GUID refusal carries another code",
+  "file": "src/book.rs",
+  "from": "            \"C11-blank-guid\",\n",
+  "to": "            \"C11-blank\",\n"
+ },
+ {
+  "id": "C11-07",
+  "by": "author",
+  "what": "C11: a repeated GUID is never refused",
+  "file": "src/book.rs",
+  "from": "        if let Some(earlier) = seen.get(&key) {\n",
+  "to": "        if let Some(earlier) = seen.get(&key).filter(|_| false) {\n"
+ },
+ {
+  "id": "C11-08",
+  "by": "author",
+  "what": "C11: GUIDs are compared with their surrounding whitespace",
+  "file": "src/book.rs",
+  "from": "        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));\n",
+  "to": "        let key = crate::support::py_lower(&v.guid);\n"
+ },
+ {
+  "id": "C11-09",
+  "by": "author",
+  "what": "C11: GUIDs are compared with their case",
+  "file": "src/book.rs",
+  "from": "        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));\n",
+  "to": "        let key = crate::support::py_strip(&v.guid).to_string();\n"
+ },
+ {
+  "id": "C11-10",
+  "by": "author",
+  "what": "C11: a GUID repeated in another part is not a repeat",
+  "file": "src/book.rs",
+  "from": "        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));\n",
+  "to": "        let key = format!(\"{name}\\0{}\", crate::support::py_lower(crate::support::py_strip(&v.guid)));\n"
+ },
+ {
+  "id": "C11-11",
+  "by": "author",
+  "what": "C11: a repeated GUID is refused only while both vouchers are in the books population",
+  "file": "src/book.rs",
+  "from": "    for (name, v) in all() {\n        let key",
+  "to": "    for (name, v) in all().filter(|(_, v)| v.status == VoucherStatus::Regular) {\n        let key"
+ },
+ {
+  "id": "C11-12",
+  "by": "author",
+  "what": "C11: the repeat refusal names the later part twice",
+  "file": "src/book.rs",
+  "from": "                    \"GUID {} is held by two vouchers, in {earlier} and {name}\",\n",
+  "to": "                    \"GUID {} is held by two vouchers, in {name} and {name}\",\n"
+ },
+ {
+  "id": "C11-13",
+  "by": "author",
+  "what": "C11: the repeat refusal gives the earlier voucher's part for the later one too",
+  "file": "src/book.rs",
+  "from": "                    \"GUID {} is held by two vouchers, in {earlier} and {name}\",\n",
+  "to": "                    \"GUID {} is held by two vouchers, in {earlier} and {earlier}\",\n"
+ },
+ {
+  "id": "C11-14",
+  "by": "author",
+  "what": "C11: the repeated-GUID refusal carries another code",
+  "file": "src/book.rs",
+  "from": "            \"C11-repeated-guid\",\n",
+  "to": "            \"C11-repeated\",\n"
+ },
+ {
+  "id": "C11-15",
+  "by": "author",
+  "what": "C11: a repeat is looked for before a voucher with no GUID",
+  "file": "src/book.rs",
+  "from": "    if let Some((name, first)) = blank.first() {\n",
+  "to": "    if let Some((name, first)) = blank.first().filter(|_| {\n        let mut keys = BTreeSet::new();\n        all().all(|(_, v)| keys.insert(crate::support::py_lower(crate::support::py_strip(&v.guid))))\n    }) {\n"
+ },
+ {
+  "id": "C11-16",
+  "by": "author",
+  "what": "C11: checked once per part, as each part is read, not over every part together",
+  "file": "src/book.rs",
+  "from": "        parts.push((vp.name.as_str(), parsed.vouchers));\n    }\n",
+  "to": "        parts.push((vp.name.as_str(), parsed.vouchers));\n        check_voucher_identity(&parts)?;\n    }\n"
+ },
+ {
+  "id": "C11-17",
+  "by": "author",
+  "what": "C11: checked after the company part's identity, not before",
+  "file": "src/book.rs",
+  "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
+  "to": "    {\n        let cp = required(read, \"company\")?;\n        let company = xml::read(&cp.content, &cp.id)?;\n        let guid = company\n            .descendants_named(\"COMPANY\")\n            .into_iter()\n            .map(|c| c.child_text(\"GUID\"))\n            .find(|g| !g.is_empty())\n            .unwrap_or(\"\");\n        if crate::support::py_lower(guid) != crate::support::py_lower(&read.company_guid) {\n            return Err(AuditError::refused(\"C5-identity\", \"company part GUID differs\"));\n        }\n    }\n    check_voucher_identity(&parts)?; // C11, over every part together\n"
+ },
+ {
+  "id": "C11-18",
+  "by": "author",
+  "what": "C11: never checked",
+  "file": "src/book.rs",
+  "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
+  "to": ""
  }
 ]

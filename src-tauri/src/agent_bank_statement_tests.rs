@@ -2323,6 +2323,8 @@ async fn a_bob_statement_parses_from_the_callers_balances_with_an_empty_password
 fn a_skipped_rows_ledger_is_listed_to_validate() {
     use bridge_bank_statement::parse::Row;
     use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    // Synthetic digits built from a visible pattern: n behind zeros to a width.
+    let padn = |n: u64, width: usize| format!("{n:0>width$}");
     let row = |party: &str, reference: &str, balance: &str| {
         let narration = format!("BY TRANSFER-UPI/CR/{reference}/{party}/XYZ");
         Row::from_pairs([
@@ -2337,8 +2339,8 @@ fn a_skipped_rows_ledger_is_listed_to_validate() {
         ])
     };
     let rows = vec![
-        row("SYNTHETIC PAYER", "000000000001", "1.00"),
-        row("OWN ACCOUNT", "000000000002", "2.00"),
+        row("SYNTHETIC PAYER", &padn(1, 12), "1.00"),
+        row("OWN ACCOUNT", &padn(2, 12), "2.00"),
     ];
     let mapping = Mapping::from_rows([
         MappingRow {
@@ -2363,7 +2365,7 @@ fn a_skipped_rows_ledger_is_listed_to_validate() {
             bank_ledger: "Synthetic Bank Ledger",
             suspense_ledger: "Suspense",
             account_label: "Synthetic SB xx1234",
-            account_number: "00000000001234",
+            account_number: &padn(1234, 14),
             date_from: None,
             date_to: None,
             cash_answers: CashAnswers::none(),
@@ -2371,7 +2373,7 @@ fn a_skipped_rows_ledger_is_listed_to_validate() {
     )
     .unwrap();
     let parsed = ParsedStatement {
-        account_number: "00000000001234".into(),
+        account_number: padn(1234, 14),
         statement_rows: rows.len(),
         closing: bridge_tally_core::ExactDecimal::parse("2.00").unwrap(),
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),

@@ -8,7 +8,6 @@ pub use bridge_tally_primitives::{
     MAX_EXACT_DECIMAL_BYTES,
 };
 
-pub mod bills_reconciliation;
 pub mod book_presence;
 pub mod master_binding;
 pub mod master_name_index;
@@ -231,11 +230,6 @@ pub struct CoreAccountingBatch {
     #[serde(skip)]
     pub foreign_master_text_diagnostics: Vec<ForeignMasterTextDiagnostic>,
 }
-
-/// Safe operator warning for a committed Core Accounting window that retains
-/// master text which may render badly in a document.
-pub const FOREIGN_MASTER_TEXT_RENDERING_WARNING_CODE: &str =
-    "foreign_master_text_rendering_degraded";
 
 impl CoreAccountingBatch {
     /// The diagnostic details intentionally remain in-process so source names

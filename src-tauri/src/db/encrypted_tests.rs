@@ -2,7 +2,7 @@ use super::{
     configure_encrypted_connection, connect_encrypted, encrypted_open_error,
     is_definitive_encrypted_open_error, is_definitive_encrypted_open_sqlite_code,
     is_forwardable_encrypted_open_sqlite_code, resolve_mirror_key, EncryptedOpenError,
-    MirrorKeyStore, MIRROR_KEY_BYTES,
+    MirrorKeyError, MirrorKeyStore, MIRROR_KEY_BYTES,
 };
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Connection, SqliteConnection};
@@ -15,18 +15,31 @@ use zeroize::Zeroizing;
 #[derive(Default)]
 struct FakeKeyStore {
     key: Mutex<Option<Vec<u8>>>,
+    load_fails: bool,
 }
 
 impl FakeKeyStore {
     fn with_key(key: Vec<u8>) -> Self {
         Self {
             key: Mutex::new(Some(key)),
+            load_fails: false,
+        }
+    }
+
+    /// A credential store that cannot be read (a denied prompt, a locked keychain).
+    fn unreadable() -> Self {
+        Self {
+            key: Mutex::new(None),
+            load_fails: true,
         }
     }
 }
 
 impl MirrorKeyStore for FakeKeyStore {
     fn load(&self) -> anyhow::Result<Option<Zeroizing<Vec<u8>>>> {
+        if self.load_fails {
+            anyhow::bail!("the credential store could not be read");
+        }
         Ok(self
             .key
             .lock()
@@ -108,18 +121,75 @@ fn missing_or_invalid_key_for_existing_mirror_fails_closed() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let database = directory.path().join("mirror.db");
     fs::write(&database, b"existing mirror marker").expect("create existing mirror");
-    let missing = match resolve_mirror_key(&database, &FakeKeyStore::default()) {
-        Ok(_) => panic!("missing key must not be replaced"),
-        Err(error) => error,
-    };
-    assert!(missing.to_string().contains("explicit local reset"));
+    let empty_store = FakeKeyStore::default();
+    assert!(matches!(
+        resolve_mirror_key(&database, &empty_store),
+        Err(MirrorKeyError::MissingForExistingMirror)
+    ));
+    assert!(
+        empty_store.load().expect("reload").is_none(),
+        "a missing key is never replaced"
+    );
 
     let invalid_store = FakeKeyStore::with_key(vec![7_u8; 16]);
-    let invalid = match resolve_mirror_key(&database, &invalid_store) {
-        Ok(_) => panic!("invalid key must not be replaced"),
-        Err(error) => error,
-    };
-    assert!(invalid.to_string().contains("explicit local reset"));
+    assert!(matches!(
+        resolve_mirror_key(&database, &invalid_store),
+        Err(MirrorKeyError::StoredKeyInvalid)
+    ));
+    assert_eq!(
+        invalid_store.load().expect("reload").expect("kept").len(),
+        16,
+        "an invalid key is never replaced"
+    );
+    // An invalid key is invalid with no database beside it, too.
+    let no_database = directory.path().join("absent.db");
+    assert!(matches!(
+        resolve_mirror_key(&no_database, &invalid_store),
+        Err(MirrorKeyError::StoredKeyInvalid)
+    ));
+}
+
+#[test]
+fn a_credential_store_that_cannot_be_read_is_not_a_missing_key() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let database = directory.path().join("mirror.db");
+    fs::write(&database, b"existing mirror marker").expect("create existing mirror");
+    assert!(matches!(
+        resolve_mirror_key(&database, &FakeKeyStore::unreadable()),
+        Err(MirrorKeyError::Store(_))
+    ));
+}
+
+/// A leftover write-ahead file beside no database and no key is not a mirror: a first-run user
+/// gets a key. (SQLite's own handling of that stale file is not measured here.)
+#[test]
+fn a_leftover_write_ahead_file_alone_does_not_stop_a_first_run() {
+    for suffix in ["-wal", "-shm"] {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let database = directory.path().join("mirror.db");
+        let mut leftover = database.as_os_str().to_os_string();
+        leftover.push(suffix);
+        fs::write(&leftover, b"leftover").expect("create leftover file");
+        let store = FakeKeyStore::default();
+        resolve_mirror_key(&database, &store).expect("a first run makes its key");
+        assert!(store.load().expect("reload").is_some(), "{suffix}");
+    }
+}
+
+/// A path whose existence cannot be read is not "no database": no key is made
+/// beside a database that may be there.
+#[cfg(unix)]
+#[test]
+fn a_database_path_that_cannot_be_checked_makes_no_key() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let blocker = directory.path().join("a-file");
+    fs::write(&blocker, b"not a directory").expect("create blocker");
+    let store = FakeKeyStore::default();
+    assert!(matches!(
+        resolve_mirror_key(&blocker.join("mirror.db"), &store),
+        Err(MirrorKeyError::DatabaseStateUnreadable)
+    ));
+    assert!(store.load().expect("reload").is_none());
 }
 
 #[tokio::test]

@@ -37,9 +37,9 @@ What Bridge does today:
 - **The desktop app's Tally mirror is encrypted.** It is SQLCipher with a random 32-byte key held
   in the OS credential store: service `com.complyeaze.bridge.tally-mirror`, account
   `database-key-v1:<sha256(path)>`. It runs an integrity check and sets `cipher_memory_security`
-  and `secure_delete` (`src-tauri/src/db/encrypted.rs:9-127,179-235`), and fails closed with
-  "an explicit local reset is required" when the database exists but its key is missing
-  (`:107-111`). The key store is constructed only in the desktop entry point
+  and `secure_delete` (`src-tauri/src/db/encrypted.rs`), and fails closed, with a typed error (`MirrorKeyError`),
+  when the database exists but its key is missing, or when the stored key is not a valid key;
+  no reset exists yet (#1563). The key store is constructed only in the desktop entry point
   (`src-tauri/src/lib.rs:64-70`, specifically `:68`).
 - **The MCP binary never touches the credential store today.** `OsMirrorKeyStore` is constructed
   only at `lib.rs:68` (the desktop app's `run`). `bridge_mcp`'s `main` runs `agent::run_stdio`
@@ -293,8 +293,8 @@ still bound the design above:
 - **New operational risks** (see Open items): credential-store access from `bridge_mcp` under
   Claude Desktop or another MCP host is untested; a binary update can change the code signature
   that gates a macOS keychain item; the key and the database can go missing independently, which
-  fails closed with "explicit local reset required", matching the existing mirror behavior
-  (`encrypted.rs:107-111`).
+  fails closed with a typed `MirrorKeyError`, matching the existing mirror behavior (no reset
+  exists yet, #1563).
 - **Option 3 (no persistence) stays open.** Once the Rust engine runs in-process, a mode that never
   writes a read can be added without changing this ADR's rules for reads that are written.
 - **Bank-statement proposals are left as they are.** They stay plaintext; this ADR does not change

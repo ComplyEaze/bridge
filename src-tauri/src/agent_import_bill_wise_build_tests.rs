@@ -16,7 +16,7 @@ const SALES: &str = "WR2 Sales";
 /// the identity and the paired catalogue read), when it refuses at the flags.
 const REFUSAL_REQUESTS: usize = 12;
 /// The requests of one whole Journal build.
-const BUILD_REQUESTS: usize = 32;
+const BUILD_REQUESTS: usize = QUALIFIED_BUILD_REQUESTS;
 
 fn server(directory: &std::path::Path, port: u16, max_bytes: usize) -> Server {
     Server::new(crate::agent::Settings {
@@ -520,7 +520,8 @@ async fn an_approval_with_a_digest_that_is_no_partys_is_refused() {
 #[tokio::test]
 async fn a_flag_that_changes_between_the_two_catalogue_reads_is_refused() {
     let yes = journal_plans(&[PARTY]);
-    // Bill-wise at the first read, not at the repeat (offset 18 onwards):
+    // Bill-wise at the first read, not at the repeat (offset 18 onwards, the
+    // numbering read included, which reads no ledger):
     // approved on one observation, then withdrawn.
     let mut changing = yes.clone();
     for (index, plan) in flagged(yes.clone(), &[]).into_iter().enumerate() {
@@ -528,8 +529,13 @@ async fn a_flag_that_changes_between_the_two_catalogue_reads_is_refused() {
             changing[index] = plan;
         }
     }
-    let (directory, simulator, server) =
-        sitting([yes[..REFUSAL_REQUESTS].to_vec(), changing[..24].to_vec()].concat());
+    let (directory, simulator, server) = sitting(
+        [
+            yes[..REFUSAL_REQUESTS].to_vec(),
+            changing[..24 + BUILD_NUMBERING_PLANS].to_vec(),
+        ]
+        .concat(),
+    );
     let refused = server.build_import_xml(&build_args(None)).await.unwrap();
     let digest = digest_of_first_party(&refused);
     let approvals = json!([{"ledger": PARTY, "party_digest": digest}]);
@@ -543,7 +549,10 @@ async fn a_flag_that_changes_between_the_two_catalogue_reads_is_refused() {
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
     // Through the catalogue repeat and no further: the pre-flight window is
     // never read.
-    assert_eq!(requests_made(simulator), REFUSAL_REQUESTS + 24);
+    assert_eq!(
+        requests_made(simulator),
+        REFUSAL_REQUESTS + 24 + BUILD_NUMBERING_PLANS
+    );
 }
 
 #[tokio::test]
@@ -561,7 +570,7 @@ async fn a_flag_that_changes_on_a_ledger_the_batch_does_not_name_changes_the_cat
             plans[index] = plan;
         }
     }
-    let simulator = SequenceSimulator::spawn(plans[..24].to_vec()).unwrap();
+    let simulator = SequenceSimulator::spawn(plans[..24 + BUILD_NUMBERING_PLANS].to_vec()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server(directory.path(), simulator.address().port(), 200_000);
     let failure = server

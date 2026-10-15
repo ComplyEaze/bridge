@@ -15,7 +15,8 @@ pub type Cells = BTreeMap<&'static str, Vec<Word>>;
 /// One statement row: a value per column, plus `<name>_spaced` for each text
 /// column. Both readings of a wrapped cell are kept on purpose: the de-wrapped
 /// form is the only one where a reference number is intact, the space-joined
-/// form the only one that never welds two words together.
+/// form the only one that never welds two words together. Name extraction (SBI and HDFC)
+/// reads the space-joined form, reference extraction the de-wrapped one.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Row(BTreeMap<String, String>);
 
@@ -47,6 +48,9 @@ impl Row {
 }
 
 /// y of the line that starts this page's transaction table, or `None`.
+///
+/// Anchors are tried in order, so a layout can put its strongest marker first: HDFC's
+/// page 1 carries the column header, later pages only the period line.
 fn table_top(page_lines: &[Line], bank: Bank) -> Option<f64> {
     bank.top_anchors().iter().find_map(|anchor| {
         page_lines
@@ -114,7 +118,20 @@ pub fn parse_pages(pages: &[Page], bank: Bank) -> Vec<Row> {
             }
             let cells = cells_of(line, bank);
             // A line that opens a transaction is a transaction whatever else it
-            // says: the date decides, and the footer anchor only breaks ties.
+            // says: the date decides, and the footer test only breaks ties. This guard
+            // covers the footer tests of the lines below (the bottom anchors and, for a
+            // layout that has one, its column footer): a footer that is a subset test
+            // would otherwise end the page at a transaction whose counterparty is the
+            // bank itself, dropping that row and every row after it on the page.
+            //
+            // What it does not cover, and why it is left: a wrapped continuation line has
+            // no date, so a continuation that carried all the footer words as separate
+            // tokens would still end the page; and the page-wide `end_anchors` scan above
+            // looks at every line, dated or not. These narrations join fields with
+            // hyphens, so a payee such as a bank's own name rarely tokenises into bare
+            // words, but a wrap can leave some of them bare. Geometry does not separate
+            // the two either: the real `STATEMENT SUMMARY` footer centres inside the
+            // narration column, exactly where a continuation sits.
             let started = bank.is_row_start(&cells);
             let words: Vec<&str> = line.words.iter().map(|word| word.text.as_str()).collect();
             if !started
@@ -387,7 +404,9 @@ static DIGIT_RUN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\d+").unwrap()
 ///
 /// Only the line the bank labels as the account number: a header block also
 /// prints a phone number, a customer id, an IFSC, a MICR code and a postcode,
-/// and on a real statement four different wrong tails matched those.
+/// and on a real statement four different wrong tails matched those. Narrowing was done
+/// twice, and the second step mattered: reading the whole document lets any transaction
+/// reference stand in for the account, and reading the whole header block is barely better.
 pub fn account_number_runs(pages: &[Page], bank: Bank) -> BTreeSet<String> {
     let mut runs = BTreeSet::new();
     if bank.account_anchors().is_empty() {
@@ -413,7 +432,7 @@ pub fn account_number_runs(pages: &[Page], bank: Bank) -> BTreeSet<String> {
     runs
 }
 
-/// The digits of the operator's free-form account label.
+/// The digits of the account label the operator typed, for matching only.
 pub fn account_digits(account_tail: &str) -> String {
     DIGIT_RUN
         .find_iter(account_tail)
@@ -426,11 +445,22 @@ pub fn account_digits(account_tail: &str) -> String {
 ///
 /// The running-balance proof validates the PDF's own arithmetic and nothing
 /// else, so it is equally happy to certify the wrong account's statement. This
-/// is the one check that ties the document to the ledger.
+/// is the one check that ties the document to the ledger. What it catches in practice:
+/// last month's file offered for this month, the other bank's file, a bank ledger named
+/// for the wrong account.
 ///
 /// Residual, stated rather than assumed: the label line can carry a second
 /// number (HDFC prints a product code beside it), so a tail that happens to end
-/// that number would also pass.
+/// that number would also pass. Four digits against one line is a far weaker coincidence
+/// than four digits against a page.
+///
+/// Where the number is printed with a clear tail, matching is on a trailing digit run,
+/// because banks mask the leading digits (`XXXXXX4230`) and may space the visible ones, and
+/// only against the line the statement labels as its account number (see
+/// [`account_number_runs`]); a layout that masks the middle is bound by
+/// `bob_account_match` instead. It runs before any proposal exists. The number returned
+/// is the statement's own, never the label the operator typed: a label can be respelled,
+/// an account number cannot, and the row labels in `proposals` are derived from it.
 pub fn require_account_match(
     pages: &[Page],
     bank: Bank,

@@ -46,6 +46,10 @@ pub const STATEMENT_PARTY_LABEL: &str = "Statement party:";
 /// a voucher posted to a mapped ledger. It cannot be built from a parser
 /// sentinel, a cash movement or a parser category such as bank charges (none
 /// is a counterparty the statement printed), nor from a name holding the segment delimiter `|` (it would end the segment early).
+///
+/// A party holding `|` is refused only when it would actually be written: this is checked
+/// before the narration is built, and a line sent to suspense (which names its party where
+/// the ledger would be) or skipped never writes the segment, so it carries a `|` harmlessly.
 struct StatementPayee<'a>(&'a str);
 
 impl<'a> StatementPayee<'a> {
@@ -347,6 +351,21 @@ pub fn format_amount(value: &ExactDecimal) -> String {
     two_places(value.as_str())
 }
 
+/// The label of one statement row, derived from the transaction and not from its position.
+///
+/// Keyed on the row ordinal, a second download of the same account would give two
+/// different transactions one label, and an overlapping export that shifts a
+/// transaction's ordinal would give it a new one; an amendment of an earlier batch, and a
+/// person's cash answer, are both named by this label, so it has to follow the
+/// transaction. So the label is a digest of what the bank itself printed on the line: the
+/// date, both amount columns, the running balance and the narration. The balance
+/// in particular makes two genuinely identical same-day payments distinguishable, because
+/// the second lands on a different balance.
+///
+/// Nothing the operator controls may enter it. The account identity is the number the
+/// statement prints, not the label typed for the account: `HDFC CA xx1234`, `HDFC xx1234`
+/// and `xx001234` all name one account but are three different strings, and any of them
+/// would give every row a new label on a corrected re-parse.
 fn transaction_id(account_number: &str, date: Date, row: &Row) -> String {
     let material = [
         account_number,
@@ -380,6 +399,12 @@ pub fn is_statement_txn_id(id: &str) -> bool {
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
+/// The check this crate makes early on a narration or a ledger name: within `limit`
+/// characters, no control character (C0, DEL or C1), and not the reserved `[BRIDGE:`
+/// marker in any ASCII case. Passing is necessary and not sufficient: Bridge's builder
+/// checks what it is handed after unescaping it, and also refuses text that would read
+/// back rewritten or draws nothing. The point of checking here is that a refusal can name
+/// the statement row.
 fn admissible_text(text: &str, limit: usize) -> bool {
     text.chars().count() <= limit
         && !text
@@ -512,6 +537,10 @@ pub fn build(
     for (index, row) in rows.iter().enumerate() {
         let number = index + 1;
         let raw_date = strip(row.get(DATE));
+        // A cell that matched the row-start shape but is not a real calendar date (a
+        // `31/02/26`) is a layout or extraction fault: it is refused with a typed
+        // category, never guessed at. Every row is read, including rows the window leaves
+        // out, so a shifted date column refuses the run wherever it falls.
         let Some(date) = bank.parse_date(raw_date) else {
             return Err(Refusal::at_row(
                 "unparseable_date",
@@ -665,6 +694,16 @@ pub fn build(
         let dont_know = cash_answer == Some(CashAnswer::DontKnow);
         // Deliberately the LOOSE fold: over-flagging costs a look. The message
         // names the ledger actually written, never the word "Suspense".
+        //
+        // Under-flagging would post an unidentified row and say nothing. This is not a
+        // claim that Tally treats the two names as one master: that direction is
+        // unverified (protocol reference section 9.4b), and `ledger_key` is looser than the
+        // measurement in several ways besides. Nothing here can know what Tally would
+        // match. Naming the real destination matters because the fold can over-flag (a
+        // mapping to `A-B` against a suspense ledger named `A B`): a message naming the
+        // wrong ledger would tell the person to reallocate from a ledger the voucher was
+        // never posted to, an instruction that cannot be followed, so a false positive
+        // costs a look instead of a wrong search.
         let unidentified = !dont_know && ledger_key(&ledger) == ledger_key(options.suspense_ledger);
         let suspense = dont_know || unidentified;
         let shown = if suspense { &party } else { &ledger };
@@ -674,6 +713,10 @@ pub fn build(
         } else {
             StatementPayee::new(&party, number)?
         };
+        // The bank's own reference leads the narration. Under automatic numbering Tally
+        // silently discards a supplied voucher number (protocol reference section 9.8), so
+        // the reference is put where it survives. A row can have none (the statement
+        // printed no reference), and the narration then carries the mode alone.
         let mut narration = squash(&format!(
             "{mode} {reference} {} {shown} | {} | {}",
             if outward { "to" } else { "from" },
@@ -776,6 +819,8 @@ pub fn build(
             ),
         ));
     }
+    // A window that is ordered but does not overlap the statement would otherwise yield an
+    // empty proposal set and be reported as a successful zero-voucher import.
     if records.is_empty() {
         return Err(Refusal::new(
             "empty_selection",
@@ -895,6 +940,13 @@ pub struct CounterpartyGroup {
 /// mapping key, so two wrap spellings of one payee are one line. No amount is
 /// kept: groups come in the order each first appears, and the parse summary
 /// sorts them.
+///
+/// One payee can reach the list under two spellings, because the wrap heuristic decides
+/// per line whether a space survives. Listing them as two invites writing two mapping
+/// rows and then wondering why the second never fires. Spellings that differ only in
+/// spacing are one counterparty; punctuation is significant (`A & B` and `AB` are two
+/// rows, and a variant left unmapped falls to suspense). The other spellings are named
+/// beside the one shown, so a person searching the statement for a variant still finds it.
 pub fn group_counterparties(
     records: &[StatementRecord],
 ) -> Result<Vec<CounterpartyGroup>, Refusal> {

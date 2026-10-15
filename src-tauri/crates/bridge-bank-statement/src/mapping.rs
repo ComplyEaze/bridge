@@ -133,7 +133,15 @@ impl Mapping {
 
     /// `party,ledger,treatment` CSV (`load_mapping`). Headers are matched
     /// case-insensitively after trimming, and a header that appears twice under
-    /// that rule is refused: one would silently overwrite the other.
+    /// that rule is refused: reading one of two columns of the same name picks one
+    /// of them silently, and a row whose party then reads blank is skipped, so its
+    /// transactions fall to suspense while the run reports success.
+    ///
+    /// All three headers are required: a mapping without `party` silently maps nothing
+    /// and one without `ledger` silently sends everything to suspense. Rows are read by
+    /// the position of the normalised header, so a header spelled `Party` cannot pass
+    /// validation and then read as empty on every row, which would discard the whole
+    /// mapping without a word.
     pub fn from_csv(reader: impl Read) -> Result<Self, Refusal> {
         let mut csv = csv::ReaderBuilder::new()
             .has_headers(false)

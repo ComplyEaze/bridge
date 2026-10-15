@@ -809,10 +809,15 @@ disagree.
   `## [X.Y.Z] - date` (a dash or en dash also works); a fence that is never
   closed, or another level-two heading, is reported as a warning in the run.
   In the same pull request, reread every answer on the Questions page (`site/faq.html`)
-  against the new release and move its check stamp (the release and the day, in the
-  hero and in the structured data). `scripts/site-pages.test.mjs` fails until the stamp
-  names the version in `packaging/mcpb/manifest.json`, so a version bump cannot merge
-  with answers nobody has reread.
+  and every tool row on the capabilities page (`site/capabilities.html`) against the new
+  release and move each page's check stamp (the release and the day; on the Questions page
+  also in the structured data), and every other mention of the release in the capabilities
+  page and in `site/llms.txt`. The tools the catalog serves that no published build installs
+  are listed in `scripts/site-pages.test.mjs` under the release the page is stamped for;
+  once that release publishes them they belong on the page. `scripts/site-pages.test.mjs`
+  fails until each stamp names the version in `packaging/mcpb/manifest.json` and the page
+  names the tools the catalog serves, so a version bump cannot merge with answers nobody
+  has reread.
 - The install page shows this file's headings, paragraphs and bullets, so a
   claim added here is a claim on the public site. Fenced code is left out, and
   tables and quotes show as plain text. Escape nothing by hand: the renderer

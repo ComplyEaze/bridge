@@ -1174,6 +1174,24 @@ const ROWS: &[Row] = &[
         parse: |_, text| masters(NativeMasterKind::StockGroups, text, SHAPE_GUID),
     },
     Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockItems)",
+        parse: |_, text| masters(NativeMasterKind::StockItems, text, SHAPE_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/masters_units_reads_lab_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_masters(Units)",

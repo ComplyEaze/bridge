@@ -18,8 +18,9 @@
 //! Children this parser does not model are skipped; an entry that holds
 //! recognised fields and skipped children is kept and says so in
 //! `other_content_skipped`. Nothing here chooses an entry or sums a rate. The
-//! opt-in `include_gst_details` of `ledger_masters` is the one reader of this
-//! observation.
+//! opt-in `include_gst_details` of `ledger_masters` reads this observation from a
+//! ledger; the `stock_items` kind of `masters` reads it from a stock item
+//! (`stock_tax_details`), which the same raw types and validator serve.
 use bridge_tally_primitives::TallyDate;
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +47,13 @@ pub struct GstDetailsEntry {
     pub taxability: Option<String>,
     /// `SRCOFGSTDETAILS`.
     pub source: Option<String>,
-    /// `GSTINELIGIBLEITC`, `Yes` or `No`.
+    /// `GSTINELIGIBLEITC`, `Yes` or `No`, as sent. The name is the one the
+    /// ledger output ships. The element's name says *in*eligible, and on one
+    /// stock item its Yes was seen where the screen read `Eligible for Input Tax
+    /// Credit: No` (PARTIAL), so the `masters` presentation of a stock item
+    /// writes it as `ineligible_itc`; `ledger_masters` is unchanged. Two keys
+    /// for one Tally element is deliberate until the ledger key is rectified
+    /// (tracked in #1741).
     pub itc_eligible: Option<bool>,
     pub states: Vec<GstStateDetails>,
     /// True when the element held content this parser does not model, at the
@@ -101,7 +108,8 @@ pub enum GstDetailsDefect {
     RateNotDecimal,
     /// A `GSTINELIGIBLEITC` other than `Yes` or `No`.
     ItcNotYesNo,
-    /// An entry whose only content is children this parser does not model.
+    /// An entry whose only content is children this parser does not model, or
+    /// text, a reference or CDATA directly in the list.
     UnrecognisedContent,
     /// Two rate rows with the same duty head in one state row, or two state
     /// rows with the same state name in one entry (compared verbatim).
@@ -176,22 +184,36 @@ impl GstDetailsObservation {
         for entry in raw.into_iter().filter(|entry| !entry.is_placeholder()) {
             entries.push(validate_entry(entry)?);
         }
-        // Document order is not assumed to be date order. Every kept entry has
-        // a date, so the key is total.
-        entries.sort_by(|a, b| a.applicable_from.cmp(&b.applicable_from));
-        let mut deduplicated: Vec<GstDetailsEntry> = Vec::with_capacity(entries.len());
-        for entry in entries {
-            match deduplicated.last() {
-                Some(last) if last.applicable_from == entry.applicable_from => {
-                    if *last != entry {
-                        return Err(GstDetailsDefect::ConflictingEntriesOnOneDate);
-                    }
-                }
-                _ => deduplicated.push(entry),
-            }
-        }
-        Ok(deduplicated)
+        sorted_without_repeats(entries, |entry| entry.applicable_from.as_str())
+            .map_err(|DatedEntriesConflict| GstDetailsDefect::ConflictingEntriesOnOneDate)
     }
+}
+
+/// Two entries on one date that differ: the dated list cannot be relied on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DatedEntriesConflict;
+
+/// Dated entries sorted by `date`, strictly increasing: document order is not
+/// assumed to be date order, an exact repeat on one date is kept once, and two
+/// entries on one date that differ are a conflict. Every kept entry has a date,
+/// so the key is total. Shared by the GST and HSN observations.
+pub(crate) fn sorted_without_repeats<E: PartialEq>(
+    mut entries: Vec<E>,
+    date: impl Fn(&E) -> &str,
+) -> Result<Vec<E>, DatedEntriesConflict> {
+    entries.sort_by(|a, b| date(a).cmp(date(b)));
+    let mut deduplicated: Vec<E> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        match deduplicated.last() {
+            Some(last) if date(last) == date(&entry) => {
+                if *last != entry {
+                    return Err(DatedEntriesConflict);
+                }
+            }
+            _ => deduplicated.push(entry),
+        }
+    }
+    Ok(deduplicated)
 }
 
 fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetailsDefect> {

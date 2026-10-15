@@ -47,6 +47,18 @@ fn capture(kind: &str) -> String {
         "stock_groups" => include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_groups_shape_lab_live.utf16le.xml"
         ),
+        // Twelve items, one with two dated HSN and two dated GST entries.
+        "stock_items" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_two_dates_live.utf16le.xml"
+        ),
+        // The first answer of the sitting: eleven items, GST content on one only.
+        "stock_items_baseline" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_baseline_live.utf16le.xml"
+        ),
+        // The item as first saved: Tally's own entries, no code and no rate.
+        "stock_items_created" => include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/masters_stock_items_shape_lab_item_created_live.utf16le.xml"
+        ),
         "cost_centres" => include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/masters_cost_centres_shape_lab_flag_no_live.utf16le.xml"
         ),
@@ -243,7 +255,14 @@ async fn an_unknown_or_missing_kind_is_refused_before_any_read() {
         assert_eq!(error(&response)["code"], code, "{response}");
         assert_eq!(response["structuredContent"]["evidence"]["bytes"], 0);
     };
-    for kind in ["ledgers", "Godowns", "stock_items", "", "voucher_type"] {
+    for kind in [
+        "ledgers",
+        "Godowns",
+        "stock_item",
+        "Stock_Items",
+        "",
+        "voucher_type",
+    ] {
         refused_with(
             one.call(json!({"company_guid":GUID,"kind":kind})).await,
             "argument_invalid:kind",
@@ -265,7 +284,7 @@ async fn an_unknown_or_missing_kind_is_refused_before_any_read() {
 }
 
 #[test]
-fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() {
+fn the_tool_definition_admits_only_the_eight_kinds_and_states_the_size_limits() {
     let definitions = tool_definitions(false, false);
     let tool = definitions
         .as_array()
@@ -281,6 +300,7 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
             "godowns",
             "units",
             "stock_groups",
+            "stock_items",
             "cost_centres",
             "cost_categories",
             "groups"
@@ -305,6 +325,60 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
             "{kind:?} {written}"
         );
     }
+    // Stock items are admitted at a lower mark, because their row is allowed for
+    // several dated entries: written without a thousands separator, and in the
+    // item limitation of the answer as well.
+    let items =
+        MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(NativeMasterKind::StockItems);
+    assert_eq!(items, 489);
+    assert!(description.contains(&format!("{items} for stock items")));
+    // The ITC element goes out under the name of its meaning, with what is and
+    // is not known; the old claim and the ledger's key are not used for items.
+    assert!(description.contains("`ineligible_itc` (Tally's `GSTINELIGIBLEITC` as sent"));
+    assert!(description.contains(
+        "which fits an ineligibility flag; PARTIAL, one book, two rows, screen against wire"
+    ));
+    assert!(description.contains("what an absent element means for the tax is not known"));
+    assert!(!description.contains("not the screen's setting"));
+    assert!(!description.contains("`itc_eligible` (true"));
+    // The kind's reach, its cut-off and what is unmeasured.
+    assert!(description.contains("refused past 16,344 UTF-16 units"));
+    assert!(description.contains(
+        "a limit of 489 refuses, by arithmetic, both client books measured, not tried on them"
+    ));
+    assert!(!description.contains("stock item count instead"));
+    assert!(description.contains("a zero-row stock-item answer are not measured"));
+    assert!(description.contains("such as text, a reference or CDATA directly in the list"));
+    assert!(description.contains("is masked like an item name"));
+    // The inheritance sentence says only what was measured, in the tool text and in the README.
+    let scoped = "the group's four other items still carried empty lists";
+    assert!(description.contains(scoped));
+    assert!(description.contains(
+        "not measured: a GST rate on a group or on the company, an HSN code on the company, and whether an item that defers to a coded group inherits its code"
+    ));
+    assert!(!description.contains("does not carry a code or rate set on its stock group"));
+    let readme = include_str!("../../docs/agent/README.md");
+    // CHANGELOG.md is not read here: a test that includes it would put it in the native CI scope.
+    let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains(scoped), "README");
+    assert!(
+        flat.contains(
+            "whether an item that defers to a coded group inherits its code, were not measured"
+        ),
+        "README"
+    );
+    assert!(
+        !flat.contains("did not appear on the items' lists"),
+        "README"
+    );
+    assert!(!description.contains("under every redaction setting"));
+    assert!(description.contains("`ineligible_itc_withheld` is `tally_default_entry`"));
+    assert!(description.contains("so recognise it by its source"));
+    assert!(description.contains(
+        "a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is"
+    ));
+    assert!(!description.contains("; On an entry"));
+    assert!(!description.contains("dated 1 April 2025, source"));
     assert!(description.contains("`voucher_types` and `groups` have no size check"));
     assert!(
         !description.contains("for voucher types"),
@@ -314,7 +388,7 @@ fn the_tool_definition_admits_only_the_seven_kinds_and_states_the_size_limits() 
     assert!(description.contains("Education mode is refused"));
     // What `mask_parties` masks, and why the rest is not masked.
     assert!(description.contains(
-        "godown, stock-group, cost-centre and cost-category names, their parents and a cost centre's category are masked"
+        "godown, stock-group, stock-item, cost-centre and cost-category names, their parents and a cost centre's category are masked"
     ));
     assert!(description.contains("configuration labels, not counterparties"));
     assert!(description.contains("masters_voucher_types_empty"));
@@ -1050,4 +1124,359 @@ async fn a_voucher_type_answer_with_no_rows_is_refused_with_its_cause() {
     assert_eq!(error(&refused)["cause"], "masters_voucher_types_empty");
     // Refused at once: no closing extent, identity or mode read.
     assert_eq!(one.requests(), 4 + 3 + 4 + 4);
+}
+
+// Stock items: their own dated HSN and GST lists.
+
+/// A mark inside the stock-item admission (489) and above every captured AlterID (294).
+const ITEM_MARK: u64 = 400;
+const ITEM: &str = "HSN Two Dates Test Item";
+
+fn item_plans(collection: String) -> Vec<ScenarioPlan> {
+    first_page_plans_at(collection, 14, ITEM_MARK)
+}
+
+fn item_row<'a>(page: &'a Value, name: &str) -> &'a Value {
+    page["masters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["name"] == name)
+        .unwrap_or_else(|| panic!("no row {name}"))
+}
+
+#[tokio::test]
+async fn stock_items_read_end_to_end_with_their_lists_exactly_as_sent() {
+    let one = OneServer::spawn(item_plans(capture("stock_items")));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["kind"], "stock_items");
+    assert_eq!(page["total"], 12);
+    let item = item_row(page, ITEM);
+    assert_eq!(item["parent"], "Raw Chemicals");
+    assert_eq!(item["master_id"], 282);
+    assert_eq!(item["alter_id"], 294);
+    assert_eq!(item["inherited_from_group_or_company"], "not_read");
+    assert_eq!(
+        item["hsn"],
+        json!({"observation": "entries", "entries": [
+            {"applicable_from": "20250401", "hsn_code": "28362010",
+             "description": "Disodium Carbonate, Dense",
+             "source": "Specify Details Here", "other_content_skipped": false},
+            {"applicable_from": "20250922", "hsn_code": "28362090",
+             "description": "Other",
+             "source": "Specify Details Here", "other_content_skipped": false},
+        ]})
+    );
+    let gst = item["gst"]["entries"].as_array().unwrap();
+    assert_eq!(item["gst"]["observation"], "entries");
+    assert_eq!(gst.len(), 2);
+    assert_eq!(gst[0]["applicable_from"], "20250401");
+    // Tally's `GSTINELIGIBLEITC`, as sent, under the name of its meaning: Yes on
+    // the first entry, absent (null, never false) on the second.
+    assert_eq!(gst[0]["ineligible_itc"], true);
+    assert_eq!(gst[1]["ineligible_itc"], Value::Null);
+    // Null is an emitted key, not a missing one.
+    assert!(gst[1].as_object().unwrap().contains_key("ineligible_itc"));
+    // Rows a person keyed or edited are not Tally's own entries: nothing is withheld.
+    assert!(gst
+        .iter()
+        .all(|entry| entry.get("ineligible_itc_withheld").is_none()));
+    // The ledger key is not on a stock item's entries.
+    assert!(gst.iter().all(|entry| entry.get("itc_eligible").is_none()));
+    let igst = |entry: &Value| entry["states"][0]["rates"][2].clone();
+    assert_eq!(
+        igst(&gst[0]),
+        json!({"duty_head": "IGST", "valuation_type": "Based on Value",
+               "rate": {"kind": "value", "raw": " 18", "decimal": "18"}})
+    );
+    assert_eq!(
+        igst(&gst[1])["rate"],
+        json!({"kind": "value", "raw": " 5", "decimal": "5"})
+    );
+    // The reserved character arrives as the marker, and a head without a rate is absent.
+    assert_eq!(gst[0]["states"][0]["state_name"], "\u{fffd}#4; Any");
+    assert_eq!(
+        gst[0]["states"][0]["rates"][3],
+        json!({"duty_head": "Cess", "valuation_type": "\u{fffd}#4; Not Applicable",
+               "rate": {"kind": "absent"}})
+    );
+    assert_eq!(
+        gst[0]["states"][0]["rates"][4]["rate"],
+        json!({"kind": "absent"})
+    );
+    assert_eq!(one.requests(), FIRST_PAGE_REQUESTS);
+}
+
+#[tokio::test]
+async fn an_item_without_entries_says_that_its_group_and_the_company_were_not_read() {
+    let one = OneServer::spawn(item_plans(capture("stock_items_baseline")));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["total"], 11);
+    let rows = page["masters"].as_array().unwrap();
+    let empty = rows
+        .iter()
+        .filter(|row| row["hsn"] == json!({"observation": "entries", "entries": []}))
+        .count();
+    assert_eq!(empty, 11, "the baseline book has no HSN entry on any item");
+    // Not one row can be read as "no HSN": every row names what was not read.
+    for row in rows {
+        assert_eq!(row["inherited_from_group_or_company"], "not_read", "{row}");
+    }
+    let limitations = page["limitations"].as_array().unwrap();
+    let mentions = |text: &str| {
+        limitations
+            .iter()
+            .any(|line| line.as_str().unwrap().contains(text))
+    };
+    assert!(mentions(
+        "is not a statement that the item has no HSN code or no GST rate"
+    ));
+    assert!(mentions(
+        "what its stock group or the company holds is not read here"
+    ));
+    assert!(mentions(
+        "the group's four other items still carried empty lists"
+    ));
+    assert!(mentions(
+        "Not measured: a GST rate on a group or on the company, an HSN code on the company, and whether an item that defers to a coded group inherits its code"
+    ));
+    // The earlier general sentences, which covered cases nobody measured, are gone.
+    assert!(!mentions("is not on the item's list"));
+    assert!(!mentions("its items' lists did not change"));
+    assert!(mentions("inherited_from_group_or_company: not_read"));
+    assert!(mentions("U+FFFD `#4;`"));
+    assert!(mentions(
+        "ineligible_itc is Tally's GSTINELIGIBLEITC as sent"
+    ));
+    assert!(mentions(
+        "fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire)"
+    ));
+    assert!(mentions(
+        "What an absent element means for the tax is not known"
+    ));
+    assert!(mentions(
+        "ineligible_itc is null and ineligible_itc_withheld is `tally_default_entry`"
+    ));
+    assert!(mentions("recognise it by its source, not by that date"));
+    assert!(mentions(
+        "a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is"
+    ));
+    assert!(mentions(
+        "under mask_parties it is masked like an item name"
+    ));
+    assert!(!mentions("returned as sent under every redaction setting"));
+    assert!(!mentions("not the screen's setting"));
+    assert!(mentions("a zero-row stock-item answer"));
+    assert!(mentions(
+        "so a limit of 489 refuses, by arithmetic, both client books measured"
+    ));
+    assert!(!mentions("stock item count"));
+    assert!(mentions("past 16,344 UTF-16 units"));
+    assert!(mentions("PARTIAL"));
+    assert!(mentions(
+        "Tally adds an HSN entry and a GST entry of its own"
+    ));
+    // The mark above which the kind is refused is stated, and is the constant's.
+    let mark =
+        MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(NativeMasterKind::StockItems);
+    assert!(mentions(&format!("master mark is at most {mark}")));
+}
+
+#[tokio::test]
+async fn the_entries_tally_adds_on_a_first_save_are_returned_as_they_are() {
+    let one = OneServer::spawn(item_plans(capture("stock_items_created")));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let item = item_row(result(&response), ITEM).clone();
+    assert_eq!(
+        item["hsn"]["entries"],
+        json!([{"applicable_from": "20250401", "hsn_code": null, "description": null,
+                "source": "As per Company/Stock Group", "other_content_skipped": false}])
+    );
+    let gst = &item["gst"]["entries"][0];
+    assert_eq!(gst["source"], "As per Company/Stock Group");
+    assert_eq!(gst["taxability"], Value::Null);
+    // The Yes Tally sent on its own entry was never compared with the screen:
+    // it is not passed on, and the entry says why.
+    assert_eq!(gst["ineligible_itc"], Value::Null);
+    assert_eq!(gst["ineligible_itc_withheld"], "tally_default_entry");
+    assert!(gst.get("itc_eligible").is_none());
+    assert!(gst["states"][0]["rates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|rate| rate["rate"] == json!({"kind": "absent"})));
+}
+
+#[tokio::test]
+async fn an_absent_flag_on_a_default_entry_stays_null_and_is_not_marked_as_withheld() {
+    // The same first-save capture with the credit element taken out of Tally's own entry:
+    // nothing was sent, so nothing is withheld.
+    let element = "<GSTINELIGIBLEITC TYPE=\"Logical\">Yes</GSTINELIGIBLEITC>\r\n      ";
+    let captured = capture("stock_items_created");
+    assert_eq!(captured.matches(element).count(), 1);
+    let one = OneServer::spawn(item_plans(captured.replace(element, "")));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let gst = &item_row(result(&response), ITEM)["gst"]["entries"][0];
+    assert_eq!(gst["source"], "As per Company/Stock Group");
+    assert!(gst.as_object().unwrap().contains_key("ineligible_itc"));
+    assert_eq!(gst["ineligible_itc"], Value::Null);
+    assert!(gst.get("ineligible_itc_withheld").is_none());
+}
+
+#[tokio::test]
+async fn no_other_kind_carries_the_stock_item_keys() {
+    let mut plans = first_page_plans(capture("stock_groups"), 14);
+    plans.extend(first_page_plans(capture("godowns"), 14));
+    plans.extend(first_page_plans(capture("units"), 14));
+    let one = OneServer::spawn(plans);
+    for kind in ["stock_groups", "godowns", "units"] {
+        let response = one.call(args(kind, 0, 500, None)).await;
+        let rows = result(&response)["masters"].as_array().unwrap().clone();
+        assert!(!rows.is_empty(), "{kind}");
+        for row in &rows {
+            for key in ["hsn", "gst", "inherited_from_group_or_company"] {
+                assert!(row.get(key).is_none(), "{kind} {key}");
+            }
+        }
+        if kind == "stock_groups" {
+            // A stock group's row is the five fields it always had.
+            let keys = rows[0]
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(
+                keys.into_iter().collect::<Vec<_>>(),
+                ["alter_id", "guid", "master_id", "name", "parent"]
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn item_names_parents_and_hsn_descriptions_are_masked_and_codes_and_rates_are_not() {
+    let one = OneServer::spawn_with(item_plans(capture("stock_items")), Redaction::MaskParties);
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let page = result(&response);
+    let text = response.to_string();
+    // Names and parents go out masked: the positive control that masking is on.
+    for plain in [ITEM, "Soda Ash Light", "Carton Box Small", "Raw Chemicals"] {
+        assert!(!text.contains(plain), "{plain}");
+    }
+    let masked = item_row(page, &mask(ITEM));
+    assert_eq!(masked["parent"], json!(mask("Raw Chemicals")));
+    // HSN codes, rates and the state row are not names and stay as sent.
+    for kept in ["28362010", "28362090", "\" 18\"", "\" 2.50\""] {
+        assert!(text.contains(kept), "{kept}");
+    }
+    assert_eq!(masked["hsn"]["entries"][0]["hsn_code"], "28362010");
+    // An HSN description is text a person can edit, so it is masked like a name.
+    assert!(!text.contains("Disodium Carbonate"));
+    assert_ne!(
+        mask("Disodium Carbonate, Dense"),
+        "Disodium Carbonate, Dense"
+    );
+    assert_eq!(
+        masked["hsn"]["entries"][0]["description"],
+        json!(mask("Disodium Carbonate, Dense"))
+    );
+    assert_eq!(
+        masked["hsn"]["entries"][1]["description"],
+        json!(mask("Other"))
+    );
+    assert!(page["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|line| line
+            .as_str()
+            .unwrap()
+            .contains("godown, stock-group, stock-item")));
+}
+
+#[tokio::test]
+async fn an_unreadable_list_is_marked_on_its_item_and_the_read_and_the_other_rows_stand() {
+    // The first HSN entry of the item undated: that item's HSN list is unreadable.
+    let captured = capture("stock_items");
+    let row = captured
+        .find(&format!("<STOCKITEM NAME=\"{ITEM}\""))
+        .unwrap();
+    let date = "<APPLICABLEFROM TYPE=\"Date\">20250401</APPLICABLEFROM>\r\n      <HSNCODE";
+    let at = row + captured[row..].find(date).unwrap();
+    let changed = format!(
+        "{}<HSNCODE{}",
+        &captured[..at],
+        &captured[at + date.len()..]
+    );
+    let one = OneServer::spawn(item_plans(changed));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let page = result(&response);
+    assert_eq!(page["total"], 12);
+    let item = item_row(page, ITEM);
+    assert_eq!(
+        item["hsn"],
+        json!({"observation": "unreadable", "defect": "entry_without_date"})
+    );
+    assert_eq!(item["gst"]["observation"], "entries");
+    assert_eq!(
+        item_row(page, "Soda Ash Light")["gst"]["observation"],
+        "entries"
+    );
+}
+
+#[tokio::test]
+async fn a_tally_error_inside_a_list_refuses_the_read_through_the_tool() {
+    let captured = capture("stock_items");
+    let at = captured.find("<GSTRATE ").unwrap();
+    let failed = format!(
+        "{}<LINEERROR>x</LINEERROR>{}",
+        &captured[..at],
+        &captured[at..]
+    );
+    let mut plans = through_opening_extent(14, ITEM_MARK);
+    pair(&mut plans, xml(failed));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args("stock_items", 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed");
+    assert_eq!(error(&refused)["cause"], "masters_tally_reported_failure");
+    assert!(refused["structuredContent"]["result"]["masters"].is_null());
+    assert_eq!(one.requests(), REFUSED_AT_ONCE);
+}
+
+#[tokio::test]
+async fn a_book_over_the_stock_item_mark_is_refused_with_the_mark_it_is_read_at() {
+    let largest = u64::try_from(
+        MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(NativeMasterKind::StockItems),
+    )
+    .unwrap();
+    assert_eq!(largest, 489);
+    let one = OneServer::spawn(through_opening_extent(14, largest + 1));
+    let refused = one.call(args("stock_items", 0, 500, None)).await;
+    let refusal = error(&refused);
+    assert_eq!(refusal["code"], "masters_too_large");
+    assert_eq!(refusal["size"]["master_alter_id"], largest + 1);
+    assert_eq!(refusal["size"]["limit_master_alter_id"], largest);
+    assert_eq!(one.requests(), 4 + 3 + 4);
+    // At the mark itself the kind is read.
+    let one = OneServer::spawn(first_page_plans_at(capture("stock_items"), 14, largest));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    assert_eq!(result(&response)["total"], 12);
+}
+
+#[tokio::test]
+async fn a_stock_item_collection_that_does_not_carry_its_type_is_refused_through_the_tool() {
+    let untyped = capture("stock_items").replacen(" MSTDEPTYPE=\"512\"", "", 1);
+    let mut plans = through_opening_extent(14, ITEM_MARK);
+    pair(&mut plans, xml(untyped));
+    let one = OneServer::spawn(plans);
+    let refused = one.call(args("stock_items", 0, 500, None)).await;
+    assert_eq!(error(&refused)["code"], "masters_read_failed");
+    assert_eq!(
+        error(&refused)["cause"],
+        "masters_collection_type_unexpected"
+    );
+    assert_eq!(one.requests(), REFUSED_AT_ONCE);
 }

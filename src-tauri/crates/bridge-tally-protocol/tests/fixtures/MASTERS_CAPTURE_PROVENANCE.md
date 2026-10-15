@@ -1,6 +1,6 @@
 # `masters_*` — provenance
 
-Voucher types, godowns, units, stock groups, cost centres and cost categories, each read as one native collection with the company GUID computed onto every row. These are the fixtures for the `masters` read (#724 step 1 for voucher types). Every file is a live capture, never hand-written.
+Voucher types, godowns, units, stock groups, stock items, cost centres and cost categories, each read as one native collection with the company GUID computed onto every row. These are the fixtures for the `masters` read (#724 step 1 for voucher types). Every file is a live capture, never hand-written.
 
 ## Provenance
 
@@ -59,3 +59,22 @@ A third synthetic book, the parity lab, whose Cost Centres setting read Yes (the
 | --- | --- | --- | --- |
 | `masters_cost_centres_parity_flag_yes_live.utf16le.xml` | 6848 | `2a8fe692c63da913919ec5e8440a2da5571b2f7d5a371cb13d1288b6a0ca9186` | CostCentre, 3 rows: two at the top level, one under another centre, default category |
 | `masters_cost_categories_parity_flag_yes_live.utf16le.xml` | 4458 | `a07fd9d365134a5023e17b5aa5e7f3c762a27d9dd807ae12ff433edaf2863376` | CostCategory, 1 row, the predefined Primary Cost Category (Yes, Yes, No) |
+
+### Stock items with their dated HSN and GST lists (captured 2026-10-14, 21:14 to 21:29 UTC)
+
+Licensed TallyPrime **Silver**, 7.1, on Windows (`http://127.0.0.1:9001`, a lab instance), the synthetic book `BRIDGE SHAPE LAB`, loaded alone, one request at a time. The sender was a lab capture script, not `bridge_mcp`: it sent the exact request bytes tabled below, as read-only Export requests. The request is the production renderer's own output, asserted equal by `every_request_is_byte_equal_to_its_committed_fixture`. The responses are **BOM-less UTF-16LE**, exactly as received; the request is UTF-16LE with a BOM. The `COLLECTION` of every answer carries `ISMSTDEPTYPE="Yes"` and `MSTDEPTYPE="512"`.
+
+The three answers are the same request sent at three points of one sitting: before anything was created (the baseline), after one stock item was created in Tally's own screen (Under `Raw Chemicals`, unit Kgs), and after that item had two dated HSN entries and two dated GST entries keyed. The sitting ended by restoring the book from a backup taken before the item was created; after the restore the baseline answer came back byte for byte. Counts below were taken by parsing the XML, not by searching the text.
+
+- **Baseline:** 11 items; every item carries an empty placeholder (a whitespace-only element) of both lists, except `Soda Ash Light`, which carries one GST entry (`Taxable`, IGST 18 with CGST and SGST/UTGST 9, source `Specify Details Here`) and an empty HSN placeholder. The largest row is 1,936 UTF-16 units.
+- **Item created:** 12 items. On its first save Tally added an HSN entry and a GST entry of its own to the new item, both dated 1 April 2025, source `As per Company/Stock Group`, with no code and no rate (the GST entry has no `TAXABILITY`, carries `GSTINELIGIBLEITC` Yes, and no `GSTRATE` on any of its five heads). The row is 2,238 units.
+- **Two dates:** 12 items. The item carries two HSN entries (`28362010`, description `Disodium Carbonate, Dense`, from 20250401; `28362090`, `Other`, from 20250922) and two GST entries (Taxable, IGST 18 from 20250401 with `GSTINELIGIBLEITC` Yes; Taxable, IGST 5 from 20250922 with no such element). Rates arrive as text with a leading space (` 9`, ` 18`, ` 2.50`), the state and the Cess valuation type carry the reserved character `&#4;`, and the State Cess head has no `GSTRATE`. Inside a row the lists come as every `GSTDETAILS.LIST`, then every `HSNDETAILS.LIST`, then `LANGUAGENAME.LIST`. The row is 4,373 UTF-16 units, line ends kept; it is the largest captured.
+- **Input-tax-credit element:** the screen's `Eligible for Input Tax Credit` read No on the first GST row and Yes on the second; those readings are not in any fixture, only in `lab/hsn-masters-answers/NOTES.md` ("Other observations") and `lab/hsn-masters-answers/check-lines.txt` (steps 9 and 10), commit `46dc0a98246ac399e294cadb7c4b43fe64e1506d` of this repository.
+- **Not shown by these files:** a GST state row other than `Any`, slab rates, a code keyed on a stock group reaching an item that defers to it (`lab/seeding-answers/answers/ans-s06b.xml` and `ans-s05c.xml`, commit `8a0c9e55ce249c93c6b35add00e5aa220c7676c6` of this repository, not stored here, showed the group's four other items still carried empty lists; no item deferring to a coded group was observed), another release, a larger book, a zero-row stock-item answer.
+
+| file | bytes | sha256 | kind | rows |
+|---|---|---|---|---|
+| `masters_stock_items_request.utf16le.xml` | 1192 | `c90cfcc238cf308b58fc160e6ecd78affa691729a3dbc2ff963f4d777e82d075` | request, stock items | n/a |
+| `masters_stock_items_shape_lab_baseline_live.utf16le.xml` | 19450 | `7038532ed86f7b924fe537d42b241eab93576d471787627e42f96837833c8a92` | stock items, baseline | 11 |
+| `masters_stock_items_shape_lab_item_created_live.utf16le.xml` | 23938 | `bdfffd330d47fcc2acc97eb40ded1ff262f86bd385c831a5b7b1b107bbcedd74` | stock items, item as first saved | 12 |
+| `masters_stock_items_shape_lab_two_dates_live.utf16le.xml` | 28208 | `6a4fd0b871763bad43db92cc98cbf0e0c48fcda441b84fbe20664d753df5d653` | stock items, two dated entries per list | 12 |

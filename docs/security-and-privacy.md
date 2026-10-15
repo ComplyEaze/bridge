@@ -9,7 +9,8 @@ pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
 `ledger_movement` read took, in section 2 (#1366), where a program built
 from this repository loads the PDF library from, in section 5 (#1422), the
-statement party written into a bank voucher's narration, in section 2 (#1430), and the
+statement party written into a bank voucher's narration, in section 2 (#1430), the
+file of skipped bank-statement rows, in section 4 (#1625), and the
 location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
@@ -66,9 +67,10 @@ and a request failed with a 400 error; the published file, switched on, was not
 started either ("Unable to connect to extension server"). Neither error mentioned
 the Terms (section 4). From 0.5.1 the setting is not marked required, so Claude
 Desktop starts the extension and every tool answers `terms_not_accepted`, naming
-the setting (bridge#1413). That was seen on one Mac with a test package; it has
-not yet been checked on Windows. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to `true`
-or `1` is not asked.
+the setting (bridge#1413). The tools the assistant called gave that answer on one
+Mac with a test package and on one Windows computer with the build our checks
+made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
+`true` or `1` is not asked.
 
 ## 2. Does anything leave my computer?
 
@@ -94,7 +96,8 @@ or `1` is not asked.
   and bank account numbers to their first two and last two characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
-  MSME or Udyam registration numbers, contact details or references, and a
+  MSME or Udyam registration numbers, contact details or references, or the last
+  four digits of a bank statement's account number (`account_last4`), and a
   shortened name can still be identified, not least from the GSTIN or PAN sent
   beside it. The default is `none`: nothing is masked unless you choose it.
   - `mask_parties` shortens, to their first two and last two characters, the
@@ -113,8 +116,9 @@ or `1` is not asked.
     groups in a group total (shown as the book has them), a ledger's parent
     group, the names of voucher types, units and account groups, narrations,
     references, GSTINs, PAN numbers, email addresses, phone numbers, postal
-    addresses or IFSCs, and a name written inside a narration or reference stays
-    as it is.
+    addresses or IFSCs, or the last four digits of a bank statement's account
+    number (`account_last4`), and a name written inside a narration or reference
+    stays as it is.
   - `drop_narration` removes narrations, and a search of vouchers by a phrase of
     their narration is refused under it. Apart from the error text noted below,
     it removes nothing else.
@@ -127,6 +131,14 @@ or `1` is not asked.
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
+  - A bank-statement check over whole calendar months (`statement_tie_out`, in
+    source and not yet in a published build) can show, with the book's figures,
+    the statement's balance at the month ends and its net over those months,
+    under every setting: never a part of a month except the part-months at the
+    statement's own start and end (whose net a month-end balance gives together
+    with the opening and closing supplied to the parse), but a month in which
+    every other row's amount is already known (a single row, or one row beside open
+    cash lines, whose amounts the parse returns) gives that row's amount.
   - **What the new reads in 0.5.0 send, under each setting.** Under `none`
     everything below is sent as read.
     - Cash Flow sends month names, each month's amounts and the net total, and
@@ -168,6 +180,10 @@ or `1` is not asked.
   - Either setting also leaves out the text of an error Tally returned for a
     line. Any other value stops the extension from starting.
   - **What the reads added since 0.5.0 send, under each setting.**
+    - The read-cost preview (`voucher_read_cost`) sends the company name,
+      its identifier, company number and books-from date, the company's voucher
+      mark, and counts and seconds derived from it, with constant text. It holds
+      no amounts and no narrations, and `mask_parties` has nothing to shorten in it.
     - The company settings read (`company_features`) sends the company name,
       its identifier, company number and books-from date, the cost-centre, GST
       and batch-wise settings as yes, no or not reported, and the currency
@@ -177,8 +193,9 @@ or `1` is not asked.
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and
       change number, and the voucher's GSTR-1 status (included, uncertain,
-      excluded or not in the return) and whether it was accepted as it
-      stands. It holds no amounts, no party or ledger names and no
+      excluded or not in the return, or that it is cancelled, optional or
+      post-dated and what its status flags read) and whether it was accepted
+      as it stands. It holds no amounts, no party or ledger names and no
       narrations, and `mask_parties` has nothing to shorten in it.
 - **To ComplyEaze: nothing we found in the published extension's code.** We
   found no analytics, telemetry, crash reporting or automatic update check in
@@ -323,9 +340,25 @@ go, and what an uninstall or reset really removes.
   being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
+- **Skipped statement rows** (`agent-import-statement-skips.jsonl`): written
+  when you build a statement in which every row is mapped `skip` (recorded
+  from the other bank account's statement), so that there is no voucher batch
+  to save. Each record holds an identifier of its own, the company's
+  identifier (GUID), the Tally address, the time, the bank ledger's GUID and,
+  when the statement covers any day in full, those dates; and for each skipped
+  row an identifier (the row's date and a short fingerprint of the row), its
+  date, amount, direction, the other ledger's GUID, the UPI, IMPS, NEFT or
+  RTGS reference if the row has one, the cheque or instrument number as the
+  statement prints it, and a mark when an equal amount goes the other way on
+  the same day. It has no field for a narration or a ledger name. A statement
+  that also has rows to post keeps the same facts for its skipped rows, and
+  the reference and instrument of each of its Contra rows, in its record in
+  the import journal: unlike the ledger records described above, these hold
+  the dates and amounts of rows that are not posted.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
-  kept in ComplyEaze Bridge's per-user folder) that keeps two copies of the
-  program from sending to Tally at the same time, and a small record written
+  kept in ComplyEaze Bridge's per-user folder and, on Windows, also in
+  `.complyeaze-bridge\coordination` under your user profile) that keeps two
+  copies of the program from sending to Tally at the same time, and a small record written
   when you record a review of a posted voucher, including your
   operating-system account name.
 
@@ -349,7 +382,11 @@ any batch in them has been posted or is waiting to be verified: they are the
 record ComplyEaze Bridge uses to reconcile a post, and without them
 `verify_import` cannot find the batch. The journal is also how it remembers
 which batches and which bank-statement rows it has already sent to Tally, so
-that it can refuse to send one twice. Once 0.5.0 has built a batch in this
+that it can refuse to send one twice. Do not delete
+`agent-import-statement-skips.jsonl` either: a missing file reads as no
+skipped rows, so those rows are no longer shown in the `transfers` section,
+and a later build that posts one of them as its own voucher is no longer
+refused for that reason: a transfer may then be booked twice. Once 0.5.0 has built a batch in this
 folder, do not run 0.4.2 or earlier over it: they refuse to post that batch. The
 [Privacy Policy](./legal/privacy.md) (section 7) describes archiving the whole
 folder instead of deleting it, and what ComplyEaze Bridge no longer remembers
@@ -418,9 +455,17 @@ begin (for example when the batch is not found or the journal is busy); a
 refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
-characters it cannot show safely, or do not fit, it refuses. A window for a
+characters it cannot show safely, or do not fit, it refuses. In the next build,
+a narration too long for one line is shown instead in numbered parts, each
+quoted and split only at a space, under a line that counts them; one that
+cannot be split so, and a reference too long for one line, are still refused.
+The review window for a posted voucher shows its narration last, under the
+same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
-and up to 40 characters of its narration, with no reference) and marks the
+and up to 40 characters of its narration, with no reference; from the next
+build a Journal's line names its first debit and first credit ledger and up to
+20 characters of its narration, fewer (never under 10) when that makes the line
+fit, and the line above says a narration may be cut) and marks the
 approved ledgers On Account on its totals lines. A batch of more than ten
 vouchers, or whose lines cannot be shown safely or do not fit, shows its totals
 only, with a line saying why, and still asks for your approval, unless a ledger

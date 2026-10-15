@@ -8056,22 +8056,6 @@
   "to": "crate::high_value_register_on(e, b, r, &match &c.bank_statement {\n                crate::documents::BankStatementLoad::Refused(_) => crate::documents::BankStatementLoad::NotSupplied,\n                other => other.clone(),\n            }, c.traces.ais_rows())"
  },
  {
-  "id": "CP-01",
-  "by": "author",
-  "what": "a pooled s.269ST row shows no printed names",
-  "file": "src/cash_payments_40a3.rs",
-  "from": "    row.add(total, v)?;\n    row.names.note(v, [cash, bank]);",
-  "to": "    row.add(total, v)?;"
- },
- {
-  "id": "CP-02",
-  "by": "author",
-  "what": "a pooled s.269ST row treats a bank ledger name as usable",
-  "file": "src/cash_payments_40a3.rs",
-  "from": "    row.names.note(v, [cash, bank]);\n    Ok(())",
-  "to": "    row.names.note(v, [cash, cash]);\n    Ok(())"
- },
- {
   "id": "CP-03",
   "by": "author",
   "what": "an s.40A(3) row shows no printed names",
@@ -13766,5 +13750,533 @@
   "file": "src/high_value_register.rs",
   "from": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"no bank statement supplied for this engagement\".to_string(),\n        )?,",
   "to": "BankStatementLoad::NotSupplied => s194n_coverage_unavailable(\n            &mut r,\n            \"the bank statement supplied was refused (it has no reason)\".to_string(),\n        )?,"
+ },
+ {
+  "id": "CS-1",
+  "by": "author",
+  "what": "book.rs: an unknown integration flag read as integrated for closing stock",
+  "file": "src/book.rs",
+  "from": "    if is_integrated != Some(true) {\n        return ClosingStock::NotApplicable;",
+  "to": "    if is_integrated == Some(false) {\n        return ClosingStock::NotApplicable;"
+ },
+ {
+  "id": "CS-2",
+  "by": "author",
+  "what": "book.rs: integrated inventory with no Stock Summary part read as closing stock not applicable",
+  "file": "src/book.rs",
+  "from": "        return ClosingStock::Unknown(ClosingStockUnknown::NotRead);",
+  "to": "        return ClosingStock::NotApplicable;"
+ },
+ {
+  "id": "CS-3",
+  "by": "author",
+  "what": "book.rs: a read with no trial-balance window read as closing stock not applicable",
+  "file": "src/book.rs",
+  "from": "    let Some(to) = tb_to else {\n        return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd);",
+  "to": "    let Some(to) = tb_to else {\n        return ClosingStock::NotApplicable;"
+ },
+ {
+  "id": "CS-4",
+  "by": "author",
+  "what": "book.rs: the Stock Summary taken is the one not dated the trial balance's last day",
+  "file": "src/book.rs",
+  "from": "p.as_of.as_ref() == Some(to)",
+  "to": "p.as_of.as_ref() != Some(to)"
+ },
+ {
+  "id": "CS-5",
+  "by": "author",
+  "what": "book.rs: two Stock Summaries dated the last day read as the first of them",
+  "file": "src/book.rs",
+  "from": "        (Some(part), None) => part,",
+  "to": "        (Some(part), _) => part,"
+ },
+ {
+  "id": "CS-6",
+  "by": "author",
+  "what": "book.rs: an unreadable Stock Summary read as a closing stock of zero",
+  "file": "src/book.rs",
+  "from": "\n        Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),\n    }\n}",
+  "to": "\n        Err(_) => ClosingStock::Valued(0),\n    }\n}"
+ },
+ {
+  "id": "CS-7",
+  "by": "author",
+  "what": "book.rs: closing stock counts only the Summary's positive values",
+  "file": "src/book.rs",
+  "from": "Ok(snapshot) => match snapshot.total_value_paise() {",
+  "to": "Ok(snapshot) => match snapshot.positive_value_paise() {"
+ },
+ {
+  "id": "CS-8",
+  "by": "author",
+  "what": "book.rs: the Summary is looked for on the trial balance's first day, not its last",
+  "file": "src/book.rs",
+  "from": "closing_stock(is_integrated, &summaries, tp.window.as_ref().map(|w| &w.to))",
+  "to": "closing_stock(is_integrated, &summaries, tp.window.as_ref().map(|w| &w.from))"
+ },
+ {
+  "id": "STB-1",
+  "by": "author",
+  "what": "financial_statements.rs: a book with no opening stock term is read as integrated with an opening stock of zero",
+  "file": "src/financial_statements.rs",
+  "from": "        OpeningStock::NotApplicable => return StockBasis::Ledgers,",
+  "to": "        OpeningStock::NotApplicable => Ok(0),"
+ },
+ {
+  "id": "STB-2",
+  "by": "author",
+  "what": "financial_statements.rs: a book with no closing stock term is read as having a closing stock of zero",
+  "file": "src/financial_statements.rs",
+  "from": "        ClosingStock::NotApplicable => Err(StockUnknown::Closing(ClosingStockUnknown::NotRead)),",
+  "to": "        ClosingStock::NotApplicable => Ok(0),"
+ },
+ {
+  "id": "STB-3",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger beside the stock items does not stop the items being used",
+  "file": "src/financial_statements.rs",
+  "from": "        (Ok(opening), Ok(closing)) if !ledger_has_value => StockBasis::Items { opening, closing },",
+  "to": "        (Ok(opening), Ok(closing)) => StockBasis::Items { opening, closing },"
+ },
+ {
+  "id": "STB-4",
+  "by": "author",
+  "what": "financial_statements.rs: an unknown term always adds the ledger-beside-items reason",
+  "file": "src/financial_statements.rs",
+  "from": "            if why.is_empty() {\n                why.push(StockUnknown::LedgerAlso);",
+  "to": "            if true {\n                why.push(StockUnknown::LedgerAlso);"
+ },
+ {
+  "id": "STB-5",
+  "by": "author",
+  "what": "financial_statements.rs: an unknown opening stock is shown as a figure of zero",
+  "file": "src/financial_statements.rs",
+  "from": "                opening: opening.ok(),\n",
+  "to": "                opening: Some(opening.unwrap_or(0)),\n"
+ },
+ {
+  "id": "STB-6",
+  "by": "author",
+  "what": "financial_statements.rs: an unknown stock term is taken as zero in the gross profit",
+  "file": "src/financial_statements.rs",
+  "from": "        StockBasis::Unknown { .. } => None,\n    };\n    let (opening_stock, closing_stock) = match &stock_basis {",
+  "to": "        StockBasis::Unknown {\n            opening, closing, ..\n        } => Some((opening.unwrap_or(0), closing.unwrap_or(0))),\n    };\n    let (opening_stock, closing_stock) = match &stock_basis {"
+ },
+ {
+  "id": "STB-7",
+  "by": "author",
+  "what": "financial_statements.rs: the item basis swaps the opening and closing stock",
+  "file": "src/financial_statements.rs",
+  "from": "        StockBasis::Items { opening, closing } => Some((*opening, *closing)),",
+  "to": "        StockBasis::Items { opening, closing } => Some((*closing, *opening)),"
+ },
+ {
+  "id": "STB-8",
+  "by": "author",
+  "what": "financial_statements.rs: the closing stock shown is the Stock-in-Hand ledgers' sum on every basis",
+  "file": "src/financial_statements.rs",
+  "from": "        _ => (stock_terms.map(|t| t.0), stock_terms.map(|t| t.1)),",
+  "to": "        _ => (stock_terms.map(|t| t.0), Some(closing_stock)),"
+ },
+ {
+  "id": "STB-9",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger that carries nothing counts as carrying a value",
+  "file": "src/financial_statements.rs",
+  "from": "r.opening_paise != 0 || r.recomputed_closing_paise != 0",
+  "to": "r.opening_paise == 0 || r.recomputed_closing_paise != 0"
+ },
+ {
+  "id": "STB-10",
+  "by": "author",
+  "what": "financial_statements.rs: profit before partners' interest is computed on a net profit that is not known",
+  "file": "src/financial_statements.rs",
+  "from": "            (Some(pi), net_profit.map(|np| add(np, pi)).transpose()?)",
+  "to": "            (Some(pi), Some(add(net_profit.unwrap_or(0), pi)?))"
+ },
+ {
+  "id": "STB-11",
+  "by": "author",
+  "what": "financial_statements.rs: the ledger wording and figures are used on the item basis",
+  "file": "src/financial_statements.rs",
+  "from": "    let on_items = !matches!(d.stock_basis, StockBasis::Ledgers);",
+  "to": "    let on_items = false;"
+ },
+ {
+  "id": "STB-12",
+  "by": "author",
+  "what": "financial_statements.rs: the stock to turnover ratio is shown on a closing stock that is not known",
+  "file": "src/financial_statements.rs",
+  "from": "    if let Some(cs) = d.closing_stock {\n        r.fig(\n            \"stock_to_turnover_pct_bp\",",
+  "to": "    if let Some(cs) = d.closing_stock.or(Some(0)) {\n        r.fig(\n            \"stock_to_turnover_pct_bp\","
+ },
+ {
+  "id": "STB-13",
+  "by": "author",
+  "what": "financial_statements.rs: a closing stock tie is claimed when the report carries no closing stock",
+  "file": "src/financial_statements.rs",
+  "from": "(Some(rep), None) if rep.closing_stock_paise.is_some() && d.closing_stock.is_some() => {",
+  "to": "(Some(rep), None) if rep.closing_stock_paise.is_some() || d.closing_stock.is_some() => {"
+ },
+ {
+  "id": "STB-14",
+  "by": "author",
+  "what": "financial_statements.rs: the finding for an unknown stock reads as a computed tie",
+  "file": "src/financial_statements.rs",
+  "from": "            confidence: Confidence::NeedsDocument,\n            limits,\n            ask_client: why.iter()",
+  "to": "            confidence: Confidence::Computed,\n            limits,\n            ask_client: why.iter()"
+ },
+ {
+  "id": "STB-15",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 swaps the item opening and closing stock",
+  "file": "src/financial_statements.rs",
+  "from": "StockBasis::Items { opening, closing } => (Some(closing), Some(profit(opening, closing)?)),",
+  "to": "StockBasis::Items { opening, closing } => (Some(closing), Some(profit(closing, opening)?)),"
+ },
+ {
+  "id": "STB-16",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 lets a net profit stand for a book whose stock is not known",
+  "file": "src/financial_statements.rs",
+  "from": "        (Some(derived), None) => out.push(format!(\n            \"FS-2: net_profit (",
+  "to": "        (Some(_), None) => {}\n        (Some(derived), None) => out.push(format!(\n            \"FS-2: net_profit ("
+ },
+ {
+  "id": "STB-17",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 lets a net profit be left out of a book whose stock is known",
+  "file": "src/financial_statements.rs",
+  "from": "        (None, Some(fresh_np)) => out.push(format!(",
+  "to": "        (None, Some(_)) => {}\n        (None, Some(fresh_np)) => out.push(format!("
+ },
+ {
+  "id": "STB-18",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 lets a closing stock stand that is not known",
+  "file": "src/financial_statements.rs",
+  "from": "        (Some(derived), None) => out.push(format!(\n            \"FS-2: closing_stock (",
+  "to": "        (Some(_), None) => {}\n        (Some(derived), None) => out.push(format!(\n            \"FS-2: closing_stock ("
+ },
+ {
+  "id": "STB-19",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value on a Stock-in-Hand ledger",
+  "file": "src/financial_statements.rs",
+  "from": "ledger_has_value |= row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "ledger_has_value |= false;"
+ },
+ {
+  "id": "STB-20",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 takes the ledger basis' closing stock from the opening",
+  "file": "src/financial_statements.rs",
+  "from": "StockBasis::Ledgers => (Some(close_stock), Some(profit(open_stock, close_stock)?)),",
+  "to": "StockBasis::Ledgers => (Some(open_stock), Some(profit(open_stock, close_stock)?)),"
+ },
+ {
+  "id": "CS-9",
+  "by": "author",
+  "what": "book.rs: a Stock Summary that lists no stock item is read as a closing stock of zero",
+  "file": "src/book.rs",
+  "from": "        Ok(snapshot) if snapshot.rows.is_empty() => {\n            ClosingStock::Unknown(ClosingStockUnknown::NoStockItems)\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "STB-21",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger with a value only in the TB's own closing field counts as carrying none",
+  "file": "src/financial_statements.rs",
+  "from": " || r.tb_closing_field_paise != 0\n",
+  "to": "\n"
+ },
+ {
+  "id": "STB-22",
+  "by": "author",
+  "what": "financial_statements.rs: a Stock-in-Hand ledger with a value only in its movement counts as carrying none",
+  "file": "src/financial_statements.rs",
+  "from": "r.opening_paise != 0 || r.recomputed_closing_paise != 0 || r.tb_closing_field_paise != 0",
+  "to": "r.opening_paise != 0 || r.tb_closing_field_paise != 0"
+ },
+ {
+  "id": "STB-23",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value only in a Stock-in-Hand ledger's own closing field",
+  "file": "src/financial_statements.rs",
+  "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "row.opening_paise != 0 || closing != 0;"
+ },
+ {
+  "id": "STB-24",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value only in a Stock-in-Hand ledger's movement",
+  "file": "src/financial_statements.rs",
+  "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "row.opening_paise != 0 || row.closing_paise != 0;"
+ },
+ {
+  "id": "STB-25",
+  "by": "author",
+  "what": "financial_statements.rs: FS-2 does not see a value only in a Stock-in-Hand ledger's opening",
+  "file": "src/financial_statements.rs",
+  "from": "row.opening_paise != 0 || closing != 0 || row.closing_paise != 0;",
+  "to": "closing != 0 || row.closing_paise != 0;"
+ },
+ {
+  "id": "CS-10",
+  "by": "author",
+  "what": "book.rs: a Stock Summary whose total overflows is read as a closing stock of zero",
+  "file": "src/book.rs",
+  "from": "            Err(_) => ClosingStock::Unknown(ClosingStockUnknown::Unreadable),\n        },\n",
+  "to": "            Err(_) => ClosingStock::Valued(0),\n        },\n"
+ },
+ {
+  "id": "CS-11",
+  "by": "author",
+  "what": "book.rs: several Stock Summaries dated the last day get the reason for none",
+  "file": "src/book.rs",
+  "from": "            return ClosingStock::Unknown(ClosingStockUnknown::SeveralSummariesAtPeriodEnd)\n",
+  "to": "            return ClosingStock::Unknown(ClosingStockUnknown::NoSummaryAtPeriodEnd)\n"
+ },
+ {
+  "id": "STB-26",
+  "by": "author",
+  "what": "registry.rs: the financial_statements figure floor is one lower than a book with no stock term shows",
+  "file": "src/registry.rs",
+  "from": "which is all a book shows when neither stock term is known.\n        min_figures: 10,",
+  "to": "which is all a book shows when neither stock term is known.\n        min_figures: 9,"
+ },
+ {
+  "id": "STB-27",
+  "by": "author",
+  "what": "financial_statements.rs: the item basis does not say how a valueless Stock Summary reads",
+  "file": "src/financial_statements.rs",
+  "from": "            \"A stock item with no value counts as nothing, so a Stock Summary whose items all lack a \\\nclosing value shows a closing stock of zero; a Summary that lists no item at all is not taken as zero.\"\n                .to_string(),\n",
+  "to": ""
+ },
+ {
+  "id": "W658-01",
+  "by": "author",
+  "what": "the receipt leg's Sales Accounts is not left out as a party (Purchase Accounts is)",
+  "file": "src/high_value_register.rs",
+  "from": "        Direction::Receipt => [SALES_ACCOUNTS_GROUP],\n",
+  "to": "        Direction::Receipt => [PURCHASE_ACCOUNTS_GROUP],\n"
+ },
+ {
+  "id": "W658-02",
+  "by": "author",
+  "what": "the payment leg's Purchase Accounts is not left out as a party (Sales Accounts is)",
+  "file": "src/high_value_register.rs",
+  "from": "        Direction::Payment => [PURCHASE_ACCOUNTS_GROUP],\n",
+  "to": "        Direction::Payment => [SALES_ACCOUNTS_GROUP],\n"
+ },
+ {
+  "id": "W658-03",
+  "by": "author",
+  "what": "a cash receipt's Loans (Liability) line is left out of the s.269ST rows, as the cash rows of high_value_register do",
+  "file": "src/high_value_register.rs",
+  "from": "        entirely_groups: &[],\n        round_off_ledgers,\n",
+  "to": "        entirely_groups: &[LOANS_LIABILITY_GROUP],\n        round_off_ledgers,\n"
+ },
+ {
+  "id": "W658-04",
+  "by": "author",
+  "what": "the s.269ST rows are not keyed by the day",
+  "file": "src/high_value_register.rs",
+  "from": "mode_rows(pop, book, cash, bank, direction, |_, v| v.date.clone(), &x)\n}",
+  "to": "mode_rows(\n        pop,\n        book,\n        cash,\n        bank,\n        direction,\n        |_, _| TallyDate::parse(\"19000101\").expect(\"a valid fixed date\"),\n        &x,\n    )\n}"
+ },
+ {
+  "id": "W658-05",
+  "by": "author",
+  "what": "the s.269ST rows read no round-off ledgers",
+  "file": "src/high_value_register.rs",
+  "from": "        round_off_ledgers,\n        counterparty_types: &no_types,\n",
+  "to": "        round_off_ledgers: &BTreeSet::new(),\n        counterparty_types: &no_types,\n"
+ },
+ {
+  "id": "W658-06",
+  "by": "author",
+  "what": "a pooled row with no party shows no printed names",
+  "file": "src/high_value_register.rs",
+  "from": "            row.names.note(v, [mode_set, other_money]);\n",
+  "to": ""
+ },
+ {
+  "id": "H8-01",
+  "by": "author",
+  "what": "the shared tag is seven hex digits",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..7].to_string()\n"
+ },
+ {
+  "id": "H8-02",
+  "by": "author",
+  "what": "the shared tag is upper-case hex",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_uppercase()\n"
+ },
+ {
+  "id": "H8-03",
+  "by": "author",
+  "what": "the shared tag hashes the text lower-cased",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest(text.to_lowercase().as_bytes()))[..8].to_string()\n"
+ },
+ {
+  "id": "H8-04",
+  "by": "author",
+  "what": "the shared tag hashes the text with a suffix",
+  "file": "src/support.rs",
+  "from": "    crate::canonical::hex(&Sha1::digest(text.as_bytes()))[..8].to_string()\n",
+  "to": "    crate::canonical::hex(&Sha1::digest([text, \"x\"].concat().as_bytes()))[..8].to_string()\n"
+ },
+ {
+  "id": "C11-01",
+  "by": "author",
+  "what": "C11: a GUID of only whitespace is not blank",
+  "file": "src/book.rs",
+  "from": "        .filter(|(_, v)| crate::support::py_strip(&v.guid).is_empty())\n",
+  "to": "        .filter(|(_, v)| v.guid.is_empty())\n"
+ },
+ {
+  "id": "C11-02",
+  "by": "author",
+  "what": "C11: a voucher with no GUID is never refused",
+  "file": "src/book.rs",
+  "from": "    if let Some((name, first)) = blank.first() {\n",
+  "to": "    if let Some((name, first)) = blank.first().filter(|_| false) {\n"
+ },
+ {
+  "id": "C11-03",
+  "by": "author",
+  "what": "C11: the blank-GUID refusal counts only the first voucher",
+  "file": "src/book.rs",
+  "from": "                blank.len(),\n",
+  "to": "                1,\n"
+ },
+ {
+  "id": "C11-04",
+  "by": "author",
+  "what": "C11: the blank-GUID refusal names the last voucher, not the first",
+  "file": "src/book.rs",
+  "from": "    if let Some((name, first)) = blank.first() {\n",
+  "to": "    if let Some((name, first)) = blank.last() {\n"
+ },
+ {
+  "id": "C11-05",
+  "by": "author",
+  "what": "C11: a voucher with no GUID is refused only while it is in the books population",
+  "file": "src/book.rs",
+  "from": "        .filter(|(_, v)| crate::support::py_strip(&v.guid).is_empty())\n",
+  "to": "        .filter(|(_, v)| v.status == VoucherStatus::Regular && crate::support::py_strip(&v.guid).is_empty())\n"
+ },
+ {
+  "id": "C11-06",
+  "by": "author",
+  "what": "C11: the blank-GUID refusal carries another code",
+  "file": "src/book.rs",
+  "from": "            \"C11-blank-guid\",\n",
+  "to": "            \"C11-blank\",\n"
+ },
+ {
+  "id": "C11-07",
+  "by": "author",
+  "what": "C11: a repeated GUID is never refused",
+  "file": "src/book.rs",
+  "from": "        if let Some(earlier) = seen.get(&key) {\n",
+  "to": "        if let Some(earlier) = seen.get(&key).filter(|_| false) {\n"
+ },
+ {
+  "id": "C11-08",
+  "by": "author",
+  "what": "C11: GUIDs are compared with their surrounding whitespace",
+  "file": "src/book.rs",
+  "from": "        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));\n",
+  "to": "        let key = crate::support::py_lower(&v.guid);\n"
+ },
+ {
+  "id": "C11-09",
+  "by": "author",
+  "what": "C11: GUIDs are compared with their case",
+  "file": "src/book.rs",
+  "from": "        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));\n",
+  "to": "        let key = crate::support::py_strip(&v.guid).to_string();\n"
+ },
+ {
+  "id": "C11-10",
+  "by": "author",
+  "what": "C11: a GUID repeated in another part is not a repeat",
+  "file": "src/book.rs",
+  "from": "        let key = crate::support::py_lower(crate::support::py_strip(&v.guid));\n",
+  "to": "        let key = format!(\"{name}\\0{}\", crate::support::py_lower(crate::support::py_strip(&v.guid)));\n"
+ },
+ {
+  "id": "C11-11",
+  "by": "author",
+  "what": "C11: a repeated GUID is refused only while both vouchers are in the books population",
+  "file": "src/book.rs",
+  "from": "    for (name, v) in all() {\n        let key",
+  "to": "    for (name, v) in all().filter(|(_, v)| v.status == VoucherStatus::Regular) {\n        let key"
+ },
+ {
+  "id": "C11-12",
+  "by": "author",
+  "what": "C11: the repeat refusal names the later part twice",
+  "file": "src/book.rs",
+  "from": "                    \"GUID {} is held by two vouchers, in {earlier} and {name}\",\n",
+  "to": "                    \"GUID {} is held by two vouchers, in {name} and {name}\",\n"
+ },
+ {
+  "id": "C11-13",
+  "by": "author",
+  "what": "C11: the repeat refusal gives the earlier voucher's part for the later one too",
+  "file": "src/book.rs",
+  "from": "                    \"GUID {} is held by two vouchers, in {earlier} and {name}\",\n",
+  "to": "                    \"GUID {} is held by two vouchers, in {earlier} and {earlier}\",\n"
+ },
+ {
+  "id": "C11-14",
+  "by": "author",
+  "what": "C11: the repeated-GUID refusal carries another code",
+  "file": "src/book.rs",
+  "from": "            \"C11-repeated-guid\",\n",
+  "to": "            \"C11-repeated\",\n"
+ },
+ {
+  "id": "C11-15",
+  "by": "author",
+  "what": "C11: a repeat is looked for before a voucher with no GUID",
+  "file": "src/book.rs",
+  "from": "    if let Some((name, first)) = blank.first() {\n",
+  "to": "    if let Some((name, first)) = blank.first().filter(|_| {\n        let mut keys = BTreeSet::new();\n        all().all(|(_, v)| keys.insert(crate::support::py_lower(crate::support::py_strip(&v.guid))))\n    }) {\n"
+ },
+ {
+  "id": "C11-16",
+  "by": "author",
+  "what": "C11: checked once per part, as each part is read, not over every part together",
+  "file": "src/book.rs",
+  "from": "        parts.push((vp.name.as_str(), parsed.vouchers));\n    }\n",
+  "to": "        parts.push((vp.name.as_str(), parsed.vouchers));\n        check_voucher_identity(&parts)?;\n    }\n"
+ },
+ {
+  "id": "C11-17",
+  "by": "author",
+  "what": "C11: checked after the company part's identity, not before",
+  "file": "src/book.rs",
+  "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
+  "to": "    {\n        let cp = required(read, \"company\")?;\n        let company = xml::read(&cp.content, &cp.id)?;\n        let guid = company\n            .descendants_named(\"COMPANY\")\n            .into_iter()\n            .map(|c| c.child_text(\"GUID\"))\n            .find(|g| !g.is_empty())\n            .unwrap_or(\"\");\n        if crate::support::py_lower(guid) != crate::support::py_lower(&read.company_guid) {\n            return Err(AuditError::refused(\"C5-identity\", \"company part GUID differs\"));\n        }\n    }\n    check_voucher_identity(&parts)?; // C11, over every part together\n"
+ },
+ {
+  "id": "C11-18",
+  "by": "author",
+  "what": "C11: never checked",
+  "file": "src/book.rs",
+  "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
+  "to": ""
  }
 ]

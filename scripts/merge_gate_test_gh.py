@@ -58,8 +58,24 @@ DEFAULT_DIFF = (
 )
 DEFAULT_PINS = ["src/example.rs", "src/other.rs"]
 DEFAULT_SURFACE = {"schema_version": 3, "files": [{"path": p} for p in DEFAULT_PINS]}
-DEFAULT_REVIEWS = [{"user": {"login": "reviewer", "type": "User"}, "commit_id": HEAD, "state": "COMMENTED"}]
+DEFAULT_REVIEWS = []
 DEFAULT_COMMENTS = []
+OWNER_USER = {"login": "lamemustafa", "id": 57982425, "type": "User"}
+T1, T2, T3 = "2026-10-14T09:00:00Z", "2026-10-14T10:00:00Z", "2026-10-14T11:00:00Z"
+VERDICT_CLEAN = "MERGE-VERDICT CLEAN head=" + HEAD + " base=" + BASE_TIP
+VERDICT_RECOMMEND = "MERGE-ADVERSARY RECOMMEND head=" + HEAD + " base=" + BASE_TIP
+
+
+def owner_comment(body, at):
+    return {"id": 1, "user": dict(OWNER_USER), "body": body, "created_at": at, "updated_at": at, "performed_via_github_app": None}
+
+
+# The owner's two lines, served in addition to whatever a scenario puts in its own comments and reviews.
+DEFAULT_OWNER_ITEMS = [owner_comment(VERDICT_CLEAN, T1), owner_comment(VERDICT_RECOMMEND, T2)]
+EMPTY_HISTORY = {"data": {"repository": {"pullRequest": {
+    "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+    "comments": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+    "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
 DEFAULT_BODY = "## Outcome and reason\n\nA bounded merge preflight.\n"
 DEFAULT_COMMIT = {
     "sha": HEAD,
@@ -200,11 +216,121 @@ def state():
         "ack_fail": False,
         "reviews": list(DEFAULT_REVIEWS),
         "comments": list(DEFAULT_COMMENTS),
+        "owner_items": [dict(i) for i in DEFAULT_OWNER_ITEMS],   # served as issue comments after "comments"
+        "owner_reviews": [],
+        "head_ref": "feature-branch",
+        "commit_comments": [],
+        "commit_comments_fail": False,
+        "inline": [],
+        "history": EMPTY_HISTORY,
+        "history_fail": False,
+        "pages_fail": set(),
         "commits": [dict(DEFAULT_COMMIT)],
     }
 
     if scenario == "surface-fetch-fail":
         s["surface_head_fail"] = True
+
+    elif scenario == "verdict-missing-clean":
+        s["owner_items"] = [owner_comment(VERDICT_RECOMMEND, T2)]
+
+    elif scenario == "verdict-missing-recommend":
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
+
+    elif scenario == "verdict-for-another-base":
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN.replace(BASE_TIP, "c" * 40), T1), owner_comment(VERDICT_RECOMMEND.replace(BASE_TIP, "c" * 40), T2)]
+
+    elif scenario == "verdict-by-review":
+        s["owner_items"] = []
+        s["owner_reviews"] = [{"id": 2, "user": dict(OWNER_USER), "body": VERDICT_CLEAN.replace(BASE_TIP, "BASE"), "submitted_at": T1, "state": "COMMENTED"},
+                              {"id": 3, "user": dict(OWNER_USER), "body": VERDICT_RECOMMEND.replace(BASE_TIP, "BASE"), "submitted_at": T2, "state": "COMMENTED"}]
+        s["reviews_use_base"] = True
+
+    elif scenario == "verdict-then-not-clean":
+        s["owner_items"] += [owner_comment("MERGE-VERDICT NOT-CLEAN head=" + HEAD + " base=" + BASE_TIP, T3)]
+
+    elif scenario == "verdict-then-owner-edit":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": [{"databaseId": 1, "lastEditedAt": T3, "userContentEdits": {"totalCount": 1}, "author": {"login": "lamemustafa", "databaseId": 57982425}}]},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
+
+    elif scenario == "verdict-then-owner-comment-deleted":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": [{"__typename": "CommentDeletedEvent", "createdAt": T3, "deletedCommentAuthor": {"login": "lamemustafa", "databaseId": 57982425}}]}}}}}
+
+    elif scenario == "history-has-another-page":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": True}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
+
+    elif scenario == "history-unreadable":
+        s["history_fail"] = True
+
+    elif scenario in {"reviews-unreadable", "comments-unreadable", "inline-unreadable"}:
+        s["pages_fail"] = {scenario.split("-")[0]}
+
+    elif scenario == "token-in-the-title":
+        s["title"] = "Fix a thing MERGE-VERDICT"
+
+    elif scenario == "token-in-the-body":
+        s["body"] = DEFAULT_BODY + "MERGE-ADVERSARY RECOMMEND\n"
+
+    elif scenario == "token-in-a-stranger-comment":
+        s["comments"] = [{"id": 9, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-VERDICT CLEAN", "created_at": T1, "updated_at": T1}]
+
+    elif scenario == "token-in-the-branch-name":
+        s["head_ref"] = "fix/merge-verdict-parser"
+
+    elif scenario == "token-in-a-file-name":
+        set_changes(s, ("added", "docs/MERGE-ADVERSARY-notes.md", "A plain line."))
+
+    elif scenario == "token-in-a-previous-file-name":
+        set_changes(s, ("renamed", "docs/MERGE-VERDICT-old.md", "docs/plain-new.md"))
+
+    elif scenario == "commit-comments-unreadable":
+        s["commit_comments_fail"] = True
+
+    elif scenario == "sixty-one-commits":
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(61)]
+
+    elif scenario == "owner-commit-comment-with-a-token":
+        s["commit_comments"] = [{"id": 12, "user": dict(OWNER_USER), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": T1, "updated_at": T1}]
+
+    elif scenario == "token-in-a-hidden-comment-in-the-body":
+        s["body"] = DEFAULT_BODY + "<!-- MERGE-VERDICT CLEAN head=x -->\n"
+
+    elif scenario == "token-in-a-stranger-commit-comment":
+        s["commit_comments"] = [{"id": 11, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1}]
+
+    elif scenario == "token-in-an-added-line":
+        s["diff"] = DEFAULT_DIFF.replace("+Safe content line.\n", "+MERGE-VERDICT CLEAN\n")
+
+    elif scenario == "changes-the-gate":
+        set_changes(s, ("modified", "scripts/merge-gate.sh"))
+
+    elif scenario == "changes-the-registry":
+        set_changes(s, ("modified", "scripts/merge-gate-synthetic-uuids.json"))
+
+    elif scenario == "changes-the-registry-in-another-case":
+        set_changes(s, ("added", "Scripts/Merge-Gate-Synthetic-Uuids.json", "{}"))
+
+    elif scenario == "changes-a-workflow":
+        set_changes(s, ("modified", ".github/workflows/ci.yml"))
+
+    elif scenario in {"renames-a-workflow-away", "renames-the-verdict-module-away"}:
+        old = ".github/workflows/ci.yml" if scenario == "renames-a-workflow-away" else "scripts/merge_gate_verdict.py"
+        set_changes(s, ("renamed", old, "elsewhere/renamed-file"))
+
+    elif scenario == "owner-edit-by-a-renamed-account":
+        s["history"] = {"data": {"repository": {"pullRequest": {
+            "reviews": {"pageInfo": {"hasNextPage": False}, "nodes": []},
+            "comments": {"pageInfo": {"hasNextPage": False}, "nodes": [
+                {"databaseId": 1, "lastEditedAt": T3, "userContentEdits": {"totalCount": 1}, "author": {"login": "a-new-name", "databaseId": 57982425}}]},
+            "timelineItems": {"pageInfo": {"hasNextPage": False}, "nodes": []}}}}}
 
     elif scenario == "surface-malformed":
         s["surface_head_malformed"] = True
@@ -793,7 +919,25 @@ def state():
         )
         s["files"] = [{"filename": "config/settings.py", "status": "modified", "additions": 1, "deletions": 1}]
 
-    elif scenario == "privacy-uuid-indeterminate":
+    elif scenario in {"privacy-two-uuids", "privacy-uuid-and-digit-run", "privacy-uuid-credential-context"}:
+        first = "+fixture reference 11111111-2222-3333-4444-555555555555\n"
+        if scenario == "privacy-uuid-credential-context":
+            first = "+session token 11111111-2222-3333-4444-555555555555\n"
+        second = {"privacy-two-uuids": "+other reference 66666666-7777-8888-9999-aaaaaaaaaaaa\n",
+                  "privacy-uuid-and-digit-run": "+synthetic account " + "12345" + "678901" + " for the test\n",
+                  "privacy-uuid-credential-context": "+plain line\n"}[scenario]
+        s["files"] = [{"filename": "docs/example.md", "status": "added", "additions": 2, "deletions": 0}]
+        s["changed_files_expected"] = 1
+        s["diff"] = (
+            "diff --git a/docs/example.md b/docs/example.md\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/docs/example.md\n"
+            "@@ -0,0 +1,2 @@\n" + first + second
+        )
+
+    elif scenario in {"privacy-uuid-indeterminate", "manifest-write-failure"}:
         s["diff"] = (
             "diff --git a/docs/example.md b/docs/example.md\n"
             "new file mode 100644\n"
@@ -926,7 +1070,7 @@ def has(*needles):
 
 if args[:2] == ["pr", "view"]:
     emit({"headRefOid": HEAD, "baseRefName": "master", "title": S["title"], "body": S["body"],
-          "changedFiles": S["changed_files_expected"]})
+          "changedFiles": S["changed_files_expected"], "headRefName": S["head_ref"]})
 
 elif args[:2] == ["pr", "diff"]:
     emit(S["diff"])
@@ -969,9 +1113,27 @@ elif args and args[0] == "api":
     elif "/pulls/321/files" in joined:
         emit([S["files"]])
     elif "/pulls/321/reviews" in joined:
-        emit([S["reviews"]])
+        if "reviews" in S["pages_fail"]:
+            fail("controlled reviews failure")
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        emit([S["reviews"] + [dict(r, body=r["body"].replace("base=BASE", "base=" + merge_base)) for r in S["owner_reviews"]]])
     elif "/issues/321/comments" in joined:
-        emit([S["comments"]])
+        if "comments" in S["pages_fail"]:
+            fail("controlled comments failure")
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        emit([S["comments"] + [dict(i, body=i["body"].replace("base=" + BASE_TIP, "base=" + merge_base)) for i in S["owner_items"]]])
+    elif "/commits/" in joined and joined.rstrip().split("?")[0].endswith("/comments"):
+        if S["commit_comments_fail"]:
+            fail("controlled commit comments failure")
+        emit([S["commit_comments"]])
+    elif "/pulls/321/comments" in joined:
+        if "inline" in S["pages_fail"]:
+            fail("controlled inline comments failure")
+        emit([S["inline"]])
+    elif "graphql" in joined:
+        if S["history_fail"]:
+            fail("controlled history failure")
+        emit(S["history"])
     elif "branches/master" in joined:
         emit(BASE_TIP)
     else:

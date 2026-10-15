@@ -102,11 +102,13 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "purchase_register",
         "read_evidence",
         "sales_register",
+        "statement_tie_out",
         "stock_summary",
         "tally_status",
         "trial_balance",
         "validate_masters",
         "voucher_presence",
+        "voucher_read_cost",
         "voucher_schema",
         "vouchers",
     ];
@@ -129,7 +131,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     // Local writers: (name, destructive, the exact sentence).
     const LOCAL_WRITERS: &[(&str, bool, &str)] = &[
         // Fresh batch id and file each call: additive.
-        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally."),
+        ("build_import_xml", false, "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer (for a statement of only skipped rows, no import file: one record of those rows); writes nothing to Tally."),
         // A new file each call: additive.
         ("parse_bank_statement", false, "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally."),
         // Each verification adds its own proof files beside the earlier ones
@@ -1119,6 +1121,66 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "an unverified hand import does not stop a duplicate",
         ),
         (
+            "build_import_xml",
+            "Do not enter a listed transfer in Tally by hand: a later post of the other statement would book it twice.",
+            "a transfer entered by hand is booked again when the other statement is posted",
+        ),
+        (
+            "build_import_xml",
+            "it never means nothing is missing",
+            "a transfer view that is not established is not a clean one",
+        ),
+        (
+            "build_import_xml",
+            "name a row only when the person confirms the other account's statement does not carry it",
+            "a skip is withdrawn on the person's word, never the assistant's",
+        ),
+        (
+            "build_import_xml",
+            "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+            "a skip one verified Contra matches is not withdrawn",
+        ),
+        (
+            "build_import_xml",
+            "or the only match carries a different reference and is verified",
+            "a Contra of another reference leaves the choice to the person only once it is verified",
+        ),
+        (
+            "build_import_xml",
+            "is refused as withdraw_skip_paired, naming each such batch",
+            "a skip the other account's statement carries is not withdrawn into a second booking",
+        ),
+        (
+            "verify_import",
+            "transfers.state not_established means it could not be computed",
+            "a failed transfer view is not an empty one",
+        ),
+        (
+            "parse_bank_statement",
+            "build_import_xml records a skipped row and lists it in a transfers section",
+            "a skip is recorded and listed with its state and what to do",
+        ),
+        (
+            "build_import_xml",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "cut a batch only between days, at most 50 vouchers",
+            "a statement day split across batches refuses the later batch for a twin (#865)",
+        ),
+        (
+            "build_import_xml",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
+        ),
+        (
+            "parse_bank_statement",
+            "same-day twins post together only with batch posting on or through a hand import of the built file",
+            "with batch posting off a second same-day twin is refused by the post (#865)",
+        ),
+        (
             "tally_status",
             "only repeat it when the refusal says attempt_recorded is false",
             "a refused post may be repeated only when no attempt was recorded",
@@ -1152,6 +1214,11 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "local_data_report",
             "never suggest deleting them",
             "the journal and imports folder are what was already sent to Tally",
+        ),
+        (
+            "local_data_report",
+            "the skipped-rows file agent-import-statement-skips.jsonl",
+            "the record of skipped statement rows is not offered for deletion",
         ),
         (
             "verify_import",
@@ -1278,6 +1345,26 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
             "The reason for a status is not available",
             "the tool names no reason for a status",
         ),
+        (
+            "voucher_read_cost",
+            "a narrower window does not lower it",
+            "the census follows the book's mark, so a shorter window is not a cheaper call",
+        ),
+        (
+            "voucher_read_cost",
+            "It is as of this call's own read of the mark",
+            "the figure is not a promise about the next call",
+        ),
+        (
+            "voucher_read_cost",
+            "No estimate is made",
+            "the measured runs are data, not a computed figure",
+        ),
+        (
+            "voucher_read_cost",
+            "`vouchers`, `ledger_movement` or `verify_import`",
+            "the tools the figure covers",
+        ),
     ];
     let definitions = registered_tool_definitions(true, true);
     let description_of = |tool: &str| -> String {
@@ -1293,6 +1380,36 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         assert!(
             description_of(tool).contains(phrase),
             "{tool} lost a safety sentence ({why}): {phrase:?}"
+        );
+    }
+
+    // build_import_xml states the withdrawal rule twice: in its description and
+    // on its withdraw_skips argument. Each sentence of the rule is pinned in
+    // both, so neither text can change and leave the other behind.
+    let build = description_of("build_import_xml");
+    let argument = definitions
+        .as_array()
+        .and_then(|tools| {
+            tools
+                .iter()
+                .find(|entry| entry["name"] == "build_import_xml")
+        })
+        .and_then(|tool| tool.pointer("/inputSchema/properties/withdraw_skips/description"))
+        .and_then(Value::as_str)
+        .expect("the withdraw_skips description");
+    for sentence in [
+        "A withdrawal is refused while exactly one verified Contra matches the row and nothing else claims that Contra.",
+        "Where more than one verified Contra matches, the match is also claimed by another row or booked twice, the amount reverses the same day and the match is by date, or the only match carries a different reference and is verified, ComplyEaze Bridge cannot tell which entry the row belongs to: the withdrawal is then the person's explicit choice, and the batch of every matching Contra is listed on the row in the transfers section.",
+        "While the only match is not yet verified, the withdrawal is refused and the step says to verify that entry first.",
+        "So is one with any match in a batch not yet verified, whatever the row's state: a person can confirm only what Tally holds.",
+    ] {
+        assert!(
+            build.contains(sentence),
+            "build_import_xml lost a sentence of the withdrawal rule: {sentence:?}"
+        );
+        assert!(
+            argument.contains(sentence),
+            "withdraw_skips lost a sentence of the withdrawal rule: {sentence:?}"
         );
     }
 
@@ -1355,6 +1472,44 @@ fn a_paged_tools_limit_names_no_default_its_handler_does_not_apply() {
                 limit.get("default").is_none(),
                 "{name}: its limit defaults to the configured row limit, so the schema names no default"
             );
+        }
+    }
+}
+
+/// The texts about skipped rows say what the code does: a skipped row that a
+/// batch found posted also posts stays open, and nothing says the send-time
+/// check is part of this release.
+#[test]
+fn the_transfer_texts_claim_only_what_the_code_does() {
+    let definitions = registered_tool_definitions(true, true);
+    let tool = |name: &str| -> Value {
+        definitions
+            .as_array()
+            .and_then(|tools| tools.iter().find(|entry| entry["name"] == name))
+            .unwrap_or_else(|| panic!("{name} is not registered"))
+            .clone()
+    };
+    let description = |name: &str| tool(name)["description"].as_str().unwrap().to_owned();
+    let parse = description("parse_bank_statement");
+    assert!(!parse.contains("never silent"), "{parse}");
+    assert!(parse.contains("posted_against_skip"), "{parse}");
+    let build = description("build_import_xml");
+    assert!(
+        !build.contains("each skipped row not yet paired"),
+        "{build}"
+    );
+    assert!(build.contains("posted_against_skip"), "{build}");
+    let argument = tool("build_import_xml")
+        .pointer("/inputSchema/properties/withdraw_skips/description")
+        .and_then(Value::as_str)
+        .unwrap()
+        .to_owned();
+    assert!(!argument.contains("It is not saved"), "{argument}");
+    assert!(!argument.contains("Without this a build"), "{argument}");
+    assert!(argument.contains("posted_against_skip"), "{argument}");
+    for text in [&parse, &build, &argument] {
+        for phrase in ["1703", "merges with"] {
+            assert!(!text.contains(phrase), "{phrase}: {text}");
         }
     }
 }

@@ -1038,7 +1038,7 @@ async fn post_over_stdio(
 #[tokio::test]
 async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
-    for held_at in (0..lease_reads).map(Some).chain([None]) {
+    async fn one_case(held_at: Option<usize>) {
         let mut plans = before_approval();
         let lease_start = plans.len();
         let mut lease = after_approval(xml(created_one()));
@@ -1087,6 +1087,37 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
             assert_eq!(intents(directory.path()), 1, "the control posts");
             assert!(observed.len() > post_at);
         }
+    }
+
+    // A case has its own simulator (on its own port), directory, server and
+    // approvals, and spends its time waiting on that simulator, so the cases
+    // run side by side on this thread, a group at a time. A group is no wider
+    // than this, so that the cancellation of a case is never held back by the
+    // others for more than a small part of the 300 milliseconds a held read
+    // lasts. Every case is joined, and a panic in any of them is passed on
+    // after the others have finished, with the case named.
+    const AT_ONCE: usize = 11;
+    let cases = (0..lease_reads).map(Some).chain([None]).collect::<Vec<_>>();
+    for group in cases.chunks(AT_ONCE) {
+        let local = tokio::task::LocalSet::new();
+        local
+            .run_until(async {
+                let running = group
+                    .iter()
+                    .map(|&held_at| (held_at, tokio::task::spawn_local(one_case(held_at))))
+                    .collect::<Vec<_>>();
+                let mut panicked = None;
+                for (held_at, case) in running {
+                    if let Err(error) = case.await {
+                        eprintln!("case {held_at:?} failed");
+                        panicked.get_or_insert(error);
+                    }
+                }
+                if let Some(error) = panicked {
+                    std::panic::resume_unwind(error.into_panic());
+                }
+            })
+            .await;
     }
 }
 
@@ -1317,10 +1348,16 @@ async fn a_refused_redemption_withdraws_its_approval() {
     // the currency pair's closing company list (a POST), and the closing mode
     // probe its checks would otherwise end with (a GET /status, then the
     // company list) is never sent.
-    assert_eq!(observed.len(), 2 * before_approval().len() - probe().len());
+    assert_eq!(
+        observed.len(),
+        2 * before_approval().len() - probe().len() - numbering_read(&[]).len()
+    );
     let last = observed.last().unwrap();
     assert_eq!(last.method, "POST", "the currency pair's closing read");
     let (first_call, redeeming) = observed.split_at(before_approval().len());
+    // The first call's numbering read (bridge#724) comes after the mode probe
+    // and is not reached by the redeeming call either.
+    let first_call = &first_call[..first_call.len() - numbering_read(&[]).len()];
     let gets = |requests: &[tally_protocol_simulator::ObservedRequest]| {
         requests
             .iter()
@@ -1796,8 +1833,8 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     for shown in [
-        "Journal 20260901  12.5  \"WR2 Sales\"  \"Synthetic test only\"",
-        "Journal 20260901  12.5  \"WR2 Sales\"  \"Second rent\"",
+        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"",
+        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Second rent\"",
     ] {
         assert!(batch.lines().any(|text| text == shown), "{shown}\n{batch}");
     }
@@ -1876,7 +1913,7 @@ fn the_agent_preview_says_when_the_post_happens() {
                     [
                         "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
                         "Each voucher: type, date, amount, ledger, narration (references not shown):",
-                        "Each line ends with its narration, quoted exactly as it will be posted.",
+                        "Each line ends with its narration, quoted; a cut one is marked … (+N characters).",
                     ]
                     .contains(&line),
                     "an unexpected line about narrations: {line:?}"

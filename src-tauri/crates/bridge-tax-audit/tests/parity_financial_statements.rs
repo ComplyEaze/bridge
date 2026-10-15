@@ -177,11 +177,11 @@ fn a_missing_partner_figure_is_reported() {
 #[test]
 fn a_dump_below_the_structural_floor_is_reported() {
     let mut rust = rust_dump(true);
-    rust["figures"].as_array_mut().unwrap().truncate(17);
+    rust["figures"].as_array_mut().unwrap().truncate(9);
     let d = compare(&rust, &rust, None).unwrap();
     assert_eq!(d.len(), 1, "{d:?}");
     assert!(
-        d[0].starts_with("figure count below the minimum (18) for test \"financial_statements\""),
+        d[0].starts_with("figure count below the minimum (10) for test \"financial_statements\""),
         "{d:?}"
     );
 }

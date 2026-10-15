@@ -3,22 +3,23 @@
 [![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
 
 <!-- llms:begin -->
-ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime (also written Tally
-Prime) MCP server for Claude Desktop. It connects Claude Desktop to the
-TallyPrime running on your own computer, and it is built for chartered
-accountants, CA firms and accountants. What Claude reads from your books goes to
-your AI provider as part of the chat. You can ask about the trial balance,
-outstanding receivables and payables with ageing, ledger movement and vouchers,
-the purchase and sales registers, the stock summary,
-and the Profit and Loss and Balance Sheet (a book with stock items is expected
-to be refused for these two). It checks ledger names before you post. For bank
-statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
-vouchers from a password-protected SBI, HDFC or Union Bank of India statement
-PDF, and it prepares Journal, Payment, Receipt and Contra vouchers as an import
-file that you review and import into TallyPrime yourself. Posting is off by
-default, so as installed it never posts to TallyPrime: it reads from it and
-prepares files on your computer. If you turn posting on in the extension, it
-posts vouchers one at a time, after you approve each one.
+ComplyEaze Bridge is an open-source (Apache-2.0) MCP server that connects
+Claude Desktop to the TallyPrime (also written Tally Prime) running on your own
+computer. It is built for chartered accountants, CA firms and accountants. It
+reads your books; from a password-protected SBI, HDFC or Union Bank of India
+statement PDF it proposes Payment, Receipt and Contra vouchers, and once every
+ledger name is exact and every question is answered it writes them to a file
+that you import in TallyPrime yourself. What Claude reads from your books goes to your AI provider as part of
+the chat. You can ask about the trial balance, outstanding receivables and
+payables with ageing, ledger movement and vouchers, the purchase and sales
+registers, the stock summary, and the Profit and Loss and Balance Sheet (a book
+with stock items is expected to be refused for these two). It checks ledger
+names before you post, and prepares Journal, Payment, Receipt and Contra
+vouchers as an import file that you review and import into TallyPrime yourself.
+Posting is off by default in a new install, so as installed it never posts to
+TallyPrime: it reads from it and prepares files on your computer. If you turn
+posting on in the extension, it posts vouchers one at a time, after you approve
+each one.
 
 Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop;
 its help pages (last updated 18 September 2026) list tools in six groups:
@@ -49,7 +50,7 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** Release 0.5.1 installs these 23, in name order. None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** In name order; release 0.5.1 installs 23 of them, and `company_features`, `gst_status`, `statement_tie_out` and `voucher_read_cost` are in source, not yet in a published build. None of them changes your TallyPrime books, and every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -57,7 +58,9 @@ with no figures, to a log on this computer.
 | `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is expected to be refused) | Nothing |
 | `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch and writes an import file | An import file and a ledger record on this computer |
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
+| `company_features` | Three settings the company’s record in Tally holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol; no ledger, voucher, amount or narration. Each of the three settings equalled Tally’s F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
+| `gst_status` | Tally’s own GSTR-1 status flags on the vouchers of one voucher type in a period of at most 93 days: for each voucher its number, date, a status (included, uncertain, excluded, not in return, cancelled, optional or post-dated; for the last three also what the three status flags read) and whether a person accepted it as it stands; no amount, party, ledger or narration. A status is Tally’s own flag and not a judgement of ComplyEaze Bridge. Measured on one synthetic book of TallyPrime 7.1 Silver, where `excluded` has not been observed | Nothing |
 | `ledger_masters` | Ledgers with their opening balances; optionally GSTIN, PAN and other party details | Nothing |
 | `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
 | `list_companies` | The companies loaded in TallyPrime (start here) | Nothing |
@@ -69,12 +72,14 @@ with no figures, to a log on this computer.
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
+| `statement_tie_out` | Whether the bank ledger stands where a parsed bank statement says it stood at the start and at the end of the statement's dates, or of whole calendar months of it: three gaps and the dates; the balances themselves are not returned | Nothing |
 | `stock_summary` | The closing stock value of each item as of a 31 March, values only; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
 | `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |
 | `verify_import` | Reads back a batch you imported by hand in TallyPrime | Proof files and status records on this computer |
 | `voucher_presence` | Which proposed vouchers are already in the book | Nothing |
+| `voucher_read_cost` | Before a call to `vouchers`, `ledger_movement` or `verify_import`: the most counting reads (reads that count the period’s vouchers by walking the whole book, before any voucher is fetched) it will make, and the least time the gaps between them take. It follows how many voucher changes the book has seen (Tally’s counter, its voucher mark), not the period, so a narrower period does not lower it and N one-day calls pay it N times. Derived and not measured, and not an estimate of how long the call takes | Nothing |
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
 | `vouchers` | The vouchers in a period. Search by voucher number, reference, narration or amount, and summaries by ledger, month, voucher type, group or primary group, are in release 0.5.0 and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group summaries in a second run, on a synthetic book of 67 vouchers; not checked on a large book) | Nothing |
 
@@ -98,7 +103,8 @@ whose ledger now points to a different master.
   shorten party and ledger names and bank account numbers to their first two and
   last two characters (four or fewer become “…”), or drop narrations. Neither
   hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration
-  numbers, contact details or references, and a shortened name can still be
+  numbers, contact details or references, or the last four digits of a bank
+  statement's account number, and a shortened name can still be
   identified, not least from the GSTIN or PAN sent beside it. See *Before you
   use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
@@ -365,8 +371,8 @@ ComplyEaze Bridge can, before sending, shorten party and ledger names and bank
 account numbers to their first two and last two characters (four or fewer become
 “…”), or drop narrations (`BRIDGE_AGENT_REDACTION` takes one value, not both).
 **Neither hides amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam
-registration numbers, contact details or references, and a shortened name can
-still be identified, not least from the GSTIN or PAN sent beside it** — figures
+registration numbers, contact details or references, or the last four digits of
+a bank statement's account number, and a shortened name can still be identified, not least from the GSTIN or PAN sent beside it** — figures
 always go with the answer. Decide this deliberately for client data.
 
 ## What it costs
@@ -386,11 +392,11 @@ What you pay or provide today:
 - **Your clients' data:** what Claude reads goes to Anthropic, under
   Anthropic's terms for your plan; through ComplyEaze Bridge, ComplyEaze does
   not receive it
-  ([Privacy Policy](https://bridge.complyeaze.com/privacy), sections 4 to 6).
+  ([Privacy Policy](https://bridge.complyeaze.com/privacy.html), sections 4 to 6).
 - **Your checking:** check results in Tally before you rely on them.
 
 Support and updates are not guaranteed
-([Terms of Use](https://bridge.complyeaze.com/terms), section 4.4). Our
+([Terms of Use](https://bridge.complyeaze.com/terms.html), section 4.4). Our
 liability is limited as section 14 sets out, including its fallback and
 exceptions; read it before client work.
 
@@ -478,8 +484,9 @@ installations default to `BRIDGE_AGENT_REDACTION=none`; set it to `mask_parties`
 or `drop_narration` (one value, not both) before launch when that better fits
 the workflow. These settings shorten party and ledger names and bank account
 numbers or drop narrations; they do not hide amounts, company names, PAN, GSTIN,
-IFSC, MSME or Udyam registration numbers, contact details or references. The
-package installation settings expose the same choices.
+IFSC, MSME or Udyam registration numbers, contact details or references, or the
+last four digits of a bank statement's account number. The package installation
+settings expose the same choices.
 
 For a first result, run `tally_status` to check that TallyPrime and its Licensed
 or Education mode are observed, then list the loaded companies. Select a

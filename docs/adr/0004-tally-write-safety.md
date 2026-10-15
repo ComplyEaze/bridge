@@ -193,7 +193,7 @@ Gold/Education posting were untested.
 | 5 | Small batches | Met | Exactly one voucher per call (`admit_saved_voucher_integrity`), under a review-size cap. Stricter than the ADR requires. |
 | 6 | Exact validation and preview commitments | Partly | Validation is exact. Before approval, the saved batch is re-hashed and compared byte for byte with the saved file (#578), and the company tuple, the date against `BOOKSFROM`, duplicate absence, and every ledger (exact match, bound by identity through `bind_selected`) are checked. After approval, inside the endpoint queue, the company identity and unique name scope, the date against the observed mode's boundary, ledger identity and duplicate absence are checked again (`post_approved_import`, `recheck_import_admission`), and for a Payment, Receipt or Contra every leg's cash/bank classification, both before approval and in the queue (2026-09-22 amendment); `BOOKSFROM` is not. The preview is rendered from the same saved batch, and `ApprovedImport` carries the XML rendered before approval (the operator sees the preview, not the XML). But the preview text is not committed: no digest of what the operator saw is persisted. |
 | 7 | Approval evidence | Partly | Approval runs in a separate native-dialog subprocess, so the model never supplies an approval boolean (`approved_import.rs`: `confirm`, `run_confirmation`). Decline and a 120 s timeout both refuse. On Windows only `IDYES` counts, but interactive Windows approval is untested (#236). No approval record is written: the durable intent (row 8) implies approval but carries no approval time or preview digest. |
-| 8 | Durable idempotency reservation | Met, by a different mechanism | Before the POST, `StatusRecord::dispatch_native` is appended and `sync_data`-flushed to `agent-import-ledger.jsonl`, under the admission lock, after a check that the batch was not already dispatched or changed (`post_import_checked`, the `before_dispatch` closure). A cross-process lease covers intent, the POST, the response append and readback (`dispatch_lease::acquire`). A dispatched batch is only ever reconciled, never re-sent. This is not the `tally_import_idempotency_state` or outbox tables of migration `0003_tally_safe_writes.sql`, which `post_import` does not use. |
+| 8 | Durable idempotency reservation | Met, by a different mechanism | Before the POST, `StatusRecord::dispatch_native` is appended and `sync_data`-flushed to `agent-import-ledger.jsonl`, under the admission lock, after a check that the batch was not already dispatched or changed (`post_import_checked`, the `before_dispatch` closure). A cross-process lease covers intent, the POST, the response append and readback (`endpoint_coordination::acquire`). Since #1584 each lease, and each per-send wire lock, is a set of lock files taken all or none: on Windows one under AppData and one under the user profile, because a packaged process's new AppData files go to its package's private folder; elsewhere one. A dispatched batch is only ever reconciled, never re-sent. This is not the `tally_import_idempotency_state` or outbox tables of migration `0003_tally_safe_writes.sql`, which `post_import` does not use. |
 | 9 | Parser-derived Tally counters | Met | `parse_import_outcome` (`bridge-tally-protocol`, `import_outcome.rs`). A clean response requires every counter to be reported, and exactly created 1, altered 0, deleted 0, with zero ignored, errors, cancelled, exceptions and line errors (`is_clean_success_for(1, 0, 0)`), and an application status other than failure (`import_outcome_is_clean`). |
 | 10 | Strict company-bound read-after-write verification | Met, for detection | Readback is mandatory (`verify_import_after_current_dispatch`). It is bound to the verified company GUID and compares accounting entries, not the response. `posted_verified` requires both a clean response and a verified readback (`finalize_current_dispatch`). It detects a write that did not land in the intended company, but it cannot prevent one or find where it went (see "How the write is aimed"). |
 | 11 | First-write canary rule: one sealed synthetic ledger-canary candidate, fixture enrollment with disposable-company and backup acknowledgements, no Passport upgrade | Not met | The first dispatched write was a Journal, not a ledger canary. `post_import` does not consult the write-fixture enrollment (`commands.rs`, `enroll_tally_write_fixture`), which exists but gates nothing on this path. The one part that holds: no Passport upgrade. |
@@ -221,6 +221,15 @@ or an owner decision to amend the requirement instead:
    canary reservation, dispatch-attempt and final-verdict tables of migrations `0015`–`0021`
    (`db/tally_mirror.rs`), and the `agent-import-ledger.jsonl` journal. Only the journal has a
    runtime caller. Decide which one is authoritative, and retire or connect the others.
+   2026-10-12: the Rust code for migration `0003` (`db/tally_write_store.rs`) had no runtime
+   caller since it was added, and was removed. Migration `0003` still creates its tables, which
+   now have no reader or writer, including the legacy rows the Consequences section says remain
+   readable. Connecting `0003` later means restoring that code from history. Which contract is
+   authoritative stays open.
+   2026-10-12: the repository methods for the canary tables of migrations `0015`–`0021` had
+   no caller since #139 removed the canary coordinator, and were removed. The tables remain,
+   with no reader or writer. Row 11 stays Not met and follow-up 1 is unchanged; which contract
+   is authoritative stays open.
 7. **Write capability in the Passport (row 1).** Decide whether a verified post
    should become observed write evidence, and under what rule.
 8. **Concurrent external changes, #239. Narrowed.** Tally offers no conditional import, so
@@ -233,7 +242,24 @@ or an owner decision to amend the requirement instead:
    gateway changes were measured (§11c.4). Not yet measured: a regroup, an edit made in Tally's own
    screens (the likelier concurrent writer), and whether posting a voucher moves `ALTMSTID` (if it
    does, a busy book refuses more often; it fails closed). A change that does not move the mark is
-   not caught. Any change that does refuses, including unrelated ones; the operator re-runs. During the approval wait, a ledger renamed and a new one created under
+   not caught. Any change that does refuses, including unrelated ones; the operator re-runs.
+   Since bridge#724 the span starts earlier: before approval the post reads the target's master
+   mark, then every voucher type's voucher numbering, and admits only voucher types that read
+   Automatic with the series' sub-method `Auto Retain` (an Automatic type set to "Renumber
+   Vouchers" was seen to change numbers already in the book when a voucher with an earlier date
+   was entered by hand, and again when a voucher with an earlier date was sent by import without
+   a number, where the import's answer read CREATED 1, ALTERED 0 and no voucher's AlterID
+   moved, on one book, TallyPrime 7.1 Silver, where a file of two Receipts, a Receipt that
+   carried a number and one Journal imported without a number were measured too
+   (TALLY_PROTOCOL_REFERENCE §9.8); a file of more than two vouchers, a mixed file, a Journal
+   that carries a number, Payment and Contra, Gold, other releases and ComplyEaze Bridge's own
+   post are not measured, and an absent or
+   unrecognised sub-method refuses too); the queue then compares
+   that mark with the one its binding reads begin with, so any
+   master saved during the approval wait, a voucher type included, refuses as `post_masters_moved`
+   (each of thirteen saves of a voucher type's screen in Tally moved the mark by 2: nine of a
+   type holding no vouchers, and two in each of the two runs of 13 October 2026 on a type holding
+   vouchers, all on one synthetic book, TallyPrime 7.1 Silver). During the approval wait, a ledger renamed and a new one created under
    its old name is refused by the catalogue binding's (name, GUID) check (`import_masters_changed`).
    Between build and post, which can be days apart, the build now records each named ledger with
    the GUID its catalogue read bound it to. Before approval, a post refuses any ledger that now
@@ -405,7 +431,20 @@ one-voucher preview ends with the voucher's own text: its reference and
 narration are the last two lines, quoted as they will be posted, under a line
 saying that no line below it is an entry, a total or an instruction, and the
 date line says where they are. Every line the preview writes itself, the On
-Account sentence included, stands above that line (#1234).
+Account sentence included, stands above that line (#1234). A narration whose
+quoted line would pass 100 characters is shown instead in numbered parts, each
+quoted on its own line and split only at a space, so that joined in order they
+are the posted text; the line above the heading, which the preview writes
+itself, counts the parts, and the date line then says the voucher's own text
+is below the dashes. Such a narration is refused, never cut, when no space
+splits it into parts that fit, or when it holds a run of dashes or a number in
+brackets (the shapes of the heading and of a part's label). A reference is
+never split: one too long for its line is refused as before, since nothing
+reads a posted reference back. Each part past the first, and the counting
+line, take a line the entries could otherwise use. The review dialog of a
+posted voucher shows its narration the same way, after every line it writes
+itself, under the same heading, so a voucher posted with a long narration can
+still be acknowledged (#1535).
 
 **Scope.** The desktop "post a saved Journal" action stays Journal-only
 (`PostScope::JournalOnly`); its review was built for one Journal. So does the
@@ -539,7 +578,7 @@ proved. With it off, a batch of more than one voucher refuses exactly as before
   dispatch intent before the POST;
 - the ledger bindings, currency and bank-leg checks for every leg.
 
-**Approval.** The native dialog (#665's nonce-bound approval) shows a summary, not a listing:
+**Approval.** The native dialog (#665's nonce-bound approval) shows a summary, and for a batch of at most ten vouchers one line for each (below):
 - the company;
 - the count by type and the date range;
 - one line per ledger with its debit and credit totals and entry count;
@@ -550,7 +589,13 @@ proved. With it off, a batch of more than one voucher refuses exactly as before
   cash/bank ledgers;
 - the standing cautions.
 
-It says, in a line of its own, that each voucher's date, narration and reference are not shown. Its budget is its own: 40 lines, 3,200 characters, 100
+Order, as amended on 13 October 2026 (#746): the count and company, the company number, the
+count by type, the date range, the grand totals and the money lines lead; then the company
+GUID and the Tally origin, the voucher lines or the sentence in their place, the per-ledger
+lines, the batch id, and the cautions. This order has not yet been shown in a running dialog
+on Windows or macOS (UNVERIFIED).
+
+A batch of at most ten vouchers lists one line for each voucher (#1278), and when those lines cannot be shown one sentence says why. Its budget is its own: 40 lines, 3,200 characters, 100
 a line, and 7,000 UTF-8 bytes (under the dialog's 8,000). A summary over it is refused
 (`import_review_too_large`), never cut, and the caller posts the batch in parts. A 40-line native
 dialog has not yet been shown on Windows or macOS (UNVERIFIED).
@@ -664,3 +709,52 @@ The owner approved this order on 8 Oct 2026: lab groundwork first, then each gua
 | Rollback inside ComplyEaze Bridge | No compensating Tally operation is implemented and verified (Decision, above). |
 
 **Not measured.** None of this has been measured against Tally: the native shape of a company's GST registration, the native shape of a sales ledger's dated GST rows, the transport of the GST status fields, and where GSTR-1 places a posted invoice.
+
+## Amendment — owner decision, 2026-10-10: master writes through the one approved path (dated deviation)
+
+The owner approved this direction on 10 Oct 2026: "yes to the direction for today, improve later". It reverses one row of the 8 Oct amendment's rejected table, "Creating masters through the approval window". The reason given there, a second dispatch path into the release, stays true of any second path. This amendment adds none. Nothing below is built yet. Every slice ships as a draft behind a setting that is off by default, and is measured on a lab company before it is switched on.
+
+**What changes.** Production may send three new write classes, each only through `post_approved_import`, the single dispatch path, with its queue, admission reads, all-company marks aim, wire lock, durable intent and native approval:
+
+- creating ledgers;
+- altering a ledger's GST, registration and state blocks, and renaming a ledger;
+- creating and altering voucher types.
+
+The request becomes a two-variant type, vouchers as today or a master batch. Each variant brings its own admission reads, approval binding, intent payload and verification. The two variants share no defaulted behaviour.
+
+**What still cannot be sent.**
+
+- Deletes of any master.
+- Openings.
+- Stock-in-Hand ledgers.
+- TDS and TCS ledgers where those features are on.
+- Caller-supplied XML. Requests are rendered by Bridge.
+- Any class not named above.
+
+**Rules that carry over unchanged.**
+
+- Every write is approved in the native dialog. A master dialog lists one master per item and refuses rather than cuts at the existing caps, so a large class is approved in parts.
+- The company is pinned by its full identity tuple. The company name in the import request is never treated as a guard.
+- Success is decided by reading back, never by Tally's counters. Counters and the company's master mark (`ALTMSTID`) are doubt signals only. Two master creates moved the mark by two (TALLY_PROTOCOL_REFERENCE §10, VERIFIED), and a gateway ledger rename by one (§11c.5, VERIFIED, synthetic company). On screen, a ledger create, regroup, opening change and delete each moved it by one (§11c.5, VERIFIED, one run each), and renaming the base currency and restoring it moved it by two, then one (§11c.5, PARTIAL). The earlier lines above that call a regroup's step not yet measured predate those screen runs. The step for a list alter and a voucher-type write is not measured, so a step other than the expected one is recorded as doubt, and only reading back decides.
+- An outcome unknown after bytes were sent is never re-sent. It is reconciled by reading back.
+
+**The dated deviation.** On 3 Oct 2026 the owner chose a different write shape, recorded here for the first time: a ledger was to be created in two requests, a Create carrying only the name and parent, then an Alter setting its other fields, subject to a lab run. That run has not been made. One reason for leaving it is measured: a ledger's GST duty head is settable at Create and silently not settable at Alter (TALLY_PROTOCOL_REFERENCE §8.3, measured both ways). Two are design judgements: it takes two writes where one approval covers one request, and it can leave a ledger half made. This amendment instead creates a ledger with one direct Create, under four conditions:
+
+1. **Before.** An absence check runs inside the queue, over every ledger and group name and alias.
+2. **Before.** The company's master mark must be unchanged from the binding read to the last read before the request.
+3. **After.** Each created name must resolve to a master that did not exist before, and the counters must show only creates. A name that resolves to an existing master, a counted `ALTERED`, or a mark step other than the expected one is reported for reconciliation, never as created. No import option such as `IMPORTDUPS` is sent: with `@@DupIgnoreCombine` an identical re-sent Create was still counted `ALTERED` (TALLY_PROTOCOL_REFERENCE §9.4g, PARTIAL, one run per envelope).
+4. **Owner's acceptance.** Between the last read and the request, no read can close the window. A ledger created there by someone else under the same name is not refused: it is overwritten in place. A Create on an existing name replaced that ledger's parent and bill-wise flag, changed together in one run, and was counted `CREATED 0, ALTERED 1`; an opening balance was replaced when one was supplied, and kept when omitted in a Create that changed nothing else (TALLY_PROTOCOL_REFERENCE §9.4g, PARTIAL, one Silver company, one run each; IMPLEMENTATION_GUIDE §3.6). An omitted opening alongside a parent or bill-wise change, which is what Bridge's Create would send, is not measured, nor are other fields. The overwrite keeps the other ledger's GUID, which the earlier read never saw, so the name check cannot tell it from a create. Only the `ALTERED` counter and a mark step larger than one create's (the other person's create also moves it) can show it, and both are signals, not proof. Its earlier values were never read, so nothing can restore them. The owner accepts that consequence, not an unnamed window.
+
+**List fields.** An Alter that carried a stock item's GST list replaced the whole list, on one book, once (TALLY_PROTOCOL_REFERENCE §9.4a); a ledger's lists are not measured and are treated the same. So a list is sent as exported, with any new dated entry added, under a check that the ledger is unchanged since it was read. The result is verified by comparing the whole ledger before and after.
+
+**Not measured.** All of these remain unmeasured:
+
+- How Tally resolves a new name against an existing alias, a case or space variant, or a group of the same name.
+- Whether a ledger's registration history is appended or replaced by an Alter.
+- Any write of a sales ledger's GST rate and HSN lists.
+- Every voucher-type write.
+- The class-batch dialog seen live.
+- The master mark's step for a list alter or a voucher type.
+- What else a Create on an existing name replaces (a GSTIN, a ledger's GST lists) beyond the three fields §9.4g measured.
+
+Each slice names the lab measurement it waits on.

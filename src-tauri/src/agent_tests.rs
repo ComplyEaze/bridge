@@ -293,16 +293,10 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
 #[test]
 fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
     const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
-    let from = bridge_tally_core::TallyDate::parse("20260401").unwrap();
-    let to = bridge_tally_core::TallyDate::parse("20260430").unwrap();
     let requests: Vec<(&str, String)> = vec![
         (
             "tally::tdl_engine::ledgers_request",
             crate::tally::tdl_engine::ledgers_request(NAME),
-        ),
-        (
-            "tally::tdl_engine::ledger_period_balances_request",
-            crate::tally::tdl_engine::ledger_period_balances_request(NAME, &from, &to),
         ),
         (
             "agent_read_profiles::render_agent_vouchers",
@@ -770,7 +764,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
     // amounts and counts of ledgers, and no ledger name; `company_features`
     // returns only three settings, a currency symbol and the company's own name;
     // `gst_status` returns only voucher numbers, dates, the voucher type's name
-    // and ids, and no party or ledger name.
+    // and ids, and no party or ledger name; `statement_tie_out` returns two
+    // dates, three signed gaps and fixed sentences, and never a ledger name;
+    // `voucher_read_cost` returns only a voucher mark, counts, seconds and
+    // constant text, and the company's own name.
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut without_a_sample = vec![
         "acknowledge_post_review",
@@ -778,6 +775,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "company_features",
         "gst_status",
         "local_data_report",
+        "statement_tie_out",
+        "voucher_read_cost",
     ];
     // Read once: the catalogue keeps the lab tools only while BRIDGE_LAB_WRITES=1
     // is set as it is built, and another test changes that variable, so the
@@ -955,8 +954,30 @@ async fn egress_receipt_uses_the_final_jsonrpc_replacement_when_only_the_envelop
     let unframed = Server::new(base_settings.clone())
         .call_tool("voucher_schema", json!({}))
         .await;
+    // The reply carries the call's own duration twice (once structured, once
+    // as the content text), so a second call that takes up to four more
+    // digits (9 ms against 10 s) is that many bytes longer than the first. The
+    // cap must absorb that swing and still sit below what the JSON-RPC
+    // envelope adds, or the tool's own cap fires before any framing and the
+    // reply is an `isError` result with no `error` member.
+    let unframed_text = unframed.to_string();
+    assert_eq!(
+        unframed_text.matches("duration_ms").count(),
+        2,
+        "the duration must appear exactly twice, or the margin below is wrong"
+    );
+    let duration_digit_margin = 2 * 4;
+    let envelope_overhead = json!({"jsonrpc": "2.0", "id": 1, "result": unframed})
+        .to_string()
+        .len()
+        + 1
+        - unframed_text.len();
+    assert!(
+        duration_digit_margin < envelope_overhead,
+        "the margin ({duration_digit_margin}) must stay below the envelope overhead ({envelope_overhead})"
+    );
     let server = Server::new(Settings {
-        max_bytes: unframed.to_string().len(),
+        max_bytes: unframed_text.len() + duration_digit_margin,
         ..base_settings
     });
     let (mut client, server_io) = tokio::io::duplex(16_384);
@@ -2134,7 +2155,7 @@ fn empty_voucher_window_corroboration_handles_all_three_control_branches() {
             "20260902",
             None,
         ),
-        Ok((true, Some("nonempty_uncorroborated")))
+        Ok((true, Some("empty_window_wider_read_nonempty")))
     );
     assert_eq!(
         corroborate_empty_voucher_window(

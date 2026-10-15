@@ -286,14 +286,10 @@ pub const MAX_ARTIFACT_BYTES: usize = 256 * 1024;
 /// drawer select. It is one file for one named reason -- not headroom.
 ///
 /// Not pinned, and deliberately: files feature-gated out of every shipped build
-/// (`agent_lab.rs`, `jsonex*.rs`, `india_tax_observation.rs`), operator filing
+/// (`agent_lab.rs`), operator filing
 /// labels (`client_groups.rs`, `client_group_label_migration.rs` and the
 /// `commands/all_clients.rs` commands over them, none of which reads Tally),
-/// dead or declaration-only modules, and `observability.rs`. It only counts
-/// the read runtime's attempts into fixed buckets: nothing reads the counts out
-/// and nothing sends them off the machine (the preview command that once did
-/// was deleted, never having been called). It becomes a candidate when something
-/// reads them. bridge#416 records the reasoning for the rest.
+/// and dead or declaration-only modules. bridge#416 records the reasoning for the rest.
 ///
 /// Also not pinned: the four frontend modules bridge#468 moved out of the pinned
 /// `src/main.tsx` and `src/MirrorProofScreen.tsx`, where they had been copied.
@@ -511,7 +507,6 @@ pub enum LoopbackFamily {
 #[serde(rename_all = "snake_case")]
 pub enum TransportProfile {
     XmlHttp,
-    JsonExShadow,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -520,10 +515,7 @@ pub enum ReadProfileId {
     XmlCompanyEnumerationV1,
     XmlSyntheticFixtureMarkerV1,
     XmlLedgerReadV1,
-    XmlVoucherEmptyRangeV1,
-    XmlVoucherPopulatedRangeV1,
     XmlEducationModeProbeV1,
-    JsonExSemanticShadowV1,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -788,12 +780,8 @@ impl LiveCompatibilityReceipt {
         }
         if !self.fixture_marker_verified {
             for operation in &self.operations {
-                if matches!(
-                    operation.profile,
-                    ReadProfileId::XmlLedgerReadV1
-                        | ReadProfileId::XmlVoucherEmptyRangeV1
-                        | ReadProfileId::XmlVoucherPopulatedRangeV1
-                ) && operation.outcome != OperationOutcome::NotAttempted
+                if matches!(operation.profile, ReadProfileId::XmlLedgerReadV1)
+                    && operation.outcome != OperationOutcome::NotAttempted
                 {
                     return Err(invalid("company_read_without_fixture_marker"));
                 }
@@ -1572,38 +1560,11 @@ fn validate_claim(claim: &SupportClaim) -> Result<(), CompatibilityError> {
         }
         _ => {}
     }
-    match claim.transport {
-        TransportProfile::XmlHttp => {
-            if claim
-                .required_profiles
-                .contains(&ReadProfileId::JsonExSemanticShadowV1)
-            {
-                return Err(invalid("xml_claim_contains_jsonex_profile"));
-            }
-        }
-        TransportProfile::JsonExShadow => {
-            if claim
-                .required_profiles
-                .iter()
-                .any(|profile| *profile != ReadProfileId::JsonExSemanticShadowV1)
-            {
-                return Err(invalid("jsonex_claim_contains_xml_profile"));
-            }
-            if claim.promotion_eligible || claim.level != ClaimLevel::Unknown {
-                return Err(invalid("jsonex_claim_not_qualifiable"));
-            }
-        }
-    }
     if claim.level == ClaimLevel::Supported {
-        if claim.transport != TransportProfile::XmlHttp {
-            return Err(invalid("supported_claim_transport_invalid"));
-        }
         let required: BTreeSet<_> = [
             ReadProfileId::XmlCompanyEnumerationV1,
             ReadProfileId::XmlSyntheticFixtureMarkerV1,
             ReadProfileId::XmlLedgerReadV1,
-            ReadProfileId::XmlVoucherEmptyRangeV1,
-            ReadProfileId::XmlVoucherPopulatedRangeV1,
         ]
         .into_iter()
         .collect();

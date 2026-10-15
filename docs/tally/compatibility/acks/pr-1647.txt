@@ -1,0 +1,2 @@
+src-tauri/src/db/tally_mirror.rs
+reviewer: lamemustafa

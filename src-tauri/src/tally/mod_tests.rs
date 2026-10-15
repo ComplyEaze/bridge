@@ -13,7 +13,7 @@ fn captured_identity(xml: &str, guid: &str) -> VerifiedCompanyIdentity {
         .expect("captured CompanyBookExtentV2 response parses as a Company collection");
     VerifiedCompanyIdentity::from_observed_companies(
         CAPTURED_NAME.to_string(),
-        guid.to_string(),
+        test_company_guid(guid),
         CAPTURED_NUMBER.to_string(),
         CAPTURED_BOOKS_FROM.to_string(),
         &companies,
@@ -49,4 +49,28 @@ fn verified_identity_canonicalizes_captured_guid_case_for_closing_comparison() {
         captured_identity(&closing, &upper_guid),
         "GUID casing alone must not make a verified closing identity drift"
     );
+}
+
+fn companies_with_guid(guid: &str) -> Vec<TallyCompany> {
+    vec![TallyCompany {
+        name: CAPTURED_NAME.to_string(),
+        guid: Some(guid.to_string()),
+        company_number: Some(CAPTURED_NUMBER.to_string()),
+        books_from: Some(CAPTURED_BOOKS_FROM.to_string()),
+    }]
+}
+
+#[test]
+fn identity_accepts_a_strict_company_guid_in_either_case_and_stores_lowercase() {
+    let upper = CAPTURED_GUID.to_ascii_uppercase();
+    let companies = companies_with_guid(&upper);
+    let identity = VerifiedCompanyIdentity::from_observed_companies(
+        CAPTURED_NAME.to_string(),
+        test_company_guid(&upper),
+        CAPTURED_NUMBER.to_string(),
+        CAPTURED_BOOKS_FROM.to_string(),
+        &companies,
+    )
+    .expect("a strict-shaped GUID in a complete tuple verifies");
+    assert_eq!(identity.company_guid(), CAPTURED_GUID);
 }

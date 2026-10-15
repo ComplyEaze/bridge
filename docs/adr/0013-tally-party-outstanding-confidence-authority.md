@@ -3,6 +3,8 @@
 Status: accepted for the portable PR16 foundation; live extraction and support
 authority remain unavailable.
 
+**Amended 2026-10-14:** the raw-observation parser and the confidence engine that implemented this decision were deleted in [#1710](https://github.com/ComplyEaze/bridge/pull/1710), because nothing outside them used them and no shipped build compiled the parser. The versioned Bills & Payments canonical model it also describes remains. The text below is kept as written.
+
 ## Context
 
 Tally exposes bill allocations and receivable/payable reports, but a parsed

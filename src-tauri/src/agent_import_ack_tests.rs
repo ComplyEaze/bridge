@@ -436,7 +436,7 @@ async fn a_recorded_review_goes_stale_when_anything_it_bound_changes() {
         ("voucher_guid", reconcile_readback(), other_guid),
         ("voucher_master_id", reconcile_readback(), other_master_id),
     ];
-    for (name, later, change) in cases {
+    async fn goes_stale(name: &str, later: Vec<ScenarioPlan>, change: Change) {
         let mut plans = reconcile_readback();
         plans.extend(reconcile_readback());
         plans.extend(later);
@@ -460,6 +460,36 @@ async fn a_recorded_review_goes_stale_when_anything_it_bound_changes() {
             "{name}"
         );
     }
+
+    // The cases share no file, lock or port: each has its own simulator,
+    // directory and server. A case spends its time waiting on its simulator
+    // (about 70 requests), so they run side by side on this thread and the
+    // waits overlap. Every case is joined, and a panic in any of them is
+    // passed on under the case's name.
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async {
+            let running = cases
+                .into_iter()
+                .map(|(name, later, change)| {
+                    (
+                        name,
+                        tokio::task::spawn_local(goes_stale(name, later, change)),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let mut panicked = None;
+            for (name, case) in running {
+                if let Err(error) = case.await {
+                    eprintln!("case {name} failed");
+                    panicked.get_or_insert(error);
+                }
+            }
+            if let Some(error) = panicked {
+                std::panic::resume_unwind(error.into_panic());
+            }
+        })
+        .await;
 }
 
 #[tokio::test]

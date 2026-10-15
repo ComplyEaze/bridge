@@ -548,7 +548,7 @@ proved. With it off, a batch of more than one voucher refuses exactly as before
   dispatch intent before the POST;
 - the ledger bindings, currency and bank-leg checks for every leg.
 
-**Approval.** The native dialog (#665's nonce-bound approval) shows a summary, not a listing:
+**Approval.** The native dialog (#665's nonce-bound approval) shows a summary, and for a batch of at most ten vouchers one line for each (below):
 - the company;
 - the count by type and the date range;
 - one line per ledger with its debit and credit totals and entry count;

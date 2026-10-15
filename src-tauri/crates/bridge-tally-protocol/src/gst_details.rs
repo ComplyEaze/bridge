@@ -47,7 +47,11 @@ pub struct GstDetailsEntry {
     pub taxability: Option<String>,
     /// `SRCOFGSTDETAILS`.
     pub source: Option<String>,
-    /// `GSTINELIGIBLEITC`, `Yes` or `No`.
+    /// `GSTINELIGIBLEITC`, `Yes` or `No`, as sent. The name is the one the
+    /// ledger output ships. The element's name says *in*eligible, and on one
+    /// stock item its Yes was seen where the screen read `Eligible for Input Tax
+    /// Credit: No` (PARTIAL), so the `masters` presentation of a stock item
+    /// writes it as `ineligible_itc`; `ledger_masters` is unchanged.
     pub itc_eligible: Option<bool>,
     pub states: Vec<GstStateDetails>,
     /// True when the element held content this parser does not model, at the

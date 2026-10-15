@@ -63,7 +63,8 @@ pub enum HsnDetailsDefect {
     /// An entry carried the same field twice.
     EntryRepeatsAField,
     ConflictingEntriesOnOneDate,
-    /// An entry whose only content is children this parser does not model.
+    /// An entry whose only content is children this parser does not model, or
+    /// text, a reference or CDATA directly in the list.
     UnrecognisedContent,
 }
 

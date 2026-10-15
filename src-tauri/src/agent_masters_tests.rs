@@ -332,6 +332,22 @@ fn the_tool_definition_admits_only_the_eight_kinds_and_states_the_size_limits() 
         MASTERS_RESPONSE_BUDGET_BYTES / masters_worst_row_bytes(NativeMasterKind::StockItems);
     assert_eq!(items, 489);
     assert!(description.contains(&format!("{items} for stock items")));
+    // The ITC element goes out under the name of its meaning, with what is and
+    // is not known; the old claim and the ledger's key are not used for items.
+    assert!(description.contains("`ineligible_itc` (Tally's `GSTINELIGIBLEITC` as sent"));
+    assert!(description.contains(
+        "which fits an ineligibility flag; PARTIAL, one book, two rows, screen against wire"
+    ));
+    assert!(description.contains("what an absent element means for the tax is not known"));
+    assert!(!description.contains("not the screen's setting"));
+    assert!(!description.contains("`itc_eligible` (true"));
+    // The kind's reach, its cut-off and what is unmeasured.
+    assert!(description.contains("refused past 16,344 UTF-16 units"));
+    assert!(description.contains("refuses both client books measured"));
+    assert!(description.contains("admit the read by the company's stock item count instead"));
+    assert!(description.contains("a zero-row stock-item answer are not measured"));
+    assert!(description.contains("such as text, a reference or CDATA directly in the list"));
+    assert!(description.contains("a person can edit, under every redaction setting"));
     assert!(description.contains("`voucher_types` and `groups` have no size check"));
     assert!(
         !description.contains("for voucher types"),
@@ -1125,9 +1141,12 @@ async fn stock_items_read_end_to_end_with_their_lists_exactly_as_sent() {
     assert_eq!(item["gst"]["observation"], "entries");
     assert_eq!(gst.len(), 2);
     assert_eq!(gst[0]["applicable_from"], "20250401");
-    assert_eq!(gst[0]["itc_eligible"], true);
-    // Present on one entry and not on the other: the second is null, never false.
-    assert_eq!(gst[1]["itc_eligible"], Value::Null);
+    // Tally's `GSTINELIGIBLEITC`, as sent, under the name of its meaning: Yes on
+    // the first entry, absent (null, never false) on the second.
+    assert_eq!(gst[0]["ineligible_itc"], true);
+    assert_eq!(gst[1]["ineligible_itc"], Value::Null);
+    // The ledger key is not on a stock item's entries.
+    assert!(gst.iter().all(|entry| entry.get("itc_eligible").is_none()));
     let igst = |entry: &Value| entry["states"][0]["rates"][2].clone();
     assert_eq!(
         igst(&gst[0]),
@@ -1180,7 +1199,19 @@ async fn an_item_without_entries_says_that_its_group_and_the_company_were_not_re
     assert!(mentions("not on the item's list"));
     assert!(mentions("inherited_from_group_or_company: not_read"));
     assert!(mentions("U+FFFD `#4;`"));
-    assert!(mentions("itc_eligible is present on some entries only"));
+    assert!(mentions(
+        "ineligible_itc is Tally's GSTINELIGIBLEITC as sent"
+    ));
+    assert!(mentions(
+        "fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire)"
+    ));
+    assert!(mentions(
+        "What an absent element means for the tax is not known"
+    ));
+    assert!(!mentions("not the screen's setting"));
+    assert!(mentions("a zero-row stock-item answer"));
+    assert!(mentions("which refuses both client books measured"));
+    assert!(mentions("past 16,344 UTF-16 units"));
     assert!(mentions("PARTIAL"));
     assert!(mentions(
         "Tally adds an HSN entry and a GST entry of its own"
@@ -1204,7 +1235,8 @@ async fn the_entries_tally_adds_on_a_first_save_are_returned_as_they_are() {
     let gst = &item["gst"]["entries"][0];
     assert_eq!(gst["source"], "As per Company/Stock Group");
     assert_eq!(gst["taxability"], Value::Null);
-    assert_eq!(gst["itc_eligible"], true);
+    assert_eq!(gst["ineligible_itc"], true);
+    assert!(gst.get("itc_eligible").is_none());
     assert!(gst["states"][0]["rates"]
         .as_array()
         .unwrap()

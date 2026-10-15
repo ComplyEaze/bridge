@@ -619,16 +619,20 @@ async fn a_tally_error_inside_a_stock_item_list_is_refused_at_once() {
 }
 
 #[tokio::test]
-async fn a_stock_item_row_over_its_bound_is_the_parsers_typed_refusal() {
-    // A filler the parser does not read, in a row: only the row's own length can
-    // refuse it. The first closing tag is the item count in the company
-    // information, outside any row, and the second is the first item's.
-    let filler = "x".repeat(masters_worst_row_bytes(NativeMasterKind::StockItems));
-    let long_row = capture(NativeMasterKind::StockItems).replacen(
-        "</STOCKITEM>",
-        &format!("<FILLER>{filler}</FILLER></STOCKITEM>"),
-        2,
-    );
+async fn a_stock_item_row_with_too_many_real_entries_is_the_parsers_typed_refusal() {
+    // Eight more copies of the item's real 22 September 2025 GST entry, each with
+    // a new valid date: the row passes the bound (16,344 UTF-16 units) and the
+    // parser refuses it, at once and by its own code.
+    let captured = capture(NativeMasterKind::StockItems);
+    let marker =
+        "<GSTDETAILS.LIST>\r\n      <APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM>";
+    let start = captured.find(marker).unwrap();
+    let end =
+        start + captured[start..].find("</GSTDETAILS.LIST>").unwrap() + "</GSTDETAILS.LIST>".len();
+    let copies = (1..=8)
+        .map(|month| captured[start..end].replace("20250922", &format!("2026{month:02}01")))
+        .collect::<String>();
+    let long_row = format!("{}{copies}{}", &captured[..end], &captured[end..]);
     let mut plans = opening(extents());
     pair(&mut plans, xml(long_row));
     let (result, dispatched) = run(plans, MastersKind::Native(NativeMasterKind::StockItems)).await;
@@ -639,6 +643,7 @@ async fn a_stock_item_row_over_its_bound_is_the_parsers_typed_refusal() {
         Some(&NativeMastersError::RowExceedsBound),
         "{error:?}"
     );
+    // Mode probe and identity (3), opening extent (4), the collection pair (4).
     assert_eq!(dispatched, 11);
 }
 

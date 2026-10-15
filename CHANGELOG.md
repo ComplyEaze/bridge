@@ -35,8 +35,11 @@ These changes are in source and not yet in a published build.
   its items' lists, the group's and the company's setting is not read, and every row says so
   (`inherited_from_group_or_company: not_read`). A defect in one item's list marks that list `unreadable` with its
   defect and the read stands; a Tally `ERROR`, markup inside a value or a cut-off list refuses the read. Item names
-  and parents are masked under `mask_parties`; HSN codes, descriptions and rates are returned as sent. A book is read
-  only up to a master mark of 489. Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
+  and parents are masked under `mask_parties`; HSN codes, descriptions and rates are returned as sent. Tally's
+  `GSTINELIGIBLEITC` is returned as sent under `ineligible_itc` (it was Yes where the screen read
+  `Eligible for Input Tax Credit: No`; one item, PARTIAL); `ledger_masters` keeps its own key. A book is read
+  only up to a master mark of 489, which refuses both client books measured; a later change is meant to admit
+  the read by the company's stock item count. Measured on one synthetic book of TallyPrime 7.1 Silver (three captures, one item
   with two dated entries in each list); a state row other than `Any`, slab rates, another release and a larger book
   are not measured. `stock_summary` is unchanged.
 

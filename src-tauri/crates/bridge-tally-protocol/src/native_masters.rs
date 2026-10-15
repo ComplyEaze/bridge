@@ -170,15 +170,23 @@ impl NativeMasterKind {
     /// names. Counted the same way (UTF-16 units, line ends kept, names
     /// included), the largest captured item row is 4,373 units, an item with two
     /// dated GST entries (1,627 and 1,569 units) and two dated HSN entries (287
-    /// and 267), against 619 to 635 for an item with empty lists. The
+    /// and 267), against 607 to 635 for an item with empty lists. The
     /// allowance is that measured row plus three more entries of each list at
     /// the larger measured size, two for further dated entries and one for the
     /// entry Tally adds on an item's first save: 4,373 + 3 x 1,627 + 3 x 287 =
     /// 10,115, rounded up. The HSN description is not a name slot: it is
-    /// inside this allowance. An item with more entries than that, or a state
-    /// row beyond `Any` (unmeasured), is refused as `masters_row_exceeds_bound`.
-    /// The admitted master mark follows from it (see
-    /// [`masters_worst_row_bytes`]).
+    /// inside this allowance.
+    ///
+    /// The cut-off a row is actually held to is the per-row span check in
+    /// `parse_row`: half of [`masters_worst_row_bytes`], that is 10,200 plus the
+    /// name allowance of 6 x 128 x 8, **16,344 UTF-16 units**. From the measured
+    /// 4,373 that lets seven further GST entries of 1,576 units (an entry of 1,569 and
+    /// its line break and indent) through (15,405 units) and refuses the eighth
+    /// (16,981). A state row beyond `Any`
+    /// (unmeasured) is read, validated and returned like any other content; it
+    /// is refused only through that same bound. A row past it is refused as
+    /// `masters_row_exceeds_bound`. The admitted master mark follows from the
+    /// same figure (see [`masters_worst_row_bytes`]).
     const fn fixed_chars(self) -> usize {
         match self {
             Self::VoucherTypes => 1_200,

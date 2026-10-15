@@ -49,7 +49,7 @@ names and bank account numbers to their first two and last two characters (a nam
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
 and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
-GSTIN, IFSC, MSME or Udyam registration numbers or contact details, and the bank statement tool's `account_last4` (the last
+GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes and descriptions or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
 environment variable before launch when that better fits the workflow.
 
@@ -408,12 +408,12 @@ sent it, and `inherited_from_group_or_company: not_read`. Each list is an `obser
 `entries` (sorted by `applicable_from`, every entry as sent; an HSN entry has its
 `hsn_code` as exact text, never trimmed, cut or read as a number, a `description`
 Tally fills from its own list and a `source`; a GST entry has `taxability`, `source`,
-`itc_eligible` (true, false or null, never filled in) and its state rows, each rate
+`ineligible_itc` (Tally's `GSTINELIGIBLEITC` as sent: true for Yes, false for No, null when absent, never filled in) and its state rows, each rate
 being `absent`, `empty`, `zero` or a `value` with its `raw` text and `decimal`, never
 merged), `unreadable` with its `defect` (an undated entry, an invalid date, a repeated
 field, two different entries on one date, a rate that is not a plain decimal, a credit
 flag other than Yes or No, a repeated state or duty-head row, or content only of a kind
-not modelled; that list of that item only, and the read and the row stand) or
+not modelled, such as text, a reference or CDATA directly in the list; that list of that item only, and the read and the row stand) or
 `not_observed` (the row had no such list). Nothing chooses the code or the rate for
 a date. An empty list, or `not_observed`, is not a statement that the item has no HSN
 code or no GST rate: a code keyed on the item's stock group did not appear on the
@@ -421,16 +421,20 @@ items' lists (one synthetic book, one release), and the group's and the company'
 setting is not read. Tally adds an entry of its own (dated 1 April 2025, source
 `As per Company/Stock Group`, no code, no rate) when an item is first saved. `state_name` and
 `valuation_type` carry the reserved-character marker (U+FFFD `#4;`) where Tally sends
-`Any` and `Not Applicable`. `itc_eligible` was present on one entry of an item and absent
-on the other, and did not follow the screen's setting. A Tally `ERROR` or `LINEERROR`
+`Any` and `Not Applicable`. On one item `GSTINELIGIBLEITC` was Yes on the entry whose screen
+row read `Eligible for Input Tax Credit: No` and absent on the entry whose screen row read Yes,
+which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire), so a stock
+item row names it `ineligible_itc`, not `itc_eligible` (`ledger_masters` keeps its own key). What an
+absent element means for the tax is not known: null is neither eligible nor ineligible. A Tally `ERROR` or `LINEERROR`
 anywhere in a list, markup inside a value, or a list cut off refuses the whole read
 (`masters_tally_reported_failure`, `masters_scalar_not_text_only`,
 `masters_xml_invalid_escape`, `masters_row_unterminated`). The collection must carry
 `MSTDEPTYPE` 512 (a choice made like the cost collections', not a measurement: no
 zero-row stock-item answer was captured). Under `mask_parties` item names and parents are
-masked; HSN codes, descriptions and rates are not names and are returned as sent.
+masked; HSN codes and rates are not names and are returned as sent, and so is an HSN description,
+which Tally fills from its tariff list and a person can edit, under every redaction setting.
 Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row other than
-`Any`, slab rates, another release and a larger book are not measured (protocol
+`Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured (protocol
 reference §12a.19). A `groups` row carries `name`,
 `parent` and `reserved_name` only, as the group snapshot returns them, and a
 parent that is Tally's reserved root keeps its marker form, as in
@@ -448,7 +452,7 @@ Godowns, units, stock groups, stock items, cost centres and cost categories are 
 mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
 mark counts the masters of every kind, so a book with few of this kind can be
 refused. That admits a mark of at most 1,152 for godowns, 1,168 for units,
-1,160 for stock groups, 489 for stock items (their row is allowed for several dated entries: 10,200 UTF-16 units against 4,373 measured), 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
+1,160 for stock groups, 489 for stock items (their row is allowed for several dated entries: a row is refused past 16,344 UTF-16 units, about seven further GST entries of the measured size, against 4,373 measured, whatever its state rows; this refuses both client books measured, and a later change is meant to admit the read by the company's stock item count instead), 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
 read at). Retrying refuses again. Both stock-heavy client books measured, with
@@ -489,9 +493,9 @@ characters a name, four aliases a master) that no capture has measured; a row
 that breaks them refuses the read as `masters_row_exceeds_bound`. No counts or
 hints (the company's `NUM*` fields), stock-item quantities or values (use `stock_summary`) or writes are part of this tool.
 
-Under `mask_parties`, godown, stock-group, cost-centre and cost-category names, their `parent`
+Under `mask_parties`, godown, stock-group, stock-item, cost-centre and cost-category names, their `parent`
 values and a cost centre's `category` are masked like a party name, because a job-work
-godown, a supplier-named stock group or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
+godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is a
 fixed marker and is left as it is. Voucher-type, unit and account-group names
 are not masked: they are configuration labels, not counterparties.
 

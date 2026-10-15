@@ -334,3 +334,14 @@ fn not_observed_still_serialises_as_an_observation() {
         serde_json::json!({"observation": "not_observed"})
     );
 }
+
+#[test]
+fn the_ledger_output_keeps_the_itc_key_it_ships() {
+    // `ledger_masters` serialises this type as it is; only the stock-item
+    // presentation of `masters` renames the key (`ineligible_itc`).
+    let observation = GstDetailsObservation::from_raw(vec![entry(Some("20260401"), vec![])]);
+    let json = serde_json::to_value(&observation).unwrap();
+    let first = &json["entries"][0];
+    assert_eq!(first["itc_eligible"], true);
+    assert!(first.get("ineligible_itc").is_none());
+}

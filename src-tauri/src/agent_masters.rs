@@ -2,6 +2,7 @@
 use super::trial_balance::page_boundary;
 use super::*;
 use crate::tally::runtime::{MastersKind, MastersRows};
+use bridge_tally_protocol::gst_details::GstDetailsObservation;
 use bridge_tally_protocol::native_masters::{
     NativeMasterDetail, NativeMasterKind, NativeMasterRow, NativeNumberingMethod,
 };
@@ -139,14 +140,35 @@ impl Server {
 /// What a `stock_items` answer says about its two lists. The size line names the
 /// master mark above which the kind is refused: the response budget over the
 /// kind's worst row (`masters_worst_row_bytes`), asserted equal in the tests.
-const STOCK_ITEM_LIMITATIONS: [&str; 6] = [
+const STOCK_ITEM_LIMITATIONS: [&str; 7] = [
     "hsn and gst are the item's own dated lists as Tally sent them: entries sorted by applicable_from, each as sent, one observation per list (entries, unreadable with its defect, or not_observed when the row had no such list). Nothing chooses the code or the rate for a date, adds a rate up or fills in a value Tally did not send",
     "An empty list (entries: []) or a missing one (not_observed) is not a statement that the item has no HSN code or no GST rate: a code or rate set on the item's stock group or on the company is not on the item's list (measured: after a code was keyed on a stock group, its items' lists did not change), and that setting is not read here. Every row says so with inherited_from_group_or_company: not_read",
     "Tally adds an HSN entry and a GST entry of its own, dated 1 Apr 2025 with source `As per Company/Stock Group` and no code or rate, when an item is first saved: such an entry says the item defers to its group or the company, not that a code or rate exists",
-    "state_name and valuation_type carry the reserved-character marker U+FFFD `#4;` where Tally sends its own `Any` and `Not Applicable`; itc_eligible is present on some entries only and is never filled in (on one item it was Yes on the entry the screen showed as No and absent on the entry the screen showed as Yes, so it is not the screen's setting); a rate is absent, empty, zero or a value, never merged",
-    "A list with a defect (an undated entry, a repeated field, a rate that is not a plain decimal, two different entries on one date) is returned as unreadable with its defect for that item's list only; a Tally ERROR, markup inside a value or a cut-off list refuses the whole read. HSN codes, descriptions and rates are not masked by mask_parties: they are not names",
-    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release and a larger book are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row); a larger book is refused as masters_too_large, and an item with more dated entries than that row allows is refused as masters_row_exceeds_bound",
+    "state_name and valuation_type carry the reserved-character marker U+FFFD `#4;` where Tally sends its own `Any` and `Not Applicable`; a rate is absent, empty, zero or a value, never merged",
+    "ineligible_itc is Tally's GSTINELIGIBLEITC as sent: true for Yes, false for No, null when the element was absent, never filled in. On one item it was Yes on the entry whose screen row read `Eligible for Input Tax Credit: No`, and absent on the entry whose screen row read Yes, which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire). What an absent element means for the tax is not known: do not read null as eligible or as ineligible, and do not read true as eligible",
+    "A list with a defect (an undated entry, a repeated field, a rate that is not a plain decimal, two different entries on one date, or an entry holding only content that is not modelled, such as text, a reference or CDATA directly in the list) is returned as unreadable with its defect for that item's list only; a Tally ERROR, markup inside a value or a cut-off list refuses the whole read. HSN codes and rates are not names. An HSN description is filled by Tally from its tariff list and a person can edit it; it is returned as sent under every redaction setting",
+    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row), which refuses both client books measured (marks of about 100,000 and 300,000); a larger book is refused as masters_too_large. A later change is meant to admit the read by the company's stock item count instead. An item row is refused as masters_row_exceeds_bound past 16,344 UTF-16 units (about seven further GST entries of the measured size), whatever its state rows",
 ];
+
+/// A stock item's GST observation under the key Tally's element means. The
+/// shared entry type serialises Tally's `GSTINELIGIBLEITC` as `itc_eligible`,
+/// which is the key `ledger_masters` ships; for a stock item Tally's Yes was
+/// seen where the screen's `Eligible for Input Tax Credit` read No, so it goes
+/// out as `ineligible_itc` with the same value, `true`, `false` or `null` and
+/// never a default. The ledger output is not changed.
+fn stock_item_gst_json(gst: &GstDetailsObservation) -> Value {
+    let mut value = json!(gst);
+    if let Some(entries) = value.get_mut("entries").and_then(Value::as_array_mut) {
+        for entry in entries {
+            if let Some(object) = entry.as_object_mut() {
+                if let Some(flag) = object.remove("itc_eligible") {
+                    object.insert("ineligible_itc".to_string(), flag);
+                }
+            }
+        }
+    }
+    value
+}
 
 /// Whether `mask_parties` masks this kind's names and parents. Godown,
 /// stock-group and stock-item names are text a user types, and a job-work
@@ -216,7 +238,7 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
             // The key is on every row: an empty list is the item's own and says
             // nothing about its stock group or the company.
             json["hsn"] = json!(hsn);
-            json["gst"] = json!(gst);
+            json["gst"] = stock_item_gst_json(gst);
             json["inherited_from_group_or_company"] = json!("not_read");
         }
         NativeMasterDetail::CostCentre { category } => {

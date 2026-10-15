@@ -24,7 +24,9 @@
 //!   repeated in an entry, state row or rate row, two entries on one date that
 //!   differ, a `GSTRATE` that is not a plain decimal, a `GSTINELIGIBLEITC` that is
 //!   not `Yes` or `No`, a repeated state or duty-head row, and an entry whose only
-//!   content is children this reader does not model.
+//!   content is children, or text, a reference or CDATA directly in the list,
+//!   that this reader does not model. (The same text directly in the row itself,
+//!   outside any list, refuses the read.)
 //!
 //! Children not modelled are skipped through the parser's own `skip_subtree`, which
 //! refuses `ERROR` at any depth, and the level records that it skipped one. This

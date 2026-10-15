@@ -189,8 +189,9 @@ fn the_two_date_capture_reads_two_hsn_and_two_gst_entries_as_sent() {
     assert_eq!(gst.len(), 2);
     assert_eq!(gst[0].applicable_from, "20250401");
     assert_eq!(gst[1].applicable_from, "20250922");
-    // The default for the credit differs between the two entries: present on
-    // one, absent on the other. Neither is filled in.
+    // `GSTINELIGIBLEITC` is present on one entry and absent on the other, and
+    // neither is filled in. (It was Yes where the screen read `Eligible for
+    // Input Tax Credit: No`, so the tool names it `ineligible_itc`.)
     assert_eq!(gst[0].itc_eligible, Some(true));
     assert_eq!(gst[1].itc_eligible, None);
     let rates = |entry: &GstDetailsEntry| {
@@ -848,29 +849,61 @@ fn item_row_units(text: &str) -> usize {
     text[start..end].encode_utf16().count()
 }
 
-#[test]
-fn a_row_over_the_bound_refuses_the_read_and_a_row_at_the_bound_does_not() {
+/// The capture with `extra` more GST entries on the item, each a copy of its
+/// real 22 September 2025 entry with a new valid date, put after that entry.
+fn with_more_gst_entries(extra: usize) -> String {
     let text = two_dates();
-    assert_eq!(item_row_units(&text), 4_373);
+    let row = text.find(&format!("<STOCKITEM NAME=\"{ITEM}\"")).unwrap();
+    let marker =
+        "<GSTDETAILS.LIST>\r\n      <APPLICABLEFROM TYPE=\"Date\">20250922</APPLICABLEFROM>";
+    let start = row + text[row..].find(marker).unwrap();
+    let end =
+        start + text[start..].find("</GSTDETAILS.LIST>").unwrap() + "</GSTDETAILS.LIST>".len();
+    // The line break and indent before the entry go with each copy.
+    let line = start - "\r\n     ".len();
+    assert_eq!(&text[line..start], "\r\n     ");
+    let mut copies = String::new();
+    for index in 0..extra {
+        let date = format!("2026{:02}01", index + 1);
+        copies.push_str(&text[line..end].replace("20250922", &date));
+    }
+    format!("{}{copies}{}", &text[..end], &text[end..])
+}
+
+#[test]
+fn seven_more_real_gst_entries_are_read_and_the_eighth_refuses_the_read() {
     let bound = masters_worst_row_bytes(KIND) / 2;
-    let filler = |units: usize| {
-        // `<FILLER>` and `</FILLER>` are 17 units.
-        assert!(units > 17);
-        format!("<FILLER>{}</FILLER>", "x".repeat(units - 17))
-    };
+    assert_eq!(bound, 16_344);
+    // Each copy of the real entry adds 1,576 units (the entry, 1,569, and its line break and indent) to the measured 4,373.
+    let seven = with_more_gst_entries(7);
+    assert_eq!(item_row_units(&seven), 4_373 + 7 * 1_576);
+    let masters = parse(&seven).unwrap();
+    let (_, gst) = lists(row(&masters, ITEM));
+    assert_eq!(gst_entries(gst).len(), 9);
+    // The eighth takes the row past the bound: the typed refusal, not a field.
+    let eight = with_more_gst_entries(8);
+    assert_eq!(item_row_units(&eight), 4_373 + 8 * 1_576);
+    assert!(item_row_units(&eight) > bound);
+    assert_eq!(parse(&eight), Err(NativeMastersError::RowExceedsBound));
+}
+
+#[test]
+fn a_row_exactly_at_the_cut_off_is_read_and_one_unit_more_is_refused() {
+    let bound = masters_worst_row_bytes(KIND) / 2;
+    // Seven real extra entries, and the item's own taxability text made longer
+    // (verbatim text, a valid value) until the row is exactly the bound.
+    let base = with_more_gst_entries(7);
     let padded = |extra: usize| {
         edited(
-            &text,
-            "</STOCKITEM>",
-            &format!("{}</STOCKITEM>", filler(extra)),
+            &base,
+            "Taxable</TAXABILITY>",
+            &format!("Taxable{}</TAXABILITY>", "t".repeat(extra)),
         )
     };
-    // Padding that brings the row exactly to the bound: read.
-    let at_bound = padded(bound - 4_373);
+    let at_bound = padded(bound - item_row_units(&base));
     assert_eq!(item_row_units(&at_bound), bound);
     assert_eq!(parse(&at_bound).unwrap().rows.len(), 12);
-    // One unit more: refused with the bound's own code.
-    let over = padded(bound - 4_373 + 1);
+    let over = padded(bound - item_row_units(&base) + 1);
     assert_eq!(item_row_units(&over), bound + 1);
     assert_eq!(parse(&over), Err(NativeMastersError::RowExceedsBound));
 }
@@ -942,4 +975,16 @@ fn another_kind_still_skips_a_list_it_does_not_read_and_still_refuses_an_error_i
         ),
         Err(NativeMastersError::TallyReportedFailure)
     );
+}
+
+#[test]
+fn a_state_row_other_than_any_is_read_like_any_other_content() {
+    let (_, gst) = item_after(
+        "<STATENAME TYPE=\"String\">&#4; Any</STATENAME>",
+        "<STATENAME TYPE=\"String\">Goa</STATENAME>",
+    )
+    .unwrap();
+    let gst = gst_entries(&gst);
+    assert_eq!(gst[0].states[0].state_name.as_deref(), Some("Goa"));
+    assert_eq!(gst[0].states[0].rates.len(), 5);
 }

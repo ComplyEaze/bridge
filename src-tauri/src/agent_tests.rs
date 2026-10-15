@@ -63,66 +63,64 @@ fn ordinary_vouchers_reject_missing_or_empty_core_fields_before_selection() {
 
 #[test]
 fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
-    for request in [render_agent_vouchers(
+    let request = render_agent_vouchers(
         "Book",
         &tally_date("20260901"),
         &tally_date("20260902"),
         None,
     )
-    .unwrap()]
-    {
-        let mut reader = quick_xml::Reader::from_str(&request);
-        let mut fields = Vec::new();
-        loop {
-            match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
-                    fields = reader
-                        .read_text(event.name())
-                        .unwrap()
-                        .split(',')
-                        .map(str::to_string)
-                        .collect();
-                }
-                quick_xml::events::Event::Eof => break,
-                _ => {}
+    .unwrap();
+    let mut reader = quick_xml::Reader::from_str(&request);
+    let mut fields = Vec::new();
+    loop {
+        match reader.read_event().unwrap() {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
+                fields = reader
+                    .read_text(event.name())
+                    .unwrap()
+                    .split(',')
+                    .map(str::to_string)
+                    .collect();
             }
+            quick_xml::events::Event::Eof => break,
+            _ => {}
         }
-        for field in [
-            "ISCANCELLED",
-            "ISOPTIONAL",
-            // Allow-listing ISPOSTDATED in agent_voucher_scalars.rs is inert unless
-            // it is also named here: Tally omits a field from COLLECTION XML that
-            // the FETCH list does not name, no matter what the parser accepts.
-            "ISPOSTDATED",
-            // The ENTRY wildcard, which 2.4a proves correct on the instance where
-            // curated allocation paths misreport New Ref/Agst Ref as On Account.
-            // The narrower BILLALLOCATIONS.* is cheaper and measured equivalent
-            // HERE, but untested THERE -- and an unverified narrowing is not worth
-            // a payload saving when the failure is silently-wrong evidence.
-            "ALLLEDGERENTRIES.*",
-            // Same inertness trap as ISPOSTDATED above: allow-listing REFERENCE/
-            // ISINVOICE/PARTYGSTIN in agent_voucher_scalars.rs without also naming
-            // them here would leave reference/is_invoice/party_gstin permanently
-            // absent. Protocol reference §8.2c captured all three cleanly on
-            // TallyPrime 7.1 Silver alongside the existing fields.
-            "REFERENCE",
-            "ISINVOICE",
-            "PARTYGSTIN",
-            // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
-            "REFERENCEDATE",
-        ] {
-            assert!(fields.iter().any(|value| value == field), "missing {field}");
-        }
-        for narrower in [
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.NAME",
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE",
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.*",
-        ] {
-            assert!(
-                !fields.iter().any(|value| value == narrower),
-                "{narrower} must not be narrowed back in while 2.4a's instance is unverified"
-            );
-        }
+    }
+    for field in [
+        "ISCANCELLED",
+        "ISOPTIONAL",
+        // Allow-listing ISPOSTDATED in agent_voucher_scalars.rs is inert unless
+        // it is also named here: Tally omits a field from COLLECTION XML that
+        // the FETCH list does not name, no matter what the parser accepts.
+        "ISPOSTDATED",
+        // The ENTRY wildcard, which 2.4a proves correct on the instance where
+        // curated allocation paths misreport New Ref/Agst Ref as On Account.
+        // The narrower BILLALLOCATIONS.* is cheaper and measured equivalent
+        // HERE, but untested THERE -- and an unverified narrowing is not worth
+        // a payload saving when the failure is silently-wrong evidence.
+        "ALLLEDGERENTRIES.*",
+        // Same inertness trap as ISPOSTDATED above: allow-listing REFERENCE/
+        // ISINVOICE/PARTYGSTIN in agent_voucher_scalars.rs without also naming
+        // them here would leave reference/is_invoice/party_gstin permanently
+        // absent. Protocol reference §8.2c captured all three cleanly on
+        // TallyPrime 7.1 Silver alongside the existing fields.
+        "REFERENCE",
+        "ISINVOICE",
+        "PARTYGSTIN",
+        // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+        "REFERENCEDATE",
+    ] {
+        assert!(fields.iter().any(|value| value == field), "missing {field}");
+    }
+    for narrower in [
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.NAME",
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE",
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.*",
+    ] {
+        assert!(
+            !fields.iter().any(|value| value == narrower),
+            "{narrower} must not be narrowed back in while 2.4a's instance is unverified"
+        );
     }
     // A read should fetch what it returns: ledger_movement discards allocations.
     let movement =

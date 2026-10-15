@@ -110,10 +110,13 @@ a caller. They are recorded so that a later re-add does not repeat them.
 
 The feed also read only ledgers and groups, while the master mark covers more. The protocol
 reference records that switching a voucher type to Manual numbering moved the company's master mark
-(`ALTMSTID`, 224 to 226) with no voucher `ALTERID` changing (TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md,
-the numbering-switch record). A feed that stops when the master mark stops moving would therefore
-need to read voucher types; this ADR records no other master kind, because no document or test in
-this repository shows one.
+(`ALTMSTID`, 224 to 226) with no voucher `ALTERID` changing. That is one observation (2026-10-12);
+a second like it is recorded for 2026-10-13, a switch to Automatic (Manual Override) on another
+synthetic book, with the mark moving by 2 and again no voucher `ALTERID` changing. Both records
+are in TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md, under the heading on switching a voucher
+type that holds vouchers to Manual numbering. A feed that
+stops when the master mark stops moving would therefore need to read voucher types; this ADR
+records no other master kind, because no document or test in this repository shows one.
 
 Nothing here changes the decision above: incremental authority still needs the proofs listed under
 "Reasons for remaining disabled".

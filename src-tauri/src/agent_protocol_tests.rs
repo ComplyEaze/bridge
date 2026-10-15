@@ -541,6 +541,11 @@ async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_rec
             .expect("a receipt for the removed tool's name");
     assert_eq!(removed_tool_receipt["tool"], "unknown");
     assert_eq!(removed_tool_receipt["rows_prepared"], 0);
+    assert_eq!(removed_tool_receipt["fields_prepared"], json!([]));
+    assert_eq!(
+        removed_tool_receipt["response_sha256"],
+        sha256_hex(format!("{}\n", responses[4]).as_bytes())
+    );
 }
 
 #[tokio::test]

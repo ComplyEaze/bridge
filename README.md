@@ -3,22 +3,23 @@
 [![ComplyEaze Bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/ComplyEaze/bridge/badges/score.svg)](https://glama.ai/mcp/servers/ComplyEaze/bridge)
 
 <!-- llms:begin -->
-ComplyEaze Bridge is an open-source (Apache-2.0) TallyPrime (also written Tally
-Prime) MCP server for Claude Desktop. It connects Claude Desktop to the
-TallyPrime running on your own computer, and it is built for chartered
-accountants, CA firms and accountants. What Claude reads from your books goes to
-your AI provider as part of the chat. You can ask about the trial balance,
-outstanding receivables and payables with ageing, ledger movement and vouchers,
-the purchase and sales registers, the stock summary,
-and the Profit and Loss and Balance Sheet (a book with stock items is expected
-to be refused for these two). It checks ledger names before you post. For bank
-statement to TallyPrime vouchers, it proposes Payment, Receipt and Contra
-vouchers from a password-protected SBI, HDFC or Union Bank of India statement
-PDF, and it prepares Journal, Payment, Receipt and Contra vouchers as an import
-file that you review and import into TallyPrime yourself. Posting is off by
-default, so as installed it never posts to TallyPrime: it reads from it and
-prepares files on your computer. If you turn posting on in the extension, it
-posts vouchers one at a time, after you approve each one.
+ComplyEaze Bridge is an open-source (Apache-2.0) MCP server that connects
+Claude Desktop to the TallyPrime (also written Tally Prime) running on your own
+computer. It is built for chartered accountants, CA firms and accountants. It
+reads your books; from a password-protected SBI, HDFC or Union Bank of India
+statement PDF it proposes Payment, Receipt and Contra vouchers, and once every
+ledger name is exact and every question is answered it writes them to a file
+that you import in TallyPrime yourself. What Claude reads from your books goes to your AI provider as part of
+the chat. You can ask about the trial balance, outstanding receivables and
+payables with ageing, ledger movement and vouchers, the purchase and sales
+registers, the stock summary, and the Profit and Loss and Balance Sheet (a book
+with stock items is expected to be refused for these two). It checks ledger
+names before you post, and prepares Journal, Payment, Receipt and Contra
+vouchers as an import file that you review and import into TallyPrime yourself.
+Posting is off by default in a new install, so as installed it never posts to
+TallyPrime: it reads from it and prepares files on your computer. If you turn
+posting on in the extension, it posts vouchers one at a time, after you approve
+each one.
 
 Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop;
 its help pages (last updated 18 September 2026) list tools in six groups:
@@ -59,7 +60,7 @@ with no figures, to a log on this computer.
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
 | `company_features` | Three settings the company’s record in Tally holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol; no ledger, voucher, amount or narration. Each of the three settings equalled Tally’s F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
-| `gst_status` | Tally’s own GSTR-1 status flags on the vouchers of one voucher type in a period of at most 93 days: for each voucher its number, date, a status (included, uncertain, excluded, not in return, cancelled or optional) and whether a person accepted it as it stands; no amount, party, ledger or narration. A status is Tally’s own flag and not a judgement of ComplyEaze Bridge. Measured on one synthetic book of TallyPrime 7.1 Silver, where `excluded` has not been observed | Nothing |
+| `gst_status` | Tally’s own GSTR-1 status flags on the vouchers of one voucher type in a period of at most 93 days: for each voucher its number, date, a status (included, uncertain, excluded, not in return, cancelled, optional or post-dated; for the last three also what the three status flags read) and whether a person accepted it as it stands; no amount, party, ledger or narration. A status is Tally’s own flag and not a judgement of ComplyEaze Bridge. Measured on one synthetic book of TallyPrime 7.1 Silver, where `excluded` has not been observed | Nothing |
 | `ledger_masters` | Ledgers with their opening balances; optionally GSTIN, PAN and other party details | Nothing |
 | `ledger_movement` | A ledger’s opening, debits, credits and closing for a period | Nothing |
 | `list_companies` | The companies loaded in TallyPrime (start here) | Nothing |
@@ -391,11 +392,11 @@ What you pay or provide today:
 - **Your clients' data:** what Claude reads goes to Anthropic, under
   Anthropic's terms for your plan; through ComplyEaze Bridge, ComplyEaze does
   not receive it
-  ([Privacy Policy](https://bridge.complyeaze.com/privacy), sections 4 to 6).
+  ([Privacy Policy](https://bridge.complyeaze.com/privacy.html), sections 4 to 6).
 - **Your checking:** check results in Tally before you rely on them.
 
 Support and updates are not guaranteed
-([Terms of Use](https://bridge.complyeaze.com/terms), section 4.4). Our
+([Terms of Use](https://bridge.complyeaze.com/terms.html), section 4.4). Our
 liability is limited as section 14 sets out, including its fallback and
 exceptions; read it before client work.
 

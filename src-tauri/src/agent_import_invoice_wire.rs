@@ -6,14 +6,14 @@
 //! one, or a name two rows claim is an error, never a default.
 //!
 //! What each read was observed to return (TallyPrime 7.1 Silver, 6 Oct 2026,
-//! one real book, not a lab book; its answers are held privately and are not
+//! one real book; its answers are held privately and are not
 //! in this repository): the voucher-type collection with no field
 //! list returns every type, with the
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
 //! returns `ISBILLWISEON` as Yes or No. The company-state read was measured
-//! the same day on the synthetic lab company (one row a loaded company, the
+//! the same day on one company on the lab's Tally (one row a loaded company, the
 //! row chosen by GUID carried its STATENAME); an answer that does not carry a
 //! known state name fails the build (`invoice_company_state_unreadable`).
 

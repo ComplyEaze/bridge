@@ -712,11 +712,12 @@ class MergeGateControls(unittest.TestCase):
         result = self.assert_pass("carry-same-patch", "carried")
         self.assertIn("byte-identical", result.stdout)
 
-    def test_a_change_of_context_lines_alone_still_carries_the_clean_line(self):
-        self.assert_pass("carry-context-differs", "carried")
+    def test_a_change_of_the_text_after_the_hunk_numbers_alone_still_carries_the_clean_line(self):
+        self.assert_pass("carry-function-context-differs", "carried")
 
     def test_a_clean_line_is_not_carried_when_the_patch_changed_or_cannot_be_compared(self):
         for scenario in ("carry-patch-differs", "carry-whitespace-only", "carry-indent-only", "carry-mode-change", "carry-binary", "carry-compare-fails",
+                         "carry-context-differs", "carry-hunk-numbers-differ", "carry-moved-insertion",
                          "carry-empty-diff", "carry-duplicate-file-sections", "carry-diff-cut-short"):
             with self.subTest(scenario=scenario):
                 result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
@@ -1778,9 +1779,9 @@ class MergeWrapperControls(unittest.TestCase):
             "#!/usr/bin/env bash\n"
             'echo "$*" >>"$GH_LOG"\n'
             'case "$1 $2" in\n'
-            '  "pr view") [ -z "${GH_VIEW_FAIL:-}" ] || exit 1; n=$(grep -c "^pr view" "$GH_LOG"); if [ "$n" -ge 2 ] && [ -n "${GH_VIEW2_FAIL:-}" ]; then exit 1; fi; if [ "$n" -ge 2 ] && [ -f "${GH_VIEW2:-/nonexistent}" ]; then cat "$GH_VIEW2"; else cat "$GH_VIEW"; fi ;;\n'
+            '  "pr view") [ -z "${GH_VIEW_FAIL:-}" ] || exit 1; n=$(grep -c "^pr view" "$GH_LOG"); if [ "$n" -ge 3 ] && [ -f "${GH_VIEW3:-/nonexistent}" ]; then cat "$GH_VIEW3"; exit 0; fi; if [ "$n" -ge 2 ] && [ -n "${GH_VIEW2_FAIL:-}" ]; then exit 1; fi; if [ "$n" -ge 2 ] && [ -f "${GH_VIEW2:-/nonexistent}" ]; then cat "$GH_VIEW2"; else cat "$GH_VIEW"; fi ;;\n'
             '  "pr ready") exit "${GH_READY_EXIT:-0}" ;;\n'
-            '  "pr merge") exit "${GH_MERGE_EXIT:-0}" ;;\n'
+            '  "pr merge") [ -z "${GH_MERGE_SLEEP:-}" ] || sleep "$GH_MERGE_SLEEP"; exit "${GH_MERGE_EXIT:-0}" ;;\n'
             "  *) exit 99 ;;\n"
             "esac\n"
         )
@@ -1793,7 +1794,7 @@ class MergeWrapperControls(unittest.TestCase):
         cls.tmp.cleanup()
 
     def run_wrapper(self, args=("321", "--repo", "ComplyEaze/bridge"), gate_out=None, gate_exit=0, view=None, view_fail=False,
-                    merge_exit=0, ready_exit=0, view2=None, view2_fail=False):
+                    merge_exit=0, ready_exit=0, view2=None, view2_fail=False, view3=None, merge_sleep=None, signal_after=None):
         work = Path(tempfile.mkdtemp(dir=self.root))
         (work / "gate-out").write_text(self.GATE_PASS if gate_out is None else gate_out)
         (work / "view").write_text(json.dumps(self.VIEW if view is None else view))
@@ -1805,12 +1806,29 @@ class MergeWrapperControls(unittest.TestCase):
         env["GH_VIEW2"] = str(work / "view2")
         if view2_fail:
             env["GH_VIEW2_FAIL"] = "1"
+        if view3 is not None:
+            (work / "view3").write_text(json.dumps(view3))
+            env["GH_VIEW3"] = str(work / "view3")
+        if merge_sleep is not None:
+            env["GH_MERGE_SLEEP"] = str(merge_sleep)
         env.update(PATH=f"{self.root}:{env['PATH']}", STUB_GATE_OUT=str(work / "gate-out"), STUB_GATE_EXIT=str(gate_exit),
                    GH_LOG=str(log), GH_VIEW=str(work / "view"), GH_MERGE_EXIT=str(merge_exit), GH_READY_EXIT=str(ready_exit))
         if view_fail:
             env["GH_VIEW_FAIL"] = "1"
-        result = subprocess.run([str(self.root / "scripts" / "merge-gate-merge.sh"), *args], env=env, text=True,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        if signal_after is not None:
+            import signal as signal_module
+            import time
+            proc = subprocess.Popen([str(self.root / "scripts" / "merge-gate-merge.sh"), *args], env=env, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            deadline = time.time() + 20
+            while time.time() < deadline and not any(line.startswith("pr merge") for line in log.read_text().splitlines()):
+                time.sleep(0.05)
+            proc.send_signal(signal_module.SIGTERM)
+            out, err = proc.communicate(timeout=30)
+            result = subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
+        else:
+            result = subprocess.run([str(self.root / "scripts" / "merge-gate-merge.sh"), *args], env=env, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
         calls = [line for line in log.read_text().splitlines() if line]
         return result, calls
 
@@ -1850,6 +1868,19 @@ class MergeWrapperControls(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertEqual([c for c in calls if c.startswith("pr ready")], ["pr ready 321 --repo ComplyEaze/bridge", "pr ready 321 --repo ComplyEaze/bridge --undo"])
                 self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_merge_that_gh_reports_as_failed_but_that_happened_is_not_undone(self):
+        draft = dict(self.VIEW, isDraft=True)
+        result, calls = self.run_wrapper(view=draft, merge_exit=1, view3=dict(draft, state="MERGED"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("merge requested", result.stdout)
+        self.assertFalse([c for c in calls if "--undo" in c], calls)
+
+    def test_an_interrupt_during_the_merge_says_what_state_the_pull_request_may_be_in_and_does_not_undo_it(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), merge_sleep=2, signal_after=True)
+        self.assertEqual(result.returncode, 143, result.stdout + result.stderr)
+        self.assertIn("interrupted", result.stderr)
+        self.assertFalse([c for c in calls if "--undo" in c], calls)
 
     def test_a_second_read_that_fails_refuses_and_returns_a_draft_to_draft(self):
         result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), view2_fail=True)

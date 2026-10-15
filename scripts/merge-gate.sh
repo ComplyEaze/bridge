@@ -933,12 +933,14 @@ else
     verdict_exit=0
     verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc.json" 2>/dev/null) || verdict_exit=$?
     # A MERGE-VERDICT CLEAN line that names an older head and merge base is carried to the current pair when the pull request's
-    # own change (merge base...head) is the same at both: the same file headers and mode lines and, byte for byte, the same added
-    # and removed lines. A merge of master that leaves the pull request's own lines alone keeps the reviewer's CLEAN; a change of
-    # context lines, hunk numbers or index lines does not matter. (git patch-id is not used: it ignores whitespace inside lines.)
+    # own change (merge base...head) is the same at both. "The same" is exact: the whole compare diff, byte for byte, apart from
+    # the `index` lines (blob ids move with a merge of master) and the text after the hunk numbers (the enclosing function's
+    # name). Context lines and hunk numbers are part of it, so a change moved to another place in a file is not the same change,
+    # and a merge that touches the pull request's files around its hunks is not carried: the reviewer looks again. A merge of
+    # master that leaves those files alone keeps the CLEAN. (git patch-id is not used: it ignores whitespace and position.)
     # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, holds a binary change (its text hides the bytes),
     # lists a file twice, or names other files than the pull request's current file list is never carried. What master changed
-    # outside the pull request's own lines is not looked at: that is the checks' job at the head.
+    # in other files is not looked at: that is the checks' job at the head.
     candidate_head=$(jq -r '.candidate_clean.head // empty' <<<"$verdict_result" 2>/dev/null)
     candidate_base=$(jq -r '.candidate_clean.base // empty' <<<"$verdict_result" 2>/dev/null)
     if [ "$(jq -r '.clean' <<<"$verdict_result" 2>/dev/null)" != "true" ] && [[ "$candidate_head" =~ ^[0-9a-f]{40}$ ]] && [[ "$candidate_base" =~ ^[0-9a-f]{40}$ ]]; then
@@ -953,11 +955,11 @@ else
           [ "$(printf '%s\n' "$names" | sort | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || return 1
           [ "$(printf '%s\n' "$names" | sort -u)" = "$(cut -f1 "$changed_records" | sort -u)" ] || return 1
         fi
-        grep -E '^(diff --git |(new|deleted) file mode |(old|new) mode |(rename|copy) (from|to) |similarity index |[+-]|\\ No newline)' "$diff_file" | shasum -a 256 | cut -c1-64
+        LC_ALL=C grep -av '^index ' "$diff_file" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
       }
       old_digest=$(own_change_digest "$candidate_base" "$candidate_head") && new_digest=$(own_change_digest "$merge_base" "$head" check-files)
       if [ -n "${old_digest:-}" ] && [ "${old_digest:-}" = "${new_digest:-}" ]; then
-        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own added and removed lines are byte-identical (digest ${old_digest:0:12})"
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included (digest ${old_digest:0:12})"
         jq -c --arg h "$candidate_head" --arg b "$candidate_base" '. + {carried: {head: $h, base: $b}}' "$tmpdir/verdict-doc.json" >"$tmpdir/verdict-doc-carried.json" 2>/dev/null \
           && verdict_exit=0 \
           && verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc-carried.json" 2>/dev/null) || verdict_exit=$?

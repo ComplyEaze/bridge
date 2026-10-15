@@ -121,6 +121,18 @@ test("the real list puts the write path, credentials and the gate in the full ti
     "src-tauri/crates/bridge-tally-protocol/tests/parse_record/x.txt",
     "scripts/testdata/capture.xml",
     "src-tauri/src/never_seen_before.rs",
+    // tests of write-path features, by name, in any language and any case
+    "scripts/journal-posting-state.test.mjs",
+    "scripts/journal-posting-ui.test.mjs",
+    "scripts/journal-posting-screen.test.tsx",
+    "scripts/source-draft-shell.spec.ts",
+    "scripts/bank_statement_import.test.py",
+    "src-tauri/tests/post_something.rs",
+    "src-tauri/tests/something_send.rs",
+    "src/BankImport.tsx",
+    "src-tauri/src/agent_company_checkpoint.rs",
+    "src-tauri/src/reports/bulk_party_statement.rs",
+    "src-tauri/src/reports/bulk_party_statement_tests.rs",
     // tests that are #[path] children of write-path modules
     "src-tauri/src/agent_post_cancellation_tests.rs",
     "src-tauri/src/agent_post_recovery_tests.rs",
@@ -177,7 +189,7 @@ test("the real list puts reads, interface, documents and plain tests in the one 
     "site/home.css",
     "site/llms.txt",
     "scripts/outstandings-csv.test.mjs",
-    "scripts/bank_statement_import.test.py",
+    "scripts/tally-endpoint-reconnect-hint.test.mjs",
   ];
   for (const path of one) assert.equal(tierOf([path], realRules).tier, "one", path);
 });
@@ -186,11 +198,10 @@ test("no tracked file whose name says import, post, ledger creation, narration, 
   const listed = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" });
   assert.equal(listed.status, 0, listed.stderr);
   const hazardous = /import|ledger_create|narration|approv|(^|[^a-z])egress|credential|secret|encrypt|_post|post_/i;
-  // Documents and tests about those subjects are one-reviewer by design; this guards the code.
+  // Documents about those subjects are one-reviewer by design (the code pattern leaves them out); tests of them are not.
   const code = /\.(rs|ts|tsx|mjs|py|sh|sql|toml|json)$/;
   const offenders = listed.stdout.split("\0").filter(Boolean).filter((path) => {
     if (!hazardous.test(path) || !code.test(path)) return false;
-    if (/(_tests?\.rs|\.test\.(mjs|py|tsx?)|\.spec\.ts)$/.test(path)) return false;
     // The tax-audit engine reads exported narrations to audit them; it writes nothing to Tally.
     if (path.startsWith("src-tauri/crates/bridge-tax-audit/")) return false;
     return tierOf([path], realRules).tier === "one";

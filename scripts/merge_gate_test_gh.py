@@ -266,11 +266,19 @@ def state():
         # removed lines (merge base...head) are byte-identical at both. The compare answers below are the two diffs.
         s["owner_items"] = [owner_comment("MERGE-VERDICT CLEAN head=" + OLD_HEAD + " base=" + OLD_BASE, T1)]
         set_changes(s, ("modified", "docs/x.md"))
-        # Only the index line and the hunk numbers differ between the two: the pull request's own lines are the same.
-        old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444").replace("@@ -1,2 +1,2 @@", "@@ -11,2 +11,2 @@")
+        # Only the index line differs between the two: the pull request's own change is the same, in the same place.
+        old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444")
         new = CARRY_DIFF
-        if scenario == "carry-context-differs":
+        if scenario == "carry-function-context-differs":
+            # the text after the hunk numbers names the enclosing function and moves with master's renames: it does not count
+            old = old.replace("@@ -1,2 +1,2 @@\n", "@@ -1,2 +1,2 @@ fn renamed_by_master()\n")
+        elif scenario == "carry-hunk-numbers-differ":
+            old = old.replace("@@ -1,2 +1,2 @@", "@@ -11,2 +11,2 @@")
+        elif scenario == "carry-context-differs":
             old = old.replace(" keep\n", " keep (master changed this line)\n")
+        elif scenario == "carry-moved-insertion":
+            # the same added line, put where the same text also stands: only the hunk's place differs
+            old = old.replace("@@ -1,2 +1,2 @@", "@@ -21,2 +21,2 @@")
         elif scenario == "carry-patch-differs":
             new = CARRY_DIFF.replace("+changed", "+changed differently")
         elif scenario == "carry-whitespace-only":

@@ -77,8 +77,17 @@ if [ "$(jq -r .state <<<"$view" 2>/dev/null)" != "OPEN" ] || [ "$(jq -r .baseRef
   undo_ready
   refuse "the pull request changed (state, base or head) between the checks and the merge"
 fi
+# An interrupt while gh runs may leave the pull request ready, merged or queued; say so and leave it as it is (undoing "ready" on a
+# queued or merged pull request would be wrong).
+trap 'echo "interrupted: PR $PR may be ready for review, queued or merged; check it" >&2; exit 143' TERM INT
 if gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$gated"; then
-  echo "merged PR $PR in $REPO at ${gated:0:12}"
+  echo "merge requested for PR $PR in $REPO at ${gated:0:12} (merged, or queued if the repository uses a merge queue)"
+  exit 0
+fi
+# gh may report an error although the merge happened: look before undoing anything.
+state=$(gh pr view "$PR" --repo "$REPO" --json state 2>/dev/null | jq -r '.state // empty' 2>/dev/null) || state=""
+if [ "$state" = "MERGED" ]; then
+  echo "merge requested for PR $PR in $REPO at ${gated:0:12} (gh reported an error, but the pull request is merged)"
   exit 0
 fi
 undo_ready

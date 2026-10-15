@@ -23,7 +23,7 @@ const CLASS_TIER = {
   tests: "one",
   docs: "one",
 };
-const MATCH_KEYS = ["exact", "prefix", "suffix", "contains"];
+const MATCH_KEYS = ["exact", "prefix", "suffix", "contains", "icontains"];
 const here = dirname(fileURLToPath(import.meta.url));
 
 function refuse(message) {
@@ -60,6 +60,7 @@ function matches(path, match) {
   if (match.prefix !== undefined && !path.startsWith(match.prefix)) return false;
   if (match.suffix !== undefined && !path.endsWith(match.suffix)) return false;
   if (match.contains !== undefined && !path.includes(match.contains)) return false;
+  if (match.icontains !== undefined && !path.toLowerCase().includes(match.icontains.toLowerCase())) return false;
   return true;
 }
 

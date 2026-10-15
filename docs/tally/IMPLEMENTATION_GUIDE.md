@@ -1110,6 +1110,18 @@ logged-in user. Its documentation does not mention the XML gateway or port 9000,
 established as a solution for headless XML integration. Worth investigating only if the hosted
 topology is revived.
 
+### 5.5 A real statement's layout is never committed as a capture
+
+A bank statement's text layer places every word, and the width or position of a word that has
+been masked can still identify the word. Do not commit a sanitised capture of a new statement
+or layout; measure the layout on the statement where it lives and commit only what describes its
+shape (see `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs`, which prints no
+position of a masked word). The two captures in `scripts/fixtures/` are the last ones, and
+`scripts/fixtures/README.md` says so. `tests/committed_captures_tests.rs` in the bank crate is a
+tripwire for non-ASCII text in them, not a gate.
+
+---
+
 ## 6. Parsing
 
 ### 6.1 Tally emits XML that strict parsers reject — I9

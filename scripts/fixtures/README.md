@@ -57,6 +57,20 @@ qualify raw customer data.
    itself lives in `scripts/`, not here — this directory holds evidence, and a tool whose bytes are
    pinned as evidence is a category error.
 
+## No new real captures
+
+The two bank captures above are the last of their kind. A statement's text layer places every
+word, and the width and position of a word that has been masked can still identify it, so a
+sanitised `pdftotext -bbox-layout` capture is not committed for a new bank or a new layout: the
+Union Bank and Bank of Baroda layouts were added from shapes measured on statements that stay
+private, and `src-tauri/crates/bridge-bank-statement/examples/layout_probe.rs` prints no position of
+a masked word. A future public fixture from a real statement needs a design that follows that
+contract, written when it is needed; until then none is added. A person reviews any capture that
+is. `src-tauri/crates/bridge-bank-statement/tests/committed_captures_tests.rs` is only a tripwire
+over `*-bbox-capture.xml` here: it fails on a character outside ASCII in the text, once the XML's
+entities are decoded and the banner comment is set aside, and it would pass on the raw text layer
+of an English statement.
+
 ## Integrity digests
 
 Each row is the SHA-256 of the file's committed bytes, which

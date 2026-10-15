@@ -709,7 +709,7 @@ impl Server {
                 "dates must be within the selected company's BOOKSFROM through today",
                 "ledger names must exactly match the live catalogue; validate_masters before build_import_xml",
                 "a batch may contain at most 100 distinct ledger names of at most 1024 characters each"
-            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import (and, when BRIDGE_AGENT_ENABLE_BATCH_POST is on, a batch of 2 to 50 such vouchers): an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
+            ], "limits": {"import_mode_qualification": "New files require freshly observed supported TallyPrime product and licence mode before and after the build reads. Release and licence tier are reported as observed facts. Journal, Payment, Receipt and Contra are the voucher types with recorded import/readback evidence, each only in the exact file shape this schema admits, except that a Payment, Receipt or Contra with more than two entries (bridge#466) rests on narrower evidence: hand-built files of that shape were imported and read back over the gateway (a Contra only with a repeated ledger) and one three-entry Receipt built by ComplyEaze Bridge was imported over the gateway and verified, but no multi-entry Payment or Contra has been, and none of the three, including that Receipt, through Tally's Import menu, and its build reports live_evidence hand_built_gateway_readback; every other voucher type is refused. A single-voucher batch is eligible for post_import, and so is a batch of 2 to 50 such vouchers: an unnumbered Journal, or a Payment, Receipt or Contra, whose legs post_import classifies again before approval and after approval inside the endpoint queue, before the final duplicate check and the post."}}}),
             evidence: local_evidence("voucher_schema"),
             company_guid: None,
             truncated: false,
@@ -1343,7 +1343,7 @@ impl Server {
             // Keep the refusal code: `post_import` returns this same code, and
             // the guidance names it rather than guessing a reason (#866).
             let post_voucher_limit = self.post_voucher_limit(post::PostScope::Vouchers);
-            let native_post_refusal = if self.settings.writes_enabled {
+            let native_post_refusal = if self.settings.posting.enabled() {
                 post::admit_saved_voucher(
                     &line,
                     &self.settings.endpoint,
@@ -1355,9 +1355,8 @@ impl Server {
                 None
             };
             let (mut warnings, next_step) = build_import_guidance(
-                self.settings.writes_enabled,
+                self.settings.posting.enabled(),
                 native_post_refusal.as_deref(),
-                post_voucher_limit,
                 renders_bank_shape(&line.vouchers),
                 line.on_account_approved
                     .as_deref()
@@ -2996,16 +2995,14 @@ const BILL_WISE_APPROVED_NOTE: &str = "Entries on the bill-wise ledgers listed i
 
 /// Why `post_import` would refuse a saved batch, for the build's warning. The
 /// code is the one `post_import` returns; the text only explains it. A code
-/// with no entry here keeps its name and a pointer to the same refusal.
-fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
-    let count = if voucher_limit > 1 {
-        format!("1 to {voucher_limit} vouchers")
-    } else {
-        "one voucher (the limit while batch posting is off)".to_string()
-    };
+/// with no entry here keeps its name and a pointer to the same refusal. The
+/// build asks only while posting is on, and posting on admits a batch (#1090),
+/// so the limit is the batch cap.
+fn native_post_refusal_reason(code: &str) -> String {
+    let voucher_limit = ledger::MAX_BATCH_POST_VOUCHERS;
     match code {
         "import_post_requires_one_voucher" => format!(
-            "native posting takes {count}, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
+            "native posting takes 1 to {voucher_limit} vouchers, each a Journal, Payment, Receipt or Contra, from a batch built by this version of ComplyEaze Bridge"
         ),
         "import_post_batch_too_large" => format!(
             "this batch has more vouchers than native posting takes at once ({voucher_limit})"
@@ -3029,7 +3026,6 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
 fn build_import_guidance(
     writes_enabled: bool,
     native_post_refusal: Option<&str>,
-    voucher_limit: usize,
     bank_types: bool,
     on_account_approved: bool,
     multi_entry_bank: bool,
@@ -3106,7 +3102,7 @@ fn build_import_guidance(
         (
             warnings(&format!(
                 "No import XML was sent to Tally. This saved batch is not eligible for native posting: post_import would refuse it as {code} ({}). Import the written file manually, then use verify_import; do not call post_import for this batch.",
-                native_post_refusal_reason(code, voucher_limit),
+                native_post_refusal_reason(code),
             )),
             manual_import_next_step,
         )

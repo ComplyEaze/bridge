@@ -659,6 +659,39 @@ is accepted, and loud.
   `operator_review` null). The verdict itself is unchanged.
 - Do not edit the journal or the check records by hand to get around any of these.
 
+## Amendment — owner decision, 2026-10-12: one posting setting for one voucher and a batch
+
+This supersedes "exactly one voucher per call" in the sections above (the "What it can send" item
+and the "Small batches" row), the MCPB key `enable_writes` and the desktop's `writes_enabled: true`
+in the "Gates" item (now `enable_posting_2026_10` and `Posting::On`), row 2's "an earlier install may
+still have 'on' saved", and the 2026-09-22 amendment's "one voucher per call". It replaces the
+setting described in the amendment "batch posting behind a setting (slice D2a)" above; that
+amendment otherwise stands, and its safeguards, summary approval and outcome rules are unchanged
+(#1090).
+
+- **One setting.** `BRIDGE_AGENT_ENABLE_WRITES` governs every post: one voucher per approval, or a
+  saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, under one approval
+  of its summary. It is off by default. `Posting::{Off, On, RetiredSettingPresent}` replaces the two
+  booleans, so "posting on, batch off" cannot be represented.
+- **A new consent.** The extension maps it from a new key, `enable_posting_2026_10`, titled "Allow
+  voucher posting, one voucher or a batch of up to 50". The released `enable_writes` offered one
+  voucher at a time, so a value stored for it is mapped to nothing and every upgrader starts with
+  posting off, as for the Terms (`agent_terms.rs`). This covers the extension only: a hand-set
+  `BRIDGE_AGENT_ENABLE_WRITES=true` on the command line now admits batches with no new consent setting,
+  by design (#1090), and the changelog says so. An absent or empty value, or the key's own
+  unresolved placeholder, reads as off; any other value that is not a plain boolean still refuses at
+  startup. What Claude Desktop passes for a new key on an upgrade is not yet measured.
+- **The retired setting refuses in band.** While `BRIDGE_AGENT_ENABLE_BATCH_POST` is present, with
+  any value, and posting is on, `post_import` refuses as `setting_retired` before any request; every
+  other tool works. Someone who set it off on purpose is not widened silently, and a refusal at
+  startup would have stopped the reads too.
+- **Evidence.** The batch path is the one run live for #1516 through the extension, on a synthetic
+  company on licensed TallyPrime 7.1 Silver: batches of 10, 50, and 7 and 7 vouchers each read back
+  `posted_verified`, and a batch of 51 was refused as `import_post_batch_too_large` (branch
+  `lab/1516-rehearsal-evidence`). That run used a lab manifest with two keys, `enable_writes` and
+  `enable_batch_post`; the single key, the upgrade from 0.5.1 and `setting_retired` have not run
+  live. This change moves no part of the post path.
+
 ## Amendment — 2026-10-02: native posts carry no narration tag
 
 - **Change:** a native post (`post_import`, and the desktop Journal post)

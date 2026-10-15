@@ -300,8 +300,7 @@ impl OneServer {
             max_bytes: 200_000,
             redaction,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         Self {
             simulator,

@@ -8,10 +8,11 @@ The developer configuration below remains for supported client integrations.
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
-parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the four limits under *Approved voucher posting* below;
-the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
-separate native approval for each new attempt. Command-line installations
+parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra, or
+a saved batch of 2 to 50) is off by default because of the limits under
+*Approved voucher posting* below; the **Allow voucher posting, one voucher or a
+batch of up to 50** setting adds it, with separate native approval for each new
+attempt. Command-line installations
 retain explicit environment switches.
 
 Build and run it with Rust 1.96:
@@ -154,8 +155,9 @@ installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
-sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting
-(Journal, Payment, Receipt, Contra)** setting, off by default, to `BRIDGE_AGENT_ENABLE_WRITES`.
+sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
+voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
+default, to `BRIDGE_AGENT_ENABLE_WRITES`.
 This is a source-configuration inventory, not a claim that an installed client
 uses a particular setting or that a tool is qualified for every runtime. Each
 call returns compact JSON with the
@@ -1819,10 +1821,11 @@ The four rest on different observations, and each build reports its own in
   with `import_bill_wise_changed` a ledger that became bill-wise since.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file. In the MCPB extension an unnumbered
+licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
-per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
-that turns that on.
+per approval (a voucher that carries a voucher number is refused), and a saved
+batch of 2 to 50 posts in one import after one approval of its summary. One
+posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -2191,10 +2194,9 @@ deadlocks.
 limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 The saved batch file is now checked byte for byte against the approved record
 before posting ([#575](https://github.com/ComplyEaze/bridge/issues/575), fixed).
-**Allow voucher posting (Journal, Payment, Receipt, Contra)** turns it on for
-users who accept those risks. Existing
-saved settings are respected, so an installation that saved the earlier default
-may still have posting on; check the setting.
+**Allow voucher posting, one voucher or a batch of up to 50** turns it on for
+users who accept those risks. It is a new setting, so a posting choice saved
+for an earlier version does not carry over: posting starts off.
 For command-line installation, set `BRIDGE_AGENT_ENABLE_WRITES=true`.
 This enables `build_import_xml`, `parse_bank_statement`, `post_import` and
 `acknowledge_post_review`, which asks the local user, in its own native dialog, to
@@ -2205,13 +2207,19 @@ after posting is turned off. `BRIDGE_AGENT_ENABLE_IMPORT=true` alone exposes
 the manual file workflow and bank-statement proposal preparation, while
 verification remains available without either switch.
 
-`BRIDGE_AGENT_ENABLE_BATCH_POST=true`, together with
-`BRIDGE_AGENT_ENABLE_WRITES=true`, lets `post_import` post a saved batch of 2 to
-50 vouchers in one import, after one approval of the batch's summary: every
+`BRIDGE_AGENT_ENABLE_WRITES=true` also lets `post_import` post a saved batch of 2
+to 50 vouchers in one import, after one approval of the batch's summary: every
 ledger's debit and credit totals, the money Receipts bring in and Payments take
-out, and the standing cautions. It is off by default. It is a command-line
-setting only, not in the MCPB extension, until a batch post through Bridge has
-been proved on a live book. A batch is `posted_verified` only when Tally created
+out, and the standing cautions (#1090). In the MCPB extension this is the
+setting **Allow voucher posting, one voucher or a batch of up to 50**
+(`enable_posting_2026_10`). It is a new key, off by default, so a posting choice
+saved for an earlier version, which covered one voucher at a time, does not
+carry over. An empty value, or the key's unresolved
+`${user_config.enable_posting_2026_10}` placeholder, reads as off; what Claude
+Desktop passes for a new key on an upgrade is not yet measured. The separate
+`BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set, with any value,
+and posting is on, `post_import` refuses as `setting_retired` until it is
+removed; every other tool works. A batch is `posted_verified` only when Tally created
 exactly that many vouchers, the readback verifies every one, and the company's
 voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark
@@ -2219,7 +2227,7 @@ was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuil
 `acknowledge_post_review` records that review, one doubt at a time, and changes
 no verdict.
 
-All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
+Both switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
@@ -2339,10 +2347,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    same-day rows of one amount are not split across batches; they pass this
    check together in one batch. A proposals file is whole days already, since
    `from` and `to` are days. A day with more than 50 rows does not fit one
-   batch, and that case is open: ask the user. Batch posting is off by
-   default, and with it off each post takes one voucher, so same-day twins
-   post together only with batch posting on or through a hand import of the
-   built file. The list and step are
+   batch, and that case is open: ask the user. With posting on, a saved
+   batch of up to 50 posts after one approval, so same-day twins post
+   together in one batch or through a hand import of the built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's

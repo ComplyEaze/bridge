@@ -710,10 +710,14 @@ class MergeGateControls(unittest.TestCase):
     # -- (c) at the gate: the clean line of an older head, carried when the pull request's own patch is unchanged --------------
     def test_a_clean_line_for_an_older_head_is_carried_when_the_patch_is_unchanged(self):
         result = self.assert_pass("carry-same-patch", "carried")
-        self.assertIn("patch-id", result.stdout)
+        self.assertIn("byte-identical", result.stdout)
+
+    def test_a_change_of_context_lines_alone_still_carries_the_clean_line(self):
+        self.assert_pass("carry-context-differs", "carried")
 
     def test_a_clean_line_is_not_carried_when_the_patch_changed_or_cannot_be_compared(self):
-        for scenario in ("carry-patch-differs", "carry-binary", "carry-compare-fails", "carry-empty-diff", "carry-two-patch-ids"):
+        for scenario in ("carry-patch-differs", "carry-whitespace-only", "carry-indent-only", "carry-mode-change", "carry-binary", "carry-compare-fails",
+                         "carry-empty-diff", "carry-duplicate-file-sections", "carry-diff-cut-short"):
             with self.subTest(scenario=scenario):
                 result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
                 self.assertNotIn("carried", result.stdout.replace("not carried", ""))
@@ -1774,7 +1778,7 @@ class MergeWrapperControls(unittest.TestCase):
             "#!/usr/bin/env bash\n"
             'echo "$*" >>"$GH_LOG"\n'
             'case "$1 $2" in\n'
-            '  "pr view") [ -z "${GH_VIEW_FAIL:-}" ] || exit 1; cat "$GH_VIEW" ;;\n'
+            '  "pr view") [ -z "${GH_VIEW_FAIL:-}" ] || exit 1; n=$(grep -c "^pr view" "$GH_LOG"); if [ "$n" -ge 2 ] && [ -n "${GH_VIEW2_FAIL:-}" ]; then exit 1; fi; if [ "$n" -ge 2 ] && [ -f "${GH_VIEW2:-/nonexistent}" ]; then cat "$GH_VIEW2"; else cat "$GH_VIEW"; fi ;;\n'
             '  "pr ready") exit "${GH_READY_EXIT:-0}" ;;\n'
             '  "pr merge") exit "${GH_MERGE_EXIT:-0}" ;;\n'
             "  *) exit 99 ;;\n"
@@ -1789,13 +1793,18 @@ class MergeWrapperControls(unittest.TestCase):
         cls.tmp.cleanup()
 
     def run_wrapper(self, args=("321", "--repo", "ComplyEaze/bridge"), gate_out=None, gate_exit=0, view=None, view_fail=False,
-                    merge_exit=0, ready_exit=0):
+                    merge_exit=0, ready_exit=0, view2=None, view2_fail=False):
         work = Path(tempfile.mkdtemp(dir=self.root))
         (work / "gate-out").write_text(self.GATE_PASS if gate_out is None else gate_out)
         (work / "view").write_text(json.dumps(self.VIEW if view is None else view))
         log = work / "gh.log"
         log.write_text("")
+        if view2 is not None:
+            (work / "view2").write_text(json.dumps(view2))
         env = os.environ.copy()
+        env["GH_VIEW2"] = str(work / "view2")
+        if view2_fail:
+            env["GH_VIEW2_FAIL"] = "1"
         env.update(PATH=f"{self.root}:{env['PATH']}", STUB_GATE_OUT=str(work / "gate-out"), STUB_GATE_EXIT=str(gate_exit),
                    GH_LOG=str(log), GH_VIEW=str(work / "view"), GH_MERGE_EXIT=str(merge_exit), GH_READY_EXIT=str(ready_exit))
         if view_fail:
@@ -1827,6 +1836,33 @@ class MergeWrapperControls(unittest.TestCase):
         result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), ready_exit=1)
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_draft_stays_a_draft_when_the_merge_does_not_happen(self):
+        # the merge fails after the pull request was made ready
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), merge_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual([c for c in calls if c.startswith("pr ready")], ["pr ready 321 --repo ComplyEaze/bridge", "pr ready 321 --repo ComplyEaze/bridge --undo"])
+        # the head or base moves between the first read and the merge
+        for name, moved in (("head", dict(self.VIEW, isDraft=True, headRefOid="b" * 40)), ("base", dict(self.VIEW, isDraft=True, baseRefName="other")),
+                            ("state", dict(self.VIEW, isDraft=True, state="CLOSED"))):
+            with self.subTest(moved=name):
+                result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), view2=moved)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertEqual([c for c in calls if c.startswith("pr ready")], ["pr ready 321 --repo ComplyEaze/bridge", "pr ready 321 --repo ComplyEaze/bridge --undo"])
+                self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_second_read_that_fails_refuses_and_returns_a_draft_to_draft(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), view2_fail=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("pr ready 321 --repo ComplyEaze/bridge --undo", calls)
+        self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_head_or_base_that_moves_after_the_first_read_is_refused_before_the_merge(self):
+        for name, moved in (("head", dict(self.VIEW, headRefOid="b" * 40)), ("base", dict(self.VIEW, baseRefName="other"))):
+            with self.subTest(moved=name):
+                result, calls = self.run_wrapper(view2=moved)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse([c for c in calls if c.startswith(("pr ready", "pr merge"))], calls)
 
     def test_a_gate_that_blocks_or_cannot_decide_is_never_merged(self):
         for code in (1, 2, 3):

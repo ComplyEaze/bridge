@@ -70,14 +70,29 @@ export function classify(path, rules) {
   return null;
 }
 
+// A test file carries the tier of the module it tests: `x_tests.rs` is judged with `x.rs`, and `dir/tests.rs` with `dir/mod.rs`. A module
+// that no rule classifies makes its test file full as well.
+function moduleOf(path) {
+  if (path.endsWith("_tests.rs")) return `${path.slice(0, -"_tests.rs".length)}.rs`;
+  if (path.endsWith("/tests.rs")) return `${path.slice(0, -"tests.rs".length)}mod.rs`;
+  return null;
+}
+
 export function tierOf(paths, rules) {
   const files = [];
   const unclassified = [];
   for (const path of paths) {
     const hit = classify(path, rules);
+    const module = moduleOf(path);
+    const moduleHit = module === null ? undefined : classify(module, rules);
     if (hit === null) {
       unclassified.push(path);
       files.push({ path, class: null, tier: "full" });
+    } else if (moduleHit === null) {
+      unclassified.push(module);
+      files.push({ path, class: hit.class, tier: "full", module });
+    } else if (moduleHit !== undefined && CLASS_TIER[moduleHit.class] === "full") {
+      files.push({ path, class: moduleHit.class, tier: "full", module });
     } else {
       files.push({ path, class: hit.class, tier: CLASS_TIER[hit.class] });
     }

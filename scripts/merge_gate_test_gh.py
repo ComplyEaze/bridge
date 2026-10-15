@@ -262,20 +262,34 @@ def state():
             set_changes(s, ("renamed", "src-tauri/src/agent_lab.rs", "docs/moved.md"))
 
     elif scenario.startswith("carry-"):
-        # The owner's CLEAN line names an OLDER head and merge base; the gate may carry it when the pull request's own patch
-        # (merge base...head) has the same patch-id at both. The compare answers below are the two diffs.
+        # The owner's CLEAN line names an OLDER head and merge base; the gate may carry it when the pull request's own added and
+        # removed lines (merge base...head) are byte-identical at both. The compare answers below are the two diffs.
         s["owner_items"] = [owner_comment("MERGE-VERDICT CLEAN head=" + OLD_HEAD + " base=" + OLD_BASE, T1)]
+        set_changes(s, ("modified", "docs/x.md"))
+        # Only the index line and the hunk numbers differ between the two: the pull request's own lines are the same.
         old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444").replace("@@ -1,2 +1,2 @@", "@@ -11,2 +11,2 @@")
         new = CARRY_DIFF
-        mode = scenario
-        if scenario == "carry-patch-differs":
+        if scenario == "carry-context-differs":
+            old = old.replace(" keep\n", " keep (master changed this line)\n")
+        elif scenario == "carry-patch-differs":
             new = CARRY_DIFF.replace("+changed", "+changed differently")
+        elif scenario == "carry-whitespace-only":
+            new = CARRY_DIFF.replace("+changed", "+chan ged")
+        elif scenario == "carry-indent-only":
+            new = CARRY_DIFF.replace("+changed", "+  changed")
         elif scenario == "carry-binary":
-            old = new = CARRY_DIFF + "diff --git a/docs/x.png b/docs/x.png\nBinary files a/docs/x.png and b/docs/x.png differ\n"
+            # the picture is one of the pull request's files, so the file list agrees; only the binary-diff guard can refuse
+            set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/x.png"))
+            old = new = CARRY_DIFF + "diff --git a/docs/x.png b/docs/x.png\nindex 1111111..2222222 100644\nBinary files a/docs/x.png and b/docs/x.png differ\n"
         elif scenario == "carry-empty-diff":
             old = new = ""
-        elif scenario == "carry-two-patch-ids":
-            old = new = CARRY_DIFF + "From 1111111111111111111111111111111111111111 Mon Sep 17 00:00:00 2001\n" + CARRY_DIFF.replace("changed", "other")
+        elif scenario == "carry-duplicate-file-sections":
+            old = new = CARRY_DIFF + CARRY_DIFF
+        elif scenario == "carry-diff-cut-short":
+            # The pull request changes two files; the compare diff names only one of them.
+            set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/y.md"))
+        elif scenario == "carry-mode-change":
+            new = CARRY_DIFF.replace("index 1111111..2222222 100644", "old mode 100644\nnew mode 100755\nindex 1111111..2222222")
         s["carry"] = {"old": old, "new": new, "fail": scenario == "carry-compare-fails"}
         if scenario == "carry-same-patch-write-path":
             set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))

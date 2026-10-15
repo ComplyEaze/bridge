@@ -19,7 +19,10 @@ const small = loadRules({
   schema_version: 1,
   rules: [
     { class: "write-path", match: { prefix: "src/post" } },
+    { class: "write-path", match: { exact: "guard/guarded.rs" } },
     { class: "tests", match: { suffix: "_tests.rs" } },
+    { class: "tests", match: { exact: "guard/tests.rs" } },
+    { class: "production", match: { prefix: "guard/" } },
     { class: "production", match: { prefix: "src/" } },
     { class: "docs", match: { prefix: "docs/" } },
   ],
@@ -36,6 +39,19 @@ test("the first matching rule decides, so a write-path test file is full and ano
   assert.equal(classify("src/other_tests.rs", small).class, "tests");
   assert.equal(tierOf(["src/other_tests.rs"], small).tier, "one");
   assert.equal(tierOf(["src/post_tests.rs"], small).tier, "full");
+});
+
+test("a test file carries the tier of the module it tests, and an unclassified module makes it full", () => {
+  assert.equal(tierOf(["src/post_extra_tests.rs"], small).tier, "full");
+  assert.equal(tierOf(["src/post/tests.rs"], small).tier, "full");
+  assert.equal(tierOf(["src/other_tests.rs"], small).tier, "one");
+  assert.equal(tierOf(["lib/stray_tests.rs"], small).tier, "full");
+  assert.deepEqual(tierOf(["lib/stray_tests.rs"], small).unclassified, ["lib/stray.rs"]);
+  assert.equal(tierOf(["src/other/tests.rs"], small).tier, "one");
+  // the test file itself matches a plain-tests rule; only its module's rule makes it full
+  assert.equal(classify("guard/guarded_tests.rs", small).class, "tests");
+  assert.equal(tierOf(["guard/guarded_tests.rs"], small).tier, "full");
+  assert.equal(tierOf(["guard/other_tests.rs"], small).tier, "one");
 });
 
 test("one write-path file makes a change full; docs and tests alone stay one", () => {
@@ -105,6 +121,34 @@ test("the real list puts the write path, credentials and the gate in the full ti
     "src-tauri/crates/bridge-tally-protocol/tests/parse_record/x.txt",
     "scripts/testdata/capture.xml",
     "src-tauri/src/never_seen_before.rs",
+    // tests that are #[path] children of write-path modules
+    "src-tauri/src/agent_post_cancellation_tests.rs",
+    "src-tauri/src/agent_post_recovery_tests.rs",
+    "src-tauri/src/tally/runtime_import_admission_tests.rs",
+    "src-tauri/crates/bridge-tally-protocol/src/ledger_create_tests.rs",
+    "src-tauri/src/agent_lab_extra_tests.rs",
+    "src-tauri/src/unknown_thing_tests.rs",
+    // data files under tests/ and docs/ are not test code or prose
+    "src-tauri/tests/golden_books.json",
+    "src-tauri/crates/bridge-tax-audit/tests/data/client_ledger.xml",
+    "docs/notes/client-tb.csv",
+    "docs/notes/books.json",
+    // interface files that call the write or setup commands
+    "src/main.tsx",
+    "src/SourceDraftScreen.tsx",
+    "src/TallyReadinessFlow.tsx",
+    // new files named for a write, an import, a post or an upload, and new unlisted files in a listed crate
+    "src-tauri/crates/bridge-tally-core/src/post_builder.rs",
+    "src-tauri/crates/bridge-tally-core/src/new_module.rs",
+    "src-tauri/crates/bridge-tax-audit/src/upload.rs",
+    "src-tauri/crates/bridge-tax-audit/src/import_ledger.rs",
+    "src-tauri/src/reports/import_helper.rs",
+    "src-tauri/src/reports/send_mail.rs",
+    // names that only look like a documented file
+    "packaging/mcpb/README.md/manifest.json",
+    "NOTICE.sh",
+    "README.md.bak",
+    "LICENSE-extra",
   ];
   for (const path of full) assert.equal(tierOf([path], realRules).tier, "full", path);
 });
@@ -121,8 +165,10 @@ test("the real list puts reads, interface, documents and plain tests in the one 
     "src-tauri/src/tally/runtime_masters.rs",
     "src-tauri/crates/bridge-tally-protocol/src/native_trial_balance/mod.rs",
     "src-tauri/crates/bridge-tally-protocol/src/native_masters_tests.rs",
-    "src/OutstandingsScreen.tsx",
+    "src/LedgerEntriesScreen.tsx",
     "src/outstandings-csv.ts",
+    "docs/img/diagram.svg",
+    "src-tauri/src/agent_trial_balance_tests.rs",
     "README.md",
     "CHANGELOG.md",
     "docs/guides/connect-claude-to-tallyprime.md",
@@ -148,6 +194,29 @@ test("no tracked file whose name says import, post, ledger creation, narration, 
     // The tax-audit engine reads exported narrations to audit them; it writes nothing to Tally.
     if (path.startsWith("src-tauri/crates/bridge-tax-audit/")) return false;
     return tierOf([path], realRules).tier === "one";
+  });
+  assert.deepEqual(offenders, []);
+});
+
+test("no interface file that calls a write, setup, enrolment, destination or lifecycle command is in the one tier", () => {
+  const listed = spawnSync("git", ["ls-files", "-z", "src"], { cwd: root, encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  const writes = /invoke[<(][^"]*"(save_tally_setup|enroll_|revoke_|desktop_|select_party_statement_destination|bootstrap_)/;
+  const offenders = listed.stdout.split("\0").filter((path) => /\.tsx?$/.test(path)).filter((path) => {
+    const text = readFileSync(join(root, path), "utf8");
+    return writes.test(text) && tierOf([path], realRules).tier === "one";
+  });
+  assert.deepEqual(offenders, []);
+});
+
+test("no tracked data file under tests/ or docs/ is in the one tier", () => {
+  const listed = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  const offenders = listed.stdout.split("\0").filter(Boolean).filter((path) => {
+    // Acknowledgement files are notes filed beside a pinned change; the pinned change is classified on its own.
+    if (path.startsWith("docs/tally/compatibility/acks/")) return false;
+    const underTests = path.includes("/tests/") || path.startsWith("docs/");
+    return underTests && /\.(json|csv|xml|txt|xlsx|yaml|yml|toml|sql|db)$/.test(path) && tierOf([path], realRules).tier === "one";
   });
   assert.deepEqual(offenders, []);
 });

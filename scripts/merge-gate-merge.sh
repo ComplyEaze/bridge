@@ -62,12 +62,25 @@ if [ "$DRY" -eq 1 ]; then
   echo "dry run: every check passed; would merge PR $PR in $REPO at $gated (draft: $(jq -r .isDraft <<<"$view")); nothing was changed"
   exit 0
 fi
+made_ready=0
+undo_ready() {
+  [ "$made_ready" -eq 1 ] || return 0
+  gh pr ready "$PR" --repo "$REPO" --undo >/dev/null 2>&1 && echo "the pull request was returned to draft" >&2 || echo "WARNING: could not return PR $PR to draft; it is ready for review" >&2
+}
 if [ "$(jq -r .isDraft <<<"$view")" = "true" ]; then
   gh pr ready "$PR" --repo "$REPO" || refuse "could not mark the pull request ready"
+  made_ready=1
+fi
+# Read it once more just before the merge: the state, base and head must still be what the gate looked at.
+view=$(gh pr view "$PR" --repo "$REPO" --json state,isDraft,headRefOid,baseRefName 2>/dev/null) || { undo_ready; refuse "could not read the pull request again before the merge"; }
+if [ "$(jq -r .state <<<"$view" 2>/dev/null)" != "OPEN" ] || [ "$(jq -r .baseRefName <<<"$view" 2>/dev/null)" != "$expected_base" ] || [ "$(jq -r .headRefOid <<<"$view" 2>/dev/null)" != "$gated" ]; then
+  undo_ready
+  refuse "the pull request changed (state, base or head) between the checks and the merge"
 fi
 if gh pr merge "$PR" --repo "$REPO" --squash --match-head-commit "$gated"; then
   echo "merged PR $PR in $REPO at ${gated:0:12}"
   exit 0
 fi
+undo_ready
 echo "REFUSED: gh did not merge PR $PR (not merged)" >&2
 exit 1

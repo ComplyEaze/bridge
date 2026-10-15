@@ -181,6 +181,21 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **A one-voucher approval now shows a long narration in parts, where it refused it before.**
+  A bank-statement voucher's narration is often too long for one line of the dialog, so posting
+  it alone was refused and the file had to be imported by hand. Such a narration is now shown
+  under the heading in numbered parts, each quoted on its own line and split only at a space,
+  so that the parts joined in order are the text that is posted. A line above the heading
+  counts the parts, and the date line says the voucher's own text is below the dashes. It is
+  still refused whole, never cut, when no space splits it into parts that fit, when it holds a
+  run of dashes or a number in brackets, or when the whole text passes the dialog's caps. A
+  reference is never split: one too long for its line is refused as before. Each part past the
+  first, and the counting line, leave one line fewer for entries. The review dialog of
+  `acknowledge_post_review` now shows the narration last, under the same heading, on one line
+  or in parts, which leaves it room for nine entries instead of ten. An approval text that fits
+  as before is unchanged. Not yet measured: how the Windows and macOS dialogs draw the parts
+  (#1535).
+
 - **A `post_import` refusal made before anything was sent now says what to do next.** Its
   `error.next_step` carries the same step every other tool gives for that refusal: its code's,
   or else its cause's. Before, a code raised inside the post, such as a date range too large to

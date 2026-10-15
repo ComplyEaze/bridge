@@ -9,11 +9,14 @@ only) are the table of ledgers. Output is ASCII only.
 Steps:
   a01 ANSWER                      company list: the only loaded company is BRIDGE PILOT LAB, Education mode No
   a02 ANSWER                      book extent: one COMPANY row, BRIDGE PILOT LAB, with its GUID and marks
-  itc ANSWER --company a02-FILE   the ledger GST read, parsed as XML: per ledger with a GSTDETAILS entry, name, parent,
+  itc ANSWER --company a02-FILE [--extra NAME]...   the ledger GST read, parsed as XML. The ledgers must be exactly the
+                                  committed 14 plus the declared --extra names (an undeclared or missing one is a STOP; each
+                                  extra holds exactly one GSTDETAILS entry with content); `--list-extras` instead prints
+                                  the names found beyond the 14 as copy-ready --extra text and declares nothing. Parsed: per ledger with a GSTDETAILS entry, name, parent,
                                   source of the details (INHERITED when it reads As per ...), applicable-from and the
                                   GSTINELIGIBLEITC state (Yes / No / absent), and counts; the book's GUID must equal the
                                   committed capture's
-  vs-committed ANSWER             the committed capture (committed/ledger_gst_details_live.utf16le.xml, size and sha256
+  vs-committed ANSWER [--extra NAME]...   the committed capture (committed/ledger_gst_details_live.utf16le.xml, size and sha256
                                   pinned below) against a new answer: byte identity by sha256 first; else the GSTDETAILS
                                   entries of the ledger rows leaf by leaf (a difference is a FINDING)
   same A B                        two answers of one request: byte-identical, or equal leaf by leaf under COLLECTION
@@ -113,6 +116,23 @@ def flat(e, path=""):
         else: out[p] = (c.text or "").strip()
     return out
 
+def declared_extras(argv, ref):
+    """The ledgers the coordinator declares beyond the committed capture: every --extra NAME."""
+    ex = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "--extra"]
+    if "--extra" in argv[-1:]: raise Err("--extra needs a name")
+    if len(set(ex)) != len(ex): raise Err("an --extra name is declared twice")
+    if [n for n in ex if n in ref]: raise Err(f"--extra names a committed ledger: {[n for n in ex if n in ref]}")
+    return set(ex)
+
+def check_sets(led, ref, extras):
+    """Exactly the committed ledgers plus the declared extras; each extra holds exactly one GSTDETAILS entry with content."""
+    und, miss, miss_x = sorted(set(led) - set(ref) - extras), sorted(set(ref) - set(led)), sorted(extras - set(led))
+    if und or miss or miss_x:
+        raise Stop(f"the ledgers are not the committed {len(ref)} plus the declared extras: undeclared extra ledger(s) in the answer {und}; committed ledger(s) missing {miss}; declared extra(s) not in the answer {miss_x}. Do not substitute: report")
+    for n in sorted(extras):
+        k = len(entries_of(led[n], n))
+        if k != 1: raise Stop(f"extra ledger {n!r} holds {k} GSTDETAILS entries with content, expected exactly 1" + (": an empty list gives nothing to look at" if k == 0 else ""))
+
 def run(argv):
     if len(argv) < 3: raise Err("usage: check.py STEP ANSWER ...  (see the top of check.py)")
     opt = lambda k: argv[argv.index(k) + 1] if k in argv else None
@@ -160,48 +180,57 @@ def run(argv):
         guid = company_guid(cf)
         led = ledgers(root, "the answer")
         ref = ledgers(common(committed_path(opt))[1], "the committed capture")
+        extras = declared_extras(argv, ref)
         for n, r in led.items():
             g, b = txt(r, "GUID"), txt(r, "BRIDGECOMPANYGUID")
             if not g.startswith(guid) or b != guid: raise Stop(f"ledger {n!r} does not carry this book's GUID: wrong company")
-        if sorted(led) != sorted(ref):
-            raise Stop(f"the ledgers differ from the committed capture: only in the answer {sorted(set(led) - set(ref))}, only in the capture {sorted(set(ref) - set(led))}. Do not substitute: report")
+        if "--list-extras" in argv:
+            if extras: raise Err("--list-extras takes no --extra")
+            if set(ref) - set(led): raise Stop(f"committed ledgers missing from the answer: {sorted(set(ref) - set(led))}. Do not substitute: report")
+            found = sorted(set(led) - set(ref))
+            return 0, "\n".join([f'--extra "{n}"' for n in found] + [f"itc: {size} B; {len(found)} ledger(s) beyond the committed {len(ref)}; nothing is declared or checked by this listing: the coordinator confirms the spelling, then step 3 declares them"])
+        check_sets(led, ref, extras)
         if book_guids(led) != book_guids(ref):
             raise Stop(f"the book GUID {book_guids(led)} differs from the committed capture's {book_guids(ref)}: another book with the same ledger names? Report, do not substitute")
-        states, inherited = {"Yes": 0, "No": 0, "absent": 0}, 0
-        for n in sorted(led):
-            es = entries_of(led[n], n)
-            if not es: continue
-            if len(es) > 1: raise Stop(f"ledger {n!r} holds {len(es)} GSTDETAILS entries with content: more than one is not covered by this sheet")
-            e = es[0]
-            frm = txt(e, "APPLICABLEFROM")
-            if not re.fullmatch(r"\d{8}", frm): raise Stop(f"ledger {n!r}: the entry has no readable APPLICABLEFROM ({frm!r})")
-            direct = [c for c in e if c.tag == "GSTINELIGIBLEITC"]
-            if len(list(e.iter("GSTINELIGIBLEITC"))) != len(direct): raise Stop(f"ledger {n!r}: GSTINELIGIBLEITC sits below the entry's own level: not covered")
-            if len(direct) > 1: raise Stop(f"ledger {n!r}: GSTINELIGIBLEITC appears {len(direct)} times in one entry")
-            st = "absent" if not direct else (direct[0].text or "").strip()
-            if st not in states: raise Stop(f"ledger {n!r}: GSTINELIGIBLEITC reads {st!r}, not Yes or No")
-            states[st] += 1
-            src = txt(e, "SRCOFGSTDETAILS")
-            inh = src.startswith("As per")
-            inherited += inh
-            table.append(f"LOOK {len(table) + 1}: {n} | parent {txt(led[n], 'PARENT')} | source {src}{' (INHERITED)' if inh else ''} | applicable-from {frm[6:]}-{frm[4:6]}-{frm[:4]} | wire GSTINELIGIBLEITC {st}")
+        counts = {k: {"Yes": 0, "No": 0, "absent": 0} for k in ("committed", "extra")}
+        inherited = 0
+        for kind, names in (("committed", sorted(set(ref))), ("extra", sorted(extras))):
+            for n in names:
+                es = entries_of(led[n], n)
+                if not es: continue
+                if len(es) > 1: raise Stop(f"ledger {n!r} holds {len(es)} GSTDETAILS entries with content: more than one is not covered by this sheet")
+                e = es[0]
+                frm = txt(e, "APPLICABLEFROM")
+                if not re.fullmatch(r"\d{8}", frm): raise Stop(f"ledger {n!r}: the entry has no readable APPLICABLEFROM ({frm!r})")
+                direct = [c for c in e if c.tag == "GSTINELIGIBLEITC"]
+                if len(list(e.iter("GSTINELIGIBLEITC"))) != len(direct): raise Stop(f"ledger {n!r}: GSTINELIGIBLEITC sits below the entry's own level: not covered")
+                if len(direct) > 1: raise Stop(f"ledger {n!r}: GSTINELIGIBLEITC appears {len(direct)} times in one entry")
+                st = "absent" if not direct else (direct[0].text or "").strip()
+                if st not in counts[kind]: raise Stop(f"ledger {n!r}: GSTINELIGIBLEITC reads {st!r}, not Yes or No")
+                counts[kind][st] += 1
+                src = txt(e, "SRCOFGSTDETAILS")
+                inh = src.startswith("As per")
+                inherited += inh
+                tag = "committed ledger" if kind == "committed" else "EXTRA ledger: wire value from this answer only"
+                table.append(f"LOOK {len(table) + 1}: {n} | parent {txt(led[n], 'PARENT')} | source {src}{' (INHERITED)' if inh else ''} | applicable-from {frm[6:]}-{frm[4:6]}-{frm[:4]} | wire GSTINELIGIBLEITC {st} | {tag}")
         if not table: raise Stop("no ledger holds a GSTDETAILS entry: nothing to look at")
-        notes.append(f"{len(led)} ledgers; {len(table)} with one GSTDETAILS entry ({inherited} inherited); GSTINELIGIBLEITC Yes {states['Yes']}, No {states['No']}, absent {states['absent']}; ledger names equal to the committed capture's 14; book GUID equals the 9-10 Oct capture's: yes")
-        if not states["No"]: notes.append("wire No: not in this book, not covered")
-        if sum(1 for v in states.values() if v) == 1: notes.append("all entries read the same wire value: one wire value seen")
+        tot = {k: counts["committed"][k] + counts["extra"][k] for k in ("Yes", "No", "absent")}
+        notes.append(f"{len(led)} ledgers = {len(ref)} committed + {len(extras)} declared extra; {len(table)} with one GSTDETAILS entry ({inherited} inherited); GSTINELIGIBLEITC Yes {tot['Yes']}, No {tot['No']}, absent {tot['absent']} (committed ledgers {counts['committed']}, extra ledgers {counts['extra']}); committed ledger names all present; book GUID equals the 9-10 Oct capture's: yes")
+        if not tot["No"]: notes.append("wire No: not in this book, not covered")
+        if sum(1 for v in tot.values() if v) == 1: notes.append("all entries read the same wire value: one wire value seen")
     elif step == "vs-committed":
         cp = committed_path(opt)
         h = hashlib.sha256(data).hexdigest()
+        led, ref = ledgers(root, "the answer"), ledgers(common(cp)[1], "the committed capture")
+        extras = declared_extras(argv, ref)
+        check_sets(led, ref, extras)
         if h == COMMITTED_SHA256 and size == COMMITTED_SIZE:
             return 0, f"vs-committed: {size} B, sha256 {h} equals the committed capture: byte-identical"
-        led, ref = ledgers(root, "the answer"), ledgers(common(cp)[1], "the committed capture")
         if book_guids(led) != book_guids(ref):
             raise Stop(f"the book GUID {book_guids(led)} differs from the committed capture's {book_guids(ref)}: another book. Report, do not substitute")
-        notes.append(f"not byte-identical (sha256 {h}); comparing the GSTDETAILS entries of the ledger rows leaf by leaf")
-        only_a, only_r = sorted(set(led) - set(ref)), sorted(set(ref) - set(led))
-        if only_a or only_r: bad += 1; notes.append(f"ledgers only in the answer {only_a}, only in the capture {only_r}")
+        notes.append(f"not byte-identical (sha256 {h}); the {len(ref)} committed rows compared on their GSTDETAILS entries leaf by leaf; {len(extras)} declared extra ledger(s) {sorted(extras)} each with one entry, not compared (no committed value)")
         diffs, other = [], []
-        for n in sorted(set(led) & set(ref)):
+        for n in sorted(ref):
             fa = {}; fr = {}
             for i, g in enumerate(entries_of(led[n], n)): fa.update(flat(g, f"E{i}"))
             for i, g in enumerate(entries_of(ref[n], n)): fr.update(flat(g, f"E{i}"))
@@ -212,7 +241,7 @@ def run(argv):
             rest = lambda r: canon(ET.fromstring(re.sub(r"<GSTDETAILS\.LIST>.*?</GSTDETAILS\.LIST>|<GSTDETAILS\.LIST\s*/>", "", ET.tostring(r, encoding="unicode"), flags=re.S)))
             if rest(led[n]) != rest(ref[n]): other.append(n)
         if diffs: bad += 1; notes.append(f"EXPECT the GSTDETAILS entries as committed; they differ on {diffs}: the wire may have moved since 9-10 Oct")
-        notes.append(f"other content of the rows (not GSTDETAILS): {'equal' if not other else 'differs on ' + str(other) + ' (recorded, not a finding)'}")
+        notes.append(f"other content of the committed rows (not GSTDETAILS): {'equal' if not other else 'differs on ' + str(other) + ' (recorded, not a finding)'}")
     return (1 if bad else 0), "\n".join(table + [f"{step}: " + "; ".join(notes)])
 
 def main(argv):

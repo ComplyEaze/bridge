@@ -83,3 +83,36 @@ composite identity brackets; that does not make the GUID-only extent parser safe
 Bridge may do more full reads than a speculative integration, but it cannot silently lose edits,
 invent deletions, or advance a cursor from partial evidence. The legacy name-based `altmastid_cache`
 helper is retired from runtime code; the old table remains only for database compatibility.
+
+## Why live AlterID filtering is not exposed (2026-10-16)
+
+The `changed_since` tool, which paged Tally's AlterID change rows for vouchers, ledgers and groups,
+was deleted on this date. It had been withheld since it was added (7 September 2026): the tool
+list omitted it, and `tool_payload` refused a direct call before it read an argument. So no client
+ever received a result from it, and the two defects below were in handler code that never ran for
+a caller. They are recorded so that a later re-add does not repeat them.
+
+1. **A legacy argument was the fallback cursor for both marks.** The handler read `alter_id` as the
+   fallback for both the voucher mark and the master mark. With marks 500 and 900, `alter_id=500`
+   would have started the master feed at 501: masters 1 to 500 never returned, and the result would
+   have looked complete. The reverse, `alter_id=900`, put the voucher cursor past its snapshot and
+   was refused (`change_checkpoint_exceeds_snapshot`). That argument was not reachable even without the refusal: the published schema had no `alter_id`
+   property, so `validate_tool_arguments` refused it as `argument_unknown`. A re-add must not accept a
+   legacy single cursor at all, or must refuse it whenever the two marks differ.
+2. **Rows were cut by AlterID alone.** Ledger and group rows were merged, sorted by AlterID and
+   cut at the page size, and the last AlterID became the next cursor. Two rows of different kinds
+   with the same AlterID at a page boundary would lose the second for good. This one was reachable
+   from the handler's own logic whenever kinds share AlterID values. Whether they do is not
+   settled: on one synthetic book the kinds measured shared one counter, with no duplicate across
+   32 rows (partial evidence; the measurement is not recorded in this repository). A re-add must
+   page on a key that cannot tie (AlterID plus kind and identity) or read each kind separately.
+
+The feed also read only ledgers and groups, while the master mark covers more. The protocol
+reference records that switching a voucher type to Manual numbering moved the company's master mark
+(`ALTMSTID`, 224 to 226) with no voucher `ALTERID` changing (TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md,
+the numbering-switch record). A feed that stops when the master mark stops moving would therefore
+need to read voucher types; this ADR records no other master kind, because no document or test in
+this repository shows one.
+
+Nothing here changes the decision above: incremental authority still needs the proofs listed under
+"Reasons for remaining disabled".

@@ -88,7 +88,6 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
     const READ_TOOLS: &[&str] = &[
         "balance_sheet",
         "cash_flow",
-        "changed_since",
         "company_features",
         "egress_log",
         "gst_status",
@@ -318,45 +317,6 @@ async fn voucher_type_selector_is_bounded_before_any_tally_read() {
     assert_eq!(response.value["structuredContent"]["evidence"]["bytes"], 0);
     args["voucher_type"] = json!("名".repeat(1024));
     assert!(validate_tool_arguments("vouchers", &args).is_ok());
-}
-
-#[tokio::test]
-async fn unqualified_change_feed_is_hidden_and_direct_calls_refuse_before_tally() {
-    for import_enabled in [false, true] {
-        assert!(!tool_definitions(import_enabled, false)
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|tool| tool["name"] == "changed_since"));
-    }
-    let directory = tempfile::tempdir().unwrap();
-    let server = Server::new(Settings {
-        endpoint: TallyEndpointConfig {
-            host: "127.0.0.1".into(),
-            port: 9,
-        },
-        data_dir: directory.path().to_path_buf(),
-        max_rows: 500,
-        max_bytes: 200_000,
-        redaction: Redaction::None,
-        import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
-    });
-    // A dispatched read against this unavailable endpoint would return a
-    // transport/company failure, not the explicit admission refusal.
-    for arguments in [
-        json!({}),
-        json!({"company_guid":"00000000-0000-4000-8000-000000000001"}),
-    ] {
-        let result = server.call_tool_response("changed_since", arguments).await;
-        assert_eq!(result.value["isError"], true);
-        assert_eq!(
-            result.value["structuredContent"]["result"]["error"]["code"],
-            "changed_since_unqualified"
-        );
-        assert_eq!(result.value["structuredContent"]["evidence"]["bytes"], 0);
-    }
 }
 
 #[tokio::test]
@@ -717,9 +677,8 @@ fn no_tool_description_names_the_product_by_its_bare_short_name() {
 /// Every input parameter of every listed tool carries a description (#1155):
 /// a tool that gains a parameter without one fails here by name. A description
 /// a schema already wrote is kept, and a schema with no parameters gains none.
-/// Three tools are held to the parameters many tools share only:
-/// `changed_since`, registered but not listed (`tool_definitions`), and the
-/// two lab-only import tools, compiled in only with the `lab-writes` feature;
+/// Two tools are held to the parameters many tools share only: the two
+/// lab-only import tools, compiled in only with the `lab-writes` feature;
 /// their own parameters were not read for this.
 #[test]
 fn every_parameter_of_every_tool_is_described() {
@@ -751,10 +710,7 @@ fn every_parameter_of_every_tool_is_described() {
                 .is_some_and(Value::is_null),
             "{name} gained a null properties"
         );
-        let shared_only = matches!(
-            name,
-            "changed_since" | "lab_import_masters" | "lab_import_vouchers"
-        );
+        let shared_only = matches!(name, "lab_import_masters" | "lab_import_vouchers");
         for (parameter, property) in tool["inputSchema"]["properties"]
             .as_object()
             .into_iter()

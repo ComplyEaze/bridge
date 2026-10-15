@@ -4,15 +4,9 @@ use super::*;
 
 #[derive(Clone, Copy)]
 enum PageShape {
-    Changes,
     Outstandings,
     Rows(&'static str),
 }
-
-const CHANGE_AXES: [(&str, &str, &str); 2] = [
-    ("vouchers", "next_voucher_alter_id", "voucher_alter_id"),
-    ("masters", "next_master_alter_id", "master_alter_id"),
-];
 
 /// A base-currency-ledgers-only outstandings result's lists of ledgers left
 /// out: those kept in another currency (bridge#551) and base-currency ones
@@ -50,18 +44,6 @@ fn outstandings_axis_widths(result: &Value) -> Option<[usize; 4]> {
 
 fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
     let result = &response["result"];
-    let change_width = CHANGE_AXES
-        .iter()
-        .filter_map(|(key, cursor, fallback)| {
-            (result[cursor].is_u64() && result[fallback].is_u64())
-                .then(|| result[key].as_array().map(Vec::len))
-                .flatten()
-        })
-        .max()
-        .unwrap_or(0);
-    if change_width > 0 {
-        return Some((PageShape::Changes, change_width));
-    }
     if let Some(widths) = outstandings_axis_widths(result) {
         return Some((
             PageShape::Outstandings,
@@ -91,23 +73,6 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
         .or_else(|| result["base_currency_ledgers"]["offset"].as_u64())
         .unwrap_or(0);
     match shape {
-        PageShape::Changes => {
-            for (key, cursor, fallback) in CHANGE_AXES {
-                if !result[cursor].is_u64() || !result[fallback].is_u64() {
-                    continue;
-                }
-                if let Some(rows) = result[key].as_array_mut().filter(|rows| rows.len() > width) {
-                    rows.truncate(width);
-                    let next = rows
-                        .iter()
-                        .filter_map(|row| row["alter_id"].as_u64())
-                        .max()
-                        .ok_or_else(|| "change_page_cursor_invalid".to_string())?;
-                    result[cursor] = json!(next);
-                    result["checkpoint_advanceable"] = json!(false);
-                }
-            }
-        }
         PageShape::Outstandings => {
             // Every collection consumes one input offset. Keep their shared
             // prefix width; exhausted shorter axes retain their null cursor.

@@ -313,13 +313,11 @@ test("the capabilities page names the tools the source's catalog serves, less th
   // a tool written in another shape (a trailing comment, two to a line) would be skipped above and never asked of the page
   assert.equal([...names.matchAll(/"[^"]*"/g)].length, registered.length, "REGISTERED_TOOL_NAMES holds a string the test did not read as a tool name: one name to a line, as `\"name\",`");
   assert.ok(registered.includes("verify_import") && registered.includes("post_import"), "the registered tool names were not read");
-  const withheld = [...source.matchAll(/\.retain\(\|tool\| tool\["name"\] != "([a-z0-9_]+)"\)/g)].map((match) => match[1]);
-  assert.deepEqual(withheld, ["changed_since"], "the catalog withholds other tools than the test expects: say so on the page, then change this test");
   const posting = ["acknowledge_post_review", "post_import"];
   const html = read("capabilities.html");
   const version = html.match(/Checked against release ([0-9.]+) on/)[1];
   const unpublished = inSourceNotPublished[version] ?? [];
-  const served = registered.filter((name) => !withheld.includes(name) && !posting.includes(name) && !unpublished.includes(name)).sort();
+  const served = registered.filter((name) => !posting.includes(name) && !unpublished.includes(name)).sort();
   const installed = [...html.matchAll(/<th scope="row"><code>([a-z0-9_]+)<\/code><\/th>/g)].map((match) => match[1]);
   assert.deepEqual([...installed].sort(), served, `the capabilities page for release ${version} and the catalog name different tools`);
   const withPosting = region(html, "<h2>Two more, only with posting on</h2>", "</section>");

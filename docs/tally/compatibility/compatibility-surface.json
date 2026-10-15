@@ -396,9 +396,6 @@
       "path": "src-tauri/src/agent_change_parse.rs"
     },
     {
-      "path": "src-tauri/src/agent_changes.rs"
-    },
-    {
       "path": "src-tauri/src/agent_company.rs"
     },
     {

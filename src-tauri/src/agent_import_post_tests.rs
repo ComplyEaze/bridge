@@ -4625,7 +4625,24 @@ fn a_fully_marked_batch_at_full_width_is_refused_at_the_character_cap() {
             })
         })
         .collect();
-    let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+    // A step whose lengths equal the last step's builds the same preview:
+    // reuse its result, so every step is still checked.
+    let last = std::cell::RefCell::new(None::<(Vec<usize>, Result<String, String>)>);
+    let (fit, refusal) = largest_fit(
+        |pad| {
+            let lengths = grown_lengths(pad, 1, &caps);
+            let mut last = last.borrow_mut();
+            match &*last {
+                Some((previous, result)) if *previous == lengths => result.clone(),
+                _ => {
+                    let result = fits(&lengths);
+                    *last = Some((lengths, result.clone()));
+                    result
+                }
+            }
+        },
+        24 * 100,
+    );
     assert_eq!(refusal.as_deref(), Some("import_review_too_large"));
     assert_eq!(fit.chars().count(), BATCH_REVIEW_MAX_CHARS, "{fit}");
     assert_eq!(fit.lines().count(), BATCH_REVIEW_MAX_LINES, "{fit}");

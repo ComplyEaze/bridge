@@ -21,7 +21,7 @@ rustup run 1.96.0 cargo run --manifest-path src-tauri/Cargo.toml --bin bridge_mc
 ```
 
 Every tool call refuses, in band, until the Terms of Use are accepted. Read them first
-(https://bridge.complyeaze.com/terms); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
+(https://bridge.complyeaze.com/terms.html); then set `BRIDGE_TERMS_ACCEPTED=true` (or `1`) to accept them. The extension asks for this
 as its "I accept" setting. `initialize` and `tools/list` still answer without it. When it
 is on, Bridge appends a line per terms version (version, time, source) to
 `terms-acceptance.jsonl` in its data folder when it starts (two servers starting together

@@ -5697,10 +5697,15 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_labelled() {
 
 // ---- the transfer check at send ---------------------------------------------------
 
-const STATEMENT_ROW: &str = "st-20260901-00000000000000d1";
+/// The statement row of the send-time check: a date, zeros built at run time, then a suffix.
+fn statement_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{:0>14}d1", 0));
+    &TEXT
+}
 
 /// A statement of only skipped rows, recorded for this company through the
-/// server's endpoint, that skips `STATEMENT_ROW` as carried by another account.
+/// server's endpoint, that skips `statement_row()` as carried by another account.
 fn skip_the_row(server: &Server) {
     use std::io::Write;
     let record = statement_facts::SkipOnlyRecord {
@@ -5714,7 +5719,7 @@ fn skip_the_row(server: &Server) {
             coverage: None,
             contra_rows: Vec::new(),
             skip_rows: vec![statement_facts::SkipRow {
-                bridge_txn_id: STATEMENT_ROW.into(),
+                bridge_txn_id: statement_row().into(),
                 date: TallyDate::parse("20260901").unwrap(),
                 amount: "12.50".into(),
                 direction: statement_facts::RowDirection::Outflow,
@@ -5748,7 +5753,7 @@ async fn a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog(
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let (_line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
     skip_the_row(&server);
     let before = journal(directory.path());
     let response = SCRIPTED_APPROVAL
@@ -5760,7 +5765,11 @@ async fn a_row_a_statement_skipped_after_the_build_is_refused_before_the_dialog(
     let observed = sent(simulator);
     let error = &response["structuredContent"]["result"]["error"];
     assert_eq!(error["code"], "skip_row_paired_elsewhere", "{response}");
-    assert_eq!(error["skipped_rows"], json!([STATEMENT_ROW]), "{response}");
+    assert_eq!(
+        error["skipped_rows"],
+        json!([statement_row()]),
+        "{response}"
+    );
     let step = error["next_step"].as_str().unwrap();
     assert!(step.starts_with(SENT_FIRST), "{step}");
     assert!(step.ends_with(SENT_LAST), "{step}");
@@ -5784,7 +5793,7 @@ async fn a_skip_recorded_while_approval_is_pending_is_refused_under_the_lock() {
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let (_line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
     let recorder = Server::new(server.settings.clone());
     let scripted = ScriptedApproval::approving_after(move || skip_the_row(&recorder));
     let response = SCRIPTED_APPROVAL
@@ -5819,7 +5828,7 @@ async fn a_skipped_row_is_refused_before_the_dialog_on_both_surfaces() {
         let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = server_at(simulator.address(), directory.path());
-        let (line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+        let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
         skip_the_row(&server);
         let before = journal(directory.path());
         let scripted = ScriptedApproval::approving();
@@ -5856,7 +5865,7 @@ async fn a_skipped_row_is_refused_before_the_dialog_on_both_surfaces() {
             assert!(!message.contains("Review the error"), "{message}");
         } else {
             // the agent is told the rows and the way on
-            assert_eq!(error["skipped_rows"], json!([STATEMENT_ROW]), "{result}");
+            assert_eq!(error["skipped_rows"], json!([statement_row()]), "{result}");
             let step = error["next_step"].as_str().unwrap();
             assert!(step.starts_with(SENT_FIRST), "{step}");
             assert!(step.ends_with(SENT_LAST), "{step}");
@@ -5874,7 +5883,7 @@ async fn the_desktop_is_told_when_the_transfer_records_cannot_be_read() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let (line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
     std::fs::write(
         directory.path().join(statement_facts::SKIPS_FILE),
         b"not a record\n",
@@ -5942,7 +5951,7 @@ async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
     let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let (_line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    let (_line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
     std::fs::write(
         directory.path().join(statement_facts::SKIPS_FILE),
         b"not a record\n",

@@ -3507,7 +3507,7 @@ fn read_with_subject(
     ledger::transfer_facts(
         Cursor::new(journal.0.as_bytes()),
         Cursor::new(skip_of_row_one().as_bytes()),
-        COMPANY,
+        company(),
         candidate,
         subject.as_deref(),
     )

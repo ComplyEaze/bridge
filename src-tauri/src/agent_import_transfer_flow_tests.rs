@@ -8,6 +8,11 @@ use super::bank_tests::{
 };
 use super::*;
 
+/// A synthetic GUID: version 4 shape, zeros, then `n` in hex.
+fn guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
+
 /// `n` behind zeros to `width` characters.
 fn padn(n: u64, width: usize) -> String {
     format!("{n:0>width$}")
@@ -2442,12 +2447,12 @@ async fn a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_bat
         directory.path(),
         [skip_only_plans(), two_bank_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let first = rig.build(withdrawing(directory.path())).await;
     let batch_id = first["batch_id"].as_str().unwrap().to_string();
     let carrying = rig
-        .build(contra_statement(directory.path(), BANK_B, BOOKED, None))
+        .build(contra_statement(directory.path(), BANK_B, booked(), None))
         .await;
     let carrier = carrying["batch_id"].as_str().unwrap().to_string();
     mark_found(directory.path(), &carrier);
@@ -2458,7 +2463,7 @@ async fn a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_bat
     assert_eq!(error["code"], "withdraw_skip_paired", "{error}");
     let rows = error["paired_rows"].as_array().unwrap();
     assert_eq!(rows.len(), 1, "{error}");
-    assert_eq!(rows[0]["bridge_txn_id"], SKIPPED);
+    assert_eq!(rows[0]["bridge_txn_id"], skipped_row());
     assert_eq!(rows[0]["batch_id"], carrier.as_str());
     let step = error["next_step"].as_str().unwrap();
     assert!(
@@ -2486,7 +2491,7 @@ async fn an_unchanged_statement_batch_passes_the_transfer_check_at_send() {
         directory.path(),
         [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let first = rig.build(withdrawing(directory.path())).await;
     let batch_id = first["batch_id"].as_str().unwrap().to_string();
@@ -2510,17 +2515,17 @@ async fn sending_one_of_two_unsent_holders_judges_the_row_held_by_the_other() {
         ]
         .concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let carrying = rig
         .build(statement_v2(
             directory.path(),
             BANK_B,
             window(),
-            json!([contra_voucher(BOOKED), contra_voucher(OTHER_BOOKED)]),
+            json!([contra_voucher(booked()), contra_voucher(other_booked())]),
             json!([
-                contra_record(BOOKED, None),
-                contra_record(OTHER_BOOKED, None)
+                contra_record(booked(), None),
+                contra_record(other_booked(), None)
             ]),
         ))
         .await;
@@ -2529,7 +2534,7 @@ async fn sending_one_of_two_unsent_holders_judges_the_row_held_by_the_other() {
     let batch_id = first["batch_id"].as_str().unwrap().to_string();
     // a second build of the same withdrawal, as the first build left it
     let mut second = latest(directory.path(), &batch_id);
-    second.batch_id = "bridge-00000000-0000-4000-8000-000000000999".into();
+    second.batch_id = format!("bridge-{}", guid(0x999));
     journal(directory.path())
         .append_import_ledger(&second)
         .unwrap();
@@ -2547,17 +2552,17 @@ async fn an_inline_build_that_withdraws_a_skip_records_it_and_is_not_refused_at_
         directory.path(),
         [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let built = rig
         .build(json!({"company_guid": CAPTURED_GUID,
-            "vouchers": [contra_voucher(SKIPPED)], "withdraw_skips": [SKIPPED]}))
+            "vouchers": [contra_voucher(skipped_row())], "withdraw_skips": [skipped_row()]}))
         .await;
     let batch_id = built["batch_id"].as_str().unwrap().to_string();
     // no statement was given, and the withdrawal is on the record all the same
     let line = latest(directory.path(), &batch_id);
     assert!(line.statement.is_none(), "{built}");
-    assert_eq!(line.withdrawn_skips, Some(vec![SKIPPED.to_string()]));
+    assert_eq!(line.withdrawn_skips, Some(vec![skipped_row().to_string()]));
     past_the_transfer_check(&rig, &batch_id).await;
 }
 
@@ -2579,18 +2584,18 @@ async fn a_withdrawal_older_than_a_later_skip_of_the_row_does_not_excuse_it_at_s
         ]
         .concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let inline = json!({"company_guid": CAPTURED_GUID,
-        "vouchers": [contra_voucher(SKIPPED)], "withdraw_skips": [SKIPPED]});
+        "vouchers": [contra_voucher(skipped_row())], "withdraw_skips": [skipped_row()]});
     let old = rig.build(inline.clone()).await;
     let old = old["batch_id"].as_str().unwrap().to_string();
     // another record of the skip, after the withdrawal
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let error = post_error(&rig.server, &old).await;
     assert_eq!(error["code"], "skip_row_paired_elsewhere", "{error}");
-    assert_eq!(error["skipped_rows"], json!([SKIPPED]), "{error}");
+    assert_eq!(error["skipped_rows"], json!([skipped_row()]), "{error}");
     // the same inline build now is newer than the skip, and is not refused
     let new = rig.build(inline).await;
     let new = new["batch_id"].as_str().unwrap().to_string();
@@ -2613,24 +2618,29 @@ async fn a_batch_that_skips_a_row_another_batch_has_sent_is_refused_at_send() {
             directory.path(),
             BANK_A,
             window(),
-            json!([contra_voucher(BOOKED)]),
+            json!([contra_voucher(booked())]),
             json!([
-                contra_record(BOOKED, None),
-                skip_record(BANK_A, SKIPPED, None)
+                contra_record(booked(), None),
+                skip_record(BANK_A, skipped_row(), None)
             ]),
         ))
         .await;
     let skipping = skipping["batch_id"].as_str().unwrap().to_string();
     // a newer build posts the skipped row, which is allowed, and is sent
     let posting = rig
-        .build(contra_statement(directory.path(), BANK_A, SKIPPED, None))
+        .build(contra_statement(
+            directory.path(),
+            BANK_A,
+            skipped_row(),
+            None,
+        ))
         .await;
     let posting = posting["batch_id"].as_str().unwrap().to_string();
     mark_sent(directory.path(), &posting);
     let error = post_error(&rig.server, &skipping).await;
     assert_eq!(error["code"], "skip_row_already_posted", "{error}");
     assert_eq!(error["blocking_batch_id"], posting.as_str(), "{error}");
-    assert_eq!(error["skipped_rows"], json!([SKIPPED]), "{error}");
+    assert_eq!(error["skipped_rows"], json!([skipped_row()]), "{error}");
     let step = error["next_step"].as_str().unwrap();
     assert!(
         step.starts_with(
@@ -2655,7 +2665,7 @@ async fn a_batch_with_a_found_status_keeps_its_withdrawal_at_send() {
         directory.path(),
         [skip_only_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let first = rig.build(withdrawing(directory.path())).await;
     let id = first["batch_id"].as_str().unwrap().to_string();

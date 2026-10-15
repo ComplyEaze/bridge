@@ -2704,7 +2704,7 @@ async fn a_skip_recorded_after_the_click_is_refused_in_the_redeeming_call_and_wi
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
-    let (line, args) = saved_batch_of_row(&server, STATEMENT_ROW, "Synthetic test only");
+    let (line, args) = saved_batch_of_row(&server, statement_row(), "Synthetic test only");
     let scripted = ScriptedApproval::held();
     let pending = SCRIPTED_APPROVAL
         .scope(
@@ -2725,7 +2725,7 @@ async fn a_skip_recorded_after_the_click_is_refused_in_the_redeeming_call_and_wi
     let observed = sent(simulator);
     let error = &result(&refused)["error"];
     assert_eq!(error["code"], "skip_row_paired_elsewhere", "{refused}");
-    assert_eq!(error["skipped_rows"], json!([STATEMENT_ROW]), "{refused}");
+    assert_eq!(error["skipped_rows"], json!([statement_row()]), "{refused}");
     let step = error["next_step"].as_str().unwrap();
     assert!(step.starts_with(SENT_FIRST), "{step}");
     assert!(step.ends_with(SENT_LAST), "{step}");

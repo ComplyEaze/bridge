@@ -772,6 +772,10 @@ pub(crate) enum PairedReadValidationError {
     StockSummaryCollection,
     #[error("Tally company book changed during stock summary read")]
     StockSummaryExtent,
+    #[error("Tally's own month-wise register changed between paired reads")]
+    MonthRegister,
+    #[error("Tally company book changed during the month-wise register read")]
+    MonthRegisterExtent,
 }
 
 impl PairedReadValidationError {
@@ -798,6 +802,8 @@ impl PairedReadValidationError {
             Self::MastersCollection => "masters_collection_changed",
             Self::MastersNumberingCollection => "masters_numbering_collection_changed",
             Self::MastersExtent => "masters_extent_changed",
+            Self::MonthRegister => "month_register_changed",
+            Self::MonthRegisterExtent => "month_register_extent_changed",
             Self::StockSummaryCollection => "stock_summary_collection_changed",
             Self::StockSummaryExtent => "stock_summary_extent_changed",
         }

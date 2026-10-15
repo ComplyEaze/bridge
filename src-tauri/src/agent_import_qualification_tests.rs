@@ -32,8 +32,7 @@ fn the_published_rules_name_every_qualified_type_and_claim_no_other() {
         max_bytes: 200_000,
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let published = server.voucher_schema().unwrap().payload;
     let prose = format!(
@@ -141,8 +140,7 @@ async fn an_unshaped_bank_voucher_is_refused_before_dispatch_or_persistence() {
                 max_bytes: 200_000,
                 redaction: super::super::super::Redaction::None,
                 import_enabled: true,
-                writes_enabled: false,
-                batch_post_enabled: false,
+                posting: crate::agent::Posting::Off,
             });
             let mut input = admitted_payload();
             input.vouchers.truncate(1);

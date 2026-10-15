@@ -8,10 +8,11 @@ The developer configuration below remains for supported client integrations.
 `bridge_mcp` is Bridge's newline-delimited JSON-RPC 2.0 MCP server. It uses
 Bridge's loopback-only Tally XML transport. Reads are enabled by default.
 The MCPB extension also exposes voucher file preparation and bank-statement
-parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra) is
-off by default because of the four limits under *Approved voucher posting* below;
-the **Allow voucher posting (Journal, Payment, Receipt, Contra)** setting adds it, with
-separate native approval for each new attempt. Command-line installations
+parsing by default. Voucher posting (one Journal, Payment, Receipt or Contra, or
+a saved batch of 2 to 50) is off by default because of the limits under
+*Approved voucher posting* below; the **Allow voucher posting, one voucher or a
+batch of up to 50** setting adds it, with separate native approval for each new
+attempt. Command-line installations
 retain explicit environment switches.
 
 Build and run it with Rust 1.96:
@@ -96,6 +97,7 @@ The ordinary default tools, in name order:
 - `list_companies`
 - `local_data_report`
 - `masters`
+- `month_register`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -114,7 +116,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register` and `voucher_read_cost` are in the
 source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
@@ -153,8 +155,9 @@ installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
 bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
-sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting
-(Journal, Payment, Receipt, Contra)** setting, off by default, to `BRIDGE_AGENT_ENABLE_WRITES`.
+sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
+voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
+default, to `BRIDGE_AGENT_ENABLE_WRITES`.
 This is a source-configuration inventory, not a claim that an installed client
 uses a particular setting or that a tool is qualified for every runtime. Each
 call returns compact JSON with the
@@ -658,6 +661,33 @@ collection shape), `company_features_currency_invalid` (a symbol over 16 charact
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
 TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
+
+### Month-wise Sales and Purchase Registers (`month_register`)
+
+`month_register` takes `company_guid`, `kind` (`sales` or `purchase`) and a window of whole months,
+`from` the 1st of a month and `to` the last day of a month, at most twelve months, not starting before
+the book does. It reads Tally's own Sales Register or Purchase Register by report name, twice, with the
+book extent checked before and after and the company and mode checked around the read, and returns
+`months`: one row per month, `month` as `YYYY-MM`, and Tally's three columns `debit`, `credit` and
+`closing`, each `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed
+it. An empty amount is not zero.
+
+Nothing ties the rows to the vouchers, to the trial balance or to `sales_register` and
+`purchase_register`; `checks` says so. On the one synthetic book read (BRIDGE PILOT LAB, one financial
+year, 13 Oct 2026) the Sales Register's credit was the month's sales invoices, tax included, neither
+cancelled nor optional, and its closing was printed for August and September only, as a running total,
+with the other months empty; the Purchase Register's debit was the month's purchases as a negative amount,
+and its closing was printed for August and, unchanged, for September, a month with no purchase. That
+reading is not applied. Equality with Tally's own register screens has not been measured, and `checks`
+says `against_register_screen: not_checked`. The set of months is not left unchecked: an answer whose
+months are not the window's is refused (`month_register_months_unexpected`). A window that is not whole
+months is refused after the company and mode reads and before the register is asked for
+(`month_register_window_not_month_start`, `_not_month_end`, `_reversed`, `_too_many_months`,
+`_unsupported_boundary`), as is one that starts before the books (`month_register_before_books`) and
+Education mode (`month_register_education_unqualified`); an answer Tally marks as a failure, an
+empty answer and a book that moved during the read fail the call (`month_register_read_failed` with the
+cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
+Payment Registers have not been captured.
 
 ### GSTR-1 status of one voucher type (`gst_status`)
 
@@ -1791,10 +1821,11 @@ The four rest on different observations, and each build reports its own in
   with `import_bill_wise_changed` a ledger that became bill-wise since.
 
 Historical batch records remain readable. None of this qualifies every host,
-licence mode, or manually imported file. In the MCPB extension an unnumbered
+licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
-per approval (a voucher that carries a voucher number is refused); a saved batch of 2 to 50 posts in one import only in a source build
-that turns that on.
+per approval (a voucher that carries a voucher number is refused), and a saved
+batch of 2 to 50 posts in one import after one approval of its summary. One
+posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
    IDs are client-supplied, unique within the batch, and retained in the local import ledger.
@@ -1826,7 +1857,12 @@ that turns that on.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
-   `agent-import-ledger.jsonl` line. On a `Journal`, `voucher_number` and
+   `agent-import-ledger.jsonl` line. The result's `path` is where a person finds
+   that file, and `path_state` says how it was obtained: `resolved` (Windows
+   reported the file's real location, which on a Microsoft Store install of
+   Claude Desktop can be inside the package's own folder), `as_is` (macOS or
+   Linux, shown as written), or `unresolved` (it could not be resolved; this is
+   the logical path, not confirmed to exist). On a `Journal`, `voucher_number` and
    `reference` are optional: when a number is absent Tally applies the voucher
    type's own numbering configuration, and when supplied it is validated and
    sent so a Manual-type duplicate policy can reject it. On `Payment`,
@@ -2158,10 +2194,9 @@ deadlocks.
 limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 The saved batch file is now checked byte for byte against the approved record
 before posting ([#575](https://github.com/ComplyEaze/bridge/issues/575), fixed).
-**Allow voucher posting (Journal, Payment, Receipt, Contra)** turns it on for
-users who accept those risks. Existing
-saved settings are respected, so an installation that saved the earlier default
-may still have posting on; check the setting.
+**Allow voucher posting, one voucher or a batch of up to 50** turns it on for
+users who accept those risks. It is a new setting, so a posting choice saved
+for an earlier version does not carry over: posting starts off.
 For command-line installation, set `BRIDGE_AGENT_ENABLE_WRITES=true`.
 This enables `build_import_xml`, `parse_bank_statement`, `post_import` and
 `acknowledge_post_review`, which asks the local user, in its own native dialog, to
@@ -2172,13 +2207,19 @@ after posting is turned off. `BRIDGE_AGENT_ENABLE_IMPORT=true` alone exposes
 the manual file workflow and bank-statement proposal preparation, while
 verification remains available without either switch.
 
-`BRIDGE_AGENT_ENABLE_BATCH_POST=true`, together with
-`BRIDGE_AGENT_ENABLE_WRITES=true`, lets `post_import` post a saved batch of 2 to
-50 vouchers in one import, after one approval of the batch's summary: every
+`BRIDGE_AGENT_ENABLE_WRITES=true` also lets `post_import` post a saved batch of 2
+to 50 vouchers in one import, after one approval of the batch's summary: every
 ledger's debit and credit totals, the money Receipts bring in and Payments take
-out, and the standing cautions. It is off by default. It is a command-line
-setting only, not in the MCPB extension, until a batch post through Bridge has
-been proved on a live book. A batch is `posted_verified` only when Tally created
+out, and the standing cautions (#1090). In the MCPB extension this is the
+setting **Allow voucher posting, one voucher or a batch of up to 50**
+(`enable_posting_2026_10`). It is a new key, off by default, so a posting choice
+saved for an earlier version, which covered one voucher at a time, does not
+carry over. An empty value, or the key's unresolved
+`${user_config.enable_posting_2026_10}` placeholder, reads as off; what Claude
+Desktop passes for a new key on an upgrade is not yet measured. The separate
+`BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set, with any value,
+and posting is on, `post_import` refuses as `setting_retired` until it is
+removed; every other tool works. A batch is `posted_verified` only when Tally created
 exactly that many vouchers, the readback verifies every one, and the company's
 voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark
@@ -2186,7 +2227,7 @@ was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuil
 `acknowledge_post_review` records that review, one doubt at a time, and changes
 no verdict.
 
-All three switches accept `true`/`false` or `1`/`0`; invalid values stop startup. No model-supplied argument can grant approval. Claude controls
+Both switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**
 for the user. That client permission does not approve an accounting entry.
 
@@ -2306,10 +2347,9 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    same-day rows of one amount are not split across batches; they pass this
    check together in one batch. A proposals file is whole days already, since
    `from` and `to` are days. A day with more than 50 rows does not fit one
-   batch, and that case is open: ask the user. Batch posting is off by
-   default, and with it off each post takes one voucher, so same-day twins
-   post together only with batch posting on or through a hand import of the
-   built file. The list and step are
+   batch, and that case is open: ask the user. With posting on, a saved
+   batch of up to 50 posts after one approval, so same-day twins post
+   together in one batch or through a hand import of the built file. The list and step are
    withheld on a very small response budget, and the same refusal inside the
    queue, after approval, carries no list. Any other read inside the queue that fails before the post is refused
    with `post_queue_read_failed`, with a `cause` where one is known (a read the endpoint's
@@ -2570,6 +2610,54 @@ This is a bounded first posting slice, not blanket host/licence qualification.
 A ledger mapper is unnecessary for exact existing names: `validate_masters`
 returns exact matches and bounded near matches. Resolve ambiguity with the
 user rather than silently creating or choosing a ledger.
+
+### A bank line is posted at most once
+
+ComplyEaze Bridge sends each bank-statement line to a company at most once from
+this computer. Once a line has been sent, Bridge will not send it again as a new
+voucher, even if the post failed, the reply was lost, or the voucher was later
+changed or deleted in Tally. If Tally does not hold it, enter it in Tally
+yourself; do not edit the statement to get it past Bridge. After each post
+Bridge reads the books back and marks a voucher verified only when it finds
+exactly the voucher its own post created. A correction built with
+`amends_batch_id` is a file the person imports by hand, meant to alter the
+vouchers in place and add none (measured over Tally's gateway, not yet through
+its Import menu); Bridge refuses to build one for a batch it posted itself.
+
+What carries the rule, by its code: the journal row check refuses a row another
+batch of the company was sent with, by its transaction id (for a row with any
+other id, also its date and amounts), whether or not that batch ended well
+(`import_txn_already_posted`, #876, #898); the read-back before
+the post names a voucher already in the book with the same date, type, ledgers
+and amounts and refuses (`import_preexisting_identity`, #901, #908); a native
+post is verified by binding its vouchers to their own exact AlterID span, with
+their GUID and MasterID recorded in the journal (#864, #1054). A post whose
+binding was refused, or whose reply was lost, is closed only by the person
+checking the vouchers in Tally (a way to close it inside Bridge is #1039). This
+was read from the code, and the cases below were not measured on a live Tally
+unless a number links to the measurement.
+
+What the rule does not cover:
+
+1. The memory of what was sent is on this computer. Posting the same company's
+   statement from a second computer, or after reinstalling Bridge or deleting
+   its data folder, is checked only against what Tally holds, and a voucher
+   changed since is not recognised.
+2. Two downloads of the same statement from different places (for example net
+   banking and a branch printout) may read a narration differently and so not be
+   recognised as the same lines; a posted voucher changed in Tally since is then
+   not recognised.
+3. Entries typed by hand are recognised only if date, voucher type, ledgers and
+   amounts all match.
+4. Never import Bridge's saved file into Tally by hand after posting it from
+   Bridge. The saved file carries a different REMOTEID from the post's, so a
+   second voucher is expected (not measured), and Bridge would only report it at
+   the next `verify_import`.
+5. If a reply is lost, or someone works in Tally while Bridge posts, the batch
+   may never read verified; Bridge shows any voucher it finds with the same
+   content, or reports the line as sent but not found, and the person checks
+   them in Tally.
+6. After restoring a backup, check the posted vouchers in Tally.
 
 ## Review and post from the ComplyEaze Bridge app
 

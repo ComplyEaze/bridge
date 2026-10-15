@@ -28,7 +28,7 @@ function visibleText(html) {
 }
 
 test("the site has the pages this test expects, so none is checked by accident or skipped", () => {
-  assert.deepEqual(pages, ["blog-bank-statement-ledger-names.html", "blog-ten-questions.html", "blog-where-does-client-data-go.html", "blog-who-approves-a-post.html", "blog.html", "capabilities.html", "changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html", "security.html"]);
+  assert.deepEqual(pages, ["bank-statement-pdf-to-tallyprime-vouchers.html", "blog-bank-statement-ledger-names.html", "blog-ten-questions.html", "blog-where-does-client-data-go.html", "blog-who-approves-a-post.html", "blog.html", "capabilities.html", "changelog.template.html", "download.html", "faq.html", "index.html", "legal.template.html", "releases.html", "security.html"]);
 });
 
 test("every page carries the same header and footer, apart from which link is the current page", () => {
@@ -148,7 +148,7 @@ test("no file that ships carries an internal working label", () => {
 });
 
 // What a search engine or an AI assistant reads about the site without running its script.
-const indexed = ["index.html", "download.html", "faq.html", "capabilities.html", "releases.html", "security.html", ...pages.filter((name) => name.startsWith("blog"))];
+const indexed = ["index.html", "download.html", "faq.html", "capabilities.html", "bank-statement-pdf-to-tallyprime-vouchers.html", "releases.html", "security.html", ...pages.filter((name) => name.startsWith("blog"))];
 const metaContent = (html, property) => html.match(new RegExp(`<meta property="${property}" content="([^"]*)" />`))?.[1];
 
 test("each indexed page names its own address, and its social card repeats the page's own title and description", () => {
@@ -291,7 +291,7 @@ test("the jobs table gives one of four answers per row, links each row to its an
 
 // A page that says it was checked against a release must say the manifest's release: a version bump fails here
 // until the page has been read again, so no stamped page can keep describing a release that is no longer current.
-const stamped = ["faq.html", "capabilities.html"];
+const stamped = ["faq.html", "capabilities.html", "bank-statement-pdf-to-tallyprime-vouchers.html"];
 test("every page that carries a 'Checked against release' stamp carries the manifest's release, and none is left out of this list", () => {
   const version = JSON.parse(readFileSync(new URL("../packaging/mcpb/manifest.json", import.meta.url), "utf8")).version;
   for (const name of pages.filter((page) => /Checked(?:\s|&nbsp;)+against(?:\s|&nbsp;)+release/i.test(read(page)))) assert.ok(stamped.includes(name), `${name} carries a check stamp and is not in the list of stamped pages`);
@@ -305,7 +305,7 @@ test("every page that carries a 'Checked against release' stamp carries the mani
 // The page lists what the stamped release installs. The catalog in the source is ahead of the release while a version is being
 // built: the tools it serves that no published build installs are named here, keyed by the release the page is stamped for. When the
 // stamp moves to the release that publishes them the entry is gone, so the page must list them, and until then the page must not.
-const inSourceNotPublished = { "0.5.1": ["company_features", "gst_status", "statement_tie_out", "voucher_read_cost"] };
+const inSourceNotPublished = { "0.5.1": ["company_features", "gst_status", "month_register", "statement_tie_out", "voucher_read_cost"] };
 test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
   const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
   const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");

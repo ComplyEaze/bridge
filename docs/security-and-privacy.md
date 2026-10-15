@@ -3,14 +3,15 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Five
+page was not read again at it, except as said below). Six
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
 `ledger_movement` read took, in section 2 (#1366), where a program built
 from this repository loads the PDF library from, in section 5 (#1422), the
-statement party written into a bank voucher's narration, in section 2 (#1430), and the
-file of skipped bank-statement rows, in section 4 (#1625). It was written from a reading
+statement party written into a bank voucher's narration, in section 2 (#1430), the
+file of skipped bank-statement rows, in section 4 (#1625), and the
+location shown for an import file on a Microsoft Store install of Claude Desktop, in section 4 (#1569). It was written from a reading
 of the source code of release 0.4.0 (tag `mcp-v0.4.0`, 2 October 2026), updated for 0.4.1 in sections 3 and 7, and read
 again on 7 October 2026 against the changes between `mcp-v0.4.2` and that
 commit for sections 1, 2, 3, 4, 7 and 8. Sections 5 and 6 were not read again
@@ -50,12 +51,13 @@ Four tools read nothing from Tally. They read ComplyEaze Bridge's own files on
 this computer: its receipt log, the evidence it kept for a read, the voucher
 format it accepts, and a report of what it has stored (section 4).
 
-It writes to Tally only if you turn posting on, and then only one voucher at a
-time (a Journal, Payment, Receipt or Contra it prepared and saved), after you
-approve that voucher in a separate ComplyEaze Bridge window. No ComplyEaze
-Bridge tool can approve it. The server program also has a setting for posting 2
-to 50 vouchers of one saved batch after one approval; the published extension
-neither offers nor sets it, so it applies only if someone sets it by hand.
+It writes to Tally only if you turn posting on, and then only a Journal,
+Payment, Receipt or Contra it prepared and saved: one voucher at a time, or a
+saved batch of 2 to 50, each post after you approve it in a separate ComplyEaze
+Bridge window (for a batch, its summary). No ComplyEaze Bridge tool can approve
+it. From the build after 0.5.1, one setting covers both, and a posting choice
+saved for an earlier version starts off; in 0.5.1 and earlier, posting through
+the extension is one voucher at a time.
 
 Every tool refuses until the Terms of Use (version 2026-10.1 since 0.5.0) are
 accepted in the extension settings. In 0.5.0 the setting was marked required, and
@@ -188,6 +190,11 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       and batch-wise settings as yes, no or not reported, and the currency
       symbol. It holds no amounts and no narrations, and `mask_parties` has
       nothing to shorten in it.
+    - The month-wise register read (`month_register`) sends the company name,
+      its identifier, company number and books-from date, the register you
+      chose (`kind`) and the report's name, the window's dates, and for each
+      month, Tally's debit, credit and closing amounts. It holds no
+      party, ledger or narration, and `mask_parties` has nothing to shorten in it.
     - The GSTR-1 status read (`gst_status`) sends the company name and its
       identifier, the voucher type name you gave and the dates, and for each
       voucher its number, date, voucher type name, Tally's identifier and
@@ -286,6 +293,24 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 | --- | --- |
 | Windows: `%LOCALAPPDATA%\Bridge\agent` | the files below |
 | macOS: `~/Library/Application Support/Bridge` | the files below |
+
+On a Microsoft Store install of Claude Desktop, Windows may keep some of these
+files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
+and a given file can be in either place (seen on one computer, #1459;
+**Not measured:** when Windows puts a file in which place). For the import file
+that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
+Windows reports for that file, with a `path_state` beside it that says whether
+Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
+still prints the folder as built (the Windows location in the table above,
+unless you set another data folder), whichever place the files are in. On that
+one computer (#1459) the second folder held a receipt log, the terms record,
+the import journal, the saved batch files (`imports/`), the bank-statement
+proposals, a lock file and the lock folder (`native-dispatch-leases/`).
+Microsoft's documentation says that uninstalling or resetting a Store app
+(here Claude Desktop itself; this is not the removal of the extension that
+section 8 describes) removes that second folder and everything in it.
+**Not measured:** any other computer, where the proof files of a verification
+go, and what an uninstall or reset really removes.
 
 - **A receipt log** (`agent-egress.jsonl`): two lines for each tool call. The
   first has the tool name, the time, the company's Tally GUID, fingerprints of

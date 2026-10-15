@@ -111,11 +111,12 @@ class MergeGateControls(unittest.TestCase):
 
     @classmethod
     @contextlib.contextmanager
-    def master_state(cls, tracked=None, symlinks=None, ignored=None):
+    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None):
         """Put files on the throwaway origin/master (and in the gate's checkout), then put it back.
 
         tracked: path -> text, committed. symlinks: path -> target, committed as links. ignored: path -> text, written
-        into the checkout only, with a committed .gitignore naming it (git status does not show it).
+        into the checkout only, with a committed .gitignore naming it (git status does not show it). hidden_edits: path -> text
+        written over a tracked file in the checkout and hidden from git with skip-worktree (git diff and git status do not show it).
         """
         base = subprocess.run(["git", "-C", str(cls.repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
         try:
@@ -130,8 +131,13 @@ class MergeGateControls(unittest.TestCase):
             for path, text in (ignored or {}).items():
                 (cls.repo / path).write_text(text)
             cls.git_in_repo("push", "-q", "-f", "origin", "master")
+            for path, text in (hidden_edits or {}).items():
+                cls.git_in_repo("update-index", "--skip-worktree", path)
+                (cls.repo / path).write_text(text)
             yield
         finally:
+            for path in (hidden_edits or {}):
+                cls.git_in_repo("update-index", "--no-skip-worktree", path)
             cls.git_in_repo("reset", "-q", "--hard", base)
             cls.git_in_repo("clean", "-fdxq")
             cls.git_in_repo("push", "-q", "-f", "origin", "master")
@@ -576,6 +582,22 @@ class MergeGateControls(unittest.TestCase):
         with self.master_state(tracked={"scripts/real-registry.json": self.registry(self.LISTED)}, symlinks={self.REGISTRY_PATH: "real-registry.json"}):
             result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
             self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_registry_that_is_only_valid_once_a_nul_byte_is_dropped_is_not_applied(self):
+        # bash drops a NUL byte when a command's output is captured into a variable, so the check reads the bytes through a pipe.
+        text = self.registry(self.LISTED).replace("a synthetic test value", "a synthetic\0 test value")
+        self.assertIn("\0", text)
+        with self.master_state(tracked={self.REGISTRY_PATH: text}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied: it is not valid", result.stdout)
+
+    def test_the_registry_on_master_is_used_not_a_different_file_in_the_checkout(self):
+        # skip-worktree hides a local edit from git diff and git status, so the gate's own-tree check passes with it present.
+        other = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(other)},
+                               hidden_edits={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry: 1 listed value(s) applied", result.stdout)
 
     def test_a_link_whose_target_text_is_itself_a_valid_registry_is_not_applied(self):
         # A link's content is its target path. Without the regular-file check that text would be read as the registry.

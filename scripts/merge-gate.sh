@@ -785,32 +785,38 @@ else
   uuid_registry_path="scripts/merge-gate-synthetic-uuids.json"
   uuid_manifest_file=""
   load_uuid_registry() {
-    local entry mode blob count manifest="$tmpdir/synthetic-uuid-manifest.json"
-    entry=$(git -C "$gate_tree" ls-tree refs/merge-gate/master -- "$uuid_registry_path" 2>/dev/null) || {
+    local tip entry mode count manifest="$tmpdir/synthetic-uuid-manifest.json"
+    # One commit is resolved once and used for every read below, so a second gate run that fetches meanwhile cannot make
+    # the mode, the bytes and the printed blob come from different states of master.
+    tip=$(git -C "$gate_tree" rev-parse --verify -q "refs/merge-gate/master^{commit}" 2>/dev/null) || {
+      say "note" "synthetic-UUID registry not applied: could not resolve master"; return 0; }
+    entry=$(git -C "$gate_tree" ls-tree "$tip" -- "$uuid_registry_path" 2>/dev/null) || {
       say "note" "synthetic-UUID registry not applied: could not look it up on master"; return 0; }
     [ -n "$entry" ] || return 0
     mode=${entry%% *}
     if [ "$mode" != "100644" ]; then
       say "note" "synthetic-UUID registry not applied: it is not a regular file on master"; return 0
     fi
-    blob=$(git -C "$gate_tree" cat-file blob "refs/merge-gate/master:$uuid_registry_path" 2>/dev/null) || {
+    git -C "$gate_tree" cat-file -e "$tip:$uuid_registry_path" 2>/dev/null || {
       say "note" "synthetic-UUID registry not applied: could not read it from master"; return 0; }
-    if ! jq -e '
+    # The bytes go straight from git into jq: capturing them in a shell variable would drop a NUL byte (bash 3.2) and could
+    # make an invalid file valid.
+    if ! git -C "$gate_tree" cat-file blob "$tip:$uuid_registry_path" 2>/dev/null | jq -e '
       type == "object" and (keys == ["entries", "schema_version"]) and .schema_version == 1 and
       (.entries | type == "array" and length <= 500 and
         all(.[]; type == "object" and (keys == ["note", "uuid"]) and
           (.uuid | type == "string" and length == 36 and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") and . != "00000000-0000-0000-0000-000000000000") and
           (.note | type == "string" and test("[^\\s]"))) and
         (([.[].uuid] | length) == ([.[].uuid] | unique | length)))
-    ' <<<"$blob" >/dev/null 2>&1; then
+    ' >/dev/null 2>&1; then
       say "note" "synthetic-UUID registry not applied: it is not valid (schema 1, at most 500 entries, each with a lowercase non-nil uuid and a note, no duplicates)"; return 0
     fi
-    if ! jq --arg head "$head" '[.entries[] | {uuid: .uuid, head: ($head | ascii_downcase), source: "fixture"}]' <<<"$blob" >"$manifest" 2>/dev/null; then
+    if ! git -C "$gate_tree" cat-file blob "$tip:$uuid_registry_path" 2>/dev/null | jq --arg head "$head" '[.entries[] | {uuid: .uuid, head: ($head | ascii_downcase), source: "fixture"}]' >"$manifest" 2>/dev/null; then
       say "note" "synthetic-UUID registry not applied: could not write the list for the scan"; return 0
     fi
-    count=$(jq -r '.entries | length' <<<"$blob")
+    count=$(jq -r 'length' "$manifest")
     uuid_manifest_file="$manifest"
-    say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "refs/merge-gate/master:$uuid_registry_path" 2>/dev/null))"
+    say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$uuid_registry_path" 2>/dev/null))"
   }
   load_uuid_registry
   scan_input_file="$tmpdir/privacy-scan-input"

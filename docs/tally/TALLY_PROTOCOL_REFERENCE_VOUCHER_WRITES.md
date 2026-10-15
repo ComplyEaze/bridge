@@ -554,16 +554,18 @@ are byte-identical to the first ones.
   as a Payment's was with duplicates allowed on the other book (above); and a Journal sent with
   a number a Journal held came back refused, with nothing that says why, where a Payment sent
   with a held number, duplicates allowed, was created as a second voucher (above). No one
-  voucher type has been measured under both settings.
+  voucher type was measured under both settings in these runs; a Payment refused for a number a
+  Payment held, duplicates prevented, is in the paragraph after next.
 - From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
   the four imports.
-- **Not established:** duplicates prevented under "Automatic (Manual Override)"; a number with
-  spaces; a Payment, a Receipt or a Contra sent a number that a voucher of its own type holds; a
-  file of several vouchers, one with a held number; Multi-user Auto; a deletion; Gold; other
-  releases; macOS; the same through ComplyEaze Bridge's own post. A back-dated voucher with a
-  number, a number with a leading zero, a held number in small letters, a number held only by a
+- **Not established:** duplicates prevented under "Automatic (Manual Override)"; a number with a
+  leading or inner space; a Receipt or a Contra sent a number that a voucher of its own type
+  holds; a file of several vouchers, one with a held number; Multi-user Auto; a deletion; Gold;
+  other releases; macOS; the same through ComplyEaze Bridge's own post. A back-dated voucher with
+  a number, a number with a leading zero, a held number in small letters, a number held only by a
   voucher of another type, and a Payment that carries a new number were sent in a later run on
-  this book (next paragraph).
+  this book (next paragraph); a Payment sent a number a Payment holds, and a number with an end
+  space, in the run after it (the paragraph after that).
 
 **Under Manual numbering with duplicates prevented, a number held only by a Journal did not block a
 Payment, a held number in small letters was refused, and `01` was created beside a held `1`:
@@ -611,12 +613,60 @@ read after the restore are byte-identical to the first ones.
 - From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
   the six imports, and that a line reading "(e) Data exceptions exist" stood on Tally's Gateway
   screen before the first import, after each import and after the restore; it was not opened.
-- **Not established:** a number in small letters, or one with a leading zero, that has no held
-  twin; a Journal whose number only a Payment holds; a Payment sent a number that another
-  Payment holds (every refusal so far was of a Journal); Receipt and Contra; a number with spaces;
-  duplicates prevented under "Automatic (Manual Override)"; a file of several vouchers, one with
-  a held number; Multi-user Auto; a deletion; Gold; other releases; macOS; the same through
-  ComplyEaze Bridge's own post.
+- **Not established:** a number with a leading zero that has no held twin; Receipt and Contra;
+  a number with a leading or inner space; duplicates prevented under "Automatic (Manual
+  Override)"; a file of several vouchers, one with a held number; Multi-user Auto; a deletion;
+  Gold; other releases; macOS; the same through ComplyEaze Bridge's own post. A number in small
+  letters with no held twin, a Journal whose number only a Payment holds, a Payment sent a number
+  another Payment holds, and a number with an end space were sent in the next run (next
+  paragraph).
+
+**Under Manual numbering with duplicates prevented, the held-number check did not cross Journal and
+Payment in either direction, a number in small letters was not refused in itself, and a number's end
+space did not come back: verified 2026-10-15 on one book and two voucher types (PARTIAL).** On the
+book of the two runs above (licensed TallyPrime 7.1 Silver, Windows), holding the same three
+vouchers, six imports were sent raw, one per step, each of one voucher that carried a
+`VOUCHERNUMBER` element and a new `REMOTEID`: four Journals and two Payments (branch
+`lab/724-m9p-matching-within-a-type-answers`, `3434d39e`, bridge#724; every figure was read from the
+marks, voucher, series and import answers with an XML parser, with each size checked against
+`CONTENT-LENGTH`; each import file on the branch has the SHA-256 the run sheet gives it). The series
+of the Journal type and of the Payment type each read `Manual`, `Auto Retain`, `PREVENTDUPLICATES`
+`Yes` at every read, and no series row differed from the first series answer at any read. That no
+type screen was saved in this run, and that the book was put back at the end by restoring a backup,
+are from that branch's notes; the voucher answer read after the restore is byte-identical to the
+first one.
+
+- **VERIFIED, a Payment against a Payment:** a Payment numbered `M9P-P1`, dated 20 July, which no
+  voucher held, was created and read back its number; a second Payment numbered `M9P-P1`, dated
+  21 July, was refused whole: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, no `LINEERROR`, in
+  an answer byte-identical to the refusals of the two runs above (538 bytes, SHA-256 `09a713e2…`),
+  which names no cause. Everything under `COLLECTION` in the voucher answer equalled the answer
+  before it.
+- **VERIFIED, a number held only by a voucher of another type:** a Journal numbered `M9P-P1`,
+  dated 22 July, sent while only that Payment held the number, was created and read back
+  `M9P-P1`; the Payment was unchanged. With the run above, where a Payment took a number only a
+  Journal held, the check did not cross these two types in either direction on this book.
+- **VERIFIED, small letters with no held twin:** a Journal numbered `m9p-x1`, dated 23 July, when no
+  voucher held that number in any letter case, was created and read back `m9p-x1` in small
+  letters. So the run above's refusal of `m9o-a1` beside a held `M9O-A1` is best explained as a
+  match made without regard to letter case; that refusal names no cause, and only one pair was
+  sent, small letters against a held number in capitals (ASCII letters only).
+- **VERIFIED, an end space:** a Journal numbered `M9P-S1 ` (seven characters, one space at the end),
+  dated 25 July, was created; the voucher answer returns `M9P-S1`, six characters, with no space.
+  A Journal numbered `M9P-S1`, dated 26 July, was then refused in the same 538-byte answer. Whether
+  Tally drops the space when it imports the number or when it exports it is not told apart.
+- **VERIFIED:** each of the four answers to a created voucher read `CREATED` 1, `LASTVCHID` the new
+  voucher's `MASTERID` (4 to 7 in the order sent), and every other counter 0. No voucher already in
+  the book changed at any import.
+- From that branch's notes, not from an answer: that nothing appeared on Tally's screen at any of
+  the six imports, and that the line reading "(e) Data exceptions exist" stood on Tally's Gateway
+  screen before the first import, after each import and after the restore; it was not opened.
+- **Not established:** a leading or inner space, or other white space; letters outside ASCII; a
+  number sent with an end space while the same number without it is held; a number with a leading
+  zero that has no held twin; Receipt and Contra; two child types of one parent, and a type with
+  several series; duplicates allowed; duplicates prevented under "Automatic (Manual Override)"; a
+  file of several vouchers, one with a held number; Multi-user Auto; a deletion; Gold; other
+  releases; macOS; the same through ComplyEaze Bridge's own post.
 
 **Switching a type that holds vouchers to Manual blanks their numbers: verified 2026-10-12, one
 observation.**

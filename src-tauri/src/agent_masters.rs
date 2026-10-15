@@ -5,6 +5,9 @@ use crate::tally::runtime::{MastersKind, MastersRows};
 use bridge_tally_protocol::native_masters::{
     NativeMasterDetail, NativeMasterKind, NativeMasterRow, NativeNumberingMethod,
 };
+use bridge_tally_protocol::native_voucher_type_numbering::{
+    DuplicateSetting, SeriesNumberingMethod, VoucherTypeNumbering,
+};
 
 impl Server {
     pub(super) async fn masters(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -46,6 +49,14 @@ impl Server {
                         .rows
                         .iter()
                         .map(|row| native_row(row, marks_party_text(kind)))
+                        .collect::<Vec<_>>(),
+                    MastersRows::VoucherTypes(types) => types
+                        .iter()
+                        .map(|(row, numbering)| {
+                            let mut json = native_row(row, marks_party_text(kind));
+                            json["series_numbering"] = series_numbering_json(numbering);
+                            json
+                        })
                         .collect::<Vec<_>>(),
                     MastersRows::Groups(groups) => groups
                         .iter()
@@ -99,7 +110,11 @@ impl Server {
                 "`default` is Tally's reported value, not evidence that the type numbers automatically",
                 "The company's voucher-type count (NUMVOUCHERTYPES) did not equal the rows returned on two books (35 vs 26, 33 vs 24), and on one book equalled the number-series count (inferred to count series, unmeasured): do not check these rows against it",
                 "The completeness of this list is unverified: absence from it is not evidence that a voucher type is absent from the book",
-                "Voucher types are read whole with no size check before the read; rows, AlterIDs and response size are checked after it",
+                "Voucher types are read whole with no size check before the read, and so is the numbering read that follows it; rows, AlterIDs and response size are checked after each",
+                "series_numbering is the numbering a voucher type's series prints (series level), read from a second paired read of the voucher-type export and joined to each row by GUID with the name as a second equality. A read whose numbering cannot be trusted returns no rows and refuses as `masters_numbering_names_differ` (a type in one read only), `masters_numbering_identity_differs` (a GUID and name that disagree between the two reads), `masters_numbering_collection_changed` (the numbering read changed between its two reads) or `masters_bound_premise_violated` (the numbering answer's row count or size); a numbering answer that does not parse, a missing or repeated GUID among the causes, refuses at once with a `masters_*` cause; a moved book is reported as `masters_extent_changed` in place of a join or premise refusal",
+                "series_numbering was measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with duplicates not prevented) were checked against Tally's screen; Automatic (Manual Override) through this tool (it is mapped from the series text measured on a synthetic book on 13 October 2026), more than one series (returned as `series_count`, with nothing read from it), Multi-user Auto, a single series not named `Default`, a voucher type created new and other releases were not measured",
+                "An `unrecognised` series method is never `manual`; a series that lacks a method or duplicate setting, repeats one, or prints a duplicate setting other than Yes or No is returned as `field_invalid`, never defaulted",
+                "The integrated read, the two requests sent as one tool call, was run live on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver, Windows; 24 voucher types each, each with exactly one series, whose name is not read): it was not refused, and on the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's defaults and not checked on screen, read Automatic",
             ]),
             MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
                 limitations.extend([
@@ -151,6 +166,33 @@ const fn marks_party_text(kind: MastersKind) -> bool {
                 | NativeMasterKind::CostCategories
         )
     )
+}
+
+/// One voucher type's series-level numbering as the tool returns it.
+fn series_numbering_json(result: &VoucherTypeNumbering) -> Value {
+    match result {
+        VoucherTypeNumbering::Observed { method, duplicates } => json!({
+            "observation": "observed",
+            "method": match method {
+                SeriesNumberingMethod::Automatic => json!("automatic"),
+                SeriesNumberingMethod::Manual => json!("manual"),
+                SeriesNumberingMethod::AutomaticManualOverride => {
+                    json!("automatic_manual_override")
+                }
+                SeriesNumberingMethod::Unrecognised(raw) => json!({"unrecognised": raw}),
+            },
+            "duplicates": match duplicates {
+                DuplicateSetting::Prevented => "prevented",
+                DuplicateSetting::NotPrevented => "not_prevented",
+            },
+        }),
+        VoucherTypeNumbering::SeriesCount(count) => {
+            json!({"observation": "series_count", "count": count})
+        }
+        VoucherTypeNumbering::FieldInvalid(code) => {
+            json!({"observation": "field_invalid", "code": code})
+        }
+    }
 }
 
 /// One native row as the tool returns it: the fields every kind has, then its

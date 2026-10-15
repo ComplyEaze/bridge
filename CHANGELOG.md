@@ -18,6 +18,28 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- `masters` with `kind` `voucher_types` now returns, on each row, `series_numbering`: the numbering method
+  (`automatic`, `manual`, `automatic_manual_override`, or the raw text under `unrecognised`, never read as
+  `manual`) and whether duplicate numbers are prevented, read at the number-series level from a second paired
+  read of the voucher-type export and joined to the row by GUID with the name as a second equality; a type with no
+  series or several returns `series_count` and nothing is read from it, and a series missing or repeating a field
+  returns `field_invalid`. A type found in one read only (`masters_numbering_names_differ`), or a GUID and name that disagree between the
+  two reads (`masters_numbering_identity_differs`), refuses the whole read; so does the numbering read changing
+  between its two reads (`masters_numbering_collection_changed`) and a numbering answer whose row count or size
+  breaks the mark's premise (`masters_bound_premise_violated`), and one that does not parse (a missing or repeated
+  GUID among the causes) refuses at once; a moved book is reported as `masters_extent_changed` in place of a
+  join or premise refusal. The type-level `numbering_method` stays as it was, with its limitation.
+  Measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named
+  `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with
+  duplicates not prevented) were checked against Tally's screen. Automatic (Manual Override) through this tool (it is
+  mapped from the series text measured on a synthetic book on 13 October 2026), more than one series, Multi-user
+  Auto, a single series not named `Default`, a type created new and other releases are not measured. The two
+  requests were run live as one tool call on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver,
+  Windows; 24 voucher types each, exactly one series per type, its name not read): the read was not refused, and on
+  the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with
+  duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's
+  defaults and not checked on screen, read Automatic (part of #724).
+
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
   carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,

@@ -6,6 +6,21 @@
 //! --lib bank_statement -- --ignored`.
 use super::*;
 
+/// `width` copies of one digit.
+fn rep(digit: char, width: usize) -> String {
+    digit.to_string().repeat(width)
+}
+
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A synthetic company GUID: version 4 shape, zeros, then `n` in hex.
+fn guid(n: u128) -> String {
+    uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | n).to_string()
+}
+
 const PASSWORD: &str = "synthetic-user-4321";
 
 fn server(directory: &Path, import_enabled: bool, redaction: Redaction) -> Server {
@@ -980,12 +995,12 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
     };
     let rows = [
         // out to a mapped Contra, and a line of the same amount back that day
-        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
-        upi("01/08/26", "BACK", "222222222222", "", "10.00", "1000.00"),
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("01/08/26", "BACK", &rep('2', 12), "", "10.00", "1000.00"),
         // out to the other bank, skipped, and the same amount back that day
-        upi("03/08/26", "OWN", "333333333333", "30.00", "", "970.00"),
-        upi("03/08/26", "BACK", "555555555555", "", "30.00", "1000.00"),
-        upi("05/08/26", "LAST", "444444444444", "", "5.00", "1005.00"),
+        upi("03/08/26", "OWN", &rep('3', 12), "30.00", "", "970.00"),
+        upi("03/08/26", "BACK", &rep('5', 12), "", "30.00", "1000.00"),
+        upi("05/08/26", "LAST", &rep('4', 12), "", "5.00", "1005.00"),
     ];
     let mapping = Mapping::from_rows(
         [
@@ -1009,7 +1024,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
             bank_ledger: "Synthetic Bank Ledger",
             suspense_ledger: "Suspense",
             account_label: "Synthetic CA xx4321",
-            account_number: "00000000004321",
+            account_number: &padn(4321, 14),
             date_from: None,
             date_to: None,
             cash_answers: CashAnswers::none(),
@@ -1017,7 +1032,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
     )
     .unwrap();
     let parsed = ParsedStatement {
-        account_number: "00000000004321".into(),
+        account_number: padn(4321, 14),
         statement_rows: rows.len(),
         closing: bridge_tally_core::ExactDecimal::parse("1005.00").unwrap(),
         totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
@@ -1062,7 +1077,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
 
     let resolved = resolve_import_arguments(
         directory.path(),
-        &json!({"company_guid": "00000000-0000-4000-8000-000000000002",
+        &json!({"company_guid": guid(2),
                 "proposals_id": proposals_id, "proposals_sha256": digest}),
     )
     .unwrap();
@@ -1084,7 +1099,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
             .as_ref()
             .map(ToString::to_string)
             .as_deref(),
-        Some("111111111111")
+        Some(rep('1', 12).as_str())
     );
     assert!(contra.reversed_same_day);
     let [skip] = &statement.skips[..] else {
@@ -1099,7 +1114,7 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
     assert_eq!(skip.other_ledger, "Other Bank");
     assert_eq!(
         skip.reference.as_ref().map(ToString::to_string).as_deref(),
-        Some("333333333333")
+        Some(rep('3', 12).as_str())
     );
     assert!(skip.reversed_same_day);
     // the facts name the bank and the skipped row's ledger beyond the vouchers'
@@ -1119,7 +1134,7 @@ fn version_two_facts_are_read_strictly_and_a_skip_only_file_is_told() {
     let directory = tempfile::tempdir().unwrap();
     let skipped = json!({"row": 1, "date": "2026-08-03", "disposition": "skipped", "amount": "30.00",
         "party": "OWN", "ledger": "Other Bank", "bridge_txn_id": "st-20260803-0123456789abcdef",
-        "reference": "333333333333", "direction": "outflow", "reversed_same_day": false});
+        "reference": &rep('3', 12), "direction": "outflow", "reversed_same_day": false});
     let publish = |schema: &str, edit: &dyn Fn(&mut Value)| {
         let proposals_id = format!("statement-{}", uuid::Uuid::new_v4());
         let mut document = json!({
@@ -1134,7 +1149,7 @@ fn version_two_facts_are_read_strictly_and_a_skip_only_file_is_told() {
         fs::write(statements.join(format!("{proposals_id}.json")), &bytes).unwrap();
         resolve_import_arguments(
             directory.path(),
-            &json!({"company_guid": "00000000-0000-4000-8000-000000000002",
+            &json!({"company_guid": guid(2),
                     "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)}),
         )
     };

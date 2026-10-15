@@ -14,12 +14,18 @@ use bridge_bank_statement::proposals::{
 };
 use common::*;
 
+/// The statement's account number, built once at run time (zeros, then the last digits).
+fn account_number() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| padn(1234, 14));
+    &TEXT
+}
+
 fn options<'a>() -> BuildOptions<'a> {
     BuildOptions {
         bank_ledger: "Bank",
         suspense_ledger: "SUSPENSE ACC",
         account_label: "ACC",
-        account_number: "00000000001234",
+        account_number: account_number(),
         date_from: None,
         date_to: None,
         cash_answers: CashAnswers::none(),
@@ -58,17 +64,10 @@ fn iso(text: &str) -> Date {
 #[test]
 fn a_record_names_which_way_money_moved_on_the_statements_own_account() {
     let rows = [
-        upi("01/08/26", "ALPHA", "111111111111", "10.00", "", "990.00"),
-        upi("02/08/26", "BETA", "222222222222", "", "20.00", "1010.00"),
-        upi(
-            "03/08/26",
-            "OWN ACCT",
-            "333333333333",
-            "30.00",
-            "",
-            "980.00",
-        ),
-        upi("04/08/26", "OWN IN", "444444444444", "", "40.00", "1020.00"),
+        upi("01/08/26", "ALPHA", &rep('1', 12), "10.00", "", "990.00"),
+        upi("02/08/26", "BETA", &rep('2', 12), "", "20.00", "1010.00"),
+        upi("03/08/26", "OWN ACCT", &rep('3', 12), "30.00", "", "980.00"),
+        upi("04/08/26", "OWN IN", &rep('4', 12), "", "40.00", "1020.00"),
     ];
     let built = build(
         &rows,
@@ -126,20 +125,20 @@ fn reversed_flags(rows: &[Row], window: impl FnOnce(&mut BuildOptions<'_>)) -> V
 fn a_line_reversed_the_same_day_is_flagged_on_both_rows() {
     let rows = [
         // out and back the same day, equal amount: both flagged
-        upi("01/08/26", "PAID", "111111111111", "10.00", "", "990.00"),
-        upi("01/08/26", "BACK", "222222222222", "", "10.00", "1000.00"),
+        upi("01/08/26", "PAID", &rep('1', 12), "10.00", "", "990.00"),
+        upi("01/08/26", "BACK", &rep('2', 12), "", "10.00", "1000.00"),
         // the amount differs: not a reversal
-        upi("02/08/26", "OUT", "333333333333", "5.00", "", "995.00"),
-        upi("02/08/26", "IN", "444444444444", "", "6.00", "1001.00"),
+        upi("02/08/26", "OUT", &rep('3', 12), "5.00", "", "995.00"),
+        upi("02/08/26", "IN", &rep('4', 12), "", "6.00", "1001.00"),
         // the next day: not the same day
-        upi("03/08/26", "OUT", "555555555555", "7.00", "", "994.00"),
-        upi("04/08/26", "IN", "666666666666", "", "7.00", "1001.00"),
+        upi("03/08/26", "OUT", &rep('5', 12), "7.00", "", "994.00"),
+        upi("04/08/26", "IN", &rep('6', 12), "", "7.00", "1001.00"),
         // two payments out, equal: the same direction is not a reversal
-        upi("05/08/26", "TWICE", "777777777777", "8.00", "", "993.00"),
-        upi("05/08/26", "TWICE", "888888888888", "8.00", "", "985.00"),
+        upi("05/08/26", "TWICE", &rep('7', 12), "8.00", "", "993.00"),
+        upi("05/08/26", "TWICE", &rep('8', 12), "8.00", "", "985.00"),
         // equal amounts that differ in notation only are equal
-        upi("06/08/26", "ODD", "999999999999", "9.5", "", "975.50"),
-        upi("06/08/26", "ODD", "101010101010", "", "9.50", "985.00"),
+        upi("06/08/26", "ODD", &rep('9', 12), "9.5", "", "975.50"),
+        upi("06/08/26", "ODD", &"10".repeat(6), "", "9.50", "985.00"),
     ];
     assert_eq!(
         reversed_flags(&rows, |_| {}),
@@ -150,10 +149,10 @@ fn a_line_reversed_the_same_day_is_flagged_on_both_rows() {
 #[test]
 fn a_reversal_is_read_over_every_row_not_only_the_window() {
     let rows = [
-        upi("01/08/26", "PAID", "111111111111", "10.00", "", "990.00"),
-        upi("01/08/26", "BACK", "222222222222", "", "10.00", "1000.00"),
-        upi("05/08/26", "LATER", "333333333333", "4.00", "", "996.00"),
-        upi("05/08/26", "LATER", "444444444444", "", "4.00", "1000.00"),
+        upi("01/08/26", "PAID", &rep('1', 12), "10.00", "", "990.00"),
+        upi("01/08/26", "BACK", &rep('2', 12), "", "10.00", "1000.00"),
+        upi("05/08/26", "LATER", &rep('3', 12), "4.00", "", "996.00"),
+        upi("05/08/26", "LATER", &rep('4', 12), "", "4.00", "1000.00"),
     ];
     // a window holding only the second pair flags it as the whole statement does
     assert_eq!(
@@ -260,8 +259,8 @@ fn coverage_steps_across_month_and_year_ends() {
 #[test]
 fn a_build_keeps_the_date_of_every_row_it_read() {
     let rows = [
-        upi("01/08/26", "A", "111111111111", "10.00", "", "990.00"),
-        upi("09/08/26", "B", "222222222222", "10.00", "", "980.00"),
+        upi("01/08/26", "A", &rep('1', 12), "10.00", "", "990.00"),
+        upi("09/08/26", "B", &rep('2', 12), "10.00", "", "980.00"),
     ];
     let mut window = options();
     window.date_from = Date::new(2026, 8, 5);

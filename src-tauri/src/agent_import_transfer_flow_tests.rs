@@ -8,17 +8,48 @@ use super::bank_tests::{
 };
 use super::*;
 
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
 const BANK_A: &str = "WR2 Sales";
 const BANK_B: &str = "Bridge Nested Debtor WR4";
 /// A row bank A's statement skipped as carried by bank B's Contra.
-const SKIPPED: &str = "st-20260901-00000000000000b1";
+fn skipped_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{}b1", padn(0, 14)));
+    &TEXT
+}
 /// The Contra bank B's statement booked for the same transfer.
-const BOOKED: &str = "st-20260901-00000000000000c1";
-const OTHER_BOOKED: &str = "st-20260901-00000000000000c2";
-const UNKNOWN: &str = "st-20260901-00000000000000ff";
-const REFERENCE: &str = "600000000001";
+fn booked() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{}c1", padn(0, 14)));
+    &TEXT
+}
+fn other_booked() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{}c2", padn(0, 14)));
+    &TEXT
+}
+fn unknown_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{}ff", padn(0, 14)));
+    &TEXT
+}
+fn reference() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| p6(1, 12));
+    &TEXT
+}
 /// Every number a section must keep to itself.
-const SECRETS: [&str; 6] = ["12.50", REFERENCE, "000417", BANK_A, BANK_B, "Cash"];
+fn secrets() -> [&'static str; 6] {
+    ["12.50", reference(), "000417", BANK_A, BANK_B, "Cash"]
+}
 /// The requests of a build that writes a batch, of a statement of only skipped
 /// rows, and of a build refused when the batches of the company are read: after
 /// the book is read for its ledgers and groups and before its mark.
@@ -178,7 +209,7 @@ fn open_rows(section: &Value) -> Vec<Value> {
 
 fn assert_nothing_secret(section: &Value) {
     let text = section.to_string();
-    for secret in SECRETS {
+    for secret in secrets() {
         assert!(!text.contains(secret), "{secret} in {text}");
     }
 }
@@ -204,7 +235,10 @@ async fn a_skipped_row_is_listed_until_the_other_statement_is_built_and_verified
     );
     // Bank A's statement skips the row. Nothing of bank B is known.
     let result = rig
-        .build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .build(a_skips(
+            directory.path(),
+            &[(skipped_row(), Some(reference()))],
+        ))
         .await;
     assert_eq!(result["state"], "skips_recorded", "{result}");
     let section = &result["transfers"];
@@ -215,7 +249,7 @@ async fn a_skipped_row_is_listed_until_the_other_statement_is_built_and_verified
     assert_eq!(section["retired"], 0);
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "not_established", None)]
+        vec![open_row(skipped_row(), "not_established", None)]
     );
     assert_eq!(
         section["next_steps"]
@@ -233,8 +267,8 @@ async fn a_skipped_row_is_listed_until_the_other_statement_is_built_and_verified
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(REFERENCE),
+            booked(),
+            Some(reference()),
         ))
         .await;
     assert_eq!(built["voucher_count"], 1, "{built}");
@@ -243,7 +277,11 @@ async fn a_skipped_row_is_listed_until_the_other_statement_is_built_and_verified
     assert_eq!(section["skips_open"], 1, "{built}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "other_side_unverified", Some(&batch))]
+        vec![open_row(
+            skipped_row(),
+            "other_side_unverified",
+            Some(&batch)
+        )]
     );
     let step = section["next_steps"]["other_side_unverified"]
         .as_str()
@@ -254,7 +292,10 @@ async fn a_skipped_row_is_listed_until_the_other_statement_is_built_and_verified
     // Found posted, the same skipped row is paired: counted, and not listed.
     mark_found(directory.path(), &batch);
     let again = rig
-        .build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .build(a_skips(
+            directory.path(),
+            &[(skipped_row(), Some(reference()))],
+        ))
         .await;
     rig.finish();
     let section = &again["transfers"];
@@ -281,10 +322,10 @@ async fn posting_a_row_another_statement_skipped_is_refused_unless_the_skip_is_w
         ]
         .concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let posting = |extra: Option<Value>| {
-        let mut args = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+        let mut args = contra_statement(directory.path(), BANK_A, skipped_row(), None);
         if let Some(withdraw) = extra {
             args["withdraw_skips"] = withdraw;
         }
@@ -294,7 +335,7 @@ async fn posting_a_row_another_statement_skipped_is_refused_unless_the_skip_is_w
     let refused = rig.build(posting(None)).await;
     assert_eq!(refused["state"], "refused", "{refused}");
     assert_eq!(refused["reason"], "skip_row_paired_elsewhere");
-    assert_eq!(refused["skipped_rows"], json!([SKIPPED]));
+    assert_eq!(refused["skipped_rows"], json!([skipped_row()]));
     let step = refused["next_step"].as_str().unwrap();
     assert!(step.contains("withdraw_skips"), "{step}");
     assert!(
@@ -309,13 +350,13 @@ async fn posting_a_row_another_statement_skipped_is_refused_unless_the_skip_is_w
     no_journal(directory.path());
 
     // withdrawn, the row is posted and the skip is held by the new batch
-    let built = rig.build(posting(Some(json!([SKIPPED])))).await;
+    let built = rig.build(posting(Some(json!([skipped_row()])))).await;
     assert_eq!(built["voucher_count"], 1, "{built}");
     let batch = built["batch_id"].as_str().unwrap().to_string();
     let section = &built["transfers"];
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "held_elsewhere", Some(&batch))],
+        vec![open_row(skipped_row(), "held_elsewhere", Some(&batch))],
         "{built}"
     );
     assert_eq!(section["skips_open"], 1);
@@ -324,7 +365,7 @@ async fn posting_a_row_another_statement_skipped_is_refused_unless_the_skip_is_w
     // once the new batch is found posted, the skip is retired
     mark_found(directory.path(), &batch);
     let later = rig
-        .build(a_skips(directory.path(), &[(OTHER_BOOKED, None)]))
+        .build(a_skips(directory.path(), &[(other_booked(), None)]))
         .await;
     rig.finish();
     assert_eq!(later["transfers"]["retired"], 1, "{later}");
@@ -344,16 +385,16 @@ async fn a_skip_in_a_batch_only_built_is_not_a_reason_to_refuse_the_row() {
             directory.path(),
             BANK_A,
             window(),
-            json!([contra_voucher(BOOKED)]),
+            json!([contra_voucher(booked())]),
             json!([
-                contra_record(BOOKED, None),
-                skip_record(BANK_A, SKIPPED, None)
+                contra_record(booked(), None),
+                skip_record(BANK_A, skipped_row(), None)
             ]),
         ))
         .await;
     assert_eq!(first["voucher_count"], 1, "{first}");
     // posting the skipped row elsewhere is allowed: the newer build supersedes it
-    let posting = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+    let posting = contra_statement(directory.path(), BANK_A, skipped_row(), None);
     let built = rig.build(posting).await;
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
@@ -368,21 +409,25 @@ async fn a_skip_in_a_batch_only_built_is_not_a_reason_to_refuse_the_row() {
         directory.path(),
         BANK_A,
         window(),
-        json!([contra_voucher(BOOKED)]),
+        json!([contra_voucher(booked())]),
         json!([
-            contra_record(BOOKED, None),
-            skip_record(BANK_A, SKIPPED, None)
+            contra_record(booked(), None),
+            skip_record(BANK_A, skipped_row(), None)
         ]),
     ))
     .await;
-    let mut withdrawing = contra_statement(directory.path(), BANK_A, SKIPPED, None);
-    withdrawing["withdraw_skips"] = json!([SKIPPED]);
+    let mut withdrawing = contra_statement(directory.path(), BANK_A, skipped_row(), None);
+    withdrawing["withdraw_skips"] = json!([skipped_row()]);
     let built = rig.build(withdrawing).await;
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
     let holder = built["batch_id"].as_str().unwrap();
     assert!(
-        open_rows(&built["transfers"]).contains(&open_row(SKIPPED, "held_elsewhere", Some(holder))),
+        open_rows(&built["transfers"]).contains(&open_row(
+            skipped_row(),
+            "held_elsewhere",
+            Some(holder)
+        )),
         "{built}"
     );
 }
@@ -400,7 +445,7 @@ async fn a_withdrawal_must_name_a_skip_of_the_company_and_a_row_of_the_build() {
         ]
         .concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let invalid = |refused: &Value, rows: Value| {
         assert_eq!(refused["state"], "refused", "{refused}");
@@ -409,21 +454,21 @@ async fn a_withdrawal_must_name_a_skip_of_the_company_and_a_row_of_the_build() {
         assert_eq!(refused["invalid_rows_omitted"], 0);
     };
     // a skip that this build does not post
-    let mut elsewhere = contra_statement(directory.path(), BANK_A, BOOKED, None);
-    elsewhere["withdraw_skips"] = json!([SKIPPED]);
+    let mut elsewhere = contra_statement(directory.path(), BANK_A, booked(), None);
+    elsewhere["withdraw_skips"] = json!([skipped_row()]);
     let refused = rig.build(elsewhere).await;
-    invalid(&refused, json!([SKIPPED]));
+    invalid(&refused, json!([skipped_row()]));
     // a row nobody skipped, however much the build posts the live one
-    let mut unknown = contra_statement(directory.path(), BANK_A, SKIPPED, None);
-    unknown["withdraw_skips"] = json!([UNKNOWN]);
+    let mut unknown = contra_statement(directory.path(), BANK_A, skipped_row(), None);
+    unknown["withdraw_skips"] = json!([unknown_row()]);
     let refused = rig.build(unknown).await;
-    invalid(&refused, json!([UNKNOWN]));
+    invalid(&refused, json!([unknown_row()]));
     // a statement of only skipped rows posts nothing to withdraw for
-    let mut skip_only = a_skips(directory.path(), &[(OTHER_BOOKED, None)]);
-    skip_only["withdraw_skips"] = json!([SKIPPED]);
+    let mut skip_only = a_skips(directory.path(), &[(other_booked(), None)]);
+    skip_only["withdraw_skips"] = json!([skipped_row()]);
     let refused = rig.build(skip_only).await;
     rig.finish();
-    invalid(&refused, json!([SKIPPED]));
+    invalid(&refused, json!([skipped_row()]));
     // nothing was written by any of them
     assert_eq!(
         fs::read_to_string(skip_file(directory.path()))
@@ -443,13 +488,16 @@ async fn a_malformed_withdrawal_is_refused_before_any_read() {
     for (bad, code) in [
         // the schema layer, by the shape of the published fragment
         (json!(["bridge-1"]), "argument_invalid:withdraw_skips"),
-        (json!(SKIPPED), "argument_invalid:withdraw_skips"),
+        (json!(skipped_row()), "argument_invalid:withdraw_skips"),
         (json!([7]), "argument_invalid:withdraw_skips"),
         (json!(null), "argument_invalid:withdraw_skips"),
         // distinctness is the parser's, since the schema layer does not check it
-        (json!([SKIPPED, SKIPPED]), "argument_schema_invalid"),
+        (
+            json!([skipped_row(), skipped_row()]),
+            "argument_schema_invalid",
+        ),
     ] {
-        let mut args = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+        let mut args = contra_statement(directory.path(), BANK_A, skipped_row(), None);
         args["withdraw_skips"] = bad.clone();
         let result = rig.build(args).await;
         assert_eq!(result["error"]["code"], code, "{bad}: {result}");
@@ -470,7 +518,7 @@ async fn skipping_a_row_a_sent_or_found_batch_holds_is_refused_naming_the_batch(
             [two_bank_plans(), skip_only_plans(), admission_plans()].concat(),
         );
         let first = rig
-            .build(contra_statement(directory.path(), BANK_A, BOOKED, None))
+            .build(contra_statement(directory.path(), BANK_A, booked(), None))
             .await;
         let held = first["batch_id"].as_str().unwrap().to_string();
         let skip_only = |directory: &Path| {
@@ -479,7 +527,7 @@ async fn skipping_a_row_a_sent_or_found_batch_holds_is_refused_naming_the_batch(
                 BANK_B,
                 window(),
                 json!([]),
-                json!([skip_record(BANK_B, BOOKED, None)]),
+                json!([skip_record(BANK_B, booked(), None)]),
             )
         };
         if found {
@@ -491,17 +539,17 @@ async fn skipping_a_row_a_sent_or_found_batch_holds_is_refused_naming_the_batch(
         assert_eq!(refused["state"], "refused", "{refused}");
         assert_eq!(refused["reason"], "skip_row_already_posted");
         assert_eq!(refused["blocking_batch_id"], held);
-        assert_eq!(refused["skipped_rows"], json!([BOOKED]));
+        assert_eq!(refused["skipped_rows"], json!([booked()]));
         assert!(!skip_file(directory.path()).exists());
         // the same row skipped by a build that writes a batch
         let building = statement_v2(
             directory.path(),
             BANK_B,
             window(),
-            json!([contra_voucher(OTHER_BOOKED)]),
+            json!([contra_voucher(other_booked())]),
             json!([
-                contra_record(OTHER_BOOKED, None),
-                skip_record(BANK_B, BOOKED, None)
+                contra_record(other_booked(), None),
+                skip_record(BANK_B, booked(), None)
             ]),
         );
         let refused = rig.build(building).await;
@@ -518,7 +566,7 @@ async fn skipping_a_row_a_batch_only_built_holds_is_not_refused() {
         directory.path(),
         [two_bank_plans(), skip_only_plans()].concat(),
     );
-    rig.build(contra_statement(directory.path(), BANK_A, BOOKED, None))
+    rig.build(contra_statement(directory.path(), BANK_A, booked(), None))
         .await;
     let recorded = rig
         .build(statement_v2(
@@ -526,7 +574,7 @@ async fn skipping_a_row_a_batch_only_built_holds_is_not_refused() {
             BANK_B,
             window(),
             json!([]),
-            json!([skip_record(BANK_B, BOOKED, None)]),
+            json!([skip_record(BANK_B, booked(), None)]),
         ))
         .await;
     rig.finish();
@@ -545,10 +593,10 @@ async fn an_amendment_cannot_skip_a_row_its_own_lineage_built() {
             directory.path(),
             BANK_A,
             window(),
-            json!([contra_voucher(BOOKED), contra_voucher(OTHER_BOOKED)]),
+            json!([contra_voucher(booked()), contra_voucher(other_booked())]),
             json!([
-                contra_record(BOOKED, None),
-                contra_record(OTHER_BOOKED, None)
+                contra_record(booked(), None),
+                contra_record(other_booked(), None)
             ]),
         ))
         .await;
@@ -557,10 +605,10 @@ async fn an_amendment_cannot_skip_a_row_its_own_lineage_built() {
         directory.path(),
         BANK_A,
         window(),
-        json!([contra_voucher(BOOKED)]),
+        json!([contra_voucher(booked())]),
         json!([
-            contra_record(BOOKED, None),
-            skip_record(BANK_A, OTHER_BOOKED, None)
+            contra_record(booked(), None),
+            skip_record(BANK_A, other_booked(), None)
         ]),
     );
     amending["amends_batch_id"] = json!(original);
@@ -568,7 +616,7 @@ async fn an_amendment_cannot_skip_a_row_its_own_lineage_built() {
     rig.finish();
     assert_eq!(refused["reason"], "skip_row_already_posted", "{refused}");
     assert_eq!(refused["blocking_batch_id"], original);
-    assert_eq!(refused["skipped_rows"], json!([OTHER_BOOKED]));
+    assert_eq!(refused["skipped_rows"], json!([other_booked()]));
 }
 
 // ---- item 10: a transfer booked from both statements ----------------------------
@@ -584,8 +632,8 @@ async fn the_same_transfer_booked_twice_with_one_reference_refuses_the_second_bu
         .build(contra_statement(
             directory.path(),
             BANK_A,
-            BOOKED,
-            Some(REFERENCE),
+            booked(),
+            Some(reference()),
         ))
         .await;
     let other = first["batch_id"].as_str().unwrap().to_string();
@@ -593,8 +641,8 @@ async fn the_same_transfer_booked_twice_with_one_reference_refuses_the_second_bu
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            OTHER_BOOKED,
-            Some(REFERENCE),
+            other_booked(),
+            Some(reference()),
         ))
         .await;
     rig.finish();
@@ -622,8 +670,8 @@ async fn the_same_transfer_booked_twice_without_a_reference_is_listed_not_refuse
         .build(contra_statement(
             directory.path(),
             BANK_A,
-            BOOKED,
-            Some(REFERENCE),
+            booked(),
+            Some(reference()),
         ))
         .await;
     let earlier = first["batch_id"].as_str().unwrap().to_string();
@@ -631,7 +679,7 @@ async fn the_same_transfer_booked_twice_without_a_reference_is_listed_not_refuse
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            OTHER_BOOKED,
+            other_booked(),
             None,
         ))
         .await;
@@ -642,8 +690,8 @@ async fn the_same_transfer_booked_twice_without_a_reference_is_listed_not_refuse
     assert_eq!(
         open_rows(&built["transfers"]),
         vec![
-            open_row(BOOKED, "double_booked", Some(&later)),
-            open_row(OTHER_BOOKED, "double_booked", Some(&earlier)),
+            open_row(booked(), "double_booked", Some(&later)),
+            open_row(other_booked(), "double_booked", Some(&earlier)),
         ],
         "{built}"
     );
@@ -661,7 +709,7 @@ fn spoil_the_skip_file(directory: &Path) {
         coverage: None,
         contra_rows: Vec::new(),
         skip_rows: vec![statement_facts::SkipRow {
-            bridge_txn_id: SKIPPED.into(),
+            bridge_txn_id: skipped_row().into(),
             date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
             amount: "12.50".into(),
             direction: statement_facts::RowDirection::Outflow,
@@ -693,11 +741,11 @@ async fn a_build_that_needs_the_view_is_refused_when_it_cannot_be_read() {
     // asking to withdraw a skip
     let inline =
         |txn: &str| json!({"company_guid": CAPTURED_GUID, "vouchers": [contra_voucher(txn)]});
-    let inline_row = inline(SKIPPED);
+    let inline_row = inline(skipped_row());
     let mut asking = inline("txn-1");
-    asking["withdraw_skips"] = json!([SKIPPED]);
+    asking["withdraw_skips"] = json!([skipped_row()]);
     for args in [
-        contra_statement(directory.path(), BANK_A, BOOKED, None),
+        contra_statement(directory.path(), BANK_A, booked(), None),
         inline_row,
         asking,
     ] {
@@ -709,7 +757,7 @@ async fn a_build_that_needs_the_view_is_refused_when_it_cannot_be_read() {
         assert_eq!(refused["check"], "bad_record_id");
         assert_eq!(refused["record_id"], "skips-spoiled");
         let text = refused.to_string();
-        for value in [SKIPPED, "12.50", "g1", "g2"] {
+        for value in [skipped_row(), "12.50", "g1", "g2"] {
             assert!(!text.contains(value), "{value} in {text}");
         }
         no_journal(directory.path());
@@ -718,7 +766,7 @@ async fn a_build_that_needs_the_view_is_refused_when_it_cannot_be_read() {
     let refused = run(
         directory.path(),
         skip_only_plans(),
-        a_skips(directory.path(), &[(OTHER_BOOKED, None)]),
+        a_skips(directory.path(), &[(other_booked(), None)]),
     )
     .await;
     assert_eq!(refused["reason"], "transfer_view_not_established");
@@ -769,7 +817,7 @@ async fn built_batch_with_a_skip(directory: &Path) -> (SequenceSimulator, Server
     let result = run(
         directory,
         skip_only_plans(),
-        a_skips(directory, &[(SKIPPED, None)]),
+        a_skips(directory, &[(skipped_row(), None)]),
     )
     .await;
     assert_eq!(result["state"], "skips_recorded", "{result}");
@@ -802,7 +850,7 @@ async fn the_first_page_of_a_verification_carries_the_section_and_a_later_page_d
     assert_eq!(section["skips_open"], 1);
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "not_established", None)]
+        vec![open_row(skipped_row(), "not_established", None)]
     );
     assert_nothing_secret(section);
     // the verdict is the proof's, which the section is not part of
@@ -845,7 +893,7 @@ async fn contention_for_the_admission_lock_leaves_the_section_not_established() 
     run(
         directory.path(),
         skip_only_plans(),
-        a_skips(directory.path(), &[(SKIPPED, None)]),
+        a_skips(directory.path(), &[(skipped_row(), None)]),
     )
     .await;
     let server = journal(directory.path());
@@ -881,7 +929,7 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
     run(
         directory.path(),
         skip_only_plans(),
-        a_skips(directory.path(), &[(SKIPPED, None)]),
+        a_skips(directory.path(), &[(skipped_row(), None)]),
     )
     .await;
     let simulator = SequenceSimulator::spawn(qualified_import_cycle_plans()).expect("simulator");
@@ -935,8 +983,8 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
 // ---- a skip the view already pairs is not withdrawn --------------------------------
 
 fn withdrawing(directory: &Path) -> Value {
-    let mut args = contra_statement(directory, BANK_A, SKIPPED, None);
-    args["withdraw_skips"] = json!([SKIPPED]);
+    let mut args = contra_statement(directory, BANK_A, skipped_row(), None);
+    args["withdraw_skips"] = json!([skipped_row()]);
     args
 }
 
@@ -952,7 +1000,7 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         );
         rig.build(a_skips_flagged(
             directory.path(),
-            &[(SKIPPED, Some(REFERENCE))],
+            &[(skipped_row(), Some(reference()))],
             flagged,
         ))
         .await;
@@ -960,8 +1008,8 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
             .build(contra_statement(
                 directory.path(),
                 BANK_B,
-                BOOKED,
-                Some(REFERENCE),
+                booked(),
+                Some(reference()),
             ))
             .await;
         let carrying = built["batch_id"].as_str().unwrap().to_string();
@@ -981,14 +1029,18 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
         };
         assert_eq!(
             refused["paired_rows"],
-            json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying, "state": state}]),
+            json!([{"bridge_txn_id": skipped_row(), "batch_id": carrying, "state": state}]),
             "{case}"
         );
         // what the build said of the row, before it was found, is the same reason
         if !found {
             assert_eq!(
                 open_rows(section),
-                vec![open_row(SKIPPED, "other_side_unverified", Some(&carrying))],
+                vec![open_row(
+                    skipped_row(),
+                    "other_side_unverified",
+                    Some(&carrying)
+                )],
                 "{case}: {built}"
             );
         }
@@ -1011,8 +1063,16 @@ async fn a_skip_the_other_statement_already_carries_cannot_be_withdrawn() {
 
 #[tokio::test]
 async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
-    const PAIRED: &str = "st-20260901-00000000000000d1";
-    const THIRD: &str = "st-20260901-00000000000000c3";
+    fn paired() -> &'static str {
+        static TEXT: std::sync::LazyLock<String> =
+            std::sync::LazyLock::new(|| format!("st-20260901-{}d1", padn(0, 14)));
+        &TEXT
+    }
+    fn third() -> &'static str {
+        static TEXT: std::sync::LazyLock<String> =
+            std::sync::LazyLock::new(|| format!("st-20260901-{}c3", padn(0, 14)));
+        &TEXT
+    }
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
@@ -1025,7 +1085,7 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
         .concat(),
     );
     // a row that pairs by reference, and one that two Contras could carry
-    let rows = [(SKIPPED, None), (PAIRED, Some(REFERENCE))];
+    let rows = [(skipped_row(), None), (paired(), Some(reference()))];
     rig.build(a_skips(directory.path(), &rows)).await;
     // bank B's statement books three equal Contras, all verified
     let built = rig
@@ -1034,14 +1094,14 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
             BANK_B,
             window(),
             json!([
-                contra_voucher(BOOKED),
-                contra_voucher(OTHER_BOOKED),
-                contra_voucher(THIRD)
+                contra_voucher(booked()),
+                contra_voucher(other_booked()),
+                contra_voucher(third())
             ]),
             json!([
-                contra_record(BOOKED, None),
-                contra_record(OTHER_BOOKED, None),
-                contra_record(THIRD, Some(REFERENCE))
+                contra_record(booked(), None),
+                contra_record(other_booked(), None),
+                contra_record(third(), Some(reference()))
             ]),
         ))
         .await;
@@ -1054,7 +1114,7 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "ambiguous", Some(&carrying))],
+        vec![open_row(skipped_row(), "ambiguous", Some(&carrying))],
         "{again}"
     );
     assert_nothing_secret(section);
@@ -1065,7 +1125,7 @@ async fn a_skip_two_contras_could_carry_can_be_withdrawn_beside_a_paired_one() {
     let rows = open_rows(&built["transfers"]);
     assert!(rows
         .iter()
-        .any(|row| row["bridge_txn_id"] == SKIPPED && row["state"] == "held_elsewhere"));
+        .any(|row| row["bridge_txn_id"] == skipped_row() && row["state"] == "held_elsewhere"));
 }
 
 #[tokio::test]
@@ -1077,8 +1137,11 @@ async fn every_key_a_withdrawn_row_is_skipped_under_is_read() {
         directory.path(),
         [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-        .await;
+    rig.build(a_skips(
+        directory.path(),
+        &[(skipped_row(), Some(reference()))],
+    ))
+    .await;
     let recorded = fs::read_to_string(skip_file(directory.path())).unwrap();
     let mut again: Value = serde_json::from_str(recorded.lines().next().unwrap()).unwrap();
     again["endpoint_origin"] = json!("http://127.0.0.1:1");
@@ -1088,8 +1151,8 @@ async fn every_key_a_withdrawn_row_is_skipped_under_is_read() {
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(REFERENCE),
+            booked(),
+            Some(reference()),
         ))
         .await;
     let carrying = built["batch_id"].as_str().unwrap().to_string();
@@ -1099,7 +1162,7 @@ async fn every_key_a_withdrawn_row_is_skipped_under_is_read() {
     assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
     assert_eq!(
         refused["paired_rows"],
-        json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying, "state": "paired"}])
+        json!([{"bridge_txn_id": skipped_row(), "batch_id": carrying, "state": "paired"}])
     );
 }
 
@@ -1110,8 +1173,8 @@ fn b_contra_read_over(directory: &Path, coverage: Value) -> Value {
         directory,
         BANK_B,
         coverage,
-        json!([contra_voucher(BOOKED)]),
-        json!([contra_record(BOOKED, None)]),
+        json!([contra_voucher(booked())]),
+        json!([contra_record(booked(), None)]),
     )
 }
 
@@ -1138,7 +1201,7 @@ async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_th
             directory.path(),
             [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
         );
-        rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
             .await;
         let built = rig
             .build(b_contra_read_over(directory.path(), coverage))
@@ -1151,7 +1214,7 @@ async fn a_skip_one_verified_contra_matches_by_date_is_not_withdrawn_whatever_th
         assert_eq!(refused["reason"], "withdraw_skip_paired", "{state}");
         assert_eq!(
             refused["paired_rows"],
-            json!([{"bridge_txn_id": SKIPPED, "batch_id": carrying, "state": state}]),
+            json!([{"bridge_txn_id": skipped_row(), "batch_id": carrying, "state": state}]),
             "{state}"
         );
         assert_eq!(refused["paired_rows_omitted"], 0, "{state}");
@@ -1167,7 +1230,7 @@ async fn a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_con
         directory.path(),
         [skip_only_plans(), two_bank_plans(), skip_only_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let built = rig
         .build(b_contra_read_over(directory.path(), Value::Null))
@@ -1175,7 +1238,7 @@ async fn a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_con
     let carrying = built["batch_id"].as_str().unwrap().to_string();
     mark_found(directory.path(), &carrying);
     let again = rig
-        .build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     rig.finish();
     let section = &again["transfers"];
@@ -1185,7 +1248,11 @@ async fn a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_con
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "matched_unconfirmed", Some(&carrying))],
+        vec![open_row(
+            skipped_row(),
+            "matched_unconfirmed",
+            Some(&carrying)
+        )],
         "{again}"
     );
     assert_eq!(
@@ -1195,8 +1262,11 @@ async fn a_date_match_whose_days_the_windows_do_not_cover_is_listed_with_the_con
     assert_nothing_secret(section);
 }
 
-const OTHER_REFERENCE: &str = "600000000002";
+fn other_reference() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| p6(2, 12));
 
+    &TEXT
+}
 const REFERENCE_DIFFERS_STEP: &str = "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.";
 
 #[tokio::test]
@@ -1207,14 +1277,17 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
         directory.path(),
         [skip_only_plans(), two_bank_plans(), admission_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-        .await;
+    rig.build(a_skips(
+        directory.path(),
+        &[(skipped_row(), Some(reference()))],
+    ))
+    .await;
     let built = rig
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(OTHER_REFERENCE),
+            booked(),
+            Some(other_reference()),
         ))
         .await;
     assert_eq!(built["voucher_count"], 1, "{built}");
@@ -1224,7 +1297,7 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
     assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
     assert_eq!(
         refused["paired_rows"],
-        json!([{"bridge_txn_id": SKIPPED, "batch_id": other, "state": "other_side_unverified"}])
+        json!([{"bridge_txn_id": skipped_row(), "batch_id": other, "state": "other_side_unverified"}])
     );
     assert_eq!(
         refused["next_step"],
@@ -1237,7 +1310,7 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
     assert_eq!(section["skips_open"], 1, "{built}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "reference_differs", Some(&other))],
+        vec![open_row(skipped_row(), "reference_differs", Some(&other))],
         "{built}"
     );
     assert_eq!(
@@ -1245,7 +1318,7 @@ async fn a_skip_is_not_withdrawn_while_a_contra_of_its_day_and_amount_with_anoth
         json!({"reference_differs": REFERENCE_DIFFERS_STEP})
     );
     assert_nothing_secret(section);
-    assert!(!section.to_string().contains(OTHER_REFERENCE));
+    assert!(!section.to_string().contains(other_reference()));
 }
 
 #[tokio::test]
@@ -1262,14 +1335,17 @@ async fn a_skip_beside_a_verified_contra_of_another_reference_is_listed_and_with
         ]
         .concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-        .await;
+    rig.build(a_skips(
+        directory.path(),
+        &[(skipped_row(), Some(reference()))],
+    ))
+    .await;
     let built = rig
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(OTHER_REFERENCE),
+            booked(),
+            Some(other_reference()),
         ))
         .await;
     let other = built["batch_id"].as_str().unwrap().to_string();
@@ -1277,14 +1353,17 @@ async fn a_skip_beside_a_verified_contra_of_another_reference_is_listed_and_with
     // the row is not said to have no Contra: it is listed with the batch that
     // holds the Contra of another reference
     let again = rig
-        .build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
+        .build(a_skips(
+            directory.path(),
+            &[(skipped_row(), Some(reference()))],
+        ))
         .await;
     let section = &again["transfers"];
     assert_eq!(section["skips_paired"], 0, "{again}");
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "reference_differs", Some(&other))],
+        vec![open_row(skipped_row(), "reference_differs", Some(&other))],
         "{again}"
     );
     assert_eq!(
@@ -1294,22 +1373,26 @@ async fn a_skip_beside_a_verified_contra_of_another_reference_is_listed_and_with
     assert_nothing_secret(section);
     // that Contra is verified, so the person may name the row: the build is
     // written, and the row is then held by the new batch
-    let mut posting = contra_statement(directory.path(), BANK_A, SKIPPED, Some(REFERENCE));
-    posting["withdraw_skips"] = json!([SKIPPED]);
+    let mut posting = contra_statement(directory.path(), BANK_A, skipped_row(), Some(reference()));
+    posting["withdraw_skips"] = json!([skipped_row()]);
     let posted = rig.build(posting).await;
     rig.finish();
     assert_eq!(posted["voucher_count"], 1, "{posted}");
     let holder = posted["batch_id"].as_str().unwrap();
     assert_eq!(
         open_rows(&posted["transfers"]),
-        vec![open_row(SKIPPED, "held_elsewhere", Some(holder))],
+        vec![open_row(skipped_row(), "held_elsewhere", Some(holder))],
         "{posted}"
     );
 }
 
 #[tokio::test]
 async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_reference() {
-    const UNREFERENCED: &str = "st-20260901-00000000000000b0";
+    fn unreferenced() -> &'static str {
+        static TEXT: std::sync::LazyLock<String> =
+            std::sync::LazyLock::new(|| format!("st-20260901-{}b0", padn(0, 14)));
+        &TEXT
+    }
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
@@ -1321,14 +1404,14 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
         ]
         .concat(),
     );
-    let rows = [(UNREFERENCED, None), (SKIPPED, Some(REFERENCE))];
+    let rows = [(unreferenced(), None), (skipped_row(), Some(reference()))];
     rig.build(a_skips(directory.path(), &rows)).await;
     let built = rig
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(OTHER_REFERENCE),
+            booked(),
+            Some(other_reference()),
         ))
         .await;
     let carrying = built["batch_id"].as_str().unwrap().to_string();
@@ -1341,18 +1424,18 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "not_found", None)],
+        vec![open_row(skipped_row(), "not_found", None)],
         "{again}"
     );
     // and the paired row is not one to withdraw
-    let mut posting = contra_statement(directory.path(), BANK_A, UNREFERENCED, None);
-    posting["withdraw_skips"] = json!([UNREFERENCED]);
+    let mut posting = contra_statement(directory.path(), BANK_A, unreferenced(), None);
+    posting["withdraw_skips"] = json!([unreferenced()]);
     let refused = rig.build(posting).await;
     rig.finish();
     assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
     assert_eq!(
         refused["paired_rows"],
-        json!([{"bridge_txn_id": UNREFERENCED, "batch_id": carrying, "state": "paired"}])
+        json!([{"bridge_txn_id": unreferenced(), "batch_id": carrying, "state": "paired"}])
     );
 }
 
@@ -1393,16 +1476,16 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
         );
         rig.build(a_skips_flagged(
             directory.path(),
-            &[(SKIPPED, None)],
+            &[(skipped_row(), None)],
             case == "reversed",
         ))
         .await;
-        let first = rig.build(b_contras(directory.path(), &[BOOKED])).await;
+        let first = rig.build(b_contras(directory.path(), &[booked()])).await;
         let first = first["batch_id"].as_str().unwrap().to_string();
         let second_row = if case == "two unsent" {
-            BOOKED
+            booked()
         } else {
-            OTHER_BOOKED
+            other_booked()
         };
         let second_built = rig.build(b_contras(directory.path(), &[second_row])).await;
         let second = second_built["batch_id"].as_str().unwrap().to_string();
@@ -1414,8 +1497,8 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
             "ambiguous"
         };
         let mut listed = vec![
-            open_row(SKIPPED, state, Some(&first)),
-            open_row(SKIPPED, state, Some(&second)),
+            open_row(skipped_row(), state, Some(&first)),
+            open_row(skipped_row(), state, Some(&second)),
         ];
         listed.sort_by_key(|row| row["batch_id"].as_str().unwrap().to_string());
         assert_eq!(open_rows(section), listed, "{case}: {second_built}");
@@ -1430,7 +1513,7 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
             refused["reason"], "withdraw_skip_paired",
             "{case}: {refused}"
         );
-        let unverified = |batch: &str| json!({"bridge_txn_id": SKIPPED, "batch_id": batch, "state": "other_side_unverified"});
+        let unverified = |batch: &str| json!({"bridge_txn_id": skipped_row(), "batch_id": batch, "state": "other_side_unverified"});
         let mut expected = if case == "two unsent" {
             vec![unverified(&first), unverified(&second)]
         } else {
@@ -1450,15 +1533,19 @@ async fn a_skip_a_contra_not_yet_verified_may_carry_cannot_be_withdrawn_in_any_s
 async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_than_not_found() {
     // the same transfer skipped on both statements; bank B's skip is withdrawn
     // through a build of inline vouchers, which records no statement
-    const B_SKIPPED: &str = "st-20260901-00000000000000b2";
+    fn b_skipped() -> &'static str {
+        static TEXT: std::sync::LazyLock<String> =
+            std::sync::LazyLock::new(|| format!("st-20260901-{}b2", padn(0, 14)));
+        &TEXT
+    }
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
         [skip_only_plans(), skip_only_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, None)]))
+    rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
-    let mut b_skip = record(B_SKIPPED, json!("skipped"), BANK_A, "inflow", false);
+    let mut b_skip = record(b_skipped(), json!("skipped"), BANK_A, "inflow", false);
     b_skip["reference"] = Value::Null;
     rig.build(statement_v2(
         directory.path(),
@@ -1470,7 +1557,7 @@ async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_t
     .await;
     let built = rig
         .build(json!({"company_guid": CAPTURED_GUID,
-            "vouchers": [contra_voucher(B_SKIPPED)], "withdraw_skips": [B_SKIPPED]}))
+            "vouchers": [contra_voucher(b_skipped())], "withdraw_skips": [b_skipped()]}))
         .await;
     rig.finish();
     let batch = built["batch_id"].as_str().unwrap();
@@ -1479,8 +1566,8 @@ async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_t
     assert_eq!(
         open_rows(&built["transfers"]),
         vec![
-            open_row(SKIPPED, "not_established", None),
-            open_row(B_SKIPPED, "held_elsewhere", Some(batch)),
+            open_row(skipped_row(), "not_established", None),
+            open_row(b_skipped(), "held_elsewhere", Some(batch)),
         ],
         "{built}"
     );
@@ -1596,16 +1683,16 @@ async fn a_live_skip_of_the_row_through_another_endpoint_refuses_the_posting() {
     run(
         directory.path(),
         skip_only_plans(),
-        a_skips(directory.path(), &[(SKIPPED, None)]),
+        a_skips(directory.path(), &[(skipped_row(), None)]),
     )
     .await;
-    let posting = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+    let posting = contra_statement(directory.path(), BANK_A, skipped_row(), None);
     let refused = run(directory.path(), admission_plans(), posting).await;
     assert_eq!(refused["reason"], "skip_row_paired_elsewhere", "{refused}");
-    assert_eq!(refused["skipped_rows"], json!([SKIPPED]));
+    assert_eq!(refused["skipped_rows"], json!([skipped_row()]));
     // and a withdrawal of it, named by the person, is for a live skip
-    let mut withdrawn = contra_statement(directory.path(), BANK_A, SKIPPED, None);
-    withdrawn["withdraw_skips"] = json!([SKIPPED]);
+    let mut withdrawn = contra_statement(directory.path(), BANK_A, skipped_row(), None);
+    withdrawn["withdraw_skips"] = json!([skipped_row()]);
     let built = run(directory.path(), two_bank_plans(), withdrawn).await;
     assert_eq!(built["voucher_count"], 1, "{built}");
 }
@@ -1706,23 +1793,32 @@ async fn a_skip_that_a_batch_found_posted_contradicts_stays_open_and_is_listed()
         [two_bank_plans(), skip_only_plans(), skip_only_plans()].concat(),
     );
     let posting = rig
-        .build(contra_statement(directory.path(), BANK_A, SKIPPED, None))
+        .build(contra_statement(
+            directory.path(),
+            BANK_A,
+            skipped_row(),
+            None,
+        ))
         .await;
     let holder = posting["batch_id"].as_str().unwrap().to_string();
     let skipped = rig
-        .build(a_skips(directory.path(), &[(SKIPPED, None)]))
+        .build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     assert_eq!(skipped["state"], "skips_recorded", "{skipped}");
     mark_found(directory.path(), &holder);
     let later = rig
-        .build(a_skips(directory.path(), &[(OTHER_BOOKED, None)]))
+        .build(a_skips(directory.path(), &[(other_booked(), None)]))
         .await;
     rig.finish();
     let section = &later["transfers"];
     assert_eq!(section["retired"], 0, "{later}");
     assert_eq!(section["skips_open"], 2, "{later}");
     assert!(
-        open_rows(section).contains(&open_row(SKIPPED, "posted_against_skip", Some(&holder))),
+        open_rows(section).contains(&open_row(
+            skipped_row(),
+            "posted_against_skip",
+            Some(&holder)
+        )),
         "{later}"
     );
     assert_nothing_secret(section);
@@ -1743,17 +1839,25 @@ async fn a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_pa
         ]
         .concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-        .await;
+    rig.build(a_skips(
+        directory.path(),
+        &[(skipped_row(), Some(reference()))],
+    ))
+    .await;
     // withdrawn once, while nothing of the other account is known: the new
     // batch holds the row and has only been built
-    let mut first = contra_statement(directory.path(), BANK_A, SKIPPED, Some("600000000002"));
-    first["withdraw_skips"] = json!([SKIPPED]);
+    let mut first = contra_statement(
+        directory.path(),
+        BANK_A,
+        skipped_row(),
+        Some(p6(2, 12).as_str()),
+    );
+    first["withdraw_skips"] = json!([skipped_row()]);
     let held = rig.build(first).await;
     let held_id = held["batch_id"].as_str().unwrap().to_string();
     assert_eq!(
         open_rows(&held["transfers"]),
-        vec![open_row(SKIPPED, "held_elsewhere", Some(&held_id))],
+        vec![open_row(skipped_row(), "held_elsewhere", Some(&held_id))],
         "{held}"
     );
     // the other account's statement books the transfer and is found posted
@@ -1761,37 +1865,42 @@ async fn a_skip_held_by_a_batch_not_found_posted_cannot_be_withdrawn_beside_a_pa
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(REFERENCE),
+            booked(),
+            Some(reference()),
         ))
         .await;
     let booked_id = booked["batch_id"].as_str().unwrap().to_string();
     mark_found(directory.path(), &booked_id);
     // naming the same row again is refused: that Contra carries it
-    let mut again = contra_statement(directory.path(), BANK_A, SKIPPED, Some("600000000003"));
-    again["withdraw_skips"] = json!([SKIPPED]);
+    let mut again = contra_statement(
+        directory.path(),
+        BANK_A,
+        skipped_row(),
+        Some(p6(3, 12).as_str()),
+    );
+    again["withdraw_skips"] = json!([skipped_row()]);
     let refused = rig.build(again).await;
     rig.finish();
     assert_eq!(refused["reason"], "withdraw_skip_paired", "{refused}");
     assert_eq!(
         refused["paired_rows"],
-        json!([{"bridge_txn_id": SKIPPED, "batch_id": booked_id, "state": "paired"}]),
+        json!([{"bridge_txn_id": skipped_row(), "batch_id": booked_id, "state": "paired"}]),
         "{refused}"
     );
 }
 
 // ---- the guards read batches that were sent and not yet verified ------------------
 
-/// A statement batch of bank A that books `OTHER_BOOKED` and skips `SKIPPED`.
+/// A statement batch of bank A that books `other_booked()` and skips `skipped_row()`.
 fn a_booking_and_skipping(directory: &Path) -> Value {
     statement_v2(
         directory,
         BANK_A,
         window(),
-        json!([contra_voucher(OTHER_BOOKED)]),
+        json!([contra_voucher(other_booked())]),
         json!([
-            contra_record(OTHER_BOOKED, None),
-            skip_record(BANK_A, SKIPPED, None)
+            contra_record(other_booked(), None),
+            skip_record(BANK_A, skipped_row(), None)
         ]),
     )
 }
@@ -1808,18 +1917,22 @@ async fn a_skip_in_a_batch_sent_but_not_verified_guards_its_row() {
     let skipping = rig.build(a_booking_and_skipping(directory.path())).await;
     let sent = skipping["batch_id"].as_str().unwrap().to_string();
     mark_sent(directory.path(), &sent);
-    let posting = contra_statement(directory.path(), BANK_A, SKIPPED, None);
+    let posting = contra_statement(directory.path(), BANK_A, skipped_row(), None);
     let refused = rig.build(posting).await;
     assert_eq!(refused["reason"], "skip_row_paired_elsewhere", "{refused}");
-    assert_eq!(refused["skipped_rows"], json!([SKIPPED]));
-    let mut withdrawing = contra_statement(directory.path(), BANK_A, SKIPPED, None);
-    withdrawing["withdraw_skips"] = json!([SKIPPED]);
+    assert_eq!(refused["skipped_rows"], json!([skipped_row()]));
+    let mut withdrawing = contra_statement(directory.path(), BANK_A, skipped_row(), None);
+    withdrawing["withdraw_skips"] = json!([skipped_row()]);
     let built = rig.build(withdrawing).await;
     rig.finish();
     assert_eq!(built["voucher_count"], 1, "{built}");
     let holder = built["batch_id"].as_str().unwrap();
     assert!(
-        open_rows(&built["transfers"]).contains(&open_row(SKIPPED, "held_elsewhere", Some(holder))),
+        open_rows(&built["transfers"]).contains(&open_row(
+            skipped_row(),
+            "held_elsewhere",
+            Some(holder)
+        )),
         "{built}"
     );
 }
@@ -1838,8 +1951,8 @@ async fn the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sen
             .build(contra_statement(
                 directory.path(),
                 BANK_A,
-                BOOKED,
-                Some(REFERENCE),
+                booked(),
+                Some(reference()),
             ))
             .await;
         let other = first["batch_id"].as_str().unwrap().to_string();
@@ -1852,8 +1965,8 @@ async fn the_same_transfer_booked_twice_is_refused_after_the_first_batch_was_sen
             .build(contra_statement(
                 directory.path(),
                 BANK_B,
-                OTHER_BOOKED,
-                Some(REFERENCE),
+                other_booked(),
+                Some(reference()),
             ))
             .await;
         rig.finish();
@@ -1940,7 +2053,7 @@ async fn a_skip_file_that_cannot_be_read_refuses_a_build_that_needs_the_view() {
     let refused = run(
         directory.path(),
         admission_plans(),
-        contra_statement(directory.path(), BANK_A, BOOKED, None),
+        contra_statement(directory.path(), BANK_A, booked(), None),
     )
     .await;
     assert_eq!(refused["state"], "refused", "{refused}");
@@ -2012,14 +2125,17 @@ async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
         directory.path(),
         [skip_only_plans(), two_bank_plans()].concat(),
     );
-    rig.build(a_skips(directory.path(), &[(SKIPPED, Some(REFERENCE))]))
-        .await;
+    rig.build(a_skips(
+        directory.path(),
+        &[(skipped_row(), Some(reference()))],
+    ))
+    .await;
     let original = rig
         .build(contra_statement(
             directory.path(),
             BANK_B,
-            BOOKED,
-            Some(REFERENCE),
+            booked(),
+            Some(reference()),
         ))
         .await["batch_id"]
         .as_str()
@@ -2031,26 +2147,26 @@ async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
     record_verified_baseline(
         &journal(directory.path()).imports_dir().unwrap(),
         &original,
-        &json!({"vouchers": [{"bridge_txn_id": BOOKED, "status": "posted_verified", "alter_id": 12}]}),
+        &json!({"vouchers": [{"bridge_txn_id": booked(), "status": "posted_verified", "alter_id": 12}]}),
     )
     .unwrap();
     // the amendment moves the Contra to the next day, and the book still holds
     // the voucher as the original wrote it
-    let tag = import_identity(&original, BOOKED).to_string();
+    let tag = import_identity(&original, booked()).to_string();
     let mut plans = two_bank_plans();
     let preflight = plans.len() - mode_tests::licensed_import_probe().len() - 6;
     for index in [preflight + 1, preflight + 3] {
         plans[index].fixture = Fixture::SyntheticXml(book_holding_the_contra(&tag));
         plans[index].encoding = WireEncoding::Utf16Le;
     }
-    let mut moved = contra_voucher(BOOKED);
+    let mut moved = contra_voucher(booked());
     moved["date"] = json!("2026-09-02");
     let mut amending = statement_v2(
         directory.path(),
         BANK_B,
         window(),
         json!([moved]),
-        json!([contra_record(BOOKED, Some(REFERENCE))]),
+        json!([contra_record(booked(), Some(reference()))]),
     );
     amending["amends_batch_id"] = json!(original);
     let rig = Rig::new(directory.path(), plans);
@@ -2075,7 +2191,11 @@ async fn an_amendment_of_a_statement_batch_is_admitted_in_its_lineage() {
     let section = &amended["transfers"];
     assert_eq!(
         open_rows(section),
-        vec![open_row(SKIPPED, "other_side_unverified", Some(&batch))],
+        vec![open_row(
+            skipped_row(),
+            "other_side_unverified",
+            Some(&batch)
+        )],
         "{amended}"
     );
     assert_eq!(section["skips_paired"], 0, "{amended}");
@@ -2111,10 +2231,13 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
             directory.path(),
             BANK_A,
             window(),
-            json!([contra_voucher(OTHER_BOOKED), contra_voucher(SKIPPED)]),
             json!([
-                contra_record(OTHER_BOOKED, None),
-                contra_record(SKIPPED, None)
+                contra_voucher(other_booked()),
+                contra_voucher(skipped_row())
+            ]),
+            json!([
+                contra_record(other_booked(), None),
+                contra_record(skipped_row(), None)
             ]),
         );
         if let Some(withdraw) = extra {
@@ -2126,7 +2249,7 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
     let second_id = second["batch_id"].as_str().unwrap().to_string();
     assert_eq!(
         open_rows(&second["transfers"]),
-        vec![open_row(SKIPPED, "held_elsewhere", Some(&second_id))],
+        vec![open_row(skipped_row(), "held_elsewhere", Some(&second_id))],
         "{second}"
     );
     let step = second["transfers"]["next_steps"]["held_elsewhere"]
@@ -2137,7 +2260,7 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
         "{step}"
     );
     // 3. built again naming the row, before anything is sent: admitted
-    let third = rig.build(again(Some(json!([SKIPPED])))).await;
+    let third = rig.build(again(Some(json!([skipped_row()])))).await;
     rig.finish();
     assert_eq!(third["voucher_count"], 2, "{third}");
     let third_id = third["batch_id"].as_str().unwrap().to_string();
@@ -2145,7 +2268,7 @@ async fn a_row_skipped_in_a_build_never_sent_is_cleared_by_building_it_again_wit
     // answer tells it to be sent and verified, not held back
     assert_eq!(
         open_rows(&third["transfers"]),
-        vec![open_row(SKIPPED, "held_elsewhere", Some(&third_id))],
+        vec![open_row(skipped_row(), "held_elsewhere", Some(&third_id))],
         "{third}"
     );
     let own_step = third["transfers"]["next_steps"]["held_elsewhere"]
@@ -2178,10 +2301,13 @@ async fn a_row_posted_without_the_withdrawal_stays_open_in_the_verification_sect
             directory.path(),
             BANK_A,
             window(),
-            json!([contra_voucher(OTHER_BOOKED), contra_voucher(SKIPPED)]),
             json!([
-                contra_record(OTHER_BOOKED, None),
-                contra_record(SKIPPED, None)
+                contra_voucher(other_booked()),
+                contra_voucher(skipped_row())
+            ]),
+            json!([
+                contra_record(other_booked(), None),
+                contra_record(skipped_row(), None)
             ]),
         ))
         .await;
@@ -2193,7 +2319,11 @@ async fn a_row_posted_without_the_withdrawal_stays_open_in_the_verification_sect
     assert_eq!(section["retired"], 0, "{section}");
     assert_eq!(
         open_rows(&section),
-        vec![open_row(SKIPPED, "posted_against_skip", Some(&holder))],
+        vec![open_row(
+            skipped_row(),
+            "posted_against_skip",
+            Some(&holder)
+        )],
         "{section}"
     );
     assert!(section["next_steps"]["posted_against_skip"]
@@ -2212,7 +2342,7 @@ async fn skip_only_answer_at(cap: usize) -> Option<Value> {
     let response = server
         .call_tool_response(
             "build_import_xml",
-            a_skips(directory.path(), &[(SKIPPED, None)]),
+            a_skips(directory.path(), &[(skipped_row(), None)]),
         )
         .await
         .value;

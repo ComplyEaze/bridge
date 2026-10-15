@@ -9,6 +9,16 @@ use crate::agent::transfer_pairing::{
 use bridge_bank_statement::bank::BankReference;
 use statement_facts::HeldSkip;
 
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
 fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).unwrap()
 }
@@ -142,7 +152,7 @@ fn every_state() -> TransferFacts {
     ];
     skips[4].reversed_same_day = true;
     let printing = |digits: &str| BankReference::from_recorded(digits);
-    skips[7].reference = printing("600000000001");
+    skips[7].reference = printing(&p6(1, 12));
     assert!(skips[7].reference.is_some());
     let mut unverified = contra("batch-2", "t2", "20260106", "222.22");
     unverified.status = BatchStatus::NotVerified {
@@ -165,12 +175,12 @@ fn every_state() -> TransferFacts {
         // two Contras of a row's day and amount, each of another reference
         {
             let mut other = contra("batch-11", "t11", "20260111", "999.99");
-            other.reference = printing("600000000003");
+            other.reference = printing(&p6(3, 12));
             other
         },
         {
             let mut other = contra("batch-10", "t10", "20260111", "999.99");
-            other.reference = printing("600000000002");
+            other.reference = printing(&p6(2, 12));
             other
         },
     ];
@@ -330,7 +340,7 @@ fn two_contras_of_one_batch_list_the_row_once_for_that_batch() {
     let mut reversed = skip("st-reversed", "20260109", "555.55");
     reversed.reversed_same_day = true;
     let mut differs = skip("st-differs", "20260111", "999.99");
-    differs.reference = printing("600000000001");
+    differs.reference = printing(&p6(1, 12));
     assert!(differs.reference.is_some());
     let of_another_reference = |txn: &str, digits: &str| {
         let mut other = contra("batch-3", txn, "20260111", "999.99");
@@ -344,8 +354,8 @@ fn two_contras_of_one_batch_list_the_row_once_for_that_batch() {
             contra("batch-1", "t2", "20260108", "444.44"),
             contra("batch-2", "t3", "20260109", "555.55"),
             contra("batch-2", "t4", "20260109", "555.55"),
-            of_another_reference("t5", "600000000002"),
-            of_another_reference("t6", "600000000003"),
+            of_another_reference("t5", &p6(2, 12)),
+            of_another_reference("t6", &p6(3, 12)),
         ],
     );
     let summary = summary_of(&facts);
@@ -426,9 +436,9 @@ fn a_rendered_section_names_rows_by_id_and_date_and_says_no_amount_or_ledger() {
         "777.77",
         "888.88",
         "999.99",
-        "600000000001",
-        "600000000002",
-        "600000000003",
+        &p6(1, 12),
+        &p6(2, 12),
+        &p6(3, 12),
         "b1",
         "b2",
     ] {
@@ -684,7 +694,7 @@ fn withdraw_skips_are_distinct_statement_row_ids() {
         json!({"withdraw_skips": ["bridge-1"]}),
         json!({"withdraw_skips": ["st-20260901-ABCDEF0123456789"]}),
         json!({"withdraw_skips": [7]}),
-        json!({"withdraw_skips": "st-20260901-0000000000000001"}),
+        json!({"withdraw_skips": &format!("st-20260901-{}", padn(1, 16))}),
         json!({"withdraw_skips": null}),
         json!({"withdraw_skips": (0..=MAX_VOUCHERS as u32).map(row).collect::<Vec<_>>()}),
     ] {

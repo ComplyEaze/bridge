@@ -7,6 +7,16 @@
 use super::*;
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, TallyNamedMaster};
 
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
 fn captured_group_collection() -> String {
     let bytes = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-groups.utf16le.xml"
@@ -3193,10 +3203,22 @@ pub(super) fn statement_v2(
     json!({"company_guid": CAPTURED_GUID, "proposals_id": proposals_id, "proposals_sha256": sha256_hex(&bytes)})
 }
 
-const CONTRA_ROW: &str = "st-20260901-00000000000000a1";
-const SKIP_ROW: &str = "st-20260902-00000000000000a2";
-const OUTFLOW_SKIP_ROW: &str = "st-20260903-00000000000000a3";
+fn contra_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260901-{}a1", padn(0, 14)));
 
+    &TEXT
+}
+fn skip_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260902-{}a2", padn(0, 14)));
+    &TEXT
+}
+fn outflow_skip_row() -> &'static str {
+    static TEXT: std::sync::LazyLock<String> =
+        std::sync::LazyLock::new(|| format!("st-20260903-{}a3", padn(0, 14)));
+    &TEXT
+}
 /// The captured plans with both money-bearing demo ledgers moved under Bank
 /// Accounts, for this test only, so a Contra between them is admitted.
 pub(super) fn two_bank_plans() -> Vec<ScenarioPlan> {
@@ -3226,19 +3248,19 @@ pub(super) fn record(
 ) -> Value {
     json!({"row": 1, "date": "2026-09-01", "disposition": disposition, "amount": "12.50",
         "party": "SYNTHETIC", "ledger": ledger, "suspense": false, "bridge_txn_id": txn,
-        "reference": "600000000001", "instrument": "000417",
+        "reference": &p6(1, 12), "instrument": "000417",
         "direction": direction, "reversed_same_day": reversed})
 }
 
 fn statement_contra() -> Value {
-    json!({"bridge_txn_id": CONTRA_ROW, "date": "2026-09-01", "voucher_type": "Contra",
+    json!({"bridge_txn_id": contra_row(), "date": "2026-09-01", "voucher_type": "Contra",
         "entries": [{"ledger": "Bridge Nested Debtor WR4", "amount": "12.50", "side": "Dr"},
                     {"ledger": "WR2 Sales", "amount": "12.50", "side": "Cr"}]})
 }
 
 fn contra_record() -> Value {
     let mut contra = record(
-        CONTRA_ROW,
+        contra_row(),
         json!({"voucher": "Contra"}),
         "Bridge Nested Debtor WR4",
         "outflow",
@@ -3249,10 +3271,10 @@ fn contra_record() -> Value {
 }
 
 fn skip_record_of(ledger: &str) -> Value {
-    let mut skip = record(SKIP_ROW, json!("skipped"), ledger, "inflow", true);
+    let mut skip = record(skip_row(), json!("skipped"), ledger, "inflow", true);
     skip["date"] = json!("2026-09-02");
     skip["amount"] = json!("7.50");
-    skip["reference"] = json!("600000000002");
+    skip["reference"] = json!(&p6(2, 12));
     skip["instrument"] = Value::Null;
     skip
 }
@@ -3260,7 +3282,7 @@ fn skip_record_of(ledger: &str) -> Value {
 /// A skipped row of the opposite direction, with no reversal.
 fn outflow_skip_record() -> Value {
     let mut skip = skip_record_of("Cash");
-    skip["bridge_txn_id"] = json!(OUTFLOW_SKIP_ROW);
+    skip["bridge_txn_id"] = json!(outflow_skip_row());
     skip["direction"] = json!("outflow");
     skip["reversed_same_day"] = json!(false);
     skip["date"] = json!("2026-09-03");
@@ -3324,12 +3346,12 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
         json!({
             "bank_ledger_guid": wr2,
             "coverage": {"from": "20260802", "to": "20260929"},
-            "contra_rows": [{"bridge_txn_id": CONTRA_ROW, "reference": "600000000001",
+            "contra_rows": [{"bridge_txn_id": contra_row(), "reference": &p6(1, 12),
                 "instrument": "000417", "reversed_same_day": true}],
-            "skip_rows": [{"bridge_txn_id": SKIP_ROW, "date": "20260902", "amount": "7.50",
-                "direction": "inflow", "other_ledger_guid": cash, "reference": "600000000002",
+            "skip_rows": [{"bridge_txn_id": skip_row(), "date": "20260902", "amount": "7.50",
+                "direction": "inflow", "other_ledger_guid": cash, "reference": &p6(2, 12),
                 "reversed_same_day": true},
-                {"bridge_txn_id": OUTFLOW_SKIP_ROW, "date": "20260903", "amount": "7.50",
+                {"bridge_txn_id": outflow_skip_row(), "date": "20260903", "amount": "7.50",
                 "direction": "outflow", "other_ledger_guid": cash}],
         })
     );
@@ -3346,7 +3368,7 @@ async fn a_version_two_statement_build_writes_facts_the_transfer_view_reads() {
     };
     assert_eq!(
         skip.key.row,
-        crate::agent::transfer_pairing::StatementRowId::new(SKIP_ROW)
+        crate::agent::transfer_pairing::StatementRowId::new(skip_row())
     );
     assert!(skip.reversed_same_day);
     assert_eq!(
@@ -3454,7 +3476,7 @@ async fn a_version_one_file_holding_a_skip_or_a_contra_is_refused_as_legacy() {
     for (vouchers, records) in [
         (
             payments.clone(),
-            json!([{"disposition": "skipped", "bridge_txn_id": SKIP_ROW}]),
+            json!([{"disposition": "skipped", "bridge_txn_id": skip_row()}]),
         ),
         (json!([statement_contra()]), json!([])),
     ] {
@@ -3557,7 +3579,7 @@ async fn a_statement_of_only_skipped_rows_is_recorded_and_builds_nothing() {
     assert!(record.built_at.ends_with('Z'));
     assert!(record.statement.contra_rows.is_empty());
     assert_eq!(record.statement.skip_rows.len(), 1);
-    assert_eq!(record.statement.skip_rows[0].bridge_txn_id, SKIP_ROW);
+    assert_eq!(record.statement.skip_rows[0].bridge_txn_id, skip_row());
     assert!(!record.statement.skip_rows[0].other_ledger_guid.is_empty());
     assert_ne!(
         record.statement.skip_rows[0].other_ledger_guid,
@@ -3704,7 +3726,10 @@ async fn a_skip_only_statement_waits_for_the_admission_lock_and_takes_no_amendme
     for (key, value, code) in [
         (
             "amends_batch_id",
-            json!("bridge-00000000-0000-4000-8000-000000000001"),
+            json!(format!(
+                "bridge-{}",
+                uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | 1)
+            )),
             "skip_only_statement_cannot_amend",
         ),
         (

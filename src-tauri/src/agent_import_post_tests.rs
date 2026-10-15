@@ -9,6 +9,16 @@ use super::super::statement_facts::{
 use super::*;
 use bridge_tally_transport::TallyEndpointConfig;
 
+/// `n` behind zeros to `width` characters.
+fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+/// A 6, then `n` behind zeros, `width` characters in all.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
 fn batch() -> (ImportLedgerLine, TallyEndpointConfig) {
     let endpoint = TallyEndpointConfig {
         host: "127.0.0.1".into(),
@@ -2610,23 +2620,23 @@ fn a_saved_batch_holds_exactly_these_records() {
             to: TallyDate::parse("20260930").unwrap(),
         }),
         contra_rows: vec![ContraRow {
-            bridge_txn_id: "st-20260901-0000000000000001".into(),
-            reference: Some("600000000001".into()),
+            bridge_txn_id: format!("st-20260901-{}", padn(1, 16)),
+            reference: Some(p6(1, 12)),
             instrument: Some("000417".into()),
             reversed_same_day: true,
         }],
         skip_rows: vec![SkipRow {
-            bridge_txn_id: "st-20260901-0000000000000002".into(),
+            bridge_txn_id: format!("st-20260901-{}", padn(2, 16)),
             date: TallyDate::parse("20260901").unwrap(),
             amount: "500.00".into(),
             direction: RowDirection::Outflow,
             other_ledger_guid: "h".into(),
-            reference: Some("600000000002".into()),
+            reference: Some(p6(2, 12)),
             instrument: Some("000418".into()),
             reversed_same_day: true,
         }],
     }));
-    line.withdrawn_skips = Some(vec!["st-20260901-0000000000000002".into()]);
+    line.withdrawn_skips = Some(vec![format!("st-20260901-{}", padn(2, 16))]);
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();

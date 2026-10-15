@@ -14,7 +14,8 @@
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
 use crate::bank::{
-    Bank, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES, PARSER_SENTINELS,
+    Bank, BankReference, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES,
+    PARSER_SENTINELS,
 };
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
 use crate::date::Date;
@@ -104,15 +105,17 @@ pub fn suspense_tag<'a>(
     ledgers: impl IntoIterator<Item = &'a str>,
 ) -> Option<SuspenseTag> {
     if narration.ends_with(&format!(" | {PURPOSE_NOT_CONFIRMED}")) {
-        Some(SuspenseTag::PurposeNotConfirmed)
-    } else if ledgers
-        .into_iter()
-        .any(|ledger| narration.ends_with(&format!(" | {UNIDENTIFIED} {ledger}")))
-    {
-        Some(SuspenseTag::Unidentified)
-    } else {
-        None
+        return Some(SuspenseTag::PurposeNotConfirmed);
     }
+    // The loose fold `build` decided "unidentified" by (`ledger_key`), applied to both
+    // sides: a book that reads the ledger back in another case or spacing must still
+    // match the tag written for it.
+    let folded = ledger_key(narration);
+    ledgers
+        .into_iter()
+        .filter(|ledger| !ledger_key(ledger).is_empty())
+        .any(|ledger| folded.ends_with(&ledger_key(&format!(" | {UNIDENTIFIED} {ledger}"))))
+        .then_some(SuspenseTag::Unidentified)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -176,8 +179,16 @@ pub struct StatementRecord {
     pub disposition: Disposition,
     pub amount: String,
     pub party: String,
-    /// The ledger the voucher posts the non-bank leg to (empty when skipped).
+    /// The ledger the voucher posts the non-bank leg to. For a skipped row,
+    /// the other bank account's ledger, whose Contra carries the transfer;
+    /// empty only for a row still waiting for a cash answer.
     pub ledger: String,
+    /// The network-transfer reference the row carries (UPI, IMPS, NEFT or RTGS),
+    /// whatever became of the row.
+    pub reference: Option<BankReference>,
+    /// The cheque or transaction number the statement prints in its own column,
+    /// recorded only: nothing matches on it.
+    pub instrument: Option<String>,
     /// The row reached the suspense ledger: answered "don't know", or, by
     /// the deliberately loose fold, mapped or defaulted there.
     pub suspense: bool,
@@ -579,6 +590,8 @@ pub fn build(
         }
         let amount_text = format_amount(&amount);
         let party = bank.party(row);
+        let transfer_reference = bank.transfer_reference(row);
+        let instrument = bank.instrument(row);
         let cash_movement = CashMovement::of_party(&party);
         let answered = options.cash_answers.get(&txn_id);
         let (ledger, voucher_type, cash_answer) = match cash_movement {
@@ -602,6 +615,8 @@ pub fn build(
                         amount: amount_text,
                         party,
                         ledger: String::new(),
+                        reference: transfer_reference,
+                        instrument,
                         suspense: false,
                         bridge_txn_id: txn_id,
                         cash_movement,
@@ -638,13 +653,41 @@ pub fn build(
                     mapped_ledger
                 };
                 if treatment == Treatment::Skip {
+                    // The other account's ledger is a ledger name like any
+                    // other: the later pairing looks for the Contra under it.
+                    require_ledger(&ledger, "skipped transfer's other ledger", Some(number))?;
+                    // The other account's Contra is found under this ledger; the
+                    // statement's own bank ledger would look for the transfer in
+                    // the account it was read from.
+                    if ledger_key(&ledger) == ledger_key(options.bank_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_statement_bank",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is this statement's own bank ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
+                    // Suspense is where unidentified rows go, never another
+                    // account whose Contra could carry the transfer.
+                    if ledger_key(&ledger) == ledger_key(options.suspense_ledger) {
+                        return Err(Refusal::at_row(
+                            "skip_ledger_is_suspense",
+                            number,
+                            format!(
+                                "row {number} is skipped as a transfer already carried by the other bank account's Contra, but its mapped ledger is the suspense ledger; name the other account's ledger"
+                            ),
+                        ));
+                    }
                     records.push(StatementRecord {
                         row: number,
                         date: date.iso(),
                         disposition: Disposition::Skipped,
                         amount: amount_text,
                         party,
-                        ledger: String::new(),
+                        ledger,
+                        reference: transfer_reference,
+                        instrument,
                         suspense: false,
                         bridge_txn_id: txn_id,
                         cash_movement: None,
@@ -746,6 +789,8 @@ pub fn build(
             amount: amount_text,
             party,
             ledger,
+            reference: transfer_reference,
+            instrument,
             suspense,
             bridge_txn_id: txn_id,
             cash_movement,
@@ -883,7 +928,8 @@ pub struct CounterpartyGroup {
     /// amount decides it.
     pub party: String,
     pub also_printed_as: Vec<String>,
-    /// The ledger its non-bank leg posts to; empty when skipped.
+    /// The ledger its non-bank leg posts to; for a skipped row, the other bank
+    /// account's ledger.
     pub ledger: String,
     /// `Payment`, `Receipt`, `Contra` or `Skipped`.
     pub disposition: String,

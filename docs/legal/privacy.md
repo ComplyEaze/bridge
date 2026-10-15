@@ -115,7 +115,7 @@ Bridge writes Local Files so that you can see what it did, and so that a posting
 - **Mac:** in Finder, choose Go, then Go to Folder, and type `~/Library/Application Support/Bridge`.
 - **Windows:** in File Explorer, type `%LOCALAPPDATA%\Bridge\agent` in the address bar. On some computers it is `%APPDATA%\Bridge\agent` instead.
 
-If someone set Bridge up by hand to use a different folder,³ that folder holds the files below. Small, empty lock files still go in the default folder.
+If someone set Bridge up by hand to use a different folder,³ that folder holds the files below. Small, empty lock files still go in the default folder. On Windows, Bridge also puts lock files in a second folder, `%USERPROFILE%\.complyeaze-bridge`, so that every copy of Bridge you run finds the same ones. They keep two copies of Bridge from sending to Tally at the same time, and Bridge does not delete them.
 
 On a Mac, Bridge restricts its folder to your user account through file permissions. On Windows it uses the folder's normal permissions. Administrators and backup software on your computer may still be able to read these files.
 
@@ -151,7 +151,7 @@ Some information is held only in memory while Bridge runs, and is lost when it s
   2. Check in Tally that everything you posted through Bridge is there. Use the report above: if it shows batches that are not settled, check each one in Tally, then archive anyway. A batch that Tally rejected stays not settled, and that is normal.
   3. Move the whole Bridge folder into an encrypted archive or encrypted disk image. Do not simply delete it.
   4. Bridge then starts fresh and no longer remembers what it sent, including which bank-statement rows it sent. It compares a new batch with what your Tally book shows, but that may not catch a repeat that differs from the original, so check Tally before posting old entries again.
-- **Everything else.** If you used the desktop app, delete its `com.complyeaze.bridge` folders and the `com.complyeaze.bridge.tally-mirror` entry in your password store. Delete any reports you exported. Remove the extension in your AI Assistant's settings. Removing it may leave the Bridge folder, its lock files and the password-store entry in place; if the Bridge folder is still there when you reinstall, Bridge picks up its records again.
+- **Everything else.** If you used the desktop app, delete its `com.complyeaze.bridge` folders and the `com.complyeaze.bridge.tally-mirror` entry in your password store. Delete any reports you exported. Remove the extension in your AI Assistant's settings. Removing it may leave the Bridge folder, its lock files and the password-store entry in place; if the Bridge folder is still there when you reinstall, Bridge picks up its records again. On Windows, also delete the `%USERPROFILE%\.complyeaze-bridge` folder once your AI Assistant and the desktop app are closed. Bridge keeps only lock files there.
 
 Bridge cannot remove one person's or one client's data. Deleting or archiving its files changes nothing in Tally, and does not affect anything your AI Assistant or AI Provider has kept. Copies may also remain elsewhere: in Tally, in reports you exported, in Time Machine or File History backups, in folders synced to a cloud service, in your AI conversations, or on the disk until the space is reused.
 

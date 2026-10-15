@@ -63,6 +63,8 @@ pub(super) mod local_data;
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
+/// The post's next step for a numbering refusal, for the refusal table.
+pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 pub(super) use approval::PostApprovals;
@@ -1108,6 +1110,58 @@ impl Server {
             let on_account_approved = verdict.approved;
             let (mark, mark_evidence) = self.pre_import_mark(&company, &identity).await?;
             accumulated = combine_evidence(accumulated.clone(), mark_evidence.clone());
+            // Every voucher is admitted against its voucher type's voucher
+            // numbering, read after the mark above (bridge#724). One written
+            // without a number is numbered by its type, so that type must be
+            // numbered Automatic with existing numbers retained. A Journal
+            // that carries its own number is also written into a type
+            // numbered Manual, where Tally keeps the number; under Automatic
+            // numbering Tally discards it and assigns its own (protocol
+            // reference §9.8), so there it is held to the same
+            // reading as a voucher without one. A blank number counts as
+            // none, and an amendment's vouchers are checked like any other.
+            let vouchers = payload.vouchers.iter().map(|voucher| {
+                (
+                    voucher.voucher_type.as_str(),
+                    post::numbering::OwnNumber::of(voucher.voucher_number.as_deref()),
+                )
+            });
+            let master_mark = mark
+                .master_value
+                .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+            match self
+                .admit_voucher_numbering(&identity, master_mark, vouchers, &mut accumulated)
+                .await
+            {
+                Ok(_) => {}
+                Err(post::numbering::NumberingFailure::Read(failure)) => return Err(failure),
+                Err(post::numbering::NumberingFailure::Refused(refusal)) => {
+                    let mut result = json!({
+                        "state":"refused", "reason":refusal.code(),
+                        "refused_types":refusal.refused_types(),
+                    });
+                    // The next step goes out only under a budget that
+                    // holds it: an answer over its budget is replaced
+                    // whole, and the reason and the refused types are
+                    // what the caller needs most. An amendment has its
+                    // own: its book check has not run yet.
+                    if self.settings.max_bytes
+                        >= post::numbering::GUIDANCE_MIN_RESPONSE_BUDGET
+                    {
+                        result["next_step"] = json!(if payload.amends_batch_id.is_some() {
+                            post::numbering::BUILD_AMENDMENT_NEXT_STEP
+                        } else {
+                            post::numbering::BUILD_NEXT_STEP
+                        });
+                    }
+                    return Ok(ToolOutcome {
+                        payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
+                        evidence: accumulated.clone(),
+                        company_guid: Some(payload.company_guid),
+                        truncated: false,
+                    });
+                }
+            }
             let (_, _, _, repeated_catalogue_evidence) = self
                 .read_import_ledger_catalogue(&identity, &company.name)
                 .await?;
@@ -2923,7 +2977,7 @@ fn native_post_refusal_reason(code: &str, voucher_limit: usize) -> String {
             "a voucher carries its own number, and native posting lets Tally assign it".to_string()
         }
         "import_review_layout_text" | "import_review_format_text" => {
-            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name)".to_string()
+            "the company name, a ledger name or a voucher's own text holds a line break or another character the approval dialog cannot show faithfully (it can show one line break at the very end of a ledger name), or a narration too long for one line holds a run of four or more dashes or a number in brackets, which the dialog keeps for its own dashed line and part labels".to_string()
         }
         "import_review_too_large" => {
             "the approval text does not fit in one native dialog".to_string()
@@ -3197,11 +3251,12 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                 return Err("voucher_text_invalid".to_string());
             }
         }
-        if voucher
-            .voucher_number
-            .as_deref()
-            .is_some_and(|number| number.chars().count() > 32 || number.contains('$'))
-        {
+        if voucher.voucher_number.as_deref().is_some_and(|number| {
+            // Tally read back a number sent with a space at its end
+            // without it (§9.8, 2026-10-15), so it could never verify as
+            // posted; white space at the start is refused too, unmeasured.
+            number.chars().count() > 32 || number.contains('$') || number.trim() != number
+        }) {
             return Err("voucher_number_invalid".to_string());
         }
         for entry in &voucher.entries {
@@ -4708,6 +4763,10 @@ fn set_private_file(file: &std::fs::File) -> Result<(), String> {
 #[cfg(test)]
 #[path = "agent_import_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "agent_import_numbering_fixtures.rs"]
+pub(in crate::agent) mod numbering_fixtures;
 
 /// A verification page as it is served, from the saved proof's bytes: the
 /// proof, with every ledger name marked so the response's redaction applies,

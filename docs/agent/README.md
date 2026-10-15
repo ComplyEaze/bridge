@@ -96,6 +96,7 @@ The ordinary default tools, in name order:
 - `list_companies`
 - `local_data_report`
 - `masters`
+- `month_register`
 - `outstandings`
 - `profit_and_loss`
 - `purchase_register`
@@ -114,7 +115,7 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status` and `voucher_read_cost` are in the
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register` and `voucher_read_cost` are in the
 source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
@@ -624,6 +625,29 @@ collection shape), `company_features_currency_invalid` (a symbol over 16 charact
 control character, a bidirectional override or isolate, a zero-width or other invisible format character, or a line or paragraph separator), `company_features_tally_reported_failure`, and the stability codes
 `company_features_changed` and `company_features_extent_changed`. Measured on three synthetic books of one
 TallyPrime 7.1 Silver (protocol reference §12a.18); the tool was run against those three books and equalled the F11 screen on all nine values.
+
+### Month-wise Sales and Purchase Registers (`month_register`)
+
+`month_register` takes `company_guid`, `kind` (`sales` or `purchase`) and a window of whole months,
+`from` the 1st of a month and `to` the last day of a month, at most twelve months, not starting before
+the book does. It reads Tally's own Sales Register or Purchase Register by report name, twice, with the
+book extent checked before and after and the company and mode checked around the read, and returns
+`months`: one row per month, `month` as `YYYY-MM`, and Tally's three columns `debit`, `credit` and
+`closing`, each `{"state": "present", "value": ...}` or `{"state": "empty"}` exactly as Tally printed
+it. An empty amount is not zero.
+
+Nothing ties the rows to the vouchers, to the trial balance or to `sales_register` and
+`purchase_register`; `checks` says so. On the one synthetic book read (BRIDGE PILOT LAB, one financial
+year, 13 Oct 2026) the Sales Register's credit was the month's sales invoices, tax included, neither
+cancelled nor optional, and its closing a running total within the year; the Purchase Register's debit
+was the month's purchases as a negative amount and its closing the running total, carried into a month
+with no purchase. That reading is not applied. Equality with Tally's own register screens has not been
+measured. A window that is not whole months is refused before any request
+(`month_register_window_not_month_start`, `_not_month_end`, `_reversed`, `_too_many_months`), and one
+that starts before the books as `month_register_before_books`; an answer Tally marks as a failure, an
+empty answer and a book that moved during the read fail the call (`month_register_read_failed` with the
+cause). The Journal Register prints a count of vouchers, not amounts, and is not read; the Receipt and
+Payment Registers have not been captured.
 
 ### GSTR-1 status of one voucher type (`gst_status`)
 

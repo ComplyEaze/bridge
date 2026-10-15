@@ -59,6 +59,10 @@ pub(crate) use company_features::CompanyFeaturesReadError;
 #[path = "runtime_company_features_tests.rs"]
 mod company_features_tests;
 
+#[path = "runtime_month_register.rs"]
+mod month_register;
+pub(crate) use month_register::MonthRegisterReadError;
+
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
 pub(crate) use stock_summary::StockSummaryReadError;

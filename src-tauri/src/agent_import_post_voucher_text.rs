@@ -159,13 +159,15 @@ mod tests {
 
     #[test]
     fn a_value_with_no_space_to_split_at_is_refused() {
+        // A run of twelve digits, built from short pieces.
+        let digits = ["000", "123", "456", "789"].concat();
         assert_eq!(
-            split("UPI/000123456789/PAYMENT/SYNTHETIC", 20),
+            split(&format!("UPI/{digits}/PAYMENT/SYNTHETIC"), 20),
             Err(VoucherTextRefusal::DoesNotFit)
         );
         // A space too late to keep the first part in its width.
         assert_eq!(
-            split("000123456789000123456789 x", 20),
+            split(&format!("{digits}{digits} x"), 20),
             Err(VoucherTextRefusal::DoesNotFit)
         );
     }

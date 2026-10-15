@@ -879,6 +879,8 @@ impl Drop for Scratch {
 struct ScratchSurface<'a> {
     scratch: &'a Scratch,
     json: String,
+    /// Read only by the symbolic-link tests, which exist on Unix only.
+    #[cfg(unix)]
     pins: Vec<String>,
 }
 
@@ -915,6 +917,7 @@ impl<'a> ScratchSurface<'a> {
         Self {
             scratch,
             json,
+            #[cfg(unix)]
             pins,
         }
     }
@@ -935,6 +938,7 @@ impl<'a> ScratchSurface<'a> {
     }
 
     /// A pinned file at least one directory deep.
+    #[cfg(unix)]
     fn pinned_file(&self) -> String {
         self.pins
             .iter()

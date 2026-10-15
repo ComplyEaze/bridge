@@ -776,16 +776,23 @@ pub(super) fn rows_held_as_vouchers(
 /// The facts the transfer pairing view takes for one company: the journal
 /// (every record admitted, as for every other read) and the skip-only file,
 /// with a build about to be written, if any, read as the newest record.
+///
+/// `subject` is a batch already in the journal that is being judged again (the
+/// one about to be sent): every record of it is left out, so the journal reads
+/// as it did when that batch was built, and it is given as `candidate`.
 pub(super) fn transfer_facts(
     journal: impl BufRead,
     skips_file: impl BufRead,
     company_guid: &str,
     candidate: Option<statement_facts::Candidate>,
+    subject: Option<&str>,
 ) -> Result<statement_facts::TransferFacts, statement_facts::TransferFactsError> {
     use statement_facts::{BuildLine, Candidate, JournalEvent, TransferFactsError};
     let mut events = Vec::new();
     scan_records(journal, |record, _| match record {
+        Record::Batch(batch) if Some(batch.batch_id.as_str()) == subject => {}
         Record::Batch(batch) => events.push(JournalEvent::Build(Box::new(BuildLine::of(&batch)))),
+        Record::Status(update) if Some(update.batch_id.as_str()) == subject => {}
         Record::Status(update) if update.sets_status() => events.push(JournalEvent::Status {
             sent: matches!(update.record_type, StatusKind::DispatchIntent),
             batch_id: update.batch_id,

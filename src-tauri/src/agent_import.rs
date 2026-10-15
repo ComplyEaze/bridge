@@ -1032,6 +1032,7 @@ impl Server {
             let transfers = match self.admit_transfers_while_admitted(transfers::TransferInput {
                 company_guid: company_guid.clone(),
                 carries_statement: statement_record.is_some(),
+                subject: None,
                 skip_rows: resolved
                     .statement
                     .iter()
@@ -1456,6 +1457,7 @@ impl Server {
                 withdraw,
                 own_lineage: None,
                 carries_statement: true,
+                subject: None,
             })
             .map_err(fail)?
         {

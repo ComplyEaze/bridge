@@ -240,6 +240,13 @@ These changes are in source and not yet in a published build.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
+- **On Windows, the approval window should now open above a full-screen Tally (not yet seen
+  live).** It could open behind TallyPrime when Tally filled the screen, so the person saw
+  nothing and the approval lapsed unanswered. Both windows, the post approval and the review
+  acknowledgement, are now drawn above every window that is not itself kept on top. Nothing
+  else changes: the text, the buttons, No as the default and the two-minute limit. Not yet
+  measured on a live Windows screen (#1589).
+
 - **A one-voucher approval now shows a long narration in parts, where it refused it before.**
   A bank-statement voucher's narration is often too long for one line of the dialog, so posting
   it alone was refused and the file had to be imported by hand. Such a narration is now shown

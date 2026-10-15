@@ -1759,7 +1759,23 @@ impl Server {
                         verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
-                        verification::mark_sent_not_attributed(&mut result)
+                        // An answer on record that was not clean (one that
+                        // did not parse included, as the post itself reads
+                        // it) makes an edit in Tally no likelier than a
+                        // voucher Tally did not create, so its line drops the
+                        // edit example (bridge#1108). With no answer on
+                        // record, or a clean one, the line is unchanged.
+                        let unclean = dispatch_response.as_ref().is_some_and(|response| {
+                            !post::import_outcome_is_clean(
+                                response.outcome.as_ref(),
+                                line.vouchers.len(),
+                            )
+                        });
+                        if unclean {
+                            verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
+                        } else {
+                            verification::mark_sent_not_attributed(&mut result)
+                        }
                     }
                 }
             }
@@ -2593,7 +2609,7 @@ impl Server {
         let _lock = self.lock_import_admission_shared()?;
         match self.import_journal_while_admitted()? {
             Some(reader) => ledger::invoice_number_control(reader, company_guid, year),
-            None => Ok(ledger::NumberControl::NeverSent),
+            None => Ok(ledger::NumberControl::NoneStanding),
         }
     }
 
@@ -2618,18 +2634,6 @@ impl Server {
         Ok(self
             .import_invoice_stop_while_admitted(&line.company_guid)?
             .is_some())
-    }
-
-    /// Every sent, unverified invoice batch of this company that stops it or
-    /// stands as its number control after a release (`ledger::invoice_holds`).
-    pub(super) fn import_invoice_holds_while_admitted(
-        &self,
-        company_guid: &str,
-    ) -> Result<BTreeMap<String, ledger::InvoiceHold>, String> {
-        match self.import_journal_while_admitted()? {
-            Some(reader) => ledger::invoice_holds(reader, company_guid),
-            None => Ok(BTreeMap::new()),
-        }
     }
 
     /// Every batch that stops this company, in id order.
@@ -2785,7 +2789,7 @@ fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) after a read that did not find its invoice, build the invoice again under a new bridge_txn_id and the SAME invoice number: ComplyEaze Bridge refuses the build while Tally's book holds that number in the financial year, and refuses the post, while an earlier batch with the same figures is still unverified, if Tally holds a voucher with those figures under any number. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and the user enters its unposted rows in Tally), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again: ask the user to enter the voucher in Tally.";
 
 /// The code of the refusal that stops an invoice build while voucher posting
 /// is off (see `build_import_xml`); its text is in agent.rs.

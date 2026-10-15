@@ -158,7 +158,8 @@ pub(super) struct InvoiceRefusal {
 pub(super) enum RefusalDetail {
     Nothing,
     Ledger(String),
-    /// A count, a state, a voucher type or an invoice number: never a ledger.
+    /// A count, a state, a voucher type, an invoice number or a batch id:
+    /// never a ledger.
     Value(String),
 }
 
@@ -1187,22 +1188,24 @@ enum NumberAbsence {
     Controlled,
     /// The book's voucher mark is 0: it holds no voucher at all.
     EmptyBook,
-    /// No invoice of this company was ever sent: the first post stands on
-    /// the voucher type's own duplicate guard and its read-back.
-    FirstPost,
+    /// No invoice of this company stands as sent (none was sent, or a person
+    /// released each one sent): the post stands on the voucher type's own
+    /// duplicate guard and its read-back.
+    NoStandingInvoice,
 }
 
 /// The basis for "not in use" when the journal names no verified invoice of
-/// the company to read beside it. Once an invoice was sent and none stands
-/// verified, a read that matches nothing could not be told from an unused
-/// number, so the build is refused until that post is verified.
+/// the company to read beside it. While an invoice stands as sent and none
+/// stands verified, a read that matches nothing could not be told from an
+/// unused number, so the build is refused until that post is verified or
+/// released.
 fn absence_without_control(
-    sent_before: bool,
+    sent_standing: bool,
     voucher_mark: Option<u64>,
 ) -> Result<NumberAbsence, InvoiceRefusal> {
-    match (voucher_mark, sent_before) {
+    match (voucher_mark, sent_standing) {
         (Some(0), _) => Ok(NumberAbsence::EmptyBook),
-        (_, false) => Ok(NumberAbsence::FirstPost),
+        (_, false) => Ok(NumberAbsence::NoStandingInvoice),
         (_, true) => Err(refuse("invoice_number_control_unavailable")),
     }
 }
@@ -1405,8 +1408,8 @@ impl super::super::Server {
         // 3c. "No voucher carries this number" is believed only beside a
         // control: the same read for an invoice this company is known to hold
         // must find it (a read that matches nothing on this Tally fails
-        // here), or the book holds no voucher at all, or this is the
-        // company's first invoice sent (whose read-back is then the check).
+        // here), or the book holds no voucher at all, or no invoice of this
+        // company stands as sent (the read-back is then the check).
         let control = self
             .import_invoice_number_control(identity.company_guid(), (&year.0, &year.1))
             .map_err(|_| failed("invoice_number_control_unreadable"))?;
@@ -1431,7 +1434,7 @@ impl super::super::Server {
                 }
                 NumberAbsence::Controlled
             }
-            super::ledger::NumberControl::NeverSent => {
+            super::ledger::NumberControl::NoneStanding => {
                 absence_without_control(false, mark.value).map_err(refused)?
             }
             super::ledger::NumberControl::NoneVerified => {

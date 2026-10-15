@@ -3,6 +3,7 @@
 //! test-only seam (`approved_import::test_seam`). No real Tally is involved.
 use super::*;
 use super::{SCRIPTED_REMOTE_ID, SCRIPTED_REMOTE_IDS};
+use crate::agent::agent_import::tests::sentinel_batch_id;
 use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 use bridge_tally_transport::TallyEndpointConfig;
 use std::time::Duration;
@@ -332,7 +333,7 @@ async fn verification_refuses_a_voucher_type_that_is_not_qualified_before_any_re
     let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
     let (journal_line, _) = saved_batch(&server);
     let mut line = journal_line.clone();
-    line.batch_id = "bridge-00000000-0000-4000-8000-000000000584".into();
+    line.batch_id = sentinel_batch_id(0x584);
     line.vouchers[0].voucher_type = VoucherType::Sales;
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(rendered.as_bytes());
@@ -4767,13 +4768,6 @@ async fn a_native_posts_alter_id_delta_is_measured_from_the_mark_before_its_post
     assert_eq!(result["pre_import_mark"]["value"], 8, "{posted}");
 }
 
-/// The rows of a `verify_import` page as the release's own readback sees them,
-/// before the page splits the verified rows off. It carries the unverified rows
-/// only, which is all of them for the one-voucher batches it is used on.
-fn unpaged(page: &Value) -> Value {
-    json!({"vouchers": page["unverified_vouchers"], "duplicates": page["duplicates"]})
-}
-
 /// A bound voucher a later window does not hold is `bound_not_in_window`,
 /// never `not_found`, and the batch is not verified.
 #[tokio::test]
@@ -4787,12 +4781,6 @@ async fn a_bound_voucher_missing_from_a_later_window_is_never_read_as_absent() {
     let result = &verified[0]["structuredContent"]["result"];
     assert_eq!(result["counts"]["bound_not_in_window"], 1, "{result}");
     assert_eq!(result["counts"]["not_found"], 0, "{result}");
-    // A release of an invoice batch reads this very result: a deleted or
-    // re-dated native post is the way a vanished control is dropped.
-    assert!(
-        !super::super::stop::Seen::of(&unpaged(result)).found(),
-        "a release reads it as absent: {result}"
-    );
     assert_eq!(
         result["unverified_vouchers"][0]["status"], "bound_not_in_window",
         "{result}"
@@ -4841,10 +4829,6 @@ async fn a_book_rolled_back_below_the_post_reads_as_rolled_back_never_absent() {
         "{result}"
     );
     assert_eq!(result["counts"]["not_found"], 0, "{result}");
-    assert!(
-        !super::super::stop::Seen::of(&unpaged(result)).found(),
-        "a release reads it as absent: {result}"
-    );
     assert_eq!(result["counts"]["book_rolled_back"], 1, "{result}");
     assert_eq!(
         result["unverified_vouchers"][0]["status"], "book_rolled_back",
@@ -5481,6 +5465,13 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         "sent_not_attributed",
         "{posted}"
     );
+    // Tally's own answer reported an exception, so the line does not suggest
+    // an edit in Tally, and names no cause (bridge#1108).
+    assert_eq!(
+        voucher("partial-2")["next_step"],
+        "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.",
+        "{posted}"
+    );
     let verdicts = String::from_utf8(journal(directory.path()))
         .unwrap()
         .lines()
@@ -5527,6 +5518,27 @@ async fn post_batch_rejected(answer: String, after_mark: u64) -> Value {
         .await;
     assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
     posted
+}
+
+/// A post whose answer from Tally does not parse is not clean, as the post
+/// reads it: its vouchers' line drops the edit example too (bridge#1108).
+#[tokio::test]
+async fn a_post_whose_answer_does_not_parse_drops_the_edit_example() {
+    let posted = post_batch_rejected("not an import answer".to_string(), 10).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(
+        result["dispatch"]["response_state"], "response_not_clean",
+        "{posted}"
+    );
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{posted}");
+    let steps = result["vouchers"]
+        .as_array()
+        .expect("the result lists its vouchers")
+        .iter()
+        .map(|voucher| voucher["next_step"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{posted}");
 }
 
 #[tokio::test]
@@ -5686,7 +5698,8 @@ async fn a_batch_rejected_whole_verified_later_says_what_tally_reported_of_each_
 /// The same batch when the voucher mark moved by one across the post (the
 /// later check reads the mark where the post left it): the post claimed
 /// nothing about any voucher, and a later check claims nothing either. Each
-/// voucher keeps the line that says to check in Tally.
+/// voucher keeps the line that says to check in Tally, without the edit
+/// example, because the saved answer was not clean.
 #[tokio::test]
 async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_check() {
     let later =
@@ -5694,8 +5707,9 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_che
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
     let (steps, summary) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain; 3], "{later}");
+    // The saved answer was not clean, so the line drops the edit example.
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{later}");
     assert_eq!(summary, LATER_SUMMARY, "{later}");
 }
 
@@ -5709,13 +5723,15 @@ async fn a_batch_rejected_whole_with_no_step_record_is_not_described_by_a_later_
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
     let (steps, _) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain; 3], "{later}");
+    // The saved answer was not clean, so the line drops the edit example.
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{later}");
 }
 
 /// A batch that landed partly, checked again later: the voucher that is not
-/// found keeps the line that says to check in Tally. A count does not say
-/// which voucher Tally rejected.
+/// found keeps the line that says to check in Tally, without the edit example
+/// (the saved answer was not clean). A count does not say which voucher Tally
+/// rejected.
 #[tokio::test]
 async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
     let later =
@@ -5723,8 +5739,8 @@ async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
     let (steps, _) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain], "{later}");
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean], "{later}");
 }
 
 /// The same answer with the voucher mark moved by one across the post: Tally

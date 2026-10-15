@@ -1276,15 +1276,6 @@ fn rendered_claim_matrix_is_deterministic_and_drift_checked() {
         non_promotable_positive.validate().unwrap_err(),
         invalid("positive_claim_not_promotion_eligible")
     );
-
-    let mut mixed_transport = manifest;
-    mixed_transport.claims[0].transport = TransportProfile::JsonExShadow;
-    mixed_transport.claims[0].promotion_eligible = false;
-    mixed_transport.claims[0].required_profiles = vec![ReadProfileId::XmlCompanyEnumerationV1];
-    assert_eq!(
-        mixed_transport.validate().unwrap_err(),
-        invalid("jsonex_claim_contains_xml_profile")
-    );
 }
 
 /// The committed schema-1 surface and matrix, byte for byte as master held
@@ -1351,10 +1342,21 @@ fn a_schema_1_or_2_surface_or_a_schema_1_matrix_is_refused() {
         .as_object_mut()
         .unwrap()
         .remove("compatibility_surface_sha256");
+    // The fixture's one claim on the retired `json_ex_shadow` transport no longer parses, so the
+    // copy names `xml_http` for it. The fixture's bytes stay as they were.
+    for claim in matrix_without_digest["claims"].as_array_mut().unwrap() {
+        if claim["transport"] == "json_ex_shadow" {
+            claim["transport"] = "xml_http".into();
+        }
+    }
+    // What refuses the copy is the schema-version check of `validate`: the copy parses, and it
+    // still says schema 1.
+    assert_eq!(matrix_without_digest["schema_version"], 1);
     assert_eq!(
         SupportClaimsManifest::from_json(&serde_json::to_vec(&matrix_without_digest).unwrap())
             .unwrap_err(),
-        invalid("support_manifest_invalid")
+        invalid("support_manifest_invalid"),
+        "the schema-1 copy parses and is refused by the schema-version check"
     );
 }
 

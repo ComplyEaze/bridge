@@ -1352,21 +1352,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
              earlier invoice it posted in this company and verified, and Tally did not return \
              it, so the read cannot be trusted here and the build is refused. The detail names \
-             that invoice's batch. Run verify_import on it. If it then stops the company, or \
-             it was released earlier, tell the user to check the invoice in Tally and call \
-             acknowledge_post_review with that batch_id and doubt invoice_stop: if a fresh read \
-             shows the invoice gone (deleted or re-dated in Tally, or the books restored), a \
-             native dialog asks the user, and nothing but their answer stops that invoice \
-             being the check. If the read still shows the invoice, or verify_import reads it \
-             posted and verified, Tally holds it and the number check does not work on this \
-             book: stop, tell the user, and do not post this invoice through ComplyEaze \
-             Bridge."),
-        "ack_stop_release_stands" => Some(
-            "This batch was released earlier after a read that found its invoice, and a fresh \
-             read does not show the invoice gone (or could not be made for a cause no wait \
-             cures), so nothing was asked or recorded. If the user says the invoice is not in \
-             Tally while the read still shows it, trust neither: do not post invoices for this \
-             company through ComplyEaze Bridge, and tell the user.",
+             the batch that posted that invoice. Run verify_import on it. If it no longer reads \
+             verified, it no longer checks new numbers, and a batch ComplyEaze Bridge sent then \
+             stops the company's invoices until the user releases it (invoice_company_stopped \
+             says how). If it still reads \
+             posted and verified, Tally holds the invoice and the number check does not work on \
+             this book: stop, tell the user, and do not post this invoice through ComplyEaze \
+             Bridge.",
         ),
         "invoice_company_stopped" => Some(
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \
@@ -1377,12 +1369,6 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              user to check that invoice in Tally, then call acknowledge_post_review with that \
              batch_id and doubt invoice_stop (available when posting is enabled): a native \
              dialog asks the user, and nothing but their answer releases the stop.",
-        ),
-        "ack_stop_tally_unreadable" => Some(
-            "A release is recorded with what ComplyEaze Bridge can see of the invoice in \
-             Tally, and the read could not be completed (Tally not answering, or the company not \
-             open). Nothing was recorded and no dialog was shown. Ask the user to open the \
-             company in Tally and call again. Such a Tally cannot post an invoice either."
         ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \

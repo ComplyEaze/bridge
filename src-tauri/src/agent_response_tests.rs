@@ -973,3 +973,55 @@ fn a_result_with_no_page_drops_a_note_section_too() {
     assert!(noted["result"].get("transfers").is_none(), "{noted}");
     assert_eq!(noted["truncated"], true);
 }
+
+/// The same drop through the two other places the cap is applied to a tool
+/// result: the MCP result's `structuredContent`, and the JSON-RPC response.
+#[test]
+fn a_result_with_no_page_drops_its_section_in_the_mcp_and_jsonrpc_envelopes_too() {
+    let bare =
+        json!({"truncated": false, "result": {"batch_id": "bridge-x", "note": "y".repeat(500)}});
+    let with_section = |section: Value| {
+        let mut full = bare.clone();
+        full["result"]["transfers"] = section;
+        full
+    };
+    // MCP: structuredContent beside its text copy
+    let mcp = |structured: Value| {
+        let mut mcp =
+            json!({"content": [{"type": "text", "text": ""}], "structuredContent": structured});
+        set_mcp_content_json(&mut mcp);
+        mcp
+    };
+    let cap = len_of(&mcp(bare.clone())) + 10;
+    for section in [transfers_section(40), check_not_run_section(false)] {
+        assert!(len_of(&mcp(with_section(section.clone()))) > cap);
+        let mut response = mcp(with_section(section));
+        enforce_mcp_result_byte_cap(&mut response, cap, "build_import_xml", 0).unwrap();
+        let structured = &response["structuredContent"];
+        assert!(
+            structured["result"].get("transfers").is_none(),
+            "{response}"
+        );
+        assert_eq!(structured["truncated"], true);
+        assert!(len_of(&response) <= cap);
+    }
+    // JSON-RPC: the same under result.structuredContent
+    let rpc = |structured: Value| {
+        let mut rpc = json!({"jsonrpc": "2.0", "id": 1, "result": {"content": [], "structuredContent": structured}});
+        set_mcp_content_json(&mut rpc["result"]);
+        rpc
+    };
+    let cap = len_of(&rpc(bare.clone())) + 11;
+    let mut response = rpc(with_section(transfers_section(40)));
+    enforce_jsonrpc_response_byte_cap(&mut response, cap).unwrap();
+    assert!(response["result"]["structuredContent"]["result"]
+        .get("transfers")
+        .is_none());
+    assert_eq!(response["result"]["structuredContent"]["truncated"], true);
+    // a result too large without the section still fails in both
+    let mut too_big = mcp(with_section(transfers_section(40)));
+    assert_eq!(
+        enforce_mcp_result_byte_cap(&mut too_big, 100, "build_import_xml", 0),
+        Err("agent_response_too_large".to_string())
+    );
+}

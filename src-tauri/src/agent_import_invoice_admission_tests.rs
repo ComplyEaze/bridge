@@ -1,22 +1,20 @@
-//! One Sales invoice admission run from its first request to its last against
-//! the scripted transport. Two scripted Tallys, each made of one book's
-//! answers, and never mixed:
+//! One Sales invoice admission, and one read-back, run from the first request
+//! to the last against the scripted transport, on one book's answers only:
+//! BRIDGE PILOT LAB (the `pilot-lab` set, captured on 9 Oct 2026; its
+//! PROVENANCE table is beside the fixtures). Every answer is Tally's own bytes.
 //!
-//! - BRIDGE PILOT LAB (the `pilot-lab` set, captured on 9 Oct 2026; its
-//!   PROVENANCE table is beside the fixtures) answers the admission tests:
-//!   the company list, the marks, the book extent, the currencies, the ledger
-//!   compliance listing, the paired listing, the groups, the voucher types,
-//!   the number read, the company's state and the ledger catalogue the
-//!   party's bill-wise flag comes from are Tally's own bytes, from the third
-//!   round and the invoice round (marks 16 and 223 in both). So is the number
-//!   read for a number the book uses, from the same day's second round (marks
-//!   15 and 223: between the rounds one voucher of another number was keyed,
-//!   and the voucher it finds reads the same alteration id in both); the lab
-//!   sent it as the number control's read, whose request is the same bytes.
-//! - BRIDGE GST RECON LAB answers the three read-back tests: the company list
-//!   and the marks from one read of that book (the `register-e2e` set), and
-//!   the read-back answers from the Sales rehearsal on the same book (the
-//!   `sales-rehearsal` set, 7 Oct 2026).
+//! - The admission: the company list, the marks, the book extent, the
+//!   currencies, the ledger compliance listing, the paired listing, the
+//!   groups, the voucher types, the number read, the company's state and the
+//!   ledger catalogue the party's bill-wise flag comes from, from the third
+//!   round and the invoice round before the post (marks 16 and 223 in both).
+//!   So is the number read for a number the book uses, from the same day's
+//!   second round (marks 15 and 223: between the rounds one voucher of
+//!   another number was keyed, and the voucher it finds reads the same
+//!   alteration id in both); the lab sent it as the number control's read,
+//!   whose request is the same bytes.
+//! - The read-back: the invoice round's marks after the post (17 and 223) and
+//!   its read-back of the posted invoice, before and after the post.
 use super::*;
 
 fn utf16(bytes: &[u8]) -> String {
@@ -172,6 +170,9 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-state.utf16le.xml"),
+        'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
+        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"),
+        'A' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     };
@@ -438,73 +439,40 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
     }
 }
 
-// ---- BRIDGE GST RECON LAB: the read-back ----
+// ---- BRIDGE PILOT LAB: the read-back ----
 
-const LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+/// What a read-back sends, in order: the marks read (6 requests), then the
+/// invoice by type and number (6). M is the marks after the post, R the
+/// read-back of `BP/26-27/0010` after the post; before it, m is the marks and A
+/// the same read-back (a complete envelope with no voucher).
+const READBACK_ORDER: &str = "eMsMseeRsRse";
+const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
+const LAB_R12_SHA256: &str = "dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7";
 
-fn company_list() -> String {
-    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml"))
-}
-
-/// One of the rehearsal's captured answers (the `sales-rehearsal` set).
-fn rehearsal(bytes: &[u8]) -> String {
-    utf16(bytes)
-}
-
-/// e company list, s status probe, m marks, N an answer with no voucher (the
-/// rehearsal's number read for a number no voucher carries), R the read-back
-/// of the rehearsal's posted invoice to the unregistered customer.
-fn plan(letter: char) -> ScenarioPlan {
-    let body = match letter {
-        's' => return status(),
-        'e' => company_list(),
-        'm' => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-marks.utf16le.xml")),
-        'N' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml")),
-        'R' => rehearsal(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml")),
-        other => panic!("unknown kind {other}"),
-    };
-    answer(body)
-}
-
-fn lab(plans: Vec<ScenarioPlan>) -> Lab {
-    server_over(plans, &company_list(), LAB_GUID)
-}
-
-/// One invoice to `party` under the voucher type `filed`, as a caller sends
-/// it or, with `observed`, as a build saved it for an unregistered customer.
-fn invoice_to(party: &str, filed: &str, observed: bool) -> ImportVoucher {
-    let mut voucher = json!({
-        "bridge_txn_id":"t1", "date":"20260310", "voucher_type":"Sales", "voucher_number":"TG/25-26/900",
-        "invoice":{"voucher_type_name":filed,"place_of_supply":"Rajasthan"},
-        "entries":[
-            {"ledger":party,"amount":"11800.00","side":"Dr"},
-            {"ledger":"Sales - Goods","amount":"10000.00","side":"Cr"},
-            {"ledger":"Output CGST","amount":"900.00","side":"Cr"},
-            {"ledger":"Output SGST","amount":"900.00","side":"Cr"}
-        ]
-    });
+/// The posted invoice the pilot lab's book took, as the build saved it.
+fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {
+    let mut saved = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    saved.voucher_number = Some(number.to_string());
     if observed {
-        voucher["invoice"]["observed"] = json!({
-            "voucher_type_guid": format!("{LAB_GUID}-00000106"),
-            "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-            "party_bill_wise":false, "company_state":"Rajasthan"
-        });
+        saved.invoice.as_mut().unwrap().observed =
+            Some(serde_json::from_value(pilot_observed()).unwrap());
     }
-    serde_json::from_value(voucher).unwrap()
+    saved
 }
 
-/// A posted invoice's read-back, on the GST RECON LAB's answers: the marks are read
-/// first (6 requests), then the invoice by type and number (6). An answer with
-/// no voucher in it (a captured empty collection) is a difference, never a
-/// pass, and so is a saved invoice with no observation, which sends nothing.
+/// A posted invoice's read-back, on the pilot lab's answers: the marks are
+/// read first (6 requests), then the invoice by type and number (6). The
+/// read-back's answer before the post (a captured collection with no voucher)
+/// is a difference, never a pass, and so is a saved invoice with no
+/// observation, which sends nothing.
 #[tokio::test]
 async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a_difference() {
     for (observed, difference, requests) in [
         (true, "invoice_not_found", 12),
         (false, "invoice_not_observed", 0),
     ] {
-        let lab = lab("emsmseeNsNse".chars().map(plan).collect());
-        let saved = invoice_to("Counter Sales - Unregistered", "Sales Manual", observed);
+        let lab = pilot_lab_over(READBACK_BEFORE_ORDER);
+        let saved = pilot_saved("BP/26-27/0010", observed);
         let (differences, alter_id, guid, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
@@ -512,52 +480,48 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, [difference]);
         assert_eq!((alter_id, guid), (None, None));
-        assert_eq!(sent(lab.simulator), requests, "{difference}");
+        let requests_sent = received(lab.simulator);
+        assert_eq!(requests_sent.len(), requests, "{difference}");
+        if observed {
+            assert_eq!(
+                sent_as(READBACK_BEFORE_ORDER, &requests_sent, 'A'),
+                [LAB_R12_SHA256; 2]
+            );
+        }
     }
 }
 
 /// The read-back's success path, through the server and on Tally's own bytes:
-/// the rehearsal's posted invoice to the unregistered customer, written here
-/// from its build plan, against the answer Tally gave to the read-back request
-/// after the post. No difference, and the voucher's own alter id and guid come
-/// back. The same answer against an invoice of another number differs in the number
-/// and in the reference the number gives.
+/// the invoice the pilot lab's book took, written here as the build saved it,
+/// against the answer Tally gave to the read-back request after the post. No
+/// difference, the voucher's own alter id and guid come back, and both sends
+/// of the read are the request the lab sent (`r12-invoice-readback.xml`, by
+/// sha256). The same answer against an invoice of another number (one the
+/// book was read not to hold on 12 Oct 2026) differs in the number and in the
+/// reference the number gives.
 #[tokio::test]
 async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_answer() {
-    let posted = |number: &str| -> ImportVoucher {
-        serde_json::from_value(json!({
-            "bridge_txn_id":"rehearsal", "date":"20260311", "voucher_type":"Sales", "voucher_number":number,
-            "invoice":{"voucher_type_name":"Sales Manual","place_of_supply":"Rajasthan","observed":{
-                "voucher_type_guid": format!("{LAB_GUID}-00000106"),
-                "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-                "party_bill_wise":false, "company_state":"Rajasthan"
-            }},
-            "entries":[
-                {"ledger":"TG Buyer Unregistered RJ","amount":"11800.00","side":"Dr"},
-                {"ledger":"Sales - Goods","amount":"10000.00","side":"Cr"},
-                {"ledger":"Output CGST","amount":"900.00","side":"Cr"},
-                {"ledger":"Output SGST","amount":"900.00","side":"Cr"}
-            ]
-        }))
-        .unwrap()
-    };
     for (number, expected) in [
-        ("TG/25-26/003", Vec::<&str>::new()),
-        ("TG/25-26/004", vec!["VOUCHERNUMBER", "REFERENCE"]),
+        ("BP/26-27/0010", Vec::<&str>::new()),
+        ("BP/26-27/0040", vec!["VOUCHERNUMBER", "REFERENCE"]),
     ] {
-        let lab = lab("emsmseeRsRse".chars().map(plan).collect());
+        let lab = pilot_lab_over(READBACK_ORDER);
         let (differences, alter_id, guid, _) = lab
             .server
-            .read_back_sales_invoice(&lab.identity, &lab.company, &posted(number))
+            .read_back_sales_invoice(&lab.identity, &lab.company, &pilot_saved(number, true))
             .await
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, expected, "{number}");
-        assert_eq!(alter_id.as_deref(), Some("65"), "{number}");
+        assert_eq!(alter_id.as_deref(), Some("17"), "{number}");
         assert_eq!(
             guid.as_deref(),
-            Some("ae1490be-52c5-4544-9ffc-4b7da85f9797-0000003f"),
+            Some("6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b"),
             "{number}"
         );
-        assert_eq!(sent(lab.simulator), 12, "{number}");
+        let requests = received(lab.simulator);
+        assert_eq!(requests.len(), 12, "{number}");
+        if number == "BP/26-27/0010" {
+            assert_eq!(sent_as(READBACK_ORDER, &requests, 'R'), [LAB_R12_SHA256; 2]);
+        }
     }
 }

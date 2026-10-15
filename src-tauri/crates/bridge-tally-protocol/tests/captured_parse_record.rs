@@ -2265,14 +2265,11 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
-const SALES_REHEARSAL: &str = "answers of the GST Sales rehearsal (7 Oct 2026), which no parser of \
-     this crate reads: the app crate's invoice code parses them (src/agent_import_invoice_wire.rs), \
-     and its tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
-     pin what each parse returns; sales-rehearsal/PROVENANCE.md says what each file is";
 const PILOT_LAB_ADMISSION: &str = "an answer of the pilot lab (9 Oct 2026), with no row here: \
-     the app crate's invoice admission tests (src/agent_import_invoice_admission_tests.rs, and for \
-     the voucher types and the number in use src/agent_import_invoice_wire_tests.rs) feed it through the admission's \
-     reads and pin what each parse returns; pilot-lab/PROVENANCE.md says what each file is";
+     the app crate's invoice tests (src/agent_import_invoice_admission_tests.rs through the server, \
+     src/agent_import_invoice_wire_tests.rs and src/agent_import_invoice_tests.rs on the parsers \
+     and the read-back comparison) pin what each parse returns; pilot-lab/PROVENANCE.md says what \
+     each file is";
 const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
      this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
      tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
@@ -2283,32 +2280,7 @@ const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tes
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
-    // The GST Sales rehearsal answers.
-    (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-absent.utf16le.xml",
-        SALES_REHEARSAL,
-    ),
-    (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml",
-        SALES_REHEARSAL,
-    ),
-    (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-shared.utf16le.xml",
-        SALES_REHEARSAL,
-    ),
-    (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml",
-        SALES_REHEARSAL,
-    ),
-    (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml",
-        SALES_REHEARSAL,
-    ),
-    (
-        "tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml",
-        SALES_REHEARSAL,
-    ),
-    // The pilot lab answers the invoice admission is scripted from.
+    // The pilot lab answers the invoice tests are made of.
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml",
         PILOT_LAB_ADMISSION,
@@ -2330,6 +2302,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_ADMISSION,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml",
         PILOT_LAB_ADMISSION,
     ),
@@ -2339,6 +2319,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml",
+        PILOT_LAB_ADMISSION,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml",
         PILOT_LAB_ADMISSION,
     ),
     (

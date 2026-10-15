@@ -418,21 +418,22 @@ not modelled, such as text, a reference or CDATA directly in the list; that list
 a date. An empty list, or `not_observed`, is not a statement that the item has no HSN
 code or no GST rate: a code keyed on the item's stock group did not appear on the
 items' lists (one synthetic book, one release), and the group's and the company's
-setting is not read. Tally adds an entry of its own (dated 1 April 2025, source
-`As per Company/Stock Group`, no code, no rate) when an item is first saved. `state_name` and
+setting is not read. Tally adds an entry of its own (source `As per Company/Stock Group`,
+no code, no rate, dated the book's first day: 1 April 2025 on the one book measured, no other book's
+date measured, so recognise it by its source) when an item is first saved. `state_name` and
 `valuation_type` carry the reserved-character marker (U+FFFD `#4;`) where Tally sends
 `Any` and `Not Applicable`. On one item `GSTINELIGIBLEITC` was Yes on the entry whose screen
 row read `Eligible for Input Tax Credit: No` and absent on the entry whose screen row read Yes,
 which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire), so a stock
 item row names it `ineligible_itc`, not `itc_eligible` (`ledger_masters` keeps its own key). What an
-absent element means for the tax is not known: null is neither eligible nor ineligible. A Tally `ERROR` or `LINEERROR`
+absent element means for the tax is not known: null is neither eligible nor ineligible. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld: `ineligible_itc` is null and `ineligible_itc_withheld` is `tally_default_entry`, because the Yes seen on such an entry was never compared with the screen (both screen readings are of rows a person edited or keyed, and a row's origin and its flag cannot be told apart on one item); a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is. A Tally `ERROR` or `LINEERROR`
 anywhere in a list, markup inside a value, or a list cut off refuses the whole read
 (`masters_tally_reported_failure`, `masters_scalar_not_text_only`,
 `masters_xml_invalid_escape`, `masters_row_unterminated`). The collection must carry
 `MSTDEPTYPE` 512 (a choice made like the cost collections', not a measurement: no
 zero-row stock-item answer was captured). Under `mask_parties` item names and parents are
-masked; HSN codes and rates are not names and are returned as sent, and so is an HSN description,
-which Tally fills from its tariff list and a person can edit, under every redaction setting.
+masked, and so is an HSN description, which Tally fills from its tariff list and a person can edit;
+HSN codes and rates are not names and are returned as sent.
 Measured on one synthetic book of TallyPrime 7.1 Silver (PARTIAL); a state row other than
 `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured (protocol
 reference §12a.19). A `groups` row carries `name`,
@@ -452,7 +453,7 @@ Godowns, units, stock groups, stock items, cost centres and cost categories are 
 mark (`ALTMSTID`) times an assumed worst-case row for that kind fits 16 MB. The
 mark counts the masters of every kind, so a book with few of this kind can be
 refused. That admits a mark of at most 1,152 for godowns, 1,168 for units,
-1,160 for stock groups, 489 for stock items (their row is allowed for several dated entries: a row is refused past 16,344 UTF-16 units, about seven further GST entries of the measured size, against 4,373 measured, whatever its state rows; a mark of 489 refuses, by arithmetic, both client books measured, not tried on them), 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
+1,160 for stock groups, 489 for stock items (their row is allowed for several dated entries: a row is refused past 16,344 UTF-16 units, about seven further GST entries of the measured size, against 4,373 measured, whatever its state rows; a limit of 489 refuses, by arithmetic, both client books measured, not tried on them), 1,037 for cost centres and 1,264 for cost categories; a larger book is refused before any collection request
 as `masters_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes`, and `limit_master_alter_id`, the largest mark this kind would be
 read at). Retrying refuses again. Both stock-heavy client books measured, with

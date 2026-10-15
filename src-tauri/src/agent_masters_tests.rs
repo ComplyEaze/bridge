@@ -344,12 +344,20 @@ fn the_tool_definition_admits_only_the_eight_kinds_and_states_the_size_limits() 
     // The kind's reach, its cut-off and what is unmeasured.
     assert!(description.contains("refused past 16,344 UTF-16 units"));
     assert!(description.contains(
-        "a mark of 489 refuses, by arithmetic, both client books measured, not tried on them"
+        "a limit of 489 refuses, by arithmetic, both client books measured, not tried on them"
     ));
     assert!(!description.contains("stock item count instead"));
     assert!(description.contains("a zero-row stock-item answer are not measured"));
     assert!(description.contains("such as text, a reference or CDATA directly in the list"));
-    assert!(description.contains("a person can edit, under every redaction setting"));
+    assert!(description.contains("is masked like an item name"));
+    assert!(!description.contains("under every redaction setting"));
+    assert!(description.contains("`ineligible_itc_withheld` is `tally_default_entry`"));
+    assert!(description.contains("so recognise it by its source"));
+    assert!(description.contains(
+        "a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is"
+    ));
+    assert!(!description.contains("; On an entry"));
+    assert!(!description.contains("dated 1 April 2025, source"));
     assert!(description.contains("`voucher_types` and `groups` have no size check"));
     assert!(
         !description.contains("for voucher types"),
@@ -1149,6 +1157,10 @@ async fn stock_items_read_end_to_end_with_their_lists_exactly_as_sent() {
     assert_eq!(gst[1]["ineligible_itc"], Value::Null);
     // Null is an emitted key, not a missing one.
     assert!(gst[1].as_object().unwrap().contains_key("ineligible_itc"));
+    // Rows a person keyed or edited are not Tally's own entries: nothing is withheld.
+    assert!(gst
+        .iter()
+        .all(|entry| entry.get("ineligible_itc_withheld").is_none()));
     // The ledger key is not on a stock item's entries.
     assert!(gst.iter().all(|entry| entry.get("itc_eligible").is_none()));
     let igst = |entry: &Value| entry["states"][0]["rates"][2].clone();
@@ -1212,10 +1224,21 @@ async fn an_item_without_entries_says_that_its_group_and_the_company_were_not_re
     assert!(mentions(
         "What an absent element means for the tax is not known"
     ));
+    assert!(mentions(
+        "ineligible_itc is null and ineligible_itc_withheld is `tally_default_entry`"
+    ));
+    assert!(mentions("recognise it by its source, not by that date"));
+    assert!(mentions(
+        "a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is"
+    ));
+    assert!(mentions(
+        "under mask_parties it is masked like an item name"
+    ));
+    assert!(!mentions("returned as sent under every redaction setting"));
     assert!(!mentions("not the screen's setting"));
     assert!(mentions("a zero-row stock-item answer"));
     assert!(mentions(
-        "so a mark of 489 refuses, by arithmetic, both client books measured"
+        "so a limit of 489 refuses, by arithmetic, both client books measured"
     ));
     assert!(!mentions("stock item count"));
     assert!(mentions("past 16,344 UTF-16 units"));
@@ -1242,13 +1265,32 @@ async fn the_entries_tally_adds_on_a_first_save_are_returned_as_they_are() {
     let gst = &item["gst"]["entries"][0];
     assert_eq!(gst["source"], "As per Company/Stock Group");
     assert_eq!(gst["taxability"], Value::Null);
-    assert_eq!(gst["ineligible_itc"], true);
+    // The Yes Tally sent on its own entry was never compared with the screen:
+    // it is not passed on, and the entry says why.
+    assert_eq!(gst["ineligible_itc"], Value::Null);
+    assert_eq!(gst["ineligible_itc_withheld"], "tally_default_entry");
     assert!(gst.get("itc_eligible").is_none());
     assert!(gst["states"][0]["rates"]
         .as_array()
         .unwrap()
         .iter()
         .all(|rate| rate["rate"] == json!({"kind": "absent"})));
+}
+
+#[tokio::test]
+async fn an_absent_flag_on_a_default_entry_stays_null_and_is_not_marked_as_withheld() {
+    // The same first-save capture with the credit element taken out of Tally's own entry:
+    // nothing was sent, so nothing is withheld.
+    let element = "<GSTINELIGIBLEITC TYPE=\"Logical\">Yes</GSTINELIGIBLEITC>\r\n      ";
+    let captured = capture("stock_items_created");
+    assert_eq!(captured.matches(element).count(), 1);
+    let one = OneServer::spawn(item_plans(captured.replace(element, "")));
+    let response = one.call(args("stock_items", 0, 500, None)).await;
+    let gst = &item_row(result(&response), ITEM)["gst"]["entries"][0];
+    assert_eq!(gst["source"], "As per Company/Stock Group");
+    assert!(gst.as_object().unwrap().contains_key("ineligible_itc"));
+    assert_eq!(gst["ineligible_itc"], Value::Null);
+    assert!(gst.get("ineligible_itc_withheld").is_none());
 }
 
 #[tokio::test]
@@ -1283,7 +1325,7 @@ async fn no_other_kind_carries_the_stock_item_keys() {
 }
 
 #[tokio::test]
-async fn item_names_and_parents_are_masked_and_codes_descriptions_and_rates_are_not() {
+async fn item_names_parents_and_hsn_descriptions_are_masked_and_codes_and_rates_are_not() {
     let one = OneServer::spawn_with(item_plans(capture("stock_items")), Redaction::MaskParties);
     let response = one.call(args("stock_items", 0, 500, None)).await;
     let page = result(&response);
@@ -1294,21 +1336,24 @@ async fn item_names_and_parents_are_masked_and_codes_descriptions_and_rates_are_
     }
     let masked = item_row(page, &mask(ITEM));
     assert_eq!(masked["parent"], json!(mask("Raw Chemicals")));
-    // HSN codes, descriptions, rates and the state row are not names and stay as sent.
-    for kept in [
-        "28362010",
-        "28362090",
-        "Disodium Carbonate, Dense",
-        "\"Other\"",
-        "\" 18\"",
-        "\" 2.50\"",
-    ] {
+    // HSN codes, rates and the state row are not names and stay as sent.
+    for kept in ["28362010", "28362090", "\" 18\"", "\" 2.50\""] {
         assert!(text.contains(kept), "{kept}");
     }
     assert_eq!(masked["hsn"]["entries"][0]["hsn_code"], "28362010");
+    // An HSN description is text a person can edit, so it is masked like a name.
+    assert!(!text.contains("Disodium Carbonate"));
+    assert_ne!(
+        mask("Disodium Carbonate, Dense"),
+        "Disodium Carbonate, Dense"
+    );
     assert_eq!(
         masked["hsn"]["entries"][0]["description"],
-        "Disodium Carbonate, Dense"
+        json!(mask("Disodium Carbonate, Dense"))
+    );
+    assert_eq!(
+        masked["hsn"]["entries"][1]["description"],
+        json!(mask("Other"))
     );
     assert!(page["limitations"]
         .as_array()

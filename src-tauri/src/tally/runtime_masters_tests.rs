@@ -621,7 +621,7 @@ async fn a_tally_error_inside_a_stock_item_list_is_refused_at_once() {
 #[tokio::test]
 async fn a_stock_item_row_with_too_many_real_entries_is_the_parsers_typed_refusal() {
     // Eight more copies of the item's real 22 September 2025 GST entry, each with
-    // a new valid date: the row passes the bound (16,344 UTF-16 units) and the
+    // a new valid date: the row exceeds the bound (16,344 UTF-16 units) and the
     // parser refuses it, at once and by its own code.
     let captured = capture(NativeMasterKind::StockItems);
     let marker =

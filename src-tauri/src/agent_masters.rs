@@ -143,12 +143,16 @@ impl Server {
 const STOCK_ITEM_LIMITATIONS: [&str; 7] = [
     "hsn and gst are the item's own dated lists as Tally sent them: entries sorted by applicable_from, each as sent, one observation per list (entries, unreadable with its defect, or not_observed when the row had no such list). Nothing chooses the code or the rate for a date, adds a rate up or fills in a value Tally did not send",
     "An empty list (entries: []) or a missing one (not_observed) is not a statement that the item has no HSN code or no GST rate: a code or rate set on the item's stock group or on the company is not on the item's list (measured: after a code was keyed on a stock group, its items' lists did not change), and that setting is not read here. Every row says so with inherited_from_group_or_company: not_read",
-    "Tally adds an HSN entry and a GST entry of its own, dated 1 Apr 2025 with source `As per Company/Stock Group` and no code or rate, when an item is first saved: such an entry says the item defers to its group or the company, not that a code or rate exists",
+    "Tally adds an HSN entry and a GST entry of its own, with source `As per Company/Stock Group`, no code or rate and, as its date, the book's first day (1 Apr 2025 on the one book measured; no other book's date is measured), when an item is first saved: recognise it by its source, not by that date; such an entry says the item defers to its group or the company, not that a code or rate exists",
     "state_name and valuation_type carry the reserved-character marker U+FFFD `#4;` where Tally sends its own `Any` and `Not Applicable`; a rate is absent, empty, zero or a value, never merged",
-    "ineligible_itc is Tally's GSTINELIGIBLEITC as sent: true for Yes, false for No, null when the element was absent, never filled in. On one item it was Yes on the entry whose screen row read `Eligible for Input Tax Credit: No`, and absent on the entry whose screen row read Yes, which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire). What an absent element means for the tax is not known: do not read null as eligible or as ineligible, and do not read true as eligible",
-    "A list with a defect (an undated entry, a repeated field, a rate that is not a plain decimal, two different entries on one date, or an entry holding only content that is not modelled, such as text, a reference or CDATA directly in the list) is returned as unreadable with its defect for that item's list only; a Tally ERROR, markup inside a value or a cut-off list refuses the whole read. HSN codes and rates are not names. An HSN description is filled by Tally from its tariff list and a person can edit it; it is returned as sent under every redaction setting",
-    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row), so a mark of 489 refuses, by arithmetic, both client books measured (marks of about 100,000 and 300,000; not tried on them); a larger book is refused as masters_too_large. An item row is refused as masters_row_exceeds_bound past 16,344 UTF-16 units (about seven further GST entries of the measured size), whatever its state rows",
+    "ineligible_itc is Tally's GSTINELIGIBLEITC as sent: true for Yes, false for No, null when the element was absent, never filled in. On one item it was Yes on the entry whose screen row read `Eligible for Input Tax Credit: No`, and absent on the entry whose screen row read Yes, which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire). What an absent element means for the tax is not known: do not read null as eligible or as ineligible, and do not read true as eligible. On an entry whose source is `As per Company/Stock Group` (the entry Tally adds itself on a first save; a person can also choose that source) a flag Tally sent is withheld: ineligible_itc is null and ineligible_itc_withheld is `tally_default_entry`, because the Yes seen on such an entry was never compared with the screen (both screen readings are of rows a person edited or keyed, and a row's origin and its flag cannot be told apart on one item); a flag Tally did not send stays null with no marker, and an entry with any other source is sent as it is",
+    "A list with a defect (an undated entry, a repeated field, a rate that is not a plain decimal, two different entries on one date, or an entry holding only content that is not modelled, such as text, a reference or CDATA directly in the list) is returned as unreadable with its defect for that item's list only; a Tally ERROR, markup inside a value or a cut-off list refuses the whole read. HSN codes and rates are not names. An HSN description is filled by Tally from its tariff list and a person can edit it, so under mask_parties it is masked like an item name",
+    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row), so a limit of 489 refuses, by arithmetic, both client books measured (marks of about 100,000 and 300,000; not tried on them); a larger book is refused as masters_too_large. An item row is refused as masters_row_exceeds_bound past 16,344 UTF-16 units (about seven further GST entries of the measured size), whatever its state rows",
 ];
+
+/// The `source` Tally gives the HSN and GST entries it adds itself when an
+/// item is first saved: the entry defers to the item's group or the company.
+const TALLY_OWN_ENTRY_SOURCE: &str = "As per Company/Stock Group";
 
 /// A stock item's GST observation under the key Tally's element means. The
 /// shared entry type serialises Tally's `GSTINELIGIBLEITC` as `itc_eligible`,
@@ -157,18 +161,48 @@ const STOCK_ITEM_LIMITATIONS: [&str; 7] = [
 /// out as `ineligible_itc` with the same value, `true`, `false` or `null` and
 /// never a default. The ledger output is not changed: two keys for one Tally
 /// element is deliberate until the ledger key is rectified (tracked in #1741).
+///
+/// On an entry whose source is Tally's own the flag is not sent on: the Yes seen there
+/// was never compared with the screen (both screen readings are of rows a
+/// person edited or keyed), so it goes out as `null` with
+/// `ineligible_itc_withheld: tally_default_entry`.
 fn stock_item_gst_json(gst: &GstDetailsObservation) -> Value {
     let mut value = json!(gst);
     if let Some(entries) = value.get_mut("entries").and_then(Value::as_array_mut) {
         for entry in entries {
             if let Some(object) = entry.as_object_mut() {
+                let own =
+                    object.get("source").and_then(Value::as_str) == Some(TALLY_OWN_ENTRY_SOURCE);
                 if let Some(flag) = object.remove("itc_eligible") {
-                    object.insert("ineligible_itc".to_string(), flag);
+                    let withhold = own && !flag.is_null();
+                    object.insert(
+                        "ineligible_itc".to_string(),
+                        if withhold { Value::Null } else { flag },
+                    );
+                    if withhold {
+                        object.insert(
+                            "ineligible_itc_withheld".to_string(),
+                            json!("tally_default_entry"),
+                        );
+                    }
                 }
             }
         }
     }
     value
+}
+
+/// Masks the description of every HSN entry: Tally fills it from its tariff
+/// list, but a person can edit it, so it can carry a party's name.
+fn mark_hsn_descriptions(hsn: &mut Value) {
+    if let Some(entries) = hsn.get_mut("entries").and_then(Value::as_array_mut) {
+        for entry in entries {
+            // A null description keeps its key: only a text one is marked.
+            if entry.get("description").is_some_and(Value::is_string) {
+                mark_party_field(entry, "description");
+            }
+        }
+    }
 }
 
 /// Whether `mask_parties` masks this kind's names and parents. Godown,
@@ -239,6 +273,9 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
             // The key is on every row: an empty list is the item's own and says
             // nothing about its stock group or the company.
             json["hsn"] = json!(hsn);
+            if mark_party_text {
+                mark_hsn_descriptions(&mut json["hsn"]);
+            }
             json["gst"] = stock_item_gst_json(gst);
             json["inherited_from_group_or_company"] = json!("not_read");
         }

@@ -49,6 +49,45 @@ pub(crate) fn default_dispatch_coordination_dir() -> Option<PathBuf> {
     }
 }
 
+/// Every root a dispatch, snapshot or wire lock is taken under, in the order
+/// it is taken; `None` when one cannot be resolved, which refuses every lock.
+///
+/// On Windows a packaged process (Claude Desktop's extension) writes new files
+/// under AppData into its package's private folder, so it and an unpackaged
+/// ComplyEaze Bridge process can each hold "the" lock in a different folder
+/// (#1584). Each lock is therefore also taken under the user's profile, which
+/// is not redirected, and still under AppData first, which an earlier build on
+/// the same side of the package boundary takes alone. Elsewhere there is one.
+pub(crate) fn dispatch_coordination_roots() -> Option<Vec<PathBuf>> {
+    coordination_roots().into_iter().collect()
+}
+
+/// Each coordination root, in order, as far as it resolves: for a report that
+/// lists the lock folders, where one that does not resolve hides no other.
+pub(crate) fn coordination_roots() -> Vec<Option<PathBuf>> {
+    #[cfg(windows)]
+    {
+        vec![
+            default_dispatch_coordination_dir(),
+            profile_coordination_dir(windows_known_folder(
+                &windows_sys::Win32::UI::Shell::FOLDERID_Profile,
+            )),
+        ]
+    }
+    #[cfg(not(windows))]
+    {
+        vec![default_dispatch_coordination_dir()]
+    }
+}
+
+/// The coordination root under the user's profile folder.
+#[cfg(any(windows, test))]
+pub(super) fn profile_coordination_dir(profile: Option<PathBuf>) -> Option<PathBuf> {
+    profile
+        .filter(|path| path.is_absolute())
+        .map(|path| path.join(".complyeaze-bridge").join("coordination"))
+}
+
 #[cfg(target_os = "macos")]
 fn macos_coordination_dir(account_home: Option<PathBuf>) -> Option<PathBuf> {
     account_home.filter(|path| path.is_absolute()).map(|home| {
@@ -106,15 +145,18 @@ pub(super) fn stable_coordination_dir(os_data_dir: Option<PathBuf>) -> Option<Pa
 
 #[cfg(windows)]
 pub(super) fn windows_local_app_data_dir() -> Option<PathBuf> {
+    windows_known_folder(&windows_sys::Win32::UI::Shell::FOLDERID_LocalAppData)
+}
+
+#[cfg(windows)]
+fn windows_known_folder(folder: &windows_sys::core::GUID) -> Option<PathBuf> {
     use std::ffi::OsString;
     use std::os::windows::ffi::OsStringExt;
     use std::ptr;
     use std::slice;
     use windows_sys::Win32::Foundation::S_OK;
     use windows_sys::Win32::System::Com::CoTaskMemFree;
-    use windows_sys::Win32::UI::Shell::{
-        FOLDERID_LocalAppData, SHGetKnownFolderPath, KF_FLAG_DONT_VERIFY,
-    };
+    use windows_sys::Win32::UI::Shell::{SHGetKnownFolderPath, KF_FLAG_DONT_VERIFY};
 
     unsafe extern "C" {
         fn wcslen(value: *const u16) -> usize;
@@ -125,7 +167,7 @@ pub(super) fn windows_local_app_data_dir() -> Option<PathBuf> {
     // nul-terminated UTF-16 string on success. It accepts a null current-user token.
     let result = unsafe {
         SHGetKnownFolderPath(
-            &FOLDERID_LocalAppData,
+            folder,
             KF_FLAG_DONT_VERIFY as u32,
             ptr::null_mut(),
             &mut raw_path,

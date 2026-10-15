@@ -22,8 +22,10 @@ const PLAN_DEADLINE: Duration = Duration::from_secs(30);
 const REQUEST_READ_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
-/// six per paired read, plus the identity and ledger legs around them.
-pub const MAX_SEQUENCE_REQUESTS: usize = 128;
+/// six per paired read, plus the identity and ledger legs around them. A post
+/// held across two calls and then sent is about 170: each pass reads its voucher
+/// numbering before the approval (bridge#724).
+pub const MAX_SEQUENCE_REQUESTS: usize = 192;
 
 /// The payload of the `TimedOut` error returned when no request reached a plan
 /// within the accept deadline: `plan` is its zero-based place in a sequence of

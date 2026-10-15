@@ -13,6 +13,7 @@ merge operation is used.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -22,6 +23,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +61,10 @@ real={real}
 if [ "${GATE_SCENARIO:-}" = "scan-input-write-failure" ] && [ "$1" = "-d" ]; then
   dir=$("$real" -d)
   mkdir "$dir/privacy-scan-input"
+  printf '%s\\n' "$dir"
+elif [ "${GATE_SCENARIO:-}" = "manifest-write-failure" ] && [ "$1" = "-d" ]; then
+  dir=$("$real" -d)
+  mkdir "$dir/synthetic-uuid-manifest.json"
   printf '%s\\n' "$dir"
 else
   exec "$real" "$@"
@@ -102,6 +108,39 @@ class MergeGateControls(unittest.TestCase):
     def git_in_repo(cls, *args):
         subprocess.run(["git", "-C", str(cls.repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", *args],
                        check=True, capture_output=True)
+
+    @classmethod
+    @contextlib.contextmanager
+    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None):
+        """Put files on the throwaway origin/master (and in the gate's checkout), then put it back.
+
+        tracked: path -> text, committed. symlinks: path -> target, committed as links. ignored: path -> text, written
+        into the checkout only, with a committed .gitignore naming it (git status does not show it). hidden_edits: path -> text
+        written over a tracked file in the checkout and hidden from git with skip-worktree (git diff and git status do not show it).
+        """
+        base = subprocess.run(["git", "-C", str(cls.repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+        try:
+            for path, text in (tracked or {}).items():
+                (cls.repo / path).write_text(text)
+            for path, target in (symlinks or {}).items():
+                os.symlink(target, cls.repo / path)
+            if ignored:
+                (cls.repo / ".gitignore").write_text("".join(path + "\n" for path in ignored))
+            cls.git_in_repo("add", "-A")
+            cls.git_in_repo("commit", "-q", "-m", "state")
+            for path, text in (ignored or {}).items():
+                (cls.repo / path).write_text(text)
+            cls.git_in_repo("push", "-q", "-f", "origin", "master")
+            for path, text in (hidden_edits or {}).items():
+                cls.git_in_repo("update-index", "--skip-worktree", path)
+                (cls.repo / path).write_text(text)
+            yield
+        finally:
+            for path in (hidden_edits or {}):
+                cls.git_in_repo("update-index", "--no-skip-worktree", path)
+            cls.git_in_repo("reset", "-q", "--hard", base)
+            cls.git_in_repo("clean", "-fdxq")
+            cls.git_in_repo("push", "-q", "-f", "origin", "master")
 
     @classmethod
     def tearDownClass(cls):
@@ -487,7 +526,98 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("privacy-credential-blocker", "literal credential, bearer, or API token value")
 
     def test_unknown_uuid_is_indeterminate(self):
-        self.assert_indeterminate("privacy-uuid-indeterminate", "without exact current-head fixture provenance")
+        result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+        self.assertNotIn("synthetic-UUID registry:", result.stdout)
+
+    # -- The synthetic-UUID registry: scripts/merge-gate-synthetic-uuids.json on master -----------------------------------
+    REGISTRY_PATH = "scripts/merge-gate-synthetic-uuids.json"
+    LISTED = "11111111-2222-3333-4444-555555555555"
+
+    def registry(self, *uuids, **override):
+        document = {"schema_version": 1, "entries": [{"uuid": value, "note": "a synthetic test value"} for value in uuids]}
+        document.update(override)
+        return json.dumps(document)
+
+    def test_a_listed_uuid_no_longer_makes_the_gate_indeterminate(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_pass("privacy-uuid-indeterminate", "synthetic-UUID registry: 1 listed value(s) applied")
+
+    def test_an_unlisted_uuid_still_does_in_the_same_pull_request(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("privacy-two-uuids", "privacy scan found 1 non-nil UUID shape(s) not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry: 1 listed value(s) applied", result.stdout)
+
+    def test_a_listed_uuid_in_credential_context_still_blocks(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_blocked("privacy-uuid-credential-context", "in credential, session, token, or bearer context")
+
+    def test_a_listed_uuid_is_not_reported_as_a_hit_when_something_else_trips_the_scan(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_blocked("privacy-uuid-and-digit-run", "unexplained long digit run")
+        self.assertIn("at docs/example.md:2: privacy scan found 0 identifier shape(s) and 1 unexplained long digit run(s)", result.stdout)
+        self.assertNotIn("docs/example.md:1:", result.stdout)
+
+    def test_an_invalid_registry_is_not_applied_and_says_so(self):
+        entries = lambda *items: json.dumps({"schema_version": 1, "entries": list(items)})
+        good = {"uuid": self.LISTED, "note": "a synthetic test value"}
+        for name, text in (
+            ("not json", "{"),
+            ("wrong schema version", self.registry(self.LISTED, schema_version=2)),
+            ("an extra top-level key", self.registry(self.LISTED, extra=1)),
+            ("entries not a list", json.dumps({"schema_version": 1, "entries": {}})),
+            ("a duplicate", entries(good, good)),
+            ("an upper-case value", entries({"uuid": "AAAAAAAA-2222-3333-4444-555555555555", "note": "n"})),
+            ("the nil value", entries({"uuid": "00000000-0000-0000-0000-000000000000", "note": "n"})),
+            ("a trailing newline in the value", entries({"uuid": self.LISTED + "\n", "note": "n"})),
+            ("a missing note", entries({"uuid": self.LISTED})),
+            ("an empty note", entries({"uuid": self.LISTED, "note": " "})),
+            ("an extra entry key", entries({"uuid": self.LISTED, "note": "n", "kind": "x"})),
+            ("more than 500 entries", entries(*[{"uuid": "%08x-2222-3333-4444-555555555555" % number, "note": "n"} for number in range(501)])),
+        ):
+            with self.subTest(case=name), self.master_state(tracked={self.REGISTRY_PATH: text}):
+                result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+                self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_registry_that_is_a_symbolic_link_is_not_applied(self):
+        with self.master_state(tracked={"scripts/real-registry.json": self.registry(self.LISTED)}, symlinks={self.REGISTRY_PATH: "real-registry.json"}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_registry_that_is_only_valid_once_a_nul_byte_is_dropped_is_not_applied(self):
+        # bash drops a NUL byte when a command's output is captured into a variable, so the check reads the bytes through a pipe.
+        text = self.registry(self.LISTED).replace("a synthetic test value", "a synthetic\0 test value")
+        self.assertIn("\0", text)
+        with self.master_state(tracked={self.REGISTRY_PATH: text}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied: it is not valid", result.stdout)
+
+    def test_the_registry_on_master_is_used_not_a_different_file_in_the_checkout(self):
+        # skip-worktree hides a local edit from git diff and git status, so the gate's own-tree check passes with it present.
+        other = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(other)},
+                               hidden_edits={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry: 1 listed value(s) applied", result.stdout)
+
+    def test_a_link_whose_target_text_is_itself_a_valid_registry_is_not_applied(self):
+        # A link's content is its target path. Without the regular-file check that text would be read as the registry.
+        text = self.registry(self.LISTED)
+        with self.master_state(symlinks={self.REGISTRY_PATH: text}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied: it is not a regular file", result.stdout)
+
+    def test_a_registry_file_only_in_the_checkout_is_not_read(self):
+        # An ignored file is invisible to git status, so the gate's own-tree check passes with it present; the registry
+        # is read from master's ref, not from the checkout.
+        with self.master_state(ignored={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+
+    def test_a_manifest_that_cannot_be_written_is_not_passed_to_the_scan(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("manifest-write-failure", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied", result.stdout)
+            # The scan was not handed an unwritten list: it did not try to read one.
+            self.assertNotIn("could not read exact current-head fixture UUID provenance", result.stdout)
 
     def test_binary_addition_without_attestation_blocks_and_names_the_path(self):
         result = self.assert_blocked("binary-missing-attestation", "require the owner's own --binary-review-sha attestation")
@@ -555,7 +685,8 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("owner-commit-comment-with-a-token", self.VERDICT_BLOCK)
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
-        for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away"):
+        for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
+                         "changes-the-registry", "changes-the-registry-in-another-case"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 
@@ -1319,6 +1450,147 @@ class MergeVerdictEvaluator(unittest.TestCase):
 
     def test_the_owner_id_is_the_numeric_id_of_the_owner_account(self):
         self.assertEqual(self.mod.OWNER_ID, 57982425)
+
+
+class PrivacyScanDecodesUtf16(unittest.TestCase):
+    """A value in text written in UTF-16 is spaced out by NUL bytes, which hides it from
+    every pattern, so a caller that hands the classifier the raw bytes must still
+    get it read as the text it stands for. Digits are synthetic and built from
+    parts: this file is scanned by the gate it tests."""
+
+    RUN = "12345" + "678901"
+    LINE = "Account reference: " + RUN + "\n"
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def utf8_view(self, raw):
+        """What a reader that assumes UTF-8 sees: NUL is a valid UTF-8 character."""
+        return raw.decode("utf-8")
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def run_main(self, raw, locale="C"):
+        # A stream is decoded by the process locale unless the reader decodes the bytes itself.
+        done = subprocess.run(
+            ["python3", "-I", str(PRIVACY_MODULE_PATH), "--head", HEAD],
+            input=raw, capture_output=True, env=dict(os.environ, LC_ALL=locale, LANG=locale),
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout)
+
+    def test_a_long_digit_run_in_utf16le_without_a_bom_is_blocked(self):
+        text = self.utf8_view(self.LINE.encode("utf-16-le"))
+        self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_a_long_digit_run_in_utf16be_without_a_bom_is_blocked(self):
+        text = self.utf8_view(self.LINE.encode("utf-16-be"))
+        self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_a_utf16_segment_among_utf8_lines_is_decoded_and_the_rest_is_untouched(self):
+        raw = b"title line\n+" + self.LINE.encode("utf-16-le") + b"+" + b"plain line\n"
+        record = self.privacy.scan(self.utf8_view(raw), HEAD)
+        self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+        self.assertTrue(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_value_that_is_the_whole_text_loses_no_character_to_the_decoding(self):
+        # The run starts at the first digit and ends at the last: dropping either one leaves ten.
+        for codec in ("utf-16-le", "utf-16-be"):
+            with self.subTest(codec=codec):
+                text = self.utf8_view(self.RUN.encode(codec))
+                self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_digits_outside_ascii_after_a_byte_order_mark_are_decoded_whole(self):
+        # Python reads these as digits too; each code unit has no NUL beside it, so only the mark finds them.
+        digits = "".join(chr(0x0966 + int(c)) for c in "123456789012")
+        for codec, bom in (("utf-16-le", b"\xff\xfe"), ("utf-16-be", b"\xfe\xff")):
+            with self.subTest(codec=codec):
+                record = self.run_main(bom + digits.encode(codec))
+                self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+
+    def test_a_short_run_next_to_plain_digits_is_joined_to_them_on_either_side(self):
+        # Each side of the NUL is needed: dropping one leaves the run undecoded and the digits split.
+        # The digits are chosen so that neither half alone is an identifier shape or a long run.
+        for raw in ("123456789".encode() + "01".encode("utf-16-le"), "01".encode("utf-16-be") + "987654321".encode()):
+            with self.subTest(raw=raw):
+                self.assertTrue(any("long digit run" in b for b in self.blockers(self.utf8_view(raw))))
+
+    def test_latin_1_letters_beside_nul_bytes_are_not_read_as_utf16(self):
+        # Valid UTF-16 text never reaches the scan this way: a code unit above 0x7f is not valid UTF-8 beside a NUL.
+        record = self.privacy.scan("\u00e9\x00\u00e9\x00\u00e9\x00", HEAD)
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_decoding_a_run_never_hides_a_number_the_original_text_shows(self):
+        # The decoded run is "ab", a word that now touches the digits and removes the boundary the
+        # patterns need before a grouped number; the original, with its NULs, still has the boundary.
+        run = "a\x00b\x00"
+        for number in ("1234-5678-9012", "011-2345-6789", "022 23456789"):
+            with self.subTest(number=number):
+                text = run + number
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], text)
+
+    def test_text_that_has_a_nul_run_is_blocked_whenever_the_same_text_without_decoding_is(self):
+        import random
+        random.seed(20261015)
+        parts = ["a\x00b\x00", "\x00x\x00y", " ", "-", "1234-5678-9012", "011-2345-6789", "022 23456789",
+                 "98765" + "43210", "12345" + "678901", "(", ")", "ab", "x" + "@" + "example.com", "C" + ":", "/Us" + "ers/", "z"]
+        original_only = mock.patch.object(self.privacy, "decode_utf16_runs", lambda text: (text, 0))
+        checked = 0
+        for _ in range(3000):
+            text = "".join(random.choice(parts) for _ in range(random.randint(1, 6)))
+            if "\x00" not in text:
+                continue
+            with original_only:
+                before = bool(self.privacy.scan(text, HEAD)["blockers"])
+            if before:
+                checked += 1
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], repr(text))
+        self.assertGreater(checked, 100, "the generator must reach inputs the original reading blocks")
+
+    def test_a_mark_never_hides_what_the_utf8_reading_shows(self):
+        digits = self.RUN + "\n"
+        for name, raw in (
+            ("utf-8 digits after a utf-16 file", b"\xff\xfe" + "hello\n".encode("utf-16-le") + digits.encode()),
+            ("plain digits after a bare mark", b"\xff\xfe" + digits.encode()),
+            ("big-endian mark over little-endian body", b"\xfe\xff" + digits.encode("utf-16-le")),
+            ("two marked files", b"\xff\xfe" + "ab\n".encode("utf-16-le") + b"\xfe\xff" + digits.encode("utf-16-be")),
+        ):
+            with self.subTest(name=name):
+                record = self.run_main(raw)
+                self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+
+    def test_harmless_utf16_text_is_not_blocked_and_is_noted(self):
+        text = self.utf8_view("Release notes for the build.\n".encode("utf-16-le"))
+        record = self.privacy.scan(text, HEAD)
+        self.assertEqual(record["blockers"], [], record)
+        self.assertTrue(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_text_without_nul_bytes_is_scanned_exactly_as_before(self):
+        record = self.privacy.scan("Release notes for the build.\n", HEAD)
+        self.assertEqual(record["blockers"], [])
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_single_stray_nul_is_not_read_as_utf16(self):
+        record = self.privacy.scan("a\x00b and nothing else\n", HEAD)
+        self.assertEqual(record["blockers"], [])
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_located_line_in_utf16_is_reported_by_location_without_its_value(self):
+        document = {"sources": [], "added": [{"path": "docs/example.md", "line": 5,
+                    "text": self.utf8_view(self.LINE.encode("utf-16-le"))}]}
+        result = self.privacy.explain(document, HEAD)
+        self.assertEqual([h["where"] for h in result["hits"]], ["docs/example.md:5"])
+        self.assertNotIn(self.RUN, json.dumps(result))
+
+    def test_bytes_that_are_not_utf8_are_indeterminate_whatever_the_locale(self):
+        unreadable = ["could not read privacy scan input"]
+        for locale in ("C", "en_US.UTF-8"):
+            for raw in (b"\x80\x81 not text", b"\xff\xfe" + b"abc"):
+                with self.subTest(locale=locale, raw=raw):
+                    record = self.run_main(raw, locale)
+                    self.assertEqual(record["indeterminate"], unreadable)
+                    self.assertEqual(record["blockers"], [])
 
 
 if __name__ == "__main__":

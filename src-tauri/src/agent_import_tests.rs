@@ -2039,7 +2039,7 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
     assert_eq!(eleven.chars().count(), 11);
     assert_eq!(eleven.len(), 33);
     let mut input = captured_catalogue_payload();
-    for number in [eleven, "क".repeat(32), "A".repeat(32)] {
+    for number in [eleven, "क".repeat(32), "A".repeat(32), "PV 1".to_string()] {
         input.vouchers[0].voucher_number = Some(number);
         assert_eq!(payload_verdict(&input), Ok(()));
     }
@@ -2047,6 +2047,10 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
         ("क".repeat(33), "voucher_number_invalid"),
         ("A".repeat(33), "voucher_number_invalid"),
         ("bad$number".into(), "voucher_number_invalid"),
+        ("PV-1 ".into(), "voucher_number_invalid"),
+        (" PV-1".into(), "voucher_number_invalid"),
+        ("PV-1\u{a0}".into(), "voucher_number_invalid"),
+        (" ".into(), "voucher_number_invalid"),
         ("bad\nnumber".into(), "voucher_text_invalid"),
         ("bad\u{007f}number".into(), "voucher_text_invalid"),
         (String::new(), "voucher_text_invalid"),
@@ -2054,6 +2058,45 @@ fn voucher_number_length_counts_unicode_characters_and_preserves_safety_checks()
         input.vouchers[0].voucher_number = Some(number);
         assert_eq!(payload_verdict(&input), Err(code.to_string()));
     }
+}
+
+#[test]
+fn a_number_read_back_without_its_end_space_is_a_voucher_number_diff() {
+    // Tally read a Journal numbered "M9P-S1 " back as "M9P-S1" (§9.8,
+    // 2026-10-15). Verification compares the number verbatim, so such a
+    // voucher reads as diverged even when Tally created it as sent: the
+    // reason a carried number with an end space is refused before any file.
+    let mut expected = admitted_payload().vouchers[0].clone();
+    expected.voucher_type = VoucherType::Journal;
+    expected.narration = None;
+    expected.voucher_number = Some("PV-1 ".into());
+    let read = |number: &str| ReadVoucher {
+        remote_id: None,
+        guid: Some("synthetic-guid-1".into()),
+        master_id: None,
+        alter_id: Some(11),
+        date: expected.date.clone(),
+        voucher_type: Some("Journal".into()),
+        narration: None,
+        voucher_number: Some(number.into()),
+        cancelled: Some(false),
+        optional: Some(false),
+        effective_date: None,
+        entries: Vec::new(),
+    };
+    let diffs = |number: &str| {
+        verification::voucher_diffs(
+            &expected,
+            &read(number),
+            true,
+            verification::WrittenNarration::Untagged,
+        )
+    };
+    assert!(
+        diffs("PV-1 ").is_empty(),
+        "read back as sent, nothing differs"
+    );
+    assert_eq!(diffs("PV-1"), vec![json!("voucher_number")]);
 }
 
 #[test]

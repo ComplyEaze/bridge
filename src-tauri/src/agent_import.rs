@@ -1660,7 +1660,23 @@ impl Server {
                         verification::mark_sent_after_reported_not_created(&mut result)
                     }
                     verification::UnmatchedCause::NotEstablished => {
-                        verification::mark_sent_not_attributed(&mut result)
+                        // An answer on record that was not clean (one that
+                        // did not parse included, as the post itself reads
+                        // it) makes an edit in Tally no likelier than a
+                        // voucher Tally did not create, so its line drops the
+                        // edit example (bridge#1108). With no answer on
+                        // record, or a clean one, the line is unchanged.
+                        let unclean = dispatch_response.as_ref().is_some_and(|response| {
+                            !post::import_outcome_is_clean(
+                                response.outcome.as_ref(),
+                                line.vouchers.len(),
+                            )
+                        });
+                        if unclean {
+                            verification::mark_sent_not_attributed_after_unclean_answer(&mut result)
+                        } else {
+                            verification::mark_sent_not_attributed(&mut result)
+                        }
                     }
                 }
             }
@@ -3026,11 +3042,12 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
                 return Err("voucher_text_invalid".to_string());
             }
         }
-        if voucher
-            .voucher_number
-            .as_deref()
-            .is_some_and(|number| number.chars().count() > 32 || number.contains('$'))
-        {
+        if voucher.voucher_number.as_deref().is_some_and(|number| {
+            // Tally read back a number sent with a space at its end
+            // without it (§9.8, 2026-10-15), so it could never verify as
+            // posted; white space at the start is refused too, unmeasured.
+            number.chars().count() > 32 || number.contains('$') || number.trim() != number
+        }) {
             return Err("voucher_number_invalid".to_string());
         }
         for entry in &voucher.entries {

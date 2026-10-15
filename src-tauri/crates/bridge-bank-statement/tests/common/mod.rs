@@ -8,6 +8,31 @@
 //! Refusals are asserted by category, never by "some error happened".
 #![allow(dead_code)]
 
+/// Synthetic reference digits, built at run time from a visible pattern so no
+/// test source carries a long digit run: `rep('1', 12)` is twelve ones,
+/// `padn(417, 16)` is 417 behind zeros to width 16, `p6(3, 12)` is a 6, zeros and
+/// a 3 to width 12, and `grp` puts a space after every four characters.
+pub fn rep(digit: char, width: usize) -> String {
+    digit.to_string().repeat(width)
+}
+
+pub fn padn(n: u64, width: usize) -> String {
+    format!("{n:0>width$}")
+}
+
+pub fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
+pub fn grp(digits: &str) -> String {
+    digits
+        .as_bytes()
+        .chunks(4)
+        .map(|chunk| std::str::from_utf8(chunk).expect("ascii digits"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 use bridge_bank_statement::bbox::read_pages;
 use bridge_bank_statement::geometry::{Page, Word};
 use bridge_bank_statement::parse::Row;

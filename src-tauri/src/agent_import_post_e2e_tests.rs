@@ -5484,6 +5484,13 @@ async fn a_batch_that_lands_partly_is_never_verified_and_shows_which_rows_landed
         "sent_not_attributed",
         "{posted}"
     );
+    // Tally's own answer reported an exception, so the line does not suggest
+    // an edit in Tally, and names no cause (bridge#1108).
+    assert_eq!(
+        voucher("partial-2")["next_step"],
+        "This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now. Check in Tally before posting it again.",
+        "{posted}"
+    );
     let verdicts = String::from_utf8(journal(directory.path()))
         .unwrap()
         .lines()
@@ -5530,6 +5537,27 @@ async fn post_batch_rejected(answer: String, after_mark: u64) -> Value {
         .await;
     assert_eq!(sent(simulator).len(), expected_requests, "{posted}");
     posted
+}
+
+/// A post whose answer from Tally does not parse is not clean, as the post
+/// reads it: its vouchers' line drops the edit example too (bridge#1108).
+#[tokio::test]
+async fn a_post_whose_answer_does_not_parse_drops_the_edit_example() {
+    let posted = post_batch_rejected("not an import answer".to_string(), 10).await;
+    let result = &posted["structuredContent"]["result"];
+    assert_eq!(
+        result["dispatch"]["response_state"], "response_not_clean",
+        "{posted}"
+    );
+    assert_eq!(result["counts"]["sent_not_attributed"], 3, "{posted}");
+    let steps = result["vouchers"]
+        .as_array()
+        .expect("the result lists its vouchers")
+        .iter()
+        .map(|voucher| voucher["next_step"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{posted}");
 }
 
 #[tokio::test]
@@ -5689,7 +5717,8 @@ async fn a_batch_rejected_whole_verified_later_says_what_tally_reported_of_each_
 /// The same batch when the voucher mark moved by one across the post (the
 /// later check reads the mark where the post left it): the post claimed
 /// nothing about any voucher, and a later check claims nothing either. Each
-/// voucher keeps the line that says to check in Tally.
+/// voucher keeps the line that says to check in Tally, without the edit
+/// example, because the saved answer was not clean.
 #[tokio::test]
 async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_check() {
     let later =
@@ -5697,8 +5726,9 @@ async fn a_batch_rejected_whole_whose_mark_moved_is_not_described_by_a_later_che
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
     let (steps, summary) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain; 3], "{later}");
+    // The saved answer was not clean, so the line drops the edit example.
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{later}");
     assert_eq!(summary, LATER_SUMMARY, "{later}");
 }
 
@@ -5712,13 +5742,15 @@ async fn a_batch_rejected_whole_with_no_step_record_is_not_described_by_a_later_
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 3, "{later}");
     let (steps, _) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain; 3], "{later}");
+    // The saved answer was not clean, so the line drops the edit example.
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean; 3], "{later}");
 }
 
 /// A batch that landed partly, checked again later: the voucher that is not
-/// found keeps the line that says to check in Tally. A count does not say
-/// which voucher Tally rejected.
+/// found keeps the line that says to check in Tally, without the edit example
+/// (the saved answer was not clean). A count does not say which voucher Tally
+/// rejected.
 #[tokio::test]
 async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
     let later =
@@ -5726,8 +5758,8 @@ async fn a_partly_created_batch_verified_later_keeps_the_earlier_line() {
     let result = &later["structuredContent"]["result"];
     assert_eq!(result["counts"]["sent_not_attributed"], 1, "{later}");
     let (steps, _) = later_next_steps(&later);
-    let plain = super::super::verification::plain_next_step("sent_not_attributed").unwrap();
-    assert_eq!(steps, [plain], "{later}");
+    let unclean = super::super::verification::SENT_NOT_ATTRIBUTED_AFTER_UNCLEAN_ANSWER_NEXT_STEP;
+    assert_eq!(steps, [unclean], "{later}");
 }
 
 /// The same answer with the voucher mark moved by one across the post: Tally

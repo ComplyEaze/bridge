@@ -51,7 +51,9 @@ pub struct GstDetailsEntry {
     /// ledger output ships. The element's name says *in*eligible, and on one
     /// stock item its Yes was seen where the screen read `Eligible for Input Tax
     /// Credit: No` (PARTIAL), so the `masters` presentation of a stock item
-    /// writes it as `ineligible_itc`; `ledger_masters` is unchanged.
+    /// writes it as `ineligible_itc`; `ledger_masters` is unchanged. Two keys
+    /// for one Tally element is deliberate until the ledger key is rectified
+    /// (tracked in #1741).
     pub itc_eligible: Option<bool>,
     pub states: Vec<GstStateDetails>,
     /// True when the element held content this parser does not model, at the
@@ -106,7 +108,8 @@ pub enum GstDetailsDefect {
     RateNotDecimal,
     /// A `GSTINELIGIBLEITC` other than `Yes` or `No`.
     ItcNotYesNo,
-    /// An entry whose only content is children this parser does not model.
+    /// An entry whose only content is children this parser does not model, or
+    /// text, a reference or CDATA directly in the list.
     UnrecognisedContent,
     /// Two rate rows with the same duty head in one state row, or two state
     /// rows with the same state name in one entry (compared verbatim).

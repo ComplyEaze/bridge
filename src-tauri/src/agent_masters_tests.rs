@@ -343,8 +343,10 @@ fn the_tool_definition_admits_only_the_eight_kinds_and_states_the_size_limits() 
     assert!(!description.contains("`itc_eligible` (true"));
     // The kind's reach, its cut-off and what is unmeasured.
     assert!(description.contains("refused past 16,344 UTF-16 units"));
-    assert!(description.contains("refuses both client books measured"));
-    assert!(description.contains("admit the read by the company's stock item count instead"));
+    assert!(description.contains(
+        "a mark of 489 refuses, by arithmetic, both client books measured, not tried on them"
+    ));
+    assert!(!description.contains("stock item count instead"));
     assert!(description.contains("a zero-row stock-item answer are not measured"));
     assert!(description.contains("such as text, a reference or CDATA directly in the list"));
     assert!(description.contains("a person can edit, under every redaction setting"));
@@ -1145,6 +1147,8 @@ async fn stock_items_read_end_to_end_with_their_lists_exactly_as_sent() {
     // the first entry, absent (null, never false) on the second.
     assert_eq!(gst[0]["ineligible_itc"], true);
     assert_eq!(gst[1]["ineligible_itc"], Value::Null);
+    // Null is an emitted key, not a missing one.
+    assert!(gst[1].as_object().unwrap().contains_key("ineligible_itc"));
     // The ledger key is not on a stock item's entries.
     assert!(gst.iter().all(|entry| entry.get("itc_eligible").is_none()));
     let igst = |entry: &Value| entry["states"][0]["rates"][2].clone();
@@ -1210,7 +1214,10 @@ async fn an_item_without_entries_says_that_its_group_and_the_company_were_not_re
     ));
     assert!(!mentions("not the screen's setting"));
     assert!(mentions("a zero-row stock-item answer"));
-    assert!(mentions("which refuses both client books measured"));
+    assert!(mentions(
+        "so a mark of 489 refuses, by arithmetic, both client books measured"
+    ));
+    assert!(!mentions("stock item count"));
     assert!(mentions("past 16,344 UTF-16 units"));
     assert!(mentions("PARTIAL"));
     assert!(mentions(

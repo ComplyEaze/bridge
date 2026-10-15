@@ -147,7 +147,7 @@ const STOCK_ITEM_LIMITATIONS: [&str; 7] = [
     "state_name and valuation_type carry the reserved-character marker U+FFFD `#4;` where Tally sends its own `Any` and `Not Applicable`; a rate is absent, empty, zero or a value, never merged",
     "ineligible_itc is Tally's GSTINELIGIBLEITC as sent: true for Yes, false for No, null when the element was absent, never filled in. On one item it was Yes on the entry whose screen row read `Eligible for Input Tax Credit: No`, and absent on the entry whose screen row read Yes, which fits an ineligibility flag (PARTIAL: one book, two rows, screen against wire). What an absent element means for the tax is not known: do not read null as eligible or as ineligible, and do not read true as eligible",
     "A list with a defect (an undated entry, a repeated field, a rate that is not a plain decimal, two different entries on one date, or an entry holding only content that is not modelled, such as text, a reference or CDATA directly in the list) is returned as unreadable with its defect for that item's list only; a Tally ERROR, markup inside a value or a cut-off list refuses the whole read. HSN codes and rates are not names. An HSN description is filled by Tally from its tariff list and a person can edit it; it is returned as sent under every redaction setting",
-    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row), which refuses both client books measured (marks of about 100,000 and 300,000); a larger book is refused as masters_too_large. A later change is meant to admit the read by the company's stock item count instead. An item row is refused as masters_row_exceeds_bound past 16,344 UTF-16 units (about seven further GST entries of the measured size), whatever its state rows",
+    "Measured on one synthetic book, TallyPrime 7.1 Silver (PARTIAL): a state row other than `Any`, slab rates, another release, a larger book and a zero-row stock-item answer are not measured. Items are read only when the master mark is at most 489 (the response budget over an assumed worst-case item row), so a mark of 489 refuses, by arithmetic, both client books measured (marks of about 100,000 and 300,000; not tried on them); a larger book is refused as masters_too_large. An item row is refused as masters_row_exceeds_bound past 16,344 UTF-16 units (about seven further GST entries of the measured size), whatever its state rows",
 ];
 
 /// A stock item's GST observation under the key Tally's element means. The
@@ -155,7 +155,8 @@ const STOCK_ITEM_LIMITATIONS: [&str; 7] = [
 /// which is the key `ledger_masters` ships; for a stock item Tally's Yes was
 /// seen where the screen's `Eligible for Input Tax Credit` read No, so it goes
 /// out as `ineligible_itc` with the same value, `true`, `false` or `null` and
-/// never a default. The ledger output is not changed.
+/// never a default. The ledger output is not changed: two keys for one Tally
+/// element is deliberate until the ledger key is rectified (tracked in #1741).
 fn stock_item_gst_json(gst: &GstDetailsObservation) -> Value {
     let mut value = json!(gst);
     if let Some(entries) = value.get_mut("entries").and_then(Value::as_array_mut) {

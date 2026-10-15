@@ -425,9 +425,12 @@ def redact_shapes(text):
 
 def scan(text, head, fixture_provenance=None):
     record = result_record()
-    text, utf16_runs = decode_utf16_runs(text)
+    decoded, utf16_runs = decode_utf16_runs(text)
     if utf16_runs:
         add(record, "notes", "%d UTF-16 text segment(s) were decoded before the scan" % utf16_runs)
+        # Both readings are scanned: decoding can join a run to the characters beside it and remove
+        # the boundary a pattern needs, so the original text must be read as well as the decoded one.
+        text = decoded + "\n" + text
     allowed = load_fixture_provenance(fixture_provenance, head, record)
 
     home_count = len(HOME_RE.findall(text))

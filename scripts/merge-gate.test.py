@@ -22,6 +22,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -1389,6 +1390,33 @@ class PrivacyScanDecodesUtf16(unittest.TestCase):
         # Valid UTF-16 text never reaches the scan this way: a code unit above 0x7f is not valid UTF-8 beside a NUL.
         record = self.privacy.scan("\u00e9\x00\u00e9\x00\u00e9\x00", HEAD)
         self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_decoding_a_run_never_hides_a_number_the_original_text_shows(self):
+        # The decoded run is "ab", a word that now touches the digits and removes the boundary the
+        # patterns need before a grouped number; the original, with its NULs, still has the boundary.
+        run = "a\x00b\x00"
+        for number in ("1234-5678-9012", "011-2345-6789", "022 23456789"):
+            with self.subTest(number=number):
+                text = run + number
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], text)
+
+    def test_text_that_has_a_nul_run_is_blocked_whenever_the_same_text_without_decoding_is(self):
+        import random
+        random.seed(20261015)
+        parts = ["a\x00b\x00", "\x00x\x00y", " ", "-", "1234-5678-9012", "011-2345-6789", "022 23456789",
+                 "98765" + "43210", "12345" + "678901", "(", ")", "ab", "x" + "@" + "example.com", "C" + ":", "/Us" + "ers/", "z"]
+        original_only = mock.patch.object(self.privacy, "decode_utf16_runs", lambda text: (text, 0))
+        checked = 0
+        for _ in range(3000):
+            text = "".join(random.choice(parts) for _ in range(random.randint(1, 6)))
+            if "\x00" not in text:
+                continue
+            with original_only:
+                before = bool(self.privacy.scan(text, HEAD)["blockers"])
+            if before:
+                checked += 1
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], repr(text))
+        self.assertGreater(checked, 100, "the generator must reach inputs the original reading blocks")
 
     def test_a_mark_never_hides_what_the_utf8_reading_shows(self):
         digits = self.RUN + "\n"

@@ -321,8 +321,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement
   you asked it to read, with date, amount, bank reference and narration.
 - **Lock files** with no content, a lock folder (`native-dispatch-leases/`,
-  kept in ComplyEaze Bridge's per-user folder) that keeps two copies of the
-  program from sending to Tally at the same time, and a small record written
+  kept in ComplyEaze Bridge's per-user folder and, on Windows, also in
+  `.complyeaze-bridge\coordination` under your user profile) that keeps two
+  copies of the program from sending to Tally at the same time, and a small record written
   when you record a review of a posted voucher, including your
   operating-system account name.
 
@@ -415,7 +416,12 @@ begin (for example when the batch is not found or the journal is busy); a
 refusal inside the checks already withdrew it. In 0.5.0 a window for one voucher
 puts "On Account" before the name of each ledger you approved for it and shows
 the voucher's own reference and narration as its last two lines; if they hold
-characters it cannot show safely, or do not fit, it refuses. A window for a
+characters it cannot show safely, or do not fit, it refuses. In the next build,
+a narration too long for one line is shown instead in numbered parts, each
+quoted and split only at a space, under a line that counts them; one that
+cannot be split so, and a reference too long for one line, are still refused.
+The review window for a posted voucher shows its narration last, under the
+same heading (#1535). A window for a
 batch of up to ten vouchers lists each on one line (type, date, amount, ledger
 and up to 40 characters of its narration, with no reference; from the next
 build a Journal's line names its first debit and first credit ledger and up to

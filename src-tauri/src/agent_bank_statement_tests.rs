@@ -2068,3 +2068,93 @@ async fn a_bob_statement_parses_from_the_callers_balances_with_an_empty_password
         Some("statement_extent_unproven")
     );
 }
+
+/// A skipped row's ledger is the other bank account's, which the later pairing
+/// looks for: it is listed for validate_masters like every other ledger.
+#[test]
+fn a_skipped_rows_ledger_is_listed_to_validate() {
+    use bridge_bank_statement::parse::Row;
+    use bridge_bank_statement::proposals::{build, group_counterparties, selfcheck, BuildOptions};
+    // Synthetic digits built from a visible pattern: n behind zeros to a width.
+    let padn = |n: u64, width: usize| format!("{n:0>width$}");
+    let row = |party: &str, reference: &str, balance: &str| {
+        let narration = format!("BY TRANSFER-UPI/CR/{reference}/{party}/XYZ");
+        Row::from_pairs([
+            ("date", "01Aug2026"),
+            ("narr", narration.as_str()),
+            ("narr_spaced", narration.as_str()),
+            ("ref", ""),
+            ("ref_spaced", ""),
+            ("dr", ""),
+            ("cr", "1.00"),
+            ("bal", balance),
+        ])
+    };
+    let rows = vec![
+        row("SYNTHETIC PAYER", &padn(1, 12), "1.00"),
+        row("OWN ACCOUNT", &padn(2, 12), "2.00"),
+    ];
+    let mapping = Mapping::from_rows([
+        MappingRow {
+            origin: "mapping[0]".into(),
+            party: "SYNTHETIC PAYER".into(),
+            ledger: "Synthetic Payer Ledger".into(),
+            treatment: None,
+        },
+        MappingRow {
+            origin: "mapping[1]".into(),
+            party: "OWN ACCOUNT".into(),
+            ledger: "Synthetic Other Bank".into(),
+            treatment: Some("skip".into()),
+        },
+    ])
+    .unwrap();
+    let build = build(
+        &rows,
+        Bank::Sbi,
+        &mapping,
+        &BuildOptions {
+            bank_ledger: "Synthetic Bank Ledger",
+            suspense_ledger: "Suspense",
+            account_label: "Synthetic SB xx1234",
+            account_number: &padn(1234, 14),
+            date_from: None,
+            date_to: None,
+            cash_answers: CashAnswers::none(),
+        },
+    )
+    .unwrap();
+    let parsed = ParsedStatement {
+        account_number: padn(1234, 14),
+        statement_rows: rows.len(),
+        closing: bridge_tally_core::ExactDecimal::parse("2.00").unwrap(),
+        totals: bridge_bank_statement::money::statement_totals(&rows).unwrap(),
+        check: selfcheck(&build, "Synthetic Bank Ledger").unwrap(),
+        counterparties: group_counterparties(&build.records).unwrap(),
+        build,
+    };
+    let request = OwnedRequest::from_args(&json!({
+        "statement_path": never_opened("statement.pdf"),
+        "password_file": never_opened("statement.password"),
+        "bank": "sbi",
+        "account_label": "Synthetic SB xx1234",
+        "opening_balance": "0.00",
+        "closing_balance": "2.00",
+        "total_debits": "0.00",
+        "total_credits": "2.00",
+        "bank_ledger": "Synthetic Bank Ledger",
+        "suspense_ledger": "Suspense"
+    }))
+    .unwrap();
+    let summary = summary(&request, &parsed, "statement-x", "0", 40_000);
+    // Each name is listed as the summary lists every ledger: a marked party name.
+    let expected: Vec<Value> = [
+        "Synthetic Bank Ledger",
+        "Synthetic Other Bank",
+        "Synthetic Payer Ledger",
+    ]
+    .iter()
+    .map(|name| json!(party_name(name.to_string())))
+    .collect();
+    assert_eq!(summary["ledgers_to_validate"], json!(expected));
+}

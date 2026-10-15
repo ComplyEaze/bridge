@@ -34,6 +34,14 @@ pub(super) enum Journal {
     Read(super::ledger::Settlement),
 }
 
+/// The master write journal, read apart from the voucher import journal.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum MasterJournal {
+    Absent,
+    NotRead(&'static str),
+    Read(super::master_ledger::MasterSummary),
+}
+
 #[derive(Debug)]
 pub(super) struct Report {
     pub(super) root: Root,
@@ -57,6 +65,7 @@ pub(super) struct Report {
     /// A folder held more entries than the report will list.
     pub(super) entry_cap_reached: bool,
     pub(super) journal: Journal,
+    pub(super) master_journal: MasterJournal,
 }
 
 const CLASSES: [&str; 10] = [
@@ -78,7 +87,9 @@ impl Report {
     pub(super) fn incomplete_reason(&self) -> Option<&'static str> {
         if self.root == Root::Unreadable {
             Some("data_folder_unreadable")
-        } else if matches!(self.journal, Journal::NotRead(_)) {
+        } else if matches!(self.journal, Journal::NotRead(_))
+            || matches!(self.master_journal, MasterJournal::NotRead(_))
+        {
             Some("journal_not_read")
         } else if !self.folders_not_read.is_empty() {
             Some("folder_not_listed")
@@ -220,6 +231,7 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         folders_not_read: Vec::new(),
         entry_cap_reached: false,
         journal: Journal::Absent,
+        master_journal: MasterJournal::Absent,
     };
     match fs::read_dir(root) {
         // A link whose target is gone (a disk that is not mounted) is not a
@@ -234,6 +246,7 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         Err(_) => {
             report.root = Root::Unreadable;
             report.journal = Journal::NotRead(DATA_FOLDER_UNREADABLE);
+            report.master_journal = MasterJournal::NotRead(DATA_FOLDER_UNREADABLE);
             scan_leases(&mut report, root, coordination);
             return report;
         }
@@ -248,6 +261,9 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
         root,
         |name| match name {
             "agent-import-ledger.jsonl" => "journal",
+            // The master write journal and its pre-image sidecars are import
+            // journal files, not strays.
+            name if super::master_ledger::is_master_file(name) => "journal",
             "agent-egress.jsonl" => "egress_log",
             "agent-import-admission.lock" => "locks",
             _ => "other",
@@ -277,6 +293,8 @@ pub(super) fn build(root: &Path, coordination: Option<&Path>) -> Report {
     }
     scan_leases(&mut report, root, coordination);
     report.journal = read_journal(root, || std::thread::sleep(Duration::from_millis(100)));
+    report.master_journal =
+        read_master_journal(root, || std::thread::sleep(Duration::from_millis(100)));
     report
 }
 
@@ -363,6 +381,36 @@ fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
     first
 }
 
+fn read_master_journal_once(path: &Path) -> MasterJournal {
+    let file = match super::super::local_file::open_local_file(path, false) {
+        Ok(file) => file,
+        Err(error) if error.kind() == ErrorKind::NotFound => return MasterJournal::Absent,
+        Err(_) => return MasterJournal::NotRead(JOURNAL_UNREADABLE),
+    };
+    match super::master_ledger::read_summary(std::io::BufReader::new(file)) {
+        Ok(summary) => MasterJournal::Read(summary),
+        Err(super::master_ledger::MasterLedgerError::Unavailable) => {
+            MasterJournal::NotRead(JOURNAL_READ_FAILED)
+        }
+        Err(_) => MasterJournal::NotRead(JOURNAL_INVALID),
+    }
+}
+
+/// The master write journal, read as the voucher journal is: without the lock,
+/// and once more after `between` if a write in progress could explain a refusal.
+fn read_master_journal(root: &Path, between: impl FnOnce()) -> MasterJournal {
+    let path = root.join("agent-master-ledger.jsonl");
+    let first = read_master_journal_once(&path);
+    if matches!(
+        first,
+        MasterJournal::NotRead(JOURNAL_INVALID | JOURNAL_READ_FAILED)
+    ) {
+        between();
+        return read_master_journal_once(&path);
+    }
+    first
+}
+
 /// Whole days since `time`, saturating at zero.
 fn age_days(time: SystemTime, now: SystemTime) -> u64 {
     now.duration_since(time)
@@ -412,6 +460,18 @@ pub(super) fn to_json(
             "no_dispatch_never_verified": settlement.no_dispatch_never_verified,
         }),
     };
+    // A dispatched master batch with no terminal verdict blocks every batch that
+    // names the same ledgers until a person settles it.
+    let master_journal = match &report.master_journal {
+        MasterJournal::Absent => json!({"state": "absent"}),
+        MasterJournal::NotRead(why) => json!({"state": "not_read", "reason": why}),
+        MasterJournal::Read(summary) => json!({
+            "state": "read",
+            "batches": summary.batches,
+            "dispatched": summary.dispatched,
+            "not_settled": summary.not_settled,
+        }),
+    };
     let mut value = json!({
         "folder": root,
         "classes": classes,
@@ -424,6 +484,7 @@ pub(super) fn to_json(
         "interrupted_write_folders": report.interrupted_writes,
         "entries_that_could_not_be_read": report.unreadable,
         "journal": journal,
+        "master_journal": master_journal,
         "app_files_outside_this_folder_covered": false,
     });
     if let Some((folder, locks)) = paths {

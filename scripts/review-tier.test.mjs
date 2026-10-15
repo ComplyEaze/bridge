@@ -133,6 +133,22 @@ test("the real list puts the write path, credentials and the gate in the full ti
     "src-tauri/src/agent_company_checkpoint.rs",
     "src-tauri/src/reports/bulk_party_statement.rs",
     "src-tauri/src/reports/bulk_party_statement_tests.rs",
+    // the read path's own guards and the egress record, and privacy and security texts
+    "src-tauri/src/tally/agent_read_request.rs",
+    "src-tauri/src/tally/agent_read_request_tests.rs",
+    "src-tauri/src/agent_read_profiles.rs",
+    "src-tauri/src/agent_read_validation.rs",
+    "src-tauri/src/agent_read_cost.rs",
+    "src-tauri/src/agent_delivery.rs",
+    "docs/security-and-privacy.md",
+    "docs/legal/privacy.md",
+    "docs/legal/terms.md",
+    "docs/tally/privacy-model.md",
+    "docs/adr/0099-privacy-notes.md",
+    "site/security.html",
+    "site/privacy.html",
+    "src-tauri/tests/egress_gate.rs",
+    "src-tauri/tests/redaction_check.rs",
     // tests that are #[path] children of write-path modules
     "src-tauri/src/agent_post_cancellation_tests.rs",
     "src-tauri/src/agent_post_recovery_tests.rs",
@@ -216,6 +232,18 @@ test("no interface file that calls a write, setup, enrolment, destination or lif
   const offenders = listed.stdout.split("\0").filter((path) => /\.tsx?$/.test(path)).filter((path) => {
     const text = readFileSync(join(root, path), "utf8");
     return writes.test(text) && tierOf([path], realRules).tier === "one";
+  });
+  assert.deepEqual(offenders, []);
+});
+
+test("no tracked file named for privacy, security, redaction or egress, in any directory, is in the one tier", () => {
+  const listed = spawnSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  const offenders = listed.stdout.split("\0").filter(Boolean).filter((path) => {
+    if (path.startsWith("docs/tally/compatibility/acks/")) return false;
+    // The tax-audit engine's own spec packs and text carry the word in their subject matter.
+    if (path.startsWith("src-tauri/crates/bridge-tax-audit/") || path.startsWith("docs/tax-audit/")) return false;
+    return /privacy|security|redact|egress/i.test(path) && tierOf([path], realRules).tier === "one";
   });
   assert.deepEqual(offenders, []);
 });

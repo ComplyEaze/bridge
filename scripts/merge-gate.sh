@@ -936,8 +936,10 @@ else
     # own change (merge base...head) is the same at both. "The same" is exact: the whole compare diff, byte for byte, apart from
     # the `index` lines (blob ids move with a merge of master) and the text after the hunk numbers (the enclosing function's
     # name). Context lines and hunk numbers are part of it, so a change moved to another place in a file is not the same change,
-    # and a merge that touches the pull request's files around its hunks is not carried: the reviewer looks again. A merge of
-    # master that leaves those files alone keeps the CLEAN. (git patch-id is not used: it ignores whitespace and position.)
+    # and a merge that touches the pull request's files inside a hunk's three context lines, or that shifts a hunk's numbers, is
+    # not carried: the reviewer looks again. Master's edits elsewhere are NOT looked at, in other files or in the same file (below
+    # the last hunk, or of equal length above one): they ride on master's own review and the checks at the head.
+    # (git patch-id is not used: it ignores whitespace and position.)
     # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, holds a binary change (its text hides the bytes),
     # lists a file twice, or names other files than the pull request's current file list is never carried. What master changed
     # in other files is not looked at: that is the checks' job at the head.

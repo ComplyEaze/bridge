@@ -18,14 +18,29 @@ These changes are in source and not yet in a published build.
 
 **Added**
 
+- A party's mailing address, PIN code, state and country are now read from Tally's dated mailing details
+  (`LEDMAILINGDETAILS.LIST`), which the party-master request now names (#1490). On the measured book (one
+  synthetic company, TallyPrime 7.1 Silver) the flat address, PIN code and state fields came back empty or absent
+  for a party that held an address, so the workbook showed them as empty or not observed. `ledger_masters
+  fields=compliance` rows carry the dated entries as `compliance.mailing_details` (the flat fields are unchanged),
+  and the party/ledger master workbook gains five columns at its end: the mailing address, PIN code and state in
+  force on the Balances-as-of date, the date they apply from, and a status that says why they are blank (no
+  mailing details, none in force on that date, not observed, or unreadable). A second mailing entry with a later
+  date, a party with two mailing rows and other releases are not measured. A party whose only entry starts after the
+  Balances-as-of date shows the first date in its status, and an entry that held content the reader does not take
+  is flagged (`other_content_skipped`). `mask_parties` masks the mailing name, every address line and the flat address field like a party's name;
+  the PIN code, state and country are returned under every redaction mode. The request is longer by one element, so the per-ledger size estimate
+  of the reads that name it (`ledger_masters` and the workbook) is 4,700 bytes instead of 3,750 (8,950 instead of
+  8,000 with the GST details), from the one growth measured (948 bytes for one populated party row); it was not
+  measured on a book of many populated parties, so a large book may be read in more parts, or refused, sooner than
+  before. The registers do not read the mailing details and keep their request and their estimate.
+
 - `ledger_masters` with `fields=compliance` takes an opt-in `include_gst_details` (a boolean, default false; with
   any other `fields` it is refused as `ledger_masters_gst_details_requires_compliance`): each ledger's row then
   carries `compliance.gst_details`, Tally's dated ledger-level GST rate details as sent, per entry and state row,
   with a rate that is `absent`, `empty`, `zero` or a `value` (the text as sent and the decimal), never merged
   (part of #1342). HSN/SAC and type of supply are not returned because no capture shows them, the place of
-  supply stays in the registration history, and slab rates are only flagged. Without the flag the requests, the
-  sizing and the result are unchanged. With it the read is admitted at 8,000 bytes a ledger instead of 3,750, a
-  margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element),
+  supply stays in the registration history, and slab rates are only flagged. Without the flag the requests carry no GST details. With it the read is admitted at 8,950 bytes a ledger instead of 4,700, a margin over the one capture (a ledger with an empty list 2,138 to 2,704 bytes; one dated entry 5,248 to 5,394; UTF-16 bytes of the ledger's own element; that request did not name the mailing details, so 950 bytes were added to each figure),
   not a measured ratio; a large book may be read in more parts or refused as too large. Measured on one 14-ledger lab book of TallyPrime 7.1 Silver and not yet run through this tool on a
   live Tally.
 
@@ -106,6 +121,10 @@ These changes are in source and not yet in a published build.
 
 **Changed**
 
+- Under `mask_parties`, `ledger_masters` with `fields=compliance` now masks the flat `address` of a ledger
+  (and, from the same change, every mailing address line) like a party name: before, the flat address was
+  returned as Tally sent it under every redaction mode. An address Tally returned empty stays empty, and the
+  PIN code, state and country are still returned under every mode.
 - **`verify_import` now compares a voucher's narration.** A posted voucher whose narration in Tally
   differs from the one approved reads `posted_divergent`, with `narration` in its `diffs`; before,
   every other compared field matched and it read `posted_verified`, and a divergent voucher never

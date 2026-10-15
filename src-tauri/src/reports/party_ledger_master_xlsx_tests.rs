@@ -8,6 +8,9 @@ use crate::reports::party_ledger_master::{
     build_party_ledger_master_workbook, BalanceDateBasis, PartyLedgerMasterRow,
     PartyLedgerMasterSource,
 };
+use bridge_tally_protocol::mailing_details::{
+    MailingDetailsDefect, MailingDetailsEntry, MailingDetailsHistory,
+};
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, PartyLedgerMasterFields};
 
 fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
@@ -450,12 +453,14 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
         .collect()
 }
 
-/// The package of the host-date workbook, taken from master before #903
-/// changed anything: with no date typed, the bytes must not change.
+/// The package of the host-date workbook. It was taken from master before #903
+/// changed anything (with no date typed, the bytes must not change), and was
+/// taken again when the five mailing columns and the Covered text changed the
+/// package (#1490); nothing since then may change it.
 const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
-    "96744b5497a819ba52934b2bb25da6c55760b41bf7cf96ea08bd47c5784b1633";
+    "ee2e97715ac355ac1f1c1a3d1f83c4a48037d3fa24d10385bc169078abcb73e9";
 const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
-    "6eccc449e188b6176e7f96c373a08de3a21b16d002b828f21e6f2cbeba65727b";
+    "db95374634b59808e2f11cff3d59de437b9064d205abf0df122f30d194fc7de1";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {
@@ -497,4 +502,197 @@ fn a_chosen_date_that_is_a_boundary_adds_no_moved_note_to_the_workbook() {
     assert!(text.contains(
         "Read period: 20260401 to 20260731. No prior-year values were requested or inferred."
     ));
+}
+
+fn mailing_row(name: &str, id: &str, history: MailingDetailsHistory) -> PartyLedgerMasterRow {
+    PartyLedgerMasterRow {
+        name: name.to_string(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
+        party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
+        fields: PartyLedgerMasterFields {
+            mailing_details: history,
+            ..PartyLedgerMasterFields::default()
+        },
+        guid: format!("guid-{id}"),
+        master_id: id.to_string(),
+        alter_id: id.to_string(),
+        opening_balance: ExactDecimal::parse("0.00".to_string()).unwrap(),
+        closing_balance: Some(ExactDecimal::parse("0.00".to_string()).unwrap()),
+    }
+}
+
+fn mailing_entry(from: &str, pin: &str) -> MailingDetailsEntry {
+    MailingDetailsEntry {
+        applicable_from: TallyDate::parse(from).unwrap(),
+        mailing_name: Some("Lab Party".to_string()),
+        address_lines: vec!["1 Test Street".to_string(), "Test Area".to_string()],
+        state: Some("Karnataka".to_string()),
+        country: Some("India".to_string()),
+        pin_code: Some(pin.to_string()),
+        other_content_skipped: false,
+    }
+}
+
+/// The text of one cell of the ledger sheet, or `None` when it holds nothing.
+fn sheet_cell(source: PartyLedgerMasterSource, cell: &str) -> Option<String> {
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_party_ledger_master_xlsx(&workbook).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+        &mut sheet,
+    )
+    .unwrap();
+    let mut shared = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared,
+    )
+    .unwrap();
+    let start = sheet.find(&format!(r#"<c r="{cell}""#))?;
+    let element = &sheet[start..start + sheet[start..].find("</c>")?];
+    let index: usize = element
+        .split("<v>")
+        .nth(1)?
+        .split("</v>")
+        .next()?
+        .parse()
+        .ok()?;
+    let entry = shared.split("<si>").skip(1).nth(index)?;
+    let text = entry.split('>').nth(1)?.split('<').next()?;
+    Some(text.to_string())
+}
+
+#[test]
+fn the_mailing_columns_are_appended_after_the_existing_ones_and_named() {
+    let source = source_with_precision(2);
+    for (cell, label) in [
+        ("W14", "Closing balance (exact text)"),
+        (
+            "X14",
+            "Mailing address in force (as of Balances-as-of date)",
+        ),
+        ("Y14", "Mailing PIN code in force"),
+        ("Z14", "Mailing state in force"),
+        ("AA14", "Mailing details effective from"),
+        ("AB14", "Mailing details status"),
+    ] {
+        assert_eq!(
+            sheet_cell(source.clone(), cell).as_deref(),
+            Some(label),
+            "{cell}"
+        );
+    }
+}
+
+#[test]
+fn a_partys_mailing_entry_in_force_on_the_balances_date_fills_the_five_cells() {
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row(
+            "Lab Party",
+            "1",
+            MailingDetailsHistory::Entries {
+                entries: vec![
+                    mailing_entry("20260401", "560001"),
+                    mailing_entry("20261001", "560099"),
+                ],
+            },
+        ),
+        mailing_row("Other", "2", MailingDetailsHistory::NotObserved),
+    ];
+    let cell = |cell: &str| sheet_cell(source.clone(), cell);
+    // `Balances as of` is 20260731: the entry dated 20260401 is in force, the one
+    // dated 20261001 is not yet.
+    assert_eq!(cell("X15").as_deref(), Some("1 Test Street, Test Area"));
+    assert_eq!(cell("Y15").as_deref(), Some("560001"));
+    assert_eq!(cell("Z15").as_deref(), Some("Karnataka"));
+    assert_eq!(cell("AA15").as_deref(), Some("20260401"));
+    assert_eq!(cell("AB15").as_deref(), Some("in force"));
+    // A ledger whose response did not carry the list says so and leaves the values blank.
+    for blank in ["X16", "Y16", "Z16", "AA16"] {
+        assert_eq!(cell(blank), None, "{blank}");
+    }
+    assert_eq!(cell("AB16").as_deref(), Some("not observed"));
+}
+
+#[test]
+fn each_mailing_status_says_why_the_values_are_blank() {
+    let status = |history: MailingDetailsHistory, as_of: &str| {
+        mailing_cells(&history, &TallyDate::parse(as_of).unwrap())[4].clone()
+    };
+    let one = MailingDetailsHistory::Entries {
+        entries: vec![mailing_entry("20260401", "560001")],
+    };
+    assert_eq!(status(one.clone(), "20260401"), "in force");
+    // Not "no address": the first entry starts later, and the status says when.
+    assert_eq!(
+        status(one.clone(), "20260331"),
+        "none in force on that date; first entry from 20260401"
+    );
+    let mut skipped = mailing_entry("20260401", "560001");
+    skipped.other_content_skipped = true;
+    assert_eq!(
+        status(
+            MailingDetailsHistory::Entries {
+                entries: vec![skipped]
+            },
+            "20260401"
+        ),
+        "in force; some content of the entry was not read"
+    );
+    assert_eq!(
+        status(
+            MailingDetailsHistory::Entries { entries: vec![] },
+            "20260731"
+        ),
+        "no mailing details"
+    );
+    assert_eq!(
+        status(MailingDetailsHistory::NotObserved, "20260731"),
+        "not observed"
+    );
+    for (defect, name) in [
+        (MailingDetailsDefect::EntryWithoutDate, "entry_without_date"),
+        (MailingDetailsDefect::DateInvalid, "date_invalid"),
+        (
+            MailingDetailsDefect::EntryRepeatsAField,
+            "entry_repeats_a_field",
+        ),
+        (
+            MailingDetailsDefect::ConflictingEntriesOnOneDate,
+            "conflicting_entries_on_one_date",
+        ),
+    ] {
+        assert_eq!(
+            status(MailingDetailsHistory::Unreadable { defect }, "20260731"),
+            format!("unreadable: {name}")
+        );
+    }
+}
+
+#[test]
+fn an_entry_missing_its_pin_or_state_leaves_those_cells_blank_and_the_rest_filled() {
+    let mut entry = mailing_entry("20260401", "560001");
+    entry.pin_code = None;
+    entry.state = None;
+    entry.address_lines = vec!["Only line".to_string()];
+    let cells = mailing_cells(
+        &MailingDetailsHistory::Entries {
+            entries: vec![entry],
+        },
+        &TallyDate::parse("20260731").unwrap(),
+    );
+    assert_eq!(cells, ["Only line", "", "", "20260401", "in force"]);
+}
+
+#[test]
+fn the_covered_text_names_the_dated_mailing_details() {
+    let text = workbook_text(source_with_precision(2));
+    assert!(text.contains(
+        "the dated mailing details (address, PIN code, state) in force on the Balances-as-of date"
+    ));
+    // The older flat columns can read empty for a party that holds an address: say so.
+    assert!(text.contains("read the Mailing columns at the right"));
 }

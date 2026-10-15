@@ -1,0 +1,730 @@
+//! The transfer pairing view: for each bank line skipped as "recorded from the
+//! other bank's statement", whether that other side exists as a posted Contra.
+//!
+//! A pure function of plain typed facts. It reads no journal, holds no state and
+//! persists no pairing, so a pair whose other batch is rolled back, amended or
+//! fails verification simply stops being a pair the next time it is computed,
+//! and no order of the inputs can change the answer (every candidate set is
+//! counted, never consumed in turn).
+//!
+//! The matching runs in two rounds over "edges" between a skipped row and a
+//! Contra:
+//!
+//! * An edge needs the same company and endpoint, a Contra whose two legs are
+//!   exactly the skip's own bank ledger and its other ledger on opposite sides,
+//!   the same direction on the skip's own bank ledger (a withdrawal skipped from
+//!   its bank is a Contra that credits that bank, so a return transfer never
+//!   matches), equal amounts, and a Contra from outside the skip's lineage and
+//!   built from the other ledger's own statement (one from the skip's own
+//!   statement is that statement's own row; one from a third bank's is another
+//!   transfer).
+//! * Round 1, by reference: both rows carry a reference and they are equal.
+//!   A pair forms only where the skip and the Contra each have exactly one such
+//!   edge.
+//! * Round 2, without a reference: on what round 1 left, one side has no
+//!   reference, and the dates are within k days. A pair forms only where both
+//!   ends have exactly one such edge, and only when the other ledger's verified
+//!   windows hold the skip's date +/- k and the skip's own ledger's hold the
+//!   Contra's: a pair by date claims that nothing else exists. A row that took
+//!   part in round 1 without pairing does not pair here, although it still
+//!   counts against the rows that could.
+//! * A Contra that is double-booked (also booked from a second statement) pairs
+//!   in neither round; a skip whose candidate it is stays `Ambiguous`.
+//!
+//! Contras are grouped once by (company, endpoint, ledger pair, side on each,
+//! canonical amount), so a skip reads only the same-amount, same-direction
+//! Contras, by reference or as a date range.
+//!
+//! Facts the view cannot reason about are refused at the boundary with a typed
+//! `PairingInputError`: duplicate keys, an amount that is not positive, a skip
+//! whose two ledgers are one, and a parse window that ends before it starts.
+//!
+//! Unverified Contras count as candidates (a second possible match must make a
+//! skip ambiguous, not paired) but never pair: a skip whose candidates are all
+//! in one batch not yet `posted_verified` is `OtherSideUnverified`.
+//!
+//! A skip with no candidate is `NotFound` only when the other bank ledger's
+//! verified parse windows cover its whole date +/- k interval; otherwise the
+//! absence proves nothing and it is `NotEstablished`.
+//!
+//! Two skips with one `SkipKey`, or two Contras with one `ContraKey`, are refused
+//! with a typed error naming the smallest such key, whatever the input order.
+
+use bridge_bank_statement::bank::BankReference;
+use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
+use std::collections::{BTreeMap, BTreeSet};
+
+macro_rules! text_id {
+    ($(#[$meta:meta])* $name:ident) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub(crate) struct $name(String);
+
+        impl $name {
+            pub(crate) fn new(value: impl Into<String>) -> Self {
+                Self(value.into())
+            }
+        }
+    };
+}
+
+text_id!(
+    /// A Tally company GUID.
+    CompanyGuid
+);
+text_id!(
+    /// A Tally ledger GUID.
+    LedgerGuid
+);
+text_id!(
+    /// The Tally endpoint a batch was built against.
+    EndpointOrigin
+);
+text_id!(
+    /// A batch's lineage: every rebuild or amendment of one statement.
+    LineageId
+);
+text_id!(
+    /// A saved batch's identity.
+    BatchId
+);
+text_id!(
+    /// A statement row's `bridge_txn_id`.
+    TxnId
+);
+text_id!(
+    /// A skipped statement row's `st-` id.
+    StatementRowId
+);
+
+/// A skipped row, whichever batch built it: a rebuilt statement is the same skip.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct SkipKey {
+    pub(crate) company: CompanyGuid,
+    pub(crate) bank_ledger: LedgerGuid,
+    /// One statement read through two endpoints is two skips.
+    pub(crate) endpoint_origin: EndpointOrigin,
+    pub(crate) row: StatementRowId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct ContraKey {
+    pub(crate) batch: BatchId,
+    pub(crate) txn: TxnId,
+}
+
+/// Which way money moved on the row's OWN bank ledger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Direction {
+    Outflow,
+    Inflow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Side {
+    Debit,
+    Credit,
+}
+
+impl Side {
+    fn opposite(self) -> Self {
+        match self {
+            Self::Debit => Self::Credit,
+            Self::Credit => Self::Debit,
+        }
+    }
+}
+
+impl Direction {
+    /// The side a Contra takes on the skip's own bank ledger: money leaving a
+    /// bank credits it, money arriving debits it.
+    fn contra_side(self) -> Side {
+        match self {
+            Self::Outflow => Side::Credit,
+            Self::Inflow => Side::Debit,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SkipFact {
+    pub(crate) key: SkipKey,
+    pub(crate) date: TallyDate,
+    pub(crate) amount: ExactDecimal,
+    pub(crate) direction: Direction,
+    pub(crate) other_ledger: LedgerGuid,
+    pub(crate) reference: Option<BankReference>,
+    pub(crate) lineage: LineageId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ContraLeg {
+    pub(crate) ledger: LedgerGuid,
+    pub(crate) side: Side,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum BatchStatus {
+    PostedVerified,
+    NotVerified { batch: BatchId },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ContraFact {
+    pub(crate) key: ContraKey,
+    pub(crate) company: CompanyGuid,
+    pub(crate) endpoint_origin: EndpointOrigin,
+    pub(crate) legs: [ContraLeg; 2],
+    pub(crate) amount: ExactDecimal,
+    pub(crate) date: TallyDate,
+    pub(crate) reference: Option<BankReference>,
+    /// The bank ledger of the statement the Contra was built from.
+    pub(crate) statement_bank_ledger: LedgerGuid,
+    pub(crate) lineage: LineageId,
+    pub(crate) status: BatchStatus,
+}
+
+/// A verified statement parse window, both ends inclusive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParseWindow {
+    pub(crate) from: TallyDate,
+    pub(crate) to: TallyDate,
+}
+
+/// Per (company, endpoint, bank ledger), the windows of its verified statements.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Coverage(BTreeMap<(CompanyGuid, EndpointOrigin, LedgerGuid), Vec<ParseWindow>>);
+
+impl Coverage {
+    pub(crate) fn add(
+        &mut self,
+        company: CompanyGuid,
+        endpoint_origin: EndpointOrigin,
+        bank_ledger: LedgerGuid,
+        window: ParseWindow,
+    ) -> Result<(), PairingInputError> {
+        if window.from > window.to {
+            return Err(PairingInputError::InvertedWindow { bank_ledger });
+        }
+        self.0
+            .entry((company, endpoint_origin, bank_ledger))
+            .or_default()
+            .push(window);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PairRound {
+    Reference,
+    NoReference,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SkipState {
+    Paired { round: PairRound, contra: ContraKey },
+    NotFound,
+    Ambiguous { candidates: Vec<ContraKey> },
+    OtherSideUnverified { batch: BatchId },
+    NotEstablished,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DoubleBookedClass {
+    /// Equal references: building the second statement is refused.
+    RefuseAtBuild,
+    /// No reference on one side and the dates within k days: listed only.
+    List,
+}
+
+/// Two Contras, from two different bank statements, for one transfer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DoubleBooked {
+    pub(crate) first: ContraKey,
+    pub(crate) second: ContraKey,
+    pub(crate) class: DoubleBookedClass,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TransferView {
+    pub(crate) skips: BTreeMap<SkipKey, SkipState>,
+    pub(crate) double_booked: Vec<DoubleBooked>,
+}
+
+/// Facts that cannot be paired because the caller gave two for one key.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum PairingInputError {
+    #[error("two skipped rows share one key")]
+    DuplicateSkip { key: SkipKey },
+    #[error("two Contras share one key")]
+    DuplicateContra { key: ContraKey },
+    #[error("a skipped row's amount is not positive")]
+    NonPositiveSkipAmount { key: SkipKey },
+    #[error("a Contra's amount is not positive")]
+    NonPositiveContraAmount { key: ContraKey },
+    #[error("a skipped row's own bank ledger is its other ledger")]
+    SkipLedgersEqual { key: SkipKey },
+    #[error("a verified parse window ends before it starts")]
+    InvertedWindow { bank_ledger: LedgerGuid },
+}
+
+/// What one transfer shares, so that a skip looks up only the Contras it can
+/// match: company, endpoint, the two ledgers (in a fixed order), the side the
+/// Contra takes on the first of them, and the amount in canonical form.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct GroupKey {
+    company: CompanyGuid,
+    endpoint: EndpointOrigin,
+    low: LedgerGuid,
+    high: LedgerGuid,
+    low_side: Side,
+    amount: String,
+}
+
+/// The Contras of one group, as indices into the sorted Contras.
+#[derive(Default)]
+struct Group<'a> {
+    /// Ordered by date (then key), so the dates within k of a day are a range.
+    by_date: Vec<usize>,
+    by_reference: BTreeMap<&'a BankReference, Vec<usize>>,
+}
+
+/// The amount without scale artefacts, so equal values are equal text: `500`,
+/// `500.00` and `0500.0` are one amount. Done once per fact, on an amount the
+/// view has already checked is positive.
+fn canonical_amount(amount: &ExactDecimal) -> String {
+    let text = amount.as_str();
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+    let whole = whole.trim_start_matches('0');
+    let fraction = fraction.trim_end_matches('0');
+    let mut canonical = String::new();
+    canonical.push_str(if whole.is_empty() { "0" } else { whole });
+    if !fraction.is_empty() {
+        canonical.push('.');
+        canonical.push_str(fraction);
+    }
+    canonical
+}
+
+fn group_key(
+    company: &CompanyGuid,
+    endpoint: &EndpointOrigin,
+    amount: String,
+    first: (&LedgerGuid, Side),
+    second: (&LedgerGuid, Side),
+) -> Option<GroupKey> {
+    if first.0 == second.0 || first.1 == second.1 {
+        return None;
+    }
+    let (low, high) = if first.0 < second.0 {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    Some(GroupKey {
+        company: company.clone(),
+        endpoint: endpoint.clone(),
+        low: low.0.clone(),
+        high: high.0.clone(),
+        low_side: low.1,
+        amount,
+    })
+}
+
+/// A Contra has a group only when its legs are two distinct ledgers on
+/// opposite sides, which is what a Contra is.
+fn contra_group_key(contra: &ContraFact) -> Option<GroupKey> {
+    let [first, second] = &contra.legs;
+    group_key(
+        &contra.company,
+        &contra.endpoint_origin,
+        canonical_amount(&contra.amount),
+        (&first.ledger, first.side),
+        (&second.ledger, second.side),
+    )
+}
+
+/// The group the skip's other side would be in: the Contra's side on the skip's
+/// own bank ledger is the one its direction needs, and the other ledger takes
+/// the opposite.
+fn skip_group_key(skip: &SkipFact) -> Option<GroupKey> {
+    let own_side = skip.direction.contra_side();
+    group_key(
+        &skip.key.company,
+        &skip.key.endpoint_origin,
+        canonical_amount(&skip.amount),
+        (&skip.key.bank_ledger, own_side),
+        (&skip.other_ledger, own_side.opposite()),
+    )
+}
+
+pub(crate) fn transfer_pairing_view(
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    k_days: u32,
+) -> Result<TransferView, PairingInputError> {
+    let mut skips: Vec<&SkipFact> = skips.iter().collect();
+    skips.sort_by(|left, right| left.key.cmp(&right.key));
+    if let Some(pair) = skips.windows(2).find(|pair| pair[0].key == pair[1].key) {
+        return Err(PairingInputError::DuplicateSkip {
+            key: pair[0].key.clone(),
+        });
+    }
+    let mut contras: Vec<&ContraFact> = contras.iter().collect();
+    contras.sort_by(|left, right| left.key.cmp(&right.key));
+    if let Some(pair) = contras.windows(2).find(|pair| pair[0].key == pair[1].key) {
+        return Err(PairingInputError::DuplicateContra {
+            key: pair[0].key.clone(),
+        });
+    }
+    // Bad facts are refused whole, in key order (skips, then Contras), so the
+    // error does not depend on the order the facts came in.
+    for skip in &skips {
+        if skip.amount.is_zero() || skip.amount.is_negative() {
+            return Err(PairingInputError::NonPositiveSkipAmount {
+                key: skip.key.clone(),
+            });
+        }
+        if skip.key.bank_ledger == skip.other_ledger {
+            return Err(PairingInputError::SkipLedgersEqual {
+                key: skip.key.clone(),
+            });
+        }
+    }
+    for contra in &contras {
+        if contra.amount.is_zero() || contra.amount.is_negative() {
+            return Err(PairingInputError::NonPositiveContraAmount {
+                key: contra.key.clone(),
+            });
+        }
+    }
+    let coverage = MergedCoverage::new(coverage);
+
+    let mut groups: BTreeMap<GroupKey, Group> = BTreeMap::new();
+    for (index, contra) in contras.iter().enumerate() {
+        if let Some(key) = contra_group_key(contra) {
+            groups.entry(key).or_default().by_date.push(index);
+        }
+    }
+    for group in groups.values_mut() {
+        // stable, so equal dates stay in key order
+        group
+            .by_date
+            .sort_by(|&left, &right| contras[left].date.cmp(&contras[right].date));
+        for &index in &group.by_date {
+            let contra: &ContraFact = contras[index];
+            if let Some(reference) = &contra.reference {
+                group.by_reference.entry(reference).or_default().push(index);
+            }
+        }
+    }
+    let skip_groups: Vec<Option<&Group>> = skips
+        .iter()
+        .map(|skip| skip_group_key(skip).and_then(|key| groups.get(&key)))
+        .collect();
+
+    // A Contra booked from two statements pairs with nothing: which of the two
+    // is the real one is not for this view to say.
+    let (double_booked, doubled) = find_double_booked(&contras, &groups, k_days);
+
+    // Round 1: equal references. There is no date bound here: the design pairs
+    // a reference whatever the dates, since one transfer can print on different
+    // days on the two statements.
+    let mut reference_edges: Vec<Vec<usize>> = vec![Vec::new(); skips.len()];
+    let mut contra_reference_edges: Vec<Vec<usize>> = vec![Vec::new(); contras.len()];
+    for (s, skip) in skips.iter().enumerate() {
+        let (Some(group), Some(reference)) = (skip_groups[s], skip.reference.as_ref()) else {
+            continue;
+        };
+        for &c in group.by_reference.get(reference).into_iter().flatten() {
+            if is_edge(skip, contras[c]) {
+                reference_edges[s].push(c);
+                contra_reference_edges[c].push(s);
+            }
+        }
+    }
+    let mut pairs: Vec<Option<(PairRound, usize)>> = vec![None; skips.len()];
+    let mut contra_taken = vec![false; contras.len()];
+    for (s, edges) in reference_edges.iter().enumerate() {
+        if let [c] = edges[..] {
+            if contra_reference_edges[c].len() == 1 && is_verified(contras[c]) && !doubled[c] {
+                pairs[s] = Some((PairRound::Reference, c));
+                contra_taken[c] = true;
+            }
+        }
+    }
+
+    // Round 2: on what round 1 left, one side without a reference, the dates
+    // within k. Rows that round 1 contested count against the others here but
+    // cannot pair themselves. With k = 0 only the same printed day matches; a
+    // transfer printed on different days by the two banks is open until the
+    // evidence for k is in.
+    let mut loose_edges: Vec<Vec<usize>> = vec![Vec::new(); skips.len()];
+    let mut contra_loose_edges: Vec<Vec<usize>> = vec![Vec::new(); contras.len()];
+    for (s, skip) in skips.iter().enumerate() {
+        let Some(group) = skip_groups[s] else {
+            continue;
+        };
+        if pairs[s].is_some() {
+            continue;
+        }
+        for &c in dates_within(group, &contras, &skip.date, k_days) {
+            let contra = contras[c];
+            if !contra_taken[c]
+                && (skip.reference.is_none() || contra.reference.is_none())
+                && is_edge(skip, contra)
+            {
+                loose_edges[s].push(c);
+                contra_loose_edges[c].push(s);
+            }
+        }
+    }
+    for (s, edges) in loose_edges.iter().enumerate() {
+        if let [c] = edges[..] {
+            if reference_edges[s].is_empty()
+                && contra_reference_edges[c].is_empty()
+                && contra_loose_edges[c].len() == 1
+                && is_verified(contras[c])
+                && !doubled[c]
+            {
+                pairs[s] = Some((PairRound::NoReference, c));
+            }
+        }
+    }
+
+    let states = skips
+        .iter()
+        .enumerate()
+        .map(|(s, skip)| {
+            let state = match pairs[s] {
+                // A pair by date claims that nothing else exists, so both
+                // statements must be known around the dates it rests on.
+                Some((PairRound::NoReference, c))
+                    if !(coverage.holds(skip, &skip.other_ledger, &skip.date, k_days)
+                        && coverage.holds(
+                            skip,
+                            &skip.key.bank_ledger,
+                            &contras[c].date,
+                            k_days,
+                        )) =>
+                {
+                    SkipState::NotEstablished
+                }
+                Some((round, c)) => SkipState::Paired {
+                    round,
+                    contra: contras[c].key.clone(),
+                },
+                None => {
+                    // every way the skip could still match, so a verified
+                    // Contra is not hidden behind an unverified one
+                    let candidates: Vec<usize> = reference_edges[s]
+                        .iter()
+                        .chain(&loose_edges[s])
+                        .copied()
+                        .collect();
+                    open_state(skip, &candidates, &contras, &coverage, k_days)
+                }
+            };
+            (skip.key.clone(), state)
+        })
+        .collect();
+
+    Ok(TransferView {
+        skips: states,
+        double_booked,
+    })
+}
+
+/// The Contras of a group a skip dated `date` can reach within k days: a range
+/// of the date-ordered members.
+fn dates_within<'g>(
+    group: &'g Group,
+    contras: &[&ContraFact],
+    date: &TallyDate,
+    k_days: u32,
+) -> &'g [usize] {
+    let days_apart =
+        |from: &TallyDate, to: &TallyDate| DateSpan::new(from, to).map(|span| span.days());
+    let start = group.by_date.partition_point(|&index| {
+        let before = &contras[index].date;
+        before < date && days_apart(before, date).is_some_and(|days| days > k_days)
+    });
+    let end = group.by_date.partition_point(|&index| {
+        let after = &contras[index].date;
+        after <= date || days_apart(date, after).is_some_and(|days| days <= k_days)
+    });
+    &group.by_date[start..end.max(start)]
+}
+
+/// The edge beyond the group (same company, endpoint, ledgers, direction and
+/// amount): a Contra from another lineage, built from the OTHER ledger's own
+/// statement. One from the skip's own statement is that statement's own row,
+/// and one from a third bank's is a different transfer.
+fn is_edge(skip: &SkipFact, contra: &ContraFact) -> bool {
+    skip.lineage != contra.lineage && contra.statement_bank_ledger == skip.other_ledger
+}
+
+fn is_verified(contra: &ContraFact) -> bool {
+    contra.status == BatchStatus::PostedVerified
+}
+
+fn within(left: &TallyDate, right: &TallyDate, k_days: u32) -> bool {
+    DateSpan::new(left, right)
+        .or_else(|| DateSpan::new(right, left))
+        .is_some_and(|span| span.days() <= k_days)
+}
+
+/// A skip that did not pair: the candidates it has, or the absence of any.
+fn open_state(
+    skip: &SkipFact,
+    candidates: &[usize],
+    contras: &[&ContraFact],
+    coverage: &MergedCoverage,
+    k_days: u32,
+) -> SkipState {
+    if candidates.is_empty() {
+        return if coverage.holds(skip, &skip.other_ledger, &skip.date, k_days) {
+            SkipState::NotFound
+        } else {
+            SkipState::NotEstablished
+        };
+    }
+    let unverified: BTreeSet<&BatchId> = candidates
+        .iter()
+        .filter_map(|&index| match &contras[index].status {
+            BatchStatus::PostedVerified => None,
+            BatchStatus::NotVerified { batch } => Some(batch),
+        })
+        .collect();
+    if unverified.len() == 1 && candidates.iter().all(|&index| !is_verified(contras[index])) {
+        if let Some(batch) = unverified.into_iter().next() {
+            return SkipState::OtherSideUnverified {
+                batch: batch.clone(),
+            };
+        }
+    }
+    let mut keys: Vec<ContraKey> = candidates
+        .iter()
+        .map(|&index| contras[index].key.clone())
+        .collect();
+    keys.sort();
+    SkipState::Ambiguous { candidates: keys }
+}
+
+/// The verified windows of each ledger, with those that overlap or touch merged
+/// into one, built once.
+struct MergedCoverage(
+    BTreeMap<(CompanyGuid, EndpointOrigin, LedgerGuid), Vec<(TallyDate, TallyDate)>>,
+);
+
+impl MergedCoverage {
+    fn new(coverage: &Coverage) -> Self {
+        let merged = coverage
+            .0
+            .iter()
+            .map(|(key, windows)| {
+                let mut windows: Vec<&ParseWindow> = windows.iter().collect();
+                windows.sort_by(|left, right| left.from.cmp(&right.from));
+                let mut merged: Vec<(TallyDate, TallyDate)> = Vec::new();
+                for window in windows {
+                    match merged.last_mut() {
+                        Some((_, end))
+                            if window.from <= *end
+                                || end
+                                    .next_day()
+                                    .is_ok_and(|following| window.from <= following) =>
+                        {
+                            // a window nested in the last one must not shorten it
+                            if window.to > *end {
+                                *end = window.to.clone();
+                            }
+                        }
+                        _ => merged.push((window.from.clone(), window.to.clone())),
+                    }
+                }
+                (key.clone(), merged)
+            })
+            .collect();
+        Self(merged)
+    }
+
+    /// Whether the ledger's verified windows (same company and endpoint as the
+    /// skip) hold the whole `date` -/+ k interval.
+    fn holds(&self, skip: &SkipFact, ledger: &LedgerGuid, date: &TallyDate, k_days: u32) -> bool {
+        let key = (
+            skip.key.company.clone(),
+            skip.key.endpoint_origin.clone(),
+            ledger.clone(),
+        );
+        let room = |from: &TallyDate, to: &TallyDate| {
+            DateSpan::new(from, to).is_some_and(|span| span.days() >= k_days)
+        };
+        self.0.get(&key).is_some_and(|windows| {
+            windows
+                .iter()
+                .any(|(from, to)| room(from, date) && room(date, to))
+        })
+    }
+}
+
+/// Contra pairs between two different bank statements for one transfer, and
+/// which Contras appear in one. Within a group everything but the statements,
+/// the lineages, the references and the dates is already equal.
+fn find_double_booked(
+    contras: &[&ContraFact],
+    groups: &BTreeMap<GroupKey, Group>,
+    k_days: u32,
+) -> (Vec<DoubleBooked>, Vec<bool>) {
+    let two_statements = |left: usize, right: usize| {
+        contras[left].statement_bank_ledger != contras[right].statement_bank_ledger
+            && contras[left].lineage != contras[right].lineage
+    };
+    let mut found = Vec::new();
+    let mut doubled = vec![false; contras.len()];
+    let mut record = |left: usize, right: usize, class: DoubleBookedClass| {
+        doubled[left] = true;
+        doubled[right] = true;
+        let (first, second) = if contras[left].key < contras[right].key {
+            (left, right)
+        } else {
+            (right, left)
+        };
+        found.push(DoubleBooked {
+            first: contras[first].key.clone(),
+            second: contras[second].key.clone(),
+            class,
+        });
+    };
+    for group in groups.values() {
+        // equal references, whatever the dates
+        for members in group.by_reference.values() {
+            for (position, &left) in members.iter().enumerate() {
+                for &right in &members[position + 1..] {
+                    if two_statements(left, right) {
+                        record(left, right, DoubleBookedClass::RefuseAtBuild);
+                    }
+                }
+            }
+        }
+        // a reference missing on one side, the dates within k
+        for (position, &left) in group.by_date.iter().enumerate() {
+            for &right in &group.by_date[position + 1..] {
+                if !within(&contras[left].date, &contras[right].date, k_days) {
+                    break;
+                }
+                if (contras[left].reference.is_none() || contras[right].reference.is_none())
+                    && two_statements(left, right)
+                {
+                    record(left, right, DoubleBookedClass::List);
+                }
+            }
+        }
+    }
+    found.sort_by(|left, right| (&left.first, &left.second).cmp(&(&right.first, &right.second)));
+    (found, doubled)
+}
+
+#[cfg(test)]
+#[path = "agent_transfer_pairing_tests.rs"]
+mod tests;

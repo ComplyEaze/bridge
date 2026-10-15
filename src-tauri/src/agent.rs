@@ -55,6 +55,8 @@ mod gst_status;
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
+#[path = "agent_month_register.rs"]
+mod month_register;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -801,6 +803,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
             cause.downcast_ref::<bridge_tally_protocol::native_cash_flow::NativeCashFlowError>()
         {
             return Some(cash_flow.code());
+        }
+        if let Some(register) = cause
+            .downcast_ref::<bridge_tally_protocol::native_month_register::NativeMonthRegisterError>()
+        {
+            return Some(register.code());
         }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
@@ -1659,6 +1666,10 @@ impl ToolFailure {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
         }) {
             error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::MonthRegisterReadError>()
+        }) {
+            error.safe_code()
         } else if error.chain().any(|cause| {
             matches!(
                 cause.downcast_ref::<crate::tally::runtime::OpeningBoundaryObservationError>(),
@@ -2275,6 +2286,7 @@ impl Server {
             }
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
+            "month_register" => self.month_register(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;

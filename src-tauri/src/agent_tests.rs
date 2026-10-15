@@ -63,15 +63,14 @@ fn ordinary_vouchers_reject_missing_or_empty_core_fields_before_selection() {
 
 #[test]
 fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
-    for request in [
-        render_agent_vouchers(
-            "Book",
-            &tally_date("20260901"),
-            &tally_date("20260902"),
-            None,
-        )
-        .unwrap(),
-    ] {
+    for request in [render_agent_vouchers(
+        "Book",
+        &tally_date("20260901"),
+        &tally_date("20260902"),
+        None,
+    )
+    .unwrap()]
+    {
         let mut reader = quick_xml::Reader::from_str(&request);
         let mut fields = Vec::new();
         loop {

@@ -532,12 +532,13 @@ async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_rec
         receipt["response_sha256"],
         sha256_hex(format!("{}\n", responses[1]).as_bytes())
     );
-    let removed_tool_receipt: Value = fs::read_to_string(directory.path().join("agent-egress.jsonl"))
-        .unwrap()
-        .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
-        .find(|receipt| receipt["tool_name_sha256"] == sha256_hex(b"changed_since"))
-        .expect("a receipt for the removed tool's name");
+    let removed_tool_receipt: Value =
+        fs::read_to_string(directory.path().join("agent-egress.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .find(|receipt| receipt["tool_name_sha256"] == sha256_hex(b"changed_since"))
+            .expect("a receipt for the removed tool's name");
     assert_eq!(removed_tool_receipt["tool"], "unknown");
     assert_eq!(removed_tool_receipt["rows_prepared"], 0);
 }

@@ -9,6 +9,11 @@ fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).unwrap()
 }
 
+/// A synthetic twelve-digit reference, built where it is used: a 6, zeros, then `n`.
+fn p6(n: u64, width: usize) -> String {
+    format!("6{n:0>w$}", w = width - 1)
+}
+
 fn reference(digits: &str) -> BankReference {
     let row = Row::from_pairs([
         (
@@ -220,9 +225,9 @@ fn transfer_pairing_a_contra_in_the_skips_own_lineage_is_no_edge() {
 #[test]
 fn transfer_pairing_equal_references_pair_in_round_one_whatever_the_date() {
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000001"));
+    c.reference = Some(reference(&p6(1, 12)));
     c.date = date("20260109");
     let view = view_of(&[s], &[c], &january_covered(), 0);
     assert_eq!(
@@ -235,9 +240,9 @@ fn transfer_pairing_equal_references_pair_in_round_one_whatever_the_date() {
 fn transfer_pairing_references_that_differ_never_pair() {
     // equal amount, equal date, a reference on each side, and not the same one
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000002"));
+    c.reference = Some(reference(&p6(2, 12)));
     let view = view_of(&[s], &[c], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
 }
@@ -245,7 +250,7 @@ fn transfer_pairing_references_that_differ_never_pair() {
 #[test]
 fn transfer_pairing_a_reference_on_one_side_only_is_a_round_two_edge() {
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[s], &[contra("batch-1", "t1")], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
@@ -256,22 +261,22 @@ fn transfer_pairing_a_reference_on_one_side_only_is_a_round_two_edge() {
 #[test]
 fn transfer_pairing_round_one_needs_one_edge_at_each_end() {
     let mut first = skip("st-1");
-    first.reference = Some(reference("600000000001"));
+    first.reference = Some(reference(&p6(1, 12)));
     let mut second = skip("st-2");
-    second.reference = Some(reference("600000000001"));
+    second.reference = Some(reference(&p6(1, 12)));
     let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000001"));
+    c.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[first, second], &[c], &january_covered(), 0);
     for row in ["st-1", "st-2"] {
         assert_eq!(state_of(&view, row), ambiguous(&[("batch-1", "t1")]));
     }
     // one skip, two Contras that both carry its reference
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut c1 = contra("batch-1", "t1");
-    c1.reference = Some(reference("600000000001"));
+    c1.reference = Some(reference(&p6(1, 12)));
     let mut c2 = contra("batch-2", "t2");
-    c2.reference = Some(reference("600000000001"));
+    c2.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[s], &[c1, c2], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
@@ -285,11 +290,11 @@ fn transfer_pairing_a_row_contested_in_round_one_does_not_pair_in_round_two() {
     // referenceless one is not a way out of the reference ambiguity, but it
     // is a candidate and is listed with the others
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut c1 = contra("batch-1", "t1");
-    c1.reference = Some(reference("600000000001"));
+    c1.reference = Some(reference(&p6(1, 12)));
     let mut c2 = contra("batch-2", "t2");
-    c2.reference = Some(reference("600000000001"));
+    c2.reference = Some(reference(&p6(1, 12)));
     let c3 = contra("batch-3", "t3");
     let view = view_of(&[s], &[c1, c2, c3], &january_covered(), 0);
     assert_eq!(
@@ -303,9 +308,9 @@ fn transfer_pairing_a_verified_loose_candidate_is_not_hidden_behind_an_unverifie
     // st-1's reference matches a Contra in a batch not yet verified, and a
     // verified Contra carries no reference at all: both are candidates
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut by_reference = unverified(contra("batch-1", "t1"));
-    by_reference.reference = Some(reference("600000000001"));
+    by_reference.reference = Some(reference(&p6(1, 12)));
     let by_date = contra("batch-2", "t2");
     let view = view_of(&[s], &[by_reference, by_date], &january_covered(), 0);
     assert_eq!(
@@ -361,9 +366,9 @@ fn transfer_pairing_round_one_takes_only_the_other_banks_statement() {
     // a Contra from b2's own statement carrying the same reference is that
     // statement's own row, never the other side of a b2 skip
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut own_statement = contra("batch-1", "t1");
-    own_statement.reference = Some(reference("600000000001"));
+    own_statement.reference = Some(reference(&p6(1, 12)));
     own_statement.statement_bank_ledger = ledger("b2");
     let view = view_of(&[s], &[own_statement], &january_covered(), 0);
     assert_eq!(state_of(&view, "st-1"), SkipState::NotFound);
@@ -454,9 +459,9 @@ fn transfer_pairing_without_coverage_an_absent_contra_is_not_established() {
     assert_eq!(state_of(&view, "st-1"), SkipState::NotEstablished);
     // a pair by reference stands on the reference alone
     let mut referenced = skip("st-1");
-    referenced.reference = Some(reference("600000000001"));
+    referenced.reference = Some(reference(&p6(1, 12)));
     let mut carried = contra("batch-1", "t1");
-    carried.reference = Some(reference("600000000001"));
+    carried.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[referenced], &[carried], &none, 0);
     assert_eq!(
         state_of(&view, "st-1"),
@@ -545,11 +550,11 @@ fn transfer_pairing_a_double_booked_contra_never_pairs() {
     assert_eq!(state_of(&view, "st-1"), ambiguous(&[("batch-1", "t1")]));
     // equal references: the pair by reference is refused for the same reason
     let mut referenced = skipped;
-    referenced.reference = Some(reference("600000000001"));
+    referenced.reference = Some(reference(&p6(1, 12)));
     let mut first = contra("batch-1", "t1");
-    first.reference = Some(reference("600000000001"));
+    first.reference = Some(reference(&p6(1, 12)));
     let mut second = b2_contra("batch-2", "t2");
-    second.reference = Some(reference("600000000001"));
+    second.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[referenced], &[first, second], &january_covered(), 0);
     assert_eq!(view.double_booked.len(), 1);
     assert_eq!(
@@ -564,12 +569,12 @@ fn transfer_pairing_a_reference_ambiguity_is_not_a_way_in_for_a_referenceless_sk
     // two skips and a Contra share one reference; a third skip, with none,
     // matches the Contra by amount and day
     let mut first = skip("st-1");
-    first.reference = Some(reference("600000000001"));
+    first.reference = Some(reference(&p6(1, 12)));
     let mut second = skip("st-2");
-    second.reference = Some(reference("600000000001"));
+    second.reference = Some(reference(&p6(1, 12)));
     let third = skip("st-3");
     let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000001"));
+    c.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[first, second, third], &[c], &january_covered(), 0);
     for row in ["st-1", "st-2", "st-3"] {
         assert_eq!(
@@ -583,9 +588,9 @@ fn transfer_pairing_a_reference_ambiguity_is_not_a_way_in_for_a_referenceless_sk
 #[test]
 fn transfer_pairing_a_contra_paired_by_reference_is_not_a_candidate_by_date() {
     let mut referenced = skip("st-1");
-    referenced.reference = Some(reference("600000000001"));
+    referenced.reference = Some(reference(&p6(1, 12)));
     let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000001"));
+    c.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[referenced, skip("st-2")], &[c], &january_covered(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
@@ -716,9 +721,9 @@ fn transfer_pairing_an_unverified_contra_never_pairs() {
     );
     // not even with equal references, and whether or not anything is covered
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     let mut c = unverified(contra("batch-1", "t1"));
-    c.reference = Some(reference("600000000001"));
+    c.reference = Some(reference(&p6(1, 12)));
     let view = view_of(&[s], &[c], &Coverage::default(), 0);
     assert_eq!(
         state_of(&view, "st-1"),
@@ -856,9 +861,9 @@ fn contra_from_b2(batch: &str, txn: &str) -> ContraFact {
 #[test]
 fn transfer_pairing_double_booked_equal_references_refuse_the_build() {
     let mut first = contra("batch-1", "t1");
-    first.reference = Some(reference("600000000001"));
+    first.reference = Some(reference(&p6(1, 12)));
     let mut second = contra_from_b2("batch-2", "t2");
-    second.reference = Some(reference("600000000001"));
+    second.reference = Some(reference(&p6(1, 12)));
     // equal references refuse whatever the dates say
     second.date = date("20260120");
     assert_eq!(
@@ -889,7 +894,7 @@ fn transfer_pairing_double_booked_without_a_reference_is_listed_within_k() {
     assert!(double_booked_pair(&first, &second).is_empty());
     // a reference on one side only is still no reference to compare
     let mut one_reference = contra_from_b2("batch-2", "t2");
-    one_reference.reference = Some(reference("600000000001"));
+    one_reference.reference = Some(reference(&p6(1, 12)));
     assert_eq!(
         double_booked_pair(&first, &one_reference)[0].class,
         DoubleBookedClass::List
@@ -901,9 +906,9 @@ fn transfer_pairing_double_booked_needs_two_statements_and_one_transfer() {
     let first = contra("batch-1", "t1");
     // references that differ are two transfers
     let mut a = contra("batch-1", "t1");
-    a.reference = Some(reference("600000000001"));
+    a.reference = Some(reference(&p6(1, 12)));
     let mut b = contra_from_b2("batch-2", "t2");
-    b.reference = Some(reference("600000000002"));
+    b.reference = Some(reference(&p6(2, 12)));
     assert!(double_booked_pair(&a, &b).is_empty());
     // the same bank's statement twice is not two statements
     assert!(double_booked_pair(&first, &contra("batch-2", "t2")).is_empty());
@@ -941,10 +946,10 @@ fn busy_book() -> (Vec<SkipFact>, Vec<ContraFact>, Coverage) {
     let mut contras = Vec::new();
     // a reference pair
     let mut s = skip("st-1");
-    s.reference = Some(reference("600000000001"));
+    s.reference = Some(reference(&p6(1, 12)));
     s.amount = ExactDecimal::parse("100.00").unwrap();
     let mut c = contra("batch-1", "t1");
-    c.reference = Some(reference("600000000001"));
+    c.reference = Some(reference(&p6(1, 12)));
     c.amount = ExactDecimal::parse("100.00").unwrap();
     skips.push(s);
     contras.push(c);

@@ -953,9 +953,11 @@ fn invoice_and_journal(filed: &str) -> super::super::ImportPayload {
 
 /// An invoice is filed under its caller-named type with its own number, so
 /// both admissions read that type's numbering as for a voucher that carries a
-/// number (Manual with duplicates prevented, the rule the invoice build's own
-/// type check holds), never the class "Sales". Every other voucher keeps its
-/// class, and a post sends it without a number.
+/// number, never the class "Sales". `admit_numbering` admits such a voucher
+/// under Automatic numbering with Auto Retain or under Manual numbering with
+/// duplicates prevented; it is the invoice build's own type check that holds
+/// an invoice to Manual with duplicates prevented. Every other voucher keeps
+/// its class, and a post sends it without a number.
 #[test]
 fn an_invoice_is_admitted_under_the_type_it_is_filed_in_with_its_number() {
     let payload = invoice_and_journal("Tax Invoice");

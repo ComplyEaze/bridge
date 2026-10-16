@@ -527,8 +527,10 @@ read three more ways: with HTML comments removed, with only the comment delimite
 hidden inside a comment is still a token), and as an HTML parser reads the text, with and without
 its comment text (tags and comment forms between the letters do not hide one). A pull request that
 quotes one in any of those places (this very section included) cannot pass the gate: its merge is the
-owner's own act. The commit comments of at most 60 commits are read; more makes the gate
-`INDETERMINATE`. Other places a person can write in (labels, the milestone, author names, comments on
+owner's own act. The commit comments are read once, from the repository's list of commit comments, and kept
+when they sit on one of the pull request's commits; the commit list must first be proven complete (250 commits
+at most). A list that is not proven, a page that cannot be read, or a comment that names no commit makes the
+gate `INDETERMINATE`. Other places a person can write in (labels, the milestone, author names, comments on
 commits no longer in the pull request) are not read. History it cannot read
 completely (more than one page of reviews, comments or timeline events included) is
 `INDETERMINATE`, never a pass.

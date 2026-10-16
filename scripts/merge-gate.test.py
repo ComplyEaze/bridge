@@ -688,6 +688,8 @@ class MergeGateControls(unittest.TestCase):
     def test_a_pull_request_of_more_than_sixty_commits_is_judged_like_any_other(self):
         # a chain link carries its parents' commits (76 here, the head among them): the comments of all of them are read
         self.assert_pass("seventy-six-commits", self.VERDICT_PASS)
+        # and a stranger's token on one of those commits that is not the head is still found
+        self.assert_blocked("seventy-six-commits-with-a-token-on-the-first", "carries a merge-verdict token")
 
     def test_the_commit_comments_of_every_page_are_read_and_only_those_on_the_pull_requests_commits_count(self):
         self.assert_blocked("commit-comment-token-on-the-second-page", self.VERDICT_BLOCK)

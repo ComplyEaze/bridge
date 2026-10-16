@@ -299,6 +299,12 @@ def state():
         # A pull request in a chain carries its parents' commits: more than the old cap of 60, the head among them.
         s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(75)] + [dict(DEFAULT_COMMIT)]
 
+    elif scenario == "seventy-six-commits-with-a-token-on-the-first":
+        # The same chain link, with a stranger's token on its first commit, which is not the head: the list of commits is
+        # what the comments are filtered by, so a list of the head alone would pass this.
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(75)] + [dict(DEFAULT_COMMIT)]
+        s["commit_comments"] = [{"id": 61, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1, "commit_id": "%040x" % 1}]
+
     elif scenario == "commit-comment-token-on-the-second-page":
         owner_token = {"id": 31, "user": dict(OWNER_USER), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": T1, "updated_at": T1, "commit_id": HEAD}
         benign = [{"id": 100 + n, "user": {"login": "someone", "id": 9, "type": "User"}, "body": "looks fine", "created_at": T1, "updated_at": T1, "commit_id": HEAD} for n in range(100)]

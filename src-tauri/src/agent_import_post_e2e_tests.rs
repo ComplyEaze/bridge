@@ -6423,3 +6423,465 @@ async fn a_master_saved_after_the_numbering_read_is_refused_before_the_post() {
     assert_eq!(result["attempt_recorded"], json!(false), "{response}");
     assert_eq!(observed, through_aim, "the POST is never sent: {response}");
 }
+
+// ---- BP/26-27/0010 on the pilot lab's own answers (#1342, 9 Oct 2026) ----
+//
+// Every answer is Tally's own bytes from the synthetic company BRIDGE PILOT LAB
+// (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
+// answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
+// are served DERIVED: their rows above the master mark 223 removed
+// (`pilot_types_as_of_the_round`). The order below is the order the
+// build and then the post asked in, as observed against a replay of those
+// answers; it is not an order read off the code. Legend: s status probe, e
+// company list, m/M marks before/after the import, b book extent, c currencies,
+// L compliance listing, P paired listing, g groups, T voucher types, N number
+// read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, X
+// the voucher types bounded by the master mark and Y their series-level
+// numbering (both read at the build and again before the approval, 16 Oct 2026),
+// R invoice read-back, Z Tally's answer to the import.
+const PILOT_ORDER: &str = concat!(
+    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeTsTse",
+    "eNsNseeCsCseemsmseseeXsXsYsYseseekskseewswseseseesesemsmseewswse",
+    "ewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese",
+    "eTsTseeNsNseeCsCseecscseseemsmseseeXsXsYsYseseekskseemsmseebsbsc",
+    "scsbsbseseebsbsLsLsPsPsgsgsbsbseseeTsTseeNsNseeCsCseseemekskseec",
+    "scseseeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
+);
+
+const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+/// The request Tally accepted on 9 Oct 2026 (CREATED 1): its SHA-256.
+const PILOT_REQUEST_SHA256: &str =
+    "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e";
+/// The SHA-256 of the request the contributor sent for each kind of read in
+/// `PILOT_ORDER` (the contributor's published request list; the write is the file
+/// `pilot-lab-invoice-post-request`): the answer at a position is Tally's
+/// answer to that request and no other. X and Y are the requests the code
+/// renders, sent to the lab in the 16 Oct 2026 sitting (their answers are the
+/// numbering fixtures, served derived).
+fn pilot_request_sha256(letter: char) -> &'static str {
+    match letter {
+        'e' => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8", // r01-company-extent.xml
+        'm' => "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c", // r02-marks.xml
+        'M' => "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c", // r02-marks.xml
+        'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
+        'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
+        'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
+        'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
+        'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
+        'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
+        'N' => "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985", // r09-number-new-invoice.xml
+        'k' => "28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0", // r13-ledger-catalogue-v2.xml
+        'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
+        'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
+        'C' => "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38", // r16-tax-units.xml
+        'R' => "dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7", // r12-invoice-readback.xml
+        'Z' => "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e", // r14-invoice-post.xml
+        'X' => "229f54c9de4cd51c2b76480129a9c6965314cd04b82d3d40d87f462167cce0d5", // r18-numbering-masters.xml
+        'Y' => "e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276", // r19-numbering-series.xml
+        other => panic!("no request for kind {other}"),
+    }
+}
+
+const PILOT_QUALIFIED: &[VoucherType] = &[
+    VoucherType::Journal,
+    VoucherType::Payment,
+    VoucherType::Receipt,
+    VoucherType::Contra,
+    VoucherType::Sales,
+];
+
+/// The master mark the replay serves: the lab's `ALTMSTID` at the invoice
+/// round of 9 Oct 2026 (the marks answers above).
+const PILOT_MASTER_MARK: u64 = 223;
+
+/// The three voucher types the lab created after the invoice round (the zero-
+/// value types of the W-list, 10 Oct 2026), and so after the master mark 223.
+const PILOT_TYPES_AFTER_THE_ROUND: [&str; 3] =
+    ["BRIDGE Sales Two", "BRIDGE Sales Z0", "BRIDGE Sales Z1"];
+
+/// Each voucher type row of an answer as `(name, AlterID, GUID)`, in answer
+/// order. The text of a tag is what follows its `>` up to the next `<`.
+fn pilot_type_rows(answer: &str) -> Vec<(String, u64, String)> {
+    const ROW: &str = "<VOUCHERTYPE NAME=\"";
+    fn text_of(row: &str, tag: &str) -> String {
+        let at = row.find(tag).unwrap_or_else(|| panic!("no {tag}"));
+        let from = at + row[at..].find('>').unwrap() + 1;
+        row[from..from + row[from..].find('<').unwrap()]
+            .trim()
+            .to_string()
+    }
+    let mut rows = Vec::new();
+    let mut rest = answer;
+    while let Some(start) = rest.find(ROW) {
+        let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        let row = &rest[start..end];
+        let name = &row[ROW.len()..ROW.len() + row[ROW.len()..].find('"').unwrap()];
+        rows.push((
+            name.to_string(),
+            text_of(row, "<ALTERID").parse().unwrap(),
+            text_of(row, "<GUID"),
+        ));
+        rest = &rest[end..];
+    }
+    rows
+}
+
+/// DERIVED, not Tally's bytes: a numbering answer of the pilot lab as of the
+/// invoice round. The two numbering answers were read on 16 Oct 2026, when the
+/// lab's book had moved on to master mark 245 and held three voucher types
+/// that did not exist at mark 223. The code refuses a numbering read with a
+/// type newer than the mark it is bounded by, so the replay serves the
+/// captured answer with exactly those rows removed: every removed row must
+/// carry an `ALTERID` above the mark, and the removed names must be the three
+/// above. The fixture files are the answers whole, as received.
+///
+/// That what is left is what the book held at mark 223 is an inference, checked
+/// only as far as the 9 Oct capture goes: the rows left must equal the 9 Oct
+/// voucher-types capture (the `T` read) in name, AlterID and GUID. The
+/// series-level fields of the rows left have no 9 Oct capture to compare with.
+fn pilot_types_as_of_the_round(answer: &str) -> String {
+    const ROW: &str = "<VOUCHERTYPE NAME=\"";
+    let mut kept = String::new();
+    let mut removed = Vec::new();
+    let mut rest = answer;
+    while let Some(start) = rest.find(ROW) {
+        let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        let (name, alter, _) = pilot_type_rows(&rest[start..end]).remove(0);
+        if alter > PILOT_MASTER_MARK {
+            removed.push((name, alter));
+            kept.push_str(&rest[..start]);
+        } else {
+            kept.push_str(&rest[..end]);
+        }
+        rest = &rest[end..];
+    }
+    kept.push_str(rest);
+    let mut names: Vec<&str> = removed.iter().map(|(name, _)| name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, PILOT_TYPES_AFTER_THE_ROUND, "{removed:?}");
+    let mut left = pilot_type_rows(&kept);
+    let mut round = pilot_type_rows(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"
+    )));
+    left.sort();
+    round.sort();
+    assert_eq!(left, round, "the rows left are not the 9 Oct voucher types");
+    kept
+}
+
+fn pilot_plan(letter: char) -> ScenarioPlan {
+    if let 'X' | 'Y' = letter {
+        let bytes: &[u8] = if letter == 'X' {
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml")
+        } else {
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml")
+        };
+        return ScenarioPlan::new(Fixture::SyntheticXml(pilot_types_as_of_the_round(
+            &captured(bytes),
+        )))
+        .with_encoding(WireEncoding::Utf16LeNoBom)
+        .with_framing(ResponseFraming::ContentLength);
+    }
+    let bytes: &[u8] = match letter {
+        's' => return status(),
+        'e' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"),
+        'm' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml"),
+        'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
+        'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
+        'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
+        'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
+        'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
+        'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
+        'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
+        'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
+        'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml"),
+        'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
+        'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
+        'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
+        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"),
+        'Z' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"),
+        other => panic!("unknown kind {other}"),
+    };
+    ScenarioPlan::new(Fixture::SyntheticXml(captured(bytes)))
+        .with_encoding(WireEncoding::Utf16LeNoBom)
+        .with_framing(ResponseFraming::ContentLength)
+}
+
+/// The outcome of a build, which a refusal is too; a failure to build is not.
+fn built_or_panic(outcome: Result<ToolOutcome, ToolFailure>) -> ToolOutcome {
+    match outcome {
+        Ok(outcome) => outcome,
+        Err(failure) => panic!("the build failed: {}", failure.code),
+    }
+}
+
+/// Each element directly under the root of Tally's answer to an import, with
+/// its text, in answer order. A malformed answer panics; an element with no
+/// text reads as empty.
+fn pilot_answer_elements(xml: &str) -> Vec<(String, String)> {
+    let mut reader = quick_xml::Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut depth = 0usize;
+    let mut elements = Vec::new();
+    loop {
+        match reader.read_event().expect("a well-formed import answer") {
+            quick_xml::events::Event::Start(start) => {
+                depth += 1;
+                if depth == 2 {
+                    let name = start.name().as_ref().to_string();
+                    elements.push((name, String::new()));
+                }
+            }
+            quick_xml::events::Event::Text(text) if depth == 2 => {
+                elements.last_mut().unwrap().1.push_str(&text);
+            }
+            quick_xml::events::Event::End(_) => depth -= 1,
+            quick_xml::events::Event::Eof => break,
+            _ => {}
+        }
+    }
+    assert_eq!(depth, 0, "the answer's elements are all closed");
+    elements
+}
+
+fn pilot_args(walk_in: &str, cgst: &str, party: &str) -> Value {
+    json!({"company_guid":PILOT_GUID, "vouchers":[{
+    "bridge_txn_id":"t1", "date":"2026-08-01", "voucher_type":"Sales", "voucher_number":"BP/26-27/0010",
+    "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan","round_off_ledger":"BRIDGE Round Off"},
+    "entries":[
+        {"ledger":walk_in,"amount":party,"side":"Dr"},
+        {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
+        {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
+        {"ledger":"BRIDGE CGST 2.5%","amount":cgst,"side":"Cr"},
+        {"ledger":"BRIDGE SGST 2.5%","amount":"25.02","side":"Cr"},
+        {"ledger":"BRIDGE Round Off","amount":"0.16","side":"Cr"}
+    ]}]})
+}
+
+/// The pilot lab's replay: a server over a simulator that answers
+/// `PILOT_ORDER` (and one more, so a request too many is counted).
+fn pilot_lab() -> (SequenceSimulator, Server, tempfile::TempDir) {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(PILOT_ORDER.chars().map(pilot_plan).collect()))
+            .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    (simulator, server, directory)
+}
+
+/// #691: Bridge builds the invoice from the pilot lab's answers and posts it,
+/// and Tally's own answers verify it. The request it sends is, byte for byte,
+/// the one Tally created `BP/26-27/0010` from; the verification reads the
+/// voucher back with no difference; the counters step by one.
+#[tokio::test]
+async fn an_invoice_built_and_posted_on_the_pilot_labs_answers_is_verified() {
+    let (simulator, server, _directory) = pilot_lab();
+    let remote_id = Uuid::parse_str("00000000-0000-4000-8000-000000000777").unwrap();
+    let response = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(PILOT_QUALIFIED, async {
+            let built = built_or_panic(
+                server
+                    .build_import_xml(&pilot_args("BRIDGE Walk-in", "25.02", "1051.00"))
+                    .await,
+            );
+            let batch_id = built.payload["result"]["batch_id"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            SCRIPTED_REMOTE_IDS
+                .scope(
+                    vec![remote_id],
+                    SCRIPTED_APPROVAL.scope(
+                        ScriptedApproval::approving(),
+                        server.call_tool(
+                            "post_import",
+                            json!({"company_guid":PILOT_GUID,"batch_id":batch_id}),
+                        ),
+                    ),
+                )
+                .await
+        })
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{response}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 1);
+    assert_eq!(result["alter_id_delta"]["before"], 16);
+    assert_eq!(result["alter_id_delta"]["after_seen"], 17);
+    assert_eq!(result["vouchers"][0]["status"], "posted_verified");
+    assert_eq!(result["vouchers"][0]["alter_id"], 17);
+    assert_eq!(result["vouchers"][0]["voucher_number"], "BP/26-27/0010");
+    assert_eq!(
+        result["dispatch"]["response"]["request_sha256"],
+        PILOT_REQUEST_SHA256
+    );
+    let counters = &result["dispatch"]["counters"];
+    assert_eq!(
+        (
+            &counters["created"],
+            &counters["errors"],
+            &counters["exceptions"]
+        ),
+        (&json!(1), &json!(0), &json!(0))
+    );
+    // Every counter of Tally's answer to the import, by name: the seven the
+    // code parses, from its own parse, and all eight, COMBINED among them, from
+    // the committed answer's elements, each present exactly once.
+    for (name, value) in [
+        ("created", 1),
+        ("altered", 0),
+        ("deleted", 0),
+        ("ignored", 0),
+        ("errors", 0),
+        ("cancelled", 0),
+        ("exceptions", 0),
+    ] {
+        assert_eq!(counters[name], json!(value), "{name}");
+    }
+    // The eight below pin the capture's own figures: they are read out of the
+    // committed answer and compared with literals, and no code under test
+    // produces them. What the code produces is the seven counters above, from
+    // its own parse of the answer the replay served.
+    let answered = pilot_answer_elements(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"
+    )));
+    for (name, value) in [
+        ("CREATED", "1"),
+        ("ALTERED", "0"),
+        ("DELETED", "0"),
+        ("COMBINED", "0"),
+        ("IGNORED", "0"),
+        ("CANCELLED", "0"),
+        ("ERRORS", "0"),
+        ("EXCEPTIONS", "0"),
+    ] {
+        let found = answered
+            .iter()
+            .filter(|(element, _)| element == name)
+            .map(|(_, text)| text.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(found, [value], "{name}");
+    }
+    // Every answer was asked for, none more; the one write is the request Tally
+    // accepted, once.
+    assert_eq!(observed.len(), PILOT_ORDER.len());
+    for (position, (letter, request)) in PILOT_ORDER.chars().zip(&observed).enumerate() {
+        if letter == 's' {
+            assert_eq!(
+                (request.method.as_str(), request.path.as_str()),
+                ("GET", "/status"),
+                "{position}"
+            );
+        } else {
+            assert_eq!(
+                request.request_body_sha256,
+                pilot_request_sha256(letter),
+                "{position} {letter}"
+            );
+        }
+    }
+    let write = PILOT_ORDER.find('Z').unwrap();
+    assert_eq!(observed[write].request_body_sha256, PILOT_REQUEST_SHA256);
+    assert_eq!(
+        sha256_hex(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-request.utf16le.xml"
+        )),
+        PILOT_REQUEST_SHA256
+    );
+    assert_eq!(
+        observed
+            .iter()
+            .filter(|request| request.request_body_sha256 == PILOT_REQUEST_SHA256)
+            .count(),
+        1
+    );
+    // What the build recorded from Tally, equal to what Tally's answers say.
+    let saved = server.import_ledger().unwrap();
+    let line = saved.last().unwrap();
+    let observed_facts = &line.vouchers[0].invoice.as_ref().unwrap().observed;
+    assert_eq!(
+        serde_json::to_value(observed_facts).unwrap(),
+        json!({"voucher_type_guid":format!("{PILOT_GUID}-000000ce"),"party_state":"Rajasthan",
+               "party_registration_type":"Unregistered/Consumer","party_bill_wise":false,"company_state":"Rajasthan"})
+    );
+    assert_eq!(
+        (
+            line.pre_import_mark.value,
+            line.pre_import_mark.master_value
+        ),
+        (Some(16), Some(223))
+    );
+    // The company's marks around the import, read by the code's own parser
+    // from the two committed marks answers the replay served: the voucher mark
+    // stepped by one and the master mark did not move. These pin the capture's
+    // own figures, the committed answers compared with literals: no code under
+    // test produces them, and they say nothing of what the code does with them.
+    let marks_before = crate::agent::parse_company_marks(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml"
+        )),
+        PILOT_GUID,
+    )
+    .unwrap();
+    let marks_after = crate::agent::parse_company_marks(
+        &captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"
+        )),
+        PILOT_GUID,
+    )
+    .unwrap();
+    assert_eq!(marks_before, (16, 223));
+    assert_eq!(marks_after.0, 17);
+    assert_eq!(marks_after.1, 223);
+    assert_eq!(marks_after.1, marks_before.1);
+}
+
+/// The walk-in ledger's row is spelled `BRIDGE Walk-in` in the pilot lab's
+/// catalogue. The earlier spelling, `Bridge Walk-in`, which the book once carried, is refused as
+/// a master that is not exact, before any admission read.
+#[tokio::test]
+async fn the_walk_in_ledgers_earlier_spelling_is_refused_on_the_pilot_labs_catalogue() {
+    let (simulator, server, directory) = pilot_lab();
+    let built = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(
+            PILOT_QUALIFIED,
+            server.build_import_xml(&pilot_args("Bridge Walk-in", "25.02", "1051.00")),
+        )
+        .await;
+    let built = built_or_panic(built);
+    let observed = sent(simulator);
+    assert_eq!(built.payload["result"]["state"], "refused");
+    assert_eq!(built.payload["result"]["reason"], "masters_not_exact");
+    // Refused on the second catalogue read, before any admission read.
+    assert_eq!(observed.len(), PILOT_ORDER.find('k').unwrap() + 5);
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
+/// The CGST line is 6 paise above the state tax line, and the customer's
+/// total is raised by the same 6 paise so that the voucher still balances. The
+/// pilot lab's answers admit the invoice with equal lines; with these they are
+/// refused with the code for unequal tax lines, and no file is written.
+#[tokio::test]
+async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_labs_answers() {
+    let (simulator, server, directory) = pilot_lab();
+    let built = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(
+            PILOT_QUALIFIED,
+            server.build_import_xml(&pilot_args("BRIDGE Walk-in", "25.08", "1051.06")),
+        )
+        .await;
+    let built = built_or_panic(built);
+    let observed = sent(simulator);
+    let result = &built.payload["result"];
+    assert_eq!(result["reason"], "invoice_not_admitted", "{result}");
+    assert_eq!(
+        result["refusals"][0]["code"],
+        "invoice_cgst_and_state_tax_differ"
+    );
+    assert_eq!(result["refusals"].as_array().unwrap().len(), 1);
+    assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}

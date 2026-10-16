@@ -2299,6 +2299,19 @@ const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
      (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md: kept as evidence for §12a.16)";
+const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
+     row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
+     src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
+     feeds it through the build, the post and the read-back and pins what each parse returns; \
+     pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_NUMBERING: &str = "an answer of the pilot lab read on 16 Oct 2026, a week \
+     after the invoice round, with no row here: the app crate's replay \
+     (src/agent_import_post_e2e_tests.rs) serves it to the voucher-numbering read of the \
+     build and of the post DERIVED, with the voucher types above the replay's master mark \
+     removed; the file is the answer whole as received; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_EVIDENCE: &str = "an answer of the pilot lab's invoice round (9 Oct 2026) that no \
+     test reads: kept beside the answers the replay uses as the evidence for §9.16; \
+     pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_ADMISSION: &str = "an answer of the pilot lab (9 Oct 2026), with no row here: \
      the app crate's invoice tests (src/agent_import_invoice_admission_tests.rs through the server, \
      src/agent_import_invoice_wire_tests.rs and src/agent_import_invoice_tests.rs on the parsers \
@@ -2322,65 +2335,97 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",
         REGISTER_NOT_RECORDED,
     ),
-    // The pilot lab answers the invoice tests are made of.
+    // The pilot lab invoice round answers, and the import request they came with.
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml",
-        PILOT_LAB_ADMISSION,
-    ),
-    (
-        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-request.utf16le.xml",
+        IMPORT_REQUEST,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_EVIDENCE,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-marks-before-post.utf16le.xml",
-        PILOT_LAB_ADMISSION,
-    ),
-    (
-        "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml",
-        PILOT_LAB_ADMISSION,
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml",
+        PILOT_LAB_NUMBERING,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml",
+        PILOT_LAB_NUMBERING,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml",
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-vouchers-after-post.utf8.xml",
+        PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml",
         PILOT_LAB_ADMISSION,
     ),
     // The GST status read answers.

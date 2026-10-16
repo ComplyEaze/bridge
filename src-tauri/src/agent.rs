@@ -45,8 +45,6 @@ mod company;
 use company::*;
 #[path = "agent_cash_flow.rs"]
 mod cash_flow;
-#[path = "agent_changes.rs"]
-mod changes;
 #[path = "agent_company_features.rs"]
 mod company_features;
 #[path = "agent_gst_status.rs"]
@@ -223,11 +221,6 @@ fn mark_voucher_party_names(mut voucher: Value) -> Value {
         }
     }
     voucher
-}
-
-fn mark_changed_master_party_name(mut master: Value) -> Value {
-    mark_party_field(&mut master, "name");
-    master
 }
 
 fn open_bill_json(bill: &OpenBillRow) -> Value {
@@ -2331,9 +2324,6 @@ impl Server {
         if let Some(code) = self.terms.refusal() {
             return Err(code.to_string().into());
         }
-        if name == "changed_since" {
-            return Err("changed_since_unqualified".to_string().into());
-        }
         if matches!(name, "build_import_xml" | "parse_bank_statement") {
             self.import_enabled()?;
         }
@@ -2361,7 +2351,6 @@ impl Server {
                 self.build_import_xml(args).await
             }
             "cash_flow" => self.cash_flow(args).await,
-            "changed_since" => self.changed_since(args).await,
             "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "gst_status" => self.gst_status(args).await,

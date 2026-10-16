@@ -355,10 +355,6 @@ cancellation of the call) stays unread until the call ends. The lab write tools 
 not cancellable.
 `egress_log` reads only the final 256 KiB, in 64 KiB reverse-seek chunks, so a
 larger receipt file still yields its bounded tail without loading the head.
-`changed_since` is unavailable: it is omitted from tool discovery and direct calls
-are refused as `changed_since_unqualified` before contacting Tally. Bounded change
-enumeration and snapshot continuation have not been qualified. There is no operator
-setting to enable this tool.
 
 ### Native Trial Balance
 
@@ -1769,8 +1765,7 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
   refuses the read as a protocol error (`agent_read_protocol_invalid`). A
   malformed `BILLDATE` refuses as `bill_allocation_date_invalid`. Both reach every reader that shares the voucher parser,
-  not only `vouchers`: `changes` (where a refusal holds the checkpoint),
-  `voucher_presence`, the empty-window corroboration read and the desktop voucher
+  not only `vouchers`: `voucher_presence`, the empty-window corroboration read and the desktop voucher
   screen. Write-side verification is not affected, because its fetch names no
   allocation fields.
 - An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
@@ -2769,10 +2764,6 @@ admitted `BOOKSFROM` the request pins). On a book holding several years it is
 not the current year's opening: for a period's opening, use `trial_balance` or
 `ledger_movement` with that period's `from`.
 
-The unavailable `changed_since` implementation must not be used as
-change-enumeration evidence; its retained internal response states that
-deletion detection is unsupported.
-
 ### What each tool's evidence covers
 
 What a tool's top-level `evidence.request_sha256` and `response_sha256` cover,
@@ -2969,8 +2960,6 @@ Per tool:
   request: its request digest hashes
   `verify_import_page:<batch_id>:<offset>` and its response digest hashes
   the saved proof.
-- `changed_since` is refused before any request, so it carries only the
-  refusal's local evidence.
 - `egress_log`, `local_data_report`, `parse_bank_statement`, `read_evidence`
   and `voucher_schema` read nothing from Tally. Their request digest hashes the tool's name, and
   their response digest hashes what they return (for `voucher_schema`, the
@@ -3052,8 +3041,7 @@ scoped access refuses them before any company report is read.
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
 any Tally request, and so is a missing required argument (`<name>_required`, for
-example `company_guid_required`). Checkpoint numeric strings are no longer accepted at the tool
-boundary. `changed_since` is unavailable; existing clients must stop calling it.
+example `company_guid_required`).
 
 `validate_masters` accepts 1–100 nonblank names, each at most 1024 characters.
 Near-miss suggestions are limited to 25 names and 8192 UTF-8 bytes per requested

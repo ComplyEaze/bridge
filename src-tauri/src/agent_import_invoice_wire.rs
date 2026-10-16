@@ -12,12 +12,11 @@
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
-//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read once
-//! on a second synthetic lab company (TallyPrime 7.1 Silver, 9 Oct 2026; typed
-//! by hand, sent as UTF-8, before any voucher was keyed): the
-//! Default Tax Unit and one GST registration, each GUID the company's GUID
-//! with a suffix, the registration's dated rows under
-//! `GSTREGISTRATIONDETAILS.LIST`.
+//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read on
+//! BRIDGE PILOT LAB (TallyPrime 7.1 Silver, 9 Oct 2026) with the code's own
+//! request, and once more with a hand-typed one: the Default Tax Unit and one
+//! GST registration, each GUID the company's GUID with a suffix, the
+//! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use quick_xml::events::Event;
@@ -562,11 +561,11 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
 }
 
 /// The company's own GST registrations: a `TaxUnit` collection with no field
-/// list. The shape was read once, on a synthetic lab company, from the same
-/// collection typed by hand and sent as UTF-8 (two units: the Default Tax Unit
-/// and one GST registration whose dated rows carry the state, the
-/// registration type and whether it is inactive); an answer to this request's
-/// own bytes is not yet captured.
+/// list. The shape was read on a synthetic lab company, BRIDGE PILOT LAB, with
+/// this request's own bytes (two units: the Default Tax Unit and one GST
+/// registration whose dated rows carry the state, the registration type and
+/// whether it is inactive), and once from the same collection typed by hand
+/// and sent as UTF-8; the pilot-lab fixtures hold the first answer.
 pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",

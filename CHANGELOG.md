@@ -16,9 +16,9 @@ Apache-2.0 builds from current source stays unambiguous.
 
 ### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)
 
-These changes are in ComplyEaze Bridge 0.6.0. Each line names the pull
-requests it comes from, except where it names an issue. Like every build so far,
-it is not yet code-signed.
+These changes are in ComplyEaze Bridge 0.6.0. Most lines name the pull
+requests or issues they come from. Like every build so far, it is not yet
+code-signed.
 
 **Should I upgrade?**
 
@@ -57,7 +57,7 @@ it is not yet code-signed.
   row's network transfer reference and printed instrument, for the transfer references both banks print. A build
   records each Contra and each skipped row, and a successful build and the first page of a verification carry a
   `transfers` section: each skipped row is paired with the other account's Contra by reference, then by date, or
-  listed as not found, ambiguous, other side unverified or not established, with counts only, no amount, reference,
+  listed in one of its open states (not found, ambiguous, other side unverified or not established, among others), with counts only, no amount, reference,
   party or ledger. A build that would book a transfer a second time is refused (part of #1392, #1585, #1592, #1625).
   Run once, on 15 October 2026, on a Windows lab PC (TallyPrime 7.1 Silver, one synthetic company) with the Contras
   imported by hand. Not measured: which banks print the same reference on both statements of a transfer, how many
@@ -485,7 +485,8 @@ it is not yet code-signed.
   posted would stop every further Sales invoice of its company until it verifies or a person releases it; that cannot
   happen while Sales is off. For Journal, Payment, Receipt and Contra one change is accepted: `"invoice": null` is
   read as absent. A first rehearsal on 7 October 2026 posted two invoices and found what must change before Sales can
-  be switched on; a later change does that (part of #691, #1342, #1463, #1488).
+  be switched on. In 0.6.0 Sales stays switched off, and a Sales invoice is built only when voucher posting is on, so there
+  is no hand import of one (part of #691, #1342, #1463, #1488, #1491).
 
 **Safer or fixed**
 
@@ -580,6 +581,8 @@ it is not yet code-signed.
   committed captures (some of them synthetic) is in the strict form, so none is expected to be refused; a
   TallyPrime release that writes another spelling would be refused until it is observed (#1627).
 
+- The `changed_since` tool, which no build offered, and the code only it reached are deleted (#1769).
+
 - Locked dependencies moved, with no source change: `rustls` 0.23.45 to 0.23.46, which clears four advisories
   published on 14 October 2026 (RUSTSEC-2026-0346 to -0349: secrets in `Debug` output of client session values,
   a Brotli certificate decompression that can allocate up to 1 GiB before authentication, and a ServerHello
@@ -589,16 +592,36 @@ it is not yet code-signed.
 
 **Known limits**
 
-- The 0.6.0 build has not yet been run live. The lab record for it, the build and the company used, is added to
-  these notes before the release is published; until it is, read this line as "not run" (#1148).
-- The single posting setting, the upgrade from 0.5.1 and the refusal of the retired `BRIDGE_AGENT_ENABLE_BATCH_POST`
-  (`setting_retired`) have not been run live; what Claude Desktop passes for a new setting on an upgrade is not
-  measured (#1090, #1630).
+- **Live pass of what 0.6.0 writes into Tally (16 October 2026).** The release candidate was installed as the
+  extension in Claude Desktop (Microsoft Store build 2.37337.1.0) on Windows 10 Home 22H2 (build 19045), and run against
+  TallyPrime 7.1 Silver on port 9001, on one new synthetic company, BRIDGE RC GATE LAB. Build: commit
+  `a3b7316947cdf3c5ce46615c8b89e45d538345f3` (pull request #1775, CI run 38877254488), `bridge-tally.mcpb` SHA-256
+  `6b83ca74377d7ed86a2b524f4d53bd2e9753b3318bfa6634078d5f5645184022`, containing `bridge_mcp.exe` SHA-256
+  `e9780806594e60afabdb83d35bb751f0aeefba708b2b63c33b11452bbf0e5a84`; the installed copy was checked against that hash
+  before the run, and the server answered every call (Bridge's own log). With the one posting setting on, each of the
+  four voucher types was posted once with no voucher number after its approval window, and one saved batch of three (a
+  Payment, a Receipt and a Contra) was posted after one approval. In every post Tally's answer reported every counter,
+  created 1 (3 for the batch) and nothing else counted; each voucher then read `posted_verified` in the post's own
+  readback and again in `verify_import`, with no duplicates, and the company's voucher mark moved by exactly the
+  number created. Tally gave the numbers itself: Journal 1, Receipt 2 (the book's seed receipt held 1), Contra 1,
+  Payment 1, then in the batch Payment 2, Receipt 3, Contra 2. On Windows the approval window showed in front of a
+  full-screen Tally and in front of Claude Desktop, with No as the default (one screen, one run) (#1148, #1589, #1630).
+- **Not run in that pass:** a batch of Journals; a batch larger than 3 or near 50; a post Tally refused or that landed
+  partly; amendments; the review acknowledgement window (no voucher raised a doubt); a post that needs an On Account
+  approval (a bill-wise party; the build refused one as designed); the retired batch variable (`setting_retired`); an
+  import file taken to Tally's Import menu; Sales invoice posting (not offered in 0.6.0); the desktop app; Gold; macOS;
+  any other Windows or Tally release. The upgrade from 0.5.1 was not run either, and what Claude Desktop passes for a
+  new setting on an upgrade is not measured (#1090, #1630).
+- **The file tested is not the file that will be tagged.** The pass ran on the CI package of the release pull request.
+  The release workflow builds `bridge_mcp` again on its own, with a plain release build of that binary, where the CI
+  package takes it from the Tauri build; the two files are the same source but not byte-identical, and no build is
+  claimed to be reproducible. Between that commit and the commit the release is built from, no file that goes into the
+  package or the desktop bundles changed (the check is recorded on the pull request that adds this paragraph). The
+  release workflow validates and starts each archive without Tally before it publishes.
 - The `headline` of a batch post has not been seen on a live Tally post (#1090, #1532).
 - Nothing was run on a Mac against a live TallyPrime for this release; the Mac package is built and started by our
   checks without Tally.
-- Each entry above states what it was measured on and what it was not. Open limits are in the issues named in it,
-  and in the README's list of what has been run against a real TallyPrime.
+- What has been run against a real TallyPrime is listed in the README.
 
 ## [0.5.1] - 2026-10-09
 

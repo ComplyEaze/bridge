@@ -921,7 +921,7 @@ impl Server {
             .vouchers
             .iter()
             .any(|voucher| voucher.voucher_type.is_invoice())
-            && !self.settings.writes_enabled
+            && !self.settings.posting.enabled()
         {
             return Err(INVOICE_POST_NOT_ENABLED.to_string().into());
         }

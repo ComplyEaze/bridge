@@ -865,7 +865,7 @@ fn an_invoice_without_a_native_post_route_is_refused_before_a_read_and_before_a_
         .find("self.qualified_import_profile().await")
         .expect("the first read of Tally");
     let off = build
-        .find("&& !self.settings.writes_enabled")
+        .find("&& !self.settings.posting.enabled()")
         .expect("posting off refuses an invoice");
     // Only an invoice: the guard is on the voucher type, in front of the setting.
     let invoice_only = build[..off]

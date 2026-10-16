@@ -2226,7 +2226,7 @@ fn a_single_voucher_preview_fits_at_exactly_1600_characters_and_not_one_more() {
 /// The batch post preview's caps (3,200 characters, 7,000 bytes) against what 40
 /// lines allow, with the company, all 22 parties and the balancing ledger grown to
 /// their own width: ASCII names and three-byte names. At full width the preview
-/// still fits all 40 lines and is under both caps (3,123 characters, 6,725 bytes
+/// still fits all 40 lines and is under both caps (3,119 characters, 6,721 bytes
 /// with three-byte names when measured), so the character and byte caps do not
 /// bind for it: the line caps do. Measured, not derived: a change that lets this
 /// preview grow past them fails here and needs its own boundary test.
@@ -2255,7 +2255,24 @@ fn the_batch_post_preview_at_full_width_against_its_caps() {
                 })
             })
             .collect();
-        let (fit, refusal) = largest_fit(|pad| fits(&grown_lengths(pad, 1, &caps)), 24 * 100);
+        // A step whose lengths equal the last step's builds the same preview:
+        // reuse its result, so every step is still checked.
+        let last = std::cell::RefCell::new(None::<(Vec<usize>, Result<String, String>)>);
+        let (fit, refusal) = largest_fit(
+            |pad| {
+                let lengths = grown_lengths(pad, 1, &caps);
+                let mut last = last.borrow_mut();
+                match &*last {
+                    Some((previous, result)) if *previous == lengths => result.clone(),
+                    _ => {
+                        let result = fits(&lengths);
+                        *last = Some((lengths, result.clone()));
+                        result
+                    }
+                }
+            },
+            24 * 100,
+        );
         assert_eq!(refusal, None, "every field at its width still fits");
         assert_eq!(fit.lines().count(), 40, "{fit}");
         assert!(

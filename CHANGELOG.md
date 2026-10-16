@@ -617,15 +617,27 @@ code-signed.
   Journal, a second numberless Payment, the refusal of a numberless voucher into a Manual-numbered type);
   `voucher_read_cost` against a real `vouchers` call (#1465); the Store-install proof of the lock (#1584, #1459: lock
   contention, `local_data_report` from the chat, which folder the desktop app uses); a second monitor. The candidate was
-  installed over 0.5.1 with Install Extension and its settings were then set by hand; whether 0.5.1's settings carried
-  over was not recorded, and what Claude Desktop passes for a new setting on an upgrade is not measured (#1090,
-  #1630).
-- **The file tested is not the file that will be tagged.** The pass ran on the CI package of the release pull request.
-  The release workflow builds `bridge_mcp` again on its own, with a plain release build of that binary, where the CI
-  package takes it from the Tauri build; the two files are the same source but not byte-identical, and no build is
-  claimed to be reproducible. Between that commit and the commit the release is built from, no file that goes into the
-  package or the desktop bundles changed (the check is recorded on the pull request that adds this paragraph). The
-  release workflow validates and starts each archive without Tally before it publishes.
+  installed while 0.5.1 was present, and its settings were not compared with 0.5.1's; what Claude Desktop passes for a
+  new setting on an upgrade is not measured (#1090, #1630).
+- **The file tested above is not the file that will be tagged.** The pass ran on the CI package of the release pull
+  request. The release workflow builds `bridge_mcp` again on its own, with a plain release build of that binary, where
+  the CI package takes it from the Tauri build; the two files are the same source but not byte-identical, and no build
+  is claimed to be reproducible. Between that commit and the commit the release is built from, no file that goes into
+  the package or the desktop bundles changed (the check is recorded on the pull request that adds this paragraph).
+- **Release package check (16 October 2026, 19:13 local time).** A package built by the release workflow's own package
+  steps (rehearsal run 38885882661, pull request #1777, source commit `d6561887130d4fd4265121d6ef40db650b538280`, which
+  is `a3b73169` plus one workflow file) was installed over the release candidate in Claude Desktop (Microsoft Store
+  2.37337.1.0) on the same Windows 10 computer, TallyPrime 7.1 Silver and company. `bridge-tally-mcp-v0.6.0-windows-x64.mcpb`
+  SHA-256 `3e76e8f6edf4d00fa8a1420b696661be9ddbe0b6ab3c84465f9cff58cc3fda05` (13,821,469 bytes), holding `bridge_mcp.exe`
+  SHA-256 `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`, which is not the release candidate's file;
+  its manifest is byte-identical to the candidate's. The settings were kept by that replace (port 9001, posting on); one
+  run, same version, and it says nothing about an upgrade from 0.5.1. One Journal (12 August 2026, debit BRIDGE RC Expense,
+  credit BRIDGE RC Suspense 5.00, no voucher number) was posted after its approval window: Tally answered created 1,
+  every other counter 0 (538 bytes, SHA-256 `42e4de026f72a1e7d882ad6f19067a8f9a6cf549dc1c40f90c752aefdfebfec5`), the
+  company's voucher mark moved from 8 to 9, the post read `posted_verified` in its own readback and again in
+  `verify_import`, and Tally gave it number 2. The four voucher types and the batch ran on the release candidate, not on
+  this file. The published file is built by the release workflow's own run, after these notes are written, so its
+  `bridge_mcp.exe` is not compared with the one above here.
 - The `headline` of a batch post has not been seen on a live Tally post (#1090, #1532).
 - Nothing was run on a Mac against a live TallyPrime for this release; the Mac package is built and started by our
   checks without Tally.

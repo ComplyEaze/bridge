@@ -3,7 +3,8 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Six
+page was not read again at it, except as said below). Release 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) was
+published after the pull requests named here; this page was not read again at that tag. Six
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -55,7 +56,7 @@ It writes to Tally only if you turn posting on, and then only a Journal,
 Payment, Receipt or Contra it prepared and saved: one voucher at a time, or a
 saved batch of 2 to 50, each post after you approve it in a separate ComplyEaze
 Bridge window (for a batch, its summary). No ComplyEaze Bridge tool can approve
-it. From the build after 0.5.1, one setting covers both. It is a new setting:
+it. From 0.6.0, one setting covers both. It is a new setting:
 if you turned posting on in an earlier version, turn it on again. In 0.5.1 and
 earlier, posting through the extension is one voucher at a time.
 
@@ -280,7 +281,7 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   - *What still passes.* A drive letter mapped to a network share, a link or
     junction partway along a path, and on a Mac a mounted network volume.
   - *What to do.* Keep statements and password files on a local disk. From
-    the release after 0.5.1 the tool refuses, on Windows too, a password file
+    0.6.0 the tool refuses, on Windows too, a password file
     owned by neither you nor Administrators, or that anyone but you, SYSTEM
     and Administrators can read or change; with 0.5.1 or earlier, restrict its
     access yourself.
@@ -445,7 +446,7 @@ accepts such a path only when its text starts with a drive letter, a colon and a
 separator (Windows) or a single slash (a Mac) (section 3). It refuses a password
 file that someone else can read: on macOS one that is not yours or has any group
 or other permission set (it does not read macOS access-control lists), and, from
-the release after 0.5.1, on Windows one owned by neither you nor Administrators,
+0.6.0, on Windows one owned by neither you nor Administrators,
 or whose access list lets anyone but you, SYSTEM and Administrators read or
 change it. Its one extra process is a
 second copy of itself that shows the approval window.

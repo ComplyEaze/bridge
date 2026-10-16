@@ -28,7 +28,7 @@ Bridge is not made by, or affiliated with, Tally Solutions, and we have not run
 the two side by side. TallyPrime also has its own Bank Statement import, which
 takes statement files in the formats Tally lists for each bank.
 
-**Current release:** <!-- managed:current-release -->[`mcp-v0.5.1`](https://github.com/ComplyEaze/bridge/releases/latest) (9 October 2026)<!-- /managed:current-release -->,
+**Current release:** <!-- managed:current-release -->[`mcp-v0.6.0`](https://github.com/ComplyEaze/bridge/releases/latest) (16 October 2026)<!-- /managed:current-release -->,
 for Windows x64 and Apple Silicon Macs, as a Claude Desktop extension (an .mcpb
 file); it has not been run in other MCP clients. We check each release before
 we publish it: the release check confirms that each package launches, lists its
@@ -50,7 +50,7 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** In name order; release 0.5.1 installs 23 of them, and `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` are in source, not yet in a published build. None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** In name order; release 0.6.0 installs 28 of them (30 with posting on). None of them changes your TallyPrime books, and every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -240,6 +240,24 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   0.4.2 was not started on this computer: the chat had no ComplyEaze Bridge tool and showed no error. What was not
   run: a changed re-import, steps 2 to 11 on the published file, posting, and other Windows versions, Tally editions
   or Claude Desktop builds. The record is the contributor's reports on #1413.
+- Builds of 0.6.0 on a Windows computer, on 16 October 2026, India time (#1148). One Windows 10 Home 22H2 computer, Claude Desktop
+  2.37337.1.0 from the Microsoft Store, TallyPrime 7.1 Silver on port 9001, one new synthetic company. What was run: the CI package
+  of the release pull request (commit `a3b7316947cdf3c5ce46615c8b89e45d538345f3`, `bridge-tally.mcpb` SHA-256
+  `6b83ca74377d7ed86a2b524f4d53bd2e9753b3318bfa6634078d5f5645184022`, `bridge_mcp.exe` SHA-256
+  `e9780806594e60afabdb83d35bb751f0aeefba708b2b63c33b11452bbf0e5a84`) with the one posting setting on: a Journal, a Receipt,
+  a Contra and a Payment posted once each with no voucher number, and one batch of three (a Payment, a Receipt and a Contra)
+  posted after one approval. Every post created what it sent, and every voucher read `posted_verified` in the post's own
+  readback and again in `verify_import`. The approval window showed in front of a full-screen Tally and of Claude Desktop, and
+  took keyboard focus (a Down arrow meant for Tally moved the selection inside the window). Then a package built by the release
+  workflow's own steps (rehearsal run 38885882661, `bridge_mcp.exe` SHA-256
+  `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`) was installed over it, kept its settings, and posted one more
+  Journal the same way. The published file (`bridge-tally.mcpb` SHA-256
+  `7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca`, `bridge_mcp.exe` SHA-256
+  `1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1`) is neither of those: its exe differs from the rehearsal's in
+  77 of 26,503,168 bytes, and we have not run it against a live TallyPrime. What was not run: a batch of Journals, a batch of more
+  than 3, a refused or partly landed post, amendments, the review window, an On Account approval, the retired batch variable,
+  the Import menu, the desktop app, Gold, macOS, other Windows or Tally releases, and an upgrade from 0.5.1. The record is in the
+  0.6.0 entry of the changelog.
 - The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
   2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
   published file), against licensed TallyPrime Silver 7.1 holding the lab's own
@@ -453,10 +471,9 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.5.1 package itself has been installed on one Windows computer with Tally
-  closed, and has not been run by us against a live TallyPrime; an earlier CI build of 0.5.1
-  was run against TallyPrime 7.1 Silver on one Windows computer (see the 9 October 2026
-  entry above).
+  0.6.0 package itself has not been run by us against a live TallyPrime; two other builds of 0.6.0, made by
+  our checks from the same source, were run against TallyPrime 7.1 Silver on one Windows computer
+  (see the 16 October 2026 entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.
 - **On a Mac, Tally must run on that same Mac**, in a local Windows virtual
   machine or through approved local forwarding. Bridge only talks to Tally on

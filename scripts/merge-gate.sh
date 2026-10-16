@@ -765,7 +765,7 @@ else
                  [range(0; $d.added_payload | length) as $i |
                   {path: $d.added_locations[$i][0], line: $d.added_locations[$i][1], text: $d.added_payload[$i]}])}
       ' >"$input" 2>/dev/null \
-       || ! located=$(python3 -I "$script_dir/merge_gate_privacy.py" --head "$head" --explain <"$input" 2>/dev/null) \
+       || ! located=$(python3 -I "$script_dir/merge_gate_privacy.py" --head "$head" ${uuid_manifest_file:+--fixture-provenance "$uuid_manifest_file"} --explain <"$input" 2>/dev/null) \
        || ! jq -e '(.hits | type == "array") and (.truncated | type == "number")' <<<"$located" >/dev/null 2>&1; then
       say "note" "could not locate the lines that tripped the privacy scan"
       return 0
@@ -777,6 +777,48 @@ else
       [ "$(jq -r '.truncated' <<<"$located")" -eq 0 ] || say "note" "$(jq -r '.truncated' <<<"$located") more line(s) not listed"
     fi
   }
+  # The synthetic-UUID registry: UUID values the owner has listed on master as synthetic test values. It is read as a blob
+  # of the master ref fetched above, never from the checkout (a file ignored by git, or a path spelled in another case on a
+  # case-insensitive file system, would otherwise carry a pull request's own list into its own run), and only as a regular
+  # file. Anything wrong with it means no list, which is what the scan did before the registry existed: an unlisted UUID is
+  # indeterminate. A pull request cannot add or remove an entry for its own run.
+  uuid_registry_path="scripts/merge-gate-synthetic-uuids.json"
+  uuid_manifest_file=""
+  load_uuid_registry() {
+    local tip entry mode count manifest="$tmpdir/synthetic-uuid-manifest.json"
+    # One commit is resolved once and used for every read below, so a second gate run that fetches meanwhile cannot make
+    # the mode, the bytes and the printed blob come from different states of master.
+    tip=$(git -C "$gate_tree" rev-parse --verify -q "refs/merge-gate/master^{commit}" 2>/dev/null) || {
+      say "note" "synthetic-UUID registry not applied: could not resolve master"; return 0; }
+    entry=$(git -C "$gate_tree" ls-tree "$tip" -- "$uuid_registry_path" 2>/dev/null) || {
+      say "note" "synthetic-UUID registry not applied: could not look it up on master"; return 0; }
+    [ -n "$entry" ] || return 0
+    mode=${entry%% *}
+    if [ "$mode" != "100644" ]; then
+      say "note" "synthetic-UUID registry not applied: it is not a regular file on master"; return 0
+    fi
+    git -C "$gate_tree" cat-file -e "$tip:$uuid_registry_path" 2>/dev/null || {
+      say "note" "synthetic-UUID registry not applied: could not read it from master"; return 0; }
+    # The bytes go straight from git into jq: capturing them in a shell variable would drop a NUL byte (bash 3.2) and could
+    # make an invalid file valid.
+    if ! git -C "$gate_tree" cat-file blob "$tip:$uuid_registry_path" 2>/dev/null | jq -e '
+      type == "object" and (keys == ["entries", "schema_version"]) and .schema_version == 1 and
+      (.entries | type == "array" and length <= 500 and
+        all(.[]; type == "object" and (keys == ["note", "uuid"]) and
+          (.uuid | type == "string" and length == 36 and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$") and . != "00000000-0000-0000-0000-000000000000") and
+          (.note | type == "string" and test("[^\\s]"))) and
+        (([.[].uuid] | length) == ([.[].uuid] | unique | length)))
+    ' >/dev/null 2>&1; then
+      say "note" "synthetic-UUID registry not applied: it is not valid (schema 1, at most 500 entries, each with a lowercase non-nil uuid and a note, no duplicates)"; return 0
+    fi
+    if ! git -C "$gate_tree" cat-file blob "$tip:$uuid_registry_path" 2>/dev/null | jq --arg head "$head" '[.entries[] | {uuid: .uuid, head: ($head | ascii_downcase), source: "fixture"}]' >"$manifest" 2>/dev/null; then
+      say "note" "synthetic-UUID registry not applied: could not write the list for the scan"; return 0
+    fi
+    count=$(jq -r 'length' "$manifest")
+    uuid_manifest_file="$manifest"
+    say "note" "synthetic-UUID registry: $count listed value(s) applied (blob $(git -C "$gate_tree" rev-parse --short=12 "$tip:$uuid_registry_path" 2>/dev/null))"
+  }
+  load_uuid_registry
   scan_input_file="$tmpdir/privacy-scan-input"
   scan_input_write_status=0
   {
@@ -787,7 +829,7 @@ else
     unknown "could not assemble complete privacy scan input"
   else
     privacy_result_status=0
-    privacy_result=$(python3 -I "$script_dir/merge_gate_privacy.py" --head "$head" <"$scan_input_file") || privacy_result_status=$?
+    privacy_result=$(python3 -I "$script_dir/merge_gate_privacy.py" --head "$head" ${uuid_manifest_file:+--fixture-provenance "$uuid_manifest_file"} <"$scan_input_file") || privacy_result_status=$?
     if [ "$privacy_result_status" -ne 0 ] || ! jq -e '
       type == "object" and
       (.blockers | type == "array" and all(.[]; type == "string" and length > 0)) and
@@ -891,7 +933,7 @@ else
   fi
 fi
 gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
-if grep -E '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
   bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo

@@ -1286,9 +1286,8 @@ fn the_batch_size_the_texts_state_is_the_batch_post_limit() {
             "{tool}'s description does not say {phrase:?}"
         );
     }
-    let clause = "Batch posting is off by default, and with it off each post takes one voucher, \
-         so same-day twins post together only with batch posting on or through a hand import \
-         of the built file.";
+    let clause = "With posting on, a saved batch of up to 50 posts after one approval, \
+         so same-day twins post together in one batch or through a hand import of the built file.";
     for tool in ["build_import_xml", "parse_bank_statement"] {
         let description = definitions
             .as_array()
@@ -1299,14 +1298,14 @@ fn the_batch_size_the_texts_state_is_the_batch_post_limit() {
             .unwrap_or_else(|| panic!("{tool} has no description"));
         assert!(
             description.contains(clause),
-            "{tool}'s description lost the batch-posting clause"
+            "{tool}'s description lost the same-day twins clause"
         );
     }
     let readme = include_str!("../../docs/agent/README.md");
     let flat = readme.split_whitespace().collect::<Vec<_>>().join(" ");
     assert!(
         flat.contains(clause),
-        "the README lost the batch-posting clause"
+        "the README lost the same-day twins clause"
     );
     let sentence = format!(
         "cut a batch only between days, at most {MAX_BATCH_POST_VOUCHERS} vouchers (the batch-post limit)"

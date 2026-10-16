@@ -29,6 +29,7 @@ DEFAULT_TOOLS = {
     "list_companies",
     "local_data_report",
     "masters",
+    "month_register",
     "outstandings",
     "profit_and_loss",
     "purchase_register",
@@ -257,12 +258,14 @@ def resolve_environment(manifest):
     require(mappings["BRIDGE_TERMS_ACCEPTED"] == "${user_config.accept_terms_2026_10_1}",
             "terms_environment_mapping_mismatch")
     require(mappings["BRIDGE_AGENT_ENABLE_IMPORT"] == "true", "import_environment_mapping_mismatch")
-    writes = manifest["user_config"].get("enable_writes", {})
+    writes = manifest["user_config"].get("enable_posting_2026_10", {})
     require(writes.get("type") == "boolean" and isinstance(writes.get("default"), bool),
             "writes_default_must_be_boolean")
     # Posting stays off by default while the limits recorded on bridge#574 and bridge#579 remain.
     require(writes["default"] is False, "posting_must_default_off")
-    require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_writes}",
+    # The key is versioned (bridge#1090): a value stored under the released enable_writes, whose
+    # text offered one voucher at a time, must not turn on batch posting, so it is mapped to nothing.
+    require(mappings["BRIDGE_AGENT_ENABLE_WRITES"] == "${user_config.enable_posting_2026_10}",
             "writes_environment_mapping_mismatch")
     # Supply isolated client settings through the manifest itself. Overwriting
     # the resulting environment would hide broken host/port substitutions.

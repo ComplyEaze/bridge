@@ -71,8 +71,9 @@ export function classify(path, rules) {
   return null;
 }
 
-// A test file carries the tier of the module it tests: `x_tests.rs` is judged with `x.rs`, and `dir/tests.rs` with `dir/mod.rs`. A module
-// that no rule classifies makes its test file full as well.
+// A RUST test file carries the tier of the module it tests: `x_tests.rs` is judged with `x.rs`, and `dir/tests.rs` with `dir/mod.rs`. A module
+// that no rule classifies makes its test file full as well. Tests in other languages (`*.test.*`, `*.spec.ts`) are classified by their own
+// path and the name rules only; they are not tied to a module.
 function moduleOf(path) {
   if (path.endsWith("_tests.rs")) return `${path.slice(0, -"_tests.rs".length)}.rs`;
   if (path.endsWith("/tests.rs")) return `${path.slice(0, -"tests.rs".length)}mod.rs`;

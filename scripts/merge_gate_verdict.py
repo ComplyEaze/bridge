@@ -14,8 +14,8 @@ The line may also open a longer comment or review: its first line is the verdict
 written review) carries neither token, read the same way as everywhere else; a review that opens with the line is then the one thing the
 reviewer posts. Prose before the line, a line with spaces around it or a token anywhere else in the body is a malformed owner line and voids.
 
-The document may carry `carried`, {"head": H, "base": B}, which only the gate sets, after proving that the pull request's own patch has
-the same patch-id at H and B as at the current head and merge base: a MERGE-VERDICT CLEAN line that names exactly that pair then stands
+The document may carry `carried`, {"head": H, "base": B}, which only the gate sets, after proving that the pull request's own diff is
+byte-identical (apart from index lines and the text after the hunk numbers) at H and B and at the current head and merge base: a MERGE-VERDICT CLEAN line that names exactly that pair then stands
 as if it named the current pair. It carries the CLEAN line only; MERGE-ADVERSARY RECOMMEND must name the current pair. The result's
 `candidate_clean` names the pair of the newest standing-but-for-its-pair CLEAN line, which is what the gate asks about.
 

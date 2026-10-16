@@ -133,6 +133,11 @@ test("the real list puts the write path, credentials and the gate in the full ti
     "src-tauri/src/agent_company_checkpoint.rs",
     "src-tauri/src/reports/bulk_party_statement.rs",
     "src-tauri/src/reports/bulk_party_statement_tests.rs",
+    // company identity the interface relies on, and the pages that carry the installer links
+    "src/tally-company-selection.ts",
+    "src/company-identity.ts",
+    "site/download.html",
+    "docs/agent/INSTALL.md",
     // Rust that talks to Tally is full whatever it is called: the read tools, their request builders and parsers, the company pin,
     // the runtime requests, the core models
     "src-tauri/src/agent_company.rs",

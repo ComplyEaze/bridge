@@ -108,11 +108,10 @@ whose ledger now points to a different master.
   statement's account number, and a shortened name can still be
   identified, not least from the GSTIN or PAN sent beside it. See *Before you
   use it with client data* below.
-- **Posting is off by default in the extension.** If you installed an
-  earlier version, note that this is a new setting: if you turned posting on in
-  an earlier version, turn it on again. When you turn posting on, each post waits
-  for your approval in a separate ComplyEaze Bridge window (for a batch, its
-  summary). No Bridge tool lets the assistant approve
+- **Posting is off by default in the extension.** Note that this is a new
+  setting: if you turned posting on in an earlier version, turn it on again.
+  When you turn posting on, each post waits for your approval in a separate
+  ComplyEaze Bridge window (for a batch, its summary). No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
   landed. Four known limits remain: ComplyEaze Bridge cannot undo a posted
@@ -321,8 +320,8 @@ exist.
   every posting still waits for your approval in a separate Bridge dialog (for a
   batch, its summary). For a batch there are two more limits: if Tally creates
   only some vouchers of a batch, Bridge reports which ones it finds in the book
-  and which it does not, and refuses to post the missing ones again, so check
-  each in Tally; and a batch of more than 50, or one whose summary does not fit
+  and which it does not, and refuses to post the missing ones again (a voucher it does not find may still be in Tally, edited: check
+  each in Tally and do not re-enter it before you check); and a batch of more than 50, or one whose summary does not fit
   the window, is refused. Leave the setting
   off unless you accept those risks. Voucher file preparation and bank-statement
   parsing, which write nothing to Tally, stay available with the setting off.

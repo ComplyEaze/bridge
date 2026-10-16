@@ -306,7 +306,7 @@ Turning on **Allow voucher posting, one voucher or a batch of up to 50** in the
 extension settings adds posting; every new posting still requires your approval in a separate ComplyEaze Bridge
 dialog. For a batch there are two more limits: if Tally creates only some vouchers of a batch, ComplyEaze Bridge
 reports which ones it finds in the book and which it does not, and refuses to post the missing ones again, so check
-each in Tally; and a batch of more than 50, or one whose summary does not fit the window, is refused. Leave it off
+each in Tally (a voucher it does not find may still be in Tally, edited: do not re-enter it before you check); and a batch of more than 50, or one whose summary does not fit the window, is refused. Leave it off
 unless you accept those risks. This is a new setting: if you turned posting on in an earlier version, turn it on
 again.
 

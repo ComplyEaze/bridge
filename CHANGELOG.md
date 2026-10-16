@@ -302,12 +302,12 @@ code-signed.
   build, a connector older than it refuses the import journal (a downgrade was already refused after
   the first native post), so keep this version for recovery (#911).
 
-- **On Windows, the approval window should now open above a full-screen Tally (not yet seen
-  live).** It could open behind TallyPrime when Tally filled the screen, so the person saw
+- **On Windows, the approval window now opens above a full-screen Tally (seen once).** It could open behind TallyPrime when Tally filled the screen, so the person saw
   nothing and the approval lapsed unanswered. Both windows, the post approval and the review
   acknowledgement, are now drawn above every window that is not itself kept on top. Nothing
-  else changes: the text, the buttons, No as the default and the two-minute limit. Not yet
-  measured on a live Windows screen (#1589).
+  else changes: the text, the buttons, No as the default and the two-minute limit. Seen once, on
+  one screen, in front of a full-screen Tally and in front of Claude Desktop; the same run found that the window
+  takes keyboard focus (see "Known limits") (#1589).
 
 - **A one-voucher approval now shows a long narration in parts, where it refused it before.**
   A bank-statement voucher's narration is often too long for one line of the dialog, so posting
@@ -485,8 +485,8 @@ code-signed.
   posted would stop every further Sales invoice of its company until it verifies or a person releases it; that cannot
   happen while Sales is off. For Journal, Payment, Receipt and Contra one change is accepted: `"invoice": null` is
   read as absent. A first rehearsal on 7 October 2026 posted two invoices and found what must change before Sales can
-  be switched on. In 0.6.0 Sales stays switched off, and a Sales invoice is built only when voucher posting is on, so there
-  is no hand import of one (part of #691, #1342, #1463, #1488, #1491).
+  be switched on. In 0.6.0 Sales stays switched off, and a Sales invoice would be built only when voucher posting is on, so
+  there would be no hand import of one (part of #691, #1342, #1463, #1488, #1491).
 
 **Safer or fixed**
 
@@ -605,13 +605,21 @@ code-signed.
   readback and again in `verify_import`, with no duplicates, and the company's voucher mark moved by exactly the
   number created. Tally gave the numbers itself: Journal 1, Receipt 2 (the book's seed receipt held 1), Contra 1,
   Payment 1, then in the batch Payment 2, Receipt 3, Contra 2. On Windows the approval window showed in front of a
-  full-screen Tally and in front of Claude Desktop, with No as the default (one screen, one run) (#1148, #1589, #1630).
+  full-screen Tally and in front of Claude Desktop, with No as the default (one screen, one run). In that run a key meant for Tally (the Down arrow) moved the selection
+  inside the approval window (No, Cancel, Yes) and Tally did not react: the window takes keyboard focus. No is still the
+  default, so Enter alone refuses; arrow keys followed by Enter can reach Yes. A typed letter was not tried (#1148,
+  #1589, #1630).
 - **Not run in that pass:** a batch of Journals; a batch larger than 3 or near 50; a post Tally refused or that landed
   partly; amendments; the review acknowledgement window (no voucher raised a doubt); a post that needs an On Account
   approval (a bill-wise party; the build refused one as designed); the retired batch variable (`setting_retired`); an
   import file taken to Tally's Import menu; Sales invoice posting (not offered in 0.6.0); the desktop app; Gold; macOS;
-  any other Windows or Tally release. The upgrade from 0.5.1 was not run either, and what Claude Desktop passes for a
-  new setting on an upgrade is not measured (#1090, #1630).
+  any other Windows or Tally release. Also not run: the voucher-numbering rows (#724, #1668: a back-dated numberless
+  Journal, a second numberless Payment, the refusal of a numberless voucher into a Manual-numbered type);
+  `voucher_read_cost` against a real `vouchers` call (#1465); the Store-install proof of the lock (#1584, #1459: lock
+  contention, `local_data_report` from the chat, which folder the desktop app uses); a second monitor. The candidate was
+  installed over 0.5.1 with Install Extension and its settings were then set by hand; whether 0.5.1's settings carried
+  over was not recorded, and what Claude Desktop passes for a new setting on an upgrade is not measured (#1090,
+  #1630).
 - **The file tested is not the file that will be tagged.** The pass ran on the CI package of the release pull request.
   The release workflow builds `bridge_mcp` again on its own, with a plain release build of that binary, where the CI
   package takes it from the Tauri build; the two files are the same source but not byte-identical, and no build is

@@ -60,17 +60,12 @@ pub(super) fn validate_tool_arguments(name: &str, args: &Value) -> Result<(), St
                 }
             }
             Some("integer") => {
-                if matches!(key.as_str(), "offset" | "limit" | "top") {
-                    if property["minimum"].as_u64() == Some(1) {
-                        arg_positive_usize(args, key, 1)?;
-                    } else {
-                        arg_usize(args, key, 0)?;
-                    }
+                if matches!(key.as_str(), "offset" | "limit" | "top")
+                    && property["minimum"].as_u64() == Some(1)
+                {
+                    arg_positive_usize(args, key, 1)?;
                 } else {
-                    if !value.is_u64() {
-                        return Err("checkpoint_invalid".to_string());
-                    }
-                    checkpoint_arg(args, key)?;
+                    arg_usize(args, key, 0)?;
                 }
             }
             Some("array") => {
@@ -294,12 +289,7 @@ fn proposed_voucher_schema() -> Value {
 }
 
 pub(super) fn tool_definitions(import_enabled: bool, writes_enabled: bool) -> Value {
-    let mut definitions = registered_tool_definitions(import_enabled, writes_enabled);
-    definitions
-        .as_array_mut()
-        .expect("tools")
-        .retain(|tool| tool["name"] != "changed_since");
-    definitions
+    registered_tool_definitions(import_enabled, writes_enabled)
 }
 
 #[cfg(feature = "lab-writes")]
@@ -352,7 +342,6 @@ impl ToolEffect {
             "balance_sheet" => Self::Read,
             "build_import_xml" => Self::LocalWrite(BUILD_IMPORT_SENTENCE),
             "cash_flow" => Self::Read,
-            "changed_since" => Self::Read,
             "company_features" => Self::Read,
             "egress_log" => Self::Read,
             "gst_status" => Self::Read,
@@ -406,7 +395,6 @@ pub(super) const REGISTERED_TOOL_NAMES: &[&str] = &[
     "balance_sheet",
     "build_import_xml",
     "cash_flow",
-    "changed_since",
     "company_features",
     "egress_log",
     "gst_status",
@@ -528,7 +516,6 @@ fn describe_parameters(name: &str, schema: &mut Value) {
     }
 }
 
-// Retain the internal schema while bounded change enumeration is unqualified.
 pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: bool) -> Value {
     #[allow(unused_mut)] // only mutated when the `lab-writes` feature is compiled in
     let mut names = REGISTERED_TOOL_NAMES.to_vec();
@@ -583,10 +570,6 @@ pub(super) fn registered_tool_definitions(import_enabled: bool, writes_enabled: 
                     "cash_flow" => (
                         "Return Tally's own Cash Flow for whole months: its month-wise movement of the cash and bank ledgers, not a cash flow statement under AS 3. The months are returned only after the net total of the whole period has been compared with the trial balance, over the ledgers this check counts as cash and bank (those under Cash-in-Hand and Bank Accounts, a group inside them included; a ledger under a group a user made inside one was not measured), and found equal; otherwise the result is not_established and no month is shown (cash_flow_differs_from_trial_balance; cash_flow_money_group_unmeasured when a Bank OD A/c or Bank OCC A/c ledger has movement; cash_flow_nothing_to_compare when neither the cash and bank ledgers nor Tally's Cash Flow carry an amount for the period). Each month's `closing` is Tally's closing column for it, not checked month by month, and Tally's debit and credit columns are not returned. A month Tally printed with no amount is returned with an empty closing, which is not zero and does not say the month had no entries. A negative amount is a debit: cash and bank grew. The result's unmeasured_in_this_answer names any credit amount, positive closing or window from March into April it contains (a credit amount was seen tied to the trial balance in live runs on one synthetic book (two windows, one of them with a positive closing), and a window from March into April was not run; no month was compared with Tally's own Cash Flow screen: compare such months with it); two zero nets are not a tie (cash_flow_nothing_to_compare). The window must be whole months, at most twelve, and not start before the book (cash_flow_window_not_month_start, cash_flow_window_not_month_end, cash_flow_window_too_many_months, trial_balance_before_books). A book with several currency masters and Education mode are refused. The report's cost on a large book with cash activity is not known (one year of empty months on a large book answered at once): ask for one month first, and if a call times out do not repeat it.",
                         json!({"type":"object","additionalProperties":false,"required":["company_guid","from","to"],"properties":{"company_guid":{"type":"string","minLength":1},"from":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"},"to":{"type":"string","pattern":"^[0-9]{4}-?[0-9]{2}-?[0-9]{2}$"}}}),
-                    ),
-                    "changed_since" => (
-                        "Return snapshot-pinned AlterID voucher and master evidence. Continue a truncated scan with both returned AlterID cursors and snapshot values; deletion detection remains unsupported.",
-                        json!({"type":"object","additionalProperties":false,"required":["company_guid"],"properties":{"company_guid":{"type":"string","minLength":1},"voucher_alter_id":{"type":"integer","minimum":0,"default":0},"master_alter_id":{"type":"integer","minimum":0,"default":0},"voucher_snapshot_alter_id":{"type":"integer","minimum":0},"master_snapshot_alter_id":{"type":"integer","minimum":0}}}),
                     ),
                     "company_features" => (
                         "Return three settings Tally's company record holds today for one company: cost centres, GST and batch-wise stock (each yes, no or not_reported), and the company's currency symbol. They say nothing about what the books contain or what the settings were during a year: a cost-centre allocation can be stored while the setting reads No. Each of the three settings has been compared with Tally's own F11 screen, on three synthetic books and not on this company; a setting changed inside a sitting has not been measured. Each setting says what it rests on. The currency is the symbol Tally holds (for example the rupee sign), not an ISO code, and it does not say whether foreign currencies are used. A setting Tally did not send is not_reported, never no. Tally's other feature flags are fetched in the same request and are not returned. Nothing this tool returns changes what another tool reads or refuses. Take company_guid from list_companies. This reads the company record and the book extent twice and returns no ledger, voucher, amount or narration. A company in Education mode is refused. Never present a setting as a fact about the books or about a past period.",

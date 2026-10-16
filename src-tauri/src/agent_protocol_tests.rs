@@ -507,11 +507,15 @@ async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_rec
         json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"absent_tool","arguments":{}}}),
         json!({"jsonrpc":"2.0","id":3,"method":"absent/method"}),
         json!({"jsonrpc":"2.0","id":4,"method":"ping"}),
+        json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"changed_since","arguments":{}}}),
     ]).await;
     assert_eq!(responses[1]["error"]["code"], -32602);
     assert_eq!(responses[1]["error"]["message"], "tool_not_found");
     assert_eq!(responses[2]["error"]["code"], -32601);
     assert_eq!(responses[3]["result"], json!({}));
+    // The removed change-feed tool is an unknown name like any other.
+    assert_eq!(responses[4]["error"]["code"], -32602);
+    assert_eq!(responses[4]["error"]["message"], "tool_not_found");
     let receipt: Value = serde_json::from_str(
         fs::read_to_string(directory.path().join("agent-egress.jsonl"))
             .unwrap()
@@ -527,6 +531,20 @@ async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_rec
     assert_eq!(
         receipt["response_sha256"],
         sha256_hex(format!("{}\n", responses[1]).as_bytes())
+    );
+    let removed_tool_receipt: Value =
+        fs::read_to_string(directory.path().join("agent-egress.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .find(|receipt| receipt["tool_name_sha256"] == sha256_hex(b"changed_since"))
+            .expect("a receipt for the removed tool's name");
+    assert_eq!(removed_tool_receipt["tool"], "unknown");
+    assert_eq!(removed_tool_receipt["rows_prepared"], 0);
+    assert_eq!(removed_tool_receipt["fields_prepared"], json!([]));
+    assert_eq!(
+        removed_tool_receipt["response_sha256"],
+        sha256_hex(format!("{}\n", responses[4]).as_bytes())
     );
 }
 

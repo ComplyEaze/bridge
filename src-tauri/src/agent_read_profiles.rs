@@ -262,66 +262,6 @@ pub(super) fn gst_status_read(
     render_gst_status_window(company, from, to, type_name).map(ReadRequest)
 }
 
-pub(super) fn render_agent_changed_vouchers(
-    company: &str,
-    checkpoint: u64,
-    snapshot: u64,
-) -> String {
-    format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Changed Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeAgentChangedVoucher\">$AlterID &gt; {checkpoint} AND $AlterID &lt;= {snapshot}</SYSTEM><COLLECTION NAME=\"Bridge Agent Changed Vouchers\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>{AGENT_VOUCHER_FETCH}</FETCH><FILTERS>BridgeAgentChangedVoucher</FILTERS><SORT>Default: $AlterID</SORT></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
-        xml_escape(company)
-    )
-}
-
-#[derive(Clone, Copy)]
-pub(super) enum MasterKind {
-    Ledger,
-    Group,
-}
-
-impl MasterKind {
-    pub(super) const ALL: [Self; 2] = [Self::Ledger, Self::Group];
-
-    fn tally_type(self) -> &'static str {
-        match self {
-            Self::Ledger => "Ledger",
-            Self::Group => "Group",
-        }
-    }
-}
-
-pub(super) fn render_agent_changed_masters(
-    company: &str,
-    checkpoint: u64,
-    snapshot: u64,
-    kind: MasterKind,
-) -> String {
-    render_master_collection(company, kind, Some((checkpoint, snapshot)))
-}
-
-pub(super) fn render_agent_master_domain_high_water(company: &str, kind: MasterKind) -> String {
-    render_master_collection(company, kind, None)
-}
-
-fn render_master_collection(company: &str, kind: MasterKind, window: Option<(u64, u64)>) -> String {
-    let object_type = kind.tally_type();
-    let name = format!("Bridge Agent {object_type} Changes");
-    let (formula, filter, fields) = match window {
-        Some((checkpoint, snapshot)) => (
-            format!(
-                r#"<SYSTEM TYPE="Formulae" NAME="BridgeAgentChangedMaster">$AlterID &gt; {checkpoint} AND $AlterID &lt;= {snapshot}</SYSTEM>"#
-            ),
-            "<FILTERS>BridgeAgentChangedMaster</FILTERS><SORT>Default: $AlterID</SORT>",
-            "NAME,PARENT,ALTERID,GUID,MASTERID",
-        ),
-        None => (String::new(), "", "ALTERID"),
-    };
-    format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>{name}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME="{name}" ISMODIFY="No"><TYPE>{object_type}</TYPE><FETCH>{fields}</FETCH>{filter}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
-        xml_escape(company)
-    )
-}
-
 pub(super) fn render_agent_company_high_water(company: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Company High Water</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Agent Company High Water\" ISMODIFY=\"No\"><TYPE>Company</TYPE><FETCH>GUID,ALTVCHID,ALTMSTID</FETCH></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
@@ -368,25 +308,6 @@ pub(super) fn voucher_type_catalogue_read(company: &str) -> ReadRequest {
 
 pub(super) fn company_high_water_read(company: &str) -> ReadRequest {
     ReadRequest(render_agent_company_high_water(company))
-}
-
-pub(super) fn master_domain_high_water_read(company: &str, kind: MasterKind) -> ReadRequest {
-    ReadRequest(render_agent_master_domain_high_water(company, kind))
-}
-
-pub(super) fn changed_vouchers_read(company: &str, checkpoint: u64, snapshot: u64) -> ReadRequest {
-    ReadRequest(render_agent_changed_vouchers(company, checkpoint, snapshot))
-}
-
-pub(super) fn changed_masters_read(
-    company: &str,
-    checkpoint: u64,
-    snapshot: u64,
-    kind: MasterKind,
-) -> ReadRequest {
-    ReadRequest(render_agent_changed_masters(
-        company, checkpoint, snapshot, kind,
-    ))
 }
 
 pub(super) fn standard_ledger_catalog_read(company: &str) -> anyhow::Result<ReadRequest> {
@@ -529,10 +450,6 @@ mod sealed_read_tests {
         let (from, to) = (tally_date("20260401"), tally_date("20260430"));
         let mut reads = vec![
             company_high_water_read(company),
-            master_domain_high_water_read(company, MasterKind::Ledger),
-            master_domain_high_water_read(company, MasterKind::Group),
-            changed_vouchers_read(company, 1, 2),
-            changed_masters_read(company, 1, 2, MasterKind::Ledger),
             standard_ledger_catalog_read(company).unwrap(),
             native_group_snapshot_read(company),
             voucher_census_read(company, &from, &to, span).unwrap(),

@@ -164,7 +164,7 @@ ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, r
 <div><dt>A post can land in the wrong company or ledger.</dt><dd>Tally aims an import at a company by name and cannot bind it to a company’s GUID. In its last request before the post, ComplyEaze Bridge checks that exactly one loaded company has the target’s GUID and name and that no other loaded company has the same name ignoring case and spacing. A company renamed or loaded in the moment after that check could still receive the voucher if it has the voucher’s ledgers, and a ledger renamed and replaced in that moment could receive the entry. The README lists this among the limits of posting.</dd></div>
 <div><dt>There is no undo.</dt><dd>No tool deletes or reverses a posted voucher.</dd></div>
 <div><dt>Read-back is partial.</dt><dd>It compares date, voucher type and ledger entries, not every field, and a match is no check of correctness.</dd></div>
-<div><dt>One voucher per approval.</dt><dd>A batch setting exists in the server program. The published extension does not set it.</dd></div>
+<div><dt>One approval per post.</dt><dd>One setting covers one voucher or a saved batch of up to 50. A batch is posted after one approval of its summary.</dd></div>
 <div><dt>Tally can slow down.</dt><dd>Requests can make Tally slow or unresponsive, sometimes until it is restarted, including for other users of a shared Tally. Reads on very large books can fail or take longer than the assistant waits.</dd></div></dl>
 <p class="solo">Nobody independent has audited it.</p>
 <h2 id="d6">What we have not run</h2>

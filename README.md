@@ -18,8 +18,8 @@ names before you post, and prepares Journal, Payment, Receipt and Contra
 vouchers as an import file that you review and import into TallyPrime yourself.
 Posting is off by default in a new install, so as installed it never posts to
 TallyPrime: it reads from it and prepares files on your computer. If you turn
-posting on in the extension, it posts vouchers one at a time, after you approve
-each one.
+posting on in the extension, it posts one voucher at a time, or a saved batch
+of up to 50, after you approve each post.
 
 Tally Solutions also offers its own TallyPrime MCP plug-in for Claude Desktop;
 its help pages (last updated 18 September 2026) list tools in six groups:
@@ -84,8 +84,8 @@ with no figures, to a log on this computer.
 | `voucher_schema` | The voucher-file format, without asking TallyPrime | Nothing |
 | `vouchers` | The vouchers in a period. Search by voucher number, reference, narration or amount, and summaries by ledger, month, voucher type, group or primary group, are in release 0.5.0 and not in 0.4.2 (search and the first three summaries checked once, and the group and primary-group summaries in a second run, on a synthetic book of 67 vouchers; not checked on a large book) | Nothing |
 
-With posting turned on in the extension, two more appear: `post_import` posts one saved voucher after you approve it in a
-ComplyEaze Bridge window, and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
+With posting turned on in the extension, two more appear: `post_import` posts one saved voucher, or a saved batch of 2 to 50,
+after you approve it in a ComplyEaze Bridge window (for a batch, its summary), and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
 whose ledger now points to a different master.
 
 ## How it handles your books
@@ -109,9 +109,10 @@ whose ledger now points to a different master.
   identified, not least from the GSTIN or PAN sent beside it. See *Before you
   use it with client data* below.
 - **Posting is off by default in the extension.** If you installed an
-  earlier version, check the setting: an earlier default may still be saved as
-  on. When you turn posting on, each voucher waits for your approval in a
-  separate ComplyEaze Bridge window. No Bridge tool lets the assistant approve
+  earlier version, note that this is a new setting: if you turned posting on in
+  an earlier version, turn it on again. When you turn posting on, each post waits
+  for your approval in a separate ComplyEaze Bridge window (for a batch, its
+  summary). No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
   token. After posting, the voucher is read back from Tally so you can see what
   landed. Four known limits remain: ComplyEaze Bridge cannot undo a posted
@@ -314,16 +315,25 @@ exist.
 
 - **The Claude Desktop extension turns voucher posting off by default.** Four
   known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. Turning on
-  **Allow voucher posting (Journal, Payment, Receipt, Contra)** in the extension
-  settings adds `post_import`, which posts one saved voucher of those types; every
-  posting still waits for your approval in a separate Bridge dialog. Leave it
+  **Allow voucher posting, one voucher or a batch of up to 50** in the extension
+  settings adds `post_import`, which posts one saved voucher of those types, or a
+  saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras;
+  every posting still waits for your approval in a separate Bridge dialog (for a
+  batch, its summary). For a batch there are two more limits: if Tally creates
+  only some vouchers of a batch, Bridge reports which ones it finds in the book
+  and which it does not, and refuses to post the missing ones again, so check
+  each in Tally; and a batch of more than 50, or one whose summary does not fit
+  the window, is refused. Leave the setting
   off unless you accept those risks. Voucher file preparation and bank-statement
   parsing, which write nothing to Tally, stay available with the setting off.
-  If you installed an earlier version, check the setting: an earlier default
-  may still be saved as on.
+  This is a new setting: if you turned posting on in an earlier version, turn it
+  on again.
 - **A source build turns writing off by default.** Preparing a file needs
   `BRIDGE_AGENT_ENABLE_IMPORT`; posting additionally needs
-  `BRIDGE_AGENT_ENABLE_WRITES`, which grants both.
+  `BRIDGE_AGENT_ENABLE_WRITES`, which grants both and covers one voucher and a
+  saved batch of 2 to 50. `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while
+  posting is on and it is still set, `post_import` refuses as `setting_retired`;
+  remove it.
 - **A source build also needs `BRIDGE_TERMS_ACCEPTED=true`.** The extension asks
   for that as its "I accept" setting; without it every tool refuses.
 
@@ -331,8 +341,10 @@ With writing on:
 
 - **Prepares vouchers as a local file** — Journal, Payment, Receipt and
   Contra. Bridge writes the file; it does not send it.
-- **Posts one saved Journal, Payment, Receipt or Contra per approval**, and
-  only after you approve that exact voucher in a dialog on your own machine.
+- **Posts one saved Journal, Payment, Receipt or Contra per approval, or a saved
+  batch of 2 to 50 after one approval of its summary**, and only after you
+  approve that exact voucher (or that batch's summary) in a dialog on your own
+  machine.
   The assistant cannot approve it. Bridge then reads the voucher back so you
   can see what actually landed. You can also import a prepared file through
   Tally yourself; `verify_import` then reads that back.

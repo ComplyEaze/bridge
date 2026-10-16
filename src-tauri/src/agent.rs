@@ -1448,10 +1448,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "invoice_number_control_missing" => Some(
             "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
              earlier invoice it posted in this company and verified, and Tally did not return \
-             it, so the read cannot be trusted here and the build is refused. Run verify_import \
-             on the batch that posted that invoice. If Tally still shows the invoice, stop and \
-             tell the user the number check does not work on this book; do not post this \
-             invoice through ComplyEaze Bridge.",
+             it, so the read cannot be trusted here and the build is refused. The detail names \
+             the batch that posted that invoice. Run verify_import on it. If it no longer reads \
+             verified, it no longer checks new numbers, and a batch ComplyEaze Bridge sent then \
+             stops the company's invoices until the user releases it (invoice_company_stopped \
+             says how). If it still reads \
+             posted and verified, Tally holds the invoice and the number check does not work on \
+             this book: stop, tell the user, and do not post this invoice through ComplyEaze \
+             Bridge.",
         ),
         "invoice_company_stopped" => Some(
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \

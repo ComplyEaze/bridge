@@ -802,7 +802,7 @@ fn invoice_batch(
 const SALE: &[(&str, &str, &str)] = &[("Customer", "118", "Dr"), ("Sales", "118.00", "Cr")];
 
 /// What the journal offers as the control for a build's number read: a
-/// verified invoice of the company (its number and date), preferring one of the
+/// verified invoice of the company (its batch, number and date), preferring one of the
 /// build's financial year and then the newest; else whether one was ever sent.
 #[test]
 fn the_number_control_is_a_verified_invoice_of_the_company() {
@@ -824,6 +824,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
         NumberControl::NoneVerified
     );
     let known = NumberControl::Known {
+        batch_id: "first".to_string(),
         number: "INV/1".to_string(),
         date: "20260901".to_string(),
     };
@@ -872,6 +873,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
     assert_eq!(
         control(journal(&[&later, &first, &next_year, &last_year])),
         NumberControl::Known {
+            batch_id: "later".to_string(),
             number: "INV/4".to_string(),
             date: "20261015".to_string()
         }
@@ -879,6 +881,7 @@ fn the_number_control_is_a_verified_invoice_of_the_company() {
     assert_eq!(
         control(journal(&[&next_year, &last_year])),
         NumberControl::Known {
+            batch_id: "next-year".to_string(),
             number: "INV/3".to_string(),
             date: "20270410".to_string()
         }
@@ -1228,6 +1231,7 @@ fn a_released_invoice_is_never_the_number_control() {
     // A later verified read voids the release, and the invoice is verified.
     // An unverified read after that is none verified again.
     let known_first = NumberControl::Known {
+        batch_id: "first".to_string(),
         number: "INV/1".to_string(),
         date: "20260901".to_string(),
     };
@@ -1262,6 +1266,54 @@ fn a_released_invoice_is_never_the_number_control() {
             known_first,
             "{seen:?}"
         );
+    }
+}
+
+/// A verified control whose invoice is gone from the book (deleted or
+/// re-dated in Tally, or the books restored): the verification that no longer
+/// finds it ends its use as the control and stops the company, an earlier
+/// verified invoice becomes the control, and one release lifts the stop.
+#[test]
+fn a_control_that_no_longer_verifies_stops_its_company_until_released() {
+    let control = |journal: &[Vec<u8>]| {
+        invoice_number_control(
+            Cursor::new(journal.concat()),
+            "synthetic-guid",
+            ("20260401", "20270331"),
+        )
+        .unwrap()
+    };
+    let older = invoice_batch("older", 'a', ("INV/1", "Sales Manual"), SALE);
+    let gone = invoice_batch("gone", 'b', ("INV/2", "Sales Manual"), SALE);
+    let verified = vec![
+        record(&older),
+        sent(&older),
+        found(&older),
+        record(&gone),
+        sent(&gone),
+        found(&gone),
+    ];
+    assert_eq!(
+        control(&verified),
+        NumberControl::Known {
+            batch_id: "gone".to_string(),
+            number: "INV/2".to_string(),
+            date: "20260901".to_string(),
+        }
+    );
+    assert!(stops(verified.clone()).is_empty());
+    let demoted = [verified, vec![incomplete(&gone)]].concat();
+    let older_known = NumberControl::Known {
+        batch_id: "older".to_string(),
+        number: "INV/1".to_string(),
+        date: "20260901".to_string(),
+    };
+    assert_eq!(control(&demoted), older_known);
+    assert_eq!(stops(demoted.clone()), vec!["gone".to_string()]);
+    for seen in EVERY_SEEN {
+        let after_release = [demoted.clone(), vec![released(&gone, seen)]].concat();
+        assert_eq!(control(&after_release), older_known, "{seen:?}");
+        assert!(stops(after_release).is_empty(), "{seen:?}");
     }
 }
 

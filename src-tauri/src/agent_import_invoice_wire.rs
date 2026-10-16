@@ -336,10 +336,12 @@ pub(super) fn resolve_voucher_type(
     // type reads Automatic (Manual Override) on top and Manual in its series;
     // the type keyed for the rehearsal reads None on top and Manual in its
     // series).
-    // Its "prevent duplicates" flag is Tally's own refusal of a second
-    // voucher of the type with a number already used (§9.8), the guard the
-    // number read's control relies on when no invoice of the company stands
-    // as sent (its first, or every one after a person's release).
+    // Its "prevent duplicates" flag is the guard the number read's control
+    // relies on when no invoice of the company stands as sent (its first, or
+    // every one after a person's release). The protocol reference (§9.8)
+    // measured that flag on Journal and Payment vouchers only (PARTIAL); on a
+    // Sales voucher it is not measured, which ADR 0004 lists as a blocker for
+    // switching Sales on.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {

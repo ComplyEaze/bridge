@@ -840,8 +840,12 @@ pub(super) fn unsettled_invoice_twin(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum NumberControl {
     /// The newest invoice of a batch whose LATEST status is `posted_verified`,
-    /// preferring one dated inside `year`: its number and its date.
-    Known { number: String, date: String },
+    /// preferring one dated inside `year`: its batch, its number and its date.
+    Known {
+        batch_id: String,
+        number: String,
+        date: String,
+    },
     /// No invoice of this company stands as sent: none was sent, or every one
     /// sent was released by a person.
     NoneStanding,
@@ -917,8 +921,11 @@ pub(super) fn invoice_number_control(
     let known = invoices
         .iter()
         .filter(|(id, _)| verified.contains(*id))
-        .flat_map(|(_, (order, held))| held.iter().map(move |invoice| (*order, invoice)))
-        .max_by_key(|(order, (date, _))| {
+        .flat_map(|(id, (order, held))| {
+            held.iter()
+                .map(move |invoice| (id.as_str(), *order, invoice))
+        })
+        .max_by_key(|(_, order, (date, _))| {
             (
                 date.as_str() >= from && date.as_str() <= to,
                 date.clone(),
@@ -926,7 +933,8 @@ pub(super) fn invoice_number_control(
             )
         });
     Ok(match known {
-        Some((_, (date, number))) => NumberControl::Known {
+        Some((batch_id, _, (date, number))) => NumberControl::Known {
+            batch_id: batch_id.to_string(),
             number: number.clone(),
             date: date.clone(),
         },

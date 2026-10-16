@@ -630,3 +630,32 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     assert_eq!(sent_as(&controlled, &requests, 'U'), [LAB_R10_SHA256; 2]);
     assert_eq!(sent_as(&controlled, &requests, 'C'), [LAB_R11_SHA256; 2]);
 }
+
+/// The control read (`r10-number-control-k0.xml`) answered with no voucher:
+/// the pilot lab's empty collection, which reads the same whatever the request
+/// (`pilot-lab/PROVENANCE.md`). The build is refused before the company's
+/// state is read, and the refusal names the verified batch that holds the
+/// control invoice, the batch `verify_import` is to be run on.
+#[tokio::test]
+async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
+    let missing = ADMISSION_ORDER.replace("eNsNse", "eNsNseeNsNse");
+    let (outcome, requests) =
+        admission_after_a_sent_invoice(Then::Status("posted_verified"), &missing).await;
+    assert_eq!(
+        outcome,
+        Err(vec![(
+            "invoice_number_control_missing",
+            sentinel_batch_id(1)
+        )])
+    );
+    assert_eq!(
+        sent_as(&missing, &requests, 'N'),
+        [
+            LAB_R09_SHA256,
+            LAB_R09_SHA256,
+            LAB_R10_SHA256,
+            LAB_R10_SHA256
+        ]
+    );
+    assert!(sent_as(&missing, &requests, 'C').is_empty());
+}

@@ -2304,6 +2304,11 @@ const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oc
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
      feeds it through the build, the post and the read-back and pins what each parse returns; \
      pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_NUMBERING: &str = "an answer of the pilot lab read on 16 Oct 2026, a week \
+     after the invoice round, with no row here: the app crate's replay \
+     (src/agent_import_post_e2e_tests.rs) serves it to the voucher-numbering read of the \
+     build and of the post DERIVED, with the voucher types above the replay's master mark \
+     removed; the file is the answer whole as received; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_EVIDENCE: &str = "an answer of the pilot lab's invoice round (9 Oct 2026) that no \
      test reads: kept beside the answers the replay uses as the evidence for §9.16; \
      pilot-lab/PROVENANCE.md says what it is";
@@ -2389,11 +2394,11 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml",
-        PILOT_LAB_REPLAY,
+        PILOT_LAB_NUMBERING,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml",
-        PILOT_LAB_REPLAY,
+        PILOT_LAB_NUMBERING,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",

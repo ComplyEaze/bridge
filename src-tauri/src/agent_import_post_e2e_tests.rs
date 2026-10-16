@@ -6427,7 +6427,10 @@ async fn a_master_saved_after_the_numbering_read_is_refused_before_the_post() {
 // ---- BP/26-27/0010 on the pilot lab's own answers (#1342, 9 Oct 2026) ----
 //
 // Every answer is Tally's own bytes from the synthetic company BRIDGE PILOT LAB
-// (fixtures/agent/pilot-lab/PROVENANCE.md). The order below is the order the
+// (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
+// answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
+// are served DERIVED: their rows above the master mark 223 removed
+// (`pilot_types_as_of_the_round`). The order below is the order the
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
@@ -6452,7 +6455,9 @@ const PILOT_REQUEST_SHA256: &str =
 /// The SHA-256 of the request the contributor sent for each kind of read in
 /// `PILOT_ORDER` (the contributor's published request list; the write is the file
 /// `pilot-lab-invoice-post-request`): the answer at a position is Tally's
-/// answer to that request and no other.
+/// answer to that request and no other. X and Y are the requests the code
+/// renders, sent to the lab in the 16 Oct 2026 sitting (their answers are the
+/// numbering fixtures, served derived).
 fn pilot_request_sha256(letter: char) -> &'static str {
     match letter {
         'e' => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8", // r01-company-extent.xml
@@ -6494,6 +6499,33 @@ const PILOT_MASTER_MARK: u64 = 223;
 const PILOT_TYPES_AFTER_THE_ROUND: [&str; 3] =
     ["BRIDGE Sales Two", "BRIDGE Sales Z0", "BRIDGE Sales Z1"];
 
+/// Each voucher type row of an answer as `(name, AlterID, GUID)`, in answer
+/// order. The text of a tag is what follows its `>` up to the next `<`.
+fn pilot_type_rows(answer: &str) -> Vec<(String, u64, String)> {
+    const ROW: &str = "<VOUCHERTYPE NAME=\"";
+    fn text_of(row: &str, tag: &str) -> String {
+        let at = row.find(tag).unwrap_or_else(|| panic!("no {tag}"));
+        let from = at + row[at..].find('>').unwrap() + 1;
+        row[from..from + row[from..].find('<').unwrap()]
+            .trim()
+            .to_string()
+    }
+    let mut rows = Vec::new();
+    let mut rest = answer;
+    while let Some(start) = rest.find(ROW) {
+        let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        let row = &rest[start..end];
+        let name = &row[ROW.len()..ROW.len() + row[ROW.len()..].find('"').unwrap()];
+        rows.push((
+            name.to_string(),
+            text_of(row, "<ALTERID").parse().unwrap(),
+            text_of(row, "<GUID"),
+        ));
+        rest = &rest[end..];
+    }
+    rows
+}
+
 /// DERIVED, not Tally's bytes: a numbering answer of the pilot lab as of the
 /// invoice round. The two numbering answers were read on 16 Oct 2026, when the
 /// lab's book had moved on to master mark 245 and held three voucher types
@@ -6502,23 +6534,21 @@ const PILOT_TYPES_AFTER_THE_ROUND: [&str; 3] =
 /// captured answer with exactly those rows removed: every removed row must
 /// carry an `ALTERID` above the mark, and the removed names must be the three
 /// above. The fixture files are the answers whole, as received.
+///
+/// That what is left is what the book held at mark 223 is an inference, checked
+/// only as far as the 9 Oct capture goes: the rows left must equal the 9 Oct
+/// voucher-types capture (the `T` read) in name, AlterID and GUID. The
+/// series-level fields of the rows left have no 9 Oct capture to compare with.
 fn pilot_types_as_of_the_round(answer: &str) -> String {
     const ROW: &str = "<VOUCHERTYPE NAME=\"";
-    const ALTER: &str = "<ALTERID TYPE=\"Number\">";
     let mut kept = String::new();
     let mut removed = Vec::new();
     let mut rest = answer;
     while let Some(start) = rest.find(ROW) {
         let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
-        let row = &rest[start..end];
-        let name = &row[ROW.len()..ROW.len() + row[ROW.len()..].find('"').unwrap()];
-        let alter_at = row.find(ALTER).unwrap() + ALTER.len();
-        let alter: u64 = row[alter_at..alter_at + row[alter_at..].find('<').unwrap()]
-            .trim()
-            .parse()
-            .unwrap();
+        let (name, alter, _) = pilot_type_rows(&rest[start..end]).remove(0);
         if alter > PILOT_MASTER_MARK {
-            removed.push((name.to_string(), alter));
+            removed.push((name, alter));
             kept.push_str(&rest[..start]);
         } else {
             kept.push_str(&rest[..end]);
@@ -6529,6 +6559,13 @@ fn pilot_types_as_of_the_round(answer: &str) -> String {
     let mut names: Vec<&str> = removed.iter().map(|(name, _)| name.as_str()).collect();
     names.sort_unstable();
     assert_eq!(names, PILOT_TYPES_AFTER_THE_ROUND, "{removed:?}");
+    let mut left = pilot_type_rows(&kept);
+    let mut round = pilot_type_rows(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"
+    )));
+    left.sort();
+    round.sort();
+    assert_eq!(left, round, "the rows left are not the 9 Oct voucher types");
     kept
 }
 

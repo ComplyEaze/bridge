@@ -76,8 +76,7 @@ async fn uncertain_build_retains_xml_journal_and_exact_recovery_error() {
         max_bytes: 256,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let result = json!({"isError":true,"content":[],"structuredContent":{"result":{
         "batch_id":update.batch_id,"error":{"code":code}}}});
@@ -266,8 +265,7 @@ async fn staged_build_failures_retain_recorded_batch_identity_through_framing() 
             max_bytes: 256,
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: crate::agent::Posting::Off,
         });
         assert_eq!(
             server.lock_import_admission().err(),
@@ -323,8 +321,7 @@ fn interruption_after_xml_publication_keeps_admission_blocked() {
         max_bytes: 256,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     assert_eq!(
         server.lock_import_admission().err(),
@@ -579,8 +576,7 @@ fn an_append_of_unknown_outcome_keeps_its_marker_and_blocks_import_admission() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     assert_eq!(
         server.lock_import_admission().err(),

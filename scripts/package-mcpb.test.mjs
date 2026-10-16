@@ -121,14 +121,14 @@ test("every host manifest launches its bundled binary and maps user settings to 
     assert.deepEqual(manifest.compatibility.platforms, [platform]);
     // Posting is off by default while the limits recorded on bridge#574 and bridge#579 remain;
     // preparation and bank-statement parsing stay on.
-    assert.equal(manifest.user_config.enable_writes.default, false);
+    assert.equal(manifest.user_config.enable_posting_2026_10.default, false);
     assert.deepEqual(manifest.server.mcp_config.env, {
       BRIDGE_TERMS_ACCEPTED: "${user_config.accept_terms_2026_10_1}",
       BRIDGE_TALLY_HOST: "${user_config.host}",
       BRIDGE_TALLY_PORT: "${user_config.port}",
       BRIDGE_AGENT_REDACTION: "${user_config.redaction}",
       BRIDGE_AGENT_ENABLE_IMPORT: "true",
-      BRIDGE_AGENT_ENABLE_WRITES: "${user_config.enable_writes}",
+      BRIDGE_AGENT_ENABLE_WRITES: "${user_config.enable_posting_2026_10}",
     });
     for (const resource of resources) await writeFile(join(stage, resource), "packaging fixture");
     await assert.rejects(() => verifyMcpbStage(stage), /missing binary/);

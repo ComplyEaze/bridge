@@ -1543,8 +1543,7 @@ mod tests {
             max_bytes: 200_000,
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         });
         let expected = render_lab_master_collection(
             identity.display_name(),

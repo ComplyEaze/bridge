@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Who approves a post to TallyPrime, and what is still weak: ComplyEaze Bridge</title>
-<meta name="description" content="ComplyEaze Bridge is an MCP server for TallyPrime. Posting is off for a new install. When it is on, a native window asks a person to approve each voucher." />
+<meta name="description" content="ComplyEaze Bridge is an MCP server for TallyPrime. Posting is off for a new install. When it is on, a native window asks a person to approve each post." />
 <link rel="canonical" href="https://bridge.complyeaze.com/blog-who-approves-a-post.html" />
 <meta property="og:type" content="article" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="Who approves a post to TallyPrime, and what is still weak: ComplyEaze Bridge" />
-<meta property="og:description" content="ComplyEaze Bridge is an MCP server for TallyPrime. Posting is off for a new install. When it is on, a native window asks a person to approve each voucher." />
+<meta property="og:description" content="ComplyEaze Bridge is an MCP server for TallyPrime. Posting is off for a new install. When it is on, a native window asks a person to approve each post." />
 <meta property="og:url" content="https://bridge.complyeaze.com/blog-who-approves-a-post.html" />
 <link rel="alternate" type="application/atom+xml" title="ComplyEaze Bridge blog" href="feed.xml" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
@@ -61,7 +61,7 @@
 <nav aria-label="Breadcrumb">
 <p class="crumb"><a href="./blog.html">Blog</a> &nbsp;/&nbsp; For developers</p></nav>
 <h1>Who approves a post to TallyPrime, and what is still weak</h1>
-<p class="ph__dek">ComplyEaze Bridge is an MCP server for TallyPrime. Posting is a separate setting, off for a new install. When it is on, a native window asks a person to approve each voucher.</p>
+<p class="ph__dek">ComplyEaze Bridge is an MCP server for TallyPrime. Posting is a separate setting, off for a new install. When it is on, a native window asks a person to approve each post.</p>
 <p class="ph__meta"><span class="m">Tapish Khandelwal</span><span class="sep">·</span><span class="m">3 October 2026</span><span class="sep">·</span><span class="m">For release 0.4.1</span><span class="sep">·</span><span class="m">8 min read</span></p></div>
 <figure class="ph__art"><svg class="art" viewBox="0 0 400 300" role="img" aria-label="Drawing: a Windows approval window with three buttons, the middle one marked as the default, and a mouse pointer on the first." xmlns="http://www.w3.org/2000/svg"><defs><clipPath id="ch"><rect width="400" height="300"/></clipPath></defs><g clip-path="url(#ch)"><rect width="400" height="300" fill="var(--art-d)"/><g fill="none" stroke="var(--art-ink)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="56" y="62" width="288" height="176" rx="8" fill="#fff"/><path d="M56 96 L344 96" stroke-width="1.9" /><path d="M84 126 L270 126 M84 150 L240 150 M84 174 L200 174" stroke-width="1.9" /><rect x="150" y="196" width="56" height="28" rx="5"/><rect x="214" y="196" width="56" height="28" rx="5" fill="var(--art-cloth)"/><rect x="278" y="196" width="56" height="28" rx="5"/><path d="M186 214 L186 272 L200 258 L212 284 L222 280 L210 254 L228 254 Z" fill="#fff"/></g></g></svg></figure></div></header>
 <div class="blog-shell">
@@ -93,20 +93,20 @@
 <figcaption>Other people’s numbers about other tools.</figcaption></figure>
 <p>We have no figure for our own window. As far as we know ComplyEaze Bridge sends us nothing, so we cannot measure it in the field.</p>
 <p><b>This is what we built, and what it costs.</b></p>
-<p>ComplyEaze Bridge is an Apache-2.0 MCP server and Claude Desktop extension for TallyPrime. TallyPrime has a local XML gateway that can import vouchers, so a tool that calls it can post to someone’s books. By default the extension reads, prepares voucher files and reads bank-statement PDFs. Posting is a separate setting, off for a new install. When it is on, the assistant prepares a voucher file, calls <code>post_import</code>, and a native window on the user’s computer asks a person to approve that one voucher.</p>
+<p>ComplyEaze Bridge is an Apache-2.0 MCP server and Claude Desktop extension for TallyPrime. TallyPrime has a local XML gateway that can import vouchers, so a tool that calls it can post to someone’s books. By default the extension reads, prepares voucher files and reads bank-statement PDFs. Posting is a separate setting, off for a new install. When it is on, the assistant prepares a voucher file, calls <code>post_import</code>, and a native window on the user’s computer asks a person to approve that post.</p>
 <p>Our evidence is thin. On 1 October we installed a candidate build of 0.4.0 on a Windows 11 computer, with a new Claude account that had no paid plan and TallyPrime Silver 7.1 holding one made-up company. We declined one post in the approval window, and nothing was sent. We approved another. One Journal was posted, and the read-back found it. That was one run of one candidate build. The README records what ran on other builds.</p>
 <p>What the assistant reads through ComplyEaze Bridge goes to the AI provider the user chose: company, ledger and party names, GSTINs, PAN and bank details, narrations and amounts. Claude Desktop sends it. A masking setting shortens party and ledger names or drops narrations, and nothing hides amounts. We do not receive Tally data through ComplyEaze Bridge, and our Privacy Policy says so. We found no upload in the code we read (release 0.4.0, re-read for the 0.4.1 changes to network destinations). That is our reading of the code, and we do not warrant it (Terms, section 13).</p>
 <h2 id="d1">1. With posting off, the posting tools are absent</h2>
 <figure class="fig fig--hero">
 <div class="ts" role="group" aria-labelledby="ts-h">
 <p class="ts__h" id="ts-h">Turn the setting and restart: what the model can see.</p><input type="radio" name="ts" id="ts-off" checked><input type="radio" name="ts" id="ts-on">
-<div class="mask__seg ts__seg"><label for="ts-off">Posting off<code>as installed</code></label><label for="ts-on">Posting on<code>“Allow voucher posting”</code></label></div>
+<div class="mask__seg ts__seg"><label for="ts-off">Posting off<code>as installed</code></label><label for="ts-on">Posting on<code>“Allow voucher posting, one voucher or a batch of up to 50”</code></label></div>
 <ul class="ts__list">
 <li class="ts__read">Read and prepare tools <span>always listed in the extension</span></li>
-<li class="ts__post"><code>post_import</code> <span>tries to post one voucher after a person approves it</span></li>
+<li class="ts__post"><code>post_import</code> <span>tries to post one voucher, or a saved batch of up to 50, after a person approves it</span></li>
 <li class="ts__post"><code>acknowledge_post_review</code> <span>records a review; writes nothing to Tally</span></li></ul>
 <p class="ts__note ts__note--off">With posting off, the two posting tools leave the tool list, and if something calls them anyway, they refuse.</p>
-<p class="ts__note ts__note--on">With posting on, the assistant prepares a voucher file, calls <code>post_import</code>, and a native window on the user’s computer asks a person to approve that one voucher.</p></div></figure>
+<p class="ts__note ts__note--on">With posting on, the assistant prepares a voucher file, calls <code>post_import</code>, and a native window on the user’s computer asks a person to approve that post.</p></div></figure>
 <p><code>acknowledge_post_review</code> writes nothing to Tally; it records a review. The model has no posting tool to try. An earlier install may have saved the setting as on, so check it after an upgrade.</p>
 <h2 id="d2">2. Approval is a window, and no ComplyEaze Bridge tool can answer it</h2>
 <p>The extension starts a second copy of itself to show a system dialog.</p>
@@ -164,7 +164,7 @@ ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, r
 <div><dt>A post can land in the wrong company or ledger.</dt><dd>Tally aims an import at a company by name and cannot bind it to a company’s GUID. In its last request before the post, ComplyEaze Bridge checks that exactly one loaded company has the target’s GUID and name and that no other loaded company has the same name ignoring case and spacing. A company renamed or loaded in the moment after that check could still receive the voucher if it has the voucher’s ledgers, and a ledger renamed and replaced in that moment could receive the entry. The README lists this among the limits of posting.</dd></div>
 <div><dt>There is no undo.</dt><dd>No tool deletes or reverses a posted voucher.</dd></div>
 <div><dt>Read-back is partial.</dt><dd>It compares date, voucher type and ledger entries, not every field, and a match is no check of correctness.</dd></div>
-<div><dt>One voucher per approval.</dt><dd>A batch setting exists in the server program. The published extension does not set it.</dd></div>
+<div><dt>One approval per post.</dt><dd>One setting covers one voucher or a saved batch of up to 50. A batch is posted after one approval of its summary.</dd></div>
 <div><dt>Tally can slow down.</dt><dd>Requests can make Tally slow or unresponsive, sometimes until it is restarted, including for other users of a shared Tally. Reads on very large books can fail or take longer than the assistant waits.</dd></div></dl>
 <p class="solo">Nobody independent has audited it.</p>
 <h2 id="d6">What we have not run</h2>

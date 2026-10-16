@@ -13,7 +13,9 @@ merge operation is used.
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import json
 import os
 import shlex
 import shutil
@@ -21,6 +23,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +62,10 @@ if [ "${GATE_SCENARIO:-}" = "scan-input-write-failure" ] && [ "$1" = "-d" ]; the
   dir=$("$real" -d)
   mkdir "$dir/privacy-scan-input"
   printf '%s\\n' "$dir"
+elif [ "${GATE_SCENARIO:-}" = "manifest-write-failure" ] && [ "$1" = "-d" ]; then
+  dir=$("$real" -d)
+  mkdir "$dir/synthetic-uuid-manifest.json"
+  printf '%s\\n' "$dir"
 else
   exec "$real" "$@"
 fi
@@ -70,6 +77,21 @@ class MergeGateControls(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="merge-gate-controls-")
         cls.bin = Path(cls.tmp.name)
+        # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
+        cls.repo = cls.bin / "gate-repo"
+        (cls.repo / "scripts").mkdir(parents=True)
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py"):
+            shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
+        os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
+        cls.origin = cls.bin / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "master", str(cls.origin)], check=True, capture_output=True)
+        cls.git_in_repo("init", "-q", "-b", "master")
+        cls.git_in_repo("add", "-A")
+        cls.git_in_repo("commit", "-q", "-m", "scripts")
+        cls.git_in_repo("remote", "add", "origin", str(cls.origin))
+        cls.git_in_repo("push", "-q", "origin", "master")
+        cls.git_in_repo("fetch", "-q", "origin", "master")
+        cls.script = cls.repo / "scripts" / "merge-gate.sh"
         gh = cls.bin / "gh"
         shutil.copyfile(FAKE_GH, gh)
         gh.chmod(0o755)
@@ -83,6 +105,44 @@ class MergeGateControls(unittest.TestCase):
             raise RuntimeError("jq is required for merge-gate controls")
 
     @classmethod
+    def git_in_repo(cls, *args):
+        subprocess.run(["git", "-C", str(cls.repo), "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", *args],
+                       check=True, capture_output=True)
+
+    @classmethod
+    @contextlib.contextmanager
+    def master_state(cls, tracked=None, symlinks=None, ignored=None, hidden_edits=None):
+        """Put files on the throwaway origin/master (and in the gate's checkout), then put it back.
+
+        tracked: path -> text, committed. symlinks: path -> target, committed as links. ignored: path -> text, written
+        into the checkout only, with a committed .gitignore naming it (git status does not show it). hidden_edits: path -> text
+        written over a tracked file in the checkout and hidden from git with skip-worktree (git diff and git status do not show it).
+        """
+        base = subprocess.run(["git", "-C", str(cls.repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+        try:
+            for path, text in (tracked or {}).items():
+                (cls.repo / path).write_text(text)
+            for path, target in (symlinks or {}).items():
+                os.symlink(target, cls.repo / path)
+            if ignored:
+                (cls.repo / ".gitignore").write_text("".join(path + "\n" for path in ignored))
+            cls.git_in_repo("add", "-A")
+            cls.git_in_repo("commit", "-q", "-m", "state")
+            for path, text in (ignored or {}).items():
+                (cls.repo / path).write_text(text)
+            cls.git_in_repo("push", "-q", "-f", "origin", "master")
+            for path, text in (hidden_edits or {}).items():
+                cls.git_in_repo("update-index", "--skip-worktree", path)
+                (cls.repo / path).write_text(text)
+            yield
+        finally:
+            for path in (hidden_edits or {}):
+                cls.git_in_repo("update-index", "--no-skip-worktree", path)
+            cls.git_in_repo("reset", "-q", "--hard", base)
+            cls.git_in_repo("clean", "-fdxq")
+            cls.git_in_repo("push", "-q", "-f", "origin", "master")
+
+    @classmethod
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
@@ -91,7 +151,7 @@ class MergeGateControls(unittest.TestCase):
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
         return subprocess.run(
-            [str(SCRIPT), "321", "--repo", repo, *extra_args],
+            [str(self.script), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
             env=env,
             text=True,
@@ -135,7 +195,7 @@ class MergeGateControls(unittest.TestCase):
             self.assertIn("unsupported repository", result.stderr)
 
     def test_pass_scenario_may_merge(self):
-        self.assert_pass("pass", "review evidence names the current head")
+        self.assert_pass("pass", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     # -- Compatibility-surface schema (schema 3 at head; 2 or 3 at the base) --
 
@@ -193,12 +253,8 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("ack-missing", "but the PR does not add " + ACK_PATH)
 
     def test_ack_exact_passes(self):
-        result = self.assert_pass("ack-exact", "review evidence names the current head")
+        result = self.assert_pass("ack-exact", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
         self.assertIn(ACK_PATH + " lists the 1 touched pinned path(s), reviewer reviewer", result.stdout)
-        self.assertIn("names " + SHORT + ", " + ACK_PATH + " and all pinned paths touched", result.stdout)
-
-    def test_ack_exact_via_a_review_body_passes(self):
-        self.assert_pass("ack-exact-via-review", "all pinned paths touched")
 
     def test_ack_with_an_extra_path_blocks(self):
         self.assert_blocked("ack-extra-path", "lists path(s) the PR does not touch: src/other.rs")
@@ -251,7 +307,7 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("pin-only-change", "but the PR does not add " + ACK_PATH)
 
     def test_pin_added_with_an_ack_and_a_reason_passes(self):
-        self.assert_pass("pin-only-change-acked", "all pinned paths touched")
+        self.assert_pass("pin-only-change-acked", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_pin_added_without_a_reason_blocks(self):
         self.assert_blocked("pin-added-without-reason", "pin(s) added without a non-empty reason: src/new.rs")
@@ -260,7 +316,7 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("pin-removed-no-line", "lacks a removed-pin line for: src/other.rs")
 
     def test_pin_removed_with_a_removed_pin_line_passes(self):
-        self.assert_pass("pin-removed-with-line", "all pinned paths touched")
+        self.assert_pass("pin-removed-with-line", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     # -- Branch history: a pin the branch added and then lost ----------------------
 
@@ -271,7 +327,7 @@ class MergeGateControls(unittest.TestCase):
         )
 
     def test_a_pin_the_branch_added_and_lost_passes_when_the_withdrawal_is_declared(self):
-        self.assert_pass("history-own-pin-lost-declared", "all pinned paths touched")
+        self.assert_pass("history-own-pin-lost-declared", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_a_lost_pin_named_as_a_path_in_the_ack_blocks(self):
         self.assert_blocked("history-own-pin-lost-ack-names-the-path", "lists path(s) the PR does not touch: src/own.rs")
@@ -280,13 +336,13 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("history-own-pin-lost-no-ack", "pinned path(s) touched")
 
     def test_a_pin_the_branch_added_and_kept_is_not_withdrawn(self):
-        self.assert_pass("history-pin-kept-at-the-head", "all pinned paths touched")
+        self.assert_pass("history-pin-kept-at-the-head", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_a_merge_commit_is_compared_with_all_of_its_parents(self):
-        self.assert_pass("history-merge-parent-compared-with-all", "all pinned paths touched")
+        self.assert_pass("history-merge-parent-compared-with-all", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_out_of_order_list_in_an_older_branch_commit_passes_once_the_head_list_is_sorted(self):
-        self.assert_pass("history-out-of-order-then-sorted", "all pinned paths touched")
+        self.assert_pass("history-out-of-order-then-sorted", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_the_same_out_of_order_history_blocks_when_the_pin_is_then_dropped(self):
         self.assert_blocked(
@@ -295,7 +351,7 @@ class MergeGateControls(unittest.TestCase):
         )
 
     def test_the_same_out_of_order_history_passes_when_the_withdrawal_is_declared(self):
-        self.assert_pass("history-out-of-order-then-dropped-declared", "all pinned paths touched")
+        self.assert_pass("history-out-of-order-then-dropped-declared", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
         self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
@@ -305,31 +361,13 @@ class MergeGateControls(unittest.TestCase):
 
     # -- The review or comment must name the head, the ack and every touched path ----
 
-    def test_comment_missing_a_touched_file_blocks(self):
-        self.assert_blocked("comment-missing-file", "no review or comment names every pinned path touched; the closest lacks: src/other.rs")
-
-    def test_comment_naming_every_touched_file_passes(self):
-        self.assert_pass("comment-names-all", "names " + SHORT + ", " + ACK_PATH + " and all pinned paths touched")
-
-    def test_comment_missing_the_ack_path_blocks(self):
-        self.assert_blocked("comment-missing-ack-path", "the closest lacks: " + ACK_PATH)
-
-    def test_comment_naming_another_head_blocks(self):
-        self.assert_blocked("comment-names-another-head", "no review or comment names head " + SHORT + " together with " + ACK_PATH)
-
-    def test_reviewer_who_is_not_the_acks_reviewer_blocks(self):
-        self.assert_blocked("reviewer-not-matching", "is by someone-else, not the acknowledgement's reviewer 'reviewer'")
-
-    def test_reviewer_login_comparison_ignores_case(self):
-        self.assert_pass("reviewer-login-case-differs", "all pinned paths touched")
-
     # -- Renames, stale branches, the cut-over PR -----------------------------------
 
     def test_rename_of_a_pinned_file_needs_an_ack_for_the_old_path(self):
         self.assert_blocked("rename-old-path-pinned", "but the PR does not add " + ACK_PATH)
 
     def test_rename_of_a_pinned_file_with_an_ack_for_the_old_path_passes(self):
-        result = self.assert_pass("rename-old-path-acked", "all pinned paths touched")
+        result = self.assert_pass("rename-old-path-acked", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
         self.assertIn("lists the 1 touched pinned path(s)", result.stdout)
 
     def test_a_nested_gitattributes_blocks(self):
@@ -356,7 +394,7 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("gitattributes-no-ack", "but the PR does not add " + ACK_PATH)
 
     def test_gitattributes_pinned_and_edited_with_an_ack_listing_it_passes(self):
-        result = self.assert_pass("gitattributes-acked", "all pinned paths touched")
+        result = self.assert_pass("gitattributes-acked", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
         self.assertIn("lists the 1 touched pinned path(s)", result.stdout)
 
     def test_gitattributes_pinned_and_edited_with_an_ack_that_omits_it_blocks(self):
@@ -368,7 +406,7 @@ class MergeGateControls(unittest.TestCase):
     # -- removed-pin lines are sorted and unique, like the path lines --------------------
 
     def test_sorted_removed_pin_lines_pass(self):
-        self.assert_pass("removed-pins-sorted", "all pinned paths touched")
+        self.assert_pass("removed-pins-sorted", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_unsorted_removed_pin_lines_block(self):
         self.assert_blocked("removed-pins-unsorted", "removed-pin lines must be sorted and unique")
@@ -380,7 +418,7 @@ class MergeGateControls(unittest.TestCase):
 
     def test_reviewer_login_shapes(self):
         for scenario in ("reviewer-login-39-chars", "reviewer-login-bot"):
-            self.assert_pass(scenario, "all pinned paths touched")
+            self.assert_pass(scenario, "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
         for scenario in ("reviewer-login-trailing-hyphen", "reviewer-login-leading-hyphen", "reviewer-login-40-chars"):
             self.assert_blocked(scenario, "needs exactly one 'reviewer: <github login>' line")
 
@@ -390,7 +428,7 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("pin-reason-501-chars", "pin(s) added with a reason over 500 characters or containing a control character: src/new.rs")
 
     def test_pin_reason_of_500_astral_characters_passes(self):
-        self.assert_pass("pin-reason-500-astral-chars", "all pinned paths touched")
+        self.assert_pass("pin-reason-500-astral-chars", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_pin_reason_with_a_control_character_blocks(self):
         self.assert_blocked("pin-reason-control-char", "reason over 500 characters or containing a control character")
@@ -404,31 +442,19 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("ack-renamed-out-no-pin-change", "no pinned path is touched, so no acknowledgement may be added or changed: " + ACK_DIR + "/pr-100.txt")
 
     def test_an_ack_that_git_pairs_with_an_unrelated_deleted_file_is_still_an_add(self):
-        self.assert_pass("ack-added-as-a-rename-from-outside", "all pinned paths touched")
+        self.assert_pass("ack-added-as-a-rename-from-outside", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     # -- Copies: the destination counts, the source only when it is itself pinned ----------------
 
     def test_a_copy_of_a_pinned_file_counts_the_pinned_source(self):
         self.assert_blocked("copy-of-a-pinned-file", "but the PR does not add " + ACK_PATH)
-        result = self.assert_pass("copy-of-a-pinned-file-acked", "all pinned paths touched")
+        result = self.assert_pass("copy-of-a-pinned-file-acked", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
         self.assertIn("lists the 1 touched pinned path(s)", result.stdout)
 
     def test_a_copy_of_an_unpinned_file_needs_no_ack(self):
         self.assert_pass("copy-of-an-unpinned-file", "changed files contain no pinned path requiring an acknowledgement")
 
     # -- A path is named in the review or comment only as a whole token ----------------------------
-
-    def test_a_longer_path_does_not_name_a_shorter_one(self):
-        self.assert_blocked("comment-names-a-longer-path", "the closest lacks: src/example.rs")
-
-    def test_a_longer_ack_path_does_not_name_the_ack(self):
-        self.assert_blocked("comment-names-a-longer-ack-path", "the closest lacks: " + ACK_PATH)
-
-    def test_paths_in_backticks_quotes_parentheses_commas_and_colons_are_named(self):
-        self.assert_pass("comment-names-paths-in-punctuation", "all pinned paths touched")
-
-    def test_a_path_with_spaces_and_parentheses_can_be_named(self):
-        self.assert_pass("comment-names-a-path-with-spaces", "all pinned paths touched")
 
     # -- A large ack: a match must not be lost when grep exits early under pipefail -------------------
 
@@ -441,7 +467,7 @@ class MergeGateControls(unittest.TestCase):
     # -- Ordering is by UTF-8 bytes (LC_ALL=C), not UTF-16 code units --------------------------------------
 
     def test_ack_paths_in_utf8_byte_order_pass(self):
-        self.assert_pass("ack-utf8-byte-order", "all pinned paths touched")
+        self.assert_pass("ack-utf8-byte-order", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_ack_paths_in_utf16_order_block(self):
         self.assert_blocked("ack-utf8-utf16-order", "paths must be sorted and unique")
@@ -452,10 +478,10 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("privacy-email-blocker", "customer email shape")
 
     def test_known_public_agent_address_in_a_well_formed_commit_trailer_is_identity_metadata(self):
-        self.assert_pass("public-agent-coauthor-trailer", "review evidence names the current head")
+        self.assert_pass("public-agent-coauthor-trailer", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
-        self.assert_pass("public-agent-coauthor-trailer-crlf", "review evidence names the current head")
+        self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_arbitrary_customer_address_in_a_coauthor_trailer_still_blocks(self):
         self.assert_blocked("customer-coauthor-trailer", "customer email shape")
@@ -500,10 +526,101 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("privacy-credential-blocker", "literal credential, bearer, or API token value")
 
     def test_unknown_uuid_is_indeterminate(self):
-        self.assert_indeterminate("privacy-uuid-indeterminate", "without exact current-head fixture provenance")
+        result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+        self.assertNotIn("synthetic-UUID registry:", result.stdout)
+
+    # -- The synthetic-UUID registry: scripts/merge-gate-synthetic-uuids.json on master -----------------------------------
+    REGISTRY_PATH = "scripts/merge-gate-synthetic-uuids.json"
+    LISTED = "11111111-2222-3333-4444-555555555555"
+
+    def registry(self, *uuids, **override):
+        document = {"schema_version": 1, "entries": [{"uuid": value, "note": "a synthetic test value"} for value in uuids]}
+        document.update(override)
+        return json.dumps(document)
+
+    def test_a_listed_uuid_no_longer_makes_the_gate_indeterminate(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_pass("privacy-uuid-indeterminate", "synthetic-UUID registry: 1 listed value(s) applied")
+
+    def test_an_unlisted_uuid_still_does_in_the_same_pull_request(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("privacy-two-uuids", "privacy scan found 1 non-nil UUID shape(s) not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry: 1 listed value(s) applied", result.stdout)
+
+    def test_a_listed_uuid_in_credential_context_still_blocks(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_blocked("privacy-uuid-credential-context", "in credential, session, token, or bearer context")
+
+    def test_a_listed_uuid_is_not_reported_as_a_hit_when_something_else_trips_the_scan(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_blocked("privacy-uuid-and-digit-run", "unexplained long digit run")
+        self.assertIn("at docs/example.md:2: privacy scan found 0 identifier shape(s) and 1 unexplained long digit run(s)", result.stdout)
+        self.assertNotIn("docs/example.md:1:", result.stdout)
+
+    def test_an_invalid_registry_is_not_applied_and_says_so(self):
+        entries = lambda *items: json.dumps({"schema_version": 1, "entries": list(items)})
+        good = {"uuid": self.LISTED, "note": "a synthetic test value"}
+        for name, text in (
+            ("not json", "{"),
+            ("wrong schema version", self.registry(self.LISTED, schema_version=2)),
+            ("an extra top-level key", self.registry(self.LISTED, extra=1)),
+            ("entries not a list", json.dumps({"schema_version": 1, "entries": {}})),
+            ("a duplicate", entries(good, good)),
+            ("an upper-case value", entries({"uuid": "AAAAAAAA-2222-3333-4444-555555555555", "note": "n"})),
+            ("the nil value", entries({"uuid": "00000000-0000-0000-0000-000000000000", "note": "n"})),
+            ("a trailing newline in the value", entries({"uuid": self.LISTED + "\n", "note": "n"})),
+            ("a missing note", entries({"uuid": self.LISTED})),
+            ("an empty note", entries({"uuid": self.LISTED, "note": " "})),
+            ("an extra entry key", entries({"uuid": self.LISTED, "note": "n", "kind": "x"})),
+            ("more than 500 entries", entries(*[{"uuid": "%08x-2222-3333-4444-555555555555" % number, "note": "n"} for number in range(501)])),
+        ):
+            with self.subTest(case=name), self.master_state(tracked={self.REGISTRY_PATH: text}):
+                result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+                self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_registry_that_is_a_symbolic_link_is_not_applied(self):
+        with self.master_state(tracked={"scripts/real-registry.json": self.registry(self.LISTED)}, symlinks={self.REGISTRY_PATH: "real-registry.json"}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied", result.stdout)
+
+    def test_a_registry_that_is_only_valid_once_a_nul_byte_is_dropped_is_not_applied(self):
+        # bash drops a NUL byte when a command's output is captured into a variable, so the check reads the bytes through a pipe.
+        text = self.registry(self.LISTED).replace("a synthetic test value", "a synthetic\0 test value")
+        self.assertIn("\0", text)
+        with self.master_state(tracked={self.REGISTRY_PATH: text}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied: it is not valid", result.stdout)
+
+    def test_the_registry_on_master_is_used_not_a_different_file_in_the_checkout(self):
+        # skip-worktree hides a local edit from git diff and git status, so the gate's own-tree check passes with it present.
+        other = "66666666-7777-8888-9999-aaaaaaaaaaaa"
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(other)},
+                               hidden_edits={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry: 1 listed value(s) applied", result.stdout)
+
+    def test_a_link_whose_target_text_is_itself_a_valid_registry_is_not_applied(self):
+        # A link's content is its target path. Without the regular-file check that text would be read as the registry.
+        text = self.registry(self.LISTED)
+        with self.master_state(symlinks={self.REGISTRY_PATH: text}):
+            result = self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied: it is not a regular file", result.stdout)
+
+    def test_a_registry_file_only_in_the_checkout_is_not_read(self):
+        # An ignored file is invisible to git status, so the gate's own-tree check passes with it present; the registry
+        # is read from master's ref, not from the checkout.
+        with self.master_state(ignored={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            self.assert_indeterminate("privacy-uuid-indeterminate", "not listed in the synthetic-UUID registry")
+
+    def test_a_manifest_that_cannot_be_written_is_not_passed_to_the_scan(self):
+        with self.master_state(tracked={self.REGISTRY_PATH: self.registry(self.LISTED)}):
+            result = self.assert_indeterminate("manifest-write-failure", "not listed in the synthetic-UUID registry")
+            self.assertIn("synthetic-UUID registry not applied", result.stdout)
+            # The scan was not handed an unwritten list: it did not try to read one.
+            self.assertNotIn("could not read exact current-head fixture UUID provenance", result.stdout)
 
     def test_binary_addition_without_attestation_blocks_and_names_the_path(self):
-        result = self.assert_blocked("binary-missing-attestation", "require matching --binary-review-sha and --independent-review-sha")
+        result = self.assert_blocked("binary-missing-attestation", "require the owner's own --binary-review-sha attestation")
         self.assertIn("first 8 at most: docs/new.png", result.stdout)
 
     def test_a_privacy_hit_in_added_text_is_located_by_file_and_new_line_without_its_value(self):
@@ -518,7 +635,7 @@ class MergeGateControls(unittest.TestCase):
         self.assertNotIn("company" + ".test", result.stdout)
 
     def test_a_merge_commit_conflict_comment_block_after_the_trailer_is_not_a_customer_address(self):
-        self.assert_pass("merge-commit-conflict-comment-block", "review evidence names the current head")
+        self.assert_pass("merge-commit-conflict-comment-block", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_address_inside_the_conflict_comment_block_still_blocks(self):
         result = self.assert_blocked("merge-commit-conflict-block-customer-address", "customer email shape")
@@ -528,24 +645,146 @@ class MergeGateControls(unittest.TestCase):
     def test_binary_addition_with_attestation_passes(self):
         self.assert_pass(
             "binary-with-attestation",
-            "have explicit current-head binary and independent review attestations",
-            extra_args=("--binary-review-sha", HEAD, "--independent-review-sha", HEAD),
+            "have the owner's current-head binary review attestation",
+            extra_args=("--binary-review-sha", HEAD),
         )
+
+    # -- The owner's merge verdict (spec v3) ------------------------------------
+
+    VERDICT_PASS = "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head"
+    VERDICT_BLOCK = "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND do not both stand"
+
+    def test_the_owners_two_lines_as_comments_or_reviews_pass(self):
+        self.assert_pass("pass", self.VERDICT_PASS)
+        self.assert_pass("verdict-by-review", self.VERDICT_PASS)
+
+    def test_either_line_missing_or_for_another_merge_base_blocks(self):
+        for scenario in ("verdict-missing-clean", "verdict-missing-recommend", "verdict-for-another-base"):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, self.VERDICT_BLOCK)
+
+    def test_a_later_not_clean_an_owner_edit_or_a_deleted_owner_comment_voids_the_lines(self):
+        for scenario in ("verdict-then-not-clean", "verdict-then-owner-edit", "verdict-then-owner-comment-deleted", "owner-edit-by-a-renamed-account"):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, self.VERDICT_BLOCK)
+
+    def test_unreadable_or_incomplete_history_is_indeterminate_never_a_pass(self):
+        for scenario in ("history-unreadable", "history-has-another-page", "reviews-unreadable", "comments-unreadable", "inline-unreadable"):
+            with self.subTest(scenario=scenario):
+                self.assert_indeterminate(scenario, "could not")
+
+    def test_a_token_in_the_title_body_added_lines_or_a_strangers_comment_is_refused(self):
+        for scenario in ("token-in-a-previous-file-name", "token-in-the-title", "token-in-the-body", "token-in-an-added-line", "token-in-a-stranger-comment", "token-in-the-branch-name",
+                         "token-in-a-file-name", "token-in-a-hidden-comment-in-the-body", "token-in-a-stranger-commit-comment"):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "carries a merge-verdict token")
+
+    def test_commit_comments_that_cannot_be_read_or_are_too_many_are_indeterminate_and_an_owners_voids(self):
+        self.assert_indeterminate("commit-comments-unreadable", "could not read")
+        self.assert_indeterminate("sixty-one-commits", "could not read")
+        self.assert_blocked("owner-commit-comment-with-a-token", self.VERDICT_BLOCK)
+
+    def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
+        for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
+                         "changes-the-registry", "changes-the-registry-in-another-case"):
+            with self.subTest(scenario=scenario):
+                self.assert_blocked(scenario, "the merge is the owner's own act")
+
+    def test_a_binary_attestation_for_another_commit_blocks(self):
+        result = self.assert_blocked("binary-with-attestation", "binary review attestation names a different commit than the PR head",
+                                     extra_args=("--binary-review-sha", "f" * 40))
+        self.assertIn("require the owner's own --binary-review-sha attestation", result.stdout)
+
+    def test_the_independent_review_flag_no_longer_exists(self):
+        result = self.run_gate("pass", extra_args=("--independent-review-sha", HEAD))
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("unknown option", result.stderr)
+
+    def run_copy(self, copy, scenario="pass", script_dir="scripts"):
+        env = os.environ.copy()
+        env["PATH"] = f"{self.bin}:{env['PATH']}"
+        env["GATE_SCENARIO"] = scenario
+        return subprocess.run([str(copy / script_dir / "merge-gate.sh"), "321", "--repo", "lamemustafa/bridge"], env=env, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+
+    def git_copy(self, copy, *args):
+        subprocess.run(["git", "-C", str(copy), "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false", *args],
+                       check=True, capture_output=True)
+
+    def private_copy(self, name):
+        """A copy of the gate repository with an origin of its own, so a test can move origin without disturbing the others."""
+        copy = Path(self.tmp.name) / name
+        shutil.copytree(self.repo, copy)
+        origin = Path(self.tmp.name) / (name + "-origin.git")
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "master", str(origin)], check=True, capture_output=True)
+        self.git_copy(copy, "remote", "set-url", "origin", str(origin))
+        self.git_copy(copy, "push", "-q", "origin", "master")
+        self.git_copy(copy, "fetch", "-q", "origin", "master")
+        return copy
+
+    def test_the_gate_refuses_to_run_from_a_tree_that_is_not_origin_masters(self):
+        for how in ("edit", "committed-edit", "untracked-file", "remote-has-moved", "stale-tracking-ref", "tag-named-master", "script-elsewhere", "no-remote"):
+            with self.subTest(how=how):
+                copy = self.private_copy("tree-" + how)
+                target = copy / "scripts" / "merge_gate_verdict.py"
+                if how == "edit":
+                    target.write_text(target.read_text() + "\n# changed\n")
+                elif how == "committed-edit":
+                    target.write_text(target.read_text() + "\n# changed\n")
+                    self.git_copy(copy, "add", "-A")
+                    self.git_copy(copy, "commit", "-q", "-m", "local edit")
+                elif how == "untracked-file":
+                    (copy / "scripts" / "extra_helper.py").write_text("x = 1\n")
+                elif how == "remote-has-moved":
+                    other = Path(self.tmp.name) / "tree-other"
+                    shutil.copytree(copy, other)
+                    (other / "scripts" / "merge_gate_verdict.py").write_text(target.read_text() + "\n# newer on origin\n")
+                    self.git_copy(other, "add", "-A")
+                    self.git_copy(other, "commit", "-q", "-m", "newer")
+                    self.git_copy(other, "push", "-q", "origin", "HEAD:refs/heads/master")
+                elif how == "tag-named-master":
+                    # a tag called master on origin must not stand in for the branch: this checkout IS the tagged commit, not the branch
+                    target.write_text(target.read_text() + "\n# tagged\n")
+                    self.git_copy(copy, "add", "-A")
+                    self.git_copy(copy, "commit", "-q", "-m", "tagged")
+                    self.git_copy(copy, "push", "-q", "origin", "HEAD:refs/tags/master")
+                elif how == "script-elsewhere":
+                    # the scripts directory equals master's, but the gate that runs is a copy placed elsewhere in the tree
+                    (copy / "other").mkdir()
+                    for helper in (copy / "scripts").glob("merge*"):
+                        shutil.copy2(helper, copy / "other" / helper.name)
+                    (copy / "other" / "merge_gate_verdict.py").write_text("raise SystemExit(0)\n")
+                elif how == "stale-tracking-ref":
+                    # a fetch refspec that leaves master out of refs/remotes/origin: the guard must still compare with what it just fetched
+                    self.git_copy(copy, "config", "remote.origin.fetch", "+refs/heads/other:refs/remotes/origin/other")
+                    other = Path(self.tmp.name) / "tree-other2"
+                    shutil.copytree(copy, other)
+                    (other / "scripts" / "merge_gate_verdict.py").write_text(target.read_text() + "\n# newer on origin\n")
+                    self.git_copy(other, "add", "-A")
+                    self.git_copy(other, "commit", "-q", "-m", "newer")
+                    self.git_copy(other, "push", "-q", "origin", "HEAD:refs/heads/master")
+                else:
+                    self.git_copy(copy, "remote", "remove", "origin")
+                result = self.run_copy(copy, script_dir="other" if how == "script-elsewhere" else "scripts")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertTrue("run this gate from origin/master's tree" in result.stderr or "could not fetch the branch master of origin" in result.stderr, result.stderr)
+
+    def test_a_module_planted_beside_the_helpers_cannot_shadow_the_standard_library(self):
+        copy = self.private_copy("tree-shadow")
+        (copy / "scripts" / "json.py").write_text("raise SystemExit(0)\n")
+        self.git_copy(copy, "add", "-A")
+        self.git_copy(copy, "commit", "-q", "-m", "plant")
+        # the planted file is on this copy's origin/master, so the tree guard passes: only an isolated interpreter keeps it out of the helpers
+        self.git_copy(copy, "push", "-q", "origin", "master")
+        self.git_copy(copy, "fetch", "-q", "origin", "master")
+        result = self.run_copy(copy)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
 
     def test_gitlink_change_is_indeterminate(self):
         self.assert_indeterminate("gitlink-change", "gitlink change(s) require explicit provenance")
 
     # -- Minimal head-SHA review-evidence check (KEEP #3, new) ---------------
-
-    def test_review_object_naming_head_passes(self):
-        self.assert_pass("review-names-head-via-review", "review evidence names the current head")
-
-    def test_summary_comment_naming_head_passes(self):
-        self.assert_pass("review-names-head-via-comment", "review evidence names the current head")
-
-    def test_no_review_evidence_blocks(self):
-        self.assert_blocked("review-missing", "no review evidence (review or comment) names current head")
-        self.assertIn("#317", self.run_gate("review-missing").stdout)
 
     # -- Regression tests for the 7 fixes in the kept code -------------------
 
@@ -567,7 +806,7 @@ class MergeGateControls(unittest.TestCase):
         # Before the fix, an added Git LFS pointer (ordinary text, no "GIT
         # binary patch" marker) was reconciled as a normal textual change and
         # never required a binary-review attestation.
-        self.assert_blocked("lfs-pointer-binary", "require matching --binary-review-sha and --independent-review-sha")
+        self.assert_blocked("lfs-pointer-binary", "require the owner's own --binary-review-sha attestation")
 
     def test_365_removed_record_line_total_mismatch_is_flagged(self):
         # Before the fix, `[ "$status" = "removed" ] && continue` skipped a
@@ -932,6 +1171,426 @@ class PrivacyLocationAndCommentBlockTests(unittest.TestCase):
         parsed = load_diff_module().parse(diff.split("\n"))
         self.assertEqual(parsed["added_payload"], ["added one", "added two", "added three", "tail"])
         self.assertEqual(parsed["added_locations"], [["a.txt", 2], ["a.txt", 4], ["a.txt", 5], ["a.txt", 44]])
+
+
+def load_verdict_module():
+    spec = importlib.util.spec_from_file_location("merge_gate_verdict", ROOT / "scripts" / "merge_gate_verdict.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class MergeVerdictEvaluator(unittest.TestCase):
+    """scripts/merge_gate_verdict.py: the owner's two machine lines, spec v3 (every case is a document the gate would build)."""
+
+    OWNER = 57982425
+    LOGIN = "lamemustafa"
+    HEAD = "1" * 40
+    BASE = "2" * 40
+    CLEAN = "MERGE-VERDICT CLEAN head=" + "1" * 40 + " base=" + "2" * 40
+    RECOMMEND = "MERGE-ADVERSARY RECOMMEND head=" + "1" * 40 + " base=" + "2" * 40
+    T = ["2026-10-14T0%d:00:00Z" % n for n in range(1, 10)]
+
+    def setUp(self):
+        self.mod = load_verdict_module()
+
+    def user(self, uid=None, kind="User"):
+        return {"id": self.OWNER if uid is None else uid, "type": kind}
+
+    def comment(self, body, at, uid=None, kind="User", app=None):
+        return {"user": self.user(uid, kind), "body": body, "created_at": at, "performed_via_github_app": app}
+
+    def review(self, body, at, uid=None, kind="User", state="COMMENTED"):
+        return {"user": self.user(uid, kind), "body": body, "submitted_at": at, "state": state}
+
+    def doc(self, reviews=(), comments=(), inline=(), title="t", body="b", commits=("c",), added=("a",),
+            reviews_graph=(), comments_graph=(), events=(), complete=True):
+        return {"head": self.HEAD, "base": self.BASE, "reviews": list(reviews), "comments": list(comments),
+                "inline_comments": list(inline),
+                "texts": {"title": title, "body": body, "commit_messages": list(commits), "added_lines": list(added)},
+                "graphql": {"complete": complete, "reviews": list(reviews_graph), "comments": list(comments_graph), "events": list(events)}}
+
+    def both(self):
+        return self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])
+
+    def status(self, doc):
+        return self.mod.evaluate(doc)["status"]
+
+    def test_both_lines_pass_as_comments_reviews_or_one_of_each(self):
+        self.assertEqual(self.status(self.both()), "pass")
+        self.assertEqual(self.status(self.doc(reviews=[self.review(self.CLEAN, self.T[1]), self.review(self.RECOMMEND, self.T[2])])), "pass")
+        self.assertEqual(self.status(self.doc(reviews=[self.review(self.CLEAN, self.T[1])], comments=[self.comment(self.RECOMMEND, self.T[2])])), "pass")
+
+    def test_either_line_alone_blocks(self):
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.CLEAN, self.T[1])])), "block")
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.RECOMMEND, self.T[1])])), "block")
+        self.assertEqual(self.status(self.doc()), "block")
+
+    def test_a_line_for_another_head_or_base_does_not_count(self):
+        other_head = self.CLEAN.replace("head=" + "1" * 40, "head=" + "3" * 40)
+        other_base = self.RECOMMEND.replace("base=" + "2" * 40, "base=" + "4" * 40)
+        self.assertEqual(self.status(self.doc(comments=[self.comment(other_head, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])), "block")
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(other_base, self.T[2])])), "block")
+
+    def test_only_a_body_that_is_exactly_the_line_counts(self):
+        bad = [self.CLEAN + " ok", " " + self.CLEAN, self.CLEAN + "\n\n", "x\n" + self.CLEAN, self.CLEAN + "\n" + self.RECOMMEND,
+               self.CLEAN.upper(), self.CLEAN.replace("1" * 40, "1" * 39), self.CLEAN.replace("CLEAN", "CLEAN,"),
+               "> " + self.CLEAN, "`" + self.CLEAN + "`", "<!-- " + self.CLEAN + " -->", self.CLEAN.replace("1" * 40, "G" * 40)]
+        for body in bad:
+            with self.subTest(body=body[:60]):
+                self.assertEqual(self.status(self.doc(comments=[self.comment(body, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])), "block")
+
+    def test_crlf_and_one_trailing_newline_are_accepted(self):
+        for body in (self.CLEAN + "\n", self.CLEAN + "\r\n"):
+            with self.subTest(body=repr(body[-3:])):
+                self.assertEqual(self.status(self.doc(comments=[self.comment(body, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])), "pass")
+
+    def test_a_line_by_anyone_else_is_refused_not_just_ignored(self):
+        for uid, kind, app in ((123, "User", None), (self.OWNER, "Bot", None), (self.OWNER, "User", {"id": 1}), (str(self.OWNER), "User", None), (True, "User", None)):
+            with self.subTest(uid=uid, kind=kind, app=app):
+                result = self.mod.evaluate(self.doc(comments=[self.comment(self.CLEAN, self.T[1], uid=uid, kind=kind, app=app), self.comment(self.RECOMMEND, self.T[2])]))
+                self.assertEqual(result["status"], "block")
+                self.assertTrue(result["refusals"])
+        nobody = {"user": None, "body": self.CLEAN, "created_at": self.T[1]}
+        self.assertEqual(self.status(self.doc(comments=[nobody, self.comment(self.RECOMMEND, self.T[2])])), "block")
+
+    def test_the_tokens_anywhere_in_the_pull_request_text_are_refused_even_with_both_lines(self):
+        for field in ("title", "body"):
+            for token in ("MERGE-VERDICT", "MERGE-ADVERSARY"):
+                with self.subTest(field=field, token=token):
+                    result = self.mod.evaluate(dict(self.both(), texts=dict(self.both()["texts"], **{field: "see " + token})))
+                    self.assertEqual(result["status"], "block")
+                    self.assertTrue(result["refusals"])
+        for texts in ({"commit_messages": ["MERGE-ADVERSARY"]}, {"added_lines": ["x MERGE-VERDICT CLEAN"]}):
+            with self.subTest(texts=texts):
+                result = self.mod.evaluate(dict(self.both(), texts=dict(self.both()["texts"], **texts)))
+                self.assertEqual(result["status"], "block")
+
+    def test_a_non_owner_review_comment_or_inline_comment_with_a_token_is_refused(self):
+        stranger = {"user": self.user(7), "body": "MERGE-VERDICT CLEAN", "created_at": self.T[3], "submitted_at": self.T[3]}
+        for kwargs in ({"comments": [stranger]}, {"reviews": [stranger]}, {"inline": [stranger]}):
+            with self.subTest(where=list(kwargs)[0]):
+                doc = self.both()
+                key = {"inline": "inline_comments"}.get(list(kwargs)[0], list(kwargs)[0])
+                doc[key] = doc[key] + list(kwargs.values())[0]
+                self.assertEqual(self.status(doc), "block")
+
+    def test_an_owner_inline_comment_with_a_token_voids_everything_and_is_never_a_verdict(self):
+        inline = {"user": self.user(), "body": self.CLEAN, "created_at": self.T[5]}
+        self.assertEqual(self.status(self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2])], inline=[inline])), "block")
+        only_inline = self.doc(comments=[self.comment(self.RECOMMEND, self.T[2])], inline=[dict(inline, created_at=self.T[0])])
+        self.assertEqual(self.status(only_inline), "block")
+        # a void older than the verdicts still voids: an inline comment's time and history are not read
+
+    def test_a_later_not_clean_or_retraction_voids_and_a_newer_pair_restores(self):
+        for line in ("MERGE-VERDICT NOT-CLEAN head=" + "1" * 40 + " base=" + "2" * 40, "MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40,
+                     "MERGE-ADVERSARY REJECT head=" + "1" * 40 + " base=" + "2" * 40, "MERGE-ADVERSARY RETRACT head=" + "1" * 40 + " base=" + "2" * 40,
+                     "MERGE-VERDICT SOMETHING ELSE"):
+            with self.subTest(line=line[:40]):
+                comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(line, self.T[3])]
+                self.assertEqual(self.status(self.doc(comments=comments)), "block")
+                renewed = comments + [self.comment(self.CLEAN, self.T[4]), self.comment(self.RECOMMEND, self.T[5])]
+                self.assertEqual(self.status(self.doc(comments=renewed)), "pass")
+                only_one_renewed = comments + [self.comment(self.CLEAN, self.T[4])]
+                self.assertEqual(self.status(self.doc(comments=only_one_renewed)), "block")
+
+    def test_a_void_at_the_same_second_as_a_verdict_voids_it(self):
+        comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]
+        self.assertEqual(self.status(self.doc(comments=comments)), "block")
+
+    def test_both_verdicts_voided_at_their_own_second_do_not_stand(self):
+        comments = [self.comment(self.CLEAN, self.T[2]), self.comment(self.RECOMMEND, self.T[2]),
+                    self.comment("MERGE-ADVERSARY RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]
+        self.assertEqual(self.status(self.doc(comments=comments)), "block")
+        self.assertEqual(self.status(self.doc(comments=comments[:2])), "pass")
+
+    def test_a_dismissal_event_alone_voids_what_is_older_and_not_what_is_newer(self):
+        late = {"type": "ReviewDismissedEvent", "createdAt": self.T[6], "authorId": self.OWNER}
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[late]))), "block")
+        early = dict(late, createdAt=self.T[0])
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[early]))), "pass")
+        someone_else = dict(late, authorId=7)
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[someone_else]))), "pass")
+
+    def test_the_owner_is_matched_by_id_so_a_renamed_account_still_voids(self):
+        doc = self.both()
+        doc["graphql"] = dict(doc["graphql"], comments=[{"authorId": self.OWNER, "authorLogin": "a-new-name", "lastEditedAt": self.T[6], "editCount": 1}])
+        self.assertEqual(self.status(doc), "block")
+        doc["graphql"] = dict(doc["graphql"], comments=[{"authorId": 7, "authorLogin": self.LOGIN, "lastEditedAt": self.T[6], "editCount": 1}])
+        self.assertEqual(self.status(doc), "pass", "a node whose author id is not the owner's is ignored, whatever its login says")
+
+    def test_the_newest_line_of_each_kind_counts_even_when_an_older_one_matched(self):
+        other_head = self.CLEAN.replace("head=" + "1" * 40, "head=" + "3" * 40)
+        comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(other_head, self.T[3])]
+        self.assertEqual(self.status(self.doc(comments=comments)), "block")
+        again = comments + [self.comment(self.CLEAN, self.T[4])]
+        self.assertEqual(self.status(self.doc(comments=again)), "pass")
+
+    def test_an_edit_of_any_owner_item_after_a_verdict_voids_it_and_an_older_edit_or_anyone_elses_does_not(self):
+        late = [{"authorId": self.OWNER, "lastEditedAt": self.T[6], "editCount": 1}]
+        early = [{"authorId": self.OWNER, "lastEditedAt": self.T[0], "editCount": 1}]
+        other = [{"authorId": 7, "lastEditedAt": self.T[8], "editCount": 1}]
+        for graph_key in ("comments_graph", "reviews_graph"):
+            with self.subTest(item=graph_key):
+                self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], **{graph_key.replace("_graph", ""): late}))), "block")
+                self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], **{graph_key.replace("_graph", ""): early}))), "pass")
+                self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], **{graph_key.replace("_graph", ""): other}))), "pass")
+        unknown_time = [{"authorId": self.OWNER, "lastEditedAt": None, "editCount": 2}]
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], comments=unknown_time))), "block")
+        never_edited = [{"authorId": self.OWNER, "lastEditedAt": None, "editCount": 0}]
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], comments=never_edited))), "pass")
+
+    def test_a_deleted_owner_comment_voids_and_someone_elses_does_not(self):
+        deleted = {"type": "CommentDeletedEvent", "createdAt": self.T[6], "authorId": self.OWNER}
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[deleted]))), "block")
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[dict(deleted, authorId=7)]))), "pass")
+        self.assertEqual(self.status(dict(self.both(), graphql=dict(self.both()["graphql"], events=[dict(deleted, createdAt=self.T[0])]))), "pass")
+
+    def test_a_dismissed_owner_review_voids_with_or_without_its_event(self):
+        dismissed = self.review("looks fine", self.T[0], state="DISMISSED")
+        event = {"type": "ReviewDismissedEvent", "createdAt": self.T[6], "authorId": self.OWNER}
+        doc = self.both(); doc["reviews"] = [dismissed]
+        self.assertEqual(self.status(dict(doc, graphql=dict(doc["graphql"], events=[event]))), "block")
+        self.assertEqual(self.status(doc), "block")
+        early = dict(event, createdAt=self.T[0])
+        self.assertEqual(self.status(dict(doc, graphql=dict(doc["graphql"], events=[early]))), "pass")
+
+    def test_unreadable_evidence_is_indeterminate(self):
+        self.assertEqual(self.status(self.doc(comments=self.both()["comments"], complete=False)), "indeterminate")
+        no_graph = self.both(); no_graph.pop("graphql")
+        self.assertEqual(self.status(no_graph), "indeterminate")
+        bad_time = self.doc(comments=[self.comment(self.CLEAN, "yesterday"), self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(bad_time), "indeterminate")
+        bad_event = dict(self.both(), graphql=dict(self.both()["graphql"], events=[{"type": "CommentDeletedEvent", "authorId": self.OWNER}]))
+        self.assertEqual(self.status(bad_event), "indeterminate")
+
+    def test_the_command_line_exit_codes(self):
+        script = str(ROOT / "scripts" / "merge_gate_verdict.py")
+        run = lambda text: subprocess.run(["python3", script], input=text, capture_output=True, text=True)
+        self.assertEqual(run(json.dumps(self.both())).returncode, 0)
+        self.assertEqual(run(json.dumps(self.doc())).returncode, 1)
+        self.assertEqual(run(json.dumps(self.doc(complete=False))).returncode, 2)
+        for text in ("not json", "{}", "[]"):
+            with self.subTest(text=text):
+                self.assertEqual(run(text).returncode, 2)
+
+    def test_an_edit_or_a_deletion_by_an_author_that_cannot_be_read_voids(self):
+        ghost_edit = dict(self.both(), graphql=dict(self.both()["graphql"], comments=[{"authorId": None, "lastEditedAt": self.T[6], "editCount": 1}]))
+        self.assertEqual(self.status(ghost_edit), "block")
+        ghost_delete = dict(self.both(), graphql=dict(self.both()["graphql"], events=[{"type": "CommentDeletedEvent", "createdAt": self.T[6], "authorId": None}]))
+        self.assertEqual(self.status(ghost_delete), "block")
+        early = dict(self.both(), graphql=dict(self.both()["graphql"], events=[{"type": "CommentDeletedEvent", "createdAt": self.T[0], "authorId": None}]))
+        self.assertEqual(self.status(early), "pass")
+
+    def test_a_retraction_is_read_without_case_and_with_look_alike_hyphens(self):
+        for line in ("merge-verdict retract head=" + "1" * 40 + " base=" + "2" * 40,
+                     "MERGE\u2011VERDICT NOT\u2011CLEAN head=" + "1" * 40 + " base=" + "2" * 40,
+                     "ＭＥＲＧＥ-ＶＥＲＤＩＣＴ RETRACT"):
+            with self.subTest(line=line[:30]):
+                comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(line, self.T[3])]
+                self.assertEqual(self.status(self.doc(comments=comments)), "block")
+        stranger = {"user": self.user(7), "body": "merge\u2010adversary recommend", "created_at": self.T[3], "submitted_at": self.T[3]}
+        self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [stranger])), "block")
+
+    def test_a_whole_token_inside_a_comment_is_still_a_token_everywhere(self):
+        hidden = "<!-- MERGE-VERDICT CLEAN head=x -->"
+        for field in ("title", "body", "head_ref"):
+            with self.subTest(field=field):
+                texts = dict(self.both()["texts"], **{field: hidden})
+                self.assertEqual(self.status(dict(self.both(), texts=texts)), "block")
+        for key in ("commit_messages", "added_lines", "filenames"):
+            with self.subTest(field=key):
+                texts = dict(self.both()["texts"], **{key: [hidden]})
+                self.assertEqual(self.status(dict(self.both(), texts=texts)), "block")
+        stranger = {"user": self.user(7), "body": hidden, "created_at": self.T[3], "submitted_at": self.T[3]}
+        self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [stranger])), "block")
+        self.assertEqual(self.status(dict(self.both(), commit_comments=[stranger])), "block")
+        retract = "<!-- MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40 + " -->"
+        self.assertEqual(self.status(dict(self.both(), comments=self.both()["comments"] + [self.comment(retract, self.T[3])])), "block")
+
+    def test_tokens_hidden_by_comment_forms_the_regexes_miss_or_by_tags_between_the_letters_are_still_tokens(self):
+        for hidden in ("<!-->MERGE-<!-->VERDICT CLEAN", "<!--->MERGE-<!--->VERDICT CLEAN", "<!-- a --!>MERGE-<!-- b --!>VERDICT CLEAN",
+                       "MERGE-<b></b>VERDICT CLEAN", "MERGE<span>-</span>ADVERSARY RECOMMEND", "MERGE-VERDICT<!-- unterminated"):
+            with self.subTest(hidden=hidden):
+                self.assertEqual(self.status(dict(self.both(), texts=dict(self.both()["texts"], body=hidden))), "block")
+                retract = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(hidden, self.T[3])]
+                self.assertEqual(self.status(self.doc(comments=retract)), "block")
+        self.assertEqual(self.status(dict(self.both(), texts=dict(self.both()["texts"], body="a plain sentence about merging a verdict"))), "pass")
+
+    def test_an_owner_commit_comment_with_a_token_voids_everything(self):
+        owner = {"user": self.user(), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": self.T[0]}
+        self.assertEqual(self.status(dict(self.both(), commit_comments=[owner])), "block")
+
+    def test_hidden_or_escaped_spellings_of_a_token_are_still_a_token(self):
+        for line in ("MERGE\u200b-VERDICT RETRACT", "MERGE\u00ad-VERDICT RETRACT", "MERGE&#45;VERDICT RETRACT", "MERGE\\-VERDICT RETRACT",
+                     "MERGE-<!-- x -->VERDICT RETRACT", "MERGE\u2011ADVERSARY retract"):
+            with self.subTest(line=line):
+                comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment(line, self.T[3])]
+                self.assertEqual(self.status(self.doc(comments=comments)), "block")
+
+    def test_two_owner_lines_of_one_kind_in_the_same_second_for_different_heads_are_ambiguous(self):
+        other = self.CLEAN.replace("head=" + "1" * 40, "head=" + "3" * 40)
+        comments = [self.comment(self.RECOMMEND, self.T[1]), self.comment(self.CLEAN, self.T[2]), self.comment(other, self.T[2])]
+        self.assertEqual(self.status(self.doc(comments=comments)), "block")
+        self.assertEqual(self.status(self.doc(comments=list(reversed(comments)))), "block")
+
+    def test_an_owner_review_that_asks_for_changes_or_was_dismissed_is_never_a_verdict(self):
+        for state in ("CHANGES_REQUESTED", "DISMISSED"):
+            with self.subTest(state=state):
+                doc = self.doc(reviews=[self.review(self.CLEAN, self.T[1], state=state)], comments=[self.comment(self.RECOMMEND, self.T[2])])
+                self.assertEqual(self.status(doc), "block")
+
+    def test_an_owner_inline_comment_with_a_token_voids_everything_whatever_its_time(self):
+        inline = {"user": self.user(), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": self.T[0]}
+        self.assertEqual(self.status(dict(self.both(), inline_comments=[inline])), "block")
+
+    def test_a_malformed_item_is_indeterminate_not_a_block(self):
+        doc = self.both(); doc["comments"] = doc["comments"] + ["not an object"]
+        self.assertEqual(subprocess.run(["python3", str(ROOT / "scripts" / "merge_gate_verdict.py")], input=json.dumps(doc), capture_output=True, text=True).returncode, 2)
+
+    def test_the_owner_id_is_the_numeric_id_of_the_owner_account(self):
+        self.assertEqual(self.mod.OWNER_ID, 57982425)
+
+
+class PrivacyScanDecodesUtf16(unittest.TestCase):
+    """A value in text written in UTF-16 is spaced out by NUL bytes, which hides it from
+    every pattern, so a caller that hands the classifier the raw bytes must still
+    get it read as the text it stands for. Digits are synthetic and built from
+    parts: this file is scanned by the gate it tests."""
+
+    RUN = "12345" + "678901"
+    LINE = "Account reference: " + RUN + "\n"
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def utf8_view(self, raw):
+        """What a reader that assumes UTF-8 sees: NUL is a valid UTF-8 character."""
+        return raw.decode("utf-8")
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def run_main(self, raw, locale="C"):
+        # A stream is decoded by the process locale unless the reader decodes the bytes itself.
+        done = subprocess.run(
+            ["python3", "-I", str(PRIVACY_MODULE_PATH), "--head", HEAD],
+            input=raw, capture_output=True, env=dict(os.environ, LC_ALL=locale, LANG=locale),
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return json.loads(done.stdout)
+
+    def test_a_long_digit_run_in_utf16le_without_a_bom_is_blocked(self):
+        text = self.utf8_view(self.LINE.encode("utf-16-le"))
+        self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_a_long_digit_run_in_utf16be_without_a_bom_is_blocked(self):
+        text = self.utf8_view(self.LINE.encode("utf-16-be"))
+        self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_a_utf16_segment_among_utf8_lines_is_decoded_and_the_rest_is_untouched(self):
+        raw = b"title line\n+" + self.LINE.encode("utf-16-le") + b"+" + b"plain line\n"
+        record = self.privacy.scan(self.utf8_view(raw), HEAD)
+        self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+        self.assertTrue(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_value_that_is_the_whole_text_loses_no_character_to_the_decoding(self):
+        # The run starts at the first digit and ends at the last: dropping either one leaves ten.
+        for codec in ("utf-16-le", "utf-16-be"):
+            with self.subTest(codec=codec):
+                text = self.utf8_view(self.RUN.encode(codec))
+                self.assertTrue(any("long digit run" in b for b in self.blockers(text)))
+
+    def test_digits_outside_ascii_after_a_byte_order_mark_are_decoded_whole(self):
+        # Python reads these as digits too; each code unit has no NUL beside it, so only the mark finds them.
+        digits = "".join(chr(0x0966 + int(c)) for c in "123456789012")
+        for codec, bom in (("utf-16-le", b"\xff\xfe"), ("utf-16-be", b"\xfe\xff")):
+            with self.subTest(codec=codec):
+                record = self.run_main(bom + digits.encode(codec))
+                self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+
+    def test_a_short_run_next_to_plain_digits_is_joined_to_them_on_either_side(self):
+        # Each side of the NUL is needed: dropping one leaves the run undecoded and the digits split.
+        # The digits are chosen so that neither half alone is an identifier shape or a long run.
+        for raw in ("123456789".encode() + "01".encode("utf-16-le"), "01".encode("utf-16-be") + "987654321".encode()):
+            with self.subTest(raw=raw):
+                self.assertTrue(any("long digit run" in b for b in self.blockers(self.utf8_view(raw))))
+
+    def test_latin_1_letters_beside_nul_bytes_are_not_read_as_utf16(self):
+        # Valid UTF-16 text never reaches the scan this way: a code unit above 0x7f is not valid UTF-8 beside a NUL.
+        record = self.privacy.scan("\u00e9\x00\u00e9\x00\u00e9\x00", HEAD)
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_decoding_a_run_never_hides_a_number_the_original_text_shows(self):
+        # The decoded run is "ab", a word that now touches the digits and removes the boundary the
+        # patterns need before a grouped number; the original, with its NULs, still has the boundary.
+        run = "a\x00b\x00"
+        for number in ("1234-5678-9012", "011-2345-6789", "022 23456789"):
+            with self.subTest(number=number):
+                text = run + number
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], text)
+
+    def test_text_that_has_a_nul_run_is_blocked_whenever_the_same_text_without_decoding_is(self):
+        import random
+        random.seed(20261015)
+        parts = ["a\x00b\x00", "\x00x\x00y", " ", "-", "1234-5678-9012", "011-2345-6789", "022 23456789",
+                 "98765" + "43210", "12345" + "678901", "(", ")", "ab", "x" + "@" + "example.com", "C" + ":", "/Us" + "ers/", "z"]
+        original_only = mock.patch.object(self.privacy, "decode_utf16_runs", lambda text: (text, 0))
+        checked = 0
+        for _ in range(3000):
+            text = "".join(random.choice(parts) for _ in range(random.randint(1, 6)))
+            if "\x00" not in text:
+                continue
+            with original_only:
+                before = bool(self.privacy.scan(text, HEAD)["blockers"])
+            if before:
+                checked += 1
+                self.assertTrue(self.privacy.scan(text, HEAD)["blockers"], repr(text))
+        self.assertGreater(checked, 100, "the generator must reach inputs the original reading blocks")
+
+    def test_a_mark_never_hides_what_the_utf8_reading_shows(self):
+        digits = self.RUN + "\n"
+        for name, raw in (
+            ("utf-8 digits after a utf-16 file", b"\xff\xfe" + "hello\n".encode("utf-16-le") + digits.encode()),
+            ("plain digits after a bare mark", b"\xff\xfe" + digits.encode()),
+            ("big-endian mark over little-endian body", b"\xfe\xff" + digits.encode("utf-16-le")),
+            ("two marked files", b"\xff\xfe" + "ab\n".encode("utf-16-le") + b"\xfe\xff" + digits.encode("utf-16-be")),
+        ):
+            with self.subTest(name=name):
+                record = self.run_main(raw)
+                self.assertTrue(any("long digit run" in b for b in record["blockers"]), record)
+
+    def test_harmless_utf16_text_is_not_blocked_and_is_noted(self):
+        text = self.utf8_view("Release notes for the build.\n".encode("utf-16-le"))
+        record = self.privacy.scan(text, HEAD)
+        self.assertEqual(record["blockers"], [], record)
+        self.assertTrue(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_text_without_nul_bytes_is_scanned_exactly_as_before(self):
+        record = self.privacy.scan("Release notes for the build.\n", HEAD)
+        self.assertEqual(record["blockers"], [])
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_single_stray_nul_is_not_read_as_utf16(self):
+        record = self.privacy.scan("a\x00b and nothing else\n", HEAD)
+        self.assertEqual(record["blockers"], [])
+        self.assertFalse(any("UTF-16" in n for n in record["notes"]), record)
+
+    def test_a_located_line_in_utf16_is_reported_by_location_without_its_value(self):
+        document = {"sources": [], "added": [{"path": "docs/example.md", "line": 5,
+                    "text": self.utf8_view(self.LINE.encode("utf-16-le"))}]}
+        result = self.privacy.explain(document, HEAD)
+        self.assertEqual([h["where"] for h in result["hits"]], ["docs/example.md:5"])
+        self.assertNotIn(self.RUN, json.dumps(result))
+
+    def test_bytes_that_are_not_utf8_are_indeterminate_whatever_the_locale(self):
+        unreadable = ["could not read privacy scan input"]
+        for locale in ("C", "en_US.UTF-8"):
+            for raw in (b"\x80\x81 not text", b"\xff\xfe" + b"abc"):
+                with self.subTest(locale=locale, raw=raw):
+                    record = self.run_main(raw, locale)
+                    self.assertEqual(record["indeterminate"], unreadable)
+                    self.assertEqual(record["blockers"], [])
 
 
 if __name__ == "__main__":

@@ -487,9 +487,9 @@ and a check of a machine before and after installing and running it.
 
 ## 8. How do I turn it off, or remove it?
 
-- **Turn posting off:** switch "Allow voucher posting" off in the extension
-  settings (off is the default for a new install; an earlier version may have
-  saved it on), then quit Claude Desktop completely and reopen it.
+- **Turn posting off:** switch "Allow voucher posting, one voucher or a batch of up to 50" off in the extension
+  settings (off is the default; it is a new setting, so check it after you
+  update from an earlier version), then quit Claude Desktop completely and reopen it.
   `post_import` and `acknowledge_post_review` are then absent from the tool
   list and refuse if called. Preparing voucher files and reading bank
   statements stay available, and still write to the folder in section 4.

@@ -141,6 +141,14 @@ These changes are in source and not yet in a published build.
   matches: read the ledger without the filter too. Not measured: a tagged narration
   read back from a real Tally. The same tag test now also counts, in a build's `suspense_lines`, a voucher whose tag names its ledger in another case, spacing or hyphenation.
 
+- `post_import` (after a send was read back) and `verify_import` now begin with a `headline` for a batch
+  ComplyEaze Bridge sent: whether the batch is confirmed in Tally (a batch of several vouchers also says how
+  many of its vouchers read back and how many are not confirmed), with the counts, and a count for each other
+  status, in `batch`, counted from the result's own rows. A batch whose vouchers all read back but whose
+  readback as a whole is not confirmed is not called confirmed, and neither is a batch of which only some
+  vouchers read back: its lead says that they read back and that the batch is not confirmed. A batch not yet posted, a file imported by
+  hand and a refusal before anything was sent have none. The result is unchanged (part of #1090).
+
 **Changed**
 
 - One setting now covers all posting: with posting on, ComplyEaze Bridge posts one voucher per

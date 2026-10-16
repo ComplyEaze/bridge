@@ -133,8 +133,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     keep their narration until an amendment of their batch is imported.
     Whenever narrations are read, the name goes to your AI provider, unshortened
     under `mask_parties`; `drop_narration` removes it with the narration.
-  - A bank-statement check over whole calendar months (`statement_tie_out`, in
-    source and not yet in a published build) can show, with the book's figures,
+  - A bank-statement check over whole calendar months (`statement_tie_out`,
+    added in release 0.6.0) can show, with the book's figures,
     the statement's balance at the month ends and its net over those months,
     under every setting: never a part of a month except the part-months at the
     statement's own start and end (whose net a month-end balance gives together

@@ -50,7 +50,7 @@ Not yet code-signed; your computer may warn you before opening it.
 - "Show the trial balance for 1 April to 31 March."
 - "Check these ledger names against the book before I post: …"
 
-**Its tools.** In name order; release 0.6.0 installs 28 of them (30 with posting on). None of them changes your TallyPrime books, and every call adds a receipt line,
+**Its tools.** In name order; release 0.6.0 installs 28 of them, none of which changes your TallyPrime books; with posting on, two more appear, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -74,7 +74,7 @@ with no figures, to a log on this computer.
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `statement_tie_out` | Whether the bank ledger stands where a parsed bank statement says it stood at the start and at the end of the statement's dates, or of whole calendar months of it: three gaps and the dates; the balances themselves are not returned | Nothing |
-| `stock_summary` | The closing stock value of each item as of a 31 March, values only; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
+| `stock_summary` | The closing stock value of each item as of a 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own; an item inside a stock group returns no quantity; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
 | `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |
@@ -240,24 +240,28 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   0.4.2 was not started on this computer: the chat had no ComplyEaze Bridge tool and showed no error. What was not
   run: a changed re-import, steps 2 to 11 on the published file, posting, and other Windows versions, Tally editions
   or Claude Desktop builds. The record is the contributor's reports on #1413.
-- Builds of 0.6.0 on a Windows computer, on 16 October 2026, India time (#1148). One Windows 10 Home 22H2 computer, Claude Desktop
+- Builds of 0.6.0 on a Windows computer, on 16 October 2026 (#1148). One Windows 10 Home 22H2 computer, Claude Desktop
   2.37337.1.0 from the Microsoft Store, TallyPrime 7.1 Silver on port 9001, one new synthetic company. What was run: the CI package
   of the release pull request (commit `a3b7316947cdf3c5ce46615c8b89e45d538345f3`, `bridge-tally.mcpb` SHA-256
   `6b83ca74377d7ed86a2b524f4d53bd2e9753b3318bfa6634078d5f5645184022`, `bridge_mcp.exe` SHA-256
   `e9780806594e60afabdb83d35bb751f0aeefba708b2b63c33b11452bbf0e5a84`) with the one posting setting on: a Journal, a Receipt,
   a Contra and a Payment posted once each with no voucher number, and one batch of three (a Payment, a Receipt and a Contra)
   posted after one approval. Every post created what it sent, and every voucher read `posted_verified` in the post's own
-  readback and again in `verify_import`. The approval window showed in front of a full-screen Tally and of Claude Desktop, and
-  took keyboard focus (a Down arrow meant for Tally moved the selection inside the window). Then a package built by the release
+  readback and again in `verify_import`. The approval window showed in front of a full-screen Tally and of Claude Desktop (one screen, one run), with No as the
+  default, and took keyboard focus (a Down arrow meant for Tally moved the selection inside the window; Enter alone refuses,
+  arrow keys then Enter can reach Yes; a typed letter was not tried). Then a package built by the release
   workflow's own steps (rehearsal run 38885882661, `bridge_mcp.exe` SHA-256
-  `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`) was installed over it, kept its settings, and posted one more
-  Journal the same way. The published file (`bridge-tally.mcpb` SHA-256
+  `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`) was installed over it, kept its port and posting settings (the same version, not an upgrade), and posted one more
+  Journal the same way. The published file (`bridge-tally-mcp-v0.6.0-windows-x64.mcpb` SHA-256
   `7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca`, `bridge_mcp.exe` SHA-256
   `1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1`) is neither of those: its exe differs from the rehearsal's in
-  77 of 26,503,168 bytes, and we have not run it against a live TallyPrime. What was not run: a batch of Journals, a batch of more
-  than 3, a refused or partly landed post, amendments, the review window, an On Account approval, the retired batch variable,
-  the Import menu, the desktop app, Gold, macOS, other Windows or Tally releases, and an upgrade from 0.5.1. The record is in the
-  0.6.0 entry of the changelog.
+  77 of 26,503,168 bytes, and we have not run it against a live TallyPrime. What was not run, among others: a batch of Journals, a batch of
+  more than 3, a refused or partly landed post, amendments, the review window, an On Account approval, the retired batch
+  variable, the voucher-numbering rows (#724, #1668), `voucher_read_cost` against a real `vouchers` call, the Store-install
+  proof of the lock (#1584, #1459), a second monitor, the batch `headline` on a live post, the Import menu, the desktop app,
+  Sales invoice posting (not offered in 0.6.0), Gold, macOS, other Windows or Tally releases, and an upgrade from 0.5.1. The
+  record of the pass is in the 0.6.0 entry of the changelog; the comparison with the published file was made from the release
+  assets after the release.
 - The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
   2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
   published file), against licensed TallyPrime Silver 7.1 holding the lab's own
@@ -279,7 +283,7 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 ## Not in the latest release
 
-- Stock quantities, and stock reads on books with many masters of any kind; sales,
+- Stock quantities of items inside a stock group, and stock reads on books with many masters of any kind; sales,
   purchase or tax posting; creating masters; bill-wise allocation
 - TallyPrime Education mode: the trial balance, Profit and Loss, Balance Sheet,
   the stock summary and the `masters` read are refused; so is a read of vouchers,

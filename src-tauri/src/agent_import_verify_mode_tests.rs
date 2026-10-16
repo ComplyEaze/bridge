@@ -28,6 +28,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
         narration: None,
         reference: None,
         voucher_number: row.voucher_number.clone(),
+        invoice: None,
         entries: row
             .entries
             .iter()

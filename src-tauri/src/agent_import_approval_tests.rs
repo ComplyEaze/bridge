@@ -613,11 +613,40 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
 /// call itself, so the answer and the cancellation are both ready when it is
 /// next polled; repeated, since the pick between two ready arms is what is
 /// under test.
-// current_thread, which `closed()` relies on: the dialog's task finishes in
-// the poll that closes it, before this task runs again.
+// current_thread, which `closed()` relies on: the dialog's task finishes in the
+// poll that closes it, before this task runs again.
+//
+// Each repeat is decided alone, from `answer` to the end of its call, with no
+// other call polled. Before it, a call is only driven to its open dialog, which
+// waits on the repeat's own simulator (its own port) and decides nothing; the
+// 16 calls are driven side by side on this task, and the moment a call's dialog
+// opens it is decided; no call is polled after its dialog has opened.
 #[tokio::test(flavor = "current_thread")]
 async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
-    for _ in 0..16 {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::task::Poll;
+    const REPEATS: usize = 16;
+    /// Names the repeat being driven or decided, if a panic happens meanwhile.
+    struct Polling(usize);
+    impl Drop for Polling {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                eprintln!("repeat {}: panicked while it was driven or decided", self.0);
+            }
+        }
+    }
+    struct Repeat {
+        simulator: std::cell::RefCell<Option<SequenceSimulator>>,
+        directory: tempfile::TempDir,
+        server: Server,
+        line: ImportLedgerLine,
+        args: Value,
+        scripted: ScriptedApproval,
+        withdrawn: tokio_util::sync::CancellationToken,
+    }
+    let mut repeats = Vec::new();
+    for _ in 0..REPEATS {
         let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let mut server = server_at(simulator.address(), directory.path());
@@ -627,40 +656,98 @@ async fn an_answer_arriving_with_the_cancellation_is_not_kept() {
             CALL_CEILING,
         ));
         let (line, args) = saved_batch(&server);
-        let scripted = ScriptedApproval::held();
-        let withdrawn = tokio_util::sync::CancellationToken::new();
-        let mut post = std::pin::pin!(crate::tally::runtime::TOOL_CANCELLATION.scope(
-            withdrawn.clone(),
-            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
-        ));
-        // Every wait is on an event, so a slow runner only slows the test;
-        // the bound stops a hang.
+        repeats.push(Repeat {
+            simulator: std::cell::RefCell::new(Some(simulator)),
+            directory,
+            server,
+            line,
+            args,
+            scripted: ScriptedApproval::held(),
+            withdrawn: tokio_util::sync::CancellationToken::new(),
+        });
+    }
+    let mut calls: Vec<Pin<Box<dyn Future<Output = Value> + '_>>> = repeats
+        .iter()
+        .map(|repeat| {
+            let call: Pin<Box<dyn Future<Output = Value> + '_>> =
+                Box::pin(crate::tally::runtime::TOOL_CANCELLATION.scope(
+                    repeat.withdrawn.clone(),
+                    SCRIPTED_APPROVAL.scope(
+                        repeat.scripted.clone(),
+                        repeat.server.call_tool("post_import", repeat.args.clone()),
+                    ),
+                ));
+            call
+        })
+        .collect();
+    let mut dialogs: Vec<Pin<Box<dyn Future<Output = ()> + '_>>> = repeats
+        .iter()
+        .map(|repeat| {
+            let dialog: Pin<Box<dyn Future<Output = ()> + '_>> = Box::pin(repeat.scripted.opened());
+            dialog
+        })
+        .collect();
+    let mut decided = [false; REPEATS];
+    for _ in 0..REPEATS {
+        // Drive the calls that have not been decided until one more dialog is
+        // open, and stop at once: that call is not polled again before its
+        // deciding part. Every wait is on an event, so a slow runner only slows
+        // the test; the bound stops a hang.
+        let number = tokio::time::timeout(
+            HANG_GUARD,
+            std::future::poll_fn(|cx| {
+                for number in 0..REPEATS {
+                    if decided[number] {
+                        continue;
+                    }
+                    let _polling = Polling(number);
+                    // The dialog first: a call whose dialog has opened must not be
+                    // polled again, because its wait for the answer is bounded and a
+                    // call polled after that bound returns pending, not at its dialog.
+                    // The dialog's task runs while this task waits, so a call that
+                    // entered its wait in the last pass is seen open at the start of
+                    // the next.
+                    if dialogs[number].as_mut().poll(cx).is_ready() {
+                        return Poll::Ready(number);
+                    }
+                    if let Poll::Ready(response) = calls[number].as_mut().poll(cx) {
+                        panic!("repeat {number}: the call ended early: {response}");
+                    }
+                }
+                Poll::Pending
+            }),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            let stuck: Vec<usize> = (0..REPEATS).filter(|number| !decided[*number]).collect();
+            panic!("the calls of repeats {stuck:?} did not open their dialogs")
+        });
+        decided[number] = true;
+        let _polling = Polling(number);
+        let repeat = &repeats[number];
+        // Answer, and let the dialog's task take it, without polling the
+        // call. On this current-thread runtime the task drops its end of
+        // the answer and runs to its end in one poll, so once `closed`
+        // resolves its answer is ready for the call's next poll.
         tokio::time::timeout(HANG_GUARD, async {
-            // Drive the call until its dialog is open.
-            tokio::select! {
-                biased;
-                response = &mut post => panic!("the call ended early: {response}"),
-                () = scripted.opened() => {}
-            }
-            // Answer, and let the dialog's task take it, without polling the
-            // call. On this current-thread runtime the task drops its end of
-            // the answer and runs to its end in one poll, so once `closed`
-            // resolves its answer is ready for the call's next poll.
-            scripted.answer(true);
-            scripted.closed().await;
+            repeat.scripted.answer(true);
+            repeat.scripted.closed().await;
         })
         .await
-        .expect("the dialog opened and its task took the answer");
-        withdrawn.cancel();
-        let response = post.await;
-        let _ = sent(simulator);
+        .unwrap_or_else(|_| panic!("repeat {number}: the dialog's task took the answer"));
+        repeat.withdrawn.cancel();
+        let response = calls[number].as_mut().await;
+        let _ = sent(repeat.simulator.borrow_mut().take().unwrap());
         assert_eq!(
             result(&response)["error"]["code"],
             "request_cancelled",
-            "{response}"
+            "repeat {number}: {response}"
         );
-        assert!(!server.post_approvals.holds(&line.batch_id), "nothing kept");
-        assert_eq!(intents(directory.path()), 0);
+        assert!(
+            !repeat.server.post_approvals.holds(&repeat.line.batch_id),
+            "repeat {number}: nothing kept"
+        );
+        assert_eq!(intents(repeat.directory.path()), 0, "repeat {number}");
     }
 }
 

@@ -233,6 +233,7 @@ def state():
         "head_ref": "feature-branch",
         "commit_comments": [],
         "commit_comments_fail": False,
+        "commit_comment_pages": None,    # pages of the repository's commit comments, when a scenario needs more than one
         "inline": [],
         "history": EMPTY_HISTORY,
         "history_fail": False,
@@ -358,6 +359,27 @@ def state():
 
     elif scenario == "commit-comments-unreadable":
         s["commit_comments_fail"] = True
+
+    elif scenario == "seventy-six-commits":
+        # A pull request in a chain carries its parents' commits: more than the old cap of 60, the head among them.
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(75)] + [dict(DEFAULT_COMMIT)]
+
+    elif scenario == "seventy-six-commits-with-a-token-on-the-first":
+        # The same chain link, with a stranger's token on its first commit, which is not the head: the list of commits is
+        # what the comments are filtered by, so a list of the head alone would pass this.
+        s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(75)] + [dict(DEFAULT_COMMIT)]
+        s["commit_comments"] = [{"id": 61, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1, "commit_id": "%040x" % 1}]
+
+    elif scenario == "commit-comment-token-on-the-second-page":
+        owner_token = {"id": 31, "user": dict(OWNER_USER), "body": "MERGE-VERDICT NOT-CLEAN", "created_at": T1, "updated_at": T1, "commit_id": HEAD}
+        benign = [{"id": 100 + n, "user": {"login": "someone", "id": 9, "type": "User"}, "body": "looks fine", "created_at": T1, "updated_at": T1, "commit_id": HEAD} for n in range(100)]
+        s["commit_comment_pages"] = [benign, [owner_token]]
+
+    elif scenario == "commit-comment-without-a-commit":
+        s["commit_comments"] = [{"id": 51, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "hello", "created_at": T1, "updated_at": T1, "commit_id": None}]
+
+    elif scenario == "commit-comment-token-on-another-commit":
+        s["commit_comments"] = [{"id": 41, "user": {"login": "stranger", "id": 7, "type": "User"}, "body": "MERGE-ADVERSARY RECOMMEND", "created_at": T1, "updated_at": T1, "commit_id": "9" * 40}]
 
     elif scenario == "sixty-one-commits":
         s["commits"] = [dict(DEFAULT_COMMIT, sha="%040x" % (n + 1)) for n in range(61)]
@@ -1203,9 +1225,13 @@ elif args and args[0] == "api":
         merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
         emit([S["comments"] + [dict(i, body=i["body"].replace("base=" + BASE_TIP, "base=" + merge_base)) for i in S["owner_items"]]])
     elif "/commits/" in joined and joined.rstrip().split("?")[0].endswith("/comments"):
+        fail("a commit comment read per commit: the gate reads the repository's commit comments once")
+    elif any(a.endswith("/comments?per_page=100") and "/issues/" not in a and "/pulls/" not in a and "/commits/" not in a for a in args):
+        # the repository's commit comments, each naming the commit it is on (the pull request's head unless a scenario says otherwise)
         if S["commit_comments_fail"]:
             fail("controlled commit comments failure")
-        emit([S["commit_comments"]])
+        pages = S["commit_comment_pages"] if S["commit_comment_pages"] is not None else [S["commit_comments"]]
+        emit([[dict({"commit_id": HEAD}, **c) for c in page] for page in pages])
     elif "/pulls/321/comments" in joined:
         if "inline" in S["pages_fail"]:
             fail("controlled inline comments failure")

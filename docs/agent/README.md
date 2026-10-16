@@ -116,8 +116,8 @@ The ordinary default tools, in name order:
 
 `masters`, `stock_summary`, `profit_and_loss`, `balance_sheet`, `purchase_register` and
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
-0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register` and `voucher_read_cost` are in the
-source after release 0.5.0 and are not in a published build yet. `local_data_report` (also
+0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
+release 0.6.0. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -355,10 +355,6 @@ cancellation of the call) stays unread until the call ends. The lab write tools 
 not cancellable.
 `egress_log` reads only the final 256 KiB, in 64 KiB reverse-seek chunks, so a
 larger receipt file still yields its bounded tail without loading the head.
-`changed_since` is unavailable: it is omitted from tool discovery and direct calls
-are refused as `changed_since_unqualified` before contacting Tally. Bounded change
-enumeration and snapshot continuation have not been qualified. There is no operator
-setting to enable this tool.
 
 ### Native Trial Balance
 
@@ -1769,8 +1765,7 @@ period when Tally sends them (New Ref and Agst Ref allocations do):
   `BILLCREDITPERIOD` inside one allocation, or a child element inside either,
   refuses the read as a protocol error (`agent_read_protocol_invalid`). A
   malformed `BILLDATE` refuses as `bill_allocation_date_invalid`. Both reach every reader that shares the voucher parser,
-  not only `vouchers`: `changes` (where a refusal holds the checkpoint),
-  `voucher_presence`, the empty-window corroboration read and the desktop voucher
+  not only `vouchers`: `voucher_presence`, the empty-window corroboration read and the desktop voucher
   screen. Write-side verification is not affected, because its fetch names no
   allocation fields.
 - An allocation is read only when it has a `BILLTYPE`. An untyped one is skipped
@@ -2225,7 +2220,10 @@ voucher mark moved by exactly that many. Otherwise it is
 `reconciliation_required` (`batch_step_unconfirmed` when only the mark
 was not confirmed). Review a doubted batch's vouchers in Tally and do not rebuild it;
 `acknowledge_post_review` records that review, one doubt at a time, and changes
-no verdict.
+no verdict. Its `invoice_stop` value is the one exception to "review": it
+releases the stop a sent Sales invoice that is not verified posted puts on its
+company (`invoice_company_stopped`), after the person has checked Tally, in the
+same dialog the model cannot answer.
 
 Both switches accept `true`/`false` or `1`/`0`; any other value stops startup, except that an empty `BRIDGE_AGENT_ENABLE_WRITES`, or the extension's unresolved placeholder for it, reads as off. No model-supplied argument can grant approval. Claude controls
 its own tool-call permission prompts: Bridge cannot preselect **Always allow**
@@ -2769,10 +2767,6 @@ admitted `BOOKSFROM` the request pins). On a book holding several years it is
 not the current year's opening: for a period's opening, use `trial_balance` or
 `ledger_movement` with that period's `from`.
 
-The unavailable `changed_since` implementation must not be used as
-change-enumeration evidence; its retained internal response states that
-deletion detection is unsupported.
-
 ### What each tool's evidence covers
 
 What a tool's top-level `evidence.request_sha256` and `response_sha256` cover,
@@ -2969,8 +2963,6 @@ Per tool:
   request: its request digest hashes
   `verify_import_page:<batch_id>:<offset>` and its response digest hashes
   the saved proof.
-- `changed_since` is refused before any request, so it carries only the
-  refusal's local evidence.
 - `egress_log`, `local_data_report`, `parse_bank_statement`, `read_evidence`
   and `voucher_schema` read nothing from Tally. Their request digest hashes the tool's name, and
   their response digest hashes what they return (for `voucher_schema`, the
@@ -3005,7 +2997,28 @@ until it has words) and, for a difference, how many lines did not tie (a Tally l
 amount that nothing derived was compared with, a derived line Tally has no counterpart for, and for a
 profit and loss the Cost of Sales heading when it is off the derived cost of sales), says when the
 derived lines are withheld, and gives one next step for each reason. So far `trial_balance`,
-`profit_and_loss` and `balance_sheet` carry one; the other read tools and the refusals follow.
+`profit_and_loss` and `balance_sheet` carry one, and `post_import` and `verify_import` carry one of
+another shape (below); the other read tools and the refusals follow.
+
+`post_import` (after a send was read back) and every page of `verify_import` carry a headline that
+says how the batch ended, counted voucher by voucher from the verification's own rows, never from
+tool arguments and never stored in the proof (a later page recomputes the same one from the saved
+proof). The lead says whether the batch is confirmed: for a batch of one voucher it is a sentence about
+that voucher, and for a batch of several vouchers it gives their number and, when some are not
+confirmed, how many read back (`posted_verified`) and how many are not. The counts are always in `batch`, which holds `vouchers`, `confirmed`, `not_confirmed` (one count for each other row status,
+and `unrecognised` for any status this build does not know) and `verdict` (`posted_verified` only when
+every voucher is confirmed and the readback as a whole is). When every voucher reads back but the
+batch as a whole is not confirmed (a duplicate, a doubt about the ledgers or the voucher mark, or an
+answer from Tally that was not clean or is missing), the lead says so and does not call the batch
+confirmed. When only some vouchers read back, the counts hold the rows only and cannot tell a doubt
+about the whole batch from a doubt about one row, so the lead says that the vouchers read back and that
+the batch is not confirmed, and never calls those vouchers confirmed. When some vouchers are not
+confirmed, the lead says that each row says what was found and
+gives a next step where there is one: only four statuses (`bound_not_in_window`, `book_rolled_back`,
+`sent_not_attributed`, `tally_reported_not_created`) carry a `next_step`. Only a batch ComplyEaze Bridge dispatched natively
+(`result.dispatch.state` present and not `not_dispatched`) carries one: a built batch not yet posted, a
+file imported by hand and a refusal before anything was sent carry none, because the batch can still be
+posted.
 
 ## Protocol and migration notes
 
@@ -3052,8 +3065,7 @@ scoped access refuses them before any company report is read.
 Port zero and ports above 65535 are rejected at startup.
 Unknown arguments, wrong selector types, and invalid enums are rejected before
 any Tally request, and so is a missing required argument (`<name>_required`, for
-example `company_guid_required`). Checkpoint numeric strings are no longer accepted at the tool
-boundary. `changed_since` is unavailable; existing clients must stop calling it.
+example `company_guid_required`).
 
 `validate_masters` accepts 1–100 nonblank names, each at most 1024 characters.
 Near-miss suggestions are limited to 25 names and 8192 UTF-8 bytes per requested

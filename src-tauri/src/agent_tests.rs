@@ -63,68 +63,64 @@ fn ordinary_vouchers_reject_missing_or_empty_core_fields_before_selection() {
 
 #[test]
 fn voucher_profiles_fetch_accounting_state_and_bill_allocations() {
-    for request in [
-        render_agent_vouchers(
-            "Book",
-            &tally_date("20260901"),
-            &tally_date("20260902"),
-            None,
-        )
-        .unwrap(),
-        render_agent_changed_vouchers("Book", 1, 2),
-    ] {
-        let mut reader = quick_xml::Reader::from_str(&request);
-        let mut fields = Vec::new();
-        loop {
-            match reader.read_event().unwrap() {
-                quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
-                    fields = reader
-                        .read_text(event.name())
-                        .unwrap()
-                        .split(',')
-                        .map(str::to_string)
-                        .collect();
-                }
-                quick_xml::events::Event::Eof => break,
-                _ => {}
+    let request = render_agent_vouchers(
+        "Book",
+        &tally_date("20260901"),
+        &tally_date("20260902"),
+        None,
+    )
+    .unwrap();
+    let mut reader = quick_xml::Reader::from_str(&request);
+    let mut fields = Vec::new();
+    loop {
+        match reader.read_event().unwrap() {
+            quick_xml::events::Event::Start(event) if event.name().as_ref() == "FETCH" => {
+                fields = reader
+                    .read_text(event.name())
+                    .unwrap()
+                    .split(',')
+                    .map(str::to_string)
+                    .collect();
             }
+            quick_xml::events::Event::Eof => break,
+            _ => {}
         }
-        for field in [
-            "ISCANCELLED",
-            "ISOPTIONAL",
-            // Allow-listing ISPOSTDATED in agent_voucher_scalars.rs is inert unless
-            // it is also named here: Tally omits a field from COLLECTION XML that
-            // the FETCH list does not name, no matter what the parser accepts.
-            "ISPOSTDATED",
-            // The ENTRY wildcard, which 2.4a proves correct on the instance where
-            // curated allocation paths misreport New Ref/Agst Ref as On Account.
-            // The narrower BILLALLOCATIONS.* is cheaper and measured equivalent
-            // HERE, but untested THERE -- and an unverified narrowing is not worth
-            // a payload saving when the failure is silently-wrong evidence.
-            "ALLLEDGERENTRIES.*",
-            // Same inertness trap as ISPOSTDATED above: allow-listing REFERENCE/
-            // ISINVOICE/PARTYGSTIN in agent_voucher_scalars.rs without also naming
-            // them here would leave reference/is_invoice/party_gstin permanently
-            // absent. Protocol reference §8.2c captured all three cleanly on
-            // TallyPrime 7.1 Silver alongside the existing fields.
-            "REFERENCE",
-            "ISINVOICE",
-            "PARTYGSTIN",
-            // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
-            "REFERENCEDATE",
-        ] {
-            assert!(fields.iter().any(|value| value == field), "missing {field}");
-        }
-        for narrower in [
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.NAME",
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE",
-            "ALLLEDGERENTRIES.BILLALLOCATIONS.*",
-        ] {
-            assert!(
-                !fields.iter().any(|value| value == narrower),
-                "{narrower} must not be narrowed back in while 2.4a's instance is unverified"
-            );
-        }
+    }
+    for field in [
+        "ISCANCELLED",
+        "ISOPTIONAL",
+        // Allow-listing ISPOSTDATED in agent_voucher_scalars.rs is inert unless
+        // it is also named here: Tally omits a field from COLLECTION XML that
+        // the FETCH list does not name, no matter what the parser accepts.
+        "ISPOSTDATED",
+        // The ENTRY wildcard, which 2.4a proves correct on the instance where
+        // curated allocation paths misreport New Ref/Agst Ref as On Account.
+        // The narrower BILLALLOCATIONS.* is cheaper and measured equivalent
+        // HERE, but untested THERE -- and an unverified narrowing is not worth
+        // a payload saving when the failure is silently-wrong evidence.
+        "ALLLEDGERENTRIES.*",
+        // Same inertness trap as ISPOSTDATED above: allow-listing REFERENCE/
+        // ISINVOICE/PARTYGSTIN in agent_voucher_scalars.rs without also naming
+        // them here would leave reference/is_invoice/party_gstin permanently
+        // absent. Protocol reference §8.2c captured all three cleanly on
+        // TallyPrime 7.1 Silver alongside the existing fields.
+        "REFERENCE",
+        "ISINVOICE",
+        "PARTYGSTIN",
+        // Same inertness trap: `reference_date` is parsed only if the request names it (#1257).
+        "REFERENCEDATE",
+    ] {
+        assert!(fields.iter().any(|value| value == field), "missing {field}");
+    }
+    for narrower in [
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.NAME",
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.BILLTYPE",
+        "ALLLEDGERENTRIES.BILLALLOCATIONS.*",
+    ] {
+        assert!(
+            !fields.iter().any(|value| value == narrower),
+            "{narrower} must not be narrowed back in while 2.4a's instance is unverified"
+        );
     }
     // A read should fetch what it returns: ledger_movement discards allocations.
     let movement =
@@ -413,11 +409,6 @@ async fn invalid_scope_arguments_are_rejected_before_any_tally_probe() {
             json!({"company_guid":"00000000-0000-4000-8000-000000000001", "from":"2026-09-01", "to":"2026-09-02", "ledger":42}),
             "argument_invalid:ledger",
         ),
-        (
-            "changed_since",
-            json!({"company_guid":"00000000-0000-4000-8000-000000000001", "master_snapshot_alter_id":-1}),
-            "changed_since_unqualified",
-        ),
     ] {
         let response = server.call_tool(tool, args).await;
         let error = &response["structuredContent"]["result"]["error"];
@@ -669,10 +660,6 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         (
             "build_import_xml",
             json!({"masters":[{"requested":party_name("Supplier Two"),"candidates":[party_name("Supplier Two")]}]}),
-        ),
-        (
-            "changed_since",
-            json!({"masters":[mark_changed_master_party_name(json!({"name":"Supplier Two"}))]}),
         ),
         ("egress_log", json!({"records":[]})),
         (
@@ -1881,25 +1868,6 @@ fn byte_trimming_keeps_each_cursor_relative_to_its_requested_offset() {
     assert_eq!(response["result"]["unallocated"]["next_offset"], 600);
 }
 
-#[test]
-fn byte_trimming_change_feed_rows_stops_checkpoint_advancement() {
-    let mut response = json!({"result": {
-        "voucher_alter_id": 10, "master_alter_id": 20,
-        "next_voucher_alter_id": 12, "next_master_alter_id": 22,
-        "checkpoint_advanceable": true,
-        "vouchers": [{"alter_id": 11}, {"alter_id": 12}],
-        "masters": [{"alter_id": 21}]
-    }});
-    assert!(truncate_response_items(&mut response).expect("trims vouchers"));
-    assert_eq!(
-        response["result"]["vouchers"].as_array().map(Vec::len),
-        Some(1)
-    );
-    assert_eq!(response["result"]["next_voucher_alter_id"], 11);
-    assert_eq!(response["result"]["checkpoint_advanceable"], false);
-    assert!(response["truncated"].as_bool().expect("truncated"));
-}
-
 #[tokio::test]
 async fn imports_are_hidden_and_refused_without_explicit_live_evidence_opt_in() {
     let disabled_tools = tool_definitions(false, false);
@@ -2022,122 +1990,6 @@ fn open_bill_paging_marks_remaining_rows_and_returns_a_cursor() {
     assert_eq!(last_page, vec!["c"]);
     assert!(!last_truncated);
     assert_eq!(last_next_offset, None);
-}
-
-#[test]
-fn changed_since_checkpoints_round_trip_as_numbers_with_numeric_string_compatibility() {
-    let observed =
-        observed_checkpoint(Some(&"42".to_string()), "voucher").expect("numeric high water");
-    let response = json!({"next_voucher_alter_id": observed});
-    assert_eq!(
-        checkpoint_arg(&response, "next_voucher_alter_id"),
-        Ok(Some(42))
-    );
-    assert_eq!(
-        checkpoint_arg(&json!({"voucher_alter_id":"42"}), "voucher_alter_id"),
-        Ok(Some(42))
-    );
-    assert_eq!(
-        checkpoint_arg(&json!({"voucher_alter_id":"bad"}), "voucher_alter_id"),
-        Err("checkpoint_invalid".to_string())
-    );
-}
-
-#[test]
-fn change_feed_snapshot_cursor_excludes_rows_inserted_after_first_page() {
-    let row = |alter_id| json!({"alter_id": alter_id});
-    let (first_page, first_truncated, first_cursor) =
-        stable_change_page(vec![row(3), row(1), row(2)], 0, 3, 2).expect("first page");
-    assert!(first_truncated);
-    assert_eq!(
-        first_page
-            .iter()
-            .map(|row| row["alter_id"].as_u64())
-            .collect::<Vec<_>>(),
-        vec![Some(1), Some(2)]
-    );
-    assert_eq!(first_cursor, 2);
-
-    // ALTERID 4 is inserted after page one. The original high-water 3 pins
-    // page two, so ID 3 is still returned and the new row cannot shift it.
-    let (second_page, second_truncated, second_cursor) =
-        stable_change_page(vec![row(4), row(3)], first_cursor, 3, 2)
-            .expect("snapshot-pinned second page");
-    assert!(!second_truncated);
-    assert_eq!(second_page, vec![row(3)]);
-    assert_eq!(second_cursor, 3);
-
-    let voucher_request = render_agent_changed_vouchers("BRIDGE SYNTHETIC BOOK", 2, 3);
-    let master_request =
-        render_agent_changed_masters("BRIDGE SYNTHETIC BOOK", 2, 3, MasterKind::Ledger);
-    for request in [voucher_request, master_request] {
-        assert!(request.contains("$AlterID &gt; 2 AND $AlterID &lt;= 3"));
-        assert!(request.contains("<SORT>Default: $AlterID</SORT>"));
-    }
-    let definitions = catalog::registered_tool_definitions(false, false);
-    let changed_since = definitions
-        .as_array()
-        .and_then(|tools| tools.iter().find(|tool| tool["name"] == "changed_since"))
-        .expect("changed-since schema");
-    assert!(changed_since["inputSchema"]["properties"]["offset"].is_null());
-}
-
-#[test]
-fn truncated_change_feed_never_advances_the_checkpoint() {
-    assert!(!checkpoint_advanceable(Some(12), 0, 12, true));
-    assert!(!checkpoint_advanceable(Some(11), 0, 12, false));
-    assert!(checkpoint_advanceable(Some(12), 0, 12, false));
-}
-
-#[test]
-fn change_scan_rejects_any_missing_or_malformed_row_alter_id() {
-    assert_eq!(
-        validate_change_row_alter_ids(&[json!({"alter_id":null})]),
-        Err("change_row_alterid_invalid".to_string())
-    );
-    assert_eq!(
-        parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>Bad</NAME><ALTERID>nope</ALTERID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"),
-        Err("change_row_alterid_invalid".to_string())
-    );
-    assert_eq!(
-        parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><GROUP><ALTERID>3</ALTERID></GROUP></COLLECTION></DATA></BODY></ENVELOPE>"),
-        Err("change_row_name_invalid".to_string())
-    );
-    assert_eq!(
-        parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>   </NAME><ALTERID>3</ALTERID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"),
-        Err("change_row_name_invalid".to_string())
-    );
-}
-
-#[test]
-fn changed_master_parser_decodes_entity_fragments() {
-    let rows = parse_agent_changed_masters("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>R&amp;D</NAME><PARENT>Income &amp; Expense</PARENT><ALTERID>3</ALTERID><GUID>ledger-guid</GUID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>").expect("changed master");
-    assert_eq!(rows[0]["name"], "R&D");
-    assert_eq!(rows[0]["parent"], "Income & Expense");
-}
-
-#[test]
-fn changed_master_rows_require_guid_or_master_id() {
-    let missing_identity = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><NAME>Cash</NAME><ALTERID>3</ALTERID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>";
-    assert_eq!(
-        parse_agent_changed_masters(missing_identity),
-        Err("change_row_identity_invalid".to_string())
-    );
-    assert!(
-        render_agent_changed_masters("BRIDGE SYNTHETIC BOOK", 2, 3, MasterKind::Ledger)
-            .contains("<FETCH>NAME,PARENT,ALTERID,GUID,MASTERID</FETCH>")
-    );
-}
-
-#[test]
-fn master_domain_high_water_ignores_unsupported_master_types() {
-    let xml = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><LEDGER><ALTERID>4</ALTERID></LEDGER><GROUP><ALTERID>7</ALTERID></GROUP><STOCKITEM><ALTERID>99</ALTERID></STOCKITEM></COLLECTION></DATA></BODY></ENVELOPE>";
-    assert_eq!(parse_master_domain_high_water(xml), Ok(7));
-    for kind in MasterKind::ALL {
-        let request = render_agent_master_domain_high_water("Book", kind);
-        assert!(request.contains("<TYPE>Ledger</TYPE>") || request.contains("<TYPE>Group</TYPE>"));
-        assert!(!request.contains("ALTMSTID"));
-    }
 }
 
 #[test]
@@ -2612,10 +2464,6 @@ fn native_cmpinfo_counters_are_not_voucher_or_master_rows() {
     assert!(parse_agent_changed_rows(&xml, "voucher")
         .expect("native empty changed vouchers")
         .is_empty());
-    assert!(parse_agent_changed_masters(&xml)
-        .expect("native empty masters")
-        .is_empty());
-    assert_eq!(parse_master_domain_high_water(&xml), Ok(0));
     assert_eq!(
         parse_company_high_water(&xml, "missing-guid"),
         Err("company_high_water_identity_absent".to_string())

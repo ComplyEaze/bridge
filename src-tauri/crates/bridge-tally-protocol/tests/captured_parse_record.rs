@@ -2332,7 +2332,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_ADMISSION,
     ),
     (
-        "tests/fixtures/agent/pilot-lab/pilot-lab-company-state.utf16le.xml",
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml",
         PILOT_LAB_ADMISSION,
     ),
     (

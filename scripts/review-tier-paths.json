@@ -133,7 +133,7 @@
  {"class": "docs", "match": {"prefix": "site/", "suffix": ".md"}},
  {"class": "docs", "match": {"prefix": "site/", "suffix": ".xml"}},
  {"class": "docs", "match": {"prefix": "site/", "suffix": ".svg"}},
- {"class": "write-path", "match": {"icontains": "import"}, "note": "Names that say a write, an import, a post, a journal, an upload, an approval or a secret are on the write path whatever the directory, the language, the case or whether the file is a test."},
+ {"class": "write-path", "match": {"icontains": "import"}, "note": "Names that say a write, an import, a post, a journal, an upload, an approval or a secret are on the write path whatever the directory, the language, the case or whether the file is a test, except prose (documents and site pages), which the documentation rules above classify first."},
  {"class": "write-path", "match": {"icontains": "post"}},
  {"class": "write-path", "match": {"icontains": "send"}},
  {"class": "write-path", "match": {"icontains": "write"}},

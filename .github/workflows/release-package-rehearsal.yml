@@ -1,0 +1,97 @@
+name: Rehearsal of the 0.6.0 release package job (DO NOT MERGE)
+
+# Throwaway. Runs the package job of release-mcpb-preview.yml, step for step, for
+# windows-latest only and with the tag fixed to mcp-v0.6.0, so a release package can be
+# lab-tested before the real release is dispatched. No admission, attest or publish step: it
+# creates no tag and no release. This file is never merged.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release-package-rehearsal.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+            binary: bridge_mcp.exe
+            architecture: x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: 1.96.0
+      - name: Set up Windows native prerequisites
+        id: windows-mcpb-prerequisites
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/setup-windows-native
+      - name: Verify the runner architecture before packaging
+        shell: bash
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          test "$actual" = "$EXPECTED_ARCHITECTURE"
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm run license:all
+      - name: Build the host Bridge MCP binary
+        run: cargo build --locked --release --manifest-path src-tauri/Cargo.toml --bin bridge_mcp
+      - name: Fetch the pinned PDFium build
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" ]]; then python_command=python; else python_command=python3; fi
+          "$python_command" scripts/fetch-pdfium.py --platform "$PLATFORM" --dest "$RUNNER_TEMP/mcpb-pdfium"
+      # bridge#583: the released binary must not hold the test-only approval
+      # seam. package-mcpb.mjs refuses it as well; this names the exact file.
+      - name: Prove the release binary lacks the test-only approval seam
+        shell: bash
+        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}
+      - name: Stage the reviewed release binary, PDFium and legal resources
+        shell: bash
+        run: >-
+          node scripts/package-mcpb.mjs
+          --binary src-tauri/target/release/${{ matrix.binary }}
+          --pdfium "$RUNNER_TEMP/mcpb-pdfium"
+      - name: Validate, archive, and exercise the real MCPB
+        shell: bash
+        env:
+          RELEASE_TAG: mcp-v0.6.0
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          asset="bridge-tally-${RELEASE_TAG}-${PLATFORM}.mcpb"
+          npx --yes @anthropic-ai/mcpb@2.1.2 validate packaging/mcpb/stage/manifest.json
+          npx --yes @anthropic-ai/mcpb@2.1.2 pack packaging/mcpb/stage "release-assets/$asset"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then python_command=python; else python_command=python3; fi
+          "$python_command" scripts/check-mcpb-bundle.test.py
+          "$python_command" scripts/check-mcpb-bundle.py "release-assets/$asset" --output "release-assets/$asset.smoke.json"
+          node scripts/write-mcpb-release-metadata.mjs "release-assets/$asset" "$RELEASE_TAG" "$PLATFORM" "$GITHUB_SHA"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rehearsal-mcpb-${{ matrix.platform }}
+          path: release-assets/**
+          if-no-files-found: error
+          retention-days: 3

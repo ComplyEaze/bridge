@@ -1541,14 +1541,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              issue a tax invoice on this date: it needs exactly one GST registration in force \
              on the invoice date, of type Regular and not inactive, whose GSTIN is valid and \
              belongs to the registration's state. The code names which of these failed. \
-             Nothing was written. Ask the user to check the company's GST registration \
+             Nothing was sent to Tally. Ask the user to check the company's GST registration \
              details in Tally, and the date they apply from, then build again. Do not change \
              the invoice's date or figures to get past this.",
         ),
         "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
             "Tally's answer about the company's GST registrations could not be read: it \
              listed no tax unit at all, or a unit without its identifier. Nothing was \
-             written. Check that the company is still open in Tally, then build again; if it \
+             sent to Tally. Check that the company is still open in Tally, then build again; if it \
              repeats, report it rather than retrying.",
         ),
         "invoice_party_registration_type_not_reported" => Some(

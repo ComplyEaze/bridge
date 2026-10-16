@@ -523,3 +523,110 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
         }
     }
 }
+
+// ---- BRIDGE PILOT LAB: the Sales stop ----
+
+/// What the journal holds after the sent invoice's dispatch intent.
+#[derive(Debug, Clone, Copy)]
+enum Then {
+    Nothing,
+    Status(&'static str),
+    Released,
+}
+
+/// The admission when the journal holds the pilot book's first invoice
+/// (`BP/26-27/0001`, dated as the book holds it) sent, then `then` appended
+/// after it, on a lab answering `order`: its outcome, and the requests sent.
+async fn admission_after_a_sent_invoice(
+    then: Then,
+    order: &str,
+) -> (
+    Result<(), Vec<(&'static str, String)>>,
+    Vec<tally_protocol_simulator::ObservedRequest>,
+) {
+    let lab = pilot_lab_over(order);
+    let mut first = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    first.bridge_txn_id = "t0".to_string();
+    first.voucher_number = Some("BP/26-27/0001".to_string());
+    let line: ImportLedgerLine = serde_json::from_value(json!({
+        "batch_id":sentinel_batch_id(1),"identity_scheme":"batch_v1",
+        "company_guid":pilot_lab_guid(),"endpoint_origin":"http://127.0.0.1:9000",
+        "company":null,"txn_ids":["t0"],"date_from":"20260801","date_to":"20260801",
+        "sha256":"a".repeat(64),"built_at":"2026-08-01T00:00:00Z","status":"built",
+        "on_account_approved":[],
+        "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
+        "vouchers":[first]
+    }))
+    .unwrap();
+    lab.server.append_import_ledger(&line).unwrap();
+    {
+        let _lock = lab.server.lock_import_admission().unwrap();
+        lab.server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_native(
+                &line,
+                "c".repeat(64),
+                uuid::Uuid::new_v4(),
+            ))
+            .unwrap();
+        let record = match then {
+            Then::Nothing => None,
+            Then::Status(status) => Some(
+                serde_json::from_value::<ledger::StatusRecord>(json!({
+                    "record_type":"verification_status","batch_id":line.batch_id,
+                    "batch_sha256":line.sha256,"status":status
+                }))
+                .unwrap(),
+            ),
+            Then::Released => Some(ledger::StatusRecord::stop_release(
+                &line,
+                ledger::ReleaseSeen::NotEstablished,
+            )),
+        };
+        if let Some(record) = record {
+            lab.server
+                .append_import_record_while_admitted(&record)
+                .unwrap();
+        }
+    }
+    let (outcome, _, requests) =
+        admit_on(lab, pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales")).await;
+    (outcome, requests)
+}
+
+/// A company with an invoice sent and not verified posted is refused before
+/// any read of Tally, naming the batch. Once that batch reads verified, the
+/// admission makes every read as before and one more: the verified invoice
+/// is the number control, so after the number read the same read is sent for
+/// it (the lab's `r10-number-control-k0.xml`, answered with the book's first
+/// invoice), and the invoice is admitted. Once a person released it instead,
+/// no invoice of the company stands as sent: the admission makes every read
+/// as before, sends no control read, and the invoice is admitted.
+#[tokio::test]
+async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
+    let stopped = Err(vec![("invoice_company_stopped", sentinel_batch_id(1))]);
+    for then in [Then::Nothing, Then::Status("verification_incomplete")] {
+        let (outcome, requests) = admission_after_a_sent_invoice(then, ADMISSION_ORDER).await;
+        assert_eq!(outcome, stopped, "{then:?}");
+        assert_eq!(requests.len(), 0, "{then:?}");
+    }
+    let (outcome, requests) = admission_after_a_sent_invoice(Then::Released, ADMISSION_ORDER).await;
+    assert_eq!(outcome, Ok(()));
+    assert_eq!(requests.len(), ADMISSION_ORDER.len());
+    // No control read: the number read is followed by the company's state.
+    assert_eq!(
+        sent_as(ADMISSION_ORDER, &requests, 'N'),
+        [LAB_R09_SHA256; 2]
+    );
+    assert_eq!(
+        sent_as(ADMISSION_ORDER, &requests, 'C'),
+        [LAB_R11_SHA256; 2]
+    );
+    let controlled = ADMISSION_ORDER.replace("eNsNse", "eNsNseeUsUse");
+    let (outcome, requests) =
+        admission_after_a_sent_invoice(Then::Status("posted_verified"), &controlled).await;
+    assert_eq!(outcome, Ok(()));
+    assert_eq!(requests.len(), controlled.len());
+    assert_eq!(sent_as(&controlled, &requests, 'N'), [LAB_R09_SHA256; 2]);
+    assert_eq!(sent_as(&controlled, &requests, 'U'), [LAB_R10_SHA256; 2]);
+    assert_eq!(sent_as(&controlled, &requests, 'C'), [LAB_R11_SHA256; 2]);
+}

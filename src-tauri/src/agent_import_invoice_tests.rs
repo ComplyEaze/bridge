@@ -1569,10 +1569,10 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
 }
 
 /// "Not in use" with no known invoice to read beside it: an empty book, or
-/// the company's first invoice sent; once one was sent and none stands
-/// verified, refused.
+/// no invoice of the company standing as sent; while one stands sent and none
+/// stands verified, refused.
 #[test]
-fn without_a_control_only_an_empty_book_or_a_first_post_is_believed() {
+fn without_a_control_only_an_empty_book_or_no_standing_invoice_is_believed() {
     assert_eq!(
         absence_without_control(false, Some(0)).map_err(|r| r.code),
         Ok(NumberAbsence::EmptyBook)
@@ -1583,7 +1583,7 @@ fn without_a_control_only_an_empty_book_or_a_first_post_is_believed() {
     );
     assert_eq!(
         absence_without_control(false, Some(40)).map_err(|r| r.code),
-        Ok(NumberAbsence::FirstPost)
+        Ok(NumberAbsence::NoStandingInvoice)
     );
     assert_eq!(
         absence_without_control(true, Some(40)).map_err(|refusal| refusal.code),

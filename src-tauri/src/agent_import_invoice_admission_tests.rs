@@ -66,8 +66,7 @@ fn server_over(mut plans: Vec<ScenarioPlan>, company_list: &str, guid: &str) -> 
         max_bytes: 200_000,
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let companies = bridge_tally_protocol::parse_companies_from_collection(company_list).unwrap();
     let company = companies

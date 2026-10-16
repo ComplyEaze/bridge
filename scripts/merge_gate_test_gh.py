@@ -312,6 +312,12 @@ def state():
     elif scenario == "changes-the-gate":
         set_changes(s, ("modified", "scripts/merge-gate.sh"))
 
+    elif scenario == "changes-the-registry":
+        set_changes(s, ("modified", "scripts/merge-gate-synthetic-uuids.json"))
+
+    elif scenario == "changes-the-registry-in-another-case":
+        set_changes(s, ("added", "Scripts/Merge-Gate-Synthetic-Uuids.json", "{}"))
+
     elif scenario == "changes-a-workflow":
         set_changes(s, ("modified", ".github/workflows/ci.yml"))
 
@@ -913,7 +919,25 @@ def state():
         )
         s["files"] = [{"filename": "config/settings.py", "status": "modified", "additions": 1, "deletions": 1}]
 
-    elif scenario == "privacy-uuid-indeterminate":
+    elif scenario in {"privacy-two-uuids", "privacy-uuid-and-digit-run", "privacy-uuid-credential-context"}:
+        first = "+fixture reference 11111111-2222-3333-4444-555555555555\n"
+        if scenario == "privacy-uuid-credential-context":
+            first = "+session token 11111111-2222-3333-4444-555555555555\n"
+        second = {"privacy-two-uuids": "+other reference 66666666-7777-8888-9999-aaaaaaaaaaaa\n",
+                  "privacy-uuid-and-digit-run": "+synthetic account " + "12345" + "678901" + " for the test\n",
+                  "privacy-uuid-credential-context": "+plain line\n"}[scenario]
+        s["files"] = [{"filename": "docs/example.md", "status": "added", "additions": 2, "deletions": 0}]
+        s["changed_files_expected"] = 1
+        s["diff"] = (
+            "diff --git a/docs/example.md b/docs/example.md\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/docs/example.md\n"
+            "@@ -0,0 +1,2 @@\n" + first + second
+        )
+
+    elif scenario in {"privacy-uuid-indeterminate", "manifest-write-failure"}:
         s["diff"] = (
             "diff --git a/docs/example.md b/docs/example.md\n"
             "new file mode 100644\n"

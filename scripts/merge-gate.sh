@@ -865,16 +865,25 @@ verdict_reviews=$(verdict_pages "repos/$REPO/pulls/$PR/reviews?per_page=100") ||
 verdict_comments=$(verdict_pages "repos/$REPO/issues/$PR/comments?per_page=100") || verdict_status=$?
 verdict_inline=$(verdict_pages "repos/$REPO/pulls/$PR/comments?per_page=100") || verdict_status=$?
 verdict_commit_comments="[]"
-verdict_shas=$(verdict_pages "repos/$REPO/pulls/$PR/commits?per_page=100" | jq -r '.[].sha') || verdict_status=$?
-if [ "$(printf '%s\n' "$verdict_shas" | sed '/^$/d' | wc -l | tr -d ' ')" -gt 60 ]; then
+# The pull request's commit comments are read once, from the repository's list of commit comments (every page), and kept when
+# they sit on one of the pull request's own commits. The commit list is the one proved complete above for the privacy scan (its
+# length equals the pull request's own count, 250 at most, no duplicate, the head among them); a list that is not proven means
+# the comments are not read, and any failed page fails the read. There is no cap on the number of commits: a pull request that
+# carries its parents' commits is judged like any other.
+if [ "$metadata_commits_proven" -ne 1 ]; then
   verdict_status=1
-  echo "more than 60 commits: their comments are not read" >>"$errfile"
+  echo "the commit list is not proven complete: commit comments are not read" >>"$errfile"
+else
+  verdict_sha_json=$(jq -c '[(if all(.[]; type == "array") then flatten else . end)[].sha | ascii_downcase]' <<<"$metadata_commits") || verdict_status=$?
+  verdict_repo_comments=$(verdict_pages "repos/$REPO/comments?per_page=100") || verdict_status=$?
+  if [ "$verdict_status" -eq 0 ] && ! jq -e 'all(.[]; (.commit_id | type) == "string")' <<<"$verdict_repo_comments" >/dev/null 2>&1; then
+    verdict_status=1
+    echo "a commit comment names no commit, so the list cannot be filtered completely" >>"$errfile"
+  fi
+  if [ "$verdict_status" -eq 0 ]; then
+    verdict_commit_comments=$(jq -c --argjson shas "$verdict_sha_json" '[.[] | select(.commit_id | type == "string") | select((.commit_id | ascii_downcase) as $c | $shas | index($c) != null)]' <<<"$verdict_repo_comments") || verdict_status=$?
+  fi
 fi
-while IFS= read -r verdict_sha; do
-  [[ "$verdict_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-  verdict_page=$(verdict_pages "repos/$REPO/commits/$verdict_sha/comments?per_page=100") || { verdict_status=$?; continue; }
-  verdict_commit_comments=$(jq -c -n --argjson a "$verdict_commit_comments" --argjson b "$verdict_page" '$a + $b') || verdict_status=$?
-done <<<"$verdict_shas"
 verdict_query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
  reviews(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
  comments(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}

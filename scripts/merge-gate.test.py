@@ -679,10 +679,21 @@ class MergeGateControls(unittest.TestCase):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "carries a merge-verdict token")
 
-    def test_commit_comments_that_cannot_be_read_or_are_too_many_are_indeterminate_and_an_owners_voids(self):
+    def test_commit_comments_that_cannot_be_read_or_whose_commit_list_is_unproven_are_indeterminate_and_an_owners_voids(self):
         self.assert_indeterminate("commit-comments-unreadable", "could not read")
+        # sixty-one commits without the head among them: the list is not proven to be the pull request's
         self.assert_indeterminate("sixty-one-commits", "could not read")
         self.assert_blocked("owner-commit-comment-with-a-token", self.VERDICT_BLOCK)
+
+    def test_a_pull_request_of_more_than_sixty_commits_is_judged_like_any_other(self):
+        # a chain link carries its parents' commits (76 here, the head among them): the comments of all of them are read
+        self.assert_pass("seventy-six-commits", self.VERDICT_PASS)
+
+    def test_the_commit_comments_of_every_page_are_read_and_only_those_on_the_pull_requests_commits_count(self):
+        self.assert_blocked("commit-comment-token-on-the-second-page", self.VERDICT_BLOCK)
+        self.assert_pass("commit-comment-token-on-another-commit", self.VERDICT_PASS)
+        # a comment that names no commit cannot be placed, so the read is not complete
+        self.assert_indeterminate("commit-comment-without-a-commit", "could not read")
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",

@@ -6432,15 +6432,17 @@ async fn a_master_saved_after_the_numbering_read_is_refused_before_the_post() {
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
 // L compliance listing, P paired listing, g groups, T voucher types, N number
-// read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, R
-// invoice read-back, Z Tally's answer to the import.
+// read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, X
+// the voucher types bounded by the master mark and Y their series-level
+// numbering (both read at the build and again before the approval, 16 Oct 2026),
+// R invoice read-back, Z Tally's answer to the import.
 const PILOT_ORDER: &str = concat!(
-    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeT",
-    "sTseeNsNseeCsCseemsmseekskseewswseseseesesemsmseewswseewswse",
-    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeT",
-    "sTseeNsNseeCsCseecscseseekskseemsmseebsbscscsbsbseseebsbsLsL",
-    "sPsPsgsgsbsbseseeTsTseeNsNseeCsCseseemekskseecscseseeewswsee",
-    "wswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
+    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeTsTse",
+    "eNsNseeCsCseemsmseseeXsXsYsYseseekskseewswseseseesesemsmseewswse",
+    "ewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese",
+    "eTsTseeNsNseeCsCseecscseseemsmseseeXsXsYsYseseekskseemsmseebsbsc",
+    "scsbsbseseebsbsLsLsPsPsgsgsbsbseseeTsTseeNsNseeCsCseseemekskseec",
+    "scseseeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
 );
 
 const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
@@ -6469,6 +6471,8 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'C' => "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38", // r16-tax-units.xml
         'R' => "dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7", // r12-invoice-readback.xml
         'Z' => "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e", // r14-invoice-post.xml
+        'X' => "229f54c9de4cd51c2b76480129a9c6965314cd04b82d3d40d87f462167cce0d5", // r18-numbering-masters.xml
+        'Y' => "e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276", // r19-numbering-series.xml
         other => panic!("no request for kind {other}"),
     }
 }
@@ -6481,7 +6485,66 @@ const PILOT_QUALIFIED: &[VoucherType] = &[
     VoucherType::Sales,
 ];
 
+/// The master mark the replay serves: the lab's `ALTMSTID` at the invoice
+/// round of 9 Oct 2026 (the marks answers above).
+const PILOT_MASTER_MARK: u64 = 223;
+
+/// The three voucher types the lab created after the invoice round (the zero-
+/// value types of the W-list, 10 Oct 2026), and so after the master mark 223.
+const PILOT_TYPES_AFTER_THE_ROUND: [&str; 3] =
+    ["BRIDGE Sales Two", "BRIDGE Sales Z0", "BRIDGE Sales Z1"];
+
+/// DERIVED, not Tally's bytes: a numbering answer of the pilot lab as of the
+/// invoice round. The two numbering answers were read on 16 Oct 2026, when the
+/// lab's book had moved on to master mark 245 and held three voucher types
+/// that did not exist at mark 223. The code refuses a numbering read with a
+/// type newer than the mark it is bounded by, so the replay serves the
+/// captured answer with exactly those rows removed: every removed row must
+/// carry an `ALTERID` above the mark, and the removed names must be the three
+/// above. The fixture files are the answers whole, as received.
+fn pilot_types_as_of_the_round(answer: &str) -> String {
+    const ROW: &str = "<VOUCHERTYPE NAME=\"";
+    const ALTER: &str = "<ALTERID TYPE=\"Number\">";
+    let mut kept = String::new();
+    let mut removed = Vec::new();
+    let mut rest = answer;
+    while let Some(start) = rest.find(ROW) {
+        let end = start + rest[start..].find("</VOUCHERTYPE>").unwrap() + "</VOUCHERTYPE>".len();
+        let row = &rest[start..end];
+        let name = &row[ROW.len()..ROW.len() + row[ROW.len()..].find('"').unwrap()];
+        let alter_at = row.find(ALTER).unwrap() + ALTER.len();
+        let alter: u64 = row[alter_at..alter_at + row[alter_at..].find('<').unwrap()]
+            .trim()
+            .parse()
+            .unwrap();
+        if alter > PILOT_MASTER_MARK {
+            removed.push((name.to_string(), alter));
+            kept.push_str(&rest[..start]);
+        } else {
+            kept.push_str(&rest[..end]);
+        }
+        rest = &rest[end..];
+    }
+    kept.push_str(rest);
+    let mut names: Vec<&str> = removed.iter().map(|(name, _)| name.as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(names, PILOT_TYPES_AFTER_THE_ROUND, "{removed:?}");
+    kept
+}
+
 fn pilot_plan(letter: char) -> ScenarioPlan {
+    if let 'X' | 'Y' = letter {
+        let bytes: &[u8] = if letter == 'X' {
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml")
+        } else {
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml")
+        };
+        return ScenarioPlan::new(Fixture::SyntheticXml(pilot_types_as_of_the_round(
+            &captured(bytes),
+        )))
+        .with_encoding(WireEncoding::Utf16LeNoBom)
+        .with_framing(ResponseFraming::ContentLength);
+    }
     let bytes: &[u8] = match letter {
         's' => return status(),
         'e' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-extent.utf16le.xml"),

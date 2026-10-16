@@ -2388,6 +2388,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_REPLAY,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-masters.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-numbering-series.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-fields.utf16le.xml",
         PILOT_LAB_EVIDENCE,
     ),

@@ -8,7 +8,6 @@ pub use bridge_tally_primitives::{
     MAX_EXACT_DECIMAL_BYTES,
 };
 
-pub mod bills_reconciliation;
 pub mod book_presence;
 pub mod master_binding;
 pub mod master_name_index;

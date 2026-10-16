@@ -45,7 +45,7 @@ const MAX_ENDPOINT_SESSIONS: usize = 32;
 
 #[path = "runtime_masters.rs"]
 mod masters;
-pub(crate) use masters::{MastersKind, MastersReadError, MastersRows};
+pub(crate) use masters::{MastersKind, MastersReadError, MastersRows, VoucherNumberingRead};
 
 #[cfg(test)]
 #[path = "runtime_masters_tests.rs"]
@@ -58,6 +58,10 @@ pub(crate) use company_features::CompanyFeaturesReadError;
 #[cfg(test)]
 #[path = "runtime_company_features_tests.rs"]
 mod company_features_tests;
+
+#[path = "runtime_month_register.rs"]
+mod month_register;
+pub(crate) use month_register::MonthRegisterReadError;
 
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;

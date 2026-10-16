@@ -6,7 +6,7 @@
 //! one, or a name two rows claim is an error, never a default.
 //!
 //! What each read was observed to return (TallyPrime 7.1 Silver, 6 Oct 2026,
-//! one real book, not a lab book; its answers are held privately and are not
+//! one real book; its answers are held privately and are not
 //! in this repository): the voucher-type collection with no field
 //! list returns every type, with the
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
@@ -338,11 +338,12 @@ pub(super) fn resolve_voucher_type(
     // type reads Automatic (Manual Override) on top and Manual in its series;
     // the type keyed for the rehearsal reads None on top and Manual in its
     // series).
-    // Its "prevent duplicates" flag is required as a further guard, not
-    // relied on: §9.8 measured it only for a failed Journal Alter, and an
-    // import that creates a Sales voucher under a used number is not measured
-    // (implementation guide §3.4). For a company's first invoice the post's
-    // readback (`invoice_number_not_unique`) is what catches a duplicate.
+    // Its "prevent duplicates" flag is the guard the number read's control
+    // relies on when no invoice of the company stands as sent (its first, or
+    // every one after a person's release). The protocol reference (§9.8)
+    // measured that flag on Journal and Payment vouchers only (PARTIAL); on a
+    // Sales voucher it is not measured, which ADR 0004 lists as a blocker for
+    // switching Sales on.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {

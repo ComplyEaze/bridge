@@ -12,11 +12,56 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
-### In plain words: the next build, since 0.5.1
+## [0.6.0] - 2026-10-16
 
-These changes are in source and not yet in a published build.
+### In plain words: ComplyEaze Bridge 0.6.0, since 0.5.1 (16 Oct 2026)
 
-**Added**
+These changes are in ComplyEaze Bridge 0.6.0. Each line names the pull
+requests it comes from, except where it names an issue. Like every build so far,
+it is not yet code-signed.
+
+**Should I upgrade?**
+
+- **If you use posting, or want to post batches: yes, read this first.** One
+  setting, **Allow voucher posting, one voucher or a batch of up to 50**, now
+  covers a single voucher and a saved batch of 2 to 50. It is a new setting and
+  is off by default: if you turned posting on in 0.5.1 or earlier, turn it on
+  again after installing 0.6.0. Every post still waits for your approval in a
+  separate window, and for a batch you approve its summary (#1090, #1630).
+- **If you use the bank-statement tool:** a skipped row must now name the other
+  account's ledger, and a transfer between two of your own accounts is checked so
+  that it is not booked twice (#1585, #1625). Several refusals are new; see
+  "What works differently" below.
+- **If you only read your books:** the new reads below are the reason to update,
+  if any. Nothing in 0.6.0 writes to Tally unless posting is on.
+- **How:** ComplyEaze Bridge does not update itself. Follow the
+  [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md):
+  (1) close any other program that runs ComplyEaze Bridge; (2) in Claude Desktop,
+  Settings, Extensions, install the new file; (3) keep ComplyEaze Bridge's data
+  folder; (4) check that the extension shows 0.6.0, that the Terms setting is
+  ticked, and that **Allow voucher posting, one voucher or a batch of up to 50**
+  is as you want it; (5) quit Claude Desktop completely and reopen it.
+
+**What you can do now**
+
+- `month_register` is a new read-only tool: Tally's own month-wise Sales Register or Purchase Register for whole
+  months, one row per month with Tally's debit, credit and closing columns exactly as printed. A window that is not
+  whole months, or that starts before the books, is refused. The rows are not tied to the vouchers, to the trial
+  balance or to `sales_register` and `purchase_register`, and not compared with Tally's register screen. Its request
+  renders as the lab sent it, and its parser reads the answers BRIDGE PILOT LAB gave on 13 October 2026 (one
+  synthetic book, TallyPrime 7.1 Silver). The Receipt and Payment Registers are not read (part of #1232, #1759).
+
+- A transfer between two of a firm's own bank accounts, printed on both statements and booked once, is now followed
+  from one statement to the other. A `skip` row must name the other account's ledger (a `skip` with no ledger, or one
+  naming the statement's own bank ledger or the suspense ledger, is refused at its row), and the parse records each
+  row's network transfer reference and printed instrument, for the transfer references both banks print. A build
+  records each Contra and each skipped row, and a successful build and the first page of a verification carry a
+  `transfers` section: each skipped row is paired with the other account's Contra by reference, then by date, or
+  listed as not found, ambiguous, other side unverified or not established, with counts only, no amount, reference,
+  party or ledger. A build that would book a transfer a second time is refused (part of #1392, #1585, #1592, #1625).
+  Run once, on 15 October 2026, on a Windows lab PC (TallyPrime 7.1 Silver, one synthetic company) with the Contras
+  imported by hand. Not measured: which banks print the same reference on both statements of a transfer, how many
+  days apart two banks print one transfer, and posting a batch that holds a transfer with `post_import`.
 
 - `masters` with `kind` `voucher_types` now returns, on each row, `series_numbering`: the numbering method
   (`automatic`, `manual`, `automatic_manual_override`, or the raw text under `unrecognised`, never read as
@@ -149,13 +194,13 @@ These changes are in source and not yet in a published build.
   vouchers read back: its lead says that they read back and that the batch is not confirmed. A batch not yet posted, a file imported by
   hand and a refusal before anything was sent have none. The result is unchanged (part of #1090).
 
-**Changed**
+**What works differently**
 
 - One setting now covers all posting: with posting on, ComplyEaze Bridge posts one voucher per
   approval, or a saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras, after
   one approval of the batch's summary (#1090). In the extension it is a new setting, **Allow voucher
-  posting, one voucher or a batch of up to 50**, off by default: if you turned posting on in 0.5.1 or
-  earlier, it starts off after you upgrade, and you turn it on again under the new text. On the command
+  posting, one voucher or a batch of up to 50**, off by default: it is a new setting, so if you turned posting on in 0.5.1 or
+  earlier, turn it on again under the new text. On the command
   line, `BRIDGE_AGENT_ENABLE_WRITES` now admits batches too, and the separate
   `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while it is set and posting is on, `post_import` refuses
   as `setting_retired` until you remove it. A batch saved earlier that was refused as more than one
@@ -422,9 +467,8 @@ These changes are in source and not yet in a published build.
   Windows computer with the build our checks made for 0.5.1; they had said it was not yet checked on Windows
   (#1543).
 
-- The README's table of tools now has a row for each of the 27 tools offered with posting off (25 reading tools
-  and 2 for import files), adding `company_features`, `gst_status` and `voucher_read_cost`, and says that those
-  three and `statement_tie_out` are in source and not in release 0.5.1, which installs 23 (#1672).
+- The README's table of tools now has a row for each tool offered with posting off, adding `company_features`,
+  `gst_status` and `voucher_read_cost` (#1672).
 
 - The FAQ answer and the security page about a second computer reaching Tally's gateway now state the rule: do
   not assume the gateway is closed to your office network; the firewall of the computer that runs Tally is what
@@ -435,8 +479,26 @@ These changes are in source and not yet in a published build.
 - The README and two blog pages no longer say that the record of a test run is our dated notes, "kept privately";
   what was and was not run is stated as before (#1528).
 
+- **The core for posting one GST Sales invoice is in this build and switched off.** Sales is not in the qualified
+  list, so every Sales build is refused before anything is sent to Tally, no file is written, the tools' schema does
+  not offer the type, and a saved Sales batch is refused at post. A Sales invoice that was sent and is not verified
+  posted would stop every further Sales invoice of its company until it verifies or a person releases it; that cannot
+  happen while Sales is off. For Journal, Payment, Receipt and Contra one change is accepted: `"invoice": null` is
+  read as absent. A first rehearsal on 7 October 2026 posted two invoices and found what must change before Sales can
+  be switched on; a later change does that (part of #691, #1342, #1463, #1488).
+
 **Safer or fixed**
 
+- On Windows, every request to one Tally port is now also serialised through a lock file under your user profile
+  (`.complyeaze-bridge\coordination`), in addition to the one under AppData. Windows writes a Store-installed Claude
+  Desktop extension's AppData files into the package's private folder, so the extension and an unpackaged
+  ComplyEaze Bridge process could each hold "the" lock in a different folder and a post could overlap a read on the
+  same Tally. A process that cannot create that folder refuses every send as `import_admission_lock_unavailable`.
+  Not measured: the cost of the extra lock per send (#1584, #1641).
+- `build_import_xml` shows where the import file really is when a Microsoft Store install of Claude Desktop keeps
+  Bridge's files in the package's private folder, so File Explorer and Tally can open the path it prints; a new
+  `path_state` field says whether the path was resolved. Where files are stored and read is unchanged. Measured
+  once, partly, on one Windows PC with Claude Desktop from the Microsoft Store, on 15 October 2026 (#1459, #1569).
 - When the local Tally mirror's key is missing from the computer's credential store, or is stored but is
   not a valid key, the app now says so with its own codes (`tally_mirror_key_missing`,
   `tally_mirror_key_invalid`) and tells you that a retry will not help, instead of asking you to approve a
@@ -524,6 +586,19 @@ These changes are in source and not yet in a published build.
   downgrade of later connections to classical key exchange), and `tokio`, `uuid`, `zeroize`, `libc` and `objc2`
   by a patch or minor release (tokio 1.53.2 fixes a Windows process-handle wait and a blocking-pool shutdown bug,
   per its release notes). The Rust licence inventory is regenerated (#1718, #1580).
+
+**Known limits**
+
+- The 0.6.0 build has not yet been run live. The lab record for it, the build and the company used, is added to
+  these notes before the release is published; until it is, read this line as "not run" (#1148).
+- The single posting setting, the upgrade from 0.5.1 and the refusal of the retired `BRIDGE_AGENT_ENABLE_BATCH_POST`
+  (`setting_retired`) have not been run live; what Claude Desktop passes for a new setting on an upgrade is not
+  measured (#1090, #1630).
+- The `headline` of a batch post has not been seen on a live Tally post (#1090, #1532).
+- Nothing was run on a Mac against a live TallyPrime for this release; the Mac package is built and started by our
+  checks without Tally.
+- Each entry above states what it was measured on and what it was not. Open limits are in the issues named in it,
+  and in the README's list of what has been run against a real TallyPrime.
 
 ## [0.5.1] - 2026-10-09
 

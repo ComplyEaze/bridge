@@ -274,11 +274,20 @@ fn the_readback_read_is_dated_and_by_type_guid_and_number() {
     assert!(render_invoice_readback_request("Co", guid, "A B", ("20250401", "20260331")).is_none());
 }
 
-/// The pilot lab's tax units as Tally answered (see the set's PROVENANCE).
-const TAX_UNITS: &str = include_str!(
-    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml"
-);
-const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+/// The pilot lab's tax units as Tally answered the code's own request (see the
+/// set's PROVENANCE), decoded.
+static TAX_UNITS: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"))
+});
+
+/// The pilot lab's GUID with its last character changed: a company that is
+/// not the lab.
+fn another_guid() -> String {
+    let mut guid = pilot_lab_guid();
+    let last = guid.pop().unwrap();
+    guid.push(if last == '6' { '7' } else { '6' });
+    guid
+}
 const REGISTRATION_ROW: &str =
     "<GSTREGISTRATIONDETAILS.LIST>\r\n      <FROMDATE>20260401</FROMDATE>";
 
@@ -289,7 +298,7 @@ fn units_with(from: &str, to: &str) -> String {
 }
 
 fn registration(xml: &str, as_of: &str) -> Result<CompanyRegistration, RegistrationOutcome> {
-    parse_company_registration(xml, PILOT_GUID, as_of)
+    parse_company_registration(xml, &pilot_lab_guid(), as_of)
 }
 
 fn refused_as(xml: &str, as_of: &str) -> &'static str {
@@ -307,16 +316,20 @@ fn the_company_registration_in_force_is_read_from_the_captured_tax_units() {
         gstin: "08ZZZZZ0000Z1ZQ".into(),
         state: "Rajasthan".into(),
     });
-    assert_eq!(registration(TAX_UNITS, "20260801"), read);
+    assert_eq!(registration(&TAX_UNITS, "20260801"), read);
     // A row dated on the invoice date applies; a day earlier nothing does.
-    assert_eq!(registration(TAX_UNITS, "20260401"), read);
+    assert_eq!(registration(&TAX_UNITS, "20260401"), read);
     assert_eq!(
-        refused_as(TAX_UNITS, "20260331"),
+        refused_as(&TAX_UNITS, "20260331"),
         "invoice_company_registration_not_yet_in_force"
     );
     // The company's GUID is matched without regard to case.
     assert_eq!(
-        parse_company_registration(TAX_UNITS, &PILOT_GUID.to_ascii_uppercase(), "20260801"),
+        parse_company_registration(
+            &TAX_UNITS,
+            &pilot_lab_guid().to_ascii_uppercase(),
+            "20260801"
+        ),
         read
     );
 }
@@ -385,11 +398,17 @@ fn a_registration_that_is_not_one_regular_unit_in_force_is_refused() {
             "invoice_company_registration_unbound",
         ),
         (
-            units_with("bfef-d32e2ab93c85-000000cd", "bfef-d32e2ab93c86-000000cd"),
+            units_with(
+                &format!("{}-000000cd", pilot_lab_guid()),
+                &format!("{}-000000cd", another_guid()),
+            ),
             "invoice_company_registration_unbound",
         ),
         (
-            units_with("bfef-d32e2ab93c85-00000064", "bfef-d32e2ab93c86-00000064"),
+            units_with(
+                &format!("{}-00000064", pilot_lab_guid()),
+                &format!("{}-00000064", another_guid()),
+            ),
             "invoice_company_registration_unbound",
         ),
     ];
@@ -409,6 +428,12 @@ fn a_registration_that_is_not_one_regular_unit_in_force_is_refused() {
     let registered = TAX_UNITS
         .find("<TAXUNIT NAME=\"Rajasthan Registration\"")
         .unwrap();
+    assert_eq!(
+        TAX_UNITS[registered..]
+            .matches("<GSTOLDREGNUMBER/>")
+            .count(),
+        1
+    );
     let old_gstin = format!(
         "{}{}",
         &TAX_UNITS[..registered],
@@ -485,10 +510,7 @@ fn a_tax_unit_answer_that_cannot_be_read_is_a_failed_read() {
     );
     assert_eq!(
         registration(
-            &units_with(
-                "<GUID>6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000cd</GUID>",
-                ""
-            ),
+            &units_with(&format!("<GUID>{}-000000cd</GUID>", pilot_lab_guid()), ""),
             "20260801"
         ),
         Err(RegistrationOutcome::Failed("invoice_tax_unit_without_guid"))

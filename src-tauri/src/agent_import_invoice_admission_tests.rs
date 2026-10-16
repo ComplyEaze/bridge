@@ -5,7 +5,7 @@
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the
-//!   groups, the voucher types, the number read, the company's state and the
+//!   groups, the voucher types, the number read, the company's tax units and the
 //!   ledger catalogue the party's bill-wise flag comes from, from the third
 //!   round and the invoice round before the post (marks 16 and 223 in both).
 //!   So is the number read for a number the book uses, from the same day's
@@ -113,7 +113,7 @@ const PILOT: &str = "BRIDGE PILOT LAB";
 
 /// What one admission sends, in order: e company list, s status probe, m
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
-/// listing, g groups, T voucher types, N the number read, C the company state;
+/// listing, g groups, T voucher types, N the number read, C the company's tax units;
 /// U is the number read for a number the book uses.
 ///
 /// The marks read; the ledger listing (its currency read inside two extents,
@@ -131,11 +131,11 @@ const ADMISSION_ORDER: &str = concat!(
 
 /// The lab's request files the tests pin a read to, by sha256: the number
 /// read for `BP/26-27/0010` (`r09-number-new-invoice.xml`), the same read for
-/// `BP/26-27/0001` (`r10-number-control-k0.xml`) and the company's state
-/// (`r11-company-state.xml`).
+/// `BP/26-27/0001` (`r10-number-control-k0.xml`) and the company's tax units
+/// (`r16-tax-units.xml`, the request the code sends).
 const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985";
 const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
-const LAB_R11_SHA256: &str = "40f91b3fdb131279b413910c60f86a3b56989d8646def9bbe6b1fbdc97b6a68b";
+const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
 
 /// The sha256 of each request sent where `order` has `letter`.
 fn sent_as<'a>(
@@ -167,7 +167,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
-        'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-state.utf16le.xml"),
+        'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
         'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
         'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"),
         'A' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml"),
@@ -195,6 +195,40 @@ fn pilot_lab() -> Lab {
 fn pilot_lab_over(order: &str) -> Lab {
     server_over(
         order.chars().map(pilot_plan).collect(),
+        &pilot_company_list(),
+        &pilot_lab_guid(),
+    )
+}
+
+/// The pilot lab's tax units, as Tally answered the code's own request
+/// (`pilot-lab-tax-units.utf16le.xml`, decoded).
+fn pilot_tax_units() -> String {
+    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"))
+}
+
+/// The captured tax units with each `(from, to, times)` applied, `from` having
+/// to occur exactly `times` times: a derived answer is the capture with a
+/// stated edit, never a hand-written one.
+fn pilot_tax_units_edited(edits: &[(&str, &str, usize)]) -> String {
+    let mut units = pilot_tax_units();
+    for (from, to, times) in edits {
+        assert_eq!(units.matches(from).count(), *times, "{from}");
+        units = units.replace(from, to);
+    }
+    units
+}
+
+/// The pilot lab answering every read of `ADMISSION_ORDER` as captured, except
+/// the tax-unit read, which gets `units`.
+fn pilot_lab_with_units(units: String) -> Lab {
+    server_over(
+        ADMISSION_ORDER
+            .chars()
+            .map(|letter| match letter {
+                'C' => answer(units.clone()),
+                letter => pilot_plan(letter),
+            })
+            .collect(),
         &pilot_company_list(),
         &pilot_lab_guid(),
     )
@@ -285,7 +319,7 @@ fn pilot_observed() -> serde_json::Value {
 
 /// The whole of one admission: 6 requests for the marks, 40 for the ledger
 /// listing, and 6 each for the voucher types, the number read and the
-/// company's state, in that order. Each case stops where its answer decides
+/// company's tax units, in that order. Each case stops where its answer decides
 /// it, which the request count shows. The invoice the pilot lab's book took,
 /// to its walk-in customer under `BRIDGE Sales`, is admitted after every read
 /// and records what it observed; a ledger of the book that is no customer,
@@ -335,7 +369,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
                 serde_json::to_value(observed.unwrap()).unwrap(),
                 pilot_observed()
             );
-            // Both sends of the number read and of the company's state read
+            // Both sends of the number read and of the tax-unit read
             // are the requests the lab sent, byte for byte.
             assert_eq!(
                 sent_as(ADMISSION_ORDER, &received, 'N'),
@@ -343,7 +377,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             );
             assert_eq!(
                 sent_as(ADMISSION_ORDER, &received, 'C'),
-                [LAB_R11_SHA256; 2]
+                [LAB_R16_SHA256; 2]
             );
         } else {
             assert!(observed.is_none(), "{party} under {filed}");
@@ -351,10 +385,97 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
     }
 }
 
+/// The company's registration is the admission's last read: a registration
+/// the build cannot issue under is a refusal under its own code, and an answer
+/// with no tax unit at all is a failed read, never "no registration". Both
+/// come after every other read (64 requests) and record no observation. The
+/// answers are the pilot lab's capture with one stated edit each.
+#[tokio::test]
+async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_unread_one_fails() {
+    let units = pilot_tax_units();
+    let first = units.find("<TAXUNIT NAME=").unwrap();
+    let end = units.rfind("</TAXUNIT>").unwrap() + "</TAXUNIT>".len();
+    assert_eq!(units.matches("<TAXUNIT NAME=").count(), 2);
+    for (answer, outcome) in [
+        (
+            // The one registration says Composition, not Regular.
+            pilot_tax_units_edited(&[(
+                "<REGISTRATIONTYPE>Regular",
+                "<REGISTRATIONTYPE>Composition",
+                1,
+            )]),
+            ("invoice_company_registration_not_regular", ""),
+        ),
+        (
+            // Both tax units removed: nothing to read.
+            format!("{}{}", &units[..first], &units[end..]),
+            ("FAILED", "invoice_company_registration_unread"),
+        ),
+    ] {
+        let (seen, voucher, requests) = admit_on(
+            pilot_lab_with_units(answer),
+            pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+        )
+        .await;
+        assert_eq!(seen, Err(vec![(outcome.0, outcome.1.to_string())]));
+        assert_eq!(requests.len(), 64);
+        assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+    }
+}
+
+/// The registration's state is the supplier's state that classification
+/// compares the place of supply with: a registration in Haryana (its GSTIN of
+/// that state, held in both places) refuses an invoice supplied in Rajasthan.
+/// The answer is the pilot lab's capture with its GSTIN and state edited.
+#[tokio::test]
+async fn the_registrations_state_is_the_supplier_state_the_place_of_supply_is_checked_against() {
+    let units = pilot_tax_units_edited(&[
+        ("08ZZZZZ0000Z1ZQ", "06ZZZZZ0000Z1ZU", 2),
+        ("<STATE>Rajasthan</STATE>", "<STATE>Haryana</STATE>", 1),
+    ]);
+    let (seen, _, requests) = admit_on(
+        pilot_lab_with_units(units),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    let refusals = seen.expect_err("not refused");
+    assert!(refusals
+        .iter()
+        .any(|(code, _)| *code == "invoice_place_of_supply_not_company_state"));
+    assert_eq!(requests.len(), 64);
+}
+
+/// The same registration read as Composition at the re-read a post makes
+/// before its approval window is refused under its own code, not as "a
+/// master changed": the saved invoice, built when the registration was
+/// Regular, meets an answer that is no longer one.
+#[tokio::test]
+async fn a_re_read_that_finds_the_registration_composition_is_refused_as_not_regular() {
+    let lab = pilot_lab_with_units(pilot_tax_units_edited(&[(
+        "<REGISTRATIONTYPE>Regular",
+        "<REGISTRATIONTYPE>Composition",
+        1,
+    )]));
+    let result = lab
+        .server
+        .recheck_sales_invoice(
+            &lab.identity,
+            &lab.company,
+            &pilot_saved("BP/26-27/0010", true),
+            &pilot_catalogue(),
+        )
+        .await;
+    assert_eq!(
+        result.err().map(|failure| failure.code),
+        Some("invoice_company_registration_not_regular".to_string())
+    );
+    assert_eq!(sent(lab.simulator), 64);
+}
+
 /// A number the book already uses, on Tally's own answer: the number read for
 /// `BP/26-27/0001` finds the book's first invoice (`BRIDGE Sales`, Sales
 /// class), and the invoice is refused after that read, before the company's
-/// state is read (58 requests). Both sends of the read are the request the
+/// tax units are read (58 requests). Both sends of the read are the request the
 /// lab sent, byte for byte (`r10-number-control-k0.xml`).
 #[tokio::test]
 async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
@@ -375,7 +496,7 @@ async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
 }
 
 /// The re-read a post makes before its approval window, and again after it,
-/// is a whole admission (64 requests when it reaches the company's state).
+/// is a whole admission (64 requests when it reaches the company's tax units).
 /// The invoice the build admitted, saved with what it observed, passes; saved
 /// with an observation the re-read does not make (another type's GUID), it is
 /// "a master changed"; and what refuses it comes back under its own code (a
@@ -612,14 +733,14 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     let (outcome, requests) = admission_after_a_sent_invoice(Then::Released, ADMISSION_ORDER).await;
     assert_eq!(outcome, Ok(()));
     assert_eq!(requests.len(), ADMISSION_ORDER.len());
-    // No control read: the number read is followed by the company's state.
+    // No control read: the number read is followed by the company's tax units.
     assert_eq!(
         sent_as(ADMISSION_ORDER, &requests, 'N'),
         [LAB_R09_SHA256; 2]
     );
     assert_eq!(
         sent_as(ADMISSION_ORDER, &requests, 'C'),
-        [LAB_R11_SHA256; 2]
+        [LAB_R16_SHA256; 2]
     );
     let controlled = ADMISSION_ORDER.replace("eNsNse", "eNsNseeUsUse");
     let (outcome, requests) =
@@ -628,13 +749,13 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     assert_eq!(requests.len(), controlled.len());
     assert_eq!(sent_as(&controlled, &requests, 'N'), [LAB_R09_SHA256; 2]);
     assert_eq!(sent_as(&controlled, &requests, 'U'), [LAB_R10_SHA256; 2]);
-    assert_eq!(sent_as(&controlled, &requests, 'C'), [LAB_R11_SHA256; 2]);
+    assert_eq!(sent_as(&controlled, &requests, 'C'), [LAB_R16_SHA256; 2]);
 }
 
 /// The control read (`r10-number-control-k0.xml`) answered with no voucher:
 /// the pilot lab's empty collection, which reads the same whatever the request
 /// (`pilot-lab/PROVENANCE.md`). The build is refused before the company's
-/// state is read, and the refusal names the verified batch that holds the
+/// tax units are read, and the refusal names the verified batch that holds the
 /// control invoice, the batch `verify_import` is to be run on.
 #[tokio::test]
 async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {

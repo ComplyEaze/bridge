@@ -2308,11 +2308,6 @@ const REGISTER_NOT_RECORDED: &str =
     "another synthetic book's Sales Register (6 Oct 2026), kept as \
      evidence for §12a.16 (BUILTIN_REPORTS_CAPTURE_PROVENANCE.md); native_month_register reads its \
      grammar, and its tests run on BRIDGE PILOT LAB's registers instead";
-const PILOT_LAB_TAX_UNITS: &str = "an answer of the pilot lab (9 Oct 2026), the company's tax \
-     units read through a request typed by hand and sent as UTF-8, which no parser of this crate \
-     reads: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs), and its \
-     tests (src/agent_import_invoice_wire_tests.rs, src/agent_import_invoice_admission_tests.rs) \
-     pin what the parse returns; pilot-lab/PROVENANCE.md says what it is";
 const GST_STATUS_READ: &str = "an answer of the GST status read (10 and 12 Oct 2026), which no parser of \
      this crate reads: the app crate's gst_status tool parses it (src/agent_gst_status.rs), and its \
      tests (src/agent_gst_status_tests.rs) pin what each parse returns; \
@@ -2337,7 +2332,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_ADMISSION,
     ),
     (
-        "tests/fixtures/agent/pilot-lab/pilot-lab-company-state.utf16le.xml",
+        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml",
         PILOT_LAB_ADMISSION,
     ),
     (
@@ -2387,11 +2382,6 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml",
         PILOT_LAB_ADMISSION,
-    ),
-    // The pilot lab's tax-unit answer.
-    (
-        "tests/fixtures/agent/pilot-lab/pilot-lab-tax-units-typed-request.utf8.xml",
-        PILOT_LAB_TAX_UNITS,
     ),
     // The GST status read answers.
     (

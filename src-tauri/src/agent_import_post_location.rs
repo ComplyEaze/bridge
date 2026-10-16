@@ -91,14 +91,21 @@ pub(super) fn target_masters_unchanged(
     guid: &str,
     name: &str,
 ) -> Option<bool> {
-    let target = |rows: &[LoadedCompanyMarks]| {
-        let mut targets = rows.iter().filter(|row| is_target(row, guid, name));
-        match (targets.next(), targets.next()) {
-            (Some(row), None) => Some(row.masters),
-            _ => None,
-        }
-    };
-    Some(target(at_binding)? == target(at_aim)?)
+    Some(target_master_mark(at_binding, guid, name)? == target_master_mark(at_aim, guid, name)?)
+}
+
+/// The target's master mark in one snapshot, when exactly one loaded company
+/// is the target. `None` otherwise.
+pub(super) fn target_master_mark(
+    rows: &[LoadedCompanyMarks],
+    guid: &str,
+    name: &str,
+) -> Option<u64> {
+    let mut targets = rows.iter().filter(|row| is_target(row, guid, name));
+    match (targets.next(), targets.next()) {
+        (Some(row), None) => Some(row.masters),
+        _ => None,
+    }
 }
 
 /// The target's voucher mark in each snapshot, and whether it moved by exactly

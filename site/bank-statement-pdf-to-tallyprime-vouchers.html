@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bank statement PDF to TallyPrime vouchers: ComplyEaze Bridge</title>
+<meta name="description" content="How ComplyEaze Bridge turns an SBI, HDFC or Union Bank of India statement PDF into a TallyPrime voucher file, what you decide, and what is untested." />
+<link rel="canonical" href="https://bridge.complyeaze.com/bank-statement-pdf-to-tallyprime-vouchers.html" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="ComplyEaze Bridge" />
+<meta property="og:locale" content="en_IN" />
+<meta property="og:title" content="Bank statement PDF to TallyPrime vouchers: ComplyEaze Bridge" />
+<meta property="og:description" content="How ComplyEaze Bridge turns an SBI, HDFC or Union Bank of India statement PDF into a TallyPrime voucher file, what you decide, and what is untested." />
+<meta property="og:url" content="https://bridge.complyeaze.com/bank-statement-pdf-to-tallyprime-vouchers.html" />
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
+<script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
+<link rel="preload" href="fonts/bricolage-wght-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="chrome.css" />
+<link rel="stylesheet" href="pages.css" />
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body class="ce-page">
+<a class="ce-skip-link" href="#main">Skip to content</a>
+<div class="ce-header__sentinel" id="ceHeaderSentinel" aria-hidden="true"></div>
+<header class="ce-header" id="ceHeader">
+  <div class="ce-header__inner">
+    <a class="ce-brand" href="./" aria-label="ComplyEaze Bridge, home">
+      <svg class="ce-logo" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg>
+    </a>
+    <div class="ce-header__right">
+      <nav class="ce-nav" id="ceNav" aria-label="Primary">
+        <a class="ce-nav__download" href="./download.html">Download</a>
+        <a href="./faq.html">Questions</a>
+        <a href="./releases.html">Releases</a>
+        <a href="./changelog.html">Changelog</a>
+        <a class="ce-nav__github" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+      <div class="ce-header__actions">
+        <a class="ce-star" id="ceStar" href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer" aria-label="ComplyEaze Bridge on GitHub">
+          <svg class="ce-star__icon" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 .8l2.1 4.4 4.8.6-3.5 3.4.9 4.8L8 11.6l-4.3 2.4.9-4.8L1.1 5.8l4.8-.6z" /></svg>
+          <span class="ce-star__count" id="ceStarCount" aria-hidden="true"></span>
+        </a>
+        <a class="btn btn-primary ce-cta" href="./download.html">Download</a>
+        <button class="ce-menu-toggle" id="ceMenuToggle" type="button" aria-expanded="false" aria-controls="ceNav">
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="ce-menu-toggle__bar"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="page-hero">
+    <div class="page-hero__inner">
+      <h1>How do I turn a bank statement PDF into TallyPrime vouchers?</h1>
+      <p>With ComplyEaze&nbsp;Bridge in Claude&nbsp;Desktop, you give Claude a password-protected statement PDF from State Bank of India, HDFC Bank or Union Bank of India. ComplyEaze&nbsp;Bridge reads it and proposes Payment, Receipt and Contra vouchers. Once every ledger name is exact, it writes them to one file that you import in TallyPrime yourself. Preparing the file writes nothing to Tally. Checked against release 0.5.1 on <time datetime="2026-10-15">15 October 2026</time>. This page describes that release and changes with later ones; the Releases page says which release is the latest.</p>
+    </div>
+  </section>
+
+  <div class="page-body">
+    <section class="page-section">
+      <h2>What you decide, and where</h2>
+      <p>ComplyEaze&nbsp;Bridge tells Claude to ask you before it prepares anything and, with posting on, before it posts anything, and never to choose a ledger for a voucher itself. It cannot check who gave an answer, so read the choices Claude shows you before the file is built.</p>
+      <ul class="faq-next">
+        <li><strong>The ledger for every party.</strong> A transaction whose party is unmapped, or cannot be identified, goes to the suspense ledger you name, and its narration carries a note to reallocate it.</li>
+        <li><strong>What a cash line was for.</strong> For the cash lines it recognises (SBI ATM withdrawals and Union Bank cash deposits) Claude is told to ask you. The file is not built until an answer for each is supplied.</li>
+        <li><strong>The import.</strong> You import the file in TallyPrime yourself. That step puts the vouchers in your books.</li>
+        <li><strong>Posting, if you turn it on.</strong> Posting is a separate setting, off by default. When it is on, the extension posts one voucher per approval, after a window on your computer asks you, and a declined or unanswered window posts nothing. The extension refuses to post a file of several vouchers, so a statement&rsquo;s file of several vouchers is imported by you. Use one way for a batch, import or post, and not both: a hand import is not checked.</li>
+      </ul>
+    </section>
+
+    <section class="page-section faq-before">
+      <h2>The steps</h2>
+      <ol>
+        <li>Have the statement and its password ready. The tool asks for the path to a small text file that holds the password, and never returns the password. Keep the statement and that file on a local disk, not a network drive. On a Mac the file must be readable by you alone; on Windows nothing checks who else can read it.</li>
+        <li>Tell Claude the bank (SBI, HDFC or Union Bank of India), the bank&rsquo;s ledger in Tally, a suspense ledger, the last digits of the account number (at least four), and the opening and closing balances. You supply both; a Union Bank of India statement prints neither. The reader checks every running balance against them. For SBI and HDFC it also needs the statement&rsquo;s total debits and total credits.</li>
+        <li>ComplyEaze&nbsp;Bridge refuses the whole statement if a transaction cannot be read, a running balance does not follow from the one before, or the totals do not match; no line is dropped without your choice (you can map a party to be skipped, and a date window leaves other rows out). A PDF with no text to read, such as a plain scan, is refused. These checks cover dates, amounts, the account line and, for Union Bank of India, the page footer. Nothing proves the narration or reference text, so read what it proposes.</li>
+        <li>Choose the ledgers. Claude lists each party as the statement prints it. For each, you say which ledger it belongs to, that it is a transfer between your own accounts (a Contra voucher), or that it is to be skipped. ComplyEaze&nbsp;Bridge creates no ledger, so each ledger must already exist in Tally.</li>
+        <li>Check the names against the book. Only a name that matches a ledger in Tally exactly is built into the file; a near miss is shown and never changed for you. A party ledger that keeps bill-by-bill details is refused until an approval for that party is passed with the request. That approval is a value Claude supplies; it does not prove that you agreed. Tally is expected to record those vouchers On Account (measured for one party on one book), and you match them to bills by hand.</li>
+        <li>Build the file. Each voucher is a Payment, a Receipt or a Contra with two entries: the bank ledger and the ledger you chose. Its narration holds the payment mode, the reference, the ledger (for a suspense line, the party as printed), the date and the account label; for a mapped ledger it also names the party as the statement printed it, and ComplyEaze&nbsp;Bridge adds a tag of its own. The file is written on your computer and ComplyEaze&nbsp;Bridge tells you where. If Tally&rsquo;s Import screen does not find it at the path shown, the 0.5.1 notes in the <a href="./changelog.html">changelog</a> say where to look.</li>
+        <li>Import the file in TallyPrime with the right company loaded: Gateway of Tally, then Import, then Vouchers.</li>
+        <li>Ask Claude to read the batch back. ComplyEaze&nbsp;Bridge reads the same dates from Tally and compares each voucher&rsquo;s date and type and each entry&rsquo;s ledger, amount and side. It does not compare the narration or the party. It reports the batch as verified only when every voucher is found and matches, none is cancelled or optional, and none is duplicated.</li>
+      </ol>
+    </section>
+
+    <section class="page-section">
+      <h2>What goes to your AI provider</h2>
+      <p>The statement reader writes the rows (dates, amounts, references and narrations) to a file on your computer, unmasked and unencrypted, and does not return them. The built file and the import journal on your computer hold the vouchers in full. Some of the content still reaches Claude. It receives each party&rsquo;s name as printed with the number of its transactions, the last four digits of the account number (sent under every setting), the figures you typed, the path of the file it builds (which can include your computer user name), and, for each cash line it asks about, the date, the amount and the party. The totals and date span of a built file, and each voucher&rsquo;s transaction id (which carries its date), reach it too, and so do the dates and amounts of a party&rsquo;s transactions when a bill-by-bill ledger is refused. What it reads from your books afterwards, amounts included, goes to your AI provider as well. See <a href="./blog-where-does-client-data-go.html">where your client&rsquo;s data goes</a>.</p>
+      <p>The Response redaction setting, off by default, takes one value: shorten party and ledger names and bank account numbers, or drop narrations. It does not hide amounts, dates, references or the last four digits. From release 0.5.1, a voucher built for a mapped ledger carries the party&rsquo;s name as the statement printed it in its narration; shortening names does not shorten it, and only dropping narrations removes it.</p>
+    </section>
+
+    <section class="page-section">
+      <h2>What has been tested, and what has not</h2>
+      <ul class="faq-next">
+        <li>Every statement PDF in the reader&rsquo;s tests was generated, with invented figures, and encrypted with RC4 only; real statements often use AES, which was not tested. The SBI and HDFC layouts were copied from real statements, and the Union Bank of India layout was described from one real statement without its figures.</li>
+        <li>A file built for six vouchers by a build of release 0.5.1 was imported by hand into TallyPrime 7.1 Silver on one Windows&nbsp;10 computer, and the read-back found all six. That build was not the published file, and nothing was tried on other Windows versions or other Tally editions.</li>
+        <li><strong>It has not yet been run end to end on a real bank statement.</strong> A real HDFC statement print was refused by the reader on 6 October 2026, and the change made for it has not been tried on a real statement.</li>
+        <li>The tool always asks for a password file; a PDF with no password has not been tried.</li>
+      </ul>
+      <p>Check what it proposes before you import it, and try it on a test company first, with a current backup.</p>
+    </section>
+
+    <section class="page-section">
+      <h2>What it does not do</h2>
+      <ul class="faq-next">
+        <li>Read statements from other banks, or Excel or CSV statements.</li>
+        <li>Use a Cash-in-Hand ledger as the statement&rsquo;s bank ledger, or make Journal vouchers from a statement.</li>
+        <li>Recognise cash text other than SBI &ldquo;ATM WDL&rdquo; and Union Bank &ldquo;BY CASH&rdquo;; other text goes to the suspense ledger or is treated as an ordinary party.</li>
+        <li>Create a ledger, or undo a voucher that was posted.</li>
+      </ul>
+      <p>TallyPrime has its own Bank Statement import, for the statement formats Tally lists for each bank. We have not run the two side by side, and ComplyEaze&nbsp;Bridge is not made by, or affiliated with, Tally Solutions.</p>
+    </section>
+
+    <section class="page-section">
+      <h2>Read next</h2>
+      <ul class="faq-next">
+        <li><a href="./faq.html#bank-statement-to-entries">Questions: entries from a bank statement</a>, with the same rules in short.</li>
+        <li><a href="./blog-bank-statement-ledger-names.html">Bank statement to Tally vouchers: check the ledger names first</a>.</li>
+        <li><a href="./blog-who-approves-a-post.html">Who approves a post to TallyPrime, and what is still weak</a>.</li>
+        <li><a href="./capabilities.html">What it can do</a>: every tool it installs.</li>
+        <li><a href="https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md">Installation guide</a>, step by step.</li>
+      </ul>
+      <p><a class="btn btn-primary" href="./download.html">Download for Claude&nbsp;Desktop</a></p>
+    </section>
+  </div>
+</main>
+
+<footer class="ce-footer">
+  <div class="ce-footer__inner">
+    <div class="ce-footer__grid">
+      <div>
+        <p class="ce-footer__brand"><svg class="ce-logo ce-logo--footer" viewBox="0 0 898.5 105" role="img" aria-label="ComplyEaze Bridge"><use href="brand/lockup.svg#lockup"></use></svg></p>
+        <dl class="ce-footer__facts">
+          <div><dt>Tally connection</dt><dd>ComplyEaze Bridge&rsquo;s own code connects to Tally on this computer only.</dd></div>
+          <div><dt>AI provider</dt><dd>Receives what the assistant reads.</dd></div>
+          <div><dt>Posting</dt><dd>Only after you approve it in a ComplyEaze Bridge window.</dd></div>
+          <div><dt>Receipts</dt><dd>Every call logged on your computer.</dd></div>
+        </dl>
+        <p class="ce-footer__synthetic">Every book, party and amount shown on this site is from a synthetic demo book.</p>
+      </div>
+      <nav class="ce-footer__col" aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="./download.html">Download</a></li>
+          <li><a href="./faq.html">Questions</a></li>
+          <li><a href="./capabilities.html">Capabilities</a></li>
+          <li><a href="./releases.html">Releases</a></li>
+          <li><a href="./changelog.html">Changelog</a></li>
+          <li><a href="./blog.html">Blog</a></li>
+          <li><a href="./security.html">Security</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/ComplyEaze/bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/issues" target="_blank" rel="noopener noreferrer">Report an issue</a></li>
+        </ul>
+      </nav>
+      <nav class="ce-footer__col" aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="./privacy.html">Privacy Policy</a></li>
+          <li><a href="./terms.html">Terms of Use</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">License</a></li>
+          <li><a href="https://github.com/ComplyEaze/bridge/blob/master/SECURITY.md" target="_blank" rel="noopener noreferrer">Security policy</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="ce-footer__base">
+      <span>ComplyEaze Bridge is open source under the Apache License, Version 2.0.</span>
+      <span>Published by SPMS Comply Eaze Solutions LLP, a limited liability partnership registered with limited liability under the Limited Liability Partnership Act, 2008, LLP identification number ACI-9231. Registered office: S-137, 1st Floor, Sunsquare Shopping Plaza, Plot No. SPL-1/J, RIICO Chowk, Bhiwadi Ind. Area, Alwar, Bhiwadi, Tijara, Alwar 301019, Rajasthan, India.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="chrome.js" defer></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 //! Responses for the local MCP adapter.
+use super::agent_import::{check_not_run_section, counts_only_section, trim_section};
 use super::*;
 
 #[derive(Clone, Copy)]
@@ -204,6 +205,89 @@ pub(super) fn drop_tally_line_error_text(value: &mut Value) -> bool {
     }
 }
 
+/// The computed `transfers` section of a result, if it has one.
+fn computed_section(response: &Value, structured_path: &str) -> Option<Value> {
+    response
+        .pointer(&format!("{structured_path}/result/transfers"))
+        .filter(|section| section["state"] == "computed")
+        .cloned()
+}
+
+/// Put `original` into the result as wide as the real encoded response allows,
+/// largest first: as many open rows as fit (the rest counted in `open_omitted`),
+/// then the counts alone, then a note that the check is to be run again.
+/// Whether the response fits.
+fn fit_section(
+    response: &mut Value,
+    structured_path: &str,
+    max_bytes: usize,
+    encoded_len: &mut impl FnMut(&mut Value) -> usize,
+    original: &Value,
+) -> bool {
+    let pointer = format!("{structured_path}/result/transfers");
+    // a statement of only skipped rows has no batch to verify
+    let recorded = response.pointer(&format!("{structured_path}/result/state"))
+        == Some(&json!("skips_recorded"));
+    let mut place = |response: &mut Value, section: Value| {
+        if let Some(slot) = response.pointer_mut(&pointer) {
+            *slot = section;
+        }
+        encoded_len(response) <= max_bytes
+    };
+    let rows = original["open"].as_array().map_or(0, Vec::len);
+    let (mut lower, mut upper) = (0, rows);
+    let mut best = None;
+    while lower <= upper {
+        let keep = lower + (upper - lower) / 2;
+        if place(response, trim_section(original, keep)) {
+            best = Some(keep);
+            lower = keep + 1;
+        } else if keep == 0 {
+            break;
+        } else {
+            upper = keep - 1;
+        }
+    }
+    match best {
+        Some(keep) => place(response, trim_section(original, keep)),
+        None => {
+            place(response, counts_only_section(original))
+                || place(response, check_not_run_section(recorded))
+        }
+    }
+}
+
+/// The widest page, of at least one row, that fits the response as it is now.
+fn trim_page(
+    original: &Value,
+    structured_path: &str,
+    shape: PageShape,
+    width: usize,
+    max_bytes: usize,
+    encoded_len: &mut impl FnMut(&mut Value) -> usize,
+) -> Result<Option<Value>, String> {
+    let (mut lower, mut upper) = (1, width.saturating_sub(1));
+    let mut best = None;
+    while lower <= upper {
+        let keep = lower + (upper - lower) / 2;
+        let mut candidate = original.clone();
+        retain_page_width(
+            candidate
+                .pointer_mut(structured_path)
+                .expect("observed payload"),
+            shape,
+            keep,
+        )?;
+        if encoded_len(&mut candidate) <= max_bytes {
+            best = Some(candidate);
+            lower = keep + 1;
+        } else {
+            upper = keep - 1;
+        }
+    }
+    Ok(best)
+}
+
 // Measure O(log n) prefix candidates instead of serializing once for each
 // discarded row. Each candidate retains at least one row on every active axis.
 // The caller measures the actual outer envelope, including duplicated text and
@@ -226,31 +310,89 @@ fn fit_response(
             return Ok(false);
         }
     }
-    let (shape, width) = response
-        .pointer(structured_path)
-        .and_then(page_shape)
-        .ok_or_else(|| "agent_response_too_large".to_string())?;
-    let (mut lower, mut upper) = (1, width.saturating_sub(1));
-    let original = response.clone();
-    let mut best = None;
-    while lower <= upper {
-        let keep = lower + (upper - lower) / 2;
-        let mut candidate = original.clone();
-        retain_page_width(
-            candidate
-                .pointer_mut(structured_path)
-                .expect("observed payload"),
-            shape,
-            keep,
-        )?;
-        if encoded_len(&mut candidate) <= max_bytes {
-            best = Some(candidate);
-            lower = keep + 1;
-        } else {
-            upper = keep - 1;
+    // The transfers section is the least essential part of a result, so it gives
+    // way before any row of a page does, in this order:
+    //   1. the page at full width, with the widest section that fits beside it
+    //      (open rows, then the counts, then a note that the check is to be run
+    //      again): the page is not cut if any of them fits;
+    //   2. otherwise the page trimmed, with the shorter of the note and the
+    //      counts beside it, as wide as it goes;
+    //   3. then the section widened again into what the trimmed page leaves.
+    // A result with no computed section takes only the page step, as it always
+    // did. Everything here returns true when anything was cut, the section's
+    // rows included, but the tool path discards that flag. The answer says what
+    // was narrowed in-band (`open_omitted`, a `not_established` note); only the
+    // drop of the whole section from a result with no page sets the envelope's
+    // `truncated`.
+    let section = computed_section(response, structured_path);
+    if let Some(section) = &section {
+        if fit_section(
+            response,
+            structured_path,
+            max_bytes,
+            &mut encoded_len,
+            section,
+        ) {
+            return Ok(true);
         }
     }
-    *response = best.ok_or_else(|| "agent_response_too_large".to_string())?;
+    let Some((shape, width)) = response.pointer(structured_path).and_then(page_shape) else {
+        // A result with no page (a written build) has nothing to trim. If it
+        // fits without its section, whatever the section says, it is answered
+        // without it and the envelope is marked `truncated`: a build whose file
+        // and journal record are written is never turned into an error by the
+        // section.
+        let dropped = response
+            .pointer_mut(&format!("{structured_path}/result"))
+            .and_then(Value::as_object_mut)
+            .is_some_and(|result| result.remove("transfers").is_some());
+        if dropped {
+            if let Some(envelope) = response
+                .pointer_mut(structured_path)
+                .and_then(Value::as_object_mut)
+            {
+                envelope.insert("truncated".into(), json!(true));
+            }
+            if encoded_len(response) <= max_bytes {
+                return Ok(true);
+            }
+        }
+        return Err("agent_response_too_large".to_string());
+    };
+    let mut original = response.clone();
+    if let Some(section) = &section {
+        // A result with a page is a batch's or a verification's, never a
+        // statement of only skipped rows, so the note is the batch's. The page
+        // is trimmed beside the shorter of the note and the counts.
+        let note = check_not_run_section(false);
+        let counts = counts_only_section(section);
+        let placeholder = if counts.to_string().len() < note.to_string().len() {
+            counts
+        } else {
+            note
+        };
+        if let Some(slot) = original.pointer_mut(&format!("{structured_path}/result/transfers")) {
+            *slot = placeholder;
+        }
+    }
+    let trimmed = trim_page(
+        &original,
+        structured_path,
+        shape,
+        width,
+        max_bytes,
+        &mut encoded_len,
+    )?;
+    *response = trimmed.ok_or_else(|| "agent_response_too_large".to_string())?;
+    if let Some(section) = &section {
+        fit_section(
+            response,
+            structured_path,
+            max_bytes,
+            &mut encoded_len,
+            section,
+        );
+    }
     Ok(true)
 }
 

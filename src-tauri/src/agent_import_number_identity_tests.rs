@@ -371,8 +371,7 @@ fn the_identity_is_read_from_the_journal_only_for_an_invoice_batch() {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let bank = payment_batch("Rent", "500.00");
     let mut earlier = invoice_batch("INV/1");
@@ -435,8 +434,7 @@ fn a_verification_beside_an_unsettled_batch_matches_the_invoice_by_its_figures()
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     });
     let mut earlier = invoice_batch("INV/26-27/011");
     earlier.batch_id = sentinel_batch_id(0xb);

@@ -63,6 +63,18 @@ DEFAULT_COMMENTS = []
 OWNER_USER = {"login": "lamemustafa", "id": 57982425, "type": "User"}
 T1, T2, T3 = "2026-10-14T09:00:00Z", "2026-10-14T10:00:00Z", "2026-10-14T11:00:00Z"
 VERDICT_CLEAN = "MERGE-VERDICT CLEAN head=" + HEAD + " base=" + BASE_TIP
+OLD_HEAD = "9" * 40
+OLD_BASE = "8" * 40
+CARRY_DIFF = (
+    "diff --git a/docs/x.md b/docs/x.md\n"
+    "index 1111111..2222222 100644\n"
+    "--- a/docs/x.md\n"
+    "+++ b/docs/x.md\n"
+    "@@ -1,2 +1,2 @@\n"
+    " keep\n"
+    "-old\n"
+    "+changed\n"
+)
 VERDICT_RECOMMEND = "MERGE-ADVERSARY RECOMMEND head=" + HEAD + " base=" + BASE_TIP
 
 
@@ -227,6 +239,7 @@ def state():
         "history_fail": False,
         "pages_fail": set(),
         "commits": [dict(DEFAULT_COMMIT)],
+        "carry": None,                   # {"old": diff served for the older pair, "new": diff for the current pair, "fail": bool}
     }
 
     if scenario == "surface-fetch-fail":
@@ -237,6 +250,58 @@ def state():
 
     elif scenario == "verdict-missing-recommend":
         s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
+
+    elif scenario in {"verdict-missing-recommend-write-path", "tier-unclassified-clean-only", "tier-rename-from-write-path", "tier-tool-fails", "tier-tool-error-object", "tier-tool-bad-tier"}:
+        # Only the CLEAN line, on a change that is NOT of the one tier (a write-path file, a path no rule classifies, a rename away
+        # from a write-path file) or whose tier tool fails: the full tier, which needs both lines.
+        s["owner_items"] = [owner_comment(VERDICT_CLEAN, T1)]
+        if scenario == "verdict-missing-recommend-write-path":
+            set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
+        elif scenario == "tier-unclassified-clean-only":
+            set_changes(s, ("added", "mystery/unknown.txt", "x"))
+        elif scenario == "tier-rename-from-write-path":
+            set_changes(s, ("renamed", "src-tauri/src/agent_lab.rs", "docs/moved.md"))
+
+    elif scenario.startswith("carry-"):
+        # The owner's CLEAN line names an OLDER head and merge base; the gate may carry it when the pull request's own added and
+        # removed lines (merge base...head) are byte-identical at both. The compare answers below are the two diffs.
+        s["owner_items"] = [owner_comment("MERGE-VERDICT CLEAN head=" + OLD_HEAD + " base=" + OLD_BASE, T1)]
+        set_changes(s, ("modified", "docs/x.md"))
+        # Only the index line differs between the two: the pull request's own change is the same, in the same place.
+        old = CARRY_DIFF.replace("index 1111111..2222222", "index 3333333..4444444")
+        new = CARRY_DIFF
+        if scenario == "carry-function-context-differs":
+            # the text after the hunk numbers names the enclosing function and moves with master's renames: it does not count
+            old = old.replace("@@ -1,2 +1,2 @@\n", "@@ -1,2 +1,2 @@ fn renamed_by_master()\n")
+        elif scenario == "carry-hunk-numbers-differ":
+            old = old.replace("@@ -1,2 +1,2 @@", "@@ -11,2 +11,2 @@")
+        elif scenario == "carry-context-differs":
+            old = old.replace(" keep\n", " keep (master changed this line)\n")
+        elif scenario == "carry-moved-insertion":
+            # the same added line, put where the same text also stands: only the hunk's place differs
+            old = old.replace("@@ -1,2 +1,2 @@", "@@ -21,2 +21,2 @@")
+        elif scenario == "carry-patch-differs":
+            new = CARRY_DIFF.replace("+changed", "+changed differently")
+        elif scenario == "carry-whitespace-only":
+            new = CARRY_DIFF.replace("+changed", "+chan ged")
+        elif scenario == "carry-indent-only":
+            new = CARRY_DIFF.replace("+changed", "+  changed")
+        elif scenario == "carry-binary":
+            # the picture is one of the pull request's files, so the file list agrees; only the binary-diff guard can refuse
+            set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/x.png"))
+            old = new = CARRY_DIFF + "diff --git a/docs/x.png b/docs/x.png\nindex 1111111..2222222 100644\nBinary files a/docs/x.png and b/docs/x.png differ\n"
+        elif scenario == "carry-empty-diff":
+            old = new = ""
+        elif scenario == "carry-duplicate-file-sections":
+            old = new = CARRY_DIFF + CARRY_DIFF
+        elif scenario == "carry-diff-cut-short":
+            # The pull request changes two files; the compare diff names only one of them.
+            set_changes(s, ("modified", "docs/x.md"), ("modified", "docs/y.md"))
+        elif scenario == "carry-mode-change":
+            new = CARRY_DIFF.replace("index 1111111..2222222 100644", "old mode 100644\nnew mode 100755\nindex 1111111..2222222")
+        s["carry"] = {"old": old, "new": new, "fail": scenario == "carry-compare-fails"}
+        if scenario == "carry-same-patch-write-path":
+            set_changes(s, ("added", "src-tauri/src/agent_lab_new.rs", "x"))
 
     elif scenario == "verdict-for-another-base":
         s["owner_items"] = [owner_comment(VERDICT_CLEAN.replace(BASE_TIP, "c" * 40), T1), owner_comment(VERDICT_RECOMMEND.replace(BASE_TIP, "c" * 40), T2)]
@@ -339,6 +404,9 @@ def state():
 
     elif scenario == "changes-the-registry-in-another-case":
         set_changes(s, ("added", "Scripts/Merge-Gate-Synthetic-Uuids.json", "{}"))
+
+    elif scenario == "changes-the-review-tier":
+        set_changes(s, ("modified", "scripts/review-tier-paths.json"))
 
     elif scenario == "changes-a-workflow":
         set_changes(s, ("modified", ".github/workflows/ci.yml"))
@@ -1123,6 +1191,18 @@ elif args and args[0] == "api":
             emit({"encoding": "base64", "content": b64(S["ack_text"])})
         else:
             fail("unknown contents fixture")
+    elif "/compare/" in joined and "vnd.github.diff" in joined:
+        carry = S["carry"]
+        if carry is None or carry["fail"]:
+            fail("controlled compare diff failure")
+        spec = next(a for a in args if "/compare/" in a).split("/compare/")[1]
+        merge_base = BEHIND_MERGE_BASE if S["surface_merge_base"] is not None else BASE_TIP
+        if spec == OLD_BASE + "..." + OLD_HEAD:
+            emit(carry["old"])
+        elif spec == merge_base + "..." + HEAD:
+            emit(carry["new"])
+        else:
+            fail("unknown compare diff fixture: " + spec)
     elif "/compare/" in joined:
         if S["merge_base_fail"]:
             fail("controlled merge-base failure")

@@ -380,6 +380,7 @@ dependencies = [
  "bridge-tally-core",
  "bridge-tally-protocol",
  "bridge-tally-transport",
+ "bridge-tax-audit",
  "chrono",
  "getrandom 0.4.3",
  "icu_properties",

@@ -102,10 +102,6 @@ impl AgentReadRequest {
     /// variable, it comes from a verified identity, and it is validated and
     /// escaped. The response still has to be admitted by GUID, because Tally
     /// resolves the `ID` by name.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "sent by the audit_read orchestrator, plan step 7")
-    )]
     pub(crate) fn company_object(
         identity: &super::VerifiedCompanyIdentity,
     ) -> Result<Self, AgentReadRequestError> {
@@ -119,6 +115,17 @@ impl AgentReadRequest {
             }
             .render(),
         ))
+    }
+
+    /// Whether this is the company Object export. [`Self::company_object`] is the only
+    /// way to build one ([`Self::parse`] refuses every `Object` envelope), so a request
+    /// that says so is that template. The text is tested, not a stored flag: a flag made
+    /// `cargo clippy` fail `large_enum_variant` in `agent_import_post.rs` (measured). A
+    /// collection whose embedded TDL merely contained the words would only have the five
+    /// numeric release fields set aside from its answer; every other check of the envelope
+    /// still applies. Its answer's `HEADER` carries those fields (item 697-S0A).
+    pub(crate) fn is_company_object(&self) -> bool {
+        self.0.contains("<TYPE>Object</TYPE>")
     }
 
     /// Whether every `SVFROMDATE`/`SVTODATE` this request sends is a boundary

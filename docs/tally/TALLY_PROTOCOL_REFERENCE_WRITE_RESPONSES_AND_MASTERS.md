@@ -1158,5 +1158,19 @@ A ledger row names its ledger twice: in the row's `NAME` attribute, and as the f
 
 **Not measured:** that the first `LANGUAGENAME.LIST` is the primary language when a master has several; what the outstandings (bills) reports carry for such a ledger; a voucher carrying the own name while the attribute differs (it was reported and is not reproduced by the 12 Oct 2026 capture); whether the first-loaded company's spelling wins for other load orders, for three companies, and for differences other than case; why the second company's own Chart of Accounts showed its capitals-keyed ledger in mixed case (it was never read through a request); whether Tally accepts the attribute spelling in an import when it differs from the own name (imports are unchanged); whether an alias can equal another ledger's own name (the reverse, a `Create` whose name equals another ledger's alias, was refused, §9.4d); which spelling a voucher carries when it is imported or read between a `Create` in a folded spelling and a restart; whether the attribute follows the own name when the company is shut and loaded again without a restart.
 
+### 9.4i A ledger `Create` on a new name moved the master mark by one and changed nothing else
+
+**Measured 2026-10-14, licensed TallyPrime 7.1 Silver on Windows (`education_mode=false`), one synthetic company loaded alone, one ledger created, one run. Confidence: PARTIAL.** Branch `lab/ml1-live-ledger-create-answers`, `7048fecf` (not for merge). ComplyEaze Bridge sent the `Create` through its approved dispatch (pull request #1650's build at `13603dba`), after its approval dialog was answered Yes; the run's own gateway reads (`MARKS`, the ledger and group lists, and a party-fields read) were sent one at a time before and after it.
+
+The request was one `LEDGER` with `ACTION="Create"`, a name that no ledger, group or alias of the company folded to, and the parent `Suspense A/c`.
+
+- **Tally's answer counted the create alone:** `CREATED` 1, and `ALTERED`, `DELETED`, `IGNORED`, `ERRORS`, `CANCELLED` and `EXCEPTIONS` 0.
+- **`ALTMSTID` moved by exactly one,** from 236 to 237. It read 236 at all eight reads before the send, including those after two approval dialogs that sent nothing, and 237 at all four after. No `MARKS` answer of the company carried `ALTVCHID` (12 of 12).
+- **The ledger list gained one row and changed no other:** the 19 rows before were the same by GUID and `ALTERID` after, plus one new GUID, which is the GUID ComplyEaze Bridge recorded in its verdict. The 29 group rows were the same by GUID and `ALTERID`.
+- **The new ledger's party fields** read `TAXTYPE` `Others`, no `GSTDUTYHEAD`, no `PARTYGSTIN`, `OPENINGBALANCE` 0.00, and an empty registration-details list.
+- **After it, nothing moved:** the master mark read 237 after a repeat call for the same batch (ComplyEaze Bridge read the book back and sent nothing) and after a second prepare of the same name (refused by ComplyEaze Bridge before any send).
+
+**Not established:** other ledger kinds and parents; more than one ledger in one request; Gold and Education; other releases; a company with Tally's security on; the dialog's own text, which was read on screen and not captured as text.
+
 
 #

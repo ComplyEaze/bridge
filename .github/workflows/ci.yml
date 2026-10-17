@@ -453,6 +453,19 @@ jobs:
         run: >-
           cargo nextest run --locked --manifest-path src-tauri/Cargo.toml
           --workspace --no-fail-fast --retries 0 --test-threads num-cpus --timings
+      # Test names, binaries, times and outcomes from nextest's JUnit report (src-tauri/.config/nextest.toml),
+      # for choosing which tests to trim or split. The report carries a failing test's panic text whatever
+      # the store-*-output settings say, so it is uploaded only when the test step passed. It sits right after
+      # that step because the PDFium step below runs nextest again and rewrites the same file.
+      - name: Retain macOS per-test timings
+        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-test-timings-macos
+          path: src-tauri/target/nextest/default/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
       - name: Collect minimized macOS test crash stacks
         if: ${{ always() && runner.os == 'macOS' && steps.native-crash-boundary.outcome == 'success' }}
         run: >-

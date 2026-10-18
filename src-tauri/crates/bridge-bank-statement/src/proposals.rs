@@ -4,7 +4,7 @@
 //! **No REMOTEID, no XML, no identity.** Bridge's writer owns all three: it
 //! mints a batch, derives each voucher's REMOTEID from that batch and the
 //! `bridge_txn_id`, renders the envelope, and corrects an imported batch only
-//! through `amends_batch_id` under compare-and-swap. The reference script
+//! through `amends_batch_id` under compare-and-swap. The removed Python script
 //! derived its own content-addressed REMOTEID and upserted on re-import; that
 //! correction path deliberately does not survive the move.
 //!
@@ -997,7 +997,7 @@ pub struct Selfcheck {
 ///
 /// A transcription check, not a correctness proof: proposals and records come
 /// from the same parse. [`crate::money::reconcile`] is the correctness proof.
-/// The reference also checked XML sign convention and DATE/EFFECTIVEDATE; those
+/// The removed Python tool also checked XML sign convention and DATE/EFFECTIVEDATE; those
 /// belong to Bridge's writer now and are not re-checked here.
 pub fn selfcheck(build: &Build, bank_ledger: &str) -> Result<Selfcheck, Refusal> {
     let bank = ledger_key(bank_ledger);

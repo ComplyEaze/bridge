@@ -1,8 +1,7 @@
-//! Proposal construction, ported from `scripts/bank_statement_import.test.py`.
+//! Proposal construction.
 //!
-//! The reference emitted XML and a REMOTEID; Bridge's writer owns both now, so
-//! these tests assert the `build_import_xml` payload shape instead, and that no
-//! identity is minted here.
+//! Bridge's writer owns the XML and the REMOTEID, so these tests assert the
+//! `build_import_xml` payload shape, and that no identity is minted here.
 
 mod common;
 

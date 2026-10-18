@@ -58,7 +58,7 @@ fn round_one(value: f64) -> f64 {
 ///
 /// A word joins the **first** existing line whose first word sits within 3pt
 /// of it, so the grouping depends on visiting words top to bottom; that is why
-/// they are sorted by rounded y before grouping, as the reference does.
+/// they are sorted by rounded y before grouping, as the removed Python tool did.
 pub fn lines(page: &[Word]) -> Vec<Line> {
     let mut words: Vec<Word> = page
         .iter()

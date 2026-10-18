@@ -1,6 +1,6 @@
 //! The Bank of Baroda layout: columns, one visual line per amount, the newest row first.
 //!
-//! There is no Python reference for this profile. Its geometry and shapes were
+//! Its geometry and shapes were
 //! measured on two real statements, held privately; every line here is synthetic, laid out at the measured
 //! column positions.
 

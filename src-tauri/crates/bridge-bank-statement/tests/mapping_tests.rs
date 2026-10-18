@@ -45,7 +45,7 @@ fn mapping_key_keeps_punctuation_significant() {
 #[test]
 fn mapping_key_ignores_wrap_spacing() {
     let mapping =
-        load("party,ledger,treatment\nZEPHYR MANUFACTURING,M/s Zephyr,auto\nOWN ACCOUNT,,skip\n")
+        load("party,ledger,treatment\nZEPHYR MANUFACTURING,M/s Zephyr,auto\nOWN ACCOUNT,Other Bank,skip\n")
             .unwrap();
     for spelling in [
         "ZEPHYRM ANUFACTURING",
@@ -88,6 +88,20 @@ fn mapping_refuses_ambiguous_input() {
     refuses(
         load("party,ledger,treatment\nOWN,,contra\n"),
         "contra_without_ledger",
+    );
+    refuses(
+        load("party,ledger,treatment\nOWN,,skip\n"),
+        "skip_without_ledger",
+    );
+    refuses(
+        load("party,ledger,treatment\nOWN,   ,SKIP\n"),
+        "skip_without_ledger",
+    );
+    assert_eq!(
+        load("party,ledger,treatment\nOWN,Other Bank,skip\n")
+            .unwrap()
+            .get("OWN"),
+        Some(&("Other Bank".to_string(), Treatment::Skip))
     );
     refuses(
         load("party,ledger,treatment\nA,L,transfer\n"),
@@ -138,6 +152,11 @@ fn a_mapping_may_not_claim_the_unresolved_sentinel() {
         load("party,ledger,treatment\nun resolved,L,skip\n"),
         "mapping_claims_a_sentinel",
     );
+    // a sentinel is named as such even when the row also lacks a ledger
+    refuses(
+        load("party,ledger,treatment\nUNRESOLVED,,skip\n"),
+        "mapping_claims_a_sentinel",
+    );
     assert!(
         !load("party,ledger,treatment\nUNRESOLVED TRADING CO,L,auto\n")
             .unwrap()
@@ -168,6 +187,10 @@ fn inline_rows_follow_the_same_rules() {
     refuses(
         Mapping::from_rows(rows("Own", "", Some("contra"))),
         "contra_without_ledger",
+    );
+    refuses(
+        Mapping::from_rows(rows("Own", "", Some("skip"))),
+        "skip_without_ledger",
     );
 }
 

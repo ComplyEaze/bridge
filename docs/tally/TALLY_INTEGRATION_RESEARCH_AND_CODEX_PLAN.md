@@ -1311,6 +1311,8 @@ mirror/checkpoint/proof state, or supports writes. `Matched` remains
 
 ### India Tax raw-observation authority slice
 
+**Amended 2026-10-14:** the parser described below was deleted in [#1710](https://github.com/ComplyEaze/bridge/pull/1710), because it had no request artifact and no caller outside itself, and no shipped build compiled it. The text below is kept as the design record and no longer describes the repository.
+
 Research against Tally's current GST setup, Release 3.0 schema, party-ledger,
 override, and report documentation also showed that the existing
 `IndiaTaxBatch` cannot faithfully represent multiple company registrations,
@@ -1798,6 +1800,8 @@ partial-failure byte plumbing, property/fuzz testing, and live profile evidence
 remain P1/P2 follow-on work.
 
 #### Implemented PR16 boundary — Party Outstanding Confidence Receipt v1
+
+**Amended 2026-10-14:** the observation parser and the confidence engine described below were deleted in [#1710](https://github.com/ComplyEaze/bridge/pull/1710), because nothing outside them used them and no shipped build compiled the parser. The canonical model this section describes (Bills & Payments schema v2, the typed canonicalization and the shared reconciliation result shape) remains. The text below is kept as the design record and describes the repository only for that model.
 
 PR16 establishes a portable, read-only foundation for bill allocations and
 party outstandings. The version-2 canonical model preserves all four known

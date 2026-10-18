@@ -80,7 +80,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -103,6 +103,20 @@ class MergeGateControls(unittest.TestCase):
         mktemp.chmod(mktemp.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         if not shutil.which("jq"):
             raise RuntimeError("jq is required for merge-gate controls")
+        real_node = shutil.which("node")
+        if not real_node:
+            raise RuntimeError("node is required for merge-gate controls (the review tier tool)")
+        node = cls.bin / "node"
+        node.write_text(
+            "#!/usr/bin/env bash\n"
+            'case "${GATE_SCENARIO:-}" in\n'
+            "  tier-tool-fails) exit 2 ;;\n"
+            '  tier-tool-error-object) echo \'{"tier":"one","error":"boom","files":[],"unclassified":[]}\'; exit 0 ;;\n'
+            '  tier-tool-bad-tier) echo \'{"tier":"maybe","files":[]}\'; exit 0 ;;\n'
+            "esac\n"
+            "exec " + shlex.quote(real_node) + ' "$@"\n'
+        )
+        node.chmod(node.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     @classmethod
     def git_in_repo(cls, *args):
@@ -659,7 +673,7 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("verdict-by-review", self.VERDICT_PASS)
 
     def test_either_line_missing_or_for_another_merge_base_blocks(self):
-        for scenario in ("verdict-missing-clean", "verdict-missing-recommend", "verdict-for-another-base"):
+        for scenario in ("verdict-missing-clean", "verdict-missing-recommend-write-path", "verdict-for-another-base"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, self.VERDICT_BLOCK)
 
@@ -679,14 +693,63 @@ class MergeGateControls(unittest.TestCase):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "carries a merge-verdict token")
 
-    def test_commit_comments_that_cannot_be_read_or_are_too_many_are_indeterminate_and_an_owners_voids(self):
+    def test_a_change_of_the_one_review_tier_needs_only_the_clean_line(self):
+        result = self.assert_pass("verdict-missing-recommend", "the owner's MERGE-VERDICT CLEAN stands at head")
+        self.assertIn("review tier: one", result.stdout)
+        self.assertIn("MERGE-ADVERSARY RECOMMEND is not required", result.stdout)
+
+    def test_a_change_that_is_not_of_the_one_tier_or_whose_tier_cannot_be_computed_still_needs_both_lines(self):
+        for scenario in ("verdict-missing-recommend-write-path", "tier-unclassified-clean-only", "tier-rename-from-write-path", "tier-tool-fails",
+                         "tier-tool-error-object", "tier-tool-bad-tier"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
+                self.assertIn("review tier: full", result.stdout)
+        self.assertIn("src-tauri/src/agent_lab_new.rs (write-path)", self.run_gate("verdict-missing-recommend-write-path").stdout)
+        self.assertIn("mystery/unknown.txt (unclassified)", self.run_gate("tier-unclassified-clean-only").stdout)
+
+    # -- (c) at the gate: the clean line of an older head, carried when the pull request's own patch is unchanged --------------
+    def test_a_clean_line_for_an_older_head_is_carried_when_the_patch_is_unchanged(self):
+        result = self.assert_pass("carry-same-patch", "carried")
+        self.assertIn("byte-identical", result.stdout)
+
+    def test_a_change_of_the_text_after_the_hunk_numbers_alone_still_carries_the_clean_line(self):
+        self.assert_pass("carry-function-context-differs", "carried")
+
+    def test_a_clean_line_is_not_carried_when_the_patch_changed_or_cannot_be_compared(self):
+        for scenario in ("carry-patch-differs", "carry-whitespace-only", "carry-indent-only", "carry-mode-change", "carry-binary", "carry-compare-fails",
+                         "carry-context-differs", "carry-hunk-numbers-differ", "carry-moved-insertion",
+                         "carry-empty-diff", "carry-duplicate-file-sections", "carry-diff-cut-short"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_blocked(scenario, self.VERDICT_BLOCK)
+                self.assertNotIn("carried", result.stdout.replace("not carried", ""))
+
+    def test_a_carried_clean_line_does_not_replace_the_recommend_line_of_the_full_tier(self):
+        self.assert_blocked("carry-same-patch-write-path", self.VERDICT_BLOCK)
+
+    def test_both_lines_still_pass_at_either_tier(self):
+        self.assert_pass("pass", self.VERDICT_PASS)
+
+    def test_commit_comments_that_cannot_be_read_or_whose_commit_list_is_unproven_are_indeterminate_and_an_owners_voids(self):
         self.assert_indeterminate("commit-comments-unreadable", "could not read")
+        # sixty-one commits without the head among them: the list is not proven to be the pull request's
         self.assert_indeterminate("sixty-one-commits", "could not read")
         self.assert_blocked("owner-commit-comment-with-a-token", self.VERDICT_BLOCK)
 
+    def test_a_pull_request_of_more_than_sixty_commits_is_judged_like_any_other(self):
+        # a chain link carries its parents' commits (76 here, the head among them): the comments of all of them are read
+        self.assert_pass("seventy-six-commits", self.VERDICT_PASS)
+        # and a stranger's token on one of those commits that is not the head is still found
+        self.assert_blocked("seventy-six-commits-with-a-token-on-the-first", "carries a merge-verdict token")
+
+    def test_the_commit_comments_of_every_page_are_read_and_only_those_on_the_pull_requests_commits_count(self):
+        self.assert_blocked("commit-comment-token-on-the-second-page", self.VERDICT_BLOCK)
+        self.assert_pass("commit-comment-token-on-another-commit", self.VERDICT_PASS)
+        # a comment that names no commit cannot be placed, so the read is not complete
+        self.assert_indeterminate("commit-comment-without-a-commit", "could not read")
+
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
-                         "changes-the-registry", "changes-the-registry-in-another-case"):
+                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 
@@ -1294,6 +1357,109 @@ class MergeVerdictEvaluator(unittest.TestCase):
                 only_one_renewed = comments + [self.comment(self.CLEAN, self.T[4])]
                 self.assertEqual(self.status(self.doc(comments=only_one_renewed)), "block")
 
+    def test_the_review_tier_one_needs_the_clean_line_alone_and_anything_else_needs_both(self):
+        clean_only = self.doc(comments=[self.comment(self.CLEAN, self.T[1])])
+        both = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(dict(clean_only, tier="one")), "pass")
+        self.assertEqual(self.status(dict(both, tier="one")), "pass")
+        for tier in (None, "full", "ONE", "one ", "", 1, True, ["one"]):
+            with self.subTest(tier=tier):
+                self.assertEqual(self.status(dict(clean_only, tier=tier)), "block")
+                self.assertEqual(self.status(dict(both, tier=tier)), "pass")
+        self.assertEqual(self.status(clean_only), "block")
+
+    def test_the_review_tier_one_still_needs_a_standing_clean_line_and_still_obeys_every_void(self):
+        recommend_only = self.doc(comments=[self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(dict(recommend_only, tier="one")), "block")
+        other_head = self.CLEAN.replace("1" * 40, "3" * 40)
+        self.assertEqual(self.status(dict(self.doc(comments=[self.comment(other_head, self.T[1])]), tier="one")), "block")
+        for line in ("MERGE-ADVERSARY REJECT head=" + "1" * 40 + " base=" + "2" * 40, "MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40):
+            with self.subTest(line=line[:30]):
+                voided = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(line, self.T[3])])
+                self.assertEqual(self.status(dict(voided, tier="one")), "block")
+        token_by_someone_else = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2], uid=7)])
+        self.assertEqual(self.status(dict(token_by_someone_else, tier="one")), "block")
+
+    # -- (a) a verdict line may open a longer comment ------------------------------------------------------------------------
+    PROSE = "Review of head 1111, the whole change. CLEAN, 0 P1 / 0 P2.\n\n- the change does what it says\n"
+
+    def test_a_verdict_line_that_opens_an_owner_review_with_prose_after_it_counts(self):
+        for separator in ("\n", "\r\n"):
+            with self.subTest(separator=repr(separator)):
+                clean = self.CLEAN + separator + separator + self.PROSE
+                self.assertEqual(self.status(dict(self.doc(comments=[self.comment(clean, self.T[1])]), tier="one")), "pass")
+                both = [self.comment(clean, self.T[1]), self.comment(self.RECOMMEND + separator + "Adversary read: nothing at P1 or P2." + separator, self.T[2])]
+                self.assertEqual(self.status(self.doc(comments=both)), "pass")
+        as_review = self.doc(reviews=[self.review(self.CLEAN + "\n\n" + self.PROSE, self.T[1])], comments=[self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(as_review), "pass")
+
+    def test_prose_around_a_verdict_line_that_is_not_just_prose_voids_instead(self):
+        token = "MERGE-VERDICT"
+        cases = {
+            "the line is not first": self.PROSE + self.CLEAN,
+            "a second verdict token in the text": self.CLEAN + "\n\nsee also " + token + " CLEAN head=" + "1" * 40 + " base=" + "2" * 40,
+            "a token inside a hidden comment": self.CLEAN + "\n\n<!-- " + token + " NOT-CLEAN -->\nProse.",
+            "trailing spaces on the line": self.CLEAN + "  \n\n" + self.PROSE,
+            "a leading space on the line": " " + self.CLEAN + "\n\n" + self.PROSE,
+            "a different word after the verdict": "MERGE-VERDICT CLEANISH head=" + "1" * 40 + " base=" + "2" * 40 + "\nProse",
+            "another line of the same kind first": "MERGE-VERDICT NOT-CLEAN head=" + "1" * 40 + " base=" + "2" * 40 + "\n" + self.CLEAN,
+        }
+        for name, body in cases.items():
+            with self.subTest(case=name):
+                both = self.doc(comments=[self.comment(body, self.T[1]), self.comment(self.RECOMMEND, self.T[2])])
+                self.assertEqual(self.status(both), "block")
+
+    def test_a_verdict_line_with_prose_by_anyone_else_is_refused_as_before(self):
+        other = self.doc(comments=[self.comment(self.CLEAN + "\n\n" + self.PROSE, self.T[1], uid=7), self.comment(self.RECOMMEND, self.T[2])])
+        self.assertEqual(self.status(other), "block")
+
+    # -- (c) a clean line carried across a change of head and merge base the gate proved leaves the patch unchanged ----------
+    OLD_HEAD = "3" * 40
+    OLD_BASE = "4" * 40
+
+    def old_clean(self):
+        return "MERGE-VERDICT CLEAN head=" + self.OLD_HEAD + " base=" + self.OLD_BASE
+
+    def test_a_clean_line_for_an_older_head_stands_only_when_the_gate_carried_exactly_that_pair(self):
+        doc = self.doc(comments=[self.comment(self.old_clean(), self.T[1])])
+        self.assertEqual(self.status(dict(doc, tier="one")), "block")
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        self.assertEqual(self.status(dict(doc, tier="one", carried=carried)), "pass")
+        for bad in ({"head": "5" * 40, "base": self.OLD_BASE}, {"head": self.OLD_HEAD, "base": "5" * 40}, {"head": self.OLD_HEAD},
+                    {"head": self.OLD_HEAD, "base": self.OLD_BASE, "x": 1},
+                    "carried", None, [], {"head": 1, "base": 2}):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.status(dict(doc, tier="one", carried=bad)), "block")
+
+    def test_a_carried_clean_line_does_not_carry_the_recommend_line(self):
+        both = self.doc(comments=[self.comment(self.old_clean(), self.T[1]),
+                                  self.comment("MERGE-ADVERSARY RECOMMEND head=" + self.OLD_HEAD + " base=" + self.OLD_BASE, self.T[2])])
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        self.assertEqual(self.status(dict(both, tier="full", carried=carried)), "block")
+        self.assertEqual(self.status(dict(both, tier="one", carried=carried)), "pass")
+
+    def test_a_carried_clean_line_is_voided_like_any_other(self):
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        for line in ("MERGE-VERDICT RETRACT head=" + self.OLD_HEAD + " base=" + self.OLD_BASE, "MERGE-ADVERSARY REJECT head=" + "1" * 40 + " base=" + "2" * 40):
+            with self.subTest(line=line[:30]):
+                voided = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(line, self.T[3])])
+                self.assertEqual(self.status(dict(voided, tier="one", carried=carried)), "block")
+
+    def test_a_newer_clean_line_for_the_current_pair_wins_over_an_older_carried_one(self):
+        carried = {"head": self.OLD_HEAD, "base": self.OLD_BASE}
+        doc = self.doc(comments=[self.comment(self.CLEAN, self.T[1]), self.comment(self.old_clean(), self.T[2])])
+        # the NEWEST clean line is the old pair: it stands because it was carried
+        self.assertEqual(self.status(dict(doc, tier="one", carried=carried)), "pass")
+        doc2 = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment(self.CLEAN, self.T[2])])
+        self.assertEqual(self.status(dict(doc2, tier="one")), "pass")
+
+    def test_the_result_names_the_clean_line_that_could_be_carried(self):
+        result = self.mod.evaluate(dict(self.doc(comments=[self.comment(self.old_clean(), self.T[1])]), tier="one"))
+        self.assertEqual(result["candidate_clean"], {"head": self.OLD_HEAD, "base": self.OLD_BASE})
+        self.assertIsNone(self.mod.evaluate(dict(self.doc(comments=[self.comment(self.CLEAN, self.T[1])]), tier="one"))["candidate_clean"])
+        voided = self.doc(comments=[self.comment(self.old_clean(), self.T[1]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[3])])
+        self.assertIsNone(self.mod.evaluate(dict(voided, tier="one"))["candidate_clean"])
+
     def test_a_void_at_the_same_second_as_a_verdict_voids_it(self):
         comments = [self.comment(self.CLEAN, self.T[1]), self.comment(self.RECOMMEND, self.T[2]), self.comment("MERGE-VERDICT RETRACT head=" + "1" * 40 + " base=" + "2" * 40, self.T[2])]
         self.assertEqual(self.status(self.doc(comments=comments)), "block")
@@ -1591,6 +1757,226 @@ class PrivacyScanDecodesUtf16(unittest.TestCase):
                     record = self.run_main(raw, locale)
                     self.assertEqual(record["indeterminate"], unreadable)
                     self.assertEqual(record["blockers"], [])
+
+
+class MergeWrapperControls(unittest.TestCase):
+    """scripts/merge-gate-merge.sh: runs the gate, then ready and a head-pinned squash merge, refusing anything that does not match.
+
+    The wrapper is copied beside a stub gate (it always runs the gate in its own directory) and called with a stub `gh` that logs
+    every call, so each case can say which commands were and were not run.
+    """
+
+    GATED = "a" * 40
+    GATE_PASS = (
+        "PR #321 (ComplyEaze/bridge)  head=aaaaaaa  base=master\n"
+        "  ok            something\n\n"
+        "MAY MERGE \u2014 checks passed for aaaaaaa.\n"
+        "Branch protection on master enforces the remaining required status checks separately.\n"
+        '  [ "$(gh pr view 321 --repo ComplyEaze/bridge --json baseRefName -q .baseRefName)" = "master" ] \\\n'
+        "    && gh pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + "a" * 40 + "\n"
+    )
+    VIEW = {"state": "OPEN", "isDraft": False, "headRefOid": "a" * 40, "baseRefName": "master"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory(prefix="merge-wrapper-")
+        cls.root = Path(cls.tmp.name)
+        (cls.root / "scripts").mkdir()
+        shutil.copyfile(ROOT / "scripts" / "merge-gate-merge.sh", cls.root / "scripts" / "merge-gate-merge.sh")
+        os.chmod(cls.root / "scripts" / "merge-gate-merge.sh", 0o755)
+        gate = cls.root / "scripts" / "merge-gate.sh"
+        gate.write_text('#!/usr/bin/env bash\ncat "$STUB_GATE_OUT"\nexit "${STUB_GATE_EXIT:-0}"\n')
+        gate.chmod(0o755)
+        gh = cls.root / "gh"
+        gh.write_text(
+            "#!/usr/bin/env bash\n"
+            'echo "$*" >>"$GH_LOG"\n'
+            'case "$1 $2" in\n'
+            '  "pr view") [ -z "${GH_VIEW_FAIL:-}" ] || exit 1; n=$(grep -c "^pr view" "$GH_LOG"); if [ "$n" -ge 3 ] && [ -f "${GH_VIEW3:-/nonexistent}" ]; then cat "$GH_VIEW3"; exit 0; fi; if [ "$n" -ge 2 ] && [ -n "${GH_VIEW2_FAIL:-}" ]; then exit 1; fi; if [ "$n" -ge 2 ] && [ -f "${GH_VIEW2:-/nonexistent}" ]; then cat "$GH_VIEW2"; else cat "$GH_VIEW"; fi ;;\n'
+            '  "pr ready") exit "${GH_READY_EXIT:-0}" ;;\n'
+            '  "pr merge") [ -z "${GH_MERGE_SLEEP:-}" ] || sleep "$GH_MERGE_SLEEP"; exit "${GH_MERGE_EXIT:-0}" ;;\n'
+            "  *) exit 99 ;;\n"
+            "esac\n"
+        )
+        gh.chmod(0o755)
+        if not shutil.which("jq"):
+            raise RuntimeError("jq is required for the merge wrapper controls")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def run_wrapper(self, args=("321", "--repo", "ComplyEaze/bridge"), gate_out=None, gate_exit=0, view=None, view_fail=False,
+                    merge_exit=0, ready_exit=0, view2=None, view2_fail=False, view3=None, merge_sleep=None, signal_after=None):
+        work = Path(tempfile.mkdtemp(dir=self.root))
+        (work / "gate-out").write_text(self.GATE_PASS if gate_out is None else gate_out)
+        (work / "view").write_text(json.dumps(self.VIEW if view is None else view))
+        log = work / "gh.log"
+        log.write_text("")
+        if view2 is not None:
+            (work / "view2").write_text(json.dumps(view2))
+        env = os.environ.copy()
+        env["GH_VIEW2"] = str(work / "view2")
+        if view2_fail:
+            env["GH_VIEW2_FAIL"] = "1"
+        if view3 is not None:
+            (work / "view3").write_text(json.dumps(view3))
+            env["GH_VIEW3"] = str(work / "view3")
+        if merge_sleep is not None:
+            env["GH_MERGE_SLEEP"] = str(merge_sleep)
+        env.update(PATH=f"{self.root}:{env['PATH']}", STUB_GATE_OUT=str(work / "gate-out"), STUB_GATE_EXIT=str(gate_exit),
+                   GH_LOG=str(log), GH_VIEW=str(work / "view"), GH_MERGE_EXIT=str(merge_exit), GH_READY_EXIT=str(ready_exit))
+        if view_fail:
+            env["GH_VIEW_FAIL"] = "1"
+        if signal_after is not None:
+            import signal as signal_module
+            import time
+            proc = subprocess.Popen([str(self.root / "scripts" / "merge-gate-merge.sh"), *args], env=env, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            deadline = time.time() + 20
+            while time.time() < deadline and not any(line.startswith("pr merge") for line in log.read_text().splitlines()):
+                time.sleep(0.05)
+            proc.send_signal(signal_module.SIGTERM)
+            out, err = proc.communicate(timeout=30)
+            result = subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
+        else:
+            result = subprocess.run([str(self.root / "scripts" / "merge-gate-merge.sh"), *args], env=env, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        calls = [line for line in log.read_text().splitlines() if line]
+        return result, calls
+
+    def assert_refused(self, result, calls, phrase):
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(phrase, result.stdout + result.stderr)
+        self.assertFalse([c for c in calls if c.startswith(("pr ready", "pr merge"))], calls)
+
+    def test_a_passing_gate_and_a_matching_head_is_merged_pinned_to_the_gated_head(self):
+        result, calls = self.run_wrapper()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([c for c in calls if c.startswith(("pr ready", "pr merge"))],
+                         ["pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + self.GATED])
+
+    def test_a_draft_is_made_ready_first_and_only_then_merged(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        acts = [c for c in calls if c.startswith(("pr ready", "pr merge"))]
+        self.assertEqual(acts, ["pr ready 321 --repo ComplyEaze/bridge",
+                                "pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + self.GATED])
+
+    def test_a_ready_that_fails_stops_before_the_merge(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), ready_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_draft_stays_a_draft_when_the_merge_does_not_happen(self):
+        # the merge fails after the pull request was made ready
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), merge_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual([c for c in calls if c.startswith("pr ready")], ["pr ready 321 --repo ComplyEaze/bridge", "pr ready 321 --repo ComplyEaze/bridge --undo"])
+        # the head or base moves between the first read and the merge
+        for name, moved in (("head", dict(self.VIEW, isDraft=True, headRefOid="b" * 40)), ("base", dict(self.VIEW, isDraft=True, baseRefName="other")),
+                            ("state", dict(self.VIEW, isDraft=True, state="CLOSED"))):
+            with self.subTest(moved=name):
+                result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), view2=moved)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertEqual([c for c in calls if c.startswith("pr ready")], ["pr ready 321 --repo ComplyEaze/bridge", "pr ready 321 --repo ComplyEaze/bridge --undo"])
+                self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_merge_that_gh_reports_as_failed_but_that_happened_is_not_undone(self):
+        draft = dict(self.VIEW, isDraft=True)
+        result, calls = self.run_wrapper(view=draft, merge_exit=1, view3=dict(draft, state="MERGED"))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("merge requested", result.stdout)
+        self.assertFalse([c for c in calls if "--undo" in c], calls)
+
+    def test_an_interrupt_during_the_merge_says_what_state_the_pull_request_may_be_in_and_does_not_undo_it(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), merge_sleep=2, signal_after=True)
+        self.assertEqual(result.returncode, 143, result.stdout + result.stderr)
+        self.assertIn("interrupted", result.stderr)
+        self.assertFalse([c for c in calls if "--undo" in c], calls)
+
+    def test_a_second_read_that_fails_refuses_and_returns_a_draft_to_draft(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, isDraft=True), view2_fail=True)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("pr ready 321 --repo ComplyEaze/bridge --undo", calls)
+        self.assertFalse([c for c in calls if c.startswith("pr merge")], calls)
+
+    def test_a_head_or_base_that_moves_after_the_first_read_is_refused_before_the_merge(self):
+        for name, moved in (("head", dict(self.VIEW, headRefOid="b" * 40)), ("base", dict(self.VIEW, baseRefName="other"))):
+            with self.subTest(moved=name):
+                result, calls = self.run_wrapper(view2=moved)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse([c for c in calls if c.startswith(("pr ready", "pr merge"))], calls)
+
+    def test_a_gate_that_blocks_or_cannot_decide_is_never_merged(self):
+        for code in (1, 2, 3):
+            with self.subTest(code=code):
+                result, calls = self.run_wrapper(gate_exit=code, gate_out="MUST NOT MERGE\n")
+                self.assert_refused(result, calls, "the gate did not pass")
+
+    def test_a_zero_exit_without_the_may_merge_line_is_refused(self):
+        result, calls = self.run_wrapper(gate_out=self.GATE_PASS.replace("MAY MERGE", "may merge"))
+        self.assert_refused(result, calls, "MAY MERGE")
+
+    def test_a_merge_command_that_is_missing_repeated_or_for_another_pull_request_is_refused(self):
+        command = "    && gh pr merge 321 --repo ComplyEaze/bridge --squash --match-head-commit " + self.GATED + "\n"
+        cases = {
+            "missing": self.GATE_PASS.replace(command, ""),
+            "repeated": self.GATE_PASS + command,
+            "another pull request": self.GATE_PASS.replace("merge 321", "merge 322"),
+            "another repository": self.GATE_PASS.replace("--repo ComplyEaze/bridge --squash", "--repo someone/bridge --squash"),
+            "a short sha": self.GATE_PASS.replace(self.GATED, "a" * 39),
+            "an upper-case sha": self.GATE_PASS.replace(self.GATED, "A" * 40),
+            "a non-hex sha": self.GATE_PASS.replace(self.GATED, "g" * 40),
+            "an extra flag": self.GATE_PASS.replace("--squash", "--squash --admin"),
+        }
+        for name, out in cases.items():
+            with self.subTest(case=name):
+                result, calls = self.run_wrapper(gate_out=out)
+                self.assert_refused(result, calls, "merge command")
+
+    def test_a_missing_or_repeated_base_check_line_is_refused(self):
+        base_line = '  [ "$(gh pr view 321 --repo ComplyEaze/bridge --json baseRefName -q .baseRefName)" = "master" ] \\\n'
+        for name, out in {"missing": self.GATE_PASS.replace(base_line, ""), "repeated": self.GATE_PASS + base_line}.items():
+            with self.subTest(case=name):
+                result, calls = self.run_wrapper(gate_out=out)
+                self.assert_refused(result, calls, "base")
+
+    def test_a_head_that_moved_since_the_gate_is_refused_and_nothing_is_run(self):
+        result, calls = self.run_wrapper(view=dict(self.VIEW, headRefOid="b" * 40))
+        self.assert_refused(result, calls, "head moved")
+
+    def test_another_base_or_a_closed_pull_request_is_refused(self):
+        for name, view in {"base": dict(self.VIEW, baseRefName="other"), "closed": dict(self.VIEW, state="CLOSED"),
+                           "merged": dict(self.VIEW, state="MERGED")}.items():
+            with self.subTest(case=name):
+                result, calls = self.run_wrapper(view=view)
+                self.assert_refused(result, calls, "pull request")
+
+    def test_a_view_that_cannot_be_read_is_refused(self):
+        result, calls = self.run_wrapper(view_fail=True)
+        self.assert_refused(result, calls, "could not read")
+        result, calls = self.run_wrapper(view={"state": "OPEN"})
+        self.assert_refused(result, calls, "could not read")
+
+    def test_a_merge_that_gh_refuses_is_a_failure_not_a_success(self):
+        result, calls = self.run_wrapper(merge_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("merged", result.stdout.lower().replace("not merged", ""))
+
+    def test_a_dry_run_runs_the_gate_and_the_checks_but_neither_ready_nor_merge(self):
+        result, calls = self.run_wrapper(args=("321", "--repo", "ComplyEaze/bridge", "--dry-run"), view=dict(self.VIEW, isDraft=True))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("dry run", result.stdout)
+        self.assertFalse([c for c in calls if c.startswith(("pr ready", "pr merge"))], calls)
+
+    def test_bad_arguments_are_a_usage_error_and_run_nothing(self):
+        for args in ((), ("abc",), ("321", "--repo", "nonsense"), ("321", "--repo", "a/b", "--unknown"), ("321", "extra"),
+                     ("321", "--repo")):
+            with self.subTest(args=args):
+                result, calls = self.run_wrapper(args=args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":

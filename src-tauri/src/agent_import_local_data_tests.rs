@@ -40,6 +40,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     let root = directory.path();
     let journal_bytes = journal(false);
     write(&root.join("agent-import-ledger.jsonl"), &journal_bytes);
+    write(&root.join("agent-import-statement-skips.jsonl"), b"123");
     write(&root.join("agent-egress.jsonl"), b"abcd");
     write(&root.join("agent-import-admission.lock"), b"");
     write(&root.join("notes.txt"), b"12345");
@@ -67,7 +68,7 @@ fn files_are_classed_by_name_and_sizes_add_up() {
     let expect = |name: &str, files: u64, bytes: u64| {
         assert_eq!(*class(&report, name), Class { files, bytes }, "{name}");
     };
-    expect("journal", 1, journal_bytes.len() as u64);
+    expect("journal", 2, journal_bytes.len() as u64 + 3);
     expect("egress_log", 1, 4);
     expect("locks", 2, 0);
     expect("other", 3, 8);
@@ -365,8 +366,7 @@ fn server_over(directory: &Path) -> crate::agent::Server {
         max_bytes: 200_000,
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: crate::agent::Posting::Off,
     })
 }
 

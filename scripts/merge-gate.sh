@@ -2,6 +2,7 @@
 # Validate a pull request's pinned-path acknowledgement (compatibility surface),
 # run the privacy/PII scan, and confirm that the owner's two machine lines (MERGE-VERDICT CLEAN and
 # MERGE-ADVERSARY RECOMMEND, bound to the head and the merge base) stand on the pull request.
+# A change of the one review tier (scripts/review-tier.mjs: docs, plain tests and read-side production code only) needs the CLEAN line alone.
 #
 # Usage: scripts/merge-gate.sh <pr-number> [--repo OWNER/NAME]
 #        [--binary-review-sha FULL_SHA] (the owner's own act: binary bytes, ownership, license, and NOTICE reviewed)
@@ -865,16 +866,25 @@ verdict_reviews=$(verdict_pages "repos/$REPO/pulls/$PR/reviews?per_page=100") ||
 verdict_comments=$(verdict_pages "repos/$REPO/issues/$PR/comments?per_page=100") || verdict_status=$?
 verdict_inline=$(verdict_pages "repos/$REPO/pulls/$PR/comments?per_page=100") || verdict_status=$?
 verdict_commit_comments="[]"
-verdict_shas=$(verdict_pages "repos/$REPO/pulls/$PR/commits?per_page=100" | jq -r '.[].sha') || verdict_status=$?
-if [ "$(printf '%s\n' "$verdict_shas" | sed '/^$/d' | wc -l | tr -d ' ')" -gt 60 ]; then
+# The pull request's commit comments are read once, from the repository's list of commit comments (every page), and kept when
+# they sit on one of the pull request's own commits. The commit list is the one proved complete above for the privacy scan (its
+# length equals the pull request's own count, 250 at most, no duplicate, the head among them); a list that is not proven means
+# the comments are not read, and any failed page fails the read. There is no cap on the number of commits: a pull request that
+# carries its parents' commits is judged like any other.
+if [ "$metadata_commits_proven" -ne 1 ]; then
   verdict_status=1
-  echo "more than 60 commits: their comments are not read" >>"$errfile"
+  echo "the commit list is not proven complete: commit comments are not read" >>"$errfile"
+else
+  verdict_sha_json=$(jq -c '[(if all(.[]; type == "array") then flatten else . end)[].sha | ascii_downcase]' <<<"$metadata_commits") || verdict_status=$?
+  verdict_repo_comments=$(verdict_pages "repos/$REPO/comments?per_page=100") || verdict_status=$?
+  if [ "$verdict_status" -eq 0 ] && ! jq -e 'all(.[]; (.commit_id | type) == "string")' <<<"$verdict_repo_comments" >/dev/null 2>&1; then
+    verdict_status=1
+    echo "a commit comment names no commit, so the list cannot be filtered completely" >>"$errfile"
+  fi
+  if [ "$verdict_status" -eq 0 ]; then
+    verdict_commit_comments=$(jq -c --argjson shas "$verdict_sha_json" '[.[] | select(.commit_id | type == "string") | select((.commit_id | ascii_downcase) as $c | $shas | index($c) != null)]' <<<"$verdict_repo_comments") || verdict_status=$?
+  fi
 fi
-while IFS= read -r verdict_sha; do
-  [[ "$verdict_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-  verdict_page=$(verdict_pages "repos/$REPO/commits/$verdict_sha/comments?per_page=100") || { verdict_status=$?; continue; }
-  verdict_commit_comments=$(jq -c -n --argjson a "$verdict_commit_comments" --argjson b "$verdict_page" '$a + $b') || verdict_status=$?
-done <<<"$verdict_shas"
 verdict_query='query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
  reviews(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
  comments(first:100){pageInfo{hasNextPage} nodes{databaseId lastEditedAt userContentEdits(first:1){totalCount} author{login ... on User{databaseId}}}}
@@ -891,14 +901,29 @@ else
   printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)" >"$tmpdir/v-filenames.txt"
   printf '%s' "$verdict_history" >"$tmpdir/v-history.json"
   printf '%s' "${sanitized_message_json:-[]}" >"$tmpdir/v-commits.json"
+  # The review tier (scripts/review-tier.mjs, from the changed paths and rename sources just written, with the list in this tree,
+  # which the gate proved equal to master): only the one tier lets the MERGE-ADVERSARY RECOMMEND line be absent. Anything wrong
+  # with the tool or its answer is the full tier.
+  review_tier="full"
+  review_tier_detail="the review tier could not be computed, so both owner lines are needed"
+  tier_json=$(node "$script_dir/review-tier.mjs" --paths-file "$tmpdir/v-filenames.txt" 2>/dev/null) || tier_json=""
+  if [ -n "$tier_json" ] && jq -e 'type == "object" and (.tier | . == "one" or . == "full") and (has("error") | not) and (.files | type == "array")' <<<"$tier_json" >/dev/null 2>&1; then
+    review_tier=$(jq -r '.tier' <<<"$tier_json")
+    if [ "$review_tier" = "one" ]; then
+      review_tier_detail="$(jq -r '.files | length' <<<"$tier_json") file(s), none on the write path, in credentials, in fixtures or unclassified"
+    else
+      review_tier_detail="decided by: $(jq -r '[.files[] | select(.tier == "full")] | .[0:3] | map(.path + " (" + (.class // "unclassified") + ")") | join(", ")' <<<"$tier_json")"
+    fi
+  fi
+  say "note" "review tier: $review_tier ($review_tier_detail)"
   verdict_doc_status=0
   jq -n -c --slurpfile reviews "$tmpdir/v-reviews.json" --slurpfile comments "$tmpdir/v-comments.json" --slurpfile inline "$tmpdir/v-inline.json" \
     --slurpfile history "$tmpdir/v-history.json" --slurpfile commits "$tmpdir/v-commits.json" --rawfile added "$added_payload" \
     --slurpfile commitcomments "$tmpdir/v-commit-comments.json" --rawfile filenames "$tmpdir/v-filenames.txt" --arg headref "$head_ref" \
-    --arg title "$title" --arg body "$raw_prbody" --arg head "$head" --arg base "$merge_base" '
+    --arg title "$title" --arg body "$raw_prbody" --arg head "$head" --arg base "$merge_base" --arg tier "$review_tier" '
     ($history[0].data.repository.pullRequest // null) as $pr |
     def edits: [(.nodes // [])[] | {authorId: (.author.databaseId // null), lastEditedAt: .lastEditedAt, editCount: (.userContentEdits.totalCount // 0)}];
-    {head: $head, base: $base,
+    {head: $head, base: $base, tier: $tier,
      reviews: $reviews[0], comments: $comments[0], inline_comments: $inline[0],
      commit_comments: $commitcomments[0],
      texts: {title: $title, body: $body, head_ref: $headref, filenames: ($filenames | split("\n") | map(select(length > 0))),
@@ -916,6 +941,43 @@ else
   else
     verdict_exit=0
     verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc.json" 2>/dev/null) || verdict_exit=$?
+    # A MERGE-VERDICT CLEAN line that names an older head and merge base is carried to the current pair when the pull request's
+    # own change (merge base...head) is the same at both. "The same" is exact: the whole compare diff, byte for byte, apart from
+    # the `index` lines (blob ids move with a merge of master) and the text after the hunk numbers (the enclosing function's
+    # name). Context lines and hunk numbers are part of it, so a change moved to another place in a file is not the same change,
+    # and a merge that touches the pull request's files inside a hunk's three context lines, or that shifts a hunk's numbers, is
+    # not carried: the reviewer looks again. Master's edits elsewhere are NOT looked at, in other files or in the same file (below
+    # the last hunk, or of equal length above one): they ride on master's own review and the checks at the head.
+    # (git patch-id is not used: it ignores whitespace and position.)
+    # Two GitHub compare diffs prove it. A diff that cannot be read, is empty, holds a binary change (its text hides the bytes),
+    # lists a file twice, or names other files than the pull request's current file list is never carried. What master changed
+    # in other files is not looked at: that is the checks' job at the head.
+    candidate_head=$(jq -r '.candidate_clean.head // empty' <<<"$verdict_result" 2>/dev/null)
+    candidate_base=$(jq -r '.candidate_clean.base // empty' <<<"$verdict_result" 2>/dev/null)
+    if [ "$(jq -r '.clean' <<<"$verdict_result" 2>/dev/null)" != "true" ] && [[ "$candidate_head" =~ ^[0-9a-f]{40}$ ]] && [[ "$candidate_base" =~ ^[0-9a-f]{40}$ ]]; then
+      own_change_digest() {
+        local diff_file="$tmpdir/patch-$1-$2.diff" names
+        gh api -H "Accept: application/vnd.github.diff" "repos/$REPO/compare/$1...$2" >"$diff_file" 2>>"$errfile" </dev/null || return 1
+        grep -q '[^[:space:]]' "$diff_file" || return 1
+        ! grep -Eq '^(Binary files |GIT binary patch)' "$diff_file" || return 1
+        if [ "${3:-}" = "check-files" ]; then
+          names=$(grep -E '^diff --git ' "$diff_file" | sed -E 's#^diff --git a/.* b/(.*)$#\1#') || return 1
+          [ -n "$names" ] || return 1
+          [ "$(printf '%s\n' "$names" | sort | uniq -d | wc -l | tr -d ' ')" -eq 0 ] || return 1
+          [ "$(printf '%s\n' "$names" | sort -u)" = "$(cut -f1 "$changed_records" | sort -u)" ] || return 1
+        fi
+        LC_ALL=C grep -av '^index ' "$diff_file" | LC_ALL=C sed -E 's/^(@@ [^@]* @@).*/\1/' | shasum -a 256 | cut -c1-64
+      }
+      old_digest=$(own_change_digest "$candidate_base" "$candidate_head") && new_digest=$(own_change_digest "$merge_base" "$head" check-files)
+      if [ -n "${old_digest:-}" ] && [ "${old_digest:-}" = "${new_digest:-}" ]; then
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is carried to head $short: the pull request's own change is byte-identical, hunk places and context included (digest ${old_digest:0:12})"
+        jq -c --arg h "$candidate_head" --arg b "$candidate_base" '. + {carried: {head: $h, base: $b}}' "$tmpdir/verdict-doc.json" >"$tmpdir/verdict-doc-carried.json" 2>/dev/null \
+          && verdict_exit=0 \
+          && verdict_result=$(python3 -I "$script_dir/merge_gate_verdict.py" <"$tmpdir/verdict-doc-carried.json" 2>/dev/null) || verdict_exit=$?
+      else
+        say "note" "MERGE-VERDICT CLEAN for head ${candidate_head:0:7} is not carried: the pull request's own lines could not be shown unchanged"
+      fi
+    fi
     if ! jq -e 'type == "object" and (.status | type == "string")' <<<"$verdict_result" >/dev/null 2>&1; then
       unknown "could not evaluate the owner's merge verdict"
     else
@@ -923,7 +985,11 @@ else
       while IFS= read -r line; do bad "$line"; done < <(jq -r '.refusals[]?' <<<"$verdict_result")
       while IFS= read -r line; do say "note" "$line"; done < <(jq -r '.reasons[]?' <<<"$verdict_result")
       if [ "$(jq -r '.status' <<<"$verdict_result")" = "pass" ]; then
-        say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+        if [ "$review_tier" = "one" ] && [ "$(jq -r '.recommend' <<<"$verdict_result")" != "true" ]; then
+          say "ok" "the owner's MERGE-VERDICT CLEAN stands at head $short and merge base ${merge_base:0:7} (review tier one: no MERGE-ADVERSARY RECOMMEND needed)"
+        else
+          say "ok" "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head $short and merge base ${merge_base:0:7}"
+        fi
       elif [ "$(jq -r '.status' <<<"$verdict_result")" = "block" ]; then
         bad "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND do not both stand at head $short and merge base ${merge_base:0:7}"
       else
@@ -933,7 +999,7 @@ else
   fi
 fi
 gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
-if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
   bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo

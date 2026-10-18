@@ -25,9 +25,22 @@
 //!   reference, and the dates are within k days. A pair forms only where both
 //!   ends have exactly one such edge, and only when the other ledger's verified
 //!   windows hold the skip's date +/- k and the skip's own ledger's hold the
-//!   Contra's: a pair by date claims that nothing else exists. A row that took
+//!   Contra's: a pair by date claims that nothing else exists. Where a window
+//!   is missing the skip is `MatchedUnconfirmed` and keeps that Contra: the
+//!   Contra is known, and that it is the only one is not. A row that took
 //!   part in round 1 without pairing does not pair here, although it still
 //!   counts against the rows that could.
+//! * A row with an equal amount going the other way the same day on its own
+//!   statement (`reversed_same_day`) may be a reversal or one of two real
+//!   transfers, and the date cannot tell them apart. Equal network references
+//!   still pair it (round 1 ignores the flag). It never pairs by date (round
+//!   2), but it still counts against the rows that could. A skip with no
+//!   reference candidate that is flagged, or any of whose candidates is, is
+//!   `ReversedSameDay` with those candidates instead of `Ambiguous` or
+//!   `NotFound`. A skip with a reference candidate is open for the reason any
+//!   row would be (`OtherSideUnverified`, `Ambiguous`), and one with no
+//!   candidate beside a Contra of another reference is `ReferenceDiffers`,
+//!   flag or none.
 //! * A Contra that is double-booked (also booked from a second statement) pairs
 //!   in neither round; a skip whose candidate it is stays `Ambiguous`.
 //!
@@ -43,9 +56,17 @@
 //! skip ambiguous, not paired) but never pair: a skip whose candidates are all
 //! in one batch not yet `posted_verified` is `OtherSideUnverified`.
 //!
-//! A skip with no candidate is `NotFound` only when the other bank ledger's
-//! verified parse windows cover its whole date +/- k interval; otherwise the
-//! absence proves nothing and it is `NotEstablished`.
+//! A skip with no candidate is not said to have no Contra while one of its
+//! day (+/- k), amount, ledgers and direction carries a reference that differs
+//! from the skip's and is neither paired with another row nor matched with one
+//! by date (`MatchedUnconfirmed`): it is `ReferenceDiffers` with every such
+//! Contra. Which banks print one value on both statements of a transfer is not
+//! measured, so two references that differ neither pair two rows nor prove
+//! them apart. This changes no pair: the two rounds never read it.
+//!
+//! Otherwise a skip with no candidate is `NotFound` only when the other bank
+//! ledger's verified parse windows cover its whole date +/- k interval; if
+//! they do not, the absence proves nothing and it is `NotEstablished`.
 //!
 //! Two skips with one `SkipKey`, or two Contras with one `ContraKey`, are refused
 //! with a typed error naming the smallest such key, whatever the input order.
@@ -63,6 +84,10 @@ macro_rules! text_id {
         impl $name {
             pub(crate) fn new(value: impl Into<String>) -> Self {
                 Self(value.into())
+            }
+
+            pub(crate) fn as_str(&self) -> &str {
+                &self.0
             }
         }
     };
@@ -155,6 +180,10 @@ pub(crate) struct SkipFact {
     pub(crate) other_ledger: LedgerGuid,
     pub(crate) reference: Option<BankReference>,
     pub(crate) lineage: LineageId,
+    /// The statement holds another row on the same date, of an equal amount,
+    /// the other way: a reversal and two real transfers look alike, so the
+    /// date alone cannot pair the row.
+    pub(crate) reversed_same_day: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -182,6 +211,10 @@ pub(crate) struct ContraFact {
     pub(crate) statement_bank_ledger: LedgerGuid,
     pub(crate) lineage: LineageId,
     pub(crate) status: BatchStatus,
+    /// The statement holds another row on the same date, of an equal amount,
+    /// the other way: a reversal and two real transfers look alike, so the
+    /// date alone cannot pair the row.
+    pub(crate) reversed_same_day: bool,
 }
 
 /// A verified statement parse window, both ends inclusive.
@@ -222,11 +255,40 @@ pub(crate) enum PairRound {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum SkipState {
-    Paired { round: PairRound, contra: ContraKey },
+    Paired {
+        round: PairRound,
+        contra: ContraKey,
+    },
     NotFound,
-    Ambiguous { candidates: Vec<ContraKey> },
-    OtherSideUnverified { batch: BatchId },
+    Ambiguous {
+        candidates: Vec<ContraKey>,
+    },
+    OtherSideUnverified {
+        batch: BatchId,
+    },
     NotEstablished,
+    /// One verified Contra matches the row by date and nothing competes with
+    /// it, and the verified windows of one of the two ledgers do not hold the
+    /// dates the match rests on: the Contra is known, and that it is the only
+    /// one is not.
+    MatchedUnconfirmed {
+        contra: ContraKey,
+    },
+    /// The skipped row, or a row that could carry it, has an equal amount going
+    /// the other way the same day on its own statement, so a reversal and two
+    /// real transfers look alike and the date cannot pair it. Listed with the Contras
+    /// that could have carried it (none when nothing matched).
+    ReversedSameDay {
+        candidates: Vec<ContraKey>,
+    },
+    /// Nothing matches the row by reference or by date, and at least one Contra
+    /// of its day, amount, ledgers and direction, neither paired with another
+    /// row nor matched with one by date, carries a reference that differs from
+    /// the row's: whether such a Contra is the row's other side is not known,
+    /// so it is listed and the row is not said to have none.
+    ReferenceDiffers {
+        candidates: Vec<ContraKey>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -487,10 +549,17 @@ pub(crate) fn transfer_pairing_view(
                 && contra_loose_edges[c].len() == 1
                 && is_verified(contras[c])
                 && !doubled[c]
+                && !reversed(skips[s], contras[c])
             {
                 pairs[s] = Some((PairRound::NoReference, c));
             }
         }
+    }
+
+    // What either round paired is spoken for.
+    let mut contra_paired = vec![false; contras.len()];
+    for &(_, c) in pairs.iter().flatten() {
+        contra_paired[c] = true;
     }
 
     let states = skips
@@ -509,7 +578,9 @@ pub(crate) fn transfer_pairing_view(
                             k_days,
                         )) =>
                 {
-                    SkipState::NotEstablished
+                    SkipState::MatchedUnconfirmed {
+                        contra: contras[c].key.clone(),
+                    }
                 }
                 Some((round, c)) => SkipState::Paired {
                     round,
@@ -523,7 +594,33 @@ pub(crate) fn transfer_pairing_view(
                         .chain(&loose_edges[s])
                         .copied()
                         .collect();
-                    open_state(skip, &candidates, &contras, &coverage, k_days)
+                    // Only a skip with no way to match is asked whether a
+                    // Contra of another reference stands where its own would.
+                    let differing = if candidates.is_empty() {
+                        differing_references(skip, skip_groups[s], &contras, &contra_paired, k_days)
+                    } else {
+                        Vec::new()
+                    };
+                    // A Contra of another reference is said first. Then a
+                    // reference edge says why the skip is open as it would for
+                    // any row; the flag decides only among candidates found by
+                    // date.
+                    if !differing.is_empty() {
+                        SkipState::ReferenceDiffers {
+                            candidates: sorted_keys(&differing, &contras),
+                        }
+                    } else if reference_edges[s].is_empty()
+                        && (skip.reversed_same_day
+                            || candidates
+                                .iter()
+                                .any(|&index| contras[index].reversed_same_day))
+                    {
+                        SkipState::ReversedSameDay {
+                            candidates: sorted_keys(&candidates, &contras),
+                        }
+                    } else {
+                        open_state(skip, &candidates, &contras, &coverage, k_days)
+                    }
                 }
             };
             (skip.key.clone(), state)
@@ -555,6 +652,37 @@ fn dates_within<'g>(
         after <= date || days_apart(date, after).is_some_and(|days| days <= k_days)
     });
     &group.by_date[start..end.max(start)]
+}
+
+/// The Contras that stand where a skip's own would, with a reference that is
+/// not the skip's: of its group, within k days, an edge, a reference on both
+/// rows that differs, and neither paired with a skip nor matched with one by
+/// date.
+fn differing_references(
+    skip: &SkipFact,
+    group: Option<&Group>,
+    contras: &[&ContraFact],
+    contra_paired: &[bool],
+    k_days: u32,
+) -> Vec<usize> {
+    let (Some(group), Some(reference)) = (group, skip.reference.as_ref()) else {
+        return Vec::new();
+    };
+    dates_within(group, contras, &skip.date, k_days)
+        .iter()
+        .copied()
+        .filter(|&c| {
+            // The reference test states the rule. For a skip with no candidate it changes nothing:
+            // a Contra in reach without a reference would be a date edge, and one whose reference
+            // equals the skip's a reference edge.
+            !contra_paired[c]
+                && contras[c]
+                    .reference
+                    .as_ref()
+                    .is_some_and(|other| other != reference)
+                && is_edge(skip, contras[c])
+        })
+        .collect()
 }
 
 /// The edge beyond the group (same company, endpoint, ledgers, direction and
@@ -604,12 +732,24 @@ fn open_state(
             };
         }
     }
+    SkipState::Ambiguous {
+        candidates: sorted_keys(candidates, contras),
+    }
+}
+
+fn sorted_keys(candidates: &[usize], contras: &[&ContraFact]) -> Vec<ContraKey> {
     let mut keys: Vec<ContraKey> = candidates
         .iter()
         .map(|&index| contras[index].key.clone())
         .collect();
     keys.sort();
-    SkipState::Ambiguous { candidates: keys }
+    keys
+}
+
+/// A flagged row never pairs by date: a reversal and two real transfers look
+/// alike. It still counts against the rows that could pair.
+fn reversed(skip: &SkipFact, contra: &ContraFact) -> bool {
+    skip.reversed_same_day || contra.reversed_same_day
 }
 
 /// The verified windows of each ledger, with those that overlap or touch merged

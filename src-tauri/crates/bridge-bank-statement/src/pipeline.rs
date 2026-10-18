@@ -23,7 +23,8 @@ use crate::money::{reconcile, statement_totals, verify_against_statement, Contro
 use crate::parse::{parse_statement, require_account_match};
 use crate::pdf::{no_readable_text, StatementText};
 use crate::proposals::{
-    build, group_counterparties, selfcheck, Build, BuildOptions, CounterpartyGroup, Selfcheck,
+    build, coverage, group_counterparties, selfcheck, Build, BuildOptions, CounterpartyGroup,
+    Selfcheck,
 };
 use crate::refusal::Refusal;
 use bridge_tally_primitives::ExactDecimal;
@@ -53,6 +54,8 @@ pub struct ParsedStatement {
     pub build: Build,
     pub check: Selfcheck,
     pub counterparties: Vec<CounterpartyGroup>,
+    /// The days whose every row the statement read (see [`coverage`]).
+    pub coverage: Option<(Date, Date)>,
 }
 
 /// [`prepare`] over the words read from a statement PDF.
@@ -121,6 +124,7 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
     )?;
     let check = selfcheck(&build, request.bank_ledger)?;
     let counterparties = group_counterparties(&build.records)?;
+    let coverage = coverage(&build.dates, request.date_from, request.date_to);
     Ok(ParsedStatement {
         account_number,
         statement_rows: rows.len(),
@@ -129,6 +133,7 @@ pub fn prepare(pages: &[Page], request: &StatementRequest<'_>) -> Result<ParsedS
         build,
         check,
         counterparties,
+        coverage,
     })
 }
 

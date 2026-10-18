@@ -4144,7 +4144,7 @@ fn an_invoice_of_three_sales_legs_is_shown_whole_inside_the_dialogs_caps() {
         "Cr 200.00  \"Sales - Other Services (SAC 999799)\"",
         "Cr 25.00  \"Output CGST @ 2.5% (Rajasthan)\"",
         "Cr 25.00  \"Output SGST @ 2.5% (Rajasthan)\"",
-        "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
+        "Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.",
     ] {
         assert!(preview.contains(needed), "lacks {needed:?}:\n{preview}");
     }
@@ -4224,7 +4224,7 @@ fn an_invoice_shows_what_a_gst_document_needs_and_is_not_posted_while_unqualifie
             // Totals are printed as the other dialogs print them, without
             // trailing zeros.
             "Total debit: 11200.4  Total credit: 11200.4",
-            "Checked: customer, Sales Accounts ledgers, CGST and state tax by head. Ledger rates not read.",
+            "Checked: customer, Sales Accounts ledgers, CGST and state tax per line at the ledger's rate.",
             batch_line.as_str(),
             "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
             "Do not post a file already imported manually. Pause other edits/imports in this company.",

@@ -6458,15 +6458,19 @@ macro_rules! pilot_queue_block {
 // read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, X
 // the voucher types bounded by the master mark and Y their series-level
 // numbering (both read at the build and again before the approval, 16 Oct 2026),
-// R invoice read-back, Z Tally's answer to the import.
+// R invoice read-back, Z Tally's answer to the import. The queue re-reads the
+// invoice's masters (the block in `pilot_queue_block!`) before its closing
+// profile and the aim marks (#1337).
 const PILOT_ORDER: &str = concat!(
     "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQse",
     "eTsTseeNsNseeCsCseemsmseseeXsXsYsYseseekskseewswseseseesesemsmse",
     "ewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsb",
     "sbseseeQsQseeTsTseeNsNseeCsCseecscseseemsmseseeXsXsYsYseseekskse",
     "emsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeTsTseeNsNse",
-    "eCsCseseemekskseecscseseeewswseewswsemZMseeseseMsMseeWsWseeWsWse",
-    "eMsMseeMsMseeRsRse",
+    "eCsCseseemekskseecscse",
+    // The invoice's masters, read again in the queue after the approval (#1337).
+    pilot_queue_block!(),
+    "seeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
 );
 
 const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
@@ -6608,6 +6612,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
+        'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
         'k' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2.utf16le.xml"),
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
@@ -7084,15 +7089,14 @@ async fn a_voucher_type_that_changed_after_the_approval_is_refused_in_the_queue(
 
 /// A number another voucher took while the approval waited is refused under
 /// the admission's own code, not as a master that moved. SYNTHETIC answer: the
-/// rehearsal's captured answer for a number a Sales voucher carries (another
-/// company's) stands for it.
+/// pilot lab's own answer for a number its book uses (`BP/26-27/0001`, the
+/// first invoice) is served for the read of `BP/26-27/0010`; it stands for a
+/// number taken, and is not Tally's answer to that request.
 #[tokio::test]
 async fn a_number_taken_after_the_approval_is_refused_in_the_queue_under_its_own_code() {
     let run = pilot_post_changed(&[Changed {
         positions: pilot_queue_positions('N'),
-        body: captured(include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-number-known.utf16le.xml"
-        )),
+        body: pilot_text('U'),
     }])
     .await;
     let error = pilot_refused_in_the_queue(

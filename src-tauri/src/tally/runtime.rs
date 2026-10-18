@@ -1805,7 +1805,9 @@ async fn read_invoice_plan(
         ComplianceRead::Standard,
     )
     .await
-    .map_err(|error| with_read_evidence(error, evidence.clone().combine(currency_read.evidence())))?;
+    .map_err(|error| {
+        with_read_evidence(error, evidence.clone().combine(currency_read.evidence()))
+    })?;
     let listing = party_ledger_listing(&currency_read, source, source_evidence);
     evidence = evidence.combine(listing.evidence.clone());
     answers.listing = Some(listing);

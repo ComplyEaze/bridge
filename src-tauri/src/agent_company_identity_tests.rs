@@ -17,8 +17,7 @@ pub(super) fn server(address: std::net::SocketAddr, path: &std::path::Path) -> S
         max_bytes: 200_000,
         redaction: Redaction::None,
         import_enabled: true,
-        writes_enabled: false,
-        batch_post_enabled: false,
+        posting: Posting::Off,
     })
 }
 
@@ -297,7 +296,7 @@ async fn observed_books_from_requires_a_calendar_date_before_company_scoped_read
         );
         let identity = VerifiedCompanyIdentity::from_observed_companies(
             selected.name.clone(),
-            GUID.into(),
+            crate::tally::test_company_guid(GUID),
             selected.company_number.clone().unwrap(),
             selected.books_from.clone().unwrap(),
             &companies,

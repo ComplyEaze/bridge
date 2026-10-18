@@ -26,6 +26,10 @@ mod lab;
 mod bank_statement;
 #[path = "agent_catalog.rs"]
 mod catalog;
+// Nothing calls the pairing view until the import journal is wired to it.
+#[allow(dead_code)]
+#[path = "agent_transfer_pairing.rs"]
+mod transfer_pairing;
 #[cfg(test)]
 use catalog::tool_definitions;
 use catalog::validate_tool_arguments;
@@ -41,8 +45,6 @@ mod company;
 use company::*;
 #[path = "agent_cash_flow.rs"]
 mod cash_flow;
-#[path = "agent_changes.rs"]
-mod changes;
 #[path = "agent_company_features.rs"]
 mod company_features;
 #[path = "agent_gst_status.rs"]
@@ -51,6 +53,8 @@ mod gst_status;
 mod headline;
 #[path = "agent_ledger_candidates.rs"]
 mod ledger_candidates;
+#[path = "agent_month_register.rs"]
+mod month_register;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -86,6 +90,8 @@ use voucher_summary::{SummaryGroup, SummaryRequest};
 mod movement;
 #[path = "agent_register.rs"]
 mod register;
+#[path = "agent_statement_tie_out.rs"]
+mod statement_tie_out;
 #[path = "agent_statements.rs"]
 mod statements;
 #[path = "agent_trial_balance.rs"]
@@ -109,6 +115,8 @@ mod read_profiles;
 use read_profiles::*;
 #[path = "agent_read_cost.rs"]
 mod read_cost;
+#[path = "agent_read_cost_preview.rs"]
+mod read_cost_preview;
 #[path = "agent_voucher_window.rs"]
 mod voucher_window;
 use voucher_window::*;
@@ -215,11 +223,6 @@ fn mark_voucher_party_names(mut voucher: Value) -> Value {
     voucher
 }
 
-fn mark_changed_master_party_name(mut master: Value) -> Value {
-    mark_party_field(&mut master, "name");
-    master
-}
-
 fn open_bill_json(bill: &OpenBillRow) -> Value {
     let mut value = serde_json::to_value(bill).unwrap_or_default();
     mark_party_field(&mut value, "party");
@@ -289,11 +292,48 @@ struct Settings {
     max_bytes: usize,
     redaction: Redaction,
     import_enabled: bool,
-    writes_enabled: bool,
-    /// `BRIDGE_AGENT_ENABLE_BATCH_POST`: lets `post_import` post 2 to 50
-    /// vouchers of one batch in one import. Off by default and not in the
-    /// extension's settings until a live batch post through Bridge is proved.
-    batch_post_enabled: bool,
+    posting: Posting,
+}
+
+/// Whether this server may post to Tally. One setting governs every post: one
+/// voucher per approval, or a saved batch of 2 to 50 under one approval of its
+/// summary (#1090). Off by default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Posting {
+    Off,
+    On,
+    /// Posting is on, but the retired `BRIDGE_AGENT_ENABLE_BATCH_POST` is still
+    /// set. Someone may have set it off on purpose to keep to one voucher at a
+    /// time, so `post_import` refuses in band (`setting_retired`) until it is
+    /// removed, rather than widening posting silently or stopping every tool.
+    RetiredSettingPresent,
+}
+
+impl Posting {
+    /// The posting setting, and whether the retired batch setting is present
+    /// with any value. The retired one matters only while posting is on.
+    fn from_settings(enabled: bool, retired_present: bool) -> Self {
+        match (enabled, retired_present) {
+            (false, _) => Self::Off,
+            (true, true) => Self::RetiredSettingPresent,
+            (true, false) => Self::On,
+        }
+    }
+
+    /// Posting is configured on: the posting tools are listed and reachable,
+    /// even when the retired setting still makes `post_import` refuse.
+    pub(super) fn enabled(self) -> bool {
+        self != Self::Off
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_enabled(enabled: bool) -> Self {
+        if enabled {
+            Self::On
+        } else {
+            Self::Off
+        }
+    }
 }
 
 impl Settings {
@@ -328,7 +368,8 @@ impl Settings {
             #[cfg(unix)]
             DirectoryAdmissionError::Permissions => "agent_data_dir_permissions_failed".to_string(),
         })?;
-        let writes_enabled = enabled_setting("BRIDGE_AGENT_ENABLE_WRITES")?;
+        let posting = posting_from_env(process_variable)?;
+        let writes_enabled = posting.enabled();
         Ok(Self {
             endpoint,
             data_dir,
@@ -336,21 +377,70 @@ impl Settings {
             max_bytes,
             redaction,
             import_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_IMPORT")? || writes_enabled,
-            writes_enabled,
-            // Validated even when posting is off, so a typo never hides.
-            batch_post_enabled: enabled_setting("BRIDGE_AGENT_ENABLE_BATCH_POST")?
-                && writes_enabled,
+            posting,
         })
     }
 }
 
 fn enabled_setting(name: &str) -> Result<bool, String> {
     match env::var(name) {
-        Err(env::VarError::NotPresent) => Ok(false),
-        Ok(value) if matches!(value.as_str(), "1" | "true") => Ok(true),
-        Ok(value) if matches!(value.as_str(), "0" | "false") => Ok(false),
-        _ => Err("boolean_setting_invalid".into()),
+        Err(env::VarError::NotPresent) => boolean_setting(None),
+        Ok(value) => boolean_setting(Some(&value)),
+        Err(env::VarError::NotUnicode(_)) => Err("boolean_setting_invalid".into()),
     }
+}
+
+/// A boolean setting's raw value: absent is off, and anything but `true`,
+/// `false`, `1` or `0` fails loud.
+fn boolean_setting(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        None => Ok(false),
+        Some("1" | "true") => Ok(true),
+        Some("0" | "false") => Ok(false),
+        Some(_) => Err("boolean_setting_invalid".into()),
+    }
+}
+
+/// The version of the posting consent the extension's setting asks for. The
+/// manifest names the setting after it (`enable_posting_2026_10`), so a change
+/// in what posting covers means a new setting and a new prompt: a "true" stored
+/// for the old one-voucher setting cannot stand for batch posting. A test ties
+/// the key and its placeholder to `packaging/mcpb/manifest.json`.
+#[cfg(test)]
+pub(super) const POSTING_SETTING_KEY: &str = "enable_posting_2026_10";
+const POSTING_PLACEHOLDER: &str = "${user_config.enable_posting_2026_10}";
+/// Retired 12 Oct 2026: batch posting follows the posting setting.
+const RETIRED_BATCH_POST_SETTING: &str = "BRIDGE_AGENT_ENABLE_BATCH_POST";
+
+/// The posting setting's raw value. An upgrade stores nothing for the new key,
+/// so a host may pass its placeholder unresolved, or an empty string: both read
+/// as off, so the upgrader starts with posting off and every read keeps working.
+/// Anything else that is not a plain boolean still fails loud.
+fn posting_setting(value: Option<&str>) -> Result<bool, String> {
+    match value {
+        Some("" | POSTING_PLACEHOLDER) => Ok(false),
+        other => boolean_setting(other),
+    }
+}
+
+fn process_variable(name: &str) -> Option<std::ffi::OsString> {
+    env::var_os(name)
+}
+
+/// The posting setting and whether the retired batch setting is present, read
+/// through `var`: the process environment in `Settings::from_env`, a map in tests.
+fn posting_from_env(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<Posting, String> {
+    let writes = var("BRIDGE_AGENT_ENABLE_WRITES")
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| "boolean_setting_invalid".to_string())
+        })
+        .transpose()?;
+    Ok(Posting::from_settings(
+        posting_setting(writes.as_deref())?,
+        var(RETIRED_BATCH_POST_SETTING).is_some(),
+    ))
 }
 
 fn tally_port(value: Option<String>) -> Result<u16, String> {
@@ -794,6 +884,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(cash_flow.code());
         }
+        if let Some(register) = cause
+            .downcast_ref::<bridge_tally_protocol::native_month_register::NativeMonthRegisterError>()
+        {
+            return Some(register.code());
+        }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
         {
@@ -853,6 +948,12 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// This never softens a refusal — it only says what to do about one.
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        "setting_retired" => Some(
+            "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
+             setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \
+             2 to 50. Remove BRIDGE_AGENT_ENABLE_BATCH_POST from ComplyEaze Bridge's environment \
+             and start it again. Nothing was sent to Tally.",
+        ),
         "terms_not_accepted" => Some(
             "ComplyEaze Bridge is off until you accept its Terms of Use. Only you can accept \
              them, not the assistant: read the Terms of Use linked in the ComplyEaze Bridge \
@@ -942,6 +1043,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "`as_of` selects the date `party_gstin` is read as of, which only \
              fields=compliance returns. Pass fields=compliance, or drop `as_of`: a basic \
              read's opening balance is dated by `opening_balance_as_of`, not by `as_of`.",
+        ),
+        "ledger_masters_gst_details_requires_compliance" => Some(
+            "`include_gst_details` adds each ledger's dated GST rate details, which only \
+             fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
         ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
@@ -1344,21 +1449,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
              earlier invoice it posted in this company and verified, and Tally did not return \
              it, so the read cannot be trusted here and the build is refused. The detail names \
-             that invoice's batch. Run verify_import on it. If it then stops the company, or \
-             it was released earlier, tell the user to check the invoice in Tally and call \
-             acknowledge_post_review with that batch_id and doubt invoice_stop: if a fresh read \
-             shows the invoice gone (deleted or re-dated in Tally, or the books restored), a \
-             native dialog asks the user, and nothing but their answer stops that invoice \
-             being the check. If the read still shows the invoice, or verify_import reads it \
-             posted and verified, Tally holds it and the number check does not work on this \
-             book: stop, tell the user, and do not post this invoice through ComplyEaze \
-             Bridge."),
-        "ack_stop_release_stands" => Some(
-            "This batch was released earlier after a read that found its invoice, and a fresh \
-             read does not show the invoice gone (or could not be made for a cause no wait \
-             cures), so nothing was asked or recorded. If the user says the invoice is not in \
-             Tally while the read still shows it, trust neither: do not post invoices for this \
-             company through ComplyEaze Bridge, and tell the user.",
+             the batch that posted that invoice. Run verify_import on it. If it no longer reads \
+             verified, it no longer checks new numbers, and a batch ComplyEaze Bridge sent then \
+             stops the company's invoices until the user releases it (invoice_company_stopped \
+             says how). If it still reads \
+             posted and verified, Tally holds the invoice and the number check does not work on \
+             this book: stop, tell the user, and do not post this invoice through ComplyEaze \
+             Bridge.",
         ),
         "invoice_company_stopped" => Some(
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \
@@ -1369,12 +1466,6 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              user to check that invoice in Tally, then call acknowledge_post_review with that \
              batch_id and doubt invoice_stop (available when posting is enabled): a native \
              dialog asks the user, and nothing but their answer releases the stop.",
-        ),
-        "ack_stop_tally_unreadable" => Some(
-            "A release is recorded with what ComplyEaze Bridge can see of the invoice in \
-             Tally, and the read could not be completed (Tally not answering, or the company not \
-             open). Nothing was recorded and no dialog was shown. Ask the user to open the \
-             company in Tally and call again. Such a Tally cannot post an invoice either."
         ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \
@@ -1450,14 +1541,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              issue a tax invoice on this date: it needs exactly one GST registration in force \
              on the invoice date, of type Regular and not inactive, whose GSTIN is valid and \
              belongs to the registration's state. The code names which of these failed. \
-             Nothing was written. Ask the user to check the company's GST registration \
+             Nothing was sent to Tally. Ask the user to check the company's GST registration \
              details in Tally, and the date they apply from, then build again. Do not change \
              the invoice's date or figures to get past this.",
         ),
         "invoice_company_registration_unread" | "invoice_tax_unit_without_guid" => Some(
             "Tally's answer about the company's GST registrations could not be read: it \
              listed no tax unit at all, or a unit without its identifier. Nothing was \
-             written. Check that the company is still open in Tally, then build again; if it \
+             sent to Tally. Check that the company is still open in Tally, then build again; if it \
              repeats, report it rather than retrying.",
         ),
         "invoice_party_registration_type_not_reported" => Some(
@@ -1499,6 +1590,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // either end of that (#1268).
         "invalid_date" | "invalid_date_range" | "tally_date_overflow" | "tally_date_underflow" => {
             Some(DATE_REMEDIATION)
+        }
+        // One next step for both numbering refusals (bridge#724): a batch that
+        // holds a voucher type of each is named
+        // `import_voucher_numbering_not_automatic`.
+        "import_voucher_numbering_not_automatic" | "import_voucher_numbering_not_retain" => {
+            Some(agent_import::POST_NUMBERING_NEXT_STEP)
         }
         _ => None,
     }
@@ -1720,6 +1817,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::CompanyFeaturesReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::MonthRegisterReadError>()
         }) {
             error.safe_code()
         } else if error.chain().any(|cause| {
@@ -2301,16 +2402,16 @@ impl Server {
         if let Some(code) = self.terms.refusal() {
             return Err(code.to_string().into());
         }
-        if name == "changed_since" {
-            return Err("changed_since_unqualified".to_string().into());
-        }
         if matches!(name, "build_import_xml" | "parse_bank_statement") {
             self.import_enabled()?;
         }
         if matches!(name, "post_import" | "acknowledge_post_review")
-            && !self.settings.writes_enabled
+            && !self.settings.posting.enabled()
         {
             return Err("import_posting_disabled".to_string().into());
+        }
+        if name == "post_import" && self.settings.posting == Posting::RetiredSettingPresent {
+            return Err("setting_retired".to_string().into());
         }
         #[cfg(feature = "lab-writes")]
         if matches!(
@@ -2328,7 +2429,6 @@ impl Server {
                 self.build_import_xml(args).await
             }
             "cash_flow" => self.cash_flow(args).await,
-            "changed_since" => self.changed_since(args).await,
             "company_features" => self.company_features(args).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
             "gst_status" => self.gst_status(args).await,
@@ -2349,6 +2449,7 @@ impl Server {
             }
             "local_data_report" => self.local_data_report().map_err(Into::into),
             "masters" => self.masters(args).await,
+            "month_register" => self.month_register(args).await,
             "outstandings" => self.outstandings(args).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
@@ -2359,6 +2460,7 @@ impl Server {
             "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
             "sales_register" => self.register(register::RegisterKind::Sales, args).await,
+            "statement_tie_out" => self.statement_tie_out(args).await,
             "stock_summary" => self.stock_summary(args).await,
             "tally_status" => {
                 let (result, evidence) = self.status().await?;
@@ -2373,6 +2475,7 @@ impl Server {
             "validate_masters" => self.validate_masters(args).await,
             "verify_import" => self.verify_import(args).await,
             "voucher_presence" => self.voucher_presence(args).await,
+            "voucher_read_cost" => self.voucher_read_cost(args).await,
             "voucher_schema" => self.voucher_schema().map_err(Into::into),
             "vouchers" => self.vouchers(args).await,
             #[cfg(feature = "lab-writes")]
@@ -2513,8 +2616,7 @@ pub(crate) async fn desktop_selected_vouchers(
             // continues to apply its independently configured response policy.
             redaction: Redaction::None,
             import_enabled: false,
-            writes_enabled: false,
-            batch_post_enabled: false,
+            posting: Posting::Off,
         },
         runtime.clone(),
     );
@@ -2813,8 +2915,10 @@ fn corroborate_empty_voucher_window(
     if !widened_rows.is_empty() {
         // Boundary-day rows only prove that this wider read returned *some*
         // data. They provide no independent cardinality for the nonempty
-        // response, so they cannot promote the original empty window.
-        return Ok((true, Some("nonempty_uncorroborated")));
+        // response, so they cannot promote the original empty window. The
+        // reason names the wider read as the nonempty one: the window's own
+        // read found nothing.
+        return Ok((true, Some("empty_window_wider_read_nonempty")));
     }
     match company_high_water {
         Some(0) => Ok((false, Some("company_has_no_vouchers"))),
@@ -2916,6 +3020,15 @@ fn optional_string(args: &Value, key: &str) -> Result<Option<String>, String> {
     match args.get(key) {
         None => Ok(None),
         Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("argument_invalid:{key}")),
+    }
+}
+/// An optional argument that must be a real JSON boolean: a string or a number
+/// is `argument_invalid:<key>`, never read as true or false.
+fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
+    match args.get(key) {
+        None => Ok(None),
+        Some(Value::Bool(value)) => Ok(Some(*value)),
         Some(_) => Err(format!("argument_invalid:{key}")),
     }
 }

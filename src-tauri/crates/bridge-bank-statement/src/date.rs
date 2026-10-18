@@ -45,6 +45,33 @@ impl Date {
         )
     }
 
+    /// The following calendar day; `None` past the last year a date can hold.
+    pub fn next_day(self) -> Option<Self> {
+        if self.day < days_in_month(self.year, self.month) {
+            Self::new(self.year, self.month, self.day + 1)
+        } else if self.month < 12 {
+            Self::new(self.year, self.month + 1, 1)
+        } else {
+            Self::new(self.year.checked_add(1)?, 1, 1)
+        }
+    }
+
+    /// The preceding calendar day; `None` before the first year a date can hold.
+    pub fn previous_day(self) -> Option<Self> {
+        if self.day > 1 {
+            Self::new(self.year, self.month, self.day - 1)
+        } else if self.month > 1 {
+            Self::new(
+                self.year,
+                self.month - 1,
+                days_in_month(self.year, self.month - 1),
+            )
+        } else {
+            let year = self.year.checked_sub(1)?;
+            Self::new(year, 12, 31)
+        }
+    }
+
     /// Strict `YYYY-MM-DD`.
     pub fn parse_iso(text: &str) -> Option<Self> {
         static ISO: LazyLock<Regex> =

@@ -471,10 +471,10 @@ book's path (from the code); a larger book's census cost was not measured here.
 - The `vouchers` call on the census book sent the same requests as a build without #1020, in the
   same order, with the same request hashes and response sizes.
 - On `5797c9ec`, an empty day read `partial` on both books, as before #1020:
-  `empty_uncorroborated` on the census book, and `nonempty_uncorroborated` on the other. From the
-  code, not the run: that reason is returned when the read widened by a day on each side finds
-  rows, none inside the window, so it names the neighbouring days, not the window, which returned
-  no row; the wording is a separate matter.
+  `empty_uncorroborated` on the census book, and, on the other, `nonempty_uncorroborated`
+  (the reason as observed; since renamed `empty_window_wider_read_nonempty`). From the code, not the run: that reason is returned when
+  the read widened by a day on each side finds rows, none inside the window, so it names the
+  neighbouring days, not the window, which returned no row; the name says so.
 
 **The read-back after a post.** One synthetic Journal, posted through `build_import_xml`,
 `post_import` and `verify_import`, on a lab book with one currency and a voucher mark of 1,794, so
@@ -523,8 +523,9 @@ export to the same instance returned `STATUS 1` promptly, with no dialog.
 
 Only `ledgers_v1` was observed. Two things are **inferred**: that the other builders using the same
 construct raise it too, and that the space in the argument is the cause. Those builders are every
-`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`:
-`vouchers_v2`/`v3`, the ledger canary and the period-balance report.
+`function-argument-with-space` entry of `scripts/check-tally-request-builder-hazards.mjs`: the
+ledger canary. (`vouchers_v2`, which this list once named, was deleted 2026-10-12, Part of #1570.
+The period-balance report it named: this read was removed by #1643; see #1642.)
 
 All of them are refused **before sending** once Bridge knows the endpoint is in Education, with
 `education_report_family_unsupported`. Admission is unchanged: nothing is sent, and nothing is
@@ -533,19 +534,22 @@ promoted.
 - **Sync period-balance tie-out.** Reads the mode from the `CompanyListV2` identity read that
   already precedes it, or from the run's own probe. The run carries on and records
   `report_tie_out_unavailable` and `education_report_family_unsupported`. A later window's
-  successful report clears the second code, as it does the other tie-out codes.
+  successful report clears the second code, as it does the other tie-out codes. (2026-10-12: this
+  read was removed by #1643; see #1642.)
 - **Selected-ledger and selected-voucher qualifiers.** Deleted with the rest of their runtime
   path (bridge#732; ADR 0015's 2026-09-26 amendment): no command or tool reached them.
 - **The live-read tool.** Takes its mode from its configuration; it does not observe it. In
-  Education, the ledger step is recorded as failed with `education_report_family_unsupported`, and
-  the voucher steps as not attempted.
+  Education, the ledger step is recorded as failed with `education_report_family_unsupported`. Its
+  two voucher steps were deleted 2026-10-12 (Part of #1570), so the run ends after the ledger step.
   - **Residual:** a run configured as `Licensed` against an endpoint that is actually in Education
     still sends `ledgers_v1`. The tool's company read (`CompanyListV1`) carries no `EDUMODE`. Moving
     it to an observed mode means changing its profile sequence, which is not done here.
 - **The native-outstandings qualification.** Accepts only an Education configuration, and its
   identity brackets read through `ledgers_v1`. It therefore refuses on load, so the tool **cannot
   run** until Phase 2 Unit A.
-- **`groups_request`.** Has no production caller, and compiles only for tests.
+- **`groups_request`.** Had no production caller and compiled only for tests. Deleted 2026-10-12
+  together with the Bridge-schema group and voucher-type parsers that read its
+  answer; core groups come from the native group collection.
 
 Reading ledgers and vouchers in Education waits for the Collection-based profiles (Phase 2 Unit A,
 `IMPROVEMENT_PLAN_2026H2.md` §8.12).
@@ -1247,9 +1251,6 @@ a partition can increase total wall-clock even as it reduces peak payload.
 Deadline planning must therefore model a book-dependent fixed scan cost separately from
 serialization, and subdivision must be justified by payload, not by time.
 
-> A separate stability hazard observed during this work is recorded privately rather than
-> here, per the project's handling of crash triggers.
-
 ### 12a.9 A ledger GUID survived an observed UI rename — coverage must compare GUID to name
 
 `LedgerOpeningCoverageV1` was captured immediately before and after renaming one ledger
@@ -1576,14 +1577,14 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 
 ### 12a.19 A company's GST registration is a tax unit, with dated rows
 
-**PARTIAL: VERIFIED 2026-10-09, licensed TallyPrime 7.1 Silver**, one synthetic company (`BRIDGE PILOT LAB`) with one GST registration, read by an outside contributor. The `TaxUnit` answer described in the second bullet was read after the registration was entered and before any voucher was keyed, to the code's collection typed by hand from the text in #1342's request list and sent as UTF-8, where ComplyEaze Bridge sends UTF-16 (`pilot-lab-tax-units-typed-request.utf8.xml`, `pilot-lab/PROVENANCE.md`). Each other read is placed in the lab sitting by the bullet that uses it.
+**PARTIAL: VERIFIED 2026-10-09, licensed TallyPrime 7.1 Silver**, one synthetic company (`BRIDGE PILOT LAB`) with one GST registration, read by an outside contributor. The `TaxUnit` answer described in the second bullet was read after the registration was entered and before any voucher was keyed, to the code's collection typed by hand from the text in #1342's request list and sent as UTF-8, where ComplyEaze Bridge sends UTF-16 (that answer is not kept in this tree; `pilot-lab/PROVENANCE.md` says why). Each other read is placed in the lab sitting by the bullet that uses it.
 
 - **The company's own row holds no registration (VERIFIED, two captures).** A `Company` collection with `NATIVEMETHOD *`, read before and after the registration was entered, differed only in the `CMPINFO` counter `TAXUNIT` (0, then 1); `GSTREGISTRATIONNUMBER` and `GSTREGISTRATIONTYPE` were empty both times. GST was already on (`ISGSTON` Yes) in the first capture, so a company with GST on and no registration was read, but not one with GST off. This agrees with §12a.7's field-listed read.
 - **A `TaxUnit` collection returns the registration (VERIFIED).** With `NATIVEMETHOD *` it returned two rows: `Default Tax Unit` (attribute `TAXTYPE=""`, `ISPRIMARYUNIT` Yes, no registration) and the registration, `Rajasthan Registration` (attributes `TAXTYPE="GST"` and `TAXREGISTRATION` holding the GSTIN; `USEDFOR` GST; `GSTREGNUMBER` the GSTIN). Each row's `GUID` was the company's GUID followed by `-` and a suffix (PARTIAL: two rows of one company). The registration's history is a list of dated rows, `GSTREGISTRATIONDETAILS.LIST`, each with `FROMDATE`, `STATE`, `PLACEOFSUPPLY`, `REGISTRATIONTYPE` (`Regular`) and `ISINACTIVE` (`No`). The unit-level `GSTREGISTRATIONTYPE`, `STATENAME` and dates are empty on the registered unit.
 - **The `CMPINFO` counter `TAXUNIT` is not a count of units.** It read 1 beside two rows in this answer, and 14, then 22, in reads of the same book after vouchers were keyed; the two tax-unit answers read after ten vouchers were keyed (`pilot-lab-tax-units` and `pilot-lab-tax-units-fields`) read 0 beside the same two rows. What moved it is not known.
 - **What ComplyEaze Bridge does (ADR 0004, slice 1).** The Sales build reads the tax units and refuses an invoice unless exactly one GST unit is in force on the invoice date: the unit's latest dated row on or before that date is not inactive, says `Regular`, and names a state that the unit's GSTIN, valid and equal to `TAXREGISTRATION`, carries. A unit with an earlier GSTIN recorded (`GSTOLDREGNUMBER`, empty here; that a change fills it is assumed from its name) is refused, because the GSTIN is held once per unit and is not dated. A row whose GUID is not the company's refuses the answer, and an answer with no unit at all is a failed read. The registration's state replaces the company's `STATENAME` as the supplier's state.
 - **The code's own request, answered (VERIFIED, 9 Oct 2026, after ten vouchers were keyed and before the invoice was imported).** Sent in UTF-16 as ComplyEaze Bridge sends it, the request returned the same two rows and the same registration, and the build admitted an invoice on it. A narrower request that fetches only `GUID`, `TAXTYPE`, `TAXREGISTRATION`, `USEDFOR`, `GSTREGNUMBER`, `GSTOLDREGNUMBER` and the registration's dated rows returned the same values for those fields. Both answers are in the `pilot-lab` fixtures.
-- **Not measured:** a company with GST off (the company's GST flag is not read), or with no registration; how Tally writes an inactive or composition registration, or a changed GSTIN; two loaded companies (whether `TaxUnit`, like `Company`, ignores `SVCURRENTCOMPANY`); several registrations; another company's units; a voucher type bound to a tax unit (`TAXUNITNAME`, `Any` on the lab's Sales type); Gold, Education, other releases; a client book.
+- **Not measured:** a company with GST off (the company's GST flag is not read), or with no registration; how Tally writes an inactive or composition registration, or a changed GSTIN; two loaded companies (whether `TaxUnit`, like `Company`, ignores `SVCURRENTCOMPANY`); several registrations; another company's units; a voucher type bound to a tax unit (`TAXUNITNAME`, `Any` on the lab's Sales type); Gold, Education, other releases; a real book (not a lab book).
 
 ## 13. Open questions
 

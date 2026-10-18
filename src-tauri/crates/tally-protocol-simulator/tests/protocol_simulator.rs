@@ -396,14 +396,22 @@ fn product_status_catalog_covers_prime_erp9_and_unknown() {
 
 #[test]
 fn utf8_bom_and_both_utf16_endiannesses_have_identical_text() {
-    let source = Fixture::NormalExport.body().into_owned();
+    // Native-shaped export text with Devanagari, a rupee sign, an escaped
+    // ampersand and a character outside the BMP (a UTF-16 surrogate pair).
+    let fixture = Fixture::SyntheticXml(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA>\
+         <COLLECTION><LEDGER NAME=\"BVL \u{90f}\u{92a}\u{94d}\u{938}\u{93f}\u{932}\u{949}\u{928} \u{20b9} R&amp;D \u{1f4b0}\">\
+         <PARENT TYPE=\"String\">Sundry Debtors</PARENT></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>"
+        .to_string(),
+    );
+    let source = fixture.body().into_owned();
     for encoding in [
         WireEncoding::Utf8,
         WireEncoding::Utf8Bom,
         WireEncoding::Utf16Le,
         WireEncoding::Utf16Be,
     ] {
-        let plan = ScenarioPlan::new(Fixture::NormalExport).with_encoding(encoding);
+        let plan = ScenarioPlan::new(fixture.clone()).with_encoding(encoding);
         let bytes = plan.response_bytes();
         assert_eq!(decode(&bytes).expect("decode supported encoding"), source);
 
@@ -585,21 +593,6 @@ fn delayed_reset_after_processing_is_explicitly_ambiguous() {
 }
 
 #[test]
-fn synthetic_json_reference_contains_selected_xml_fixture_values() {
-    let xml = Fixture::NormalExport.body();
-    let json: serde_json::Value =
-        serde_json::from_str(&Fixture::SyntheticJsonSemanticReference.body())
-            .expect("valid synthetic JSON reference");
-
-    assert!(xml.contains(json["company"]["guid"].as_str().unwrap()));
-    assert!(xml.contains(json["company"]["name"].as_str().unwrap()));
-    let ledger = &json["ledgers"][0];
-    for field in ["name", "opening_balance", "parent", "guid"] {
-        assert!(xml.contains(ledger[field].as_str().unwrap()));
-    }
-}
-
-#[test]
 fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
     let empty = Fixture::EmptyExport.body();
     assert!(empty.contains("<RECORDCOUNT>0</RECORDCOUNT>"));
@@ -615,32 +608,6 @@ fn scoped_export_metadata_scenarios_are_explicit_and_minimized() {
     let duplicate = Fixture::DuplicateExportMetadata.body();
     assert!(duplicate.contains("SCHEMA=\"bridge.tally.ledgers/1\""));
     assert!(duplicate.contains("<SCHEMA>bridge.tally.ledgers/1</SCHEMA>"));
-
-    let voucher = Fixture::VoucherExport.body();
-    assert!(voucher.contains("SCHEMA=\"bridge.tally.vouchers/2\""));
-    assert!(voucher.contains("OBJECTTYPE=\"VOUCHER\""));
-    for forbidden in [
-        "NARRATION",
-        "ADDRESS",
-        "EMAIL",
-        "PHONE",
-        "MOBILE",
-        "PINCODE",
-    ] {
-        assert!(!voucher.contains(forbidden));
-    }
-}
-
-#[test]
-fn inconsistent_date_filter_fixture_returns_a_row_outside_its_declared_window() {
-    let xml = Fixture::InconsistentDateFilter.body();
-    assert_eq!(
-        element_values(&xml, b"DATE").unwrap(),
-        vec!["20260630".to_string()]
-    );
-    assert!(xml.contains("FROMDATE=\"20260701\""));
-    assert!(xml.contains("TODATE=\"20260731\""));
-    assert!(assert_well_formed(&xml).is_ok());
 }
 
 #[test]
@@ -657,8 +624,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::EmptyExport,
         Fixture::DuplicateIdentity,
         Fixture::WrongCompany,
-        Fixture::VoucherExport,
-        Fixture::InconsistentDateFilter,
         Fixture::RecordCountMismatch,
         Fixture::MalformedExportMetadata,
         Fixture::DuplicateExportMetadata,
@@ -668,7 +633,6 @@ fn entire_corpus_is_synthetic_and_contains_no_local_identity_markers() {
         Fixture::ImportPartial,
         Fixture::MalformedXml,
         Fixture::TruncatedXml,
-        Fixture::SyntheticJsonSemanticReference,
         Fixture::UnsupportedCapability,
     ];
     for fixture in fixtures {

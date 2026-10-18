@@ -76,8 +76,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha1::{Digest, Sha1};
-
 use crate::book::{voucher_keys, Book, Voucher, VoucherKey};
 use crate::depreciation::civil_day_number;
 use crate::error::{AuditError, Result};
@@ -85,7 +83,7 @@ use crate::findings::{Confidence, EvidenceRef, Finding, TestResult, Unit, Value}
 use crate::ledger_ids::stable_ledger_tag;
 use crate::read::Window;
 use crate::rules::Rules;
-use crate::support::{overflow, py_repr_str, rupees, voucher_label};
+use crate::support::{hash8, overflow, py_repr_str, rupees, voucher_label};
 use crate::tds_payees::py_format_g;
 use crate::PartnersConfig;
 
@@ -276,12 +274,6 @@ ledger",
         }
     }
     Ok(())
-}
-
-/// The reference's `_hash`: the first 8 hex characters of the key's SHA-1.
-fn hash8(key: &str) -> String {
-    let digest = Sha1::digest(key.as_bytes());
-    crate::canonical::hex(&digest)[..8].to_string()
 }
 
 /// `numerator / denominator` rounded half-up; 0 when either is not positive.
@@ -2134,6 +2126,26 @@ remuneration in each voucher named here and the TDS on each.";
         // Either key alone runs.
         let one = "[p30395]\ncapital_ledgers = [\"A Capital\"]\n";
         assert!(run(&book, &rules, &year(), "firm", &cfg(one), &BTreeSet::new()).is_ok());
+    }
+
+    /// A partner's figures carry the first eight hex digits of the sha1 of its key as written
+    /// (`hashlib.sha1(b"PartnerA").hexdigest()[:8]`, measured in Python; mixed case on purpose, so
+    /// a tag that folds case is caught).
+    #[test]
+    fn a_partners_figure_id_carries_the_sha1_tag_of_its_key_as_written() {
+        let mut book = Book {
+            vouchers: Vec::new(),
+            ..unreadable_book()
+        };
+        book.ledgers
+            .insert("A Capital".to_string(), ledger("A Capital"));
+        let rules = Rules::vendored().unwrap();
+        let one = "[PartnerA]\ncapital_ledgers = [\"A Capital\"]\n";
+        let r = run(&book, &rules, &year(), "firm", &cfg(one), &BTreeSet::new()).unwrap();
+        assert!(r
+            .figures
+            .iter()
+            .any(|f| f.id == "partners_40b_194t.capital_opening_8a0577f9"));
     }
 
     #[test]

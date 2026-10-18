@@ -52,12 +52,9 @@ result. It makes no write, import, telemetry, or snapshot request.
 Use no customer or personal data. In Tally Education, create or load a
 disposable company whose name exactly matches the reviewed `company_marker` in
 [`fixtures/education-small-v1.json`](./fixtures/education-small-v1.json). Add at
-least one synthetic ledger and at least one synthetic voucher dated 1 or 2
-April 2026. Exactly one ledger must use the reviewed `ledger_sentinel`, and
-exactly one voucher must use the reviewed `voucher_number_sentinel`. Keep all
-counts within the reviewed minimum and maximum bounds and keep 3 April 2026
-empty. The 1st and 2nd are documented Education
-voucher dates; the controller performs reads only and adds no workaround.
+least one synthetic ledger. Exactly one ledger must use the reviewed
+`ledger_sentinel`. Keep the ledger count within the reviewed minimum and maximum
+bounds. The controller performs reads only and adds no workaround.
 
 From Tally's About page, read the exact Application and Release. Confirm the
 visible operating mode, ODBC state, and locale. Do not infer the release from
@@ -102,11 +99,10 @@ current source surface, commit/dirty state, executable, and Cargo.lock. Network
 reads start only after the exact text is entered, and the source surface is
 revalidated immediately before dispatch. It reads loaded-company metadata,
 requires one unique GUID-bearing match for the reviewed fixture marker, and
-then reads ledgers, an expected-empty voucher range, and an expected-populated
-voucher range. The fixture contract is verified only when the unique ledger and
-voucher sentinels, count bounds, dates, GUID, and company context all pass. A
-marker, sentinel, GUID, company-context, parser, application-status, range,
-timeout, or transport failure stops every later read.
+then reads ledgers. The fixture contract is verified only when the unique ledger
+sentinel, count bounds, GUID, and company context all pass. A marker, sentinel,
+GUID, company-context, parser, application-status, timeout, or transport
+failure stops every later read.
 
 The controller next prints the exact privacy-reduced receipt and a
 receipt-and-output-bound `SAVE ...` challenge. The controller consumes a

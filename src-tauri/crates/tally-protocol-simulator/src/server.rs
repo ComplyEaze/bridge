@@ -22,11 +22,13 @@ const PLAN_DEADLINE: Duration = Duration::from_secs(30);
 const REQUEST_READ_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const MAX_REQUEST_BYTES: usize = 128 * 1024;
 /// A divided agent read replayed end to end (bridge#520) is about ninety legs:
-/// six per paired read, plus the identity and ledger legs around them. An
-/// invoice built and then posted is about 430: each read is bracketed by
-/// status probes and company lists, the post reads the book again, and the
-/// endpoint queue reads the invoice's masters once more under its lock.
-pub const MAX_SEQUENCE_REQUESTS: usize = 512;
+/// six per paired read, plus the identity and ledger legs around them. A post
+/// held across two calls and then sent is about 170: each pass reads its voucher
+/// numbering before the approval (bridge#724). An invoice built and then posted
+/// is about 402: each read is bracketed by status probes and company lists, the
+/// build and the post each read the voucher numbering, and the post reads the
+/// book again.
+pub const MAX_SEQUENCE_REQUESTS: usize = 420;
 
 /// The payload of the `TimedOut` error returned when no request reached a plan
 /// within the accept deadline: `plan` is its zero-based place in a sequence of
@@ -117,8 +119,10 @@ impl std::error::Error for RefusedRequest {}
 pub struct ObservedRequest {
     pub method: String,
     pub path: String,
-    /// Sanitized transport metadata used by integration tests. The simulator
-    /// never retains arbitrary request headers or the request body.
+    /// The request body as received, for a test that must see which dates or
+    /// names a request carried. Headers are never retained.
+    pub request_body: Vec<u8>,
+    /// Sanitized transport metadata used by integration tests.
     pub request_content_type_is_tally_xml_utf16: bool,
     pub request_content_type_is_plain_tally_xml: bool,
     pub bytes_received: usize,
@@ -519,6 +523,7 @@ fn observe(request: &[u8], cancelled: bool) -> ObservedRequest {
         request_content_type_is_tally_xml_utf16: has_tally_xml_utf16_content_type(request),
         request_content_type_is_plain_tally_xml: has_plain_tally_xml_content_type(request),
         bytes_received: request.len(),
+        request_body: request_body.to_vec(),
         request_body_bytes: request_body.len(),
         request_body_sha256: hex::encode(Sha256::digest(request_body)),
         request_body_sha256_without_reference_date: hex::encode(Sha256::digest(
@@ -804,11 +809,6 @@ fn response_headers(plan: &ScenarioPlan, body_len: usize) -> String {
     let charset = match plan.encoding {
         WireEncoding::Utf16Le | WireEncoding::Utf16LeNoBom | WireEncoding::Utf16Be => {
             "; charset=utf-16"
-        }
-        WireEncoding::Utf8 | WireEncoding::Utf8Bom
-            if plan.fixture.content_type() == "application/json" =>
-        {
-            "; charset=utf-8"
         }
         WireEncoding::Utf8 | WireEncoding::Utf8Bom => "; charset=utf-8",
     };

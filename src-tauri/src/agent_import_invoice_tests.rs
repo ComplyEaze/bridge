@@ -1,4 +1,5 @@
 use super::*;
+use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 use crate::agent::agent_import::VoucherType;
 use serde_json::json;
 
@@ -206,7 +207,7 @@ fn structure_admits_the_plain_invoice_and_refuses_each_defect() {
         Ok(())
     );
     // Outside GST rule 46(b): a space, a period, an underscore, over 16 characters.
-    for bad in ["INV 0042", "INV.0042", "INV_0042", "12345678901234567"] {
+    for bad in ["INV 0042", "INV.0042", "INV_0042", &"1".repeat(17)] {
         assert_eq!(
             mutated(&|v| v.voucher_number = Some(bad.into())),
             "invoice_number_invalid",
@@ -681,11 +682,16 @@ fn observed() -> InvoiceObserved {
 fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     let mut v = voucher();
     v.invoice.as_mut().unwrap().observed = Some(observed());
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let xml =
         render_sales_invoice_xml(&v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
-    let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"11111111-1111-1111-1111-111111111111\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11800.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11800.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
-    assert_eq!(xml, expected.replace("@GSTIN@", GSTIN_RJ));
+    let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"@ID@\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11800.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11800.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
+    assert_eq!(
+        xml,
+        expected
+            .replace("@GSTIN@", GSTIN_RJ)
+            .replace("@ID@", &id.to_string())
+    );
     assert!(
         !xml.contains("ALLLEDGERENTRIES"),
         "an invoice view silently drops ALLLEDGERENTRIES"
@@ -713,7 +719,7 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     let mut v = voucher();
     v.entries[0].ledger = "A & B \"Co\" <x>".to_string();
     v.invoice.as_mut().unwrap().observed = Some(observed());
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
     assert!(!xml.contains("A & B"));
     assert!(xml.contains("A &amp; B"));
@@ -812,7 +818,7 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
     seen.party_registration_type = "Unregistered/Consumer".to_string();
     seen.party_bill_wise = false;
     v.invoice.as_mut().unwrap().observed = Some(seen);
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
     assert!(!xml.contains("PARTYGSTIN"));
     assert!(xml.contains("<GSTREGISTRATIONTYPE>Unregistered/Consumer</GSTREGISTRATIONTYPE>"));
@@ -829,7 +835,7 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// attributes Tally adds, wrapped as a collection response. Built from the
 /// renderer, so what is written and what is compared cannot drift apart.
 fn readback_xml(v: &ImportVoucher) -> String {
-    let id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+    let id = sentinel_uuid(0x1a);
     let rendered =
         render_sales_invoice_xml(v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
     let voucher = rendered
@@ -1174,13 +1180,14 @@ fn the_approval_digest_binds_every_invoice_field_and_leaves_other_vouchers_alone
 /// a hand-keyed invoice read back on the lab; the party GSTIN and the New Ref
 /// allocation were on no invoice read when it was written, and were assumed. It checks the
 /// comparison against a layout this module's renderer did not produce. The
-/// rehearsal's captured read-backs are compared in the test after it. Names
+/// pilot lab's captured read-back is compared in the test after it. Names
 /// and numbers are synthetic.
 #[test]
 fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
+    let remote_id = sentinel_uuid(0x2b);
     let xml = format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO><COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
-<VOUCHER REMOTEID=\"22222222-2222-2222-2222-222222222222\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
+<VOUCHER REMOTEID=\"{remote_id}\" VCHKEY=\"k\" VCHTYPE=\"Sales\" OBJVIEW=\"Invoice Voucher View\">\
 <DATE TYPE=\"Date\">20260310</DATE><EFFECTIVEDATE TYPE=\"Date\">20260310</EFFECTIVEDATE><REFERENCEDATE TYPE=\"Date\">20260310</REFERENCEDATE>\
 <GUID TYPE=\"String\">g-1</GUID><PARTYGSTIN TYPE=\"String\">{GSTIN_RJ}</PARTYGSTIN><STATENAME TYPE=\"String\">Rajasthan</STATENAME>\
 <PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><VOUCHERTYPENAME TYPE=\"String\">Sales</VOUCHERTYPENAME><PARTYLEDGERNAME TYPE=\"String\">Customer A</PARTYLEDGERNAME>\
@@ -1206,12 +1213,10 @@ fn a_hand_authored_export_of_a_registered_bill_wise_invoice_reads_back_clean() {
     assert_eq!(differences(&v, &stray), vec!["bill_allocation"]);
 }
 
-/// One of the Sales rehearsal's captured read-backs (the `sales-rehearsal`
-/// set; its PROVENANCE table is beside the fixtures), decoded and compared
-/// with `expected` as a post compares them. In the registered customer's two
-/// read-backs the GSTIN is a substituted token (that table says so), so its
-/// comparison there shows the element is read, not what Tally stored.
-fn rehearsal_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<String> {
+/// The pilot lab's captured read-back of the invoice its book took (the
+/// `pilot-lab` set; its PROVENANCE table is beside the fixtures), decoded and
+/// compared with `expected` as a post compares them.
+fn pilot_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<String> {
     let xml = String::from_utf16(
         &bytes
             .chunks_exact(2)
@@ -1225,136 +1230,44 @@ fn rehearsal_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> 
     }
 }
 
-/// An invoice of the rehearsal, written here from its build plan and from what
-/// the build recorded as observed: the keyed `Sales Manual` type, the lab
-/// company's customers and ledgers. The narration is left out; the comparison
-/// does not read it.
-fn rehearsal_invoice(
-    (number, date): (&str, &str),
-    party: &str,
-    registered_bill_wise: bool,
-    credits: &[(&str, &str)],
-    total: &str,
-) -> ImportVoucher {
-    let round_off = credits
-        .iter()
-        .find(|(ledger, _)| *ledger == "Round Off")
-        .map(|(ledger, _)| ledger.to_string());
-    let mut entries = vec![entry(party, total, EntrySide::Dr)];
-    entries.extend(
-        credits
-            .iter()
-            .map(|(ledger, amount)| entry(ledger, amount, EntrySide::Cr)),
-    );
-    ImportVoucher {
-        bridge_txn_id: "rehearsal".to_string(),
-        date: bridge_tally_core::TallyDate::parse(date.replace('-', "")).expect("a rehearsal date"),
-        voucher_type: VoucherType::Sales,
-        narration: None,
-        reference: None,
-        voucher_number: Some(number.to_string()),
-        invoice: Some(InvoiceDetail {
-            voucher_type_name: "Sales Manual".to_string(),
-            place_of_supply: RAJ.to_string(),
-            round_off_ledger: round_off,
-            observed: Some(InvoiceObserved {
-                voucher_type_guid: "ae1490be-52c5-4544-9ffc-4b7da85f9797-00000106".to_string(),
-                party_gstin: registered_bill_wise.then(|| GSTIN_RJ.to_string()),
-                party_state: RAJ.to_string(),
-                party_registration_type: if registered_bill_wise {
-                    "Regular"
-                } else {
-                    "Unregistered/Consumer"
-                }
-                .to_string(),
-                party_bill_wise: registered_bill_wise,
-                company_state: RAJ.to_string(),
-            }),
-        }),
-        entries,
-    }
+/// The invoice the pilot lab's book took (`BRIDGE Sales`, to its walk-in
+/// customer, unregistered and not bill-wise), numbered `number`, as the build
+/// saved it with what it observed.
+fn pilot_posted(number: &str) -> ImportVoucher {
+    serde_json::from_value(serde_json::json!({
+        "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":number,
+        "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan","round_off_ledger":"BRIDGE Round Off",
+            "observed":{
+                "voucher_type_guid":format!("{}-000000ce", pilot_lab_guid()),
+                "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
+                "party_bill_wise":false, "company_state":"Rajasthan"
+            }},
+        "entries":[
+            {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
+            {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
+            {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
+            {"ledger":"BRIDGE CGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE SGST 2.5%","amount":"25.02","side":"Cr"},
+            {"ledger":"BRIDGE Round Off","amount":"0.16","side":"Cr"}
+        ]
+    }))
+    .unwrap()
 }
 
-/// The two invoices the rehearsal posted (7 Oct 2026, the synthetic lab
-/// company), each written from its build plan, against Tally's answer to the
-/// read-back request sent raw after the post (not the binary's own read of
-/// it): no difference. The invoice keyed by hand to the registered customer
-/// differs from what a build would write only by the reference and its date,
-/// which a keyed invoice of that book does not carry.
+/// The invoice the pilot lab's book took (9 Oct 2026), written as the build
+/// saved it, against Tally's answer to the read-back request after the post:
+/// no difference. The same answer against the invoice under another number
+/// differs in the number and the reference the number gives.
 #[test]
-fn the_rehearsals_posted_invoices_read_back_as_planned_on_the_captured_answers() {
-    let registered = rehearsal_invoice(
-        ("TG/25-26/002", "2026-03-11"),
-        "TG Buyer Regular RJ",
-        true,
-        &[
-            ("Sales - Goods", "1234.50"),
-            ("Output CGST", "111.11"),
-            ("Output SGST", "111.11"),
-            ("Round Off", "0.28"),
-        ],
-        "1457.00",
-    );
+fn the_pilot_labs_posted_invoice_reads_back_as_planned_on_its_captured_answer() {
+    let answer = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml");
     assert_eq!(
-        rehearsal_differences(
-            &registered,
-            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml"),
-            "20260311",
-        ),
+        pilot_differences(&pilot_posted("BP/26-27/0010"), answer, "20260801"),
         Vec::<String>::new()
     );
-    let ten_thousand_at_18_percent: &[(&str, &str)] = &[
-        ("Sales - Goods", "10000.00"),
-        ("Output CGST", "900.00"),
-        ("Output SGST", "900.00"),
-    ];
-    let unregistered = rehearsal_invoice(
-        ("TG/25-26/003", "2026-03-11"),
-        "TG Buyer Unregistered RJ",
-        false,
-        ten_thousand_at_18_percent,
-        "11800.00",
-    );
     assert_eq!(
-        rehearsal_differences(
-            &unregistered,
-            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-unregistered.utf16le.xml"),
-            "20260311",
-        ),
-        Vec::<String>::new()
-    );
-    // Each read-back is that invoice's own: against the other invoice it
-    // differs in every field the two do not share.
-    assert_eq!(
-        rehearsal_differences(
-            &unregistered,
-            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-posted-registered.utf16le.xml"),
-            "20260311",
-        ),
-        vec![
-            "VOUCHERNUMBER",
-            "REFERENCE",
-            "PARTYLEDGERNAME",
-            "PARTYGSTIN",
-            "GSTREGISTRATIONTYPE",
-            "legs",
-            "bill_allocation"
-        ]
-    );
-    let keyed = rehearsal_invoice(
-        ("TG/25-26/001", "2026-03-10"),
-        "TG Buyer Regular RJ",
-        true,
-        ten_thousand_at_18_percent,
-        "11800.00",
-    );
-    assert_eq!(
-        rehearsal_differences(
-            &keyed,
-            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/sales-rehearsal/sales-rehearsal-readback-keyed-registered.utf16le.xml"),
-            "20260310",
-        ),
-        vec!["REFERENCE", "REFERENCEDATE"]
+        pilot_differences(&pilot_posted("BP/26-27/0040"), answer, "20260801"),
+        vec!["VOUCHERNUMBER", "REFERENCE"]
     );
 }
 
@@ -2073,10 +1986,10 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
 }
 
 /// "Not in use" with no known invoice to read beside it: an empty book, or
-/// the company's first invoice sent; once one was sent and none stands
-/// verified, refused.
+/// no invoice of the company standing as sent; while one stands sent and none
+/// stands verified, refused.
 #[test]
-fn without_a_control_only_an_empty_book_or_a_first_post_is_believed() {
+fn without_a_control_only_an_empty_book_or_no_standing_invoice_is_believed() {
     assert_eq!(
         absence_without_control(false, Some(0)).map_err(|r| r.code),
         Ok(NumberAbsence::EmptyBook)
@@ -2087,7 +2000,7 @@ fn without_a_control_only_an_empty_book_or_a_first_post_is_believed() {
     );
     assert_eq!(
         absence_without_control(false, Some(40)).map_err(|r| r.code),
-        Ok(NumberAbsence::FirstPost)
+        Ok(NumberAbsence::NoStandingInvoice)
     );
     assert_eq!(
         absence_without_control(true, Some(40)).map_err(|refusal| refusal.code),

@@ -5,18 +5,18 @@
 //! the company's GST registration. Nothing here guesses: a missing element, a repeated
 //! one, or a name two rows claim is an error, never a default.
 //!
-//! What each read was measured to return (TallyPrime 7.1 Silver, lab, 6 Oct
-//! 2026, a client sample book): the voucher-type collection with no field
-//! list returns every type in 0.1 s (26 types, about 12 KB each) with the
+//! What each read was observed to return (TallyPrime 7.1 Silver, 6 Oct 2026,
+//! one real book; its answers are held privately and are not
+//! in this repository): the voucher-type collection with no field
+//! list returns every type, with the
 //! type's reserved name as an attribute, its PARENT, its GUID, a top-level
 //! NUMBERINGMETHOD and, inside `VOUCHERNUMBERSERIES.LIST`, the series-level
 //! one that decides what an import's supplied number does. A `Ledger` row
-//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read once
-//! on a second synthetic lab company (TallyPrime 7.1 Silver, 9 Oct 2026; typed
-//! by hand, sent as UTF-8, before any voucher was keyed): the
-//! Default Tax Unit and one GST registration, each GUID the company's GUID
-//! with a suffix, the registration's dated rows under
-//! `GSTREGISTRATIONDETAILS.LIST`.
+//! returns `ISBILLWISEON` as Yes or No. The tax-unit collection was read on
+//! BRIDGE PILOT LAB (TallyPrime 7.1 Silver, 9 Oct 2026) with the code's own
+//! request, and once more with a hand-typed one: the Default Tax Unit and one
+//! GST registration, each GUID the company's GUID with a suffix, the
+//! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 use quick_xml::events::Event;
@@ -337,11 +337,12 @@ pub(super) fn resolve_voucher_type(
     // type reads Automatic (Manual Override) on top and Manual in its series;
     // the type keyed for the rehearsal reads None on top and Manual in its
     // series).
-    // Its "prevent duplicates" flag is required as a further guard, not
-    // relied on: §9.8 measured it only for a failed Journal Alter, and an
-    // import that creates a Sales voucher under a used number is not measured
-    // (implementation guide §3.4). For a company's first invoice the post's
-    // readback (`invoice_number_not_unique`) is what catches a duplicate.
+    // Its "prevent duplicates" flag is the guard the number read's control
+    // relies on when no invoice of the company stands as sent (its first, or
+    // every one after a person's release). The protocol reference (§9.8)
+    // measured that flag on Journal and Payment vouchers only (PARTIAL); on a
+    // Sales voucher it is not measured, which ADR 0004 lists as a blocker for
+    // switching Sales on.
     match target.series.as_slice() {
         [(_, method, Some(guard))] if method == "Manual" && guard == "Yes" => {}
         [(_, method, _)] if method == "Manual" => {
@@ -368,7 +369,7 @@ pub(super) fn guid_literal_safe(guid: &str) -> bool {
 /// type, each with the measured per-row class compute (`$$IsSales` of the row's
 /// voucher type, bridge#625). GST requires an invoice number to be unique within
 /// the year across every series, and a book can hold several Sales types, so the
-/// class is decided here, client-side, from that compute. Only measured
+/// class is decided here, in the program, from that compute. Only measured
 /// primitives reach Tally: a date formula on literal dates (SVFROMDATE and
 /// SVTODATE do not limit a collection), a voucher-number equality (the form the
 /// hand-keyed invoice read used) and the class compute.
@@ -560,11 +561,11 @@ pub(super) fn count_vouchers(xml: &str) -> Result<usize, &'static str> {
 }
 
 /// The company's own GST registrations: a `TaxUnit` collection with no field
-/// list. The shape was read once, on a synthetic lab company, from the same
-/// collection typed by hand and sent as UTF-8 (two units: the Default Tax Unit
-/// and one GST registration whose dated rows carry the state, the
-/// registration type and whether it is inactive). This request, sent in UTF-16,
-/// was answered on 9 Oct 2026 with the same two rows (the `pilot-lab` fixtures).
+/// list. The shape was read on a synthetic lab company, BRIDGE PILOT LAB, with
+/// this request's own bytes (two units: the Default Tax Unit and one GST
+/// registration whose dated rows carry the state, the registration type and
+/// whether it is inactive), and once from the same collection typed by hand
+/// and sent as UTF-8; the pilot-lab fixtures hold the first answer.
 pub(in crate::agent) fn render_company_registration_request(company: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Tax Units</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME=\"Bridge Invoice Tax Units\" ISMODIFY=\"No\"><TYPE>TaxUnit</TYPE><NATIVEMETHOD>*</NATIVEMETHOD></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",

@@ -25,7 +25,7 @@ fn options(label: &str) -> BuildOptions<'_> {
         bank_ledger: "Bank",
         suspense_ledger: "Suspense",
         account_label: label,
-        account_number: "00000000001234",
+        account_number: "0000001234",
         date_from: None,
         date_to: None,
         cash_answers: CashAnswers::none(),
@@ -192,7 +192,7 @@ fn the_transaction_id_follows_the_statements_account_not_the_operators_label() {
     assert_eq!(ids[0], ids[2]);
     // The statement's own account number does move it.
     let mut other = options("ACC xx1234");
-    other.account_number = "00000000005678";
+    other.account_number = "0000005678";
     let elsewhere = build(&[debit_to(party)], Bank::Sbi, &mapped, &other).unwrap();
     assert_ne!(ids[0], elsewhere.records[0].bridge_txn_id);
 }

@@ -695,7 +695,7 @@ fn bounded_party(
             continue;
         }
         // the test strips whitespace: HDFC narrations are read space-joined, so a cell wrap
-        // that lands inside a reference leaves a space in it (`HDF CH12345678901`), and a
+        // that lands inside a reference leaves a space in it (`HDF CH12345678`), and a
         // marker that is only recognisable when unbroken is not a marker. Names keep their
         // spaces; only the test strips.
         if is_boundary(&remove_space(part)) {

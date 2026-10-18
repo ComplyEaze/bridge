@@ -4,6 +4,15 @@
 //! earlier stage could not prove. The order is the reference's: bind the
 //! account before trusting the arithmetic, prove the arithmetic before mapping,
 //! and re-read what was built.
+//!
+//! Why that order: the running-balance proof validates the statement's own arithmetic and
+//! nothing else, so it is equally happy to certify the wrong account's statement. The
+//! account check is the one thing that ties the document in hand to the ledger it will be
+//! posted against, so it runs before the arithmetic is trusted and before any proposal
+//! exists. The balance replay runs before mapping because a misread amount or a dropped
+//! row must stop the run before it is turned into vouchers. The design rule throughout: a
+//! malformed input, an ambiguous mapping or an unproven extent stops the run, because
+//! every proposal is posted to a real book.
 
 use crate::bank::Bank;
 use crate::cash::CashAnswers;

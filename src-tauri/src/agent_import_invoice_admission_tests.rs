@@ -13,6 +13,10 @@
 //!   another number was keyed, and the voucher it finds reads the same
 //!   alteration id in both); the lab sent it as the number control's read,
 //!   whose request is the same bytes.
+//! - The rate listing: the compliance listing with each ledger's GST rate and
+//!   rounding, as the lab answered it on 10 Oct 2026 (`Q`; the one derived
+//!   answer of these tests, the same listing with its ledger rows removed, is
+//!   built by a counted edit).
 //! - The read-back: the invoice round's marks after the post (17 and 223) and
 //!   its read-back of the posted invoice, before and after the post.
 use super::*;
@@ -113,7 +117,8 @@ const PILOT: &str = "BRIDGE PILOT LAB";
 
 /// What one admission sends, in order: e company list, s status probe, m
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
-/// listing, g groups, T voucher types, N the number read, C the company's tax units;
+/// listing, g groups, Q the listing with each ledger's GST rate and rounding,
+/// T voucher types, N the number read, C the company's tax units;
 /// U is the number read for a number the book uses.
 ///
 /// The marks read; the ledger listing (its currency read inside two extents,
@@ -124,6 +129,7 @@ const ADMISSION_ORDER: &str = concat!(
     "see",
     "bsbsLsLsPsPsgsgsbsbs",
     "ese",
+    "eQsQse",
     "eTsTse",
     "eNsNse",
     "eCsCse"
@@ -136,6 +142,8 @@ const ADMISSION_ORDER: &str = concat!(
 const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985";
 const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
+/// The listing with each ledger's GST rate and rounding (`w7-ledgers-rates.xml`).
+const LAB_W7_SHA256: &str = "2e728e002305cbaa33c73bd36507ca8d6ab62c5dea5497b02204a07636385d88";
 
 /// The sha256 of each request sent where `order` has `letter`.
 fn sent_as<'a>(
@@ -165,6 +173,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
+        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
@@ -219,19 +228,49 @@ fn pilot_tax_units_edited(edits: &[(&str, &str, usize)]) -> String {
 }
 
 /// The pilot lab answering every read of `ADMISSION_ORDER` as captured, except
-/// the tax-unit read, which gets `units`.
-fn pilot_lab_with_units(units: String) -> Lab {
+/// the read `kind`, which gets `body`.
+fn pilot_lab_replacing(kind: char, body: String) -> Lab {
     server_over(
         ADMISSION_ORDER
             .chars()
-            .map(|letter| match letter {
-                'C' => answer(units.clone()),
-                letter => pilot_plan(letter),
+            .map(|letter| {
+                if letter == kind {
+                    answer(body.clone())
+                } else {
+                    pilot_plan(letter)
+                }
             })
             .collect(),
         &pilot_company_list(),
         &pilot_lab_guid(),
     )
+}
+
+/// The pilot lab answering as captured, except the tax-unit read, which gets
+/// `units`.
+fn pilot_lab_with_units(units: String) -> Lab {
+    pilot_lab_replacing('C', units)
+}
+
+/// The captured rate listing (`pilot-lab-ledger-rates.utf16le.xml`, decoded).
+fn pilot_rate_listing() -> String {
+    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates.utf16le.xml"))
+}
+
+/// DERIVED, not Tally's bytes: the captured rate listing with every ledger row
+/// removed (the rows are counted, and there must be some), which is a complete
+/// answer that lists no ledger.
+fn pilot_rate_listing_without_ledgers() -> String {
+    let mut listing = pilot_rate_listing();
+    let mut removed = 0;
+    while let Some(start) = listing.find("<LEDGER NAME=\"") {
+        let end = start + listing[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        listing.replace_range(start..end, "");
+        removed += 1;
+    }
+    assert!(removed > 0, "the capture lists no ledger");
+    assert!(!listing.contains("<LEDGER "), "a ledger row is left");
+    listing
 }
 
 /// The invoice the pilot lab's book took (`BP/26-27/0010`), to `party` under
@@ -329,7 +368,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
     let walk_in = "BRIDGE Walk-in";
     let goods = "BRIDGE Goods 18%";
     for (party, filed, outcome, requests) in [
-        (walk_in, "BRIDGE Sales", Ok(()), 64),
+        (walk_in, "BRIDGE Sales", Ok(()), 70),
         (
             goods,
             "BRIDGE Sales",
@@ -337,7 +376,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
                 ("invoice_sales_must_be_credit", goods),
                 ("invoice_party_missing", ""),
             ]),
-            64,
+            70,
         ),
         // A type whose series is not Manual, and a type the book does not
         // have, stop before the number is read.
@@ -345,13 +384,13 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             walk_in,
             "Sales",
             Err(vec![("invoice_voucher_type_numbering_not_manual", "Sales")]),
-            52,
+            58,
         ),
         (
             walk_in,
             "Sales Acc",
             Err(vec![("invoice_voucher_type_not_found", "Sales Acc")]),
-            52,
+            58,
         ),
     ] {
         let (seen, voucher, received) = admit(party, filed).await;
@@ -379,6 +418,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
                 sent_as(ADMISSION_ORDER, &received, 'C'),
                 [LAB_R16_SHA256; 2]
             );
+            assert_eq!(sent_as(ADMISSION_ORDER, &received, 'Q'), [LAB_W7_SHA256; 2]);
         } else {
             assert!(observed.is_none(), "{party} under {filed}");
         }
@@ -388,7 +428,7 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
 /// The company's registration is the admission's last read: a registration
 /// the build cannot issue under is a refusal under its own code, and an answer
 /// with no tax unit at all is a failed read, never "no registration". Both
-/// come after every other read (64 requests) and record no observation. The
+/// come after every other read (70 requests) and record no observation. The
 /// answers are the pilot lab's capture with one stated edit each.
 #[tokio::test]
 async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_unread_one_fails() {
@@ -418,9 +458,31 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
         )
         .await;
         assert_eq!(seen, Err(vec![(outcome.0, outcome.1.to_string())]));
-        assert_eq!(requests.len(), 64);
+        assert_eq!(requests.len(), 70);
         assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
     }
+}
+
+/// A rate listing with no ledger row is a failed read under its own code, never
+/// "this ledger has no rate": the company's ledgers were listed just before it.
+/// The admission stops at that read (52 requests) and records no observation.
+/// The answer is the lab's rate listing with its ledger rows removed.
+#[tokio::test]
+async fn an_empty_rate_listing_fails_the_admission_at_that_read() {
+    let (seen, voucher, requests) = admit_on(
+        pilot_lab_replacing('Q', pilot_rate_listing_without_ledgers()),
+        pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales"),
+    )
+    .await;
+    assert_eq!(
+        seen,
+        Err(vec![(
+            "FAILED",
+            "invoice_ledger_rates_listing_empty".to_string()
+        )])
+    );
+    assert_eq!(requests.len(), 52);
+    assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 
 /// The registration's state is the supplier's state that classification
@@ -442,7 +504,7 @@ async fn the_registrations_state_is_the_supplier_state_the_place_of_supply_is_ch
     assert!(refusals
         .iter()
         .any(|(code, _)| *code == "invoice_place_of_supply_not_company_state"));
-    assert_eq!(requests.len(), 64);
+    assert_eq!(requests.len(), 70);
 }
 
 /// The same registration read as Composition at the re-read a post makes
@@ -469,13 +531,13 @@ async fn a_re_read_that_finds_the_registration_composition_is_refused_as_not_reg
         result.err().map(|failure| failure.code),
         Some("invoice_company_registration_not_regular".to_string())
     );
-    assert_eq!(sent(lab.simulator), 64);
+    assert_eq!(sent(lab.simulator), 70);
 }
 
 /// A number the book already uses, on Tally's own answer: the number read for
 /// `BP/26-27/0001` finds the book's first invoice (`BRIDGE Sales`, Sales
 /// class), and the invoice is refused after that read, before the company's
-/// tax units are read (58 requests). Both sends of the read are the request the
+/// tax units are read (64 requests). Both sends of the read are the request the
 /// lab sent, byte for byte (`r10-number-control-k0.xml`).
 #[tokio::test]
 async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
@@ -490,18 +552,18 @@ async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
             "BP/26-27/0001".to_string()
         )])
     );
-    assert_eq!(requests.len(), 58);
+    assert_eq!(requests.len(), 64);
     assert_eq!(sent_as(&order, &requests, 'U'), [LAB_R10_SHA256; 2]);
     assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
 }
 
 /// The re-read a post makes before its approval window, and again after it,
-/// is a whole admission (64 requests when it reaches the company's tax units).
+/// is a whole admission (70 requests when it reaches the company's tax units).
 /// The invoice the build admitted, saved with what it observed, passes; saved
 /// with an observation the re-read does not make (another type's GUID), it is
 /// "a master changed"; and what refuses it comes back under its own code (a
-/// type whose series is not Manual, 52 requests; a number the book uses by
-/// the re-read, 58 requests), never as "a master changed".
+/// type whose series is not Manual, 58 requests; a number the book uses by
+/// the re-read, 64 requests), never as "a master changed".
 #[tokio::test]
 async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
     let mut other_type = pilot_observed();
@@ -514,7 +576,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             pilot_observed(),
             None,
-            64,
+            70,
         ),
         (
             "BRIDGE Sales",
@@ -522,7 +584,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             other_type,
             Some("import_invoice_masters_changed"),
-            64,
+            70,
         ),
         (
             "Sales",
@@ -530,7 +592,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             ADMISSION_ORDER,
             pilot_observed(),
             Some("invoice_voucher_type_numbering_not_manual"),
-            52,
+            58,
         ),
         (
             "BRIDGE Sales",
@@ -538,7 +600,7 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
             in_use.as_str(),
             pilot_observed(),
             Some("invoice_number_already_used"),
-            58,
+            64,
         ),
     ] {
         let lab = pilot_lab_over(order);

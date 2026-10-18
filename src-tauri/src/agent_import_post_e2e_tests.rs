@@ -6434,18 +6434,20 @@ async fn a_master_saved_after_the_numbering_read_is_refused_before_the_post() {
 // build and then the post asked in, as observed against a replay of those
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
-// L compliance listing, P paired listing, g groups, T voucher types, N number
+// L compliance listing, Q the same listing with each ledger's GST rate and
+// rounding (10 Oct 2026), P paired listing, g groups, T voucher types, N number
 // read, k ledger catalogue, w/W the 1-Aug window before/after, C tax units, X
 // the voucher types bounded by the master mark and Y their series-level
 // numbering (both read at the build and again before the approval, 16 Oct 2026),
 // R invoice read-back, Z Tally's answer to the import.
 const PILOT_ORDER: &str = concat!(
-    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeTsTse",
-    "eNsNseeCsCseemsmseseeXsXsYsYseseekskseewswseseseesesemsmseewswse",
-    "ewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese",
-    "eTsTseeNsNseeCsCseecscseseemsmseseeXsXsYsYseseekskseemsmseebsbsc",
-    "scsbsbseseebsbsLsLsPsPsgsgsbsbseseeTsTseeNsNseeCsCseseemekskseec",
-    "scseseeewswseewswsemZMseeseseMsMseeWsWseeWsWseeMsMseeMsMseeRsRse",
+    "seesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQse",
+    "eTsTseeNsNseeCsCseemsmseseeXsXsYsYseseekskseewswseseseesesemsmse",
+    "ewswseewswseseesesekskseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsb",
+    "sbseseeQsQseeTsTseeNsNseeCsCseecscseseemsmseseeXsXsYsYseseekskse",
+    "emsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseeQsQseeTsTseeNsNse",
+    "eCsCseseemekskseecscseseeewswseewswsemZMseeseseMsMseeWsWseeWsWse",
+    "eMsMseeMsMseeRsRse",
 );
 
 const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";

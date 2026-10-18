@@ -1,7 +1,7 @@
 //! The fail-closed order of operations, in one place.
 //!
 //! Every stage refuses the whole run; nothing downstream sees a statement an
-//! earlier stage could not prove. The order is the reference's: bind the
+//! earlier stage could not prove. The order is the one the removed Python tool used: bind the
 //! account before trusting the arithmetic, prove the arithmetic before mapping,
 //! and re-read what was built.
 //!

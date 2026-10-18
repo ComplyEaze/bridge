@@ -1,6 +1,6 @@
-//! Shared fixtures for the port of `scripts/bank_statement_import.test.py`.
+//! Shared fixtures for the crate's tests.
 //!
-//! Three levels of fixture, as in the reference suite: sanitised real
+//! Three levels of fixture: sanitised real
 //! `pdftotext -bbox-layout` captures (the only geometry this repository did not
 //! write), constructed pages at the same geometry (for negative cases a capture
 //! cannot be made to contain), and row maps for the pure functions downstream.
@@ -100,9 +100,10 @@ pub fn capture(name: &str) -> Vec<Page> {
     }))
 }
 
-/// The reference suite's `digest`: sha256 over newline-joined values, first 16
-/// hex digits. The pinned values below were computed by the Python suite, so
-/// matching them is parity with the reference, not agreement with ourselves.
+/// `digest`: sha256 over newline-joined values, first 16 hex digits. The pinned
+/// values below were computed once by the Python tool that has been removed
+/// (#1748) and are constants now, so matching them is agreement with those
+/// recorded values, not with this code's own output.
 pub fn digest<I: IntoIterator<Item = String>>(values: I) -> String {
     let joined = values.into_iter().collect::<Vec<_>>().join("\n");
     Sha256::digest(joined.as_bytes())

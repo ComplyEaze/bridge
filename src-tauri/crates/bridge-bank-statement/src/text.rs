@@ -1,6 +1,6 @@
 //! String folds, ported with Python's semantics rather than Rust's defaults.
 //!
-//! The Python reference (`scripts/bank_statement_import.py`) uses `str.strip`,
+//! The rules were first written against Python's `str.strip`,
 //! `str.isspace`, `str.upper` and `re.sub(r"\s+", ...)`. Rust's
 //! `char::is_whitespace` is the Unicode `White_Space` property, which omits
 //! the four information separators U+001C..U+001F that Python's `isspace`

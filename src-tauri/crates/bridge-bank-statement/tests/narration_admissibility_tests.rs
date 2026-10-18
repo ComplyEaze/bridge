@@ -1,6 +1,6 @@
 //! What the narration and the ledger names of a proposal may carry, and which refusal says so.
 //!
-//! The Python statement tool (removed in a later change) held these as `build`
+//! The Python statement tool (since removed, #1748) held these as `build`
 //! assertions; the app refuses a bad narration only at `build_import_xml`, after a person has
 //! mapped and answered, so the crate's own per-row refusals are the early warning and need their
 //! own guards: control characters, the reserved marker, the exact length boundary, the order

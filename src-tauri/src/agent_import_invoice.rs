@@ -21,13 +21,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
+#[path = "agent_import_invoice_scope.rs"]
+mod scope;
 #[path = "agent_import_invoice_wire.rs"]
 mod wire;
 
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request, render_voucher_types_request,
+    render_invoice_readback_request, render_ledger_rates_request_for_parents,
+    render_voucher_types_request,
 };
 
 /// What an invoice voucher carries besides its entries.
@@ -347,8 +350,9 @@ fn mark_admits(mark: u64) -> bool {
 /// What a book above that mark may hold, by the company's own ledger count,
 /// and still be built on: the whole compliance listing is a few kilobytes a
 /// ledger, so this keeps one read of it to a few megabytes. The listing's own
-/// size gate stays in front of it; a follow-up scopes the read to the named
-/// ledgers' parent groups so large books can be admitted.
+/// size gate stays in front of it. The rate read is already narrowed to the named
+/// ledgers' parent groups (#1331); narrowing this listing the same way, so that
+/// large books can be admitted, waits for its own measurement.
 const INVOICE_MAX_LEDGERS: u64 = 2_000;
 
 /// Why a book over the mark is refused on the company's own ledger count, or
@@ -1117,13 +1121,17 @@ pub(super) fn queued_invoice_for<'a>(
 /// Whether the plan the queue sent is the one this invoice calls for. Every
 /// part of it is a function of the invoice and the clock alone (the company,
 /// the date the listing is read as of, and each request, the ledger count's
-/// among them) apart from the number's control, which is the journal's. A plan
-/// that differs in the company or in any request is a wiring fault. A listing
-/// date that is not the queue's day is not a fault but a clock that moved
-/// since the plan (a post whose approval spans midnight), and a control that
-/// moved since the plan is a change: each is named by its own cause. The
-/// precheck is the invoice module's own function; the judge decides again
-/// whatever it answered.
+/// among them) apart from the number's control, which is the journal's, and the
+/// rates request, which is also a function of the catalogue: it names the
+/// parents of the ledgers the invoice names (#1331). A plan that differs in the
+/// company or in any other request is a wiring fault. A listing date that is
+/// not the queue's day is not a fault but a clock that moved since the plan (a
+/// post whose approval spans midnight), a control that moved since the plan is
+/// a change, and so is a rates request that differs when every request the
+/// invoice alone decides is equal (a named ledger regrouped, or its group
+/// renamed, since the plan's catalogue was read): each is named by its own
+/// cause. The precheck is the invoice module's own function; the judge decides
+/// again whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
     carried: &InvoiceReadPlan,
@@ -1141,7 +1149,6 @@ pub(super) fn fit_plan(
     } = wanted;
     if *company_name != carried.company_name
         || *ledger_count != carried.ledger_count
-        || *rates != carried.rates
         || *voucher_types != carried.voucher_types
         || *number != carried.number
         || *registration != carried.registration
@@ -1158,6 +1165,11 @@ pub(super) fn fit_plan(
             field: "number_control",
         });
     }
+    if *rates != carried.rates {
+        return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
+            field: "ledger_scope",
+        });
+    }
     Ok(())
 }
 
@@ -1166,8 +1178,9 @@ pub(super) fn fit_plan(
 ///
 /// Refused, each before any intent: a plan that is not the one this invoice
 /// calls for (a wiring fault); a plan made on another day than `today`, named
-/// by its date; a number control that moved since the plan; the judge's own refusal; and an observation that differs from the
-/// recorded one, naming the first field that does. The size limits and the
+/// by its date; a number control, or a ledger scope (a named ledger regrouped
+/// since the plan's catalogue was read), that moved since the plan; the judge's
+/// own refusal; and an observation that differs from the recorded one, naming the first field that does. The size limits and the
 /// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(
     voucher: &ImportVoucher,
@@ -1792,6 +1805,24 @@ impl InvoiceJudge<'_> {
         Ok(self.voucher.date.as_str().to_string())
     }
 
+    /// The ledgers the invoice names, in entry order.
+    fn named(&self) -> Vec<&str> {
+        self.voucher
+            .entries
+            .iter()
+            .map(|entry| entry.ledger.as_str())
+            .collect()
+    }
+
+    /// The rate read asks only for the ledgers under the parents of the
+    /// ledgers this invoice names. The scope is planned from the catalogue the
+    /// caller has just read, so every refusal of it comes before any request
+    /// to Tally (#1331).
+    fn scope(&self) -> Result<scope::InvoiceLedgerScope, Verdict> {
+        scope::InvoiceLedgerScope::from_catalogue(self.catalogue.catalog(), &self.named())
+            .map_err(refusing)
+    }
+
     fn year(&self) -> Result<(String, String), Verdict> {
         financial_year_window(&self.as_of()?).ok_or_else(|| unusable("invoice_date_invalid"))
     }
@@ -1812,10 +1843,12 @@ impl InvoiceJudge<'_> {
                 admitted(super::super::invoice_company_registration_read(company))
             }
             Need::Rates => {
+                let scope = self.scope()?;
                 let window = self.year()?;
-                let request = super::super::invoice_ledger_rates_read(
+                let request = super::super::invoice_ledger_rates_scoped_read(
                     company,
                     (&window.0, self.as_of()?.as_str()),
+                    scope.part(),
                 )
                 .ok_or_else(|| unusable("invoice_date_invalid"))?;
                 admitted(request)
@@ -1887,6 +1920,7 @@ impl InvoiceJudge<'_> {
         let party_name = party_entry(voucher)
             .map(|entry| entry.ledger.clone())
             .ok_or_else(|| refusing(refuse("invoice_party_missing")))?;
+        let scope = self.scope()?;
 
         // 0. Refuse large books: the whole ledger compliance listing is read
         // three times for one invoice (build, before the dialog, after it).
@@ -1912,13 +1946,12 @@ impl InvoiceJudge<'_> {
         let Some(rates_body) = answers.rates.as_deref() else {
             return Err(Verdict::Need(Need::Rates));
         };
-        let wanted = voucher
-            .entries
-            .iter()
-            .map(|entry| entry.ledger.as_str())
-            .collect::<Vec<_>>();
-        let rates = wire::parse_ledger_rates(rates_body, self.company_guid, &wanted)
-            .map_err(|code| Verdict::Failed(code.to_string()))?;
+        let (rates, listed) =
+            wire::parse_ledger_rates_and_rows(rates_body, self.company_guid, &self.named())
+                .map_err(|code| Verdict::Failed(code.to_string()))?;
+        // A scoped read is believed only when its rows are exactly the
+        // catalogue's ledgers under those parents.
+        scope.prove(&listed).map_err(refusing)?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {
             let matching = listing

@@ -227,9 +227,9 @@ the voucher, for a saved batch a summary:
 
 - **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts. **No**
   is the button already chosen, so pressing Enter does not post. **When you ask the assistant to post, stop typing in
-  Tally until you have answered this window.** It also takes the keyboard: in our tests of the published 0.6.0 (Windows 10,
-  TallyPrime 7.1 full screen, one screen, each tried once; #1780) a Down arrow moved its buttons, a typed **n** declined it
-  and a typed **y** approved it. Answer it with the mouse. The Mac window has not been measured for this.
+  Tally until you have answered this window.** It also takes the keyboard: in our tests (Windows 10,
+  TallyPrime 7.1 full screen, one screen, each tried once; #1780) a Down arrow moved its buttons on the 0.6.0 release
+  candidate, and on the published 0.6.0 a typed **n** declined it and a typed **y** approved it. Answer it with the mouse. The Mac window has not been measured for this.
 - **Mac:** the window says "approve one voucher" with **Post voucher** and **Cancel**. Only **Post voucher** posts; pressing Return may leave the window open.
 
 There is no tool to undo or delete a posted voucher. A wrong entry must be corrected by hand in Tally.

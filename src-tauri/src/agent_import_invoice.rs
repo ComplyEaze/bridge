@@ -1361,12 +1361,14 @@ fn gst_status_differences(fields: &BTreeMap<String, String>) -> Vec<GstStatusDif
         Ok(GstStatus::Uncertain) => Some(GstStatusDifference::Uncertain),
         Ok(GstStatus::Excluded) => Some(GstStatusDifference::Excluded),
         Ok(GstStatus::NotInReturn) => Some(GstStatusDifference::NotInReturn),
-        // `status_of_flags` reads the three status flags only and never states these two
-        // (the status tool decides them from `ISCANCELLED` and `ISOPTIONAL` first). A
-        // cancelled or optional invoice is refused earlier, by the field comparison, which
-        // wants both flags `No`; this arm only makes the match exhaustive, and were it ever
-        // reached it is no pass.
-        Ok(GstStatus::Cancelled | GstStatus::Optional) => Some(GstStatusDifference::Unreadable),
+        // `status_of_flags` reads the three status flags only and never states these three
+        // (the status tool decides them from `ISCANCELLED`, `ISOPTIONAL` and `ISPOSTDATED`
+        // first). A cancelled or optional invoice is refused earlier, by the field
+        // comparison, which wants both flags `No`; this arm only makes the match
+        // exhaustive, and were it ever reached it is no pass.
+        Ok(GstStatus::Cancelled | GstStatus::Optional | GstStatus::PostDated) => {
+            Some(GstStatusDifference::Unreadable)
+        }
         Err(code) => Some(GstStatusDifference::unread(code)),
     };
     let overridden = match overridden_of(flag("ISGSTOVERRIDDEN")) {

@@ -1245,15 +1245,7 @@ fn pilot_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<
     )
     .unwrap();
     match wire::parse_invoice_readback(&xml).unwrap() {
-        wire::Readback::One(read) => {
-            let mut found = invoice_readback_differences(expected, &read, date);
-            assert_eq!(
-                found.pop().as_deref(),
-                Some("gst_status_not_reported"),
-                "{found:?}"
-            );
-            found
-        }
+        wire::Readback::One(read) => invoice_readback_differences(expected, &read, date),
         other => panic!("one voucher expected, got {other:?}"),
     }
 }
@@ -1268,7 +1260,8 @@ fn pilot_posted(number: &str) -> ImportVoucher {
             "observed":{
                 "voucher_type_guid":format!("{}-000000ce", pilot_lab_guid()),
                 "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-                "party_bill_wise":false, "company_state":"Rajasthan"
+                "party_bill_wise":false, "company_state":"Rajasthan",
+                "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
             }},
         "entries":[
             {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
@@ -1283,19 +1276,25 @@ fn pilot_posted(number: &str) -> ImportVoucher {
 }
 
 /// The invoice the pilot lab's book took (9 Oct 2026), written as the build
-/// saved it, against Tally's answer to the read-back request after the post:
-/// no difference. The same answer against the invoice under another number
-/// differs in the number and the reference the number gives.
+/// saved it, against Tally's answer to the read-back request the code sends
+/// now (the GSTR-1 status fields and each line's HSN/SAC, answered on 10 Oct
+/// 2026): no difference. The same answer against the invoice under another
+/// number differs in the number and the reference the number gives. The 9 Oct
+/// answer, whose request asked for no status field, reads as the build wrote it
+/// in everything else, and says so once: the GSTR-1 status not reported.
 #[test]
 fn the_pilot_labs_posted_invoice_reads_back_as_planned_on_its_captured_answer() {
-    let answer = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml");
     assert_eq!(
-        pilot_differences(&pilot_posted("BP/26-27/0010"), answer, "20260801"),
+        pilot_differences(&pilot_posted("BP/26-27/0010"), STATUS_INCLUDED, "20260801"),
         Vec::<String>::new()
     );
     assert_eq!(
-        pilot_differences(&pilot_posted("BP/26-27/0040"), answer, "20260801"),
+        pilot_differences(&pilot_posted("BP/26-27/0040"), STATUS_INCLUDED, "20260801"),
         vec!["VOUCHERNUMBER", "REFERENCE"]
+    );
+    assert_eq!(
+        pilot_differences(&pilot_posted("BP/26-27/0010"), STATUS_NOT_ASKED, "20260801"),
+        vec!["gst_status_not_reported"]
     );
 }
 

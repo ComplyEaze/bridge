@@ -19,39 +19,19 @@ object says the same. `src-tauri/src/source_draft/catalog_tests.rs` asserts that
 serves it as a mocked backend response. No capture byte count or SHA-256 is declared for it; its
 integrity digest, at the end, pins the committed bytes only.
 
-## Re-deriving them
+## How they were made
 
-`../sanitise-bbox-capture.py` is the whole procedure and the fixtures reproduce from it byte for byte:
-
-```bash
-pdftotext -bbox-layout -opw "$PASSWORD" statement.pdf raw.xml
-python3 scripts/sanitise-bbox-capture.py raw.xml \
-  scripts/fixtures/hdfc-bbox-capture.xml hdfc \
-  0:0-800 2:200-330,700-800 3:200-300
-```
-
-```bash
-python3 scripts/sanitise-bbox-capture.py raw.xml \
-  scripts/fixtures/sbi-bbox-capture.xml sbi \
-  0:90-741 1:0-165
-```
-
-The page ranges are chosen to keep each parser rule load-bearing: a full first page with its account
-header, a continuation page that repeats the column header while a row is in progress, the page that
-carries the end-of-statement marker, and — for HDFC — one page *after* that marker, so the marker
-cannot be removed without a test noticing.
-
-The bank argument is a closed parser selection (`hdfc` or `sbi`). The sanitiser parses every selected
-source region and the complete generated regions, using the same retained geometry before writing the destination. It refuses empty,
-incomplete accounting rows, misaligned or party-class-changing evidence; captured geometry remains fixture evidence and does not
-qualify raw customer data.
+They were made once from two real statements by a sanitiser script, which has been removed with the
+Python bank-statement tool (#1748): a capture is not re-derived, and not remade. The sanitiser
+kept every coordinate, word break, line break and entity encoding of the PDF producer's output, and
+replaced every customer value with a fabricated one; the banner comment of each file says what is
+real and what is not. What now pins them are the byte counts and SHA-256 digests below.
 
 ## Byte integrity
 
 `scripts/fixtures/**` is `-text` in `.gitattributes` and the directory is registered in
 `scripts/fixture-roots.mjs`. Line-ending normalisation would rewrite the geometry these fixtures
-exist to preserve. That is also why the sanitiser itself lives in `scripts/`, not here: this
-directory holds evidence, and a tool whose bytes are pinned as evidence is a category error.
+exist to preserve.
 A capture for a new bank is not added (see the next section).
 
 ## No new real captures

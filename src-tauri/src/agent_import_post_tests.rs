@@ -1385,6 +1385,8 @@ fn a_journal_recording_a_cash_in_hand_ledger_is_refused_by_the_queue() {
             &single_currency,
             &ledger_binding,
             InvoiceIdentity::ByNumber,
+            None,
+            None,
         )
     };
     let error = recheck(&catalogue).expect_err("a recorded cash ledger without a bank voucher");
@@ -1466,6 +1468,8 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             &single_currency,
             &ledger_binding,
             InvoiceIdentity::ByNumber,
+            None,
+            None,
         )
     };
     // Control: the captured catalogue holds no twin of any named ledger.
@@ -1565,6 +1569,8 @@ fn a_named_ledger_switched_to_bill_wise_since_the_build_is_refused_by_the_queue(
             &single_currency,
             &ledger_binding,
             InvoiceIdentity::ByNumber,
+            None,
+            None,
         )
     };
     // Control: nothing bill-wise at the build and nothing now.
@@ -1653,6 +1659,8 @@ fn a_record_without_cash_in_hand_ledgers_is_refused_by_the_queue() {
         "",
         &ledger_binding,
         InvoiceIdentity::ByNumber,
+        None,
+        None,
     )
     .expect_err("a record without the field must be refused");
     assert_eq!(
@@ -1711,6 +1719,8 @@ fn a_record_without_bill_wise_approvals_is_refused_by_the_queue() {
         "",
         &ledger_binding,
         InvoiceIdentity::ByNumber,
+        None,
+        None,
     )
     .expect_err("a record without the field must be refused");
     assert_eq!(
@@ -1799,6 +1809,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         &single_currency,
         &ledger_binding,
         InvoiceIdentity::ByNumber,
+        None,
+        None,
     )
     .expect_err("captured attributed Journal must block the queued native attempt");
     assert!(matches!(
@@ -1824,6 +1836,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         &single_currency,
         &ledger_binding,
         InvoiceIdentity::ByNumber,
+        None,
+        None,
     )
     .expect("paired captured source establishes absence of the new candidate");
 
@@ -1849,6 +1863,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
         &single_currency,
         &ledger_binding,
         InvoiceIdentity::ByNumber,
+        None,
+        None,
     )
     .expect_err("a folded twin added since approval must refuse the queued post");
     assert!(matches!(
@@ -1884,6 +1900,8 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             &single_currency,
             &ledger_binding,
             InvoiceIdentity::ByNumber,
+            None,
+            None,
         )
     };
     recheck(&payment, Some(&groups)).expect("the captured masters classify this Payment");
@@ -4072,6 +4090,8 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
             &single_currency,
             &binding,
             InvoiceIdentity::ByNumber,
+            None,
+            None,
         )
     };
     let changed = |result: anyhow::Result<()>| {
@@ -4082,9 +4102,17 @@ fn the_queued_bill_wise_recheck_exempts_an_invoices_new_ref_party_and_nobody_els
             Some(ApprovedImportAdmissionError::BillWiseChanged)
         )
     };
-    // The customer is bill-wise, as built: admitted with no On Account approval.
-    recheck(&["Bridge Nested Debtor WR4"], &line)
-        .expect("a New Ref party needs no On Account approval");
+    // The customer is bill-wise, as built: the bill-wise recheck admits it with
+    // no On Account approval. The recheck then stops at the one thing this call
+    // leaves out, the reads of the invoice's masters (#1337), which a batch
+    // holding an invoice must carry; no bill-wise refusal came first.
+    assert_eq!(
+        recheck(&["Bridge Nested Debtor WR4"], &line)
+            .expect_err("an invoice with no masters read in the queue")
+            .downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(&ApprovedImportAdmissionError::AdmissionInconsistent),
+        "a New Ref party needs no On Account approval"
+    );
     // The customer is no longer bill-wise: the New Ref would be dropped unseen.
     assert!(changed(recheck(&[], &line)));
     // Another leg has become bill-wise: still judged, still refused.
@@ -5416,6 +5444,8 @@ fn the_queue_recognises_an_invoice_by_its_number_and_by_its_figures_beside_an_un
             &single_currency,
             &ledger_binding,
             identity,
+            None,
+            None,
         )
         .err()
         .is_some_and(|error| {

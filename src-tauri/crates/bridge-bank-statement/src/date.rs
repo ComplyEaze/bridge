@@ -35,7 +35,7 @@ impl Date {
         format!("{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 
-    /// `DD-Mon-YYYY`, as the reference writes into a narration.
+    /// `DD-Mon-YYYY`, as the removed Python tool wrote it into a narration.
     pub fn narration(self) -> String {
         format!(
             "{:02}-{}-{:04}",
@@ -144,8 +144,7 @@ pub fn parse_day_month_name_year(text: &str) -> Option<Date> {
     )
 }
 
-/// `DD-MM-YYYY`, Union Bank's form. It has no Python reference, so it is
-/// strict rather than strptime-shaped: two-digit day and month, four-digit
+/// `DD-MM-YYYY`, Union Bank's form. It is strict rather than strptime-shaped: two-digit day and month, four-digit
 /// year, nothing left over.
 pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
     static PATTERN: LazyLock<Regex> =
@@ -158,8 +157,7 @@ pub fn parse_day_month_year_hyphenated(text: &str) -> Option<Date> {
     )
 }
 
-/// `DD/MM/YYYY`, the form on the measured Bank of Baroda statements. It has no Python reference, so it is
-/// strict rather than strptime-shaped: two-digit day and month, four-digit
+/// `DD/MM/YYYY`, the form on the measured Bank of Baroda statements. It is strict rather than strptime-shaped: two-digit day and month, four-digit
 /// year, nothing left over.
 pub fn parse_day_month_year_slashed(text: &str) -> Option<Date> {
     static PATTERN: LazyLock<Regex> =

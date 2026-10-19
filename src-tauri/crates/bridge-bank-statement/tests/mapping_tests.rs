@@ -1,5 +1,4 @@
-//! Mapping keys and the mapping loader, ported from
-//! `scripts/bank_statement_import.test.py`.
+//! Mapping keys and the rules a mapping must follow.
 
 mod common;
 
@@ -7,8 +6,25 @@ use bridge_bank_statement::mapping::{Mapping, MappingRow, Treatment};
 use bridge_bank_statement::text::{ledger_key, mapping_key};
 use common::*;
 
+/// The tests write a mapping as a header line and one line per row (party, ledger,
+/// treatment), with no quoting. The header line is skipped; `Mapping` is built from
+/// rows only, as the app builds it.
 fn load(text: &str) -> Result<Mapping, bridge_bank_statement::Refusal> {
-    Mapping::from_csv(text.as_bytes())
+    let rows = text
+        .lines()
+        .skip(1)
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(index, line)| {
+            let fields: Vec<&str> = line.split(',').collect();
+            MappingRow {
+                origin: format!("mapping record {}", index + 2),
+                party: fields[0].to_string(),
+                ledger: fields[1].to_string(),
+                treatment: fields.get(2).map(|field| field.to_string()),
+            }
+        });
+    Mapping::from_rows(rows)
 }
 
 #[test]
@@ -64,10 +80,6 @@ fn mapping_key_ignores_wrap_spacing() {
 #[test]
 fn mapping_refuses_ambiguous_input() {
     refuses(
-        load("name,ledger,treatment\nA,L,auto\n"),
-        "mapping_headers_missing",
-    );
-    refuses(
         load("party,ledger,treatment\nZEPHYR MANUFACTURING,Ledger One,auto\nZEPHYRMANUFACTURING,Ledger Two,auto\n"),
         "mapping_key_collision",
     );
@@ -112,15 +124,6 @@ fn mapping_refuses_ambiguous_input() {
             .unwrap()
             .get("---"),
         Some(&("L".to_string(), Treatment::Auto))
-    );
-    refuses(
-        load("party,Party,ledger,treatment\nA,,L,auto\n"),
-        "mapping_headers_duplicated",
-    );
-    let padded = load(" Party , Ledger , Treatment \nAcme,Acme Ledger,auto\n").unwrap();
-    assert_eq!(
-        padded.get("ACME"),
-        Some(&("Acme Ledger".to_string(), Treatment::Auto))
     );
     // a blank treatment defaults to auto; a whitespace-only one does not
     assert_eq!(

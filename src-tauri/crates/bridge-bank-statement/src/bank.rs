@@ -1,18 +1,18 @@
 //! Column geometry and row rules for the supported statement layouts.
 //!
-//! `Sbi` and `Hdfc` are a direct port of the `SBI` and `HDFC` classes in
-//! `scripts/bank_statement_import.py`. The reasoning behind each rule — why a
+//! `Sbi` and `Hdfc` were first written as a port of a Python tool that has been
+//! removed; the Rust items are now the only statement of their rules. The reasoning behind each rule — why a
 //! boundary is the shape it is, and which real statement it was measured
 //! against — is written on the item that implements it where it was recorded. An
 //! item with no such comment (the reference extractors, the SBI party patterns, the
 //! `TPT` pattern of the HDFC party) is specified by its tests, which hold each shape;
 //! read both before changing one.
 //!
-//! `Ubi` (Union Bank of India) has no Python reference. Its rules come from the
+//! `Ubi` (Union Bank of India): its rules come from the
 //! text layer of one real statement, described by shape only (68 single-line
 //! rows): see [`Layout::SingleLine`] and `ubi_party`.
 //!
-//! `Bob` (Bank of Baroda) has no Python reference either. Its rules come from two
+//! `Bob` (Bank of Baroda): its rules come from two
 //! real statements read through PDFium (held privately), described by shape and
 //! geometry only: see
 //! [`Bank::bob_rows`] for what is peculiar to it (newest row first, a

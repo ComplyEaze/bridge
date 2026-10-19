@@ -197,12 +197,41 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
 /// bill-wise flag and the parents the rates read is restricted to come from
 /// here.
 fn pilot_catalogue() -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    pilot_catalogue_of(&pilot_catalogue_text())
+}
+
+fn pilot_catalogue_text() -> String {
+    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml"))
+}
+
+fn pilot_catalogue_of(text: &str) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     bridge_tally_protocol::parse_standard_ledger_catalog_v2_with_identities(
-        &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml")),
+        text,
         PILOT,
         &pilot_lab_guid(),
     )
     .unwrap()
+}
+
+/// DERIVED, not Tally's bytes: the lab's 10 Oct catalogue with the row of
+/// `ledger` put under the group `to`, which stands for the ledger regrouped (or
+/// its group renamed) in Tally. Its one `PARENT` element is replaced and the
+/// parent must have changed; nothing else differs.
+fn pilot_catalogue_with_parent(
+    ledger: &str,
+    to: &str,
+) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    let text = pilot_catalogue_text();
+    let row = format!("<LEDGER NAME=\"{ledger}\"");
+    assert_eq!(text.matches(&row).count(), 1, "{ledger}");
+    let start = text.find(&row).unwrap();
+    let end = start + text[start..].find("</LEDGER>").unwrap();
+    let open = start + text[start..end].find("<PARENT").unwrap();
+    let from = open + text[open..end].find('>').unwrap() + 1;
+    let to_end = from + text[from..end].find("</PARENT>").unwrap();
+    assert_ne!(&text[from..to_end], to);
+    let edited = format!("{}{to}{}", &text[..from], &text[to_end..]);
+    pilot_catalogue_of(&edited)
 }
 
 fn pilot_lab() -> Lab {
@@ -957,13 +986,20 @@ async fn an_invoice_naming_a_ledger_the_catalogue_lacks_is_refused_before_any_re
 // ---- #1337: what the endpoint queue is handed, and when it refuses ----
 
 fn plan_of(voucher: &ImportVoucher, control: &ledger::NumberControl) -> InvoiceReadPlan {
-    let catalogue = pilot_catalogue();
+    plan_of_in(voucher, control, &pilot_catalogue())
+}
+
+fn plan_of_in(
+    voucher: &ImportVoucher,
+    control: &ledger::NumberControl,
+    catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+) -> InvoiceReadPlan {
     let guid = pilot_lab_guid();
     InvoiceJudge {
         company_name: PILOT,
         company_guid: &guid,
         voucher,
-        catalogue: &catalogue,
+        catalogue,
         control,
     }
     .plan(today())
@@ -1050,6 +1086,53 @@ fn a_number_control_that_moved_since_the_plan_is_a_change_not_a_fault() {
             })
         );
     }
+}
+
+/// The rates request names the parents of the ledgers the invoice names (#1331),
+/// so it is a function of the catalogue too: a named ledger regrouped, or its
+/// group renamed, between the plan's catalogue and the queue's is a master that
+/// changed, named as such, not a wiring fault. Every other request of the two
+/// plans is equal. The catalogues differ by a counted edit (DERIVED).
+#[test]
+fn a_ledger_regrouped_since_the_plan_is_a_change_not_a_fault() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged;
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let control = ledger::NumberControl::NoneStanding;
+    let planned = plan_of(&voucher, &control);
+    for (ledger, to) in [
+        // Moved into a group the scope did not name.
+        ("BRIDGE Walk-in", "Cash-in-Hand"),
+        // Its group renamed (the only ledger of the party's group the invoice names).
+        ("BRIDGE Walk-in", "Sundry Debtors (old)"),
+        // A sales ledger moved to a group of its own.
+        ("BRIDGE Svc 998313 5%", "Services Sold"),
+    ] {
+        let later = plan_of_in(&voucher, &control, &pilot_catalogue_with_parent(ledger, to));
+        assert_ne!(planned.rates, later.rates, "{ledger} under {to}");
+        assert_eq!(planned.number, later.number);
+        assert_eq!(planned.voucher_types, later.voucher_types);
+        assert_eq!(planned.registration, later.registration);
+        assert_eq!(planned.ledger_count, later.ledger_count);
+        for (wanted, carried) in [(&later, &planned), (&planned, &later)] {
+            assert_eq!(
+                invoice::fit_plan(wanted, carried),
+                Err(InvoiceMastersChanged {
+                    field: "ledger_scope"
+                }),
+                "{ledger} under {to}"
+            );
+        }
+    }
+    // A regroup between parents the scope already names changes nothing the
+    // plan sends: the sales ledger moved from Sales Accounts to Indirect
+    // Expenses, both named by the other ledgers of the invoice.
+    let same_parents = plan_of_in(
+        &voucher,
+        &control,
+        &pilot_catalogue_with_parent("BRIDGE Svc 998313 5%", "Indirect Expenses"),
+    );
+    assert_eq!(planned.rates, same_parents.rates);
+    assert_eq!(invoice::fit_plan(&planned, &same_parents), Ok(()));
 }
 
 /// An invoice and its reads go to the queue together or not at all.

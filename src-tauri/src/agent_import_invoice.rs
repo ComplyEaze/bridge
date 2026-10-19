@@ -1121,13 +1121,17 @@ pub(super) fn queued_invoice_for<'a>(
 /// Whether the plan the queue sent is the one this invoice calls for. Every
 /// part of it is a function of the invoice and the clock alone (the company,
 /// the date the listing is read as of, and each request, the ledger count's
-/// among them) apart from the number's control, which is the journal's. A plan
-/// that differs in the company or in any request is a wiring fault. A listing
-/// date that is not the queue's day is not a fault but a clock that moved
-/// since the plan (a post whose approval spans midnight), and a control that
-/// moved since the plan is a change: each is named by its own cause. The
-/// precheck is the invoice module's own function; the judge decides again
-/// whatever it answered.
+/// among them) apart from the number's control, which is the journal's, and the
+/// rates request, which is also a function of the catalogue: it names the
+/// parents of the ledgers the invoice names (#1331). A plan that differs in the
+/// company or in any other request is a wiring fault. A listing date that is
+/// not the queue's day is not a fault but a clock that moved since the plan (a
+/// post whose approval spans midnight), a control that moved since the plan is
+/// a change, and so is a rates request that differs when every request the
+/// invoice alone decides is equal (a named ledger regrouped, or its group
+/// renamed, since the plan's catalogue was read): each is named by its own
+/// cause. The precheck is the invoice module's own function; the judge decides
+/// again whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
     carried: &InvoiceReadPlan,
@@ -1145,7 +1149,6 @@ pub(super) fn fit_plan(
     } = wanted;
     if *company_name != carried.company_name
         || *ledger_count != carried.ledger_count
-        || *rates != carried.rates
         || *voucher_types != carried.voucher_types
         || *number != carried.number
         || *registration != carried.registration
@@ -1162,6 +1165,11 @@ pub(super) fn fit_plan(
             field: "number_control",
         });
     }
+    if *rates != carried.rates {
+        return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
+            field: "ledger_scope",
+        });
+    }
     Ok(())
 }
 
@@ -1170,8 +1178,9 @@ pub(super) fn fit_plan(
 ///
 /// Refused, each before any intent: a plan that is not the one this invoice
 /// calls for (a wiring fault); a plan made on another day than `today`, named
-/// by its date; a number control that moved since the plan; the judge's own refusal; and an observation that differs from the
-/// recorded one, naming the first field that does. The size limits and the
+/// by its date; a number control, or a ledger scope (a named ledger regrouped
+/// since the plan's catalogue was read), that moved since the plan; the judge's
+/// own refusal; and an observation that differs from the recorded one, naming the first field that does. The size limits and the
 /// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(
     voucher: &ImportVoucher,

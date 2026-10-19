@@ -958,9 +958,10 @@ const HEAD_RATE_CHILDREN: &[&str] = &["GSTRATE", "GSTRATEDUTYHEAD", "GSTRATEVALU
 /// The rate listing by ledger name, for the ledgers an invoice names. Every
 /// row of the answer must carry the verified company's GUID (the
 /// `BRIDGECOMPANYGUID` compute) and a name; the rows of the named ledgers are
-/// read in full, and a name two of them claim refuses the answer. The rest of
-/// any other ledger's row is not read, so one unrelated ledger's fields
-/// cannot fail an invoice.
+/// read in full, and a name two of them claim refuses the answer. Of any other
+/// ledger's row only its name, GUID and parent are read (the scope proves the
+/// rows against the catalogue), so one unrelated ledger's rate fields cannot
+/// fail an invoice.
 #[cfg(test)]
 pub(super) fn parse_ledger_rates(
     xml: &str,

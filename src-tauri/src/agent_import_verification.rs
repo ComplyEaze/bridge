@@ -880,29 +880,38 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
 
 /// What a person does about an invoice that is in the book and did not read
 /// back as built.
-pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`). Open the invoice in Tally and check it against the source document before relying on it. Do not post it again.";
+pub(super) const INVOICE_DIVERGENT_NEXT_STEP: &str = "This invoice is in Tally, but it is not confirmed as built. `diffs` says why: a GST field, the reference, the entries (`legs`) or the bill allocation differs; or the invoice was not read back, because the read failed, the company is now over the size limit for that read, or this version does not read invoices of this type back; or another voucher of its type carries the same number; or the voucher found under that number is not the one this post created (`guid`, `alter_id`); or Tally's GSTR-1 does not list it as included (`gst_status_uncertain`, `gst_status_excluded`, `gst_status_not_in_return`; `gst_status_not_reported` or `gst_status_unreadable` when its status did not come back or does not read), or a person accepted it there as it stands (`gst_status_overridden`); or Tally did not fill in the HSN/SAC of a sales line (`invoice_line_hsn_unresolved`: `invoice_lines` shows, for every sales line, the code Tally used and the ledger or group it took it from). Open the invoice in Tally and check it against the source document before relying on it. For `invoice_line_hsn_unresolved`, that line's ledger, its group or the company has no HSN/SAC for the invoice date: set it in Tally, then open the invoice and save it again, because correcting the master alone did not change an invoice already saved. For a GSTR-1 status, open GSTR-1 for the invoice's month in Tally and read the reason there: none comes back with the status. Correcting a ledger or another master does not by itself change the status of an invoice already saved: on a test company an invoice stayed uncertain after its sales ledger's HSN/SAC was set, until the invoice itself was saved again. Accepting it as it stands in GSTR-1 leaves it not confirmed here until a person releases it in ComplyEaze Bridge's own dialog. These statuses were seen only on invoices to an unregistered buyer. Do not post it again.";
 
 /// An invoice the standard readback matched, whose own fields did not read back
 /// as built (party, GST header, reference, allocation, or the voucher could not
 /// be read), is divergent: "posted_verified" means every field was checked.
+/// What Tally used as each sales line's HSN/SAC is shown beside it either way
+/// (`invoice_lines`), when the invoice was read back.
 pub(super) fn mark_invoice_readback(
     result: &mut Value,
     bridge_txn_id: &str,
     differences: &[String],
+    lines: &[Value],
 ) {
-    if differences.is_empty() {
-        return;
-    }
     let mut moved = 0_u64;
     if let Some(vouchers) = result["vouchers"].as_array_mut() {
         for voucher in vouchers {
-            if voucher["bridge_txn_id"] == bridge_txn_id && voucher["status"] == "posted_verified" {
+            if voucher["bridge_txn_id"] != bridge_txn_id || voucher["status"] != "posted_verified" {
+                continue;
+            }
+            if !lines.is_empty() {
+                voucher["invoice_lines"] = json!(lines);
+            }
+            if !differences.is_empty() {
                 voucher["status"] = json!("posted_divergent");
                 voucher["diffs"] = json!([{ "invoice_fields": differences }]);
                 voucher["next_step"] = json!(INVOICE_DIVERGENT_NEXT_STEP);
                 moved += 1;
             }
         }
+    }
+    if differences.is_empty() {
+        return;
     }
     let counts = &mut result["counts"];
     counts["posted_verified"] = json!(counts["posted_verified"]
@@ -938,6 +947,7 @@ pub(super) fn invoice_readback_due<'a>(
             result,
             &voucher.bridge_txn_id,
             &["invoice_type_unqualified".to_string()],
+            &[],
         );
         return None;
     }
@@ -1014,13 +1024,16 @@ pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<b
 /// Every place a verification result names a ledger, as a path from the
 /// result (`*` for each element of an array). The one list that marking reads,
 /// and that its test holds against the names the verifier marks.
-pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 3] = [
+pub(super) const VERIFICATION_NAME_FIELDS: [&[&str]; 6] = [
     &[
         "vouchers", "*", "diffs", "*", "entries", "expected", "*", "ledger",
     ],
     &[
         "vouchers", "*", "diffs", "*", "entries", "observed", "*", "ledger",
     ],
+    &["vouchers", "*", "invoice_lines", "*", "ledger"],
+    &["vouchers", "*", "invoice_lines", "*", "hsn_ledger_source"],
+    &["vouchers", "*", "invoice_lines", "*", "hsn_group_source"],
     &["masters_after_post", "ledgers", "*"],
 ];
 

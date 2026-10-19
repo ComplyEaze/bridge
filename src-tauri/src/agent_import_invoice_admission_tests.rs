@@ -184,7 +184,7 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
         'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
-        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-after-post.utf16le.xml"),
+        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"),
         'A' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml"),
         'U' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"),
         other => panic!("unknown kind {other}"),
@@ -416,7 +416,8 @@ fn pilot_observed() -> serde_json::Value {
     json!({
         "voucher_type_guid": format!("{}-000000ce", pilot_lab_guid()),
         "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-        "party_bill_wise":false, "company_state":"Rajasthan"
+        "party_bill_wise":false, "company_state":"Rajasthan",
+        "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
     })
 }
 
@@ -703,7 +704,10 @@ async fn a_re_read_is_a_whole_admission_and_its_refusal_keeps_its_own_code() {
 /// the same read-back (a complete envelope with no voucher).
 const READBACK_ORDER: &str = "eMsMseeRsRse";
 const READBACK_BEFORE_ORDER: &str = "emsmseeAsAse";
-const LAB_R12_SHA256: &str = "dc03b35f075e638acf6ca0a1a8503311ee501c5ee6f739e31d4240c4d22bf5f7";
+/// The read-back of `BP/26-27/0010` with the GSTR-1 status fields and each
+/// line's HSN/SAC (`w8-readback-status-single.xml`, the request the code sends;
+/// the lab answered it on 10 Oct 2026).
+const LAB_R12_SHA256: &str = "352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1";
 
 /// The posted invoice the pilot lab's book took, as the build saved it.
 fn pilot_saved(number: &str, observed: bool) -> ImportVoucher {
@@ -729,13 +733,14 @@ async fn a_read_back_reads_the_marks_then_the_invoice_and_an_absent_invoice_is_a
     ] {
         let lab = pilot_lab_over(READBACK_BEFORE_ORDER);
         let saved = pilot_saved("BP/26-27/0010", observed);
-        let (differences, alter_id, guid, _) = lab
+        let (differences, alter_id, guid, lines, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &saved)
             .await
             .expect("a read-back after a post is never an error");
         assert_eq!(differences, [difference]);
         assert_eq!((alter_id, guid), (None, None));
+        assert!(lines.is_empty());
         let requests_sent = received(lab.simulator);
         assert_eq!(requests_sent.len(), requests, "{difference}");
         if observed {
@@ -762,7 +767,7 @@ async fn a_read_back_of_a_posted_invoice_finds_no_difference_on_its_captured_ans
         ("BP/26-27/0040", vec!["VOUCHERNUMBER", "REFERENCE"]),
     ] {
         let lab = pilot_lab_over(READBACK_ORDER);
-        let (differences, alter_id, guid, _) = lab
+        let (differences, alter_id, guid, _, _) = lab
             .server
             .read_back_sales_invoice(&lab.identity, &lab.company, &pilot_saved(number, true))
             .await

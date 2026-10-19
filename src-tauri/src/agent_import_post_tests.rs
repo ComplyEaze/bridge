@@ -2612,6 +2612,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                         party_registration_type: _,
                         party_bill_wise: _,
                         company_state: _,
+                        sales_ledgers: _,
                     }),
             }) = invoice
             {}
@@ -2683,7 +2684,7 @@ fn a_saved_batch_holds_exactly_these_records() {
         "voucher_type_name":"Sales", "place_of_supply":"Rajasthan", "round_off_ledger":"Round Off",
         "observed":{"voucher_type_guid":"g", "party_gstin":"08ZZZZZ0000Z1ZQ",
             "party_state":"Rajasthan", "party_registration_type":"Regular",
-            "party_bill_wise":true, "company_state":"Rajasthan"}
+            "party_bill_wise":true, "company_state":"Rajasthan", "sales_ledgers":["Sales"]}
     }))
     .unwrap();
     line.statement = Some(statement_record(&StatementFacts {
@@ -2779,6 +2780,7 @@ fn a_saved_batch_holds_exactly_these_records() {
             "vouchers[].invoice.observed.party_gstin",
             "vouchers[].invoice.observed.party_registration_type",
             "vouchers[].invoice.observed.party_state",
+            "vouchers[].invoice.observed.sales_ledgers",
             "vouchers[].invoice.observed.voucher_type_guid",
             "vouchers[].invoice.place_of_supply",
             "vouchers[].invoice.round_off_ledger",
